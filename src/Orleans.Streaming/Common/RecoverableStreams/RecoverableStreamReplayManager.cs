@@ -1084,6 +1084,10 @@ internal sealed class RecoverableStreamReplayManager<TQueueMessage>
                 if ((LiveCursor ?? HistoricalCursor) is IQueueCacheCursorProgress progress)
                 {
                     progress.RecordDeliverySuccess();
+                    if (progress.SafeSequenceToken is { } safeToken)
+                    {
+                        DeliveredThrough = safeToken;
+                    }
                 }
 
                 if (Fragment is { } fragment)

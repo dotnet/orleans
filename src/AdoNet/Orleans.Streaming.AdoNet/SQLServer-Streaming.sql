@@ -1025,6 +1025,7 @@ BEGIN
         BEGIN
 
             SELECT
+                @CurrentOwnerEpoch AS OwnerEpoch,
                 CAST(0 AS BIT) AS Ran,
                 0 AS DeletedCount,
                 CAST(NULL AS BIGINT) AS DeletedThroughMessageId,
@@ -1101,6 +1102,7 @@ BEGIN
             AND Message.QueueId = @QueueId;
 
         SELECT
+            @CurrentOwnerEpoch AS OwnerEpoch,
             CAST(1 AS BIT) AS Ran,
             COUNT(*) AS DeletedCount,
             MAX(MessageId) AS DeletedThroughMessageId,

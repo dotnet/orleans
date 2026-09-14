@@ -759,6 +759,7 @@ CREATE OR REPLACE FUNCTION CleanupStreamMessages
 )
 RETURNS TABLE
 (
+    OwnerEpoch BIGINT,
     Ran BOOLEAN,
     DeletedCount INT,
     DeletedThroughMessageId BIGINT,
@@ -826,6 +827,7 @@ BEGIN
 
         RETURN QUERY
         SELECT
+            _CurrentOwnerEpoch,
             FALSE,
             0,
             NULL::BIGINT,
@@ -935,6 +937,7 @@ BEGIN
 
     RETURN QUERY
     SELECT
+        _CurrentOwnerEpoch,
         TRUE,
         _DeletedCount,
         _DeletedThroughMessageId,

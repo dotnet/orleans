@@ -129,6 +129,40 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public async Task Replay_AtProviderTailFiltersLiveRecordsAlreadyDeliveredByReplay()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var history = new[]
+        {
+            new TestQueueMessage(streamId, 1, "target-1"),
+            new TestQueueMessage(streamId, 2, "target-2"),
+            new TestQueueMessage(streamId, 3, "target-3"),
+        };
+        var receiver = CreateReplayReceiver(
+            history,
+            new TestReplaySourceFactory(history[..2]),
+            new TestCheckpointer(string.Empty),
+            new RecoverableStreamReplayOptions
+            {
+                MaxConcurrentReaders = 1,
+                MaxPendingReaders = 0,
+                CacheSize = 4,
+                ReadBatchSize = 2,
+                TemporaryTailRetryDelay = TimeSpan.Zero,
+            });
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        using var cursor = receiver.GetCacheCursor(streamId, new EventSequenceTokenV2(1));
+
+        var replayed = await ReadAll(cursor);
+        _ = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var live = await ReadAll(cursor);
+
+        Assert.Equal([1, 2], replayed);
+        Assert.Equal([3], live);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Replay_FutureStartAtEmptyTail_WaitsForRequestedLivePosition()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());

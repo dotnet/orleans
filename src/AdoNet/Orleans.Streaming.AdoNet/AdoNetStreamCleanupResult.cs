@@ -4,6 +4,7 @@ namespace Orleans.Streaming.AdoNet;
 /// Describes one bounded stream partition retention cleanup operation.
 /// </summary>
 internal record AdoNetStreamCleanupResult(
+    long? OwnerEpoch,
     bool Ran,
     int DeletedCount,
     long? DeletedThroughMessageId,

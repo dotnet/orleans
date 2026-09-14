@@ -290,6 +290,7 @@ public class AdoNetRecoverableStreamTests
             CleanupRecords =
             [
                 Record(
+                    (nameof(AdoNetStreamCleanupResult.OwnerEpoch), 1L),
                     (nameof(AdoNetStreamCleanupResult.Ran), true),
                     (nameof(AdoNetStreamCleanupResult.DeletedCount), 100),
                     (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 100L),
@@ -342,6 +343,7 @@ public class AdoNetRecoverableStreamTests
             CleanupRecords =
             [
                 Record(
+                    (nameof(AdoNetStreamCleanupResult.OwnerEpoch), 1L),
                     (nameof(AdoNetStreamCleanupResult.Ran), true),
                     (nameof(AdoNetStreamCleanupResult.DeletedCount), 0),
                     (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), null),
@@ -401,6 +403,7 @@ public class AdoNetRecoverableStreamTests
             CleanupRecords =
             [
                 Record(
+                    (nameof(AdoNetStreamCleanupResult.OwnerEpoch), 1L),
                     (nameof(AdoNetStreamCleanupResult.Ran), true),
                     (nameof(AdoNetStreamCleanupResult.DeletedCount), 1),
                     (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), 1L),
@@ -430,6 +433,43 @@ public class AdoNetRecoverableStreamTests
 
         Assert.Contains("cache admission failed", failure.Message);
         Assert.Equal(readsAfterFailure, storage.ReadCallCount);
+    }
+
+    [Fact]
+    public async Task Read_OwnershipLossStopsStaleReceiver()
+    {
+        var storage = new CapturingRelationalStorage
+        {
+            CleanupRecords =
+            [
+                Record(
+                    (nameof(AdoNetStreamCleanupResult.OwnerEpoch), 2L),
+                    (nameof(AdoNetStreamCleanupResult.Ran), false),
+                    (nameof(AdoNetStreamCleanupResult.DeletedCount), 0),
+                    (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedCount), 0),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedFromMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.HardDeletedThroughMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.Checkpoint), 0L),
+                    (nameof(AdoNetStreamCleanupResult.ActiveReplayWatermark), null),
+                    (nameof(AdoNetStreamCleanupResult.EarliestMessageId), null),
+                    (nameof(AdoNetStreamCleanupResult.TailMessageId), null)),
+            ],
+        };
+        var source = new AdoNetRecoverableStream(
+            "service",
+            "provider",
+            "queue",
+            new AdoNetStreamOptions(),
+            CreateQueries(storage),
+            NullLogger.Instance);
+        _ = await source.Load(TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => source.Read(10, TestContext.Current.CancellationToken));
+
+        Assert.Contains("ownership was lost", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("epoch 1", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1077,6 +1117,7 @@ public class AdoNetRecoverableStreamTests
                 nameof(DbStoredQueries.CleanupStreamMessagesKey) =>
                 [
                     Record(
+                        (nameof(AdoNetStreamCleanupResult.OwnerEpoch), 1L),
                         (nameof(AdoNetStreamCleanupResult.Ran), true),
                         (nameof(AdoNetStreamCleanupResult.DeletedCount), 0),
                         (nameof(AdoNetStreamCleanupResult.DeletedThroughMessageId), null),
