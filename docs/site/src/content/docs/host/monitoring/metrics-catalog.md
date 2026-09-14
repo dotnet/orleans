@@ -11,6 +11,8 @@ This catalog lists every instrument created for the `Microsoft.Orleans` meter in
 
 The **Unit** column gives the natural unit recorded by Orleans. "Implicit" means the instrument doesn't set unit metadata. `TimeSpan` ticks are 100 nanoseconds. The **Attributes** column lists attributes added by Orleans; resource attributes such as `service.instance.id` also identify each time series.
 
+Instruments with `grain_type` also emit the boolean `grain_type_known` attribute when the value is `unknown`: `true` identifies a grain whose canonical name is literally `unknown`, and `false` identifies unavailable type metadata. Preserve both attributes when grouping those series.
+
 Instrument types use these abbreviations:
 
 - **C**: <xref:System.Diagnostics.Metrics.Counter`1>
@@ -78,7 +80,7 @@ Request latency covers the interval until the caller's callback completes, inclu
 | `orleans-catalog-activation-failed-to-activate` | C | Activations, implicit | `grain_type` | Activations whose lifecycle initialization failed or was canceled. |
 | `orleans-catalog-activation-latency` | H | `ms` | `grain_type`, `status`, `directory` | Activation duration, split by outcome and whether the grain uses the directory (`enabled` or `disabled`). Status values are `success`, `canceled`, `directory_error`, `duplicate`, and `error`. |
 | `orleans-catalog-activation-non-existent` | C | Messages, implicit | `grain_type` | Requests for a new activation which the catalog could not create while the silo was inactive. Registered target types use their canonical names; unavailable type metadata uses `unknown`. |
-| `orleans-catalog-activation-shutdown` | C | Shutdown events, implicit | `grain_type`, `via` | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. Includes the historical additional event for each nonempty collection batch, tagged `grain_type=unknown`, `via=collection`. |
+| `orleans-catalog-activation-shutdown` | C | Shutdown events, implicit | `grain_type`, `via` | Activation shutdowns split by `collection`, `deactivateOnIdle`, `deactivateStuckActivation`, or `migration`. Includes the historical additional event for each nonempty collection batch, tagged `grain_type=unknown`, `grain_type_known=false`, `via=collection`. |
 | `orleans-catalog-activation-working-set` | OG | Activations, implicit | `grain_type` | Activations recently active on this silo, counted until working-set eviction or deactivation. |
 | `orleans-catalog-activations` | OG | Catalog entries, implicit | `grain_type` | Targets currently registered in the local activation directory, including system targets and stateless-worker group contexts. |
 | `orleans-catalog-deactivation-latency` | H | `ms` | `grain_type`, `via` | Deactivation duration, split by the shutdown path. `via=unknown` identifies completion before a shutdown path was selected. |
@@ -88,9 +90,9 @@ Request latency covers the interval until the caller's callback completes, inclu
 
 ### Grain-type identity and aggregation
 
-`grain_type` is the canonical string representation of the target's <xref:Orleans.Runtime.GrainType>, equivalent to `GrainId.Type.ToString()`. Explicit grain-type names and constructed generic arguments are part of that identity. The value can differ from the CLR implementation name. Default or unavailable type identity uses `unknown`, matching the request timeout/cancellation convention.
+`grain_type` is the canonical string representation of the target's <xref:Orleans.Runtime.GrainType>, equivalent to `GrainId.Type.ToString()`. Explicit grain-type names and constructed generic arguments are part of that identity. The value can differ from the CLR implementation name. Default or unavailable type identity uses `unknown` with `grain_type_known=false`; a real grain named `unknown` uses that canonical value with `grain_type_known=true`. Activation, request timeout/cancellation, and streaming metrics share this convention. Other canonical values identify known types through `grain_type` alone.
 
-Activation metrics cache the canonical string and population counters per registered type for the silo lifetime. All activations of a type share this metadata. Working-set insertion/removal and activation-directory registration/removal update the corresponding populations. A scrape enumerates type counters, including zero counts after the last member leaves. The first idle working-set scan retains a member; eviction removes it. Completed transitions reconcile per-type sums with the corresponding local population; concurrent scrapes can observe transitions in progress.
+Activation metrics cache the canonical string and population counters per registered type for the silo lifetime. All activations of a type share this metadata. Working-set insertion/removal and activation-directory registration/removal update the corresponding populations. A scrape enumerates type counters, including zero counts after the last member leaves. The two `unknown` identities retain independent counters and distinct complete label sets. The first idle working-set scan retains a member; eviction removes it. Completed transitions reconcile per-type sums with the corresponding local population; concurrent scrapes can observe transitions in progress.
 
 Lifecycle counters record additive events. Sum their increases across types for the same emitter and interval to recover total event volume. Collection scans retain their scan-level scope. A completed activation attempt contributes one latency observation with its outcome and directory tags; a completed deactivation contributes one observation with its shutdown path. Histograms begin timing when enabled at the start of the operation.
 

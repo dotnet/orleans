@@ -13,6 +13,33 @@ namespace Tester.Diagnostics;
 
 public class GrainInstrumentsTests
 {
+    [TestSuite("BVT"), TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void GrainCounts_NamedUnknownHasKnownLabelAndRetainsClrStatistics()
+    {
+        using var fixture = new GrainMetricFixture();
+        var count = fixture.Instruments.GetGrainCount("Example.UnknownGrain");
+        var observations = new List<GrainMeasurement>();
+        using var listener = fixture.Listen((instrument, value, tags, _) => observations.Add(new(instrument, value, tags.ToArray())));
+        fixture.Instruments.IncrementGrainCounts("unknown", count);
+        Assert.Equal(1, count.Value);
+        Assert.Equal(new KeyValuePair<string, long>("Example.UnknownGrain", 1),
+            Assert.Single(new GrainCountStatistics(fixture.Instruments).GetSimpleGrainStatistics()));
+        fixture.Instruments.DecrementGrainCounts("unknown", count);
+        Assert.Equal(0, count.Value);
+        Assert.Empty(new GrainCountStatistics(fixture.Instruments).GetSimpleGrainStatistics());
+        Assert.Equal(new[] { 1, -1 }, observations.Select(item => item.Value));
+        Assert.All(observations, item =>
+        {
+            Assert.IsType<UpDownCounter<int>>(item.Instrument);
+            Assert.Equal(InstrumentNames.GRAIN_COUNTS, item.Instrument.Name);
+            Assert.Equal(2, item.Tags.Length);
+            Assert.Equal("unknown", Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value);
+            Assert.True(Assert.IsType<bool>(Assert.Single(item.Tags, tag => tag.Key == "grain_type_known").Value));
+        });
+        Assert.Same(count, fixture.Instruments.GetGrainCount("Example.UnknownGrain"));
+    }
+
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]

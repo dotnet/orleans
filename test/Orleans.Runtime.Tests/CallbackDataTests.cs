@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -13,6 +15,74 @@ namespace Tester;
 
 public class CallbackDataTests
 {
+    [TestSuite("BVT"), TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(null, false)]
+    [InlineData("unknown", false)]
+    [InlineData("normal-orders", false)]
+    [InlineData(null, true)]
+    [InlineData("unknown", true)]
+    [InlineData("normal-orders", true)]
+    public void CancellationAndTimeoutMetricsDistinguishUnavailableFromNamedUnknown(string? typeName, bool timeout)
+    {
+        using var provider = CreateServiceProvider();
+        var meter = new OrleansInstruments(provider.GetRequiredService<IMeterFactory>());
+        var instruments = new ApplicationRequestInstruments(meter);
+        var samples = new ConcurrentQueue<(Instrument Instrument, long Value, KeyValuePair<string, object?>[] Tags)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, owner) =>
+        {
+            if (ReferenceEquals(instrument.Meter, meter.Meter)
+                && instrument.Name is InstrumentNames.APP_REQUESTS_CANCELED or InstrumentNames.APP_REQUESTS_TIMED_OUT)
+            {
+                owner.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => samples.Enqueue((instrument, value, tags.ToArray())));
+        listener.Start();
+        var clock = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        var message = new Message { TargetGrain = typeName is null ? default : GrainId.Create(typeName, "request-key") };
+        var unregistered = new ConcurrentQueue<Message>();
+        var shared = CreateSharedCallbackData(unregistered.Enqueue, clock, TimeSpan.FromSeconds(1));
+        var callback = new CallbackData(shared, completion, message, instruments);
+        using var cancellation = new CancellationTokenSource();
+        callback.SubscribeForCancellation(cancellation.Token);
+
+        if (timeout)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromTicks(1));
+            Assert.True(callback.IsExpired(clock.GetTimestamp()));
+            callback.OnTimeout();
+        }
+        else
+        {
+            cancellation.Cancel();
+        }
+
+        var response = completion.Response;
+        Assert.True(callback.IsCompleted);
+        if (timeout) Assert.IsType<TimeoutException>(response.Exception);
+        else Assert.Equal(cancellation.Token, Assert.IsType<OperationCanceledException>(response.Exception).CancellationToken);
+        // Losing completion paths cannot add a second metric, unregister, or replace the result.
+        callback.OnTimeout();
+        cancellation.Cancel();
+        callback.OnHostShutdown();
+        Assert.Same(response, completion.Response);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Same(message, Assert.Single(unregistered));
+        var sample = Assert.Single(samples);
+        Assert.IsType<Counter<long>>(sample.Instrument);
+        Assert.Equal(timeout ? InstrumentNames.APP_REQUESTS_TIMED_OUT : InstrumentNames.APP_REQUESTS_CANCELED, sample.Instrument.Name);
+        Assert.Equal(1, sample.Value);
+        Assert.Equal(typeName is null or "unknown" ? 2 : 1, sample.Tags.Length);
+        Assert.Equal(typeName ?? "unknown", Assert.IsType<string>(Assert.Single(sample.Tags, tag => tag.Key == "grain_type").Value));
+        if (typeName is null or "unknown")
+        {
+            Assert.Equal(typeName is not null, Assert.IsType<bool>(Assert.Single(sample.Tags, tag => tag.Key == "grain_type_known").Value));
+        }
+    }
+
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
@@ -190,10 +260,15 @@ public class CallbackDataTests
     private sealed class TestResponseCompletionSource : IResponseCompletionSource
     {
         public Response Response { get; private set; } = null!;
+        public int CompletionCount { get; private set; }
 
-        public void Complete(Response value) => Response = value;
+        public void Complete(Response value)
+        {
+            Response = value;
+            CompletionCount++;
+        }
 
-        public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+        public void Complete() => Complete(Orleans.Serialization.Invocation.Response.Completed);
     }
 
     private sealed class HighFrequencyTimeProvider : TimeProvider

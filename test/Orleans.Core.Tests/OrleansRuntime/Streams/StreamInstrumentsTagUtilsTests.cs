@@ -50,9 +50,10 @@ public class StreamInstrumentsTagUtilsTests
 
         var tags = ToTagDictionary(StreamInstrumentsTagUtils.InitializeTags(streamId));
 
-        Assert.Equal(2, tags.Count);
+        Assert.Equal(3, tags.Count);
         Assert.Equal("ProviderName", tags["provider"]);
         Assert.Equal("unknown", tags["grain_type"]);
+        Assert.False(Assert.IsType<bool>(tags["grain_type_known"]));
         Assert.DoesNotContain("namespace", tags.Keys);
     }
 
@@ -73,12 +74,36 @@ public class StreamInstrumentsTagUtilsTests
         Assert.DoesNotContain("namespace", tags.Keys);
     }
 
+    [TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
+    [Theory, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]
+    [InlineData(null)]
+    [InlineData("unknown")]
+    [InlineData("normal-orders")]
+    public void GrainTagsDistinguishDefaultFromNamedUnknownWithoutChangingNormalSchema(string? typeName)
+    {
+        var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("Orders", "sensitive-key"));
+        GrainId target = typeName is null ? default : GrainId.Create(typeName, "sensitive-grain-key");
+        var tags = ToTagDictionary(StreamInstrumentsTagUtils.InitializeTags(streamId, target));
+
+        Assert.Equal(typeName is null or "unknown" ? 3 : 2, tags.Count);
+        Assert.Equal("ProviderName", tags["provider"]);
+        Assert.Equal(typeName ?? "unknown", tags["grain_type"]);
+        if (typeName is null or "unknown")
+        {
+            Assert.Equal(typeName is not null, Assert.IsType<bool>(tags["grain_type_known"]));
+        }
+        else
+        {
+            Assert.False(tags.ContainsKey("grain_type_known"));
+        }
+    }
+
     private static Dictionary<string, object?> ToTagDictionary(TagList tags)
     {
         var result = new Dictionary<string, object?>();
         foreach (KeyValuePair<string, object?> tag in tags)
         {
-            result[tag.Key] = tag.Value;
+            result.Add(tag.Key, tag.Value); // Duplicate labels are a schema violation.
         }
 
         return result;

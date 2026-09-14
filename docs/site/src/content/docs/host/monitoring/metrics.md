@@ -79,6 +79,8 @@ Message-size instruments `orleans-messaging-sent-messages-size` and `orleans-mes
 
 The `grain_type` value is the canonical `GrainId.Type.ToString()` identity, including explicit names and constructed generic arguments. Orleans caches this value once per registered type and shares it across activations. See [Grain-type identity and aggregation](metrics-catalog.md#grain-type-identity-and-aggregation) for population boundaries and the `unknown` convention.
 
+When `grain_type=unknown`, retain `grain_type_known` in groupings: `true` identifies a real grain named `unknown`, and `false` identifies unavailable type metadata. This boolean discriminator applies to activation, request, and streaming metrics. Other canonical names retain their single `grain_type` attribute.
+
 For lifecycle throughput, sum event-counter increases across types over the same interval. For current cluster populations, sum the latest fresh per-silo gauge values by type. Configure exporter resource identity and backend freshness rules so each silo contributes one current population. Compare per-host populations using the same observation window and freshness policy.
 
 A long-running turn means Orleans observed one scheduled work item executing synchronously beyond the configured warning threshold. It doesn't by itself prove a deadlock. Common causes include synchronous blocking, lock contention, CPU-heavy work, or blocking I/O. See [Grain turns appear stuck](troubleshooting.md#grain-turns-appear-stuck).

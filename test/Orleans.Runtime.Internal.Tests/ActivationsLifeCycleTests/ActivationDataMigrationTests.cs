@@ -147,9 +147,10 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     [InlineData("named")]
     [InlineData("int")]
     [InlineData("string")]
+    [InlineData("unknown")]
     public async Task CanonicalRuntimeTypes_ReuseSharedMetricsAcrossActualActivations(string kind)
     {
-        await using var fixture = new MetricsFixture();
+        await using var fixture = new MetricsFixture(namedUnknown: kind == "unknown");
         await fixture.InitializeAsync();
         var services = fixture.PrimaryServices;
         using var metrics = new RuntimeMetrics(services);
@@ -172,6 +173,12 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         if (kind == "named")
         {
             Assert.Equal("guid-test-grain", shared.GrainTypeMetricName);
+        }
+        else if (kind == "unknown")
+        {
+            Assert.Equal(GrainType.Create("unknown"), first.GrainId.Type);
+            Assert.False(first.GrainId.Type.IsDefault);
+            Assert.Equal("unknown", shared.GrainTypeMetricName);
         }
 
         AssertCounts(services, metrics, baseline, shared, 2, 2, 2);
@@ -737,17 +744,20 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Runtime_NonExistentActivationReusesCachedType(bool metadataUnavailable)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Runtime_NonExistentActivationReusesCachedType(bool metadataUnavailable, bool namedUnknown)
     {
-        await using var fixture = new MetricsFixture("non-existent");
+        await using var fixture = new MetricsFixture("non-existent", namedUnknown: namedUnknown);
         await fixture.InitializeAsync();
         var services = fixture.PrimaryServices;
         using var metrics = new RuntimeMetrics(services);
         using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
         var baseline = metrics.Snapshot();
-        var call = GetCall(fixture.GrainFactory, "named", 701);
+        var kind = namedUnknown ? "unknown" : "named";
+        var call = GetCall(fixture.GrainFactory, kind, 701);
         var activation = await InvokeAndObserve(services, metrics, events, call, 1);
         var shared = AssertCanonicalContext(services, activation);
         await Deactivate(activation);
@@ -764,7 +774,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
 
         var catalog = services.GetRequiredService<Catalog>();
         Assert.Null(catalog.GetOrCreateActivation(activation.GrainId, null, null));
-        Assert.Null(catalog.GetOrCreateActivation(GetCall(fixture.GrainFactory, "named", 702).Reference.GrainId, null, null));
+        Assert.Null(catalog.GetOrCreateActivation(GetCall(fixture.GrainFactory, kind, 702).Reference.GrainId, null, null));
 
         Assert.True(instruments.TryGetGrainTypeMetrics(activation.GrainId.Type, out var retained));
         Assert.Same(cached, retained);
@@ -780,9 +790,10 @@ public class ActivationDataMigrationTestsRuntimeMetrics
     [InlineData("named")]
     [InlineData("int")]
     [InlineData("string")]
+    [InlineData("unknown")]
     public async Task Runtime_NonExistentActivationCachesRecognizedType(string kind)
     {
-        await using var fixture = new MetricsFixture("non-existent");
+        await using var fixture = new MetricsFixture("non-existent", namedUnknown: kind == "unknown");
         await fixture.InitializeAsync();
         var services = fixture.PrimaryServices;
         using var metrics = new RuntimeMetrics(services);
@@ -845,7 +856,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         }
 
         Assert.False(instruments.TryGetGrainTypeMetrics(GrainType.Create(GrainTypeMetrics.UnknownGrainType), out _));
-        AssertNonExistentEvents(metrics, GrainTypeMetrics.UnknownGrainType, ids.Length * 2);
+        AssertNonExistentEvents(metrics, GrainTypeMetrics.UnknownGrainType, ids.Length * 2, isKnown: false);
         AssertNonExistentGauges(services, metrics, baseline);
         using var lateListener = new RuntimeMetrics(services);
         AssertNonExistentGauges(services, lateListener, baseline);
@@ -907,7 +918,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         AssertNonExistentGauges(services, lateListener, baseline, cached);
     }
 
-    private static void AssertNonExistentEvents(RuntimeMetrics metrics, string type, int count)
+    private static void AssertNonExistentEvents(RuntimeMetrics metrics, string type, int count, bool isKnown = true)
     {
         var samples = metrics.Gauges(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS);
         Assert.Equal(count, samples.Length);
@@ -915,7 +926,15 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         {
             Assert.IsType<Counter<int>>(sample.Instrument);
             Assert.Equal(1, sample.Value);
-            Assert.Equal("grain_type", Assert.Single(sample.Tags).Key);
+            Assert.Equal(type == "unknown" ? 2 : 1, sample.Tags.Count);
+            if (type == "unknown")
+            {
+                Assert.Equal(isKnown, Assert.IsType<bool>(sample.Tags["grain_type_known"]));
+            }
+            else
+            {
+                Assert.Equal("grain_type", Assert.Single(sample.Tags).Key);
+            }
             Assert.Same(type, sample.Tags["grain_type"]);
         });
         Assert.All(metrics.ForType(type), sample => Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_NON_EXISTENT_ACTIVATIONS, sample.Instrument.Name));
@@ -969,6 +988,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         switch (kind)
         {
             case "ordinary":
+            case "unknown":
                 var idle = factory.GetGrain<IIdleActivationGcTestGrain1>(new Guid(key, 0, 0, new byte[8]));
                 return ((GrainReference)idle, idle.Nop);
             case "named":
@@ -1037,8 +1057,8 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             Assert.Equal(instanceCount, statistics[shared.GrainTypeName]);
         }
 
-        Assert.Same(name, Assert.Single(metrics.Gauges(InstrumentNames.CATALOG_ACTIVATION_COUNT), s => Equals(s.Tags["grain_type"], name)).Tags["grain_type"]);
-        Assert.Same(name, Assert.Single(metrics.Gauges(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET), s => Equals(s.Tags["grain_type"], name)).Tags["grain_type"]);
+        AssertTypeTag(Assert.Single(metrics.Gauges(InstrumentNames.CATALOG_ACTIVATION_COUNT), s => Equals(s.Tags["grain_type"], name)), shared, "grain_type");
+        AssertTypeTag(Assert.Single(metrics.Gauges(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET), s => Equals(s.Tags["grain_type"], name)), shared, "grain_type");
     }
 
     private static void AssertActivationEvents(RuntimeMetrics metrics, GrainTypeSharedContext shared,
@@ -1098,7 +1118,15 @@ public class ActivationDataMigrationTestsRuntimeMetrics
 
     private static void AssertTypeTag(MetricSample sample, GrainTypeSharedContext shared, params string[] keys)
     {
-        Assert.Equal(keys, sample.Tags.Keys.Order());
+        if (shared.GrainTypeMetricName == "unknown")
+        {
+            Assert.Equal(keys.Append("grain_type_known").Order(), sample.Tags.Keys.Order());
+            Assert.True(Assert.IsType<bool>(sample.Tags["grain_type_known"]));
+        }
+        else
+        {
+            Assert.Equal(keys, sample.Tags.Keys.Order());
+        }
         Assert.Same(shared.GrainTypeMetricName, sample.Tags["grain_type"]);
     }
 
@@ -1204,7 +1232,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         public void Dispose() => _listener.Dispose();
     }
 
-    private sealed class MetricsFixture(string mode = "normal", short siloCount = 1) : BaseTestClusterFixture
+    private sealed class MetricsFixture(string mode = "normal", short siloCount = 1, bool namedUnknown = false) : BaseTestClusterFixture
     {
         public IServiceProvider PrimaryServices => ((InProcessSiloHandle)HostedCluster.Primary!).SiloHost.Services;
 
@@ -1226,6 +1254,7 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         {
             builder.Options.InitialSilosCount = siloCount;
             builder.Properties["RuntimeMetricsMode"] = mode;
+            builder.Properties["RuntimeMetricsNamedUnknown"] = namedUnknown.ToString();
             builder.AddSiloBuilderConfigurator<MetricsConfigurator>();
         }
     }
@@ -1244,6 +1273,10 @@ public class ActivationDataMigrationTestsRuntimeMetrics
             services.AddSingleton<IConfigureGrainTypeComponents, LifecycleConfigurator>();
             services.AddSingleton<ControlledDirectory>();
             services.AddSingleton<IGrainDirectoryResolver, ControlledDirectoryResolver>();
+            if (context.Configuration["RuntimeMetricsNamedUnknown"] == bool.TrueString)
+            {
+                services.AddSingleton<IGrainTypeProvider, UnknownGrainTypeProvider>();
+            }
             if (context.Configuration["RuntimeMetricsMode"] == "stateless-fanout")
             {
                 services.AddSingleton<WorkerCallGate>();
@@ -1258,6 +1291,21 @@ public class ActivationDataMigrationTestsRuntimeMetrics
                 services.AddSingleton(provider => new GrainPropertiesResolver(provider.GetRequiredService<CatalogAvailability>()));
             }
         });
+    }
+
+    private sealed class UnknownGrainTypeProvider : IGrainTypeProvider
+    {
+        public bool TryGetGrainType(Type type, out GrainType grainType)
+        {
+            if (type == typeof(UnitTests.Grains.IdleActivationGcTestGrain1))
+            {
+                grainType = GrainType.Create("unknown");
+                return true;
+            }
+
+            grainType = default;
+            return false;
+        }
     }
 
     private sealed class WorkerProperties : IGrainPropertiesProvider

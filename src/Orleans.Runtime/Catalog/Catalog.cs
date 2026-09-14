@@ -102,7 +102,7 @@ namespace Orleans.Runtime
 
                 // this should be removed once we've refactored the deactivation code path. For now safe to keep.
                 activationCollector.TryCancelCollection(activation as ICollectibleGrainContext);
-                _catalogInstruments.OnActivationDestroyed(GetGrainTypeMetricName(activation));
+                _catalogInstruments.OnActivationDestroyed(GetGrainTypeMetricName(activation), isGrainTypeKnown: !activation.GrainId.Type.IsDefault);
             }
         }
 
@@ -195,7 +195,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result));
+            _catalogInstruments.OnActivationCreated(GetGrainTypeMetricName(result), isGrainTypeKnown: !grainId.Type.IsDefault);
 
             // Rehydration occurs before activation.
             if (rehydrationContext is not null)
@@ -231,7 +231,9 @@ namespace Orleans.Runtime
                         metrics = instruments.GetGrainTypeMetrics(grainId.Type);
                     }
 
-                    instruments.OnNonExistentActivation(metrics?.GrainTypeTagValue ?? GrainTypeMetrics.UnknownGrainType);
+                    instruments.OnNonExistentActivation(
+                        metrics?.GrainTypeTagValue ?? GrainTypeMetrics.UnknownGrainType,
+                        isGrainTypeKnown: metrics is not null && !grainId.Type.IsDefault);
                 }
 
                 var grainLocator = self.serviceProvider.GetRequiredService<GrainLocator>();

@@ -9,17 +9,18 @@ namespace Orleans.Streaming;
 internal static class StreamInstrumentsTagUtils
 {
     private const string StreamProviderNameTagName = "provider";
-    private const string GrainTypeTagName = "grain_type";
     private const string QueueIdTagName = "queue";
-    private const string UnknownGrainType = "unknown";
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static TagList InitializeTags(QualifiedStreamId streamId, GrainId grainId) =>
-        CreateStreamTags(streamId, grainId.Type.ToString() ?? UnknownGrainType);
+        CreateStreamTags(
+            streamId,
+            grainId.Type.IsDefault ? GrainTypeMetrics.UnknownGrainType : grainId.Type.ToString(),
+            isGrainTypeKnown: !grainId.Type.IsDefault);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static TagList InitializeTags(QualifiedStreamId streamId) =>
-        CreateStreamTags(streamId, UnknownGrainType);
+        CreateStreamTags(streamId, GrainTypeMetrics.UnknownGrainType, isGrainTypeKnown: false);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static TagList InitializeTags(QueueId queueId, string streamProviderName) =>
@@ -30,10 +31,10 @@ internal static class StreamInstrumentsTagUtils
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static TagList CreateStreamTags(QualifiedStreamId streamId, string grainType) =>
-        new()
-        {
-            { StreamProviderNameTagName, streamId.ProviderName },
-            { GrainTypeTagName, grainType }
-        };
+    private static TagList CreateStreamTags(QualifiedStreamId streamId, string grainType, bool isGrainTypeKnown)
+    {
+        var tags = new TagList { { StreamProviderNameTagName, streamId.ProviderName } };
+        GrainTypeMetrics.AddTags(ref tags, grainType, isGrainTypeKnown);
+        return tags;
+    }
 }

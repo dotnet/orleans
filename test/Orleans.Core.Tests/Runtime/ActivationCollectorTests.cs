@@ -1212,9 +1212,10 @@ namespace UnitTests.Runtime
             {
                 Assert.IsType<Counter<int>>(item.Instrument);
                 Assert.Equal(1, item.Value);
-                Assert.Equal(2, item.Tags.Length);
+                Assert.Equal(3, item.Tags.Length);
                 Assert.Equal("collection", Assert.Single(item.Tags, tag => tag.Key == "via").Value);
                 Assert.Same(GrainTypeMetrics.UnknownGrainType, Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value);
+                Assert.False(Assert.IsType<bool>(Assert.Single(item.Tags, tag => tag.Key == "grain_type_known").Value));
             });
         }
 
@@ -1263,11 +1264,16 @@ namespace UnitTests.Runtime
                 Assert.Equal(expected.Length, _snapshot.Count);
                 foreach (var (type, count) in expected)
                 {
-                    var item = Assert.Single(_snapshot, item => Equals(Assert.Single(item.Tags).Value, type));
+                    var item = Assert.Single(_snapshot, item => Equals(Assert.Single(item.Tags, tag => tag.Key == "grain_type").Value, type));
                     Assert.IsType<ObservableGauge<int>>(item.Instrument);
                     Assert.Equal(InstrumentNames.CATALOG_ACTIVATION_WORKING_SET, item.Instrument.Name);
                     Assert.Equal(count, item.Value);
-                    var tag = Assert.Single(item.Tags);
+                    Assert.Equal(type == "unknown" ? 2 : 1, item.Tags.Length);
+                    if (type == "unknown")
+                    {
+                        Assert.False(Assert.IsType<bool>(Assert.Single(item.Tags, tag => tag.Key == "grain_type_known").Value));
+                    }
+                    var tag = Assert.Single(item.Tags, tag => tag.Key == "grain_type");
                     Assert.Equal("grain_type", tag.Key);
                     Assert.True(Instruments.TryGetGrainTypeMetrics(type == "unknown" ? default : GrainType.Create(type), out var cached));
                     Assert.Same(cached.GrainTypeTagValue, tag.Value);

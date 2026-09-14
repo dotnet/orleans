@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -32,13 +31,19 @@ internal class ApplicationRequestInstruments
 
     internal bool AppRequestsLatencyEnabled => _appRequestsLatencyHistogramSum.Enabled;
 
-    internal void OnAppRequestsTimedOut(string grainType)
+    internal void OnAppRequestsTimedOut(string grainType, bool isGrainTypeKnown = true)
     {
-        _timedOutRequestsCounter.Add(1, new KeyValuePair<string, object?>("grain_type", grainType));
+        if (_timedOutRequestsCounter.Enabled)
+        {
+            _timedOutRequestsCounter.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
+        }
     }
 
-    internal void OnAppRequestsCanceled(string grainType)
+    internal void OnAppRequestsCanceled(string grainType, bool isGrainTypeKnown = true)
     {
-        _canceledRequestsCounter.Add(1, new KeyValuePair<string, object?>("grain_type", grainType));
+        if (_canceledRequestsCounter.Enabled)
+        {
+            _canceledRequestsCounter.Add(1, GrainTypeMetrics.CreateTags(grainType, isGrainTypeKnown));
+        }
     }
 }

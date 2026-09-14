@@ -129,7 +129,7 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             SignalCancellation();
             shared.Unregister(Message);
-            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
+            _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType(), isGrainTypeKnown: !Message.TargetGrain.Type.IsDefault);
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
             DisposeCancellationRegistration();
@@ -150,7 +150,7 @@ namespace Orleans.Runtime
 
             this.shared.Unregister(this.Message);
             DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
+            _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType(), isGrainTypeKnown: !Message.TargetGrain.Type.IsDefault);
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
