@@ -25,17 +25,9 @@ internal sealed class DefaultBlobContainerFactory(AzureBlobJournalStorageOptions
     }
 
     /// <inheritdoc/>
-    public Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)
-        => InitializeAsync(client, cancellationToken, AzureBlobJournalStorageInstruments.CreateForDirectConstruction());
-
-    internal async Task InitializeAsync(
-        BlobServiceClient client, CancellationToken cancellationToken, AzureBlobJournalStorageInstruments instruments)
+    public async Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)
     {
         _defaultContainer = client.GetBlobContainerClient(options.ContainerName);
-        await instruments.TrackApiCallAsync(
-            nameof(BlobContainerClient.CreateIfNotExistsAsync),
-            () => _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken),
-            static result => result is null ? JournalStorageTelemetry.AlreadyExists
-                : JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)).ConfigureAwait(false);
+        await _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
     }
 }

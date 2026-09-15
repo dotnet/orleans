@@ -169,23 +169,24 @@ Enumeration observes live storage. Concurrent changes follow each provider's lis
 
 ## Provider metrics
 
-The `Microsoft.Orleans` meter exposes two complementary layers across S3, Azure Blob, Azure Table,
-Redis, and Volatile providers:
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries:
 
-- `orleans-journaling-provider-operations` and `orleans-journaling-provider-operation-duration` cover
-  provider-created storage handles, metadata operations, and catalog enumeration, tagged by
-  `provider`, `operation`, and `status`.
-- `orleans-journaling-provider-api-calls` and `orleans-journaling-provider-api-call-duration` measure
-  underlying SDK invocations and exposed listing pages, tagged by `provider`, `api`, and `status`.
+- `orleans-journaling-provider-catalog-pages` counts pages received during S3 and Azure catalog
+  traversal, including empty pages.
+- `orleans-journaling-provider-catalog-items` counts native page candidates and consumed Redis
+  scan keys before local filtering.
+- `orleans-journaling-provider-catalog-entries` counts entries delivered by S3, Azure Blob, Azure
+  Table, Redis, and Volatile providers.
+- `orleans-journaling-provider-retries` counts explicit provider-loop retries.
 
-Payload-byte, native-item, delivered-catalog-entry, and explicit-provider-retry counters help explain
-request amplification. Catalog timing measures active execution and excludes consumer pauses.
-Existing state-manager and provider-specific metrics retain their original meanings.
+Pages, items, and entries use the bounded `provider` tag; retries use `provider` and `reason`.
+Compare candidates with delivered entries to assess filtering and duplicate suppression.
 
-SDK call counts support API workload monitoring. Automatic SDK retries, upload chunking, and Redis
-cursor paging can create additional wire requests inside one invocation; service-side transaction
-metrics or SDK transport telemetry provide billing-grade counts. Metric labels contain bounded
-provider, operation, API, reason, and outcome values; use logs and traces for resource identities.
+Existing state-manager and provider-specific metrics retain storage latency, outcomes, and byte
+measurements. The application supplies [client SDK telemetry](../../docs/site/src/content/docs/grains/journaling/operations.md#use-host-provided-dependency-telemetry)
+through hosting integrations such as Aspire, instrumentation libraries, or SDK diagnostic
+configuration. Use those signals for dependency timing and outcomes, and service-side transaction
+metrics for billing reconciliation.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

@@ -62,25 +62,24 @@ Discovery yields ids incrementally in traversal order, without sorting or buffer
 
 Storage errors and cancellation propagate without provider-level retries, restarts, or success fallbacks. A disconnected primary or the absence of any primary is an error; failures on later servers can occur after earlier ids have been yielded. Dispose the enumerator when stopping early. Cancellation is checked between scan and metadata operations, but does not abort an in-flight Redis metadata request.
 
-## Operation and SDK metrics
+## Catalog metrics
 
-Provider-created storage handles and catalog enumeration emit the shared
-`orleans-journaling-provider-operations` and `orleans-journaling-provider-operation-duration` metrics
-with `provider=redis`. Metadata outcomes distinguish missing journals and unapplied conditional updates
-from SDK failures.
+The `Microsoft.Orleans` meter records `orleans-journaling-provider-catalog-items` for scan keys
+consumed by catalog traversal and `orleans-journaling-provider-catalog-entries` for identities yielded
+after filtering and duplicate suppression. Both use `provider=redis`. Empty logical ranges produce
+zero measurements; early disposal and cancellation retain the consumed-key and delivered-entry
+counts.
 
-The API call/duration metrics use `api=hash_get`, `script_evaluate`, `scan_keys`, or `close`.
-`scan_keys` counts one SDK enumeration per primary server and measures active enumeration time,
-excluding consumer pauses. Its item count reports yielded metadata keys. StackExchange.Redis owns
-the underlying cursor paging; use Redis command statistics or client transport instrumentation for
-individual SCAN/EVALSHA/EVAL attempts. Shared connections retain their caller-owned lifetime, and
-closing such a provider records no SDK close call.
+Existing journaling metrics supply storage latency and outcomes. The application supplies command
+telemetry through its hosting integration or instrumentation libraries. For targeted diagnosis,
+[StackExchange.Redis profiling](https://seredis.dev/Profiling_v2) on the same connection multiplexer
+provides command queue, send, and response timings. Reuse existing client instrumentation and scope
+additional profiling sessions to the investigated work. Shared connections retain their caller-owned
+lifetime and diagnostic configuration.
 
 ## Redis key layout
 
 Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<encodedKeyName>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI escaping encodes Unicode scalars, while `%uXXXX` encodes each unpaired UTF-16 surrogate using four uppercase hexadecimal digits. Literal percent signs are escaped as `%25`, so raw journal ids round-trip distinctly from escape sequences and replacement characters. The stored `$journal-id` uses the same encoding to preserve the identity through Redis string transport and custom-mapped discovery. Native scan patterns escape glob characters in the configured key prefix and broaden partial surrogate prefixes before applying the ordinal filters locally.
-
-**Alpha layout upgrade:** When upgrading from the previous hash-only layout, drain durable jobs before deploying the new version, then recreate journals using the new layout.
 
 ## Documentation
 

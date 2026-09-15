@@ -21,8 +21,6 @@ For example, journal `jobs/00001234` uses `wal/jobs/00001234` and checkpoint obj
 
 S3 Express directory buckets benefit from slash-delimited prefixes. Unordered listings scan the selected WAL directory and retain every matching overdue journal, however old. Applications can supply hierarchical base keys, provided their prefix and reverse mappings satisfy the catalog contract.
 
-**Alpha layout upgrade:** When upgrading from the previous `<base-key>/wal` layout, drain durable jobs before deploying the new version, then recreate journals using the new layout.
-
 ## Catalog enumeration
 
 `IJournalStorageCatalog.ListAsync` returns `JournalCatalogEntry` values incrementally in S3 traversal order. Each entry's `Id` is the journal identity. S3 entries always have null `Metadata`, including when `ListOptions.IncludeMetadata = true`: `ListObjectsV2` cannot project the complete journal format, ETag, and caller-owned properties together. Enumeration never adds separate per-journal metadata requests. Call `GetMetadataAsync` explicitly when metadata is needed.
@@ -56,25 +54,19 @@ Dispose the enumerator when stopping early and use a cancellation token covering
 
 ## Metrics
 
-The `Microsoft.Orleans` meter reports both logical journal operations and the S3 SDK calls they cause. The shared metrics use `provider=s3`:
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. The shared counters use `provider=s3`:
 
 | Metric | Measurement | Other tags |
 | --- | --- | --- |
-| `orleans-journaling-provider-operations` | Completed logical operations | `operation`, `status` |
-| `orleans-journaling-provider-operation-duration` | Logical operation latency in milliseconds | `operation`, `status` |
-| `orleans-journaling-provider-operation-bytes` | Successful append/replace payload bytes and bytes delivered to read consumers | `operation`, `status` |
 | `orleans-journaling-provider-catalog-entries` | Catalog entries delivered to consumers | None |
-| `orleans-journaling-provider-api-calls` | Completed provider-issued SDK calls, including failures | `api`, `status` |
-| `orleans-journaling-provider-api-call-duration` | SDK call latency in milliseconds | `api`, `status` |
-| `orleans-journaling-provider-api-items` | Objects returned by successful listing pages before local filtering | `api`, `status` |
+| `orleans-journaling-provider-catalog-pages` | Pages received by catalog traversal, including empty pages | None |
+| `orleans-journaling-provider-catalog-items` | Native catalog candidates before local filtering | None |
 | `orleans-journaling-provider-retries` | Provider-loop retries | `reason` |
 
-Logical storage operations are `create`, `get_metadata`, `update_metadata`, `append`, `replace`, `read`, and `delete`. The provider also measures `initialize`, `close`, and `list`. Storage instances returned by the provider measure each caller operation once; internal WAL creation and metadata reads contribute SDK calls, not additional logical operations.
+Each received catalog page increments the page counter even when its object collection is empty. Failed page retrieval and terminal enumeration advances add zero pages. Compare native candidates with delivered entries to assess filtering work.
 
-Fixed API names are `head_bucket`, `create_bucket`, `head_object`, `get_object`, `put_object`, `delete_object`, and `list_objects_v2`. All provider-issued calls are measured, including part-count HEAD requests, checkpoint cleanup, conditional rewrites, and continued or empty listing pages. A listing records one logical outcome on completion, failure, cancellation, or early disposal. Its latency excludes time the consumer spends between enumerator advances.
+Retry reasons are `metadata_conflict` and `checkpoint_collision`, recorded when the provider performs another attempt. Catalog entries count only yielded identities; native item counts include candidates filtered from the current page. Early disposal and cancellation retain the work already recorded.
 
-SDK outcomes distinguish `ok`, `not_found`, `conflict`, `throttled`, `unavailable`, `timeout`, `canceled`, and `error`. Logical outcomes describe the caller-visible result instead: for example, an unsuccessful conditional create records `already_exists`, a missing metadata lookup records `not_found`, and an unapplied metadata update records `not_applied`. Retried conflicts do not turn a successful logical operation into an error. Retry reasons are the bounded values `metadata_conflict` and `checkpoint_collision`; handled conflicts which do not start another loop attempt do not increment the retry metric.
-
-API counts and latency make request amplification visible for capacity and cost analysis. Each measurement covers one SDK invocation, including any retries performed inside the SDK; it does not count individual wire attempts. GET latency ends when the SDK returns its response, while logical read latency also includes consuming the response streams. Metrics do not calculate AWS charges, and no bucket, object key, journal id, metadata value, or exception message is used as a tag.
+The application supplies request telemetry through its hosting integrations, instrumentation libraries, or [AWS SDK diagnostic configuration](https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/Util/TLoggingConfig.html). Reuse client instrumentation already configured by the host. The application owns diagnostic collection and sensitive-response handling; service-side transaction metrics support billing reconciliation. Resource identities belong in protected logs and traces; metric tags remain bounded.
 
 The existing `orleans-journaling-s3-operations`, `orleans-journaling-s3-operation-duration`, and `orleans-journaling-s3-operation-bytes` metrics retain their names, tags, and behavior, including for directly constructed storage instances.

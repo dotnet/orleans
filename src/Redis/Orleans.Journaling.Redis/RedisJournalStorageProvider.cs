@@ -56,17 +56,10 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         }
 
         var keyName = _options.GetKeyNameForJournal(journalId);
-        return new InstrumentedJournalStorage(
-            new RedisJournalStorage(GetDatabase(), _keyPrefix, keyName, _journalFormatKey, _options, journalId, _telemetry),
-            JournalStorageTelemetry.Redis, _telemetry);
+        return new RedisJournalStorage(GetDatabase(), _keyPrefix, keyName, _journalFormatKey, _options, journalId);
     }
 
-    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
-        CancellationToken cancellationToken = default)
-        => _telemetry.TrackCatalog(JournalStorageTelemetry.Redis, ListCoreAsync(options, cancellationToken));
-
-    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -100,9 +93,10 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
             }
 
             scannedServer = true;
-            await using var metadataKeys = _telemetry.TrackApiEnumeration(
-                JournalStorageTelemetry.Redis, "scan_keys",
-                server.KeysAsync(database.Database, pattern, pageSize: ScanPageSize)).GetAsyncEnumerator(cancellationToken);
+            await using var metadataKeys = server.KeysAsync(
+                database.Database,
+                pattern,
+                pageSize: ScanPageSize).GetAsyncEnumerator(cancellationToken);
             if (identityKeyMapping)
             {
                 while (true)
@@ -113,10 +107,12 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
+                    _telemetry.OnCatalogItems(JournalStorageTelemetry.Redis, 1);
                     cancellationToken.ThrowIfCancellationRequested();
                     var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
+                        _telemetry.OnCatalogEntry(JournalStorageTelemetry.Redis);
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }
@@ -135,6 +131,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
+                    _telemetry.OnCatalogItems(JournalStorageTelemetry.Redis, 1);
                     batch[count++] = metadataKeys.Current;
                 }
 
@@ -147,10 +144,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                 var reads = new Task<RedisValue>[count];
                 for (var i = 0; i < count; i++)
                 {
-                    var key = batch[i];
-                    reads[i] = _telemetry.TrackApiCallAsync(
-                        JournalStorageTelemetry.Redis, "hash_get",
-                        () => database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey));
+                    reads[i] = database.HashGetAsync(batch[i], RedisJournalStorage.JournalIdMetadataKey);
                 }
 
                 var values = await Task.WhenAll(reads).ConfigureAwait(false);
@@ -160,10 +154,10 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     var value = values[i];
                     if (value.IsNullOrEmpty)
                     {
-                        var key = batch[i];
-                        var result = (RedisResult[]?)await _telemetry.TrackApiCallAsync(
-                            JournalStorageTelemetry.Redis, "script_evaluate",
-                            () => database.ScriptEvaluateAsync(ReadJournalIdScript, [key], NoValues)).ConfigureAwait(false);
+                        var result = (RedisResult[]?)await database.ScriptEvaluateAsync(
+                            ReadJournalIdScript,
+                            [batch[i]],
+                            NoValues).ConfigureAwait(false);
                         cancellationToken.ThrowIfCancellationRequested();
                         if (result is not { Length: > 0 })
                         {
@@ -194,6 +188,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        _telemetry.OnCatalogEntry(JournalStorageTelemetry.Redis);
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }
@@ -221,10 +216,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
             onStop: Close);
     }
 
-    private Task Initialize(CancellationToken cancellationToken)
-        => _telemetry.TrackOperationAsync(JournalStorageTelemetry.Redis, "initialize", () => InitializeCore(cancellationToken));
-
-    private async Task InitializeCore(CancellationToken cancellationToken)
+    private async Task Initialize(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var (multiplexer, isShared) = await _options.CreateMultiplexer(_options).ConfigureAwait(false);
@@ -233,20 +225,16 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         _database = _connection.GetDatabase();
     }
 
-    private Task Close(CancellationToken cancellationToken)
-        => _telemetry.TrackOperationAsync(JournalStorageTelemetry.Redis, "close", () => CloseCore(cancellationToken));
-
-    private async Task CloseCore(CancellationToken cancellationToken)
+    private async Task Close(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var connection = _connection;
-        if (connection is null || _isSharedConnection)
+        if (_connection is null || _isSharedConnection)
         {
             return;
         }
 
-        await _telemetry.TrackApiCallAsync(JournalStorageTelemetry.Redis, "close", () => connection.CloseAsync()).ConfigureAwait(false);
-        connection.Dispose();
+        await _connection.CloseAsync().ConfigureAwait(false);
+        _connection.Dispose();
         _connection = null;
         _database = null;
     }

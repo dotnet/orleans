@@ -167,7 +167,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             {
                 if (attempt > 0)
                 {
-                    _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureTable, "metadata_conflict");
+                    _shared.Instruments.OnRetry("metadata_conflict");
                 }
 
                 var entity = await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false);
@@ -202,14 +202,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
                 try
                 {
-                    var response = await _shared.Instruments.TrackApiCallAsync(
-                        nameof(TableClient.UpdateEntityAsync),
-                        () => Table.UpdateEntityAsync(
-                            patch,
-                            expectedETag is null ? entity.ETag : ToAzureETag(expectedETag),
-                            TableUpdateMode.Merge,
-                            cancellationToken),
-                        static result => JournalStorageTelemetry.GetHttpStatus(result.Status)).ConfigureAwait(false);
+                    var response = await Table.UpdateEntityAsync(
+                        patch,
+                        expectedETag is null ? entity.ETag : ToAzureETag(expectedETag),
+                        TableUpdateMode.Merge,
+                        cancellationToken).ConfigureAwait(false);
                     var updatedETag = SetHeaderFromResponse(response, headerState.ProviderState);
                     succeeded = true;
                     return new JournalMetadata(
@@ -283,7 +280,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
                 try
                 {
-                    var result = await SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+                    var result = await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
 
                     LogAppend(_shared.Logger, value.Length, entities.Count, Table.Name, _partitionKey);
 
@@ -299,7 +296,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                         : null;
                     if (refreshed is not null)
                     {
-                        _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureTable, "metadata_only_conflict");
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -356,10 +353,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 try
                 {
                     // Delete the header under its ETag before row cleanup so a racing journal update cannot lose data.
-                    await _shared.Instruments.TrackApiCallAsync(
-                        nameof(TableClient.DeleteEntityAsync),
-                        () => Table.DeleteEntityAsync(_partitionKey, HeaderRowKey, deleteState.ETag, cancellationToken),
-                        static result => JournalStorageTelemetry.GetHttpStatus(result.Status)).ConfigureAwait(false);
+                    await Table.DeleteEntityAsync(_partitionKey, HeaderRowKey, deleteState.ETag, cancellationToken).ConfigureAwait(false);
                     SetHeader(eTag: default, providerState: default);
                     break;
                 }
@@ -371,7 +365,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     if (refreshed is { } refreshedState)
                     {
                         headerState = refreshedState;
-                        _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureTable, "metadata_only_conflict");
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -430,23 +424,18 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 // comes from the header so rows appended concurrently by another instance are not read.
                 var filter = TableClient.CreateQueryFilter(
                     $"PartitionKey eq {_partitionKey} and RowKey ge {FormatRowKey(generation, 0)} and RowKey le {FormatRowKey(generation, expectedRowCount - 1)}");
-                await foreach (var page in _shared.Instruments.TrackApiPages(
-                    nameof(TableClient.QueryAsync),
-                    Table.QueryAsync<TableEntity>(filter, cancellationToken: cancellationToken).AsPages()).ConfigureAwait(false))
+                await foreach (var row in Table.QueryAsync<TableEntity>(filter, cancellationToken: cancellationToken).ConfigureAwait(false))
                 {
-                    foreach (var row in page.Values)
+                    var expectedRowKey = FormatRowKey(generation, rowCount);
+                    if (!string.Equals(row.RowKey, expectedRowKey, StringComparison.Ordinal))
                     {
-                        var expectedRowKey = FormatRowKey(generation, rowCount);
-                        if (!string.Equals(row.RowKey, expectedRowKey, StringComparison.Ordinal))
-                        {
-                            throw CreateInconsistentHeaderStateException(
-                                $"Azure Table journal row sequence is invalid: expected \"{expectedRowKey}\", found \"{row.RowKey}\"; recovery is required.",
-                                headerState.ETag);
-                        }
-
-                        rowCount++;
-                        bytes += ReadChunks(row, buffer, consumer, metadata);
+                        throw CreateInconsistentHeaderStateException(
+                            $"Azure Table journal row sequence is invalid: expected \"{expectedRowKey}\", found \"{row.RowKey}\"; recovery is required.",
+                            headerState.ETag);
                     }
+
+                    rowCount++;
+                    bytes += ReadChunks(row, buffer, consumer, metadata);
                 }
             }
 
@@ -512,14 +501,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     try
                     {
                         // Flip the header under its ETag to publish the new generation only if the journal is unchanged.
-                        var response = await _shared.Instruments.TrackApiCallAsync(
-                            nameof(TableClient.UpdateEntityAsync),
-                            () => Table.UpdateEntityAsync(
-                                CreateHeaderFlipPatch(newGeneration, rowCount, value.Length),
-                                publishState.ETag,
-                                TableUpdateMode.Merge,
-                                cancellationToken),
-                            static result => JournalStorageTelemetry.GetHttpStatus(result.Status)).ConfigureAwait(false);
+                        var response = await Table.UpdateEntityAsync(
+                            CreateHeaderFlipPatch(newGeneration, rowCount, value.Length),
+                            publishState.ETag,
+                            TableUpdateMode.Merge,
+                            cancellationToken).ConfigureAwait(false);
                         published = true;
                         SetHeaderFromResponse(
                             response,
@@ -540,7 +526,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                         if (refreshed is { } refreshedState)
                         {
                             headerState = refreshedState;
-                            _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureTable, "metadata_only_conflict");
+                            _shared.Instruments.OnRetry("metadata_only_conflict");
                             continue;
                         }
 
@@ -618,7 +604,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
             if (!HeaderExists)
             {
-                _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureTable, "create_race");
+                _shared.Instruments.OnRetry("create_race");
             }
         }
     }
@@ -640,9 +626,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             [MetadataPropertyName] = SerializeCallerMetadata(callerMetadata),
         };
 
-        var response = await _shared.Instruments.TrackApiCallAsync(
-            nameof(TableClient.AddEntityAsync), () => Table.AddEntityAsync(entity, cancellationToken),
-            static result => JournalStorageTelemetry.GetHttpStatus(result.Status)).ConfigureAwait(false);
+        var response = await Table.AddEntityAsync(entity, cancellationToken).ConfigureAwait(false);
         return (
             response.Headers.ETag ?? default,
             new HeaderProviderState(
@@ -752,14 +736,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     {
         try
         {
-            var response = await _shared.Instruments.TrackApiCallAsync(
-                nameof(TableClient.GetEntityAsync),
-                () => Table.GetEntityAsync<TableEntity>(
-                    _partitionKey,
-                    HeaderRowKey,
-                    select: null,
-                    cancellationToken),
-                static result => JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)).ConfigureAwait(false);
+            var response = await Table.GetEntityAsync<TableEntity>(
+                _partitionKey,
+                HeaderRowKey,
+                select: null,
+                cancellationToken).ConfigureAwait(false);
             return response.Value;
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
@@ -783,7 +764,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             var entityBytes = GetEntityPayloadLength(entity);
             if (actions.Count > 0 && (actions.Count == MaxEntitiesPerTransaction || actionBytes + entityBytes > MaxAppendBytes))
             {
-                await SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+                await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
                 actions.Clear();
                 actionBytes = 0;
             }
@@ -794,7 +775,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
         if (actions.Count > 0)
         {
-            await SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+            await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
         }
 
         return sequence;
@@ -827,16 +808,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         var rowKeys = new List<string>();
         try
         {
-            await foreach (var page in _shared.Instruments.TrackApiPages(
-                nameof(TableClient.QueryAsync),
-                Table.QueryAsync<TableEntity>(filter, select: RowKeySelect, cancellationToken: cancellationToken).AsPages()).ConfigureAwait(false))
+            await foreach (var row in Table.QueryAsync<TableEntity>(filter, select: RowKeySelect, cancellationToken: cancellationToken).ConfigureAwait(false))
             {
-                foreach (var row in page.Values)
+                if (!string.Equals(row.RowKey, HeaderRowKey, StringComparison.Ordinal))
                 {
-                    if (!string.Equals(row.RowKey, HeaderRowKey, StringComparison.Ordinal))
-                    {
-                        rowKeys.Add(row.RowKey);
-                    }
+                    rowKeys.Add(row.RowKey);
                 }
             }
         }
@@ -859,14 +835,14 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                 actions.Add(new(TableTransactionActionType.Delete, new TableEntity(_partitionKey, rowKey), ETag.All));
                 if (actions.Count == MaxEntitiesPerTransaction)
                 {
-                    await SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+                    await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
                     actions.Clear();
                 }
             }
 
             if (actions.Count > 0)
             {
-                await SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
+                await Table.SubmitTransactionAsync(actions, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (RequestFailedException exception)
@@ -874,14 +850,6 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             LogRowCleanupFailure(_shared.Logger, Table.Name, _partitionKey, exception);
         }
     }
-
-    private Task<Response<IReadOnlyList<Response>>> SubmitTransactionAsync(
-        List<TableTransactionAction> actions, CancellationToken cancellationToken)
-        => _shared.Instruments.TrackApiCallAsync(
-            nameof(TableClient.SubmitTransactionAsync),
-            () => Table.SubmitTransactionAsync(actions, cancellationToken),
-            static result => JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status),
-            static result => result.Value.Count);
 
     private string CreateAllRowsFilter()
         => TableClient.CreateQueryFilter($"PartitionKey eq {_partitionKey}");

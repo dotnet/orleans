@@ -190,14 +190,14 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
                 try
                 {
-                    using var walResult = await _shared.Instruments.TrackApiCallAsync("get_object", () => _client.GetObjectAsync(
+                    using var walResult = await _client.GetObjectAsync(
                         new GetObjectRequest
                         {
                             BucketName = _shared.BucketName,
                             Key = _walObjectKey,
                             EtagToMatch = properties.ETag,
                         },
-                        cancellationToken)).ConfigureAwait(false);
+                        cancellationToken).ConfigureAwait(false);
                     var marker = RandomNumberGenerator.GetBytes(CompactedWalMarkerBytes);
                     await using var payload = CreateTemporaryPayloadStream();
                     await payload.WriteAsync(marker, cancellationToken).ConfigureAwait(false);
@@ -211,8 +211,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     payload.Position = 0;
                     var request = CreatePutObjectRequest(_walObjectKey, payload, metadata);
                     request.IfMatch = properties.ETag;
-                    var response = await _shared.Instruments.TrackApiCallAsync("put_object",
-                        () => _client.PutObjectAsync(request, cancellationToken)).ConfigureAwait(false);
+                    var response = await _client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
                     var updatedManifest = CreateWalManifest(metadata);
                     SetWal(
                         response.ETag,
@@ -382,8 +381,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                         deleteRequest.IfMatchLastModifiedTime = deleteWalState.LastModified;
                     }
 
-                    await _shared.Instruments.TrackApiCallAsync("delete_object",
-                        () => _client.DeleteObjectAsync(deleteRequest, cancellationToken)).ConfigureAwait(false);
+                    await _client.DeleteObjectAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
                     SetWal(eTag: null, providerState: default, lastModified: null);
                 }
                 catch (AmazonS3Exception exception) when (IsWalMutationConflict(exception))
@@ -459,13 +457,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             if (manifest.Checkpoint is { } checkpoint)
             {
                 checkpointObjectKey = checkpoint.Name;
-                using (var checkpointResult = await _shared.Instruments.TrackApiCallAsync("get_object", () => _client.GetObjectAsync(
+                using (var checkpointResult = await _client.GetObjectAsync(
                     new GetObjectRequest
                     {
                         BucketName = _shared.BucketName,
                         Key = checkpoint.Name,
                     },
-                    cancellationToken)).ConfigureAwait(false))
+                    cancellationToken).ConfigureAwait(false))
                 {
                     checkpointMetadata = ValidateCheckpointMetadata(checkpoint, CopyMetadata(checkpointResult.Metadata), expectedFormat);
                     await checkpointResult.ResponseStream.CopyToAsync(checkpointPayload!, cancellationToken).ConfigureAwait(false);
@@ -478,14 +476,14 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             GetObjectResponse walResult;
             try
             {
-                walResult = await _shared.Instruments.TrackApiCallAsync("get_object", () => _client.GetObjectAsync(
+                walResult = await _client.GetObjectAsync(
                     new GetObjectRequest
                     {
                         BucketName = _shared.BucketName,
                         Key = _walObjectKey,
                         EtagToMatch = walProperties.ETag,
                     },
-                    cancellationToken)).ConfigureAwait(false);
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
             {
@@ -680,7 +678,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         CancellationToken cancellationToken)
     {
         using var stream = new S3ReadOnlySequenceStream(value);
-        var response = await _shared.Instruments.TrackApiCallAsync("put_object", () => _client.PutObjectAsync(
+        var response = await _client.PutObjectAsync(
             new PutObjectRequest
             {
                 BucketName = _shared.BucketName,
@@ -691,7 +689,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 IfMatch = expectedETag,
                 WriteOffsetBytes = expectedProviderState.ContentLength,
             },
-            cancellationToken)).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         SetWal(
             response.ETag,
@@ -716,14 +714,14 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 $"Current WAL length: {expectedProviderState.ContentLength:N0} bytes. Append length: {value.Length:N0} bytes.");
         }
 
-        using var walResult = await _shared.Instruments.TrackApiCallAsync("get_object", () => _client.GetObjectAsync(
+        using var walResult = await _client.GetObjectAsync(
             new GetObjectRequest
             {
                 BucketName = _shared.BucketName,
                 Key = _walObjectKey,
                 EtagToMatch = expectedETag,
             },
-            cancellationToken)).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         var walMetadata = CopyMetadata(walResult.Metadata);
         var manifest = CreateWalManifest(walMetadata);
@@ -752,8 +750,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         payload.Position = 0;
         var request = CreatePutObjectRequest(_walObjectKey, payload, metadata);
         request.IfMatch = expectedETag;
-        var response = await _shared.Instruments.TrackApiCallAsync("put_object",
-            () => _client.PutObjectAsync(request, cancellationToken)).ConfigureAwait(false);
+        var response = await _client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
         SetWal(
             response.ETag,
             CreateWalProviderState(manifest, payload.Length, partsCount: 1),
@@ -936,8 +933,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         var request = CreatePutObjectRequest(_walObjectKey, stream, metadata);
         request.IfMatch = ifMatch;
         request.IfNoneMatch = ifNoneMatch ? "*" : null;
-        var response = await _shared.Instruments.TrackApiCallAsync("put_object",
-            () => _client.PutObjectAsync(request, cancellationToken)).ConfigureAwait(false);
+        var response = await _client.PutObjectAsync(request, cancellationToken).ConfigureAwait(false);
         var manifest = CreateWalManifest(metadata);
         return new CreatedWal(response, manifest, CreateWalProviderState(manifest, marker.Length, partsCount: 1));
     }
@@ -957,8 +953,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     checkpointStream,
                     CreateCheckpointObjectMetadata());
                 checkpointRequest.IfNoneMatch = "*";
-                await _shared.Instruments.TrackApiCallAsync("put_object",
-                    () => _client.PutObjectAsync(checkpointRequest, cancellationToken)).ConfigureAwait(false);
+                await _client.PutObjectAsync(checkpointRequest, cancellationToken).ConfigureAwait(false);
                 return true;
             }
             catch (AmazonS3Exception exception) when (IsObjectAlreadyExists(exception))
@@ -1031,13 +1026,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     {
         try
         {
-            await _shared.Instruments.TrackApiCallAsync("delete_object", () => _client.DeleteObjectAsync(
+            await _client.DeleteObjectAsync(
                 new DeleteObjectRequest
                 {
                     BucketName = _shared.BucketName,
                     Key = checkpointName,
                 },
-                cancellationToken)).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
         }
         catch (AmazonS3Exception exception)
         {
@@ -1073,13 +1068,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     {
         try
         {
-            await _shared.Instruments.TrackApiCallAsync("head_object", () => _client.GetObjectMetadataAsync(
+            await _client.GetObjectMetadataAsync(
                 new GetObjectMetadataRequest
                 {
                     BucketName = _shared.BucketName,
                     Key = key,
                 },
-                cancellationToken)).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
@@ -1243,14 +1238,14 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     {
         try
         {
-            return await _shared.Instruments.TrackApiCallAsync("head_object", () => _client.GetObjectMetadataAsync(
+            return await _client.GetObjectMetadataAsync(
                 new GetObjectMetadataRequest
                 {
                     BucketName = _shared.BucketName,
                     Key = _walObjectKey,
                     EtagToMatch = expectedETag,
                 },
-                cancellationToken)).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
         }
         catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
         {
@@ -1276,7 +1271,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
         try
         {
-            var partProperties = await _shared.Instruments.TrackApiCallAsync("head_object", () => _client.GetObjectMetadataAsync(
+            var partProperties = await _client.GetObjectMetadataAsync(
                 new GetObjectMetadataRequest
                 {
                     BucketName = _shared.BucketName,
@@ -1284,7 +1279,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     EtagToMatch = expectedETag,
                     PartNumber = 1,
                 },
-                cancellationToken)).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
             return partProperties.PartsCount ?? reportedPartsCount ?? 1;
         }
         catch (AmazonS3Exception exception) when (IsWalMutationConflict(exception))

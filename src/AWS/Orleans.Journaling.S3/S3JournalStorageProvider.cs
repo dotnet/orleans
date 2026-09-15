@@ -13,7 +13,6 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 {
     private static readonly TimeSpan MaximumTaskDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
     private readonly S3JournalStorageOptions _options;
-    private readonly S3JournalStorageInstruments _instruments;
     private readonly S3JournalStorage.S3JournalStorageShared _shared;
     private IAmazonS3? _client;
 
@@ -28,11 +27,10 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         ValidateOptions(_options);
         var journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
         var journalFormat = GetJournalFormat(serviceProvider, journalFormatKey);
-        _instruments = instruments ?? S3JournalStorageInstruments.CreateForDirectConstruction();
         _shared = new S3JournalStorage.S3JournalStorageShared(
             logger,
             options,
-            _instruments,
+            instruments ?? S3JournalStorageInstruments.CreateForDirectConstruction(),
             mimeType: journalFormat.MimeType,
             journalFormatKey);
     }
@@ -44,18 +42,10 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        return new InstrumentedJournalStorage(
-            new S3JournalStorage(_shared, GetClient(), journalId),
-            JournalStorageTelemetry.S3,
-            _instruments.Telemetry);
+        return new S3JournalStorage(_shared, GetClient(), journalId);
     }
 
-    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
-        CancellationToken cancellationToken = default)
-        => _instruments.Telemetry.TrackCatalog(JournalStorageTelemetry.S3, ListCoreAsync(options, cancellationToken));
-
-    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -105,7 +95,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 
         do
         {
-            var response = await _instruments.TrackApiCallAsync("list_objects_v2", () => client.ListObjectsV2Async(
+            var response = await client.ListObjectsV2Async(
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
@@ -114,7 +104,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                     MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
-                cancellationToken), static result => result.S3Objects?.Count ?? 0).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
+            _shared.Instruments.OnCatalogPage(response.S3Objects?.Count ?? 0);
 
             cancellationToken.ThrowIfCancellationRequested();
             // AWS SDK v4 represents an empty listing page with a null collection.
@@ -129,6 +120,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 if (TryGetJournalId(item.Key, range, out var id))
                 {
                     // ListObjectsV2 cannot project the complete journal metadata without a separate request.
+                    _shared.Instruments.OnCatalogEntry();
                     yield return new JournalCatalogEntry(id);
                 }
             }
@@ -168,11 +160,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             onStop: CloseAsync);
     }
 
-    internal Task InitializeAsync(CancellationToken cancellationToken)
-        => _instruments.Telemetry.TrackOperationAsync(
-            JournalStorageTelemetry.S3, "initialize", () => InitializeCoreAsync(cancellationToken));
-
-    private async Task InitializeCoreAsync(CancellationToken cancellationToken)
+    internal async Task InitializeAsync(CancellationToken cancellationToken)
     {
         var client = await _options.GetCreateClient()(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The configured S3 client factory returned null.");
@@ -193,9 +181,6 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     }
 
     internal Task CloseAsync(CancellationToken cancellationToken)
-        => _instruments.Telemetry.TrackOperationAsync(JournalStorageTelemetry.S3, "close", CloseCoreAsync);
-
-    private Task CloseCoreAsync()
     {
         var client = _client;
         _client = null;
@@ -222,24 +207,21 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         return bucketName;
     }
 
-    private async Task EnsureBucketAsync(IAmazonS3 client, string bucketName, bool createIfMissing, CancellationToken cancellationToken)
+    private static async Task EnsureBucketAsync(IAmazonS3 client, string bucketName, bool createIfMissing, CancellationToken cancellationToken)
     {
         try
         {
-            await _instruments.TrackApiCallAsync("head_bucket",
-                () => client.HeadBucketAsync(new HeadBucketRequest { BucketName = bucketName }, cancellationToken)).ConfigureAwait(false);
+            await client.HeadBucketAsync(new HeadBucketRequest { BucketName = bucketName }, cancellationToken).ConfigureAwait(false);
         }
         catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.NotFound && createIfMissing)
         {
             try
             {
-                await _instruments.TrackApiCallAsync("create_bucket",
-                    () => client.PutBucketAsync(new PutBucketRequest { BucketName = bucketName }, cancellationToken)).ConfigureAwait(false);
+                await client.PutBucketAsync(new PutBucketRequest { BucketName = bucketName }, cancellationToken).ConfigureAwait(false);
             }
             catch (AmazonS3Exception createException) when (createException.StatusCode is HttpStatusCode.Conflict)
             {
-                await _instruments.TrackApiCallAsync("head_bucket",
-                    () => client.HeadBucketAsync(new HeadBucketRequest { BucketName = bucketName }, cancellationToken)).ConfigureAwait(false);
+                await client.HeadBucketAsync(new HeadBucketRequest { BucketName = bucketName }, cancellationToken).ConfigureAwait(false);
             }
         }
     }

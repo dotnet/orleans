@@ -1,26 +1,21 @@
 using System.Diagnostics.Metrics;
-using Azure;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureTableJournalStorageInstruments(OrleansInstruments instruments, TimeProvider? clock = null)
+internal sealed class AzureTableJournalStorageInstruments(OrleansInstruments instruments)
 {
-    internal JournalStorageTelemetry Telemetry { get; } = new(instruments, clock);
+    private readonly JournalStorageTelemetry _telemetry = new(instruments);
 
-    internal Task<T> TrackApiCallAsync<T>(
-        string api, Func<Task<T>> call, Func<T, string>? classifyResult = null, Func<T, long>? countItems = null)
-        => Telemetry.TrackApiCallAsync(JournalStorageTelemetry.AzureTable, api, call, ClassifyException, classifyResult, countItems);
+    internal void OnCatalogPage(long items)
+        => _telemetry.OnCatalogPage(JournalStorageTelemetry.AzureTable, items);
 
-    internal IAsyncEnumerable<Page<T>> TrackApiPages<T>(string api, IAsyncEnumerable<Page<T>> pages)
-        where T : notnull
-        => Telemetry.TrackApiPages(JournalStorageTelemetry.AzureTable, api, pages, static page => page.Values.Count, ClassifyException);
+    internal void OnCatalogEntry()
+        => _telemetry.OnCatalogEntry(JournalStorageTelemetry.AzureTable);
 
-    private static string ClassifyException(Exception exception)
-        => exception is RequestFailedException request
-            ? JournalStorageTelemetry.GetHttpStatus(request.Status)
-            : JournalStorageTelemetry.GetExceptionStatus(exception);
+    internal void OnRetry(string reason)
+        => _telemetry.OnRetry(JournalStorageTelemetry.AzureTable, reason);
 
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";

@@ -72,16 +72,11 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
         }
 
-        return new InstrumentedJournalStorage(new VolatileJournalStorage(store, journalFormatKey), JournalStorageTelemetry.Volatile, _telemetry);
+        return new VolatileJournalStorage(store, journalFormatKey);
     }
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
-        CancellationToken cancellationToken = default)
-        => _telemetry.TrackCatalog(JournalStorageTelemetry.Volatile, ListCoreAsync(options, cancellationToken));
-
-    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -133,6 +128,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            _telemetry.OnCatalogEntry(JournalStorageTelemetry.Volatile);
             yield return new JournalCatalogEntry(new JournalId(key), metadata);
         }
 

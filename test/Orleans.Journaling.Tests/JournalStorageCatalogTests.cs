@@ -38,140 +38,116 @@ public sealed class JournalStorageCatalogTests
     });
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", 2)]
-    [InlineData("AzureTable", "azure_table", 1)]
-    public async Task AzureInitialize_TelemetryPreservesAlreadyExistingResourceResponses(
-        string kind, string provider, int expectedCalls)
+    [InlineData("AzureBlob", "azure_blob")]
+    [InlineData("AzureTable", "azure_table")]
+    public async Task AzureListAsync_TelemetryCountsReturnedPagesAndNativeItemsBeforeFiltering(
+        string kind, string provider)
     {
         using var metrics = new AzureJournalStorageMetricsFixture(provider);
-        await using var context = await CreateAsync(kind, ["a"], initialize: false, metrics: metrics);
-        context.Native.ResourceAlreadyExists = true;
-        context.Native.BeforeSetup = () => metrics.Clock.Advance(TimeSpan.FromMilliseconds(5));
-
-        await context.InitializeAsync();
-
-        var calls = metrics.Calls.GetMeasurementSnapshot();
-        Assert.Equal(expectedCalls, calls.Count);
-        Assert.Equal(expectedCalls, context.Native.SetupCalls);
-        Assert.All(calls, call =>
-        {
-            Assert.Equal(provider, call.Tags["provider"]);
-            Assert.Equal("CreateIfNotExistsAsync", call.Tags["api"]);
-            Assert.Equal("already_exists", call.Tags["status"]);
-            Assert.Equal(1, call.Value);
-        });
-        Assert.All(metrics.ApiDuration.GetMeasurementSnapshot(), duration => Assert.Equal(5, duration.Value));
-        var operation = Assert.Single(metrics.Operations.GetMeasurementSnapshot());
-        Assert.Equal("initialize", operation.Tags["operation"]);
-        Assert.Equal("ok", operation.Tags["status"]);
-        Assert.Equal(1, operation.Value);
-        Assert.Equal(expectedCalls * 5, Assert.Single(metrics.OperationDuration.GetMeasurementSnapshot()).Value);
-        Assert.Equal(["a"], await DrainAsync(context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
-    }
-
-    [Theory]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync")]
-    public async Task AzureListAsync_TelemetryCountsEmptyAndContinuationPagesExcludingConsumerPauses(
-        string kind, string provider, string api)
-    {
-        using var metrics = new AzureJournalStorageMetricsFixture(provider);
-        await using var context = await CreateAsync(kind, ["a", "b", "c"], metrics: metrics);
+        await using var context = await CreateAsync(kind, [], metrics: metrics,
+            blobs: [Blob("wal/a", BlobType.Block), Blob("wal/b"), Blob("wal/c")],
+            headers:
+            [
+                Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("a"))),
+                Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("b")), "b"),
+                Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("c")), "c"),
+            ]);
         context.Native.EmptyFirstPage = true;
-        context.Native.BeforeRequest = () => metrics.Clock.Advance(TimeSpan.FromMilliseconds(5));
 
         var entries = new List<string>();
-        await foreach (var entry in context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken))
+        await using (var enumerator = context.Catalog.ListAsync(
+            cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
-            entries.Add(entry.Id.Value);
-            metrics.Clock.Advance(TimeSpan.FromHours(1));
+            while (await enumerator.MoveNextAsync())
+            {
+                entries.Add(enumerator.Current.Id.Value);
+            }
+
+            Assert.False(await enumerator.MoveNextAsync());
         }
 
-        Assert.Equal(["a", "b", "c"], entries);
+        Assert.Equal(["b", "c"], entries);
         Assert.Equal([0, 2, 1], context.Native.Requests.Select(request => request.ResultCount));
-        var calls = metrics.Calls.GetMeasurementSnapshot();
-        Assert.Equal(kind == "AzureBlob" ? 5 : 4, calls.Count);
-        Assert.All(calls, call =>
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+        Assert.Equal([1L, 1L, 1L], metrics.Pages.GetMeasurementSnapshot().Select(measurement => measurement.Value));
+        Assert.All(metrics.Pages.GetMeasurementSnapshot(), page =>
         {
-            Assert.Equal(3, call.Tags.Count);
-            Assert.Equal(provider, call.Tags["provider"]);
-            Assert.Equal("ok", call.Tags["status"]);
-            Assert.Equal(1, call.Value);
+            Assert.Single(page.Tags);
+            Assert.Equal(provider, page.Tags["provider"]);
         });
-        Assert.Equal(3, calls.Count(call => Equals(call.Tags["api"], api)));
-        Assert.Equal([5d, 5d, 5d], metrics.ApiDuration.GetMeasurementSnapshot()
-            .Where(measurement => Equals(measurement.Tags["api"], api)).Select(measurement => measurement.Value));
         Assert.Equal([2L, 1L], metrics.Items.GetMeasurementSnapshot().Select(measurement => measurement.Value));
-        Assert.Equal(3, metrics.Entries.GetMeasurementSnapshot().Sum(measurement => measurement.Value));
-        var operation = Assert.Single(metrics.Operations.GetMeasurementSnapshot(),
-            measurement => Equals(measurement.Tags["operation"], "list"));
-        Assert.Equal("ok", operation.Tags["status"]);
-        Assert.Equal(provider, operation.Tags["provider"]);
-        Assert.Equal(1, operation.Value);
-        var duration = Assert.Single(metrics.OperationDuration.GetMeasurementSnapshot(),
-            measurement => Equals(measurement.Tags["operation"], "list"));
-        Assert.Equal(15, duration.Value);
+        Assert.All(metrics.Items.GetMeasurementSnapshot(), item =>
+        {
+            Assert.Single(item.Tags);
+            Assert.Equal(provider, item.Tags["provider"]);
+        });
+        Assert.Equal([1L, 1L], metrics.Entries.GetMeasurementSnapshot().Select(measurement => measurement.Value));
+        Assert.All(metrics.Entries.GetMeasurementSnapshot(), entry =>
+        {
+            Assert.Single(entry.Tags);
+            Assert.Equal(provider, entry.Tags["provider"]);
+        });
+        Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", false)]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", true)]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", false)]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", true)]
-    public async Task AzureListAsync_TelemetryRecordsFailedPageAndEarlyDisposalOnce(
-        string kind, string provider, string api, bool fail)
+    [InlineData("AzureBlob", "azure_blob", false)]
+    [InlineData("AzureBlob", "azure_blob", true)]
+    [InlineData("AzureTable", "azure_table", false)]
+    [InlineData("AzureTable", "azure_table", true)]
+    public async Task AzureListAsync_TelemetryPreservesReturnedPageCountsAfterFailureOrDisposal(
+        string kind, string provider, bool fail)
     {
         using var metrics = new AzureJournalStorageMetricsFixture(provider);
         await using var context = await CreateAsync(kind, ["a", "b", "c"], metrics: metrics);
-        context.Native.BeforeRequest = () => metrics.Clock.Advance(TimeSpan.FromMilliseconds(5));
         context.Native.Failure = new RequestFailedException(503, "unavailable");
         context.Native.FailureAtRequest = 2;
         await using (var enumerator = context.Catalog.ListAsync(
             cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            metrics.Clock.Advance(TimeSpan.FromHours(1));
+            Assert.Equal("a", enumerator.Current.Id.Value);
             if (fail)
             {
                 Assert.True(await enumerator.MoveNextAsync());
-                await Assert.ThrowsAsync<RequestFailedException>(() => enumerator.MoveNextAsync().AsTask());
+                Assert.Equal("b", enumerator.Current.Id.Value);
+                var actual = await Assert.ThrowsAsync<RequestFailedException>(() => enumerator.MoveNextAsync().AsTask());
+                Assert.Same(context.Native.Failure, actual);
+                Assert.False(await enumerator.MoveNextAsync());
             }
         }
 
-        var calls = metrics.Calls.GetMeasurementSnapshot().Where(call => Equals(call.Tags["api"], api)).ToArray();
-        Assert.Equal(fail ? new[] { "ok", "unavailable" } : ["ok"], calls.Select(call => call.Tags["status"]));
-        Assert.Equal(fail ? 2 : 1, calls.Length);
-        var operation = Assert.Single(metrics.Operations.GetMeasurementSnapshot(),
-            measurement => Equals(measurement.Tags["operation"], "list"));
-        Assert.Equal(fail ? "error" : "disposed", operation.Tags["status"]);
-        Assert.Equal(1, operation.Value);
-        var duration = Assert.Single(metrics.OperationDuration.GetMeasurementSnapshot(),
-            measurement => Equals(measurement.Tags["operation"], "list"));
-        Assert.Equal(fail ? 10 : 5, duration.Value);
-        Assert.Equal(fail ? 2 : 1, metrics.Entries.GetMeasurementSnapshot().Sum(measurement => measurement.Value));
+        Assert.Equal(fail ? 2 : 1, context.Native.Requests.Count);
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+        var page = Assert.Single(metrics.Pages.GetMeasurementSnapshot());
+        Assert.Equal(1, page.Value);
+        Assert.Single(page.Tags);
+        Assert.Equal(provider, page.Tags["provider"]);
+        var items = Assert.Single(metrics.Items.GetMeasurementSnapshot());
+        Assert.Equal(2, items.Value);
+        Assert.Single(items.Tags);
+        Assert.Equal(provider, items.Tags["provider"]);
+        var entries = metrics.Entries.GetMeasurementSnapshot();
+        Assert.Equal(fail ? 2 : 1, entries.Count);
+        Assert.All(entries, entry =>
+        {
+            Assert.Equal(1, entry.Value);
+            Assert.Single(entry.Tags);
+            Assert.Equal(provider, entry.Tags["provider"]);
+        });
+        Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 404, "not_found")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 409, "conflict")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 412, "conflict")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 429, "throttled")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 500, "error")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 503, "unavailable")]
-    [InlineData("AzureBlob", "azure_blob", "GetBlobsAsync", 0, "canceled")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 404, "not_found")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 409, "conflict")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 412, "conflict")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 429, "throttled")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 500, "error")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 503, "unavailable")]
-    [InlineData("AzureTable", "azure_table", "QueryAsync", 0, "canceled")]
-    public async Task AzureListAsync_TelemetryClassifiesSdkPageFailures(
-        string kind, string provider, string api, int status, string expectedStatus)
+    [InlineData("AzureBlob", "azure_blob", 503)]
+    [InlineData("AzureBlob", "azure_blob", 0)]
+    [InlineData("AzureTable", "azure_table", 503)]
+    [InlineData("AzureTable", "azure_table", 0)]
+    public async Task AzureListAsync_TelemetryDoesNotCountFailedFirstPage(
+        string kind, string provider, int status)
     {
         using var metrics = new AzureJournalStorageMetricsFixture(provider);
         await using var context = await CreateAsync(kind, [], metrics: metrics);
-        context.Native.BeforeRequest = () => metrics.Clock.Advance(TimeSpan.FromMilliseconds(7));
         context.Native.Failure = status == 0
             ? new OperationCanceledException(TestContext.Current.CancellationToken)
             : new RequestFailedException(status, "native failure");
@@ -181,48 +157,57 @@ public sealed class JournalStorageCatalogTests
             context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
 
         Assert.Same(context.Native.Failure, exception);
-        var call = Assert.Single(metrics.Calls.GetMeasurementSnapshot(), call => Equals(call.Tags["api"], api));
-        Assert.Equal(expectedStatus, call.Tags["status"]);
-        Assert.Equal(provider, call.Tags["provider"]);
-        Assert.Equal(1, call.Value);
-        Assert.Equal(7, Assert.Single(metrics.ApiDuration.GetMeasurementSnapshot(),
-            call => Equals(call.Tags["api"], api)).Value);
+        Assert.Single(context.Native.Requests);
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+        Assert.Empty(metrics.Pages.GetMeasurementSnapshot());
         Assert.Empty(metrics.Items.GetMeasurementSnapshot());
         Assert.Empty(metrics.Entries.GetMeasurementSnapshot());
-        var operation = Assert.Single(metrics.Operations.GetMeasurementSnapshot(),
-            measurement => Equals(measurement.Tags["operation"], "list"));
-        Assert.Equal(status == 0 ? "canceled" : "error", operation.Tags["status"]);
+        Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", "GetPropertiesAsync")]
-    [InlineData("AzureTable", "azure_table", "GetEntityAsync")]
-    public async Task AzureStorage_TelemetrySeparatesLogicalConditionalOutcomeFromNativeCalls(
-        string kind, string provider, string api)
+    [InlineData("AzureBlob", "azure_blob", false)]
+    [InlineData("AzureBlob", "azure_blob", true)]
+    [InlineData("AzureTable", "azure_table", false)]
+    [InlineData("AzureTable", "azure_table", true)]
+    public async Task AzureListAsync_NativeDisposalFailurePropagatesWithoutChangingCatalogCounts(
+        string kind, string provider, bool stopEarly)
     {
         using var metrics = new AzureJournalStorageMetricsFixture(provider);
-        await using var context = await CreateAsync(kind, ["a"], metrics: metrics);
-        var storage = context.Provider.CreateStorage(new("a"));
-        var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
-        Assert.NotNull(metadata);
-        context.Native.CurrentETag = new ETag("changed");
+        await using var context = await CreateAsync(kind, ["a", "b", "c"], metrics: metrics);
+        var failure = new InvalidOperationException("native catalog disposal failed");
+        context.Native.DisposalFailure = failure;
+        await using (var enumerator = context.Catalog.ListAsync(
+            cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
+        {
+            Assert.True(await enumerator.MoveNextAsync());
+            Assert.Equal("a", enumerator.Current.Id.Value);
+            if (stopEarly)
+            {
+                Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => enumerator.DisposeAsync().AsTask()));
+            }
+            else
+            {
+                Assert.True(await enumerator.MoveNextAsync());
+                Assert.Equal("b", enumerator.Current.Id.Value);
+                Assert.True(await enumerator.MoveNextAsync());
+                Assert.Equal("c", enumerator.Current.Id.Value);
+                Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => enumerator.MoveNextAsync().AsTask()));
+            }
+        }
 
-        Assert.Null(await storage.UpdateMetadataAsync(
-            set: new Dictionary<string, string> { ["owner"] = "bob" }, expectedETag: metadata.ETag,
-            cancellationToken: TestContext.Current.CancellationToken));
-
-        var calls = metrics.Calls.GetMeasurementSnapshot().Where(call => Equals(call.Tags["api"], api)).ToArray();
-        Assert.Equal(2, calls.Length);
-        Assert.Equal("ok", calls[0].Tags["status"]);
-        Assert.Equal(kind == "AzureBlob" ? "conflict" : "ok", calls[1].Tags["status"]);
-        var get = Assert.Single(metrics.Operations.GetMeasurementSnapshot(),
-            operation => Equals(operation.Tags["operation"], "get_metadata"));
-        Assert.Equal(provider, get.Tags["provider"]);
-        Assert.Equal("ok", get.Tags["status"]);
-        var update = Assert.Single(metrics.Operations.GetMeasurementSnapshot(),
-            operation => Equals(operation.Tags["operation"], "update_metadata"));
-        Assert.Equal(provider, update.Tags["provider"]);
-        Assert.Equal("not_applied", update.Tags["status"]);
+        Assert.Equal(!stopEarly, context.Native.ReachedEndBeforeDisposal);
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+        Assert.Equal(stopEarly ? 1 : 2, context.Native.Requests.Count);
+        Assert.Equal(stopEarly ? new long[] { 1 } : [1, 1],
+            metrics.Pages.GetMeasurementSnapshot().Select(page => page.Value));
+        Assert.Equal(stopEarly ? new long[] { 2 } : [2, 1],
+            metrics.Items.GetMeasurementSnapshot().Select(item => item.Value));
+        Assert.Equal(stopEarly ? new long[] { 1 } : [1, 1, 1],
+            metrics.Entries.GetMeasurementSnapshot().Select(entry => entry.Value));
+        Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
     }
 
     [Theory]
@@ -513,7 +498,9 @@ public sealed class JournalStorageCatalogTests
     [InlineData("S3")]
     public async Task ListAsync_EmptyRangeDoesNotRequestStorage(string kind)
     {
-        await using var context = await CreateAsync(kind, ["tenant/a"]);
+        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
+            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+        await using var context = await CreateAsync(kind, ["tenant/a"], metrics: metrics);
         Assert.Empty(await DrainAsync(context.Catalog.ListAsync(
             new() { MinId = new("z"), MaxId = new("a") }, TestContext.Current.CancellationToken)));
         Assert.Empty(await DrainAsync(context.Catalog.ListAsync(
@@ -521,6 +508,13 @@ public sealed class JournalStorageCatalogTests
         Assert.Empty(await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new("tenant"), MaxId = new("a") }, TestContext.Current.CancellationToken)));
         Assert.Empty(context.Native.Requests);
+        if (metrics is not null)
+        {
+            Assert.Empty(metrics.Pages.GetMeasurementSnapshot());
+            Assert.Empty(metrics.Items.GetMeasurementSnapshot());
+            Assert.Empty(metrics.Entries.GetMeasurementSnapshot());
+            Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
+        }
     }
 
     [Theory]
@@ -624,7 +618,9 @@ public sealed class JournalStorageCatalogTests
     [InlineData("S3")]
     public async Task ListAsync_CancellationBeforeAndBetweenResultsPropagates(string kind)
     {
-        await using var context = await CreateAsync(kind, ["z", "a", "b"]);
+        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
+            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+        await using var context = await CreateAsync(kind, ["z", "a", "b"], metrics: metrics);
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
         await using (var enumerator = context.Catalog.ListAsync(cancellationToken: canceled.Token).GetAsyncEnumerator(canceled.Token))
@@ -632,6 +628,12 @@ public sealed class JournalStorageCatalogTests
             var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
             Assert.Equal(canceled.Token, exception.CancellationToken);
             Assert.Empty(context.Native.Requests);
+            if (metrics is not null)
+            {
+                Assert.Empty(metrics.Pages.GetMeasurementSnapshot());
+                Assert.Empty(metrics.Items.GetMeasurementSnapshot());
+                Assert.Empty(metrics.Entries.GetMeasurementSnapshot());
+            }
         }
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -642,6 +644,13 @@ public sealed class JournalStorageCatalogTests
         var actual = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => active.MoveNextAsync().AsTask());
         Assert.Equal(cancellation.Token, actual.CancellationToken);
         Assert.Equal(requests, context.Native.Requests.Count);
+        if (metrics is not null)
+        {
+            Assert.Equal(1, Assert.Single(metrics.Pages.GetMeasurementSnapshot()).Value);
+            Assert.Equal(2, Assert.Single(metrics.Items.GetMeasurementSnapshot()).Value);
+            Assert.Equal(1, Assert.Single(metrics.Entries.GetMeasurementSnapshot()).Value);
+            Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
+        }
     }
 
     [Theory]
@@ -652,7 +661,9 @@ public sealed class JournalStorageCatalogTests
     {
         foreach (var empty in new[] { false, true })
         {
-            await using var context = await CreateAsync(kind, empty ? [] : ["z", "a"]);
+            using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
+                : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+            await using var context = await CreateAsync(kind, empty ? [] : ["z", "a"], metrics: metrics);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             context.Native.BeforeResponse = cancellation.Cancel;
             await using var enumerator = context.Catalog.ListAsync(
@@ -663,6 +674,13 @@ public sealed class JournalStorageCatalogTests
             var request = Assert.Single(context.Native.Requests);
             Assert.Equal(empty || kind == "AzureTable" ? 0 : 2, request.ResultCount);
             Assert.Equal(cancellation.Token, request.CancellationToken);
+            if (metrics is not null)
+            {
+                Assert.Equal(1, Assert.Single(metrics.Pages.GetMeasurementSnapshot()).Value);
+                Assert.Equal(request.ResultCount, metrics.Items.GetMeasurementSnapshot().Sum(item => item.Value));
+                Assert.Empty(metrics.Entries.GetMeasurementSnapshot());
+                Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
+            }
         }
     }
 
@@ -1726,13 +1744,12 @@ public sealed class JournalStorageCatalogTests
         public bool EmptyFirstPage { get; set; }
         public bool HierarchicalNamespace { get; set; }
         public Exception? Failure { get; set; }
+        public Exception? DisposalFailure { get; set; }
+        public bool ReachedEndBeforeDisposal { get; set; }
         public int FailureAtRequest { get; set; }
         public Action? BeforeResponse { get; set; }
-        public Action? BeforeRequest { get; set; }
         public int DisposedEnumerators { get; set; }
         public int SetupCalls { get; set; }
-        public bool ResourceAlreadyExists { get; set; }
-        public Action? BeforeSetup { get; set; }
         public int FailingSetup { get; set; }
         public Exception? SetupFailure { get; set; }
         public string? Filter { get; set; }
@@ -1747,7 +1764,6 @@ public sealed class JournalStorageCatalogTests
             var count = cursor is null && EmptyFirstPage ? 0 : Math.Min(Math.Min(2, maximum ?? 2), records.Length - offset);
             var next = offset + count < records.Length ? $"native:{offset + count}" : null;
             Requests.Add(new(cursor, maximum, prefix, cancellationToken, count, next, lowerStart));
-            BeforeRequest?.Invoke();
             if (Requests.Count == FailureAtRequest && Failure is { } failure)
             {
                 throw failure;
@@ -1763,7 +1779,13 @@ public sealed class JournalStorageCatalogTests
     private sealed class FakePageable<T>(NativeState state, T[] records, int? maximum, string? prefix, CancellationToken token, string? lowerStart = null) : AsyncPageable<T>
         where T : notnull
     {
-        public override async IAsyncEnumerable<Page<T>> AsPages(string? continuationToken = null, int? pageSizeHint = null)
+        public override IAsyncEnumerable<Page<T>> AsPages(string? continuationToken = null, int? pageSizeHint = null)
+        {
+            var pages = EnumeratePages(continuationToken, pageSizeHint);
+            return state.DisposalFailure is null ? pages : new FailingDisposalPages(pages, state);
+        }
+
+        private async IAsyncEnumerable<Page<T>> EnumeratePages(string? continuationToken, int? pageSizeHint)
         {
             try
             {
@@ -1779,6 +1801,30 @@ public sealed class JournalStorageCatalogTests
             finally
             {
                 state.DisposedEnumerators++;
+            }
+        }
+
+        private sealed class FailingDisposalPages(IAsyncEnumerable<Page<T>> pages, NativeState state) : IAsyncEnumerable<Page<T>>
+        {
+            public IAsyncEnumerator<Page<T>> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+                => new Enumerator(pages.GetAsyncEnumerator(cancellationToken), state);
+
+            private sealed class Enumerator(IAsyncEnumerator<Page<T>> inner, NativeState state) : IAsyncEnumerator<Page<T>>
+            {
+                public Page<T> Current => inner.Current;
+
+                public async ValueTask<bool> MoveNextAsync()
+                {
+                    var result = await inner.MoveNextAsync();
+                    state.ReachedEndBeforeDisposal = !result;
+                    return result;
+                }
+
+                public async ValueTask DisposeAsync()
+                {
+                    await inner.DisposeAsync();
+                    throw state.DisposalFailure!;
+                }
             }
         }
     }
@@ -1803,15 +1849,9 @@ public sealed class JournalStorageCatalogTests
             BlobContainerEncryptionScopeOptions? encryptionScopeOptions = null,
             CancellationToken cancellationToken = default)
         {
-            state.BeforeSetup?.Invoke();
             if (++state.SetupCalls == state.FailingSetup && state.SetupFailure is { } failure)
             {
                 return Task.FromException<Response<BlobContainerInfo>>(failure);
-            }
-
-            if (state.ResourceAlreadyExists)
-            {
-                return Task.FromResult<Response<BlobContainerInfo>>(null!);
             }
 
             return Task.FromResult(Response.FromValue(
@@ -1891,12 +1931,7 @@ public sealed class JournalStorageCatalogTests
         }
 
         public override Task<Response<TableItem>> CreateIfNotExistsAsync(CancellationToken cancellationToken = default)
-        {
-            state.SetupCalls++;
-            state.BeforeSetup?.Invoke();
-            return Task.FromResult(Response.FromValue(
-                new TableItem("journals"), new FakeResponse(state.ResourceAlreadyExists ? 409 : 200)));
-        }
+            => Task.FromResult(Response.FromValue(new TableItem("journals"), new FakeResponse()));
 
         public override AsyncPageable<T> QueryAsync<T>(
             string? filter = null, int? maxPerPage = null, IEnumerable<string>? select = null,
@@ -2025,9 +2060,9 @@ public sealed class JournalStorageCatalogTests
         public void Dispose() { }
     }
 
-    private sealed class FakeResponse(int status = 200) : Response
+    private sealed class FakeResponse : Response
     {
-        public override int Status => status;
+        public override int Status => 200;
         public override string ReasonPhrase => "OK";
         public override Stream? ContentStream { get; set; }
         public override string ClientRequestId { get; set; } = string.Empty;

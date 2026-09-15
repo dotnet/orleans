@@ -20,33 +20,42 @@ At minimum, dashboard and alert on:
 - Storage-operation queue duration, which shows time waiting behind earlier work for the same journal.
 - Compaction triggers by `storage_requested`, `migration`, and `user_snapshot`.
 - Write coalescing, gathered state count, and operation byte distributions.
-- Provider-level storage and catalog operation outcomes and latency, grouped by `provider` and `operation`.
-- Underlying SDK call rates and latency, grouped by `provider`, `api`, and `status`.
+- Catalog page and candidate counts, grouped by `provider`.
 - Native listing item counts compared with delivered catalog entries, and explicit provider retry rates.
 
 Correlate these signals with grain identity, provider dependency health, deployment version, and storage throttling.
 
-### Monitor API cost and latency
+### Monitor catalog traversal and retries
 
-The provider-agnostic `orleans-journaling-provider-operations` counter covers calls to provider-created
-storage handles, including metadata and catalog operations. Compare it with
-`orleans-journaling-provider-api-calls` to identify operations which generate increasing numbers of SDK
-calls. For example, an S3 replacement can issue several HEAD and PUT calls, and a catalog sweep can
-fetch multiple listing pages. Use the corresponding duration histograms for latency percentiles.
-Configure exporter histogram views with sub-millisecond buckets for Redis and a seconds-scale tail
-for cloud storage so percentile resolution matches the dependency being measured.
+Use `orleans-journaling-provider-catalog-pages` to track pages received during S3 and Azure catalog
+traversal, including empty pages. Compare `orleans-journaling-provider-catalog-items` with
+`orleans-journaling-provider-catalog-entries` to see how many returned candidates are filtered before
+reaching the consumer. Redis candidate counts include consumed scan keys before filtering and
+duplicate suppression. Volatile storage records delivered entries.
 
-Group requests by API and outcome before applying regional service pricing. HTTP not-found and
-conditional-conflict responses still represent SDK calls, while a logical empty-range query completes
-with zero SDK requests. Successful Redis scripts can return a logical conflict or missing-journal
-result, so SDK and logical outcomes have separate series.
+`orleans-journaling-provider-retries` records explicit retries in provider storage recovery loops.
+Correlate retry rates with the existing journaling and provider-specific storage latency and outcome
+metrics. Catalog pages, candidates, and entries describe traversal work; use service-side transaction
+metrics when reconciling costs.
 
-SDK counters provide workload and request-amplification signals. Reconcile cost estimates with
-service-side transaction metrics or SDK transport telemetry: automatic SDK retries, chunked uploads,
-and Redis cursor paging can create multiple wire requests inside one measured SDK invocation.
-Redis `scan_keys` measures a complete SDK key enumeration and its active latency; catalog entry and
-API item counters report the keys visible to the provider. Resource names and journal identities
-remain in logs and traces so metric cardinality stays bounded.
+### Use host-provided dependency telemetry
+
+The application supplies client SDK telemetry through its hosting integrations, instrumentation
+libraries, and diagnostic configuration. For example, Aspire integrations can enable dependency
+telemetry for their registered clients. Reuse that existing instrumentation when investigating
+SDK request latency, failures, and transport retries. Additional diagnostic collection belongs
+in the application's client configuration:
+
+| Provider | Opt-in diagnostics |
+| --- | --- |
+| Azure Blob and Table | Follow [Azure SDK logging](https://learn.microsoft.com/dotnet/azure/sdk/logging) to attach an event listener or forward SDK events to application logging. Request/response events include HTTP status and I/O duration. |
+| S3 | Configure [AWS SDK logging](https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/Util/TLoggingConfig.html) at application startup, before constructing the S3 client. Select a logging destination and enable SDK metric logging for request diagnostics. |
+| Redis | Register a profiler on the provider's connection multiplexer using [StackExchange.Redis profiling](https://seredis.dev/Profiling_v2). Scope sessions to the investigated work and finish each session to collect command queue, send, and response timings. |
+
+The application controls diagnostic collection, exporters, and retention. Limit detailed collection
+to the required interval and protect resource identities and response contents using the SDK's
+logging controls and the application's data-handling policy. Shared clients retain their existing
+diagnostic configuration and caller-owned lifetime.
 
 ## Plan capacity
 
