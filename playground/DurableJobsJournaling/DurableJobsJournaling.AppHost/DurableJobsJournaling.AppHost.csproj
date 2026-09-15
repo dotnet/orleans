@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\StorageBackend.cs" Link="StorageBackend.cs" />
     <ProjectReference Include="..\DurableJobsJournaling.Silo\DurableJobsJournaling.Silo.csproj" />
     <ProjectReference Include="..\DurableJobsJournaling.Web\DurableJobsJournaling.Web.csproj" />
   </ItemGroup>

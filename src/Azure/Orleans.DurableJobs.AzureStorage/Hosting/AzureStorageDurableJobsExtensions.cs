@@ -10,7 +10,7 @@ using Orleans.Journaling.Json;
 namespace Orleans.Hosting;
 
 /// <summary>
-/// Extensions for configuring Azure Blob Storage durable jobs.
+/// Extensions for configuring Azure Storage durable jobs.
 /// </summary>
 public static class AzureStorageDurableJobsExtensions
 {
@@ -62,6 +62,39 @@ public static class AzureStorageDurableJobsExtensions
         builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
 
         services.UseJournaledDurableJobs();
+        return services;
+    }
+
+    /// <summary>
+    /// Adds durable jobs backed by Azure Table journal storage.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configure">The delegate used to configure journal storage.</param>
+    /// <returns>The silo builder, for chaining.</returns>
+    public static ISiloBuilder UseAzureTableDurableJobs(this ISiloBuilder builder, Action<AzureTableJournalStorageOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        builder.AddDurableJobs();
+        builder.AddAzureTableJournalStorage(configure);
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.Services.UseJournaledDurableJobs();
+        return builder;
+    }
+
+    /// <summary>
+    /// Adds durable jobs backed by Azure Table journal storage.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">The delegate used to configure journal storage.</param>
+    /// <returns>The service collection, for chaining.</returns>
+    public static IServiceCollection UseAzureTableDurableJobs(this IServiceCollection services, Action<AzureTableJournalStorageOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        new ServiceCollectionSiloBuilder(services).UseAzureTableDurableJobs(configure);
         return services;
     }
 
