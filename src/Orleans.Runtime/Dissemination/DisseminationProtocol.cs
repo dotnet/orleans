@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Dissemination;
 
@@ -18,6 +19,7 @@ internal sealed partial class DisseminationProtocol
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
     private readonly DisseminationBroadcastQueue _broadcastQueue;
+    private readonly AdmissionGate _admission = new();
     private readonly DisseminationSendGate _antiEntropySendGate;
     private readonly CancellationTokenSource _antiEntropyShutdown = new();
     private readonly object _antiEntropyResponseCursorLock = new();
@@ -68,6 +70,13 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var admission = _admission.TryEnter();
+        if (!admission.Entered)
+        {
+            DisseminationInstruments.OnPublication(disseminationNamespace.Name, accepted: false, reason: "stopping");
+            return false;
+        }
+
         var options = _options.CurrentValue;
         if (!options.Enabled || !disseminationNamespace.Options.Enabled)
         {
@@ -127,6 +136,9 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var admission = _admission.TryEnter();
+        ObjectDisposedException.ThrowIf(!admission.Entered, this);
+
         var receivedTimestamp = _timeProvider.GetTimestamp();
         var options = _options.CurrentValue;
         if (!options.Enabled)
@@ -237,6 +249,12 @@ internal sealed partial class DisseminationProtocol
     public async Task RunAntiEntropyRound(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var admission = _admission.TryEnter();
+        if (!admission.Entered)
+        {
+            return;
+        }
+
         var options = _options.CurrentValue;
         if (!options.Enabled)
         {
@@ -727,6 +745,9 @@ Complete:
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        using var admission = _admission.TryEnter();
+        ObjectDisposedException.ThrowIf(!admission.Entered, this);
+
         if (request.MaxResponseItems is { } maxResponseItems)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResponseItems, nameof(request.MaxResponseItems));
@@ -1126,9 +1147,20 @@ Complete:
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
+        var admittedOperations = _admission.CloseAsync();
         _antiEntropySendGate.Stop();
-        await _antiEntropyShutdown.CancelAsync();
-        await _broadcastQueue.StopAsync(cancellationToken);
+        try
+        {
+            await _antiEntropyShutdown.CancelAsync();
+            // Admitted publishers and receivers finish enqueueing before the accepted broadcasts drain.
+            await admittedOperations.WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            await _broadcastQueue.StopAsync(cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     internal IReadOnlyList<SiloAddress> GetUnconfirmedPeers(

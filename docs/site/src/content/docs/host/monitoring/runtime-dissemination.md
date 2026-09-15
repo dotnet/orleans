@@ -75,7 +75,7 @@ Compare returned values with <xref:Orleans.Configuration.DisseminationOptions.Ma
 
 ### Rejected publications increase
 
-Break down by `namespace` and `reason`. Validate peer version compatibility, payload limits, and namespace enablement. `queue-rejected` identifies a full or stopping broadcast queue; correlate it with queue admission rejection and silo lifecycle activity. Deployment-load and membership integrations retain direct paths, so also inspect their component-specific logs and metrics for the authoritative outcome.
+Break down by `namespace` and `reason`. Validate peer version compatibility, payload limits, and namespace enablement. `stopping` identifies closed protocol admission; `queue-rejected` identifies a full or stopping broadcast queue. Correlate these reasons with queue admission rejection and silo lifecycle activity. Deployment-load and membership integrations retain direct paths, so also inspect their component-specific logs and metrics for the authoritative outcome.
 
 ## DiagnosticListener events
 
