@@ -20,6 +20,77 @@ public sealed class AzureTableJournalStorageTests
     private static readonly string TestPartitionKey = AzureTableJournalStorageOptions.GetDefaultPartitionKey(TestJournalId);
 
     [Fact]
+    public async Task Telemetry_RecordsEverySdkCallAndTransactionItemsAcrossStorageLifecycle()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable);
+        var store = new FakeTableStore();
+        var storage = CreateStorage(store, instruments: metrics.Table);
+
+        Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.NotNull(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, TestContext.Current.CancellationToken);
+        await storage.DeleteAsync(TestContext.Current.CancellationToken);
+
+        var expected = new Dictionary<string, int>
+        {
+            ["AddEntityAsync"] = store.AddCalls.Count,
+            ["GetEntityAsync"] = store.GetCalls.Count,
+            ["UpdateEntityAsync"] = store.UpdateCalls.Count,
+            ["DeleteEntityAsync"] = store.DeleteCalls.Count,
+            ["SubmitTransactionAsync"] = store.TransactionCalls.Count,
+            ["QueryAsync"] = store.QueryCalls.Count,
+        };
+        var calls = metrics.Calls.GetMeasurementSnapshot();
+        Assert.Equal(expected.Values.Sum(), calls.Count);
+        foreach (var (api, count) in expected)
+        {
+            Assert.True(count > 0, api);
+            Assert.Equal(count, calls.Count(call => Equals(call.Tags["api"], api)));
+        }
+
+        Assert.All(calls, call =>
+        {
+            Assert.Equal(3, call.Tags.Count);
+            Assert.Equal("azure_table", call.Tags["provider"]);
+            Assert.Equal(1, call.Value);
+        });
+        Assert.Equal("not_found", calls[0].Tags["status"]);
+        Assert.All(calls.Skip(1), call => Assert.Equal("ok", call.Tags["status"]));
+        Assert.Equal(calls.Count, metrics.ApiDuration.GetMeasurementSnapshot().Count);
+        Assert.Equal(store.TransactionCalls.Select(transaction => (long)transaction.Count),
+            metrics.Items.GetMeasurementSnapshot().Where(item => Equals(item.Tags["api"], "SubmitTransactionAsync")).Select(item => item.Value));
+    }
+
+    [Fact]
+    public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable);
+        var store = new FakeTableStore();
+        var storage = CreateStorage(store, instruments: metrics.Table);
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        store.BeforeUpdate = (_, _) => throw new RequestFailedException(412, "concurrent update");
+
+        Assert.Null(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+
+        var retries = metrics.Retries.GetMeasurementSnapshot();
+        Assert.Equal([1L, 1L], retries.Select(retry => retry.Value));
+        Assert.All(retries, retry =>
+        {
+            Assert.Equal(2, retry.Tags.Count);
+            Assert.Equal("azure_table", retry.Tags["provider"]);
+            Assert.Equal("metadata_conflict", retry.Tags["reason"]);
+        });
+        var conflicts = metrics.Calls.GetMeasurementSnapshot().Where(call => Equals(call.Tags["api"], "UpdateEntityAsync")).ToArray();
+        Assert.Equal(3, conflicts.Length);
+        Assert.All(conflicts, call => Assert.Equal("conflict", call.Tags["status"]));
+    }
+
+    [Fact]
     public async Task AppendAsync_RoundTripsThroughRead()
     {
         var store = new FakeTableStore();
@@ -805,7 +876,8 @@ public sealed class AzureTableJournalStorageTests
         long compactionRowCountThreshold = AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD,
         long compactionSizeThreshold = AzureTableJournalStorageOptions.DEFAULT_COMPACTION_SIZE_THRESHOLD,
         Action<AzureTableJournalStorageOptions>? configure = null,
-        JournalId journalId = default)
+        JournalId journalId = default,
+        AzureTableJournalStorageInstruments? instruments = null)
     {
         var options = new AzureTableJournalStorageOptions
         {
@@ -819,7 +891,7 @@ public sealed class AzureTableJournalStorageTests
                 NullLogger<AzureTableJournalStorage>.Instance,
                 Options.Create(options),
                 new FakeTableClientProvider(store),
-                CreateAzureTableJournalStorageInstruments(),
+                instruments ?? CreateAzureTableJournalStorageInstruments(),
                 journalFormatKey),
             journalId.IsDefault ? TestJournalId : journalId);
     }

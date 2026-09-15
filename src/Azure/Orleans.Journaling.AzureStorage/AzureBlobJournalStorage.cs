@@ -131,6 +131,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             for (var attempt = 0; attempt < 3; attempt++)
             {
+                if (attempt > 0)
+                {
+                    _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "metadata_conflict");
+                }
+
                 BlobProperties? properties;
                 try
                 {
@@ -167,7 +172,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
                 try
                 {
-                    var response = await _walClient.SetMetadataAsync(metadata, conditions, cancellationToken).ConfigureAwait(false);
+                    var response = await _shared.Instruments.TrackApiCallAsync(
+                        nameof(AppendBlobClient.SetMetadataAsync),
+                        () => _walClient.SetMetadataAsync(metadata, conditions, cancellationToken)).ConfigureAwait(false);
                     SetWal(response.Value.ETag, walState.ProviderState);
                     succeeded = true;
                     return CreateJournalMetadata(response.Value.ETag, metadata);
@@ -220,16 +227,18 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 try
                 {
                     // Use the last observed WAL ETag so appends fail if the WAL changed since this instance recovered it.
-                    var result = await _walClient.AppendBlockAsync(
-                        stream,
-                        new AppendBlobAppendBlockOptions
-                        {
-                            Conditions = new AppendBlobRequestConditions
+                    var result = await _shared.Instruments.TrackApiCallAsync(
+                        nameof(AppendBlobClient.AppendBlockAsync),
+                        () => _walClient.AppendBlockAsync(
+                            stream,
+                            new AppendBlobAppendBlockOptions
                             {
-                                IfMatch = expectedETag,
-                            }
-                        },
-                        cancellationToken).ConfigureAwait(false);
+                                Conditions = new AppendBlobRequestConditions
+                                {
+                                    IfMatch = expectedETag,
+                                }
+                            },
+                            cancellationToken)).ConfigureAwait(false);
 
                     LogAppend(_shared.Logger, stream.Length, _walClient.BlobContainerName, _walClient.Name);
 
@@ -258,6 +267,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                         : null;
                     if (refreshed is not null)
                     {
+                        _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "metadata_only_conflict");
                         continue;
                     }
 
@@ -328,10 +338,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 try
                 {
                     // Delete the WAL under its ETag before checkpoint cleanup so a racing WAL update cannot lose its checkpoint.
-                    await _walClient.DeleteIfExistsAsync(
-                        DeleteSnapshotsOption.None,
-                        new BlobRequestConditions { IfMatch = deleteWalState.ETag },
-                        cancellationToken).ConfigureAwait(false);
+                    await _shared.Instruments.TrackApiCallAsync(
+                        nameof(AppendBlobClient.DeleteIfExistsAsync),
+                        () => _walClient.DeleteIfExistsAsync(
+                            DeleteSnapshotsOption.None,
+                            new BlobRequestConditions { IfMatch = deleteWalState.ETag },
+                            cancellationToken),
+                        static result => result.Value ? JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)
+                            : JournalStorageTelemetry.NotFound).ConfigureAwait(false);
                     SetWal(eTag: default, providerState: default);
                     break;
                 }
@@ -344,6 +358,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     {
                         walState = refreshedState;
                         checkpointName = refreshedState.Manifest.Checkpoint?.Name;
+                        _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "metadata_only_conflict");
                         continue;
                     }
 
@@ -385,7 +400,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             try
             {
                 // Download the WAL first because its metadata is the manifest for any checkpoint that must be replayed.
-                walResult = await _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                walResult = await _shared.Instruments.TrackApiCallAsync(
+                    nameof(AppendBlobClient.DownloadStreamingAsync),
+                    () => _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
             }
             catch (RequestFailedException exception) when (exception.Status is 404)
             {
@@ -407,7 +424,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             if (manifest.Checkpoint is { } checkpoint)
             {
                 var checkpointClient = GetCheckpointClient(checkpoint.Name);
-                var checkpointResult = await checkpointClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                var checkpointResult = await _shared.Instruments.TrackApiCallAsync(
+                    nameof(BlockBlobClient.DownloadStreamingAsync),
+                    () => checkpointClient.DownloadStreamingAsync(cancellationToken: cancellationToken)).ConfigureAwait(false);
                 await using var checkpointStream = checkpointResult.Value.Content;
 
                 // Replay the immutable checkpoint first because it represents the compacted prefix before WAL entries.
@@ -509,19 +528,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 {
                     // Upload the checkpoint before publishing it from WAL metadata so upload failures leave recovery unchanged.
                     checkpointStream.Position = 0;
-                    await checkpointClient.UploadAsync(
-                        checkpointStream,
-                        new BlobUploadOptions
-                        {
-                            Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
-                            HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-                            Metadata = CreateCheckpointBlobMetadata(),
-                        },
-                        cancellationToken).ConfigureAwait(false);
+                    await _shared.Instruments.TrackApiCallAsync(
+                        nameof(BlockBlobClient.UploadAsync),
+                        () => checkpointClient.UploadAsync(
+                            checkpointStream,
+                            new BlobUploadOptions
+                            {
+                                Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
+                                HttpHeaders = CreateHttpHeaders(_shared.MimeType),
+                                Metadata = CreateCheckpointBlobMetadata(),
+                            },
+                            cancellationToken)).ConfigureAwait(false);
                 }
                 catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
                 {
                     // Snapshot ids are random, so this should be vanishingly rare. Retry with a new id.
+                    _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "checkpoint_collision");
                     continue;
                 }
 
@@ -547,6 +569,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                         if (refreshed is { } refreshedState)
                         {
                             walState = refreshedState;
+                            _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "metadata_only_conflict");
                             continue;
                         }
 
@@ -626,6 +649,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 // Another instance created the WAL first; load only the properties needed before appending.
                 await TryLoadWalStateAsync(conditions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
+
+            if (!WalExists)
+            {
+                _shared.Instruments.Telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, "create_race");
+            }
         }
     }
 
@@ -638,7 +666,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         try
         {
             // Read only WAL properties and metadata; no journal bytes are needed to cache mutation state.
-            walProperties = await _walClient.GetPropertiesAsync(conditions, cancellationToken).ConfigureAwait(false);
+            walProperties = await _shared.Instruments.TrackApiCallAsync(
+                nameof(AppendBlobClient.GetPropertiesAsync),
+                () => _walClient.GetPropertiesAsync(conditions, cancellationToken)).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
@@ -728,14 +758,16 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     {
         var metadata = CreateWalMetadata(checkpointName, checkpointOffset: 0, callerMetadata);
         // Creating an append blob is also how compaction publishes a fresh WAL manifest.
-        var response = await _walClient.CreateAsync(
-            new AppendBlobCreateOptions
-            {
-                Conditions = conditions,
-                HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-                Metadata = metadata,
-            },
-            cancellationToken).ConfigureAwait(false);
+        var response = await _shared.Instruments.TrackApiCallAsync(
+            nameof(AppendBlobClient.CreateAsync),
+            () => _walClient.CreateAsync(
+                new AppendBlobCreateOptions
+                {
+                    Conditions = conditions,
+                    HttpHeaders = CreateHttpHeaders(_shared.MimeType),
+                    Metadata = metadata,
+                },
+                cancellationToken)).ConfigureAwait(false);
         var manifest = CreateWalManifest(metadata);
         return new CreatedWal(response, manifest, CreateWalProviderState(manifest, contentLength: 0, committedBlockCount: 0));
     }
@@ -771,7 +803,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         try
         {
             // Obsolete checkpoint cleanup is best-effort because the published WAL no longer references it.
-            await checkpointClient.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: null, cancellationToken).ConfigureAwait(false);
+            await _shared.Instruments.TrackApiCallAsync(
+                nameof(BlockBlobClient.DeleteIfExistsAsync),
+                () => checkpointClient.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: null, cancellationToken),
+                static result => result.Value ? JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)
+                    : JournalStorageTelemetry.NotFound).ConfigureAwait(false);
         }
         catch (RequestFailedException exception)
         {
@@ -892,14 +928,16 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return CreateJournalMetadata(eTag: default, checkpointDetails.Metadata);
     }
 
-    private static async ValueTask<BlobProperties?> GetPropertiesCoreAsync(
+    private async ValueTask<BlobProperties?> GetPropertiesCoreAsync(
         AppendBlobClient blobClient,
         BlobRequestConditions? conditions,
         CancellationToken cancellationToken)
     {
         try
         {
-            var response = await blobClient.GetPropertiesAsync(conditions, cancellationToken).ConfigureAwait(false);
+            var response = await _shared.Instruments.TrackApiCallAsync(
+                nameof(AppendBlobClient.GetPropertiesAsync),
+                () => blobClient.GetPropertiesAsync(conditions, cancellationToken)).ConfigureAwait(false);
             return response.Value;
         }
         catch (RequestFailedException exception) when (exception.Status is 404)

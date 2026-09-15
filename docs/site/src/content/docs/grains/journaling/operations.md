@@ -20,9 +20,33 @@ At minimum, dashboard and alert on:
 - Storage-operation queue duration, which shows time waiting behind earlier work for the same journal.
 - Compaction triggers by `storage_requested`, `migration`, and `user_snapshot`.
 - Write coalescing, gathered state count, and operation byte distributions.
-- Azure Blob, Azure Table, or Redis provider operation errors and latency.
+- Provider-level storage and catalog operation outcomes and latency, grouped by `provider` and `operation`.
+- Underlying SDK call rates and latency, grouped by `provider`, `api`, and `status`.
+- Native listing item counts compared with delivered catalog entries, and explicit provider retry rates.
 
 Correlate these signals with grain identity, provider dependency health, deployment version, and storage throttling.
+
+### Monitor API cost and latency
+
+The provider-agnostic `orleans-journaling-provider-operations` counter covers calls to provider-created
+storage handles, including metadata and catalog operations. Compare it with
+`orleans-journaling-provider-api-calls` to identify operations which generate increasing numbers of SDK
+calls. For example, an S3 replacement can issue several HEAD and PUT calls, and a catalog sweep can
+fetch multiple listing pages. Use the corresponding duration histograms for latency percentiles.
+Configure exporter histogram views with sub-millisecond buckets for Redis and a seconds-scale tail
+for cloud storage so percentile resolution matches the dependency being measured.
+
+Group requests by API and outcome before applying regional service pricing. HTTP not-found and
+conditional-conflict responses still represent SDK calls, while a logical empty-range query completes
+with zero SDK requests. Successful Redis scripts can return a logical conflict or missing-journal
+result, so SDK and logical outcomes have separate series.
+
+SDK counters provide workload and request-amplification signals. Reconcile cost estimates with
+service-side transaction metrics or SDK transport telemetry: automatic SDK retries, chunked uploads,
+and Redis cursor paging can create multiple wire requests inside one measured SDK invocation.
+Redis `scan_keys` measures a complete SDK key enumeration and its active latency; catalog entry and
+API item counters report the keys visible to the provider. Resource names and journal identities
+remain in logs and traces so metric cardinality stays bounded.
 
 ## Plan capacity
 

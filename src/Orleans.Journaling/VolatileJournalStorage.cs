@@ -16,12 +16,14 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
     private readonly SortedSet<string> _storageKeys = new(StringComparer.Ordinal);
     private readonly object _catalogLock = new();
+    private readonly JournalStorageTelemetry _telemetry;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
     /// </summary>
     public VolatileJournalStorageProvider()
     {
+        _telemetry = JournalStorageTelemetry.CreateForDirectConstruction();
     }
 
     /// <summary>
@@ -32,6 +34,20 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options;
+        _telemetry = JournalStorageTelemetry.CreateForDirectConstruction();
+    }
+
+    /// <summary>
+    /// Initializes an in-memory provider using the configured Orleans metrics meter.
+    /// </summary>
+    /// <param name="options">The journaled state manager options.</param>
+    /// <param name="instruments">The Orleans runtime metrics meter.</param>
+    public VolatileJournalStorageProvider(IOptions<JournaledStateManagerOptions> options, OrleansInstruments instruments)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(instruments);
+        _options = options;
+        _telemetry = new JournalStorageTelemetry(instruments);
     }
 
     /// <inheritdoc/>
@@ -56,11 +72,16 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
         }
 
-        return new VolatileJournalStorage(store, journalFormatKey);
+        return new InstrumentedJournalStorage(new VolatileJournalStorage(store, journalFormatKey), JournalStorageTelemetry.Volatile, _telemetry);
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        ListOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => _telemetry.TrackCatalog(JournalStorageTelemetry.Volatile, ListCoreAsync(options, cancellationToken));
+
+    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

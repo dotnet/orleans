@@ -43,7 +43,11 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             journalFormatKey);
     }
 
-    private async Task Initialize(CancellationToken cancellationToken)
+    private Task Initialize(CancellationToken cancellationToken)
+        => _shared.Instruments.Telemetry.TrackOperationAsync(
+            JournalStorageTelemetry.AzureTable, "initialize", () => InitializeCore(cancellationToken));
+
+    private async Task InitializeCore(CancellationToken cancellationToken)
     {
         var createClient = _options.CreateClient
             ?? throw new InvalidOperationException(
@@ -52,7 +56,10 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         var client = await createClient(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The configured Azure Table service client factory returned null.");
         var table = client.GetTableClient(_options.TableName);
-        await table.CreateIfNotExistsAsync(cancellationToken).ConfigureAwait(false);
+        await _shared.Instruments.TrackApiCallAsync(
+            nameof(TableClient.CreateIfNotExistsAsync), () => table.CreateIfNotExistsAsync(cancellationToken),
+            static result => result.GetRawResponse().Status == 409 ? JournalStorageTelemetry.AlreadyExists
+                : JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)).ConfigureAwait(false);
         _tableClientProvider.SetTableClient(table);
     }
 
@@ -63,11 +70,18 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        return new AzureTableJournalStorage(_shared, journalId);
+        return new InstrumentedJournalStorage(
+            new AzureTableJournalStorage(_shared, journalId), JournalStorageTelemetry.AzureTable, _shared.Instruments.Telemetry);
     }
 
-    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => _shared.Instruments.Telemetry.TrackCatalog(
+            JournalStorageTelemetry.AzureTable, ListCoreAsync(options, cancellationToken));
+
+    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
+        ListOptions? options,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -83,11 +97,11 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
 
         var table = _tableClientProvider.GetTableClient();
         var filter = GetCatalogFilter(range);
-        await foreach (var page in table.QueryAsync<TableEntity>(
+        await foreach (var page in _shared.Instruments.TrackApiPages(nameof(TableClient.QueryAsync), table.QueryAsync<TableEntity>(
             filter,
             maxPerPage: 1000,
             select: range.IncludeMetadata ? JournalMetadataSelect : JournalIdSelect,
-            cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
+            cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var entity in page.Values)

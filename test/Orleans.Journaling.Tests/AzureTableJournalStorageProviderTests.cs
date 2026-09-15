@@ -294,7 +294,7 @@ public sealed class AzureTableJournalStorageProviderTests
 
         var storage = context.Provider.CreateStorage(new JournalId("matching-format"));
 
-        Assert.IsType<AzureTableJournalStorage>(storage);
+        Assert.IsType<InstrumentedJournalStorage>(storage);
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         var header = Assert.Single(table.AddedEntities);
         Assert.Equal(FormatKey, header[AzureTableJournalStorage.FormatPropertyName]);

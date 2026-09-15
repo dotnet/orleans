@@ -167,6 +167,26 @@ server-side filtering can reduce transferred data while the service still examin
 
 Enumeration observes live storage. Concurrent changes follow each provider's listing semantics; callers should tolerate repeated identities during changes and use subsequent enumerations to discover later updates. Journal existence can change between discovery and a storage operation. Cancellation and storage errors propagate through enumeration. Dispose a failed enumerator and begin a new enumeration when retrying a listing operation.
 
+## Provider metrics
+
+The `Microsoft.Orleans` meter exposes two complementary layers across S3, Azure Blob, Azure Table,
+Redis, and Volatile providers:
+
+- `orleans-journaling-provider-operations` and `orleans-journaling-provider-operation-duration` cover
+  provider-created storage handles, metadata operations, and catalog enumeration, tagged by
+  `provider`, `operation`, and `status`.
+- `orleans-journaling-provider-api-calls` and `orleans-journaling-provider-api-call-duration` measure
+  underlying SDK invocations and exposed listing pages, tagged by `provider`, `api`, and `status`.
+
+Payload-byte, native-item, delivered-catalog-entry, and explicit-provider-retry counters help explain
+request amplification. Catalog timing measures active execution and excludes consumer pauses.
+Existing state-manager and provider-specific metrics retain their original meanings.
+
+SDK call counts support API workload monitoring. Automatic SDK retries, upload chunking, and Redis
+cursor paging can create additional wire requests inside one invocation; service-side transaction
+metrics or SDK transport telemetry provide billing-grade counts. Metric labels contain bounded
+provider, operation, API, reason, and outcome values; use logs and traces for resource identities.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

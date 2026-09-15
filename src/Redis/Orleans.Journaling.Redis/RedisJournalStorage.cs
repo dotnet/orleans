@@ -393,6 +393,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private readonly RedisJournalStorageOptions _options;
     private readonly JournalId _journalId;
     private readonly string _encodedJournalId;
+    private readonly JournalStorageTelemetry _telemetry;
     private string? _contentETag;
     private long _appendLength;
 
@@ -402,7 +403,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
         string keyName,
         string journalFormatKey,
         RedisJournalStorageOptions options,
-        JournalId journalId)
+        JournalId journalId,
+        JournalStorageTelemetry? telemetry = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentException.ThrowIfNullOrWhiteSpace(keyPrefix);
@@ -422,6 +424,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         _options = options;
         _journalId = journalId;
         _encodedJournalId = EncodeKeyName(journalId.Value);
+        _telemetry = telemetry ?? JournalStorageTelemetry.CreateForDirectConstruction();
     }
 
     public bool IsCompactionRequested => _options.CompactionThresholdBytes > 0 && _appendLength >= _options.CompactionThresholdBytes;
@@ -671,16 +674,11 @@ internal sealed class RedisJournalStorage : IJournalStorage
         return result.ToString();
     }
 
-    private ValueTask<RedisResult[]> EvaluateArrayAsync(string script, RedisKey[] keys, RedisValue[] values)
-        => EvaluateArrayAsync(_database, script, keys, values);
-
-    private static async ValueTask<RedisResult[]> EvaluateArrayAsync(
-        IDatabase database,
-        string script,
-        RedisKey[] keys,
-        RedisValue[] values)
+    private async ValueTask<RedisResult[]> EvaluateArrayAsync(string script, RedisKey[] keys, RedisValue[] values)
     {
-        var result = (RedisResult[]?)await database.ScriptEvaluateAsync(script, keys, values).ConfigureAwait(false);
+        var result = (RedisResult[]?)await _telemetry.TrackApiCallAsync(
+            JournalStorageTelemetry.Redis, "script_evaluate",
+            () => _database.ScriptEvaluateAsync(script, keys, values)).ConfigureAwait(false);
         return result is { Length: > 0 }
             ? result
             : throw new InvalidOperationException("The Redis journal storage script returned an invalid response.");
