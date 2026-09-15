@@ -85,9 +85,9 @@ public class HostedClientDrainTests
     public async Task ReceiveMessage_CompletesOutstandingResponseDuringDrain()
     {
         var fixture = new HostedFixture(nameof(ReceiveMessage_CompletesOutstandingResponseDuringDrain));
-        var invocation = fixture.Track(new ScopeCheckingInvokable(1701, fixture.DescribeState, fixture.Events));
-        CallbackData? callback = null;
         var completion = new CallbackCompletionSource();
+        var invocation = fixture.Track(new CallbackAwaitingScopeInvokable(1701, fixture.DescribeState, fixture.Events, completion));
+        CallbackData? callback = null;
         var outgoing = new Message
         {
             Direction = Message.Directions.Request,
@@ -116,8 +116,10 @@ public class HostedClientDrainTests
             await fixture.StartAsync();
             fixture.Deliver(invocation);
             await fixture.WaitAsync(invocation.ScopeEntered.Task, "1701: observer held before response");
+            await fixture.WaitAsync(invocation.CallbackAwaiting.Task, "1701: observer awaiting tracked callback 1702");
             var stop = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(stop.IsCompleted, fixture.DescribeState());
+            Assert.False(invocation.Exited.Task.IsCompleted, fixture.DescribeState());
 
             // Model an already-issued outbound call, without SendRequest/routing. Success responses
             // take InsideRuntimeClient's callback-only branch: no directory or transport is touched.
@@ -134,7 +136,7 @@ public class HostedClientDrainTests
             fixture.Hosted.ReceiveMessage(response);
             await fixture.WaitAsync(
                 completion.Completed.Task,
-                "1702: real callback completed while 1701 remains held",
+                "1702: real callback completed during observer drain",
                 () => $"callbackCount={completion.CompletionCount}; ledgerContainsKey={callbacks.ContainsKey(key)}");
             Assert.Equal(731, Assert.IsType<int>(completion.Result));
             Assert.Null(completion.Exception);
@@ -142,8 +144,9 @@ public class HostedClientDrainTests
             Assert.True(callback.IsCompleted);
             Assert.False(callbacks.ContainsKey(key));
             Assert.False(invocation.Release.Task.IsCompleted);
-            Assert.False(invocation.Exited.Task.IsCompleted, fixture.DescribeState());
-            Assert.False(stop.IsCompleted, fixture.DescribeState());
+            await fixture.WaitAsync(stop, "1701: awaited response releases actual hosted drain");
+            Assert.Equal(731, Assert.IsType<int>(invocation.CallbackResult));
+            fixture.AssertExecuted(invocation);
 
             // A duplicate response must not complete the original promise a second time.
             fixture.Hosted.ReceiveMessage(response);
@@ -151,9 +154,6 @@ public class HostedClientDrainTests
             Assert.False(callbacks.ContainsKey(key));
             fixture.AssertScopeLive();
 
-            invocation.Release.TrySetResult();
-            await fixture.WaitAsync(stop, "1701: actual hosted drain after response completion");
-            fixture.AssertExecuted(invocation);
             Assert.Equal(1, completion.CompletionCount);
             succeeded = true;
         }
@@ -641,8 +641,7 @@ public class HostedClientDrainTests
                 MarkerLiveOnEntry = ObservedMarker.DisposeCount == 0;
                 _events.Enqueue($"{Id}:entered");
                 ScopeEntered.TrySetResult();
-                await DrainTestHelpers.AwaitPhaseAsync(
-                    Release.Task, $"{Id}: body release", _describeState, TestContext.Current.CancellationToken);
+                await WaitForCompletionAsync();
                 MarkerLiveBeforeExit = ObservedMarker.DisposeCount == 0;
                 _events.Enqueue($"{Id}:exiting");
                 return Response.Completed;
@@ -660,6 +659,30 @@ public class HostedClientDrainTests
         internal string DescribeState() =>
             $"id={Id}, invokes={InvocationCount}, scopeEntered={ScopeEntered.Task.Status}, " +
             $"release={Release.Task.Status}, exited={Exited.Task.Status}, failure={Failure?.Message}";
+
+        protected virtual Task WaitForCompletionAsync() =>
+            DrainTestHelpers.AwaitPhaseAsync(
+                Release.Task, $"{Id}: body release", _describeState, TestContext.Current.CancellationToken);
+    }
+
+    private sealed class CallbackAwaitingScopeInvokable(
+        long id, Func<string> describeState, ConcurrentQueue<string> events, CallbackCompletionSource completion)
+        : ScopeCheckingInvokable(id, describeState, events)
+    {
+        internal TaskCompletionSource CallbackAwaiting { get; } = DrainTestHelpers.CreateSignal();
+        internal object? CallbackResult { get; private set; }
+
+        protected override async Task WaitForCompletionAsync()
+        {
+            CallbackAwaiting.TrySetResult();
+            await completion.Completed.Task;
+            if (completion.Exception is { } exception)
+            {
+                throw exception;
+            }
+
+            CallbackResult = completion.Result;
+        }
     }
 
     private sealed class CancellableScopeInvokable(
