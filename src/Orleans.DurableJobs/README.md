@@ -125,8 +125,10 @@ outage. Future shard identities are filtered by the catalog before candidate met
 
 Each periodic or membership check starts a fresh, locally scoped sweep. Discovery requests
 catalog metadata, orders and deduplicates the selected entries, then uses each supplied
-ownership snapshot or reads metadata when absent. Claims run oldest first and use the
-snapshot's ETag for conditional updates, so a concurrent ownership change rejects a stale claim.
+ownership snapshot with an ETag or reads current metadata when that snapshot is unavailable.
+Claims run oldest first and require the snapshot's ETag for conditional updates, so a
+concurrent ownership change rejects a stale claim. Providers used for Durable Jobs supply
+metadata ETags and enforce conditional updates; a missing ETag surfaces as a discovery error.
 Assigned shards are delivered as they are opened, allowing
 execution to proceed while later candidates are evaluated. The claim budget limits new claims;
 locally owned shards remain eligible after that budget is exhausted.

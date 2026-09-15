@@ -28,7 +28,60 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
-    public async Task Discovery_StaleProjectedMetadataCannotOverwriteConcurrentOwnership()
+    public async Task Discovery_ProjectedMetadataWithoutETagReadsCurrentMetadataForConditionalClaim()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var id = await fixture.AddShardAsync("no-projected-etag", fixture.Now);
+        var storage = fixture.Storage.CreateStorage(id);
+        var snapshot = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(snapshot);
+        Assert.NotNull(snapshot.ETag);
+        fixture.Catalog.Metadata.Add(id, new JournalMetadata(snapshot.Format, properties: snapshot.Properties));
+        fixture.Catalog.Ids.Add(id);
+        fixture.Storage.MetadataReads.Clear();
+
+        AssertAssignedIds([id], await fixture.DiscoverAsync(maxNewClaims: 1));
+        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Equal((id, snapshot.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
+        var claimed = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(claimed);
+        Assert.Equal(fixture.Silo.ToParsableString(), claimed.Properties["DurableJobsOwner"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discovery_MetadataWithoutETagRejectsUnconditionalClaim(bool includeProjectedMetadata)
+    {
+        await using var fixture = new DiscoveryFixture();
+        var id = await fixture.AddShardAsync("no-storage-etag", fixture.Now);
+        var storage = fixture.Storage.CreateStorage(id);
+        var original = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(original);
+        if (includeProjectedMetadata)
+        {
+            fixture.Catalog.Metadata.Add(id, new JournalMetadata(original.Format, properties: original.Properties));
+        }
+
+        fixture.Catalog.Ids.Add(id);
+        fixture.Storage.OmitMetadataETags = true;
+        fixture.Storage.MetadataReads.Clear();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.DiscoverAsync(maxNewClaims: 1));
+        Assert.Contains("requires a storage metadata ETag", exception.Message);
+        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Empty(fixture.Storage.MetadataUpdates);
+        fixture.Storage.OmitMetadataETags = false;
+        var current = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(current);
+        Assert.Equal(original.ETag, current.ETag);
+        Assert.False(current.Properties.ContainsKey("DurableJobsOwner"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discovery_StaleProjectedMetadataCannotOverwriteConcurrentOwnership(bool includeETag)
     {
         await using var fixture = new DiscoveryFixture();
         var id = await fixture.AddShardAsync("stale", fixture.Now);
@@ -36,7 +89,7 @@ public partial class JournaledJobShardManagerTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshot = await storage.GetMetadataAsync(cancellationToken);
         Assert.NotNull(snapshot);
-        fixture.Catalog.Metadata.Add(id, snapshot);
+        fixture.Catalog.Metadata.Add(id, includeETag ? snapshot : new JournalMetadata(snapshot.Format, properties: snapshot.Properties));
         fixture.Catalog.Ids.Add(id);
 
         var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
@@ -46,9 +99,19 @@ public partial class JournaledJobShardManagerTests
             expectedETag: snapshot.ETag, cancellationToken: cancellationToken);
         Assert.NotNull(current);
         fixture.Storage.MetadataReads.Clear();
+        fixture.Storage.MetadataUpdates.Clear();
 
         Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Empty(fixture.Storage.MetadataReads);
+        Assert.Equal(includeETag ? Array.Empty<JournalId>() : [id], fixture.Storage.MetadataReads);
+        if (includeETag)
+        {
+            Assert.Equal((id, snapshot.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
+        }
+        else
+        {
+            Assert.Empty(fixture.Storage.MetadataUpdates);
+        }
+
         var after = await storage.GetMetadataAsync(cancellationToken);
         Assert.NotNull(after);
         Assert.Equal(current.ETag, after.ETag);

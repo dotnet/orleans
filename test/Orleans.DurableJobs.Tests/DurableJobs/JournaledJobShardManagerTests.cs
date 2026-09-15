@@ -599,7 +599,9 @@ public partial class JournaledJobShardManagerTests
     private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
+        public ConcurrentQueue<(JournalId Id, string? ExpectedETag)> MetadataUpdates { get; } = new();
         public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
+        public bool OmitMetadataETags { get; set; }
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly Func<CancellationToken, ValueTask>? _onAppend;
         private readonly object _appendGate = new();
@@ -687,7 +689,10 @@ public partial class JournaledJobShardManagerTests
                     await beforeRead(journalId, cancellationToken);
                 }
 
-                return await inner.GetMetadataAsync(cancellationToken);
+                var metadata = await inner.GetMetadataAsync(cancellationToken);
+                return owner.OmitMetadataETags && metadata is not null
+                    ? new JournalMetadata(metadata.Format, properties: metadata.Properties)
+                    : metadata;
             }
 
             public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
@@ -695,7 +700,10 @@ public partial class JournaledJobShardManagerTests
                 IEnumerable<string>? remove = null,
                 string? expectedETag = null,
                 CancellationToken cancellationToken = default)
-                => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+            {
+                owner.MetadataUpdates.Enqueue((journalId, expectedETag));
+                return inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+            }
 
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
                 => inner.ReadAsync(consumer, cancellationToken);

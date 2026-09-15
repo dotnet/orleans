@@ -129,7 +129,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private async ValueTask<(IJobShard? Shard, bool Claimed)> TryAssignShardAsync(
         JournalCatalogEntry entry, DateTimeOffset maxDueTime, bool canClaim, CancellationToken cancellationToken)
     {
-        var descriptor = entry.Metadata is { } metadata
+        var descriptor = entry.Metadata is { ETag: not null } metadata
             ? ShardCatalogProperties.From(entry.Id, metadata)
             : await GetDescriptorAsync(entry.Id, cancellationToken);
         if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
@@ -476,8 +476,10 @@ internal sealed class JournaledJobShardManager : JobShardManager
         IEnumerable<string>? remove,
         CancellationToken cancellationToken)
     {
+        var expectedETag = descriptor.Properties.ETag
+            ?? throw new InvalidOperationException($"DurableJobs shard '{descriptor.ShardId}' requires a storage metadata ETag for conditional ownership updates.");
         var storage = _storageProvider.CreateStorage(descriptor.StorageId);
-        return await storage.UpdateMetadataAsync(set, remove, descriptor.Properties.ETag, cancellationToken);
+        return await storage.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
     }
 
     private Dictionary<string, string> CreateInitialProperties(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string>? metadata)
