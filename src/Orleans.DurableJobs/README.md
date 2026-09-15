@@ -101,6 +101,31 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
+## Shutdown lifecycle
+
+Scheduling, cancellation requests, and activation use the shared
+`Orleans.Internal.AdmissionGate` utility from `Orleans.Core` for lock-free admission.
+Callers keep the returned readonly token in a `using` local and check `Entered` before
+starting work; disposal releases the admission.
+Each admitted token has one owner which disposes it exactly once. An atomic increment
+reserves a count and observes the closing flag in the same operation; attempts which
+observe closure release their count immediately. A preliminary check rejects callers
+which observe closure before incrementing, so further arrivals leave the drain count
+unchanged. Scheduling and cancellation requests hold admission through completion,
+including ownership lookup and remote cancellation routing. Activation holds admission
+until its execution task is published and queued.
+Shutdown atomically sets the closing flag through `CloseAsync`, signals cancellation to
+in-flight requests, and awaits these operations before snapshotting the running shards
+and canceling execution. Callback failures are logged while shutdown continues draining
+requests, awaiting execution, and releasing shards.
+
+Successful scheduling and cancellation writes retain their result, and successful shard
+creations remain owned even when cancellation races with their completion. Shutdown then
+awaits the active shard check and every admitted shard's execution and cleanup. It unregisters cached shards which
+remained inactive using the shutdown token, then disposes them. The journaled provider
+releases populated shards for another silo to claim and deletes empty shards, including
+creations which completed after request cancellation.
+
 ## Usage Examples
 
 ### Basic Job Scheduling

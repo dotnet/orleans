@@ -365,6 +365,7 @@ dotnet_diagnostic.CA1805.severity = suggestion
 
 # CA1806: Do not ignore method results
 dotnet_diagnostic.CA1806.severity = suggestion
+dotnet_code_quality.CA1806.additional_use_results_methods = M:Orleans.Internal.AdmissionGate.TryEnter
 
 # CA1810: Do not initialize unnecessarily
 dotnet_diagnostic.CA1810.severity = suggestion
