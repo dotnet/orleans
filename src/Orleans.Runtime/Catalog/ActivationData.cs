@@ -47,8 +47,12 @@ internal sealed partial class ActivationData :
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
-    private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
-    private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
+    private ActivationRequestTracker? _requestTracker;
+    // Low 32 bits store waiting requests and high 32 bits store running requests.
+    // Writers hold the activation lock; readers use one volatile snapshot without observing pooled tracker state.
+    private long _requestStatus;
+    // 0-2 count completed request cycles. 3 indicates that a recurring activation retains its empty tracker.
+    private byte _requestTrackerReuseState;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
@@ -192,33 +196,29 @@ internal sealed partial class ActivationData :
         {
             lock (_lock)
             {
-                return _waitingRequests.Count;
+                return _requestTracker?.WaitingCount ?? 0;
             }
         }
     }
 
-    public bool IsInactive => GetRequestStatus().IsInactive;
-
-    public bool IsCurrentlyExecuting
+    public bool IsInactive
     {
         get
         {
             lock (_lock)
             {
-                return _runningRequests.Count > 0;
+                return _requestTracker is null or { IsEmpty: true };
             }
         }
     }
 
+    public bool IsCurrentlyExecuting => GetRunningCount(Volatile.Read(ref _requestStatus)) > 0;
+
     internal (int WaitingCount, bool IsInactive) GetRequestStatus()
     {
-        lock (_lock)
-        {
-            var waitingCount = _waitingRequests.Count;
-            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
-        }
+        var status = Volatile.Read(ref _requestStatus);
+        return (GetWaitingCount(status), status == 0);
     }
-
     internal ValueTask WaitForActivationReadyAsync(CancellationToken cancellationToken)
     {
         lock (_lock)
@@ -517,7 +517,7 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            return _runningRequests.Count + _waitingRequests.Count;
+            return _requestTracker?.Count ?? 0;
         }
     }
 
@@ -525,22 +525,67 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            var result = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
+            if (_requestTracker is null)
             {
-                // Local-only messages are not allowed to escape the activation.
-                if (message.IsLocalOnly)
-                {
-                    continue;
-                }
-
-                result.Add(message);
+                return [];
             }
 
-            _waitingRequests.Clear();
+            var result = _requestTracker.DequeueAllWaitingRequests();
+            ReturnRequestTrackerIfEmpty();
             return result;
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReturnRequestTrackerIfEmpty()
+    {
+        if (_requestTracker is not { } requestTracker)
+        {
+            return;
+        }
+
+        UpdateRequestStatus(requestTracker);
+        if (_requestTrackerReuseState >= 3 && State == ActivationState.Valid)
+        {
+            return;
+        }
+
+        ReturnRequestTrackerIfEmptySlow(requestTracker);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ReturnRequestTrackerIfEmptySlow(ActivationRequestTracker requestTracker)
+    {
+        if (!requestTracker.IsEmpty)
+        {
+            return;
+        }
+
+        if (_requestTrackerReuseState < 2)
+        {
+            _requestTrackerReuseState++;
+        }
+
+        // The activation lock protects this transition. Detach before returning so no reader can observe pooled state.
+        _requestTracker = null;
+        requestTracker.Return();
+    }
+
+    private void OnWaitingRequestAdded()
+    {
+        if (_requestTrackerReuseState == 2)
+        {
+            _requestTrackerReuseState = 3;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateRequestStatus(ActivationRequestTracker requestTracker)
+        => Volatile.Write(ref _requestStatus, ((long)requestTracker.RunningCount << 32) | (uint)requestTracker.WaitingCount);
+
+    private static int GetWaitingCount(long status) => (int)(uint)status;
+
+    private static int GetRunningCount(long status) => (int)(status >> 32);
 
     /// <summary>
     /// Returns how long this activation has been idle.
@@ -611,7 +656,7 @@ internal sealed partial class ActivationData :
                     TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, CollectionAgeLimit.Ticks)));
             }
 
-            if (_waitingRequests.Count > 0 || _runningRequests.Count > 0 || _idleDuration.Elapsed < ageLimit)
+            if (_requestStatus != 0 || _idleDuration.Elapsed < ageLimit)
             {
                 return ActivationCollectionResult.Reschedule(CollectionAgeLimit);
             }
@@ -750,6 +795,7 @@ internal sealed partial class ActivationData :
 
                     _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                     SetState(ActivationState.Deactivating);
+                    ReturnRequestTrackerIfEmpty();
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
                     ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity));
@@ -853,7 +899,8 @@ internal sealed partial class ActivationData :
             {
                 var message = _blockingRequest;
                 TimeSpan? timeSinceQueued = default;
-                if (_runningRequests.TryGetValue(message, out var waitTime))
+                if (_requestTracker?.RunningRequests is { } trackedRunningRequests
+                    && trackedRunningRequests.TryGetValue(message, out var waitTime))
                 {
                     timeSinceQueued = waitTime.Elapsed;
                 }
@@ -876,55 +923,61 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            foreach (var running in _runningRequests)
+            if (_requestTracker?.RunningRequests is { Count: > 0 } runningRequests)
             {
-                var message = running.Key;
-                var runDuration = running.Value;
-                if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
+                foreach (var running in runningRequests)
                 {
-                    continue;
-                }
-
-                // Check how long they've been executing.
-                var executionTime = runDuration.Elapsed;
-                if (executionTime >= slowRunningRequestDuration)
-                {
-                    // Interleaving message X has been executing for a long time
-                    GetStatusList(ref diagnostics);
-                    var messageDiagnostics = new List<string>(diagnostics)
+                    var message = running.Key;
+                    var runDuration = running.Value;
+                    if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
                     {
-                        $"Interleaving message {message} has been executing for {executionTime}."
-                    };
+                        continue;
+                    }
 
-                    var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    // Check how long they've been executing.
+                    var executionTime = runDuration.Elapsed;
+                    if (executionTime >= slowRunningRequestDuration)
+                    {
+                        // Interleaving message X has been executing for a long time
+                        GetStatusList(ref diagnostics);
+                        var messageDiagnostics = new List<string>(diagnostics)
+                        {
+                            $"Interleaving message {message} has been executing for {executionTime}."
+                        };
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
+                        messageCenter.SendMessage(response);
+                    }
                 }
             }
 
             var queueLength = 1;
-            foreach (var pair in _waitingRequests)
+            if (_requestTracker?.WaitingRequests is { Count: > 0 } waitingRequests)
             {
-                var message = pair.Message;
-                if (message.IsLocalOnly)
+                foreach (var pair in waitingRequests)
                 {
-                    continue;
-                }
-
-                var queuedTime = pair.QueuedTime.Elapsed;
-                if (queuedTime >= longQueueTimeDuration)
-                {
-                    // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
-                    GetStatusList(ref diagnostics);
-                    var messageDiagnostics = new List<string>(diagnostics)
+                    var message = pair.Message;
+                    if (message.IsLocalOnly)
                     {
-                       $"Message {message} has been enqueued on the target grain for {queuedTime} and is currently position {queueLength} in queue for processing."
-                    };
+                        continue;
+                    }
 
-                    var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    var queuedTime = pair.QueuedTime.Elapsed;
+                    if (queuedTime >= longQueueTimeDuration)
+                    {
+                        // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
+                        GetStatusList(ref diagnostics);
+                        var messageDiagnostics = new List<string>(diagnostics)
+                        {
+                            $"Message {message} has been enqueued on the target grain for {queuedTime} and is currently position {queueLength} in queue for processing."
+                        };
+
+                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
+                        messageCenter.SendMessage(response);
+                    }
+
+                    queueLength++;
                 }
-
-                queueLength++;
             }
         }
 
@@ -947,7 +1000,7 @@ internal sealed partial class ActivationData :
         lock (_lock)
         {
             var currentlyExecuting = includeExtraDetails ? _blockingRequest : null;
-            return @$"[Activation: {Address.SiloAddress}/{GrainId}{ActivationId} {GetActivationInfoString()} State={State} NonReentrancyQueueSize={WaitingCount} NumRunning={_runningRequests.Count} IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}{(currentlyExecuting != null ? " CurrentlyExecuting=" : null)}{currentlyExecuting}]";
+            return @$"[Activation: {Address.SiloAddress}/{GrainId}{ActivationId} {GetActivationInfoString()} State={State} NonReentrancyQueueSize={WaitingCount} NumRunning={_requestTracker?.RunningCount ?? 0} IdlenessTimeSpan={GetIdleness()} CollectionAgeLimit={_shared.CollectionAgeLimit}{(currentlyExecuting != null ? " CurrentlyExecuting=" : null)}{currentlyExecuting}]";
         }
     }
 
@@ -986,6 +1039,7 @@ internal sealed partial class ActivationData :
         {
             _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
             SetState(ActivationState.Invalid);
+            ReturnRequestTrackerIfEmpty();
         }
 
         DisposeTimers();
@@ -1139,12 +1193,12 @@ internal sealed partial class ActivationData :
                 Message? message = null;
                 lock (_lock)
                 {
-                    if (_waitingRequests.Count <= i)
+                    if (_requestTracker?.WaitingRequests is not { } waitingRequests || waitingRequests.Count <= i)
                     {
                         break;
                     }
 
-                    message = _waitingRequests[i].Message;
+                    message = waitingRequests[i].Message;
 
                     // If the activation is not valid, reject all pending messages except for local-only messages.
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
@@ -1211,12 +1265,13 @@ internal sealed partial class ActivationData :
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
                         }
 
-                        _waitingRequests.RemoveAt(i);
+                        _requestTracker.RemoveWaitingAt(i);
+                        ReturnRequestTrackerIfEmpty();
                         continue;
                     }
 
                     // Process this message, removing it from the queue.
-                    _waitingRequests.RemoveAt(i);
+                    _requestTracker.RemoveWaitingAt(i);
 
                     Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
                     RecordRunning(message, message.IsAlwaysInterleave);
@@ -1231,7 +1286,8 @@ internal sealed partial class ActivationData :
         void RecordRunning(Message message, bool isInterleavable)
         {
             var stopwatch = CoarseStopwatch.StartNew();
-            _runningRequests.Add(message, stopwatch);
+            _requestTracker!.AddRunning(message, stopwatch);
+            UpdateRequestStatus(_requestTracker);
 
             if (_blockingRequest != null || isInterleavable) return;
 
@@ -1593,7 +1649,10 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            _runningRequests.Remove(message);
+            var removed = _requestTracker!.RemoveRunning(message);
+            Debug.Assert(removed, $"Completed request {message} was not tracked by activation {this}.");
+
+            ReturnRequestTrackerIfEmpty();
 
             // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
             // is in the activation working set.
@@ -1671,7 +1730,10 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
-            _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+            var requestTracker = _requestTracker ??= ActivationRequestTracker.Rent();
+            requestTracker.AddWaiting(message);
+            UpdateRequestStatus(requestTracker);
+            OnWaitingRequestAdded();
         }
 
         _workSignal.Signal();
@@ -1726,7 +1788,6 @@ internal sealed partial class ActivationData :
         }
     }
 
-    #region Activation
     public void Rehydrate(IRehydrationContext context)
     {
         ScheduleOperation(new Command.Rehydrate(context));
@@ -2026,10 +2087,6 @@ internal sealed partial class ActivationData :
             activity.SetTag(ActivityTagKeys.ExceptionMessage, exception.Message);
         }
     }
-
-    #endregion
-
-    #region Deactivation
 
     /// <summary>
     /// Completes the deactivation process.
@@ -2378,29 +2435,13 @@ internal sealed partial class ActivationData :
             var wasWaiting = false;
             lock (_lock)
             {
-                // Check the running requests.
-                foreach (var candidate in _runningRequests.Keys)
+                if (_requestTracker is { } requestTracker)
                 {
-                    if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
+                    if (!requestTracker.TryFindRunningRequest(senderGrainId, messageId, out message)
+                        && requestTracker.TryRemoveWaitingRequest(senderGrainId, messageId, out message))
                     {
-                        message = candidate;
-                        break;
-                    }
-                }
-
-                if (message is null)
-                {
-                    // Check the waiting requests.
-                    for (var i = 0; i < _waitingRequests.Count; i++)
-                    {
-                        var candidate = _waitingRequests[i].Message;
-                        if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
-                        {
-                            message = candidate;
-                            _waitingRequests.RemoveAt(i);
-                            wasWaiting = true;
-                            break;
-                        }
+                        ReturnRequestTrackerIfEmpty();
+                        wasWaiting = true;
                     }
                 }
             }
@@ -2442,8 +2483,6 @@ internal sealed partial class ActivationData :
         Message = "One or more cancellation callbacks failed."
     )]
     private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
-
-    #endregion
 
     /// <summary>
     /// Additional properties which are not needed for the majority of an activation's lifecycle.
