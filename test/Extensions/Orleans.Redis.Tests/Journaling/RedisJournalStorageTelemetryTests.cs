@@ -179,7 +179,7 @@ public sealed class RedisJournalStorageTelemetryTests
             {
                 var key = RedisJournalStorage.GetMetadataKey("metrics", options.GetKeyName(new(value)));
                 keys.Add(key);
-                Database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns((RedisValue)value);
+                Database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns((RedisValue)RedisJournalStorage.EncodeKeyName(value));
             }
 
             server.KeysAsync(0, Arg.Any<RedisValue>(), pageSize: 250).Returns(Keys(keys));
