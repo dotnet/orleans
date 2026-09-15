@@ -146,7 +146,7 @@ replacement the same initial state and bounds WAL growth.
 The storage format is registered as `benchmark-bytes-v1` with
 `application/octet-stream`. Its input consists of deterministic fixed-length
 byte records. This measures provider I/O plus validation; the existing
-`Journaling` dispatch supplies the JSON/binary durable-state codec benchmarks.
+`Journaling` dispatch supplies the in-memory durable-state codec benchmarks.
 Recovery read callbacks guarantee a consistent format; complete caller metadata
 and ETags are checked using the storage metadata API outside measurement.
 Catalog metadata is checked in the listing operation.
