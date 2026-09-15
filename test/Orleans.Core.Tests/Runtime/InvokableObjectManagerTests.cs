@@ -642,7 +642,7 @@ public class InvokableObjectManagerTests
             Assert.Equal(ids.Select(id => new CorrelationId(id)).ToArray(), _executionOrder.ToArray());
 
         internal void AssertResponseCount(int count) => Assert.Equal(count, _responses.Count);
-        internal void AssertNoResponse(Message message) => Assert.Empty(_responses.Where(response => response.Id == message.Id));
+        internal void AssertNoResponse(Message message) => Assert.DoesNotContain(_responses, response => response.Id == message.Id);
 
         internal void AssertSuccess(Message message, TestInvokable body, string expectedResult)
         {
@@ -680,7 +680,7 @@ public class InvokableObjectManagerTests
 
         private ResponseObservation SingleResponse(Message message)
         {
-            var response = Assert.Single(_responses.Where(response => response.Id == message.Id));
+            var response = Assert.Single(_responses, response => response.Id == message.Id);
             Assert.Equal(message.Id, response.Id);
             Assert.Equal(Sender, response.Sender);
             Assert.Equal(ObserverId.GrainId, response.Target);
