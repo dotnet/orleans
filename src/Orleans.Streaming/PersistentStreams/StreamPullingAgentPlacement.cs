@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
@@ -10,35 +8,61 @@ using Orleans.Runtime.Placement;
 namespace Orleans.Streams;
 
 [GenerateSerializer]
-internal sealed class StreamPullingAgentPlacement : PlacementStrategy;
+internal sealed class StreamPullingAgentPlacement : PlacementStrategy
+{
+    internal static TResult WithHint<TResult>(SiloAddress silo, Func<TResult> send)
+    {
+        var previous = RequestContext.Get(IPlacementDirector.PlacementHintKey);
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, silo);
+        try
+        {
+            return send();
+        }
+        finally
+        {
+            if (previous is null)
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+            else
+            {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, previous);
+            }
+        }
+    }
+}
 
 internal sealed class StreamPullingAgentPlacementAttribute() : PlacementAttribute(new StreamPullingAgentPlacement());
 
-internal sealed class StreamPullingAgentPlacementDirector(
-    IClusterManifestProvider manifestProvider,
-    IInternalGrainFactory grainFactory) : IPlacementDirector
+internal sealed class StreamPullingAgentPlacementDirector(StreamPullingAgentHostResolver hosts) : IPlacementDirector
 {
     internal const string ProviderPropertyPrefix = "stream-pulling-agent-provider:";
 
     public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
     {
-        var (providerName, queueId) = StreamPullingAgentId.Parse(target.GrainIdentity);
-        var manifests = manifestProvider.Current.Silos;
-        var candidates = context.GetCompatibleSilos(target)
-            .Where(silo => manifests.TryGetValue(silo, out var manifest)
-                && manifest.Grains.TryGetValue(StreamPullingAgentId.GrainType, out var properties)
-                && properties.Properties.ContainsKey(ProviderPropertyPrefix + providerName))
-            .ToArray();
-        var eligibility = await Task.WhenAll(candidates.Select(silo => grainFactory
-            .GetSystemTarget<IStreamPullingAgentRuntime>(StreamPullingAgentRuntime.TargetType, silo)
-            .IsEligible(providerName, queueId)));
-        var eligible = candidates.Where((_, index) => eligibility[index]).ToArray();
-        if (eligible.Length == 0)
+        var isCoordinator = target.GrainIdentity.Type == StreamPullingAgentCoordinator.GrainType;
+        var (providerName, queueId) = isCoordinator
+            ? (target.GrainIdentity.Key.ToString(), (QueueId?)null)
+            : GetAgentIdentity(target.GrainIdentity);
+        var compatible = context.GetCompatibleSilos(target);
+        if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatible) is { } hint
+            && (await hosts.FilterEligibleSilos(providerName, queueId, target.GrainIdentity.Type, [hint], CancellationToken.None)).Length > 0)
         {
-            throw new OrleansException($"Stream provider '{providerName}' has no running, assigned host for queue {queueId:H}.");
+            return hint;
         }
 
-        return IPlacementDirector.GetPlacementHint(target.RequestContextData, eligible)
-            ?? eligible.OrderBy(static silo => silo).First();
+        var eligible = await hosts.FilterEligibleSilos(providerName, queueId, target.GrainIdentity.Type, compatible, CancellationToken.None);
+        if (eligible.Length == 0)
+        {
+            throw new OrleansException($"Stream provider '{providerName}' has no running, compatible host for {target.GrainIdentity}.");
+        }
+
+        return eligible[Random.Shared.Next(eligible.Length)];
+    }
+
+    private static (string ProviderName, QueueId? QueueId) GetAgentIdentity(GrainId grainId)
+    {
+        var (providerName, queueId) = StreamPullingAgentId.Parse(grainId);
+        return (providerName, queueId);
     }
 }

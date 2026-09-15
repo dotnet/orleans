@@ -11,7 +11,7 @@ namespace Orleans.Streams;
 
 internal interface IStreamPullingAgentRuntime : ISystemTarget
 {
-    Task<bool> IsEligible(string providerName, QueueId queueId, CancellationToken cancellationToken = default);
+    Task<bool> IsEligible(string providerName, QueueId? queueId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAgentRuntime, ILifecycleParticipant<ISiloLifecycle>
@@ -36,17 +36,23 @@ internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAg
         ? provider
         : throw new OrleansException($"The pulling-agent runtime for stream provider '{name}' is not initialized on {Silo}.");
 
-    public Task<bool> IsEligible(string providerName, QueueId queueId, CancellationToken cancellationToken)
+    public Task<bool> IsEligible(string providerName, QueueId? queueId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(_providers.TryGetValue(providerName, out var provider) && provider.IsEligible(queueId));
+        return Task.FromResult(_providers.TryGetValue(providerName, out var provider)
+            && (queueId is { } queue
+                ? provider.IsEligible(queue)
+                : provider.State == StreamLifecycleOptions.RunState.AgentsStarted));
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
     }
 
-    internal sealed class Provider(Func<IGrainContext, QueueId, Task<PersistentStreamPullingAgent>> createAgent)
+    internal sealed class Provider(
+        ImmutableHashSet<QueueId> queues,
+        StreamPullingAgentOptions options,
+        Func<IGrainContext, QueueId, Task<PersistentStreamPullingAgent>> createAgent)
     {
         private readonly object _lifecycleLock = new();
         private volatile StreamLifecycleOptions.RunState _state;
@@ -61,17 +67,12 @@ internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAg
                 }
             }
         }
-        internal ImmutableHashSet<QueueId> DesiredQueues
-        {
-            get => Volatile.Read(ref _desiredQueues);
-            set => Volatile.Write(ref _desiredQueues, value);
-        }
-
-        private ImmutableHashSet<QueueId> _desiredQueues = ImmutableHashSet<QueueId>.Empty;
+        internal ImmutableHashSet<QueueId> Queues { get; } = queues;
+        internal StreamPullingAgentOptions Options { get; } = options;
         internal ConcurrentDictionary<QueueId, GrainHostedStreamPullingAgent> Agents { get; } = new();
         internal int RunningAgentCount => Agents.Count(static entry => entry.Value.IsRunning);
         internal QueueId[] GetRunningQueues() => Agents.Where(static entry => entry.Value.IsRunning).Select(static entry => entry.Key).ToArray();
-        internal bool IsEligible(QueueId queueId) => State == StreamLifecycleOptions.RunState.AgentsStarted && DesiredQueues.Contains(queueId);
+        internal bool IsEligible(QueueId queueId) => State == StreamLifecycleOptions.RunState.AgentsStarted && Queues.Contains(queueId);
         internal Task<PersistentStreamPullingAgent> CreateAgent(IGrainContext context, QueueId queueId) => createAgent(context, queueId);
 
         internal bool TryRegisterAgent(QueueId queueId, GrainHostedStreamPullingAgent agent)

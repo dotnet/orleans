@@ -4,7 +4,9 @@ This sample demonstrates how to use Orleans Streams with a non-Orleans publisher
 
 ## Grain-hosted pulling agents
 
-Run the silo with `--grain-hosted-pulling-agents` to select one directory-registered grain per Event Hubs partition. Queue balancing requests activation migration, and successful source checkpoint persistence precedes destination receiver initialization.
+Run the silo with `--grain-hosted-pulling-agents` to select one directory-registered grain per Event Hubs partition. A central coordinator probes agents every 30 seconds, preserves live placements, and activates missing agents using placement hints. Optional balancing waits one minute and moves only excess agents to equalize partition counts. These intervals are configurable in the silo's pulling-agent options.
+
+During migration, successful source checkpoint persistence precedes destination receiver initialization. Pulling agents also migrate to surviving hosts during graceful silo shutdown.
 
 Use the same flag on every participating silo. To change hosting mode, stop and drain the named provider on all silos, switch the configuration, and restart from the existing checkpoints. Event Hubs retains its inclusive restart boundary, so consumers handle replay.
 

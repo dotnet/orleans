@@ -1,9 +1,9 @@
-using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
@@ -30,8 +30,6 @@ public sealed class GrainHostedPullingAgentControlTests
         await using var setup = new Setup(1);
         await setup.Deploy();
         var silo = setup.Cluster.Silos[0];
-        setup.Owner = silo.SiloAddress;
-        await setup.Notify(silo.SiloAddress);
         setup.Clock.Advance(TimeSpan.FromMinutes(1));
 
         Assert.Equal(0, setup.Initializations);
@@ -42,6 +40,7 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(silo.SiloAddress, await setup.NextInitialization());
         Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
         await setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
+        var readsAtStop = setup.Reads;
 
         var grain = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(ProviderName, Queue));
         await grain.AddSubscriber(
@@ -50,13 +49,13 @@ public sealed class GrainHostedPullingAgentControlTests
             GrainId.Create("consumer", "stopped"),
             null,
             TestContext.Current.CancellationToken);
-        await grain.EnsureRunning(silo.SiloAddress, TestContext.Current.CancellationToken);
-        await setup.Notify(silo.SiloAddress);
+        Assert.False((await grain.Probe(TestContext.Current.CancellationToken)).IsRunning);
+        await setup.Coordinator.NotifyHostChanged(TestContext.Current.CancellationToken);
         setup.Clock.Advance(TimeSpan.FromMinutes(1));
 
         Assert.Equal(1, setup.Initializations);
         Assert.Equal(1, setup.Shutdowns);
-        Assert.Equal(0, setup.Reads);
+        Assert.Equal(readsAtStop, setup.Reads);
         Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped, await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
 
@@ -67,12 +66,31 @@ public sealed class GrainHostedPullingAgentControlTests
     }
 
     [Fact]
+    public async Task LifecycleStop_DrainsAgentsWithoutSendingCoordinatorNotification()
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        Assert.Equal(1, setup.CoordinatorNotifications);
+
+        var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, silo.SiloAddress, ProviderName);
+        var manager = silo.ServiceProvider.GetRequiredService<IInternalGrainFactory>()
+            .GetSystemTarget<IPersistentStreamPullingManager>(managerId.GrainId);
+        await manager.Stop(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, setup.Shutdowns);
+        Assert.Equal(1, setup.CoordinatorNotifications);
+        Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+    }
+
+    [Fact]
     public async Task StopAgents_DrainsActivationTriggeredWhileReceiverIsInitializing()
     {
         await using var setup = new Setup(1);
         await setup.Deploy();
         var silo = setup.Cluster.Silos[0];
-        setup.Owner = silo.SiloAddress;
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
         var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
@@ -80,7 +98,7 @@ public sealed class GrainHostedPullingAgentControlTests
 
         setup.InitializationBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var activation = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
-            .EnsureRunning(silo.SiloAddress, TestContext.Current.CancellationToken);
+            .Probe(TestContext.Current.CancellationToken);
         await setup.NextInitialization();
         var stopping = setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
         try
@@ -96,10 +114,11 @@ public sealed class GrainHostedPullingAgentControlTests
             await stopping;
         }
 
+        var readsAtStop = setup.Reads;
         setup.Clock.Advance(TimeSpan.FromMinutes(1));
         Assert.Equal(2, setup.Initializations);
         Assert.Equal(2, setup.Shutdowns);
-        Assert.Equal(0, setup.Reads);
+        Assert.Equal(readsAtStop, setup.Reads);
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
     }
 
@@ -109,7 +128,6 @@ public sealed class GrainHostedPullingAgentControlTests
         await using var setup = new Setup(1);
         await setup.Deploy();
         var silo = setup.Cluster.Silos[0];
-        setup.Owner = silo.SiloAddress;
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
         setup.ShutdownBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -151,7 +169,6 @@ public sealed class GrainHostedPullingAgentControlTests
         };
         listener.Start();
         Assert.Equal(1, cacheGaugeRegistrations);
-        setup.Owner = silo.SiloAddress;
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
         var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
@@ -166,8 +183,10 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(silo.SiloAddress, await setup.NextInitialization());
 
         // The initialization above was triggered by supervision; this call observes its completed activation.
-        var address = await setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
-            .EnsureRunning(silo.SiloAddress, TestContext.Current.CancellationToken);
+        var status = await setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
+            .Probe(TestContext.Current.CancellationToken);
+        var address = status.Address;
+        Assert.True(status.IsRunning);
         Assert.Equal(grainId, address.GrainId);
         Assert.Equal(originalAddress.SiloAddress, address.SiloAddress);
         Assert.NotEqual(originalAddress.ActivationId, address.ActivationId);
@@ -183,17 +202,16 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Deploy();
         var source = setup.Cluster.Silos[0];
         var destination = setup.Cluster.Silos[1];
-        setup.Owner = source.SiloAddress;
         await setup.Command(source, PersistentStreamProviderCommand.StartAgents);
         await setup.Command(destination, PersistentStreamProviderCommand.StartAgents);
         Assert.Equal(source.SiloAddress, await setup.NextInitialization());
 
-        setup.Owner = destination.SiloAddress;
-        await setup.Notify(source.SiloAddress);
-        await setup.Notify(destination.SiloAddress);
-        Assert.Equal(destination.SiloAddress, await setup.NextInitialization());
         var grain = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(ProviderName, Queue));
-        var address = await grain.EnsureRunning(destination.SiloAddress, TestContext.Current.CancellationToken);
+        var previous = await grain.Probe(TestContext.Current.CancellationToken);
+        Assert.True(await grain.Rebalance(previous.Address, destination.SiloAddress, TestContext.Current.CancellationToken));
+        Assert.Equal(destination.SiloAddress, await setup.NextInitialization());
+        var address = (await grain.Probe(TestContext.Current.CancellationToken)).Address;
+        Assert.False(await grain.Rebalance(previous.Address, source.SiloAddress, TestContext.Current.CancellationToken));
         await grain.Stop(source.SiloAddress, TestContext.Current.CancellationToken);
         await setup.Command(source, PersistentStreamProviderCommand.StopAgents);
 
@@ -211,14 +229,15 @@ public sealed class GrainHostedPullingAgentControlTests
 
     private sealed class Setup : IAsyncDisposable
     {
-        private readonly ConcurrentDictionary<SiloAddress, AssignedBalancer> _balancers = new();
         private readonly Channel<SiloAddress> _initialized = Channel.CreateUnbounded<SiloAddress>();
-        private SiloAddress? _owner;
         private int _initializations;
         private int _shutdowns;
         private int _reads;
+        private int _coordinatorNotifications;
 
         internal InProcessTestCluster Cluster { get; }
+        internal IStreamPullingAgentCoordinator Coordinator => Cluster.Client.GetGrain<IStreamPullingAgentCoordinator>(
+            StreamPullingAgentCoordinator.GetGrainId(ProviderName));
         internal FakeTimeProvider Clock { get; } = new();
         internal TaskCompletionSource ShutdownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
@@ -226,11 +245,7 @@ public sealed class GrainHostedPullingAgentControlTests
         internal int Initializations => Volatile.Read(ref _initializations);
         internal int Shutdowns => Volatile.Read(ref _shutdowns);
         internal int Reads => Volatile.Read(ref _reads);
-        internal SiloAddress? Owner
-        {
-            get => Volatile.Read(ref _owner);
-            set => Volatile.Write(ref _owner, value);
-        }
+        internal int CoordinatorNotifications => Volatile.Read(ref _coordinatorNotifications);
 
         internal Setup(short siloCount)
         {
@@ -239,6 +254,7 @@ public sealed class GrainHostedPullingAgentControlTests
             {
                 siloBuilder.Services.AddSingleton<TimeProvider>(Clock);
                 siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+                siloBuilder.Services.AddSingleton<IOutgoingGrainCallFilter>(new NotificationRecorder(this));
                 siloBuilder.AddPersistentStreams(
                     ProviderName,
                     (services, name) => CreateFactory(name, services.GetRequiredService<ILocalSiloDetails>().SiloAddress),
@@ -251,13 +267,8 @@ public sealed class GrainHostedPullingAgentControlTests
                         }));
                         configurator.ConfigureLifecycle(options => options.Configure(value =>
                             value.StartupState = StreamLifecycleOptions.RunState.AgentsStopped));
-                        configurator.ConfigurePartitionBalancing((services, _) =>
-                        {
-                            var address = services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
-                            var balancer = new AssignedBalancer(this, address);
-                            _balancers[address] = balancer;
-                            return balancer;
-                        });
+                        configurator.ConfigurePartitionBalancing((_, _) =>
+                            throw new InvalidOperationException("Grain hosting must not construct a queue balancer."));
                     });
                 siloBuilder.Services.Configure<StreamPubSubOptions>(ProviderName, options => options.PubSubType = StreamPubSubType.ImplicitOnly);
             });
@@ -271,8 +282,6 @@ public sealed class GrainHostedPullingAgentControlTests
             await Cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
         }
 
-        internal Task Notify(SiloAddress silo) => _balancers[silo].Notify().WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
-
         internal async Task<SiloAddress> NextInitialization()
         {
             try
@@ -283,14 +292,23 @@ public sealed class GrainHostedPullingAgentControlTests
             catch (TimeoutException exception)
             {
                 throw new TimeoutException(
-                    $"Waiting for receiver initialization on desired host {Owner}; initialized={Initializations}, shutdown={Shutdowns}, reads={Reads}.",
+                    $"Waiting for receiver initialization for {ProviderName}/{Queue}; initialized={Initializations}, shutdown={Shutdowns}, reads={Reads}.",
                     exception);
             }
         }
 
-        internal Task<object?> Command(InProcessSiloHandle silo, PersistentStreamProviderCommand command)
-            => silo.ServiceProvider.GetRequiredKeyedService<IControllable>(ProviderName).ExecuteCommand((int)command, null)
+        internal async Task<object?> Command(InProcessSiloHandle silo, PersistentStreamProviderCommand command)
+        {
+            var result = await silo.ServiceProvider.GetRequiredKeyedService<IControllable>(ProviderName).ExecuteCommand((int)command, null)
                 .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            if (command == PersistentStreamProviderCommand.StartAgents)
+            {
+                Clock.Advance(TimeSpan.Zero);
+                await Coordinator.GetAgents(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            }
+
+            return result;
+        }
 
         private IQueueAdapterFactory CreateFactory(string name, SiloAddress silo)
         {
@@ -337,27 +355,20 @@ public sealed class GrainHostedPullingAgentControlTests
         }
 
         public ValueTask DisposeAsync() => Cluster.DisposeAsync();
+
+        private sealed class NotificationRecorder(Setup setup) : IOutgoingGrainCallFilter
+        {
+            public Task Invoke(IOutgoingGrainCallContext context)
+            {
+                if (context.TargetId.Equals(StreamPullingAgentCoordinator.GetGrainId(ProviderName))
+                    && context.MethodName == nameof(IStreamPullingAgentCoordinator.NotifyHostChanged))
+                {
+                    Interlocked.Increment(ref setup._coordinatorNotifications);
+                }
+
+                return context.Invoke();
+            }
+        }
     }
 
-    private sealed class AssignedBalancer(Setup setup, SiloAddress silo) : IStreamQueueBalancer
-    {
-        private IStreamQueueBalanceListener? _listener;
-
-        public Task Initialize(IStreamQueueMapper queueMapper) => Task.CompletedTask;
-        public Task Shutdown() => Task.CompletedTask;
-        public IEnumerable<QueueId> GetMyQueues() => setup.Owner == silo ? [Queue] : [];
-        public bool SubscribeToQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            _listener = observer;
-            return true;
-        }
-
-        public bool UnSubscribeFromQueueDistributionChangeEvents(IStreamQueueBalanceListener observer)
-        {
-            _listener = null;
-            return true;
-        }
-
-        internal Task Notify() => _listener!.QueueDistributionChangeNotification();
-    }
 }

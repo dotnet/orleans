@@ -7,6 +7,7 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.Hosting;
 using Orleans.Internal;
+using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
@@ -118,8 +119,11 @@ public sealed class GrainHostedPullingAgentMigrationTests
                 configurator =>
                 {
                     configurator.ConfigurePullingAgent(options => options.Configure(value => value.HostingMode = StreamPullingAgentHostingMode.Grain));
+                    configurator.ConfigureLifecycle(options => options.Configure(value =>
+                        value.StartupState = StreamLifecycleOptions.RunState.AgentsStopped));
                     configurator.ConfigureStreamPubSub(StreamPubSubType.ExplicitGrainBasedOnly);
-                    configurator.ConfigurePartitionBalancing((services, _) => new MigrationAssignmentBalancer(services, state));
+                    configurator.ConfigurePartitionBalancing((_, _) =>
+                        throw new InvalidOperationException("Grain hosting must not construct a queue balancer."));
                 });
         });
         await using var cluster = builder.Build();
@@ -151,7 +155,8 @@ public sealed class GrainHostedPullingAgentMigrationTests
                     && value.StreamId == state.StreamId && value.SiloAddress == state.SourceSilo,
                 PhaseTimeout,
                 TestContext.Current.CancellationToken);
-            await Wait(state.Balancers[state.SourceSilo].SetAssigned(true), "supervisor starting assigned production host");
+            await Wait(cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IControllable>(PullingAgentMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting production provider on source");
             await Wait(sourceDrained, "production host acknowledgement through 100");
             var stableId = StreamPullingAgentId.Create(PullingAgentMigrationState.ProviderName, PullingAgentMigrationState.QueueId);
             var original = state.SourceSession.Address;
@@ -167,8 +172,10 @@ public sealed class GrainHostedPullingAgentMigrationTests
                     && value.StreamId == state.StreamId && value.SiloAddress == state.DestinationSilo,
                 PhaseTimeout,
                 TestContext.Current.CancellationToken);
-            await Wait(state.Balancers[state.SourceSilo].SetAssigned(false), "source supervisor relinquishing desired assignment");
-            await Wait(state.Balancers[state.DestinationSilo].SetAssigned(true), "destination supervisor requesting migration");
+            await Wait(cluster.Silos[1].ServiceProvider.GetRequiredKeyedService<IControllable>(PullingAgentMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting production provider on destination");
+            Assert.True(await Wait(cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(stableId)
+                .Rebalance(original, state.DestinationSilo, TestContext.Current.CancellationToken), "explicit production-host rebalance"));
             await Wait(state.FlushEntered.Task, "production host final checkpoint flush");
             Assert.Equal(100, state.SourceSession.AcknowledgedOffset);
             var sourceReadCount = state.SourceSession.ReadCount;
@@ -650,17 +657,23 @@ public sealed class MigrationPullingAgentRelay(PullingAgentMigrationState state)
     public async Task<GrainAddress[]> ProbeHostedProducer(GrainId producerId, SiloAddress requestedHost)
     {
         var producer = GrainFactory.GetGrain<IGrainHostedStreamPullingAgent>(producerId);
-        Task<GrainAddress>[] calls =
-        [
-            producer.EnsureRunning(requestedHost),
-            producer.EnsureRunning(requestedHost),
-            producer.EnsureRunning(requestedHost),
-        ];
+        Task<StreamPullingAgentStatus>[] calls;
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, requestedHost);
+        try
+        {
+            calls = [producer.Probe(), producer.Probe(), producer.Probe()];
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
         var directory = Assert.IsType<DistributedGrainDirectory>(
             ServiceProvider.GetRequiredService<GrainDirectoryResolver>().Resolve(producerId.Type));
         state.DirectoryAddressDuringFlush = await directory.Lookup(producerId, CancellationToken.None);
         state.ProbesIssued.TrySetResult();
-        return await Task.WhenAll(calls);
+        var statuses = await Task.WhenAll(calls);
+        Assert.All(statuses, status => Assert.True(status.IsRunning));
+        return statuses.Select(status => status.Address).ToArray();
     }
 }
 
@@ -736,7 +749,6 @@ public sealed class PullingAgentMigrationState
     internal ConcurrentQueue<GrainId> RegisteredProducers { get; } = new();
     internal ConcurrentQueue<GrainId> UnregisteredProducers { get; } = new();
     internal ConcurrentQueue<long> DeliveredOffsets { get; } = new();
-    internal ConcurrentDictionary<SiloAddress, MigrationAssignmentBalancer> Balancers { get; } = new();
     internal TaskCompletionSource FlushEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal TaskCompletionSource ReleaseFlush { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal TaskCompletionSource ProbesIssued { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -827,24 +839,6 @@ internal sealed class MigrationQueueAdapter(PullingAgentMigrationState state, Mi
     public IQueueCache CreateQueueCache(QueueId queueId) => new MigrationQueueCache(session);
     public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
         => throw new NotSupportedException("The spike has a controlled read-only source.");
-}
-
-internal sealed class MigrationAssignmentBalancer : QueueBalancerBase
-{
-    private bool _assigned;
-
-    internal MigrationAssignmentBalancer(IServiceProvider services, PullingAgentMigrationState state)
-        : base(services, services.GetRequiredService<ILoggerFactory>().CreateLogger<MigrationAssignmentBalancer>())
-        => Assert.True(state.Balancers.TryAdd(SiloAddress, this));
-
-    public Task SetAssigned(bool assigned)
-    {
-        Volatile.Write(ref _assigned, assigned);
-        return NotifyListeners();
-    }
-
-    public override IEnumerable<QueueId> GetMyQueues() => Volatile.Read(ref _assigned) ? [PullingAgentMigrationState.QueueId] : [];
-    protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos) { }
 }
 
 internal sealed class HostedMigrationAdapterFactory(PullingAgentMigrationState state, IGrainContextAccessor contextAccessor) : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IStreamQueueMapper
