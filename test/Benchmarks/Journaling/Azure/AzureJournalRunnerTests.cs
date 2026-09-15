@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Azure;
+using Azure.Storage.Blobs.Models;
 using DurableJobsJournaling;
 using Orleans.Journaling;
 using Orleans.Serialization.Buffers;
@@ -39,13 +40,35 @@ public class AzureJournalRunnerTests
     [Fact]
     public void AccountVerificationDistinguishesEmulatorStandardAndPremium()
     {
-        AzureJournalScenario.VerifyAccount(AzureJournalBackend.StandardBlob, "StorageV2", "Standard_LRS");
-        AzureJournalScenario.VerifyAccount(AzureJournalBackend.PremiumBlob, "BlockBlobStorage", "Premium_LRS");
-        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.PremiumBlob, "StorageV2", "Standard_LRS"));
-        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.PremiumBlob, "Azurite", "Premium_LRS"));
-        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.StandardBlob, "BlockBlobStorage", "Premium_LRS"));
+        AzureJournalScenario.VerifyAccount(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.StandardLrs);
+        AzureJournalScenario.VerifyAccount(AzureJournalBackend.PremiumBlob, AccountKind.BlockBlobStorage, SkuName.PremiumLrs);
+        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.AzuriteBlob, AccountKind.StorageV2, SkuName.StandardLrs));
+        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.AzuriteTable, AccountKind.StorageV2, SkuName.StandardLrs));
+        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.StandardBlob, (AccountKind)int.MaxValue, SkuName.StandardLrs));
+        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.PremiumBlob, AccountKind.BlockBlobStorage, (SkuName)int.MaxValue));
+        Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, (SkuName)int.MaxValue));
         Assert.True(AzureJournalOptions.Parse(["--backend", "Table", "--allow-azure", "true"]).AllowAzure);
     }
+
+    [Theory]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.Storage, SkuName.StandardLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.BlobStorage, SkuName.StandardLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.StandardLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.StandardGrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.StandardRagrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.StandardZrs)]
+    [InlineData(AzureJournalBackend.PremiumBlob, AccountKind.BlockBlobStorage, SkuName.PremiumLrs)]
+    public void AccountVerificationAcceptsSupportedSdkSkus(AzureJournalBackend backend, AccountKind kind, SkuName sku)
+        => AzureJournalScenario.VerifyAccount(backend, kind, sku);
+
+    [Theory]
+    [InlineData(AzureJournalBackend.PremiumBlob, AccountKind.StorageV2, SkuName.PremiumLrs)]
+    [InlineData(AzureJournalBackend.PremiumBlob, AccountKind.BlockBlobStorage, SkuName.StandardLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.StorageV2, SkuName.PremiumLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.FileStorage, SkuName.StandardLrs)]
+    [InlineData(AzureJournalBackend.StandardBlob, AccountKind.BlockBlobStorage, SkuName.StandardLrs)]
+    public void AccountVerificationRejectsMismatchedSdkKindAndTier(AzureJournalBackend backend, AccountKind kind, SkuName sku)
+        => Assert.Throws<InvalidOperationException>(() => AzureJournalScenario.VerifyAccount(backend, kind, sku));
 
     [Theory]
     [InlineData("https://account.blob.core.windows.net/?sig=secret", false)]
