@@ -93,7 +93,6 @@ namespace Orleans.Streams
             if (strProviderName == null) throw new ArgumentNullException(nameof(strProviderName), "PersistentStreamPullingAgent: strProviderName should not be null");
 
             GrainContext = grainContext;
-            _shutdownCancellation = GrainId.IsSystemTarget() ? null : new();
             _timerRegistry = timerRegistry;
             _grainFactory = grainFactory;
             QueueId = queueId;
@@ -160,6 +159,7 @@ namespace Orleans.Streams
         public async Task Initialize(CancellationToken cancellationToken, bool waitForReceiver = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _shutdownCancellation = new CancellationTokenSource();
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
             _activePumpTask = Task.CompletedTask;

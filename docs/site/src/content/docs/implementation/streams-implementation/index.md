@@ -119,6 +119,8 @@ Both hosts use the same `PersistentStreamPullingAgent` processing implementation
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
+Each initialization creates a fresh cancellation scope in both hosting modes. Shutdown cancels outstanding registration, handshake, and delivery waits before releasing queue resources, preserving acknowledged progress for the final checkpoint. Reused system-target agents start their next run with a new, uncanceled scope.
+
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
 <a name="backpressure"></a>
