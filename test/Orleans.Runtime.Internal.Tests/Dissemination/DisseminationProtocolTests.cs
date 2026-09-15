@@ -3198,6 +3198,7 @@ public partial class DisseminationProtocolTests
     public void NamespaceOptionsUseExpectedUpdateCadenceDefaults()
     {
         Assert.Equal(TimeSpan.FromSeconds(5), new DeploymentLoadPublisherOptions().Dissemination.ExpectedUpdateCadence);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), new ClusterMembershipOptions().Dissemination.ExpectedUpdateCadence);
     }
 

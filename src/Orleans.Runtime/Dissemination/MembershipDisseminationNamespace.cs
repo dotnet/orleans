@@ -14,6 +14,7 @@ internal sealed class MembershipDisseminationNamespace(
     Serializer serializer) : IDisseminationNamespace
 {
     private const int MaxSnapshotHistory = 32;
+    private static readonly DisseminationKey[] MembershipKeys = [DisseminationKey.Default];
     private readonly object _historyLock = new();
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
     private readonly Dictionary<long, ReadOnlyMemory<byte>> _snapshotPayloads = [];
@@ -24,6 +25,8 @@ internal sealed class MembershipDisseminationNamespace(
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
 
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
+
+    public IEnumerable<DisseminationKey> Keys => MembershipKeys;
 
     public async ValueTask<bool> PublishAsync(
         IDisseminationService disseminationService,

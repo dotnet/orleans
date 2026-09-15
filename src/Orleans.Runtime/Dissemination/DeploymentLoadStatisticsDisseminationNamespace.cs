@@ -40,7 +40,7 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         }
     }
 
-    public IEnumerable<DigestEntry> Digests
+    public IEnumerable<DisseminationKey> Keys
     {
         get
         {
@@ -48,7 +48,18 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
             PruneCache(activeSilos);
             foreach (var siloAddress in activeSilos.Keys)
             {
-                yield return new DigestEntry(siloAddress, GetVersion(siloAddress));
+                yield return siloAddress;
+            }
+        }
+    }
+
+    public IEnumerable<DigestEntry> Digests
+    {
+        get
+        {
+            foreach (var key in Keys)
+            {
+                yield return new DigestEntry(key, GetVersion(key));
             }
         }
     }
@@ -111,7 +122,29 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return new(deploymentLoadPublisher.ApplyDisseminatedRuntimeStatisticsAsync(siloAddress, statistics, cancellationToken));
+        return ApplyAndCache(siloAddress, statistics, value, cancellationToken);
+    }
+
+    private async ValueTask<DisseminationApplyResult> ApplyAndCache(
+        SiloAddress origin,
+        SiloRuntimeStatistics statistics,
+        DisseminationValue value,
+        CancellationToken cancellationToken)
+    {
+        var result = await deploymentLoadPublisher.ApplyDisseminatedRuntimeStatisticsAsync(origin, statistics, cancellationToken);
+        if (result is DisseminationApplyResult.Applied)
+        {
+            lock (_cacheLock)
+            {
+                // The owner accepted these exact bytes. Forward them without serializing the same sample again.
+                if (!_cachedValues.TryGetValue(origin, out var cached) || cached.ToVersion < value.ToVersion)
+                {
+                    _cachedValues[origin] = value;
+                }
+            }
+        }
+
+        return result;
     }
 
     private void PruneCache(Dictionary<SiloAddress, SiloStatus> activeSilos)

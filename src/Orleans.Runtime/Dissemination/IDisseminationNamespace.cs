@@ -14,6 +14,18 @@ internal interface IDisseminationNamespace
 
     IEnumerable<DigestEntry> Digests { get; }
 
+    // Inventory maintenance needs identities, independently of versions and anti-entropy fingerprints.
+    IEnumerable<DisseminationKey> Keys
+    {
+        get
+        {
+            foreach (var digest in Digests)
+            {
+                yield return digest.Key;
+            }
+        }
+    }
+
     long GetVersion(DisseminationKey key);
 
     DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request);
