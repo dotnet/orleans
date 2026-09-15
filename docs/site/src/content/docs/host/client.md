@@ -97,3 +97,11 @@ Use [grain observers](../grains/observers.md) for best-effort, one-way callbacks
 ## Dependency injection
 
 Let the Generic Host own client startup and shutdown. Don't create a client per request, cache a second client in a static field, or dispose the dependency-injected singleton. When the host receives a termination signal, it closes the client as part of normal shutdown.
+
+## Observer invocations during shutdown
+
+Graceful client shutdown closes admission for new observer invocations and waits for admitted work to finish before shutting down transport. The drain includes queued invocations, running invocations, interleaved invocations, and response handling. Queued work keeps its per-observer order. Cancellation-control calls remain available while admitted application work drains, and then Orleans closes and drains that control path. New request-response calls receive a <xref:Orleans.Runtime.SiloUnavailableException>; rejected one-way calls are logged.
+
+External clients complete outstanding outbound calls with a shutdown exception before waiting for observer invocations, allowing observers awaiting those calls to finish. Co-hosted clients first drain their incoming dispatch queue, then drain observer execution. Their owned dependency-injection scope is released after execution actually finishes.
+
+The host shutdown token bounds the shutdown wait. When that token is canceled, the host advances its shutdown sequence and owns disposal of root and singleton services. Orleans continues accounting for admitted observer work and defers disposal of the co-hosted client's owned scope until that work exits. Size the [shutdown budget](configuration-guide/shutting-down-orleans.md#configure-a-shutdown-budget) for observer completion, and keep observer operations and cancellation callbacks bounded.

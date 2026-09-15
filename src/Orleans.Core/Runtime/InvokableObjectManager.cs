@@ -2,11 +2,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
@@ -24,6 +24,8 @@ namespace Orleans
         private readonly DeepCopier deepCopier;
         private readonly DeepCopier<Response> _responseCopier;
         private readonly MessagingTrace messagingTrace;
+        private readonly AdmissionGate _invocations = new();
+        private readonly AdmissionGate _cancellations = new();
         private List<IIncomingGrainCallFilter>? _grainCallFilters;
 
         private List<IIncomingGrainCallFilter> GrainCallFilters
@@ -63,6 +65,29 @@ namespace Orleans
             return true;
         }
 
+        /// <summary>
+        /// Closes observer admission and drains invocation processing, including cancellation controls and response handling.
+        /// </summary>
+        public async Task StopAsync()
+        {
+            // Cancellation controls can release admitted work while application admission is closed.
+            await _invocations.CloseAsync().ConfigureAwait(false);
+            await _cancellations.CloseAsync().ConfigureAwait(false);
+        }
+
+        internal static bool IsCancellationRequest(Message message) =>
+            message.BodyObject is IInvokable request && request.GetInterfaceType() == typeof(IGrainCallCancellationExtension);
+
+        internal void RejectMessage(Message message)
+        {
+            LogRejectingMessageDuringShutdown(logger, message);
+            if (message.Direction == Message.Directions.Request)
+            {
+                runtimeClient.SendResponse(message, Response.FromException(
+                    new SiloUnavailableException("The local Orleans host is shutting down and can no longer accept observer invocations.")));
+            }
+        }
+
         public void Dispatch(Message message)
         {
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
@@ -83,6 +108,8 @@ namespace Orleans
 
         public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension
         {
+            internal readonly record struct PendingMessage(Message Message, AdmissionGate.Admission Admission);
+
             private const int MaxPendingCancellations = 1_024;
             private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
@@ -95,14 +122,14 @@ namespace Orleans
             {
                 this.LocalObject = new WeakReference(obj);
                 this.ObserverId = observerId;
-                this.Messages = new Queue<Message>();
+                this.Messages = new Queue<PendingMessage>();
                 this.Running = false;
                 _manager = manager;
             }
 
             internal WeakReference LocalObject { get; }
             internal ObserverGrainId ObserverId { get; }
-            internal Queue<Message> Messages { get; }
+            internal Queue<PendingMessage> Messages { get; }
             internal bool Running { get; set; }
 
             GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
@@ -153,6 +180,31 @@ namespace Orleans
             public void ReceiveMessage(object msg)
             {
                 var message = (Message)msg;
+                var gate = IsCancellationRequest(message) ? _manager._cancellations : _manager._invocations;
+                var admission = gate.TryEnter();
+                if (!admission.Entered)
+                {
+                    _manager.RejectMessage(message);
+                    return;
+                }
+
+                var ownsAdmission = true;
+                try
+                {
+                    // Queue publication transfers this token to the pump or interleaved invocation.
+                    ReceiveMessage(message, admission, ref ownsAdmission);
+                }
+                finally
+                {
+                    if (ownsAdmission)
+                    {
+                        admission.Dispose();
+                    }
+                }
+            }
+
+            private void ReceiveMessage(Message message, AdmissionGate.Admission admission, ref bool ownsAdmission)
+            {
                 var obj = this.LocalObject.Target;
                 if (obj is null)
                 {
@@ -177,13 +229,14 @@ namespace Orleans
                             var task = Task.Factory.StartNew(
                                 static state =>
                                 {
-                                    var (self, msg) = ((LocalObjectData, Message))state!;
-                                    return self.ProcessMessageAsync(msg);
+                                    var (self, pending) = ((LocalObjectData, PendingMessage))state!;
+                                    return self.ProcessMessageAsync(pending);
                                 },
-                                (this, message),
+                                (this, new PendingMessage(message, admission)),
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
                                 TaskScheduler.Default).Unwrap();
+                            ownsAdmission = false;
                             _runningRequests.Add(message, task);
                         }
                     }
@@ -207,7 +260,8 @@ namespace Orleans
                     }
                     else
                     {
-                        this.Messages.Enqueue(message);
+                        this.Messages.Enqueue(new PendingMessage(message, admission));
+                        ownsAdmission = false;
                         start = !this.Running;
                         this.Running = true;
                     }
@@ -247,7 +301,7 @@ namespace Orleans
                             this,
                             CancellationToken.None,
                             TaskCreationOptions.DenyChildAttach,
-                            TaskScheduler.Default);
+                            TaskScheduler.Default).Unwrap();
                 }
             }
 
@@ -258,7 +312,7 @@ namespace Orleans
                     await ProcessMessageAsync(message);
                 }
 
-                bool TryDequeueMessage([NotNullWhen(true)] out Message? message)
+                bool TryDequeueMessage(out PendingMessage message)
                 {
                     lock (Messages)
                     {
@@ -269,7 +323,7 @@ namespace Orleans
                         }
                         else
                         {
-                            _runningRequests.Add(message!, _messagePumpTask);
+                            _runningRequests.Add(message.Message, _messagePumpTask);
                         }
 
                         return result;
@@ -277,8 +331,10 @@ namespace Orleans
                 }
             }
 
-            private async Task ProcessMessageAsync(Message message)
+            private async Task ProcessMessageAsync(PendingMessage pending)
             {
+                using var admission = pending.Admission;
+                var message = pending.Message;
                 try
                 {
                     if (message.IsExpired)
@@ -344,19 +400,18 @@ namespace Orleans
                     {
                         this.ReportException(message, exc);
                     }
-                    finally
-                    {
-                        // Clear the running request when done.
-                        lock (Messages)
-                        {
-                            _runningRequests.Remove(message);
-                        }
-                    }
                 }
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
+                }
+                finally
+                {
+                    lock (Messages)
+                    {
+                        _runningRequests.Remove(message);
+                    }
                 }
             }
 
@@ -479,6 +534,7 @@ namespace Orleans
                 void TryCancelRequest()
                 {
                     Message? message = null;
+                    AdmissionGate.Admission admission = default;
                     var wasWaiting = false;
                     var key = (senderGrainId, messageId);
                     lock (Messages)
@@ -498,10 +554,11 @@ namespace Orleans
                             // Check the waiting requests.
                             foreach (var waitingRequest in Messages)
                             {
-                                var waiting = waitingRequest;
+                                var waiting = waitingRequest.Message;
                                 if (waiting.Id == messageId && waiting.SendingGrain == senderGrainId)
                                 {
                                     message = waiting;
+                                    admission = waitingRequest.Admission;
                                     wasWaiting = true;
 
                                     // Remove the message, since it will be rejected immediately (outside the lock) without being executed.
@@ -509,7 +566,7 @@ namespace Orleans
                                     for (var i = 0; i < initialCount; i++)
                                     {
                                         var current = Messages.Dequeue();
-                                        if (!ReferenceEquals(current, message))
+                                        if (!ReferenceEquals(current.Message, message))
                                         {
                                             Messages.Enqueue(current);
                                         }
@@ -535,7 +592,11 @@ namespace Orleans
                         // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
                         if (wasWaiting)
                         {
-                            SendCanceledResponse(message);
+                            using (admission)
+                            {
+                                SendCanceledResponse(message);
+                            }
+
                             didCancel = true;
                         }
                         else if (message.BodyObject is IInvokable invokableRequest)
@@ -600,6 +661,12 @@ namespace Orleans
         {
             public override string ToString() => observerId.ToString();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Rejecting observer invocation during shutdown: '{Message}'."
+        )]
+        private static partial void LogRejectingMessageDuringShutdown(ILogger logger, Message message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.ProxyClient_OGC_TargetNotFound_2,

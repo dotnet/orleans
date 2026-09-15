@@ -34,6 +34,7 @@ Set the orchestrator's termination grace period longer than the host shutdown ti
 - Load balancers and readiness probes to stop sending new traffic.
 - Gateway and membership changes to propagate.
 - Grain deactivation callbacks and state writes.
+- Admitted client-observer invocations and their response handling.
 - Stream, reminder, storage, and telemetry providers to flush and stop.
 
 If the external grace period expires first, the process is killed and graceful shutdown can't complete.

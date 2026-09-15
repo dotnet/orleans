@@ -28,7 +28,7 @@ namespace Orleans
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager? localObjects;
         private int _isStopping;
-        private bool disposing;
+        private int _disposeRequested;
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
@@ -158,14 +158,21 @@ namespace Orleans
             LogStartedClient(logger, CurrentActivationAddress, _localClientDetails.ClientId);
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+        internal Task StopObserverInvocationsAsync()
         {
             Volatile.Write(ref _isStopping, 1);
+            var drain = this.localObjects?.StopAsync() ?? Task.CompletedTask;
             this.callbackTimer.Dispose();
 
             // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
             // which issues follow-up calls, so request admission must already be closed.
             BreakOutstandingMessages();
+            return drain;
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            await StopObserverInvocationsAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
 
             if (this.callbackTimerTask is { } task)
             {
@@ -437,17 +444,27 @@ namespace Orleans
 
         public void Dispose()
         {
-            if (this.disposing) return;
-            this.disposing = true;
-            Volatile.Write(ref _isStopping, 1);
-
-            this.callbackTimer.Dispose();
-            BreakOutstandingMessages();
-
-            Utils.SafeExecute(() => MessageCenter?.Dispose());
+            if (Interlocked.Exchange(ref _disposeRequested, 1) != 0) return;
+            _ = DisposeAfterDrainAsync(StopObserverInvocationsAsync());
 
             GC.SuppressFinalize(this);
-            disposed = true;
+        }
+
+        private async Task DisposeAfterDrainAsync(Task drain)
+        {
+            try
+            {
+                await drain.ConfigureAwait(false);
+                MessageCenter?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                LogErrorDisposing(logger, exception);
+            }
+            finally
+            {
+                disposed = true;
+            }
         }
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
@@ -607,6 +624,12 @@ namespace Orleans
             Message = "Error while processing callback expiry."
         )]
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error disposing the client message center after draining observer invocations."
+        )]
+        private static partial void LogErrorDisposing(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
