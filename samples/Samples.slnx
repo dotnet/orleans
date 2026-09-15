@@ -102,6 +102,10 @@
     <Project Path="Streaming/CustomDataAdapter/NonOrleansClient/NonOrleansClient.csproj" />
     <Project Path="Streaming/CustomDataAdapter/Silo/Silo.csproj" />
   </Folder>
+  <Folder Name="/Streaming/RabbitMQ/">
+    <Project Path="Streaming/RabbitMQ/RabbitMQ.AppHost/RabbitMQ.AppHost.csproj" />
+    <Project Path="Streaming/RabbitMQ/RabbitMQ.Silo/RabbitMQ.Silo.csproj" />
+  </Folder>
   <Folder Name="/Streaming/Simple/">
     <Project Path="Streaming/Simple/Client/Client.csproj" />
     <Project Path="Streaming/Simple/GrainInterfaces/GrainInterfaces.csproj" />
