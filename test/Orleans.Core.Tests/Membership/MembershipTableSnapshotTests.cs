@@ -192,6 +192,24 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(2, previous.Entries.Count);
         }
 
+        [Fact]
+        public void MembershipTableSnapshot_HeartbeatAdvanceCannotChangeSameVersionMembership()
+        {
+            var keep = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
+            var active = Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
+            var dead = Entry(Silo("127.0.0.1:300@1"), SiloStatus.Dead, DateTimeOffset.UnixEpoch);
+            var previous = MembershipTableSnapshot.Create(Table(keep, active, dead));
+            var later = keep.WithIAmAliveTime(DateTime.UnixEpoch.AddMinutes(1));
+
+            Assert.False(MembershipTableSnapshot.Create(Table(later, dead)).IsSuccessorTo(previous));
+            Assert.False(MembershipTableSnapshot.Create(Table(later, active.WithStatus(SiloStatus.Dead), dead))
+                .IsSuccessorTo(previous));
+            Assert.False(MembershipTableSnapshot.Create(Table(later, active, dead.WithStatus(SiloStatus.Active)))
+                .IsSuccessorTo(previous));
+            Assert.True(MembershipTableSnapshot.Create(Table(later, active)).IsSuccessorTo(previous));
+            Assert.Equal(DateTime.UnixEpoch, previous.Entries[keep.SiloAddress].IAmAliveTime);
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime = default)

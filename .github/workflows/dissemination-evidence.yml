@@ -18,6 +18,7 @@ on:
       - 'src/Orleans.Runtime/OrleansContracts.txt'
       - 'src/Orleans.Core/OrleansContracts.txt'
       - 'src/Orleans.Core/Runtime/Constants.cs'
+      - 'src/Orleans.Core/Runtime/MembershipTableSnapshot.cs'
       - 'src/Orleans.Core/SystemTargetInterfaces/IDisseminationSystemTarget.cs'
       - 'src/Orleans.Core/SystemTargetInterfaces/IDeploymentLoadPublisher.cs'
       - 'src/Orleans.Core/SystemTargetInterfaces/IMembershipTable.cs'

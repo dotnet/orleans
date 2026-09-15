@@ -1086,6 +1086,7 @@ Complete:
             cancellationToken,
             lifetimeCancellation.Token);
         DisseminationApplyResult result;
+        Task<DisseminationApplyResult>? applicationTask = null;
         try
         {
             var application = disseminationNamespace.ApplyValueAsync(item.Value, applicationCancellation.Token);
@@ -1097,19 +1098,20 @@ Complete:
             {
                 // Only this local wait is bounded. Namespace owners must observe cancellation before mutating
                 // queued state; arbitrary implementations which ignore the token cannot be forcibly stopped.
-                var applicationTask = application.AsTask();
+                applicationTask = application.AsTask();
                 applicationTask.Ignore();
                 result = await applicationTask.WaitAsync(applicationCancellation.Token);
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (
             lifetimeCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            result = DisseminationApplyResult.Obsolete;
+            result = applicationTask is { IsCompletedSuccessfully: true }
+                ? applicationTask.Result
+                : DisseminationApplyResult.Obsolete;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         EmitApplyResult(namespaceName, item, sender, result);
         if (result is DisseminationApplyResult.Applied)
         {

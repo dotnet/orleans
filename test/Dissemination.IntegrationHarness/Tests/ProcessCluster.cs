@@ -107,11 +107,17 @@ internal sealed class ProcessCluster : IAsyncDisposable
         await Eventually("exact production load state at every active process", async () =>
         {
             var snapshots = await Task.WhenAll(Active.Select(node => node.Send("snapshot")));
-            return snapshots.All(snapshot => expected.All(pair =>
-                snapshot.Load.TryGetValue(pair.Key, out var actual) && StringComparer.Ordinal.Equals(pair.Value, actual)));
+            return snapshots.All(snapshot => MatchesExpectedLoad(snapshot.Load, expected));
         }, expected: expected);
         return clock.Elapsed.TotalMilliseconds;
     }
+
+    internal static bool MatchesExpectedLoad(
+        IReadOnlyDictionary<string, string> actual,
+        IReadOnlyDictionary<string, string> expected) =>
+        actual.Count == expected.Count
+        && expected.All(pair => actual.TryGetValue(pair.Key, out var value)
+            && StringComparer.Ordinal.Equals(pair.Value, value));
 
     public async Task HealPartition(SiloProcess partitioned)
     {

@@ -12,6 +12,28 @@ namespace Orleans.Dissemination.IntegrationHarness;
 public sealed class MeasurementTests
 {
     [Fact]
+    public void LoadStateComparisonRequiresExactInventoryAndValues()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["silo@2"] = "current",
+            ["peer@1"] = "peer-value",
+        };
+        var actual = new Dictionary<string, string>(expected);
+        Assert.True(ProcessCluster.MatchesExpectedLoad(actual, expected));
+
+        actual["silo@1"] = "retired";
+        Assert.False(ProcessCluster.MatchesExpectedLoad(actual, expected));
+        actual.Remove("silo@2");
+        Assert.False(ProcessCluster.MatchesExpectedLoad(actual, expected));
+        actual.Remove("silo@1");
+        actual["silo@2"] = "older-value";
+        Assert.False(ProcessCluster.MatchesExpectedLoad(actual, expected));
+        actual["silo@2"] = "current";
+        Assert.True(ProcessCluster.MatchesExpectedLoad(actual, expected));
+    }
+
+    [Fact]
     public async Task ConnectionDrain_WaitsForInitializationAndCloseBeforeReopening()
     {
         using var observation = new Observation(captureProvenance: false);
