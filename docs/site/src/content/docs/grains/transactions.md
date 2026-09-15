@@ -1,7 +1,7 @@
 ---
 title: Transactions in Orleans
 description: Use distributed ACID transactions with Orleans transactional state.
-ms.date: 08/02/2026
+ms.date: 08/11/2026
 ms.topic: concept-article
 ---
 
@@ -21,9 +21,20 @@ A transactional call without transaction services fails with <xref:Orleans.Trans
 
 ## Configure transactional storage
 
-Transactional storage implements <xref:Orleans.Transactions.Abstractions.ITransactionalStateStorage`1>. The supported provider package `Microsoft.Orleans.Transactions.AzureStorage` registers Azure Table transactional storage:
+Transactional storage implements <xref:Orleans.Transactions.Abstractions.ITransactionalStateStorage`1>. Orleans provides transactional state packages for Azure Table Storage and ADO.NET.
+
+### Azure Table Storage
+
+The `Microsoft.Orleans.Transactions.AzureStorage` package registers Azure Table transactional storage:
 
 :::code language="csharp" source="../snippets/compiled/Grains/TransactionSnippets.cs" id="configure_transaction_storage":::
+
+### ADO.NET
+
+The `Microsoft.Orleans.Transactions.AdoNet` package supports SQL Server, MySQL, PostgreSQL, and Oracle. Install the database's ADO.NET driver and create the transaction tables using the matching script from the [`Orleans.Transactions.AdoNet` source directory](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Transactions.AdoNet).
+
+Configure a named provider with <xref:Orleans.Hosting.AdoNetTransactionsSiloBuilderExtensions.AddAdoNetTransactionalStateStorage*> and set the ADO.NET invariant and connection string. The provider name must match the name supplied to <xref:Orleans.Transactions.Abstractions.TransactionalStateAttribute>. Use <xref:Orleans.Hosting.AdoNetTransactionsSiloBuilderExtensions.AddAdoNetTransactionalStateStorageAsDefault*> when transactional state should use ADO.NET without specifying a provider name.
+
 If no named transactional provider exists, Orleans can bridge transactional state to a configured <xref:Orleans.Storage.IGrainStorage>. The bridge is less efficient and is intended for development and compatibility scenarios. Prefer a transactional provider for production workloads.
 
 ## Declare transaction behavior
