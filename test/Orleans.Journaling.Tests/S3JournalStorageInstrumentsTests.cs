@@ -647,7 +647,9 @@ public sealed class S3JournalStorageInstrumentsTests
                     Assert.True(request.EtagToMatch is null || request.EtagToMatch == stored.ETag);
                     var result = new GetObjectMetadataResponse
                     {
-                        ETag = stored.ETag, ContentLength = stored.Data.Length, PartsCount = 1,
+                        ETag = stored.ETag,
+                        ContentLength = stored.Data.Length,
+                        PartsCount = 1,
                         LastModified = Clock.GetUtcNow().UtcDateTime,
                     };
                     foreach (var (key, value) in stored.Metadata)
@@ -664,7 +666,9 @@ public sealed class S3JournalStorageInstrumentsTests
                     var stored = objects[request.Key];
                     var result = new GetObjectResponse
                     {
-                        ETag = stored.ETag, ContentLength = stored.Data.Length, PartsCount = 1,
+                        ETag = stored.ETag,
+                        ContentLength = stored.Data.Length,
+                        PartsCount = 1,
                         ResponseStream = new MemoryStream(stored.Data, writable: false),
                     };
                     foreach (var (key, value) in stored.Metadata)
