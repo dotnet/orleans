@@ -5,6 +5,7 @@ using System.Globalization;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.Diagnostics;
 using Orleans.Providers;
@@ -245,7 +246,8 @@ public sealed class GrainHostedEventHubMigrationTests
 
     private static async Task RunGracefulShutdown(bool failFlush)
     {
-        var state = new EventHubMigrationState { ObserveMigration = true };
+        var clock = new FakeTimeProvider();
+        var state = new EventHubMigrationState { ObserveMigration = true, GrainClock = clock };
         await using var cluster = CreateCluster(state);
         using var events = new DiagnosticEventCollector(StreamingEvents.ListenerName, GrainLifecycleEvents.ListenerName);
         GrainAddress? observedAddress = null;
@@ -290,6 +292,10 @@ public sealed class GrainHostedEventHubMigrationTests
             var initialDelivery = WaitForDrain(events, state, sourceSilo.SiloAddress);
             await Wait(sourceSilo.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting shutdown-test source provider");
+            var coordinatorId = GrainId.Create("Orleans.Streams.PullingAgentCoordinator", EventHubMigrationState.ProviderName);
+            clock.Advance(TimeSpan.Zero);
+            await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(coordinatorId).GetAddress(), "initial coordinator round mailbox barrier");
+            clock.Advance(TimeSpan.FromSeconds(1));
             await Wait(initialDelivery, "source Event Hubs acknowledgement through 100");
             var source = Assert.Single(state.Epochs);
             observedAddress = source.Address;
@@ -298,6 +304,10 @@ public sealed class GrainHostedEventHubMigrationTests
             await Wait(survivor.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting surviving Event Hubs provider");
 
+            // Quiesce membership-driven evacuation and hold the local heartbeat clocks stationary.
+            // The production agent's ShuttingDown callback is the sole migration initiator in this scenario.
+            await Wait(cluster.DeactivateAsync(coordinatorId), "quiescing coordinator before catalog shutdown");
+            Assert.False(cluster.TryGetGrainContext(coordinatorId, out _));
             var gate = state.ArmSave(source, failFlush ? EventHubWriteFailure.Failed : EventHubWriteFailure.None);
             var deactivating = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivating),
                 evt => evt.Payload is GrainLifecycleEvents.Deactivating value && value.GrainContext.Address.Equals(source.Address),
@@ -326,6 +336,7 @@ public sealed class GrainHostedEventHubMigrationTests
             Assert.Equal(0, state.ReadsOn(survivor.SiloAddress));
             Assert.Single(state.Epochs);
             Assert.Equal(sourceReads, source.ReadCount);
+            Assert.False(cluster.TryGetGrainContext(coordinatorId, out _));
 
             state.AvailableThrough = 101;
             gate.Release.TrySetResult();
@@ -356,6 +367,7 @@ public sealed class GrainHostedEventHubMigrationTests
             // above distinguishes that recovery from a cooperative transfer of the failed activation.
             var address = await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(source.Address.GrainId).GetAddress(),
                 "successor address after source shutdown");
+            clock.Advance(TimeSpan.FromSeconds(1));
             await Wait(successorDelivered, "successor Event Hubs delivery through 101");
             var successor = Assert.Single(state.Epochs, epoch => epoch.Ordinal == 2);
             var checkpoint = failFlush ? "20" : "100";
@@ -387,6 +399,12 @@ public sealed class GrainHostedEventHubMigrationTests
         builder.ConfigureSilo((_, silo) =>
         {
             silo.Services.AddSingleton(state);
+            if (state.GrainClock is { } clock)
+            {
+                silo.Services.AddSingleton<TimeProvider>(clock);
+                silo.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+            }
+
             silo.Services.AddKeyedSingleton<IStreamQueueCheckpointerFactory>(
                 EventHubMigrationState.ProviderName, (services, _) => new EventHubMigrationCheckpointerFactory(
                     state, services.GetRequiredService<IGrainContextAccessor>()));
@@ -613,6 +631,7 @@ public sealed class EventHubMigrationState
     private int _maximumActiveSources;
     private long _availableThrough = 100;
     internal bool ObserveMigration { get; init; }
+    internal FakeTimeProvider? GrainClock { get; init; }
     internal StreamId StreamId { get; } = StreamId.Create("event-hubs-migration", Guid.NewGuid());
     internal ConcurrentQueue<EventHubReceiverEpoch> Epochs { get; } = new();
     internal ConcurrentQueue<long> Delivered { get; } = new();
