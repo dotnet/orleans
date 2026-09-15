@@ -242,11 +242,11 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var admissionDrained = _admission.CloseAsync();
         LogStopping(_logger, _runningShards.Count);
 
-        _requestCts.Cancel();
+        CancelForShutdown(_requestCts, "requests");
         // Drain requests and activation publication before taking the execution snapshot.
         await admissionDrained;
         var runningShards = _runningShards.Values.ToArray();
-        _cts.Cancel();
+        CancelForShutdown(_cts, "execution");
 
         try
         {
@@ -290,6 +290,18 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         LogStopped(_logger);
+    }
+
+    private void CancelForShutdown(CancellationTokenSource cancellation, string phase)
+    {
+        try
+        {
+            cancellation.Cancel(throwOnFirstException: false);
+        }
+        catch (AggregateException exception)
+        {
+            LogErrorCancelingOperations(_logger, exception, phase);
+        }
     }
 
     /// <inheritdoc/>

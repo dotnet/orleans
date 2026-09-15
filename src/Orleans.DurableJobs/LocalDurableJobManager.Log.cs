@@ -43,6 +43,12 @@ internal partial class LocalDurableJobManager
     private static partial void LogStopped(ILogger logger);
 
     [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error running {Phase} cancellation callbacks during durable job shutdown"
+    )]
+    private static partial void LogErrorCancelingOperations(ILogger logger, Exception exception, string phase);
+
+    [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Requesting cancellation of job {JobId} (Name: '{JobName}') in shard {ShardId}"
     )]

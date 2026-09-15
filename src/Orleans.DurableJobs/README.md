@@ -116,7 +116,8 @@ including ownership lookup and remote cancellation routing. Activation holds adm
 until its execution task is published and queued.
 Shutdown atomically sets the closing flag through `CloseAsync`, signals cancellation to
 in-flight requests, and awaits these operations before snapshotting the running shards
-and canceling execution.
+and canceling execution. Callback failures are logged while shutdown continues draining
+requests, awaiting execution, and releasing shards.
 
 Successful scheduling and cancellation writes retain their result, and successful shard
 creations remain owned even when cancellation races with their completion. Shutdown then
