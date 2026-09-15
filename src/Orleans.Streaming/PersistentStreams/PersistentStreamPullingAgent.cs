@@ -47,6 +47,7 @@ namespace Orleans.Streams
         private GrainId GrainId => GrainContext.GrainId;
         private SiloAddress Silo => GrainContext.Address.SiloAddress!;
         internal readonly QueueId QueueId;
+        internal int PubSubCacheSize => pubSubCache.Count;
 
         private int numMessages;
         private IQueueCache? queueCache;
@@ -222,7 +223,10 @@ namespace Orleans.Streams
             });
             StreamingEvents.EmitPullingAgentStarted(streamProviderName, Silo, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
-            _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object?>("name", StatisticUniquePostfix)));
+            if (GrainId.IsSystemTarget())
+            {
+                _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object?>("name", StatisticUniquePostfix)));
+            }
 
             LogInfoTakingQueue(new(QueueId));
 
