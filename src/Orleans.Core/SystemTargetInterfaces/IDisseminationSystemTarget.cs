@@ -238,6 +238,9 @@ internal sealed class DisseminationBroadcastBatch
 
     [Id(1)]
     public Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> Values { get; init; } = [];
+
+    [Id(2)]
+    public bool SupportsCompactAcknowledgments { get; init; }
 }
 
 // Acknowledgments report the versions the receiver actually holds after processing the batch.
@@ -249,6 +252,10 @@ internal sealed class DisseminationBroadcastResponse
 
     [Id(1)]
     public List<DisseminationNamespace> UnsupportedNamespaces { get; init; } = [];
+
+    // Certifies the maximum transmitted version of every key. Namespace entries retain capability evidence.
+    [Id(2)]
+    public bool AllVersionsAcknowledged { get; init; }
 }
 
 [GenerateSerializer, Immutable]

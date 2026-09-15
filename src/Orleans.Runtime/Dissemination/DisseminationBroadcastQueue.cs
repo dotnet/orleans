@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
@@ -24,6 +25,7 @@ internal sealed partial class DisseminationBroadcastQueue
     private readonly object _lock = new();
     private readonly Dictionary<SiloAddress, PeerQueuePump> _peers = [];
     private readonly DisseminationSendGate _sendGate;
+    private readonly ObjectPool<Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>> _inventoryPool;
     private bool _stopped;
 
     public DisseminationBroadcastQueue(
@@ -44,6 +46,8 @@ internal sealed partial class DisseminationBroadcastQueue
         _logger = logger;
         _responseObserver = responseObserver;
         _sendGate = new(Math.Max(1, options.CurrentValue.MaxConcurrentSends));
+        _inventoryPool = new DefaultObjectPool<Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>>(
+            new InventoryPoolPolicy(_disseminationNamespaces), maximumRetained: 1);
     }
 
     public bool Notify(
@@ -134,49 +138,81 @@ internal sealed partial class DisseminationBroadcastQueue
         CancellationToken cancellationToken)
     {
         // Namespace identities are the authoritative inventory for retiring clean ledger entries.
-        var activeKeys = new Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>();
-        foreach (var disseminationNamespace in _disseminationNamespaces)
+        var activeKeys = _inventoryPool.Get();
+        try
         {
-            if (disseminationNamespace.Options.Enabled)
+            foreach (var disseminationNamespace in _disseminationNamespaces)
             {
-                activeKeys[disseminationNamespace.Name] = disseminationNamespace.Keys.ToHashSet();
+                if (disseminationNamespace.Options.Enabled)
+                {
+                    activeKeys[disseminationNamespace.Name].UnionWith(disseminationNamespace.Keys);
+                }
             }
-        }
 
-        List<PeerQueuePump>? removedPeers = null;
-        List<PeerQueuePump> retainedPeers;
-        lock (_lock)
-        {
-            retainedPeers = new(_peers.Count);
-            foreach (var (peer, pending) in _peers)
+            List<PeerQueuePump>? removedPeers = null;
+            List<PeerQueuePump> retainedPeers;
+            lock (_lock)
             {
-                if (!_localSilo.Equals(peer) && !membershipSnapshots.AllMembers.ContainsMember(peer))
+                retainedPeers = new(_peers.Count);
+                foreach (var (peer, pending) in _peers)
                 {
-                    (removedPeers ??= []).Add(pending);
+                    if (!_localSilo.Equals(peer) && !membershipSnapshots.AllMembers.ContainsMember(peer))
+                    {
+                        (removedPeers ??= []).Add(pending);
+                    }
+                    else
+                    {
+                        retainedPeers.Add(pending);
+                    }
                 }
-                else
+
+                if (removedPeers is not null)
                 {
-                    retainedPeers.Add(pending);
+                    foreach (var pending in removedPeers)
+                    {
+                        _peers.Remove(pending.Peer);
+                    }
                 }
+            }
+
+            foreach (var peer in retainedPeers)
+            {
+                peer.PruneKeys(activeKeys, membershipSnapshots);
             }
 
             if (removedPeers is not null)
             {
-                foreach (var pending in removedPeers)
-                {
-                    _peers.Remove(pending.Peer);
-                }
+                await Task.WhenAll(removedPeers.Select(peer => peer.StopAsync(drain: false, cancellationToken).AsTask()));
             }
         }
-
-        foreach (var peer in retainedPeers)
+        finally
         {
-            peer.PruneKeys(activeKeys, membershipSnapshots);
+            _inventoryPool.Return(activeKeys);
+        }
+    }
+
+    private sealed class InventoryPoolPolicy(IDisseminationNamespace[] namespaces)
+        : PooledObjectPolicy<Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>>
+    {
+        public override Dictionary<DisseminationNamespace, HashSet<DisseminationKey>> Create()
+        {
+            var result = new Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>(namespaces.Length);
+            foreach (var ns in namespaces)
+            {
+                result.Add(ns.Name, []);
+            }
+
+            return result;
         }
 
-        if (removedPeers is not null)
+        public override bool Return(Dictionary<DisseminationNamespace, HashSet<DisseminationKey>> inventory)
         {
-            await Task.WhenAll(removedPeers.Select(peer => peer.StopAsync(drain: false, cancellationToken).AsTask()));
+            foreach (var keys in inventory.Values)
+            {
+                keys.Clear();
+            }
+
+            return true;
         }
     }
 
@@ -932,6 +968,7 @@ internal sealed partial class DisseminationBroadcastQueue
                             work.Namespace.Name,
                             out _);
                         namespaceValues ??= [];
+                        long sentVersion = 0;
                         foreach (var value in repair.Values)
                         {
                             namespaceValues.Add(new DisseminationBroadcastValue
@@ -941,9 +978,10 @@ internal sealed partial class DisseminationBroadcastQueue
                             });
                             itemCount++;
                             byteCount += value.Payload.Length;
+                            sentVersion = Math.Max(sentVersion, value.ToVersion);
                         }
 
-                        sentKeys.Add(new(work, knownVersion, repair.Version));
+                        sentKeys.Add(new(work, knownVersion, repair.Version, sentVersion));
                         if (itemCount >= currentOptions.MaxBatchItems || byteCount >= currentOptions.MaxBatchBytes)
                         {
                             break;
@@ -968,7 +1006,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
                     // RPC completion is not application evidence; only the returned receiver versions advance the ledger.
                     _owner._responseObserver?.Invoke(Peer, response);
-                    var acknowledgments = CreateAcknowledgmentLookup(response.Acknowledgments);
+                    var acknowledgments = response.AllVersionsAcknowledged ? null : CreateAcknowledgmentLookup(response.Acknowledgments);
                     var unsupportedNamespaces = response.UnsupportedNamespaces.Count > 0
                         ? response.UnsupportedNamespaces.ToHashSet()
                         : null;
@@ -980,9 +1018,10 @@ internal sealed partial class DisseminationBroadcastQueue
                             continue;
                         }
 
-                        if (!acknowledgments.TryGetValue(
+                        var acknowledgedVersion = sent.SentVersion;
+                        if (acknowledgments is not null && !acknowledgments.TryGetValue(
                             new(sent.Work.Namespace.Name, sent.Work.Key),
-                            out var acknowledgedVersion))
+                            out acknowledgedVersion))
                         {
                             if (!CompleteFromExistingEvidence(sent))
                             {
@@ -1047,6 +1086,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 {
                     Sender = _owner._localSilo,
                     Values = valuesByNamespace,
+                    SupportsCompactAcknowledgments = true,
                 };
                 sendCancellation.Token.ThrowIfCancellationRequested();
                 var sendTask = GetTarget().PushBroadcast(batch, sendCancellation.Token);
@@ -1596,7 +1636,8 @@ internal sealed partial class DisseminationBroadcastQueue
         private readonly record struct SentKey(
             PendingKeyWork Work,
             long? FromVersion,
-            long ResolvedVersion);
+            long ResolvedVersion,
+            long SentVersion);
 
         private readonly record struct DigestKey(
             DisseminationNamespace Namespace,

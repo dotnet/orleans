@@ -149,7 +149,7 @@ internal sealed partial class DisseminationProtocol
             };
         }
 
-        var receivedKeys = new Dictionary<IDisseminationNamespace, Dictionary<DisseminationKey, bool>>();
+        var receivedKeys = new Dictionary<IDisseminationNamespace, Dictionary<DisseminationKey, ReceivedKeyState>>();
         var unsupportedNamespaces = new List<DisseminationNamespace>();
         foreach (var namespaceName in batch.Values.Keys)
         {
@@ -159,17 +159,19 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        foreach (var (namespaceName, values) in SelectReceivedValues(batch.Sender, batch.Values, options, antiEntropy: false))
+        var selectedValues = SelectReceivedValues(batch.Sender, batch.Values, options, antiEntropy: false);
+        foreach (var (namespaceName, values) in selectedValues)
         {
             var disseminationNamespace = _namespaces[namespaceName];
             DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
             ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
-            var namespaceKeys = new Dictionary<DisseminationKey, bool>();
+            var namespaceKeys = new Dictionary<DisseminationKey, ReceivedKeyState>();
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
             foreach (var item in values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                namespaceKeys.TryAdd(item.Value.Key, false);
+                var existing = namespaceKeys.TryGetValue(item.Value.Key, out var keyState);
+                var sentVersion = existing ? Math.Max(keyState.SentVersion, item.Value.ToVersion) : item.Value.ToVersion;
                 // The sender necessarily owns this version; use that fact only if an outbound ledger already exists.
                 _broadcastQueue.ObservePeerVersion(
                     batch.Sender,
@@ -193,10 +195,7 @@ internal sealed partial class DisseminationProtocol
                     throw;
                 }
 
-                if (result is DisseminationApplyResult.Applied)
-                {
-                    namespaceKeys[item.Value.Key] = true;
-                }
+                namespaceKeys[item.Value.Key] = new(sentVersion, keyState.Applied || result is DisseminationApplyResult.Applied);
             }
         }
 
@@ -209,7 +208,7 @@ internal sealed partial class DisseminationProtocol
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
-            foreach (var (key, applied) in keys)
+            foreach (var (key, state) in keys)
             {
                 if (disseminationNamespace.GetVersion(key) <= 0)
                 {
@@ -220,20 +219,26 @@ internal sealed partial class DisseminationProtocol
                 {
                     if (!Equals(peer, batch.Sender))
                     {
-                        _broadcastQueue.Notify(peer, disseminationNamespace, key, force: applied);
+                        _broadcastQueue.Notify(peer, disseminationNamespace, key, force: state.Applied);
                     }
                 }
             }
         }
 
         // Once downstream work is queued, report the versions this receiver actually holds.
-        var acknowledgments = new Dictionary<DisseminationNamespace, List<DigestEntry>>();
+        var compact = batch.SupportsCompactAcknowledgments
+            && ReferenceEquals(selectedValues, batch.Values)
+            && CanAcknowledgeTransmittedVersions(receivedKeys);
+        var acknowledgments = new Dictionary<DisseminationNamespace, List<DigestEntry>>(receivedKeys.Count);
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
-            var namespaceAcknowledgments = new List<DigestEntry>(keys.Count);
-            foreach (var key in keys.Keys)
+            var namespaceAcknowledgments = new List<DigestEntry>(compact ? 0 : keys.Count);
+            if (!compact)
             {
-                namespaceAcknowledgments.Add(new DigestEntry(key, disseminationNamespace.GetVersion(key)));
+                foreach (var key in keys.Keys)
+                {
+                    namespaceAcknowledgments.Add(new DigestEntry(key, disseminationNamespace.GetVersion(key)));
+                }
             }
 
             acknowledgments.Add(disseminationNamespace.Name, namespaceAcknowledgments);
@@ -243,8 +248,29 @@ internal sealed partial class DisseminationProtocol
         {
             Acknowledgments = acknowledgments,
             UnsupportedNamespaces = unsupportedNamespaces,
+            AllVersionsAcknowledged = compact,
         };
     }
+
+    private static bool CanAcknowledgeTransmittedVersions(
+        Dictionary<IDisseminationNamespace, Dictionary<DisseminationKey, ReceivedKeyState>> receivedKeys)
+    {
+        foreach (var (disseminationNamespace, keys) in receivedKeys)
+        {
+            foreach (var (key, state) in keys)
+            {
+                // A different version needs an explicit acknowledgment to preserve the peer's exact repair baseline.
+                if (disseminationNamespace.GetVersion(key) != state.SentVersion)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private readonly record struct ReceivedKeyState(long SentVersion, bool Applied);
 
     public async Task RunAntiEntropyRound(CancellationToken cancellationToken)
     {

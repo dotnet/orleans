@@ -864,8 +864,10 @@ public partial class DisseminationProtocolTests
         }
     }
 
-    [Fact]
-    public async Task ProtocolReviewLargerBroadcastSenderContinuesFromAcknowledgedPrefix()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(10)]
+    public async Task ProtocolReviewLargerBroadcastSenderContinuesFromAcknowledgedPrefix(int senderLimit)
     {
         var sourceAddress = CreateSilo(39581);
         var receiverAddress = CreateSilo(39582);
@@ -882,18 +884,22 @@ public partial class DisseminationProtocolTests
             options.MaxBatchBytes = 8;
         }, clock);
         var acknowledgments = new List<long>();
+        var compactResponses = new List<bool>();
         var sentItemCounts = new List<int>();
         var transport = new FakeTransport(sourceAddress, receiverAddress);
         transport.SendBroadcastResponseHandler = async (_, batch, token) =>
         {
             sentItemCounts.Add(GetBroadcastValues(batch).Count());
             var acknowledgment = await receivingProtocol.ReceiveBroadcast(batch, token);
-            acknowledgments.Add(Assert.Single(acknowledgment.Acknowledgments[source.Name]).Version);
+            compactResponses.Add(acknowledgment.AllVersionsAcknowledged);
+            acknowledgments.Add(acknowledgment.AllVersionsAcknowledged
+                ? receiver.GetVersion("chain")
+                : Assert.Single(acknowledgment.Acknowledgments[source.Name]).Version);
             return acknowledgment;
         };
         var sendingProtocol = CreateProtocol(transport, source, options =>
         {
-            options.MaxBatchItems = 10;
+            options.MaxBatchItems = senderLimit;
             options.MaxBatchBytes = 1024;
         }, clock);
         try
@@ -902,7 +908,10 @@ public partial class DisseminationProtocolTests
             await sendingProtocol.FlushPendingBroadcast(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(new long[] { 1, 2, 3 }, acknowledgments);
-            Assert.Equal(new[] { 3, 2, 1 }, sentItemCounts);
+            int[] expectedCounts = senderLimit == 1 ? [1, 1, 1] : [3, 2, 1];
+            bool[] expectedCompact = senderLimit == 1 ? [true, true, true] : [false, false, true];
+            Assert.Equal(expectedCounts, sentItemCounts);
+            Assert.Equal(expectedCompact, compactResponses);
             Assert.Equal(new long[] { 0, 1, 2 }, receiver.Attempts.Select(static value => value.FromVersion));
             Assert.Equal(new long[] { 1, 2, 3 }, receiver.Attempts.Select(static value => value.ToVersion));
             Assert.Equal(3, receiver.GetVersion("chain"));
