@@ -75,11 +75,9 @@ Each `PersistentStreamPullingAgent` is a system target with single-threaded Orle
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
-### Shutdown and queue handoff
+### Shutdown and admitted work
 
-When an agent stops, it closes admission for new background work and stops its polling timer. It waits for receiver initialization, the active queue pump, and accepted producer registrations, subscription handshakes, and deliveries to finish. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Outstanding calls retain their existing messaging timeouts and retry limits while accepted work drains.
-
-The agent then reports final delivery progress to the cache, disposes subscription cursors, and shuts down the receiver so provider-specific checkpoint flushing observes the completed progress. Registrations pending when shutdown starts keep the existing checkpoint, since their subscriber positions are still uncertain. Producer unregistration follows receiver cleanup. When the manager reuses an agent for a reassigned queue, initialization waits for that full cleanup and opens admission for the new run.
+Each pulling-agent run owns admission for queue reads, producer registrations, subscription handshakes, and consumer delivery. Shutdown closes processing admission, stops polling, cancels processing waits, and drains admitted work and actual receiver initialization. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Repeated shutdown calls share the same completion. Initialization waits for the prior run's full cleanup before opening fresh admission and cancellation scopes.
 
 Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
 
@@ -87,7 +85,11 @@ A completed handshake establishes the subscription's current cursor and replay p
 
 A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
 
-Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
+Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence. Once fault persistence starts, it uses the cleanup lifetime so shutdown drains the durable operation.
+
+An unavailable client is detached locally immediately. Durable subscription retirement has its own admission and cancellation lifetime, allowing a finishing delivery to start cleanup after processing admission closes. Once processing drains, shutdown closes retirement admission and waits for persistence and notification retries to finish. Producer-initiated retirement persists the removal and notifies the other producers; the requesting producer has already detached that subscription. Ordinary consumer unregistration notifies every registered producer.
+
+The final delivery-progress scan preserves the checkpoint barrier for registrations and handshakes which were pending when shutdown began. Cancellation and failed registration retain the prior safe position. The agent disposes subscription cursors before receiver shutdown flushes the safe checkpoint and releases its resources. Producer unregistration follows receiver cleanup. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 

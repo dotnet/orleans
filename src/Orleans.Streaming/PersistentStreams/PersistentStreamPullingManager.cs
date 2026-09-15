@@ -23,7 +23,7 @@ namespace Orleans.Streams
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> deactivatedAgents = new();
         private readonly string streamProviderName;
-        private readonly IStreamPubSub pubSub;
+        private readonly IStreamPubSubRuntime pubSub;
         private readonly SystemTargetShared _systemTargetShared;
 
         private readonly StreamPullingAgentOptions options;
@@ -49,7 +49,7 @@ namespace Orleans.Streams
         internal PersistentStreamPullingManager(
             SystemTargetGrainId managerId,
             string strProviderName,
-            IStreamPubSub streamPubSub,
+            IStreamPubSubRuntime streamPubSub,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             IStreamFilter streamFilter,

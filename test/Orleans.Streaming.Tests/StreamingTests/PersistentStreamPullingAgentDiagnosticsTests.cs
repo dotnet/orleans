@@ -36,7 +36,7 @@ public partial class PersistentStreamPullingAgentTests
         data.IsRegistered = true;
         var unregister = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var unregisterAttempts = 0;
-        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+        pubSub.UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>()).Returns(_ =>
             Interlocked.Increment(ref unregisterAttempts) == 1
                 ? unregister.Task
                 : Task.CompletedTask);
@@ -112,7 +112,7 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Same(consumer, completed.Consumer);
             Assert.Null(completed.Exception);
             _ = pubSub.Received(failUnregistration ? 2 : 1)
-                .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+                .UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
         }
         finally
         {
@@ -121,7 +121,10 @@ public partial class PersistentStreamPullingAgentTests
         }
     }
 
-    [Fact]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public async Task ShutdownDrainsUnavailableConsumerUnregistrationBeforeCancelingRetries()
     {
         var streamId = new QualifiedStreamId("provider", StreamId.Create("shutdown-unregister", Guid.NewGuid()));
@@ -142,7 +145,7 @@ public partial class PersistentStreamPullingAgentTests
         data.IsRegistered = true;
         var firstAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var attempts = 0;
-        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+        pubSub.UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>()).Returns(_ =>
             Interlocked.Increment(ref attempts) == 1 ? firstAttempt.Task : Task.CompletedTask);
 
         await accessor.RunConsumerCursor(data).WaitAsync(
@@ -155,10 +158,13 @@ public partial class PersistentStreamPullingAgentTests
         await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         _ = pubSub.Received(2)
-            .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+            .UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public async Task ShutdownDrainsCleanupStartedByInFlightDelivery()
     {
         var streamId = new QualifiedStreamId("provider", StreamId.Create("shutdown-delivery", Guid.NewGuid()));
@@ -169,30 +175,44 @@ public partial class PersistentStreamPullingAgentTests
         var (accessor, pubSub, streamData) = await CreateInitializedAgentWithStream(
             streamId, token, cache, new StreamPullingAgentOptions());
         var unavailable = Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException();
-        var consumer = new BlockingUnavailableConsumer(unavailable);
+        var consumer = new UnavailableConsumer(unavailable);
         var data = streamData.AddConsumer(subscriptionId, streamId, consumer, filterData: null, DateTime.UtcNow);
         data.Cursor = cache.GetCacheCursor(streamId.StreamId, token);
         data.IsRegistered = true;
         var firstAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var attempts = 0;
-        pubSub.UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>()).Returns(_ =>
+        pubSub.UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>()).Returns(_ =>
             Interlocked.Increment(ref attempts) == 1 ? firstAttempt.Task : Task.CompletedTask);
 
-        var delivery = accessor.RunConsumerCursor(data);
-        await consumer.DeliveryStarted.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken);
-        var shutdown = accessor.Shutdown();
-
-        Assert.False(shutdown.IsCompleted);
-        consumer.FailDelivery();
-        await delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.False(shutdown.IsCompleted);
-        firstAttempt.SetException(new InvalidOperationException("transient cleanup failure"));
-        await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Task? shutdown = null;
+        using var observer = StreamingEvents.AllEvents.Subscribe(value =>
+        {
+            if (value is StreamingEvents.SubscriptionRemoved removed && removed.SubscriptionId == subscriptionId.Guid)
+            {
+                // Close work admission before the failing delivery starts durable retirement.
+                shutdown = accessor.Shutdown();
+            }
+        });
+        try
+        {
+            await accessor.RunConsumerCursor(data).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.NotNull(shutdown);
+            await accessor.GetPubSubCache();
+            Assert.False(shutdown.IsCompleted);
+            Assert.Equal(1, attempts);
+            Assert.False(streamData.Contains(subscriptionId));
+            Assert.Null(data.Cursor);
+            firstAttempt.SetException(new InvalidOperationException("transient cleanup failure"));
+            await shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            firstAttempt.TrySetResult();
+            await (shutdown ?? accessor.Shutdown()).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
 
         _ = pubSub.Received(2)
-            .UnregisterConsumer(subscriptionId, streamId, Arg.Any<CancellationToken>());
+            .UnregisterConsumerFromProducer(subscriptionId, streamId, Arg.Any<GrainId>(), Arg.Any<CancellationToken>());
     }
 
     private sealed class UnavailableConsumer(ClientNotAvailableException exception) : IStreamConsumerExtension
