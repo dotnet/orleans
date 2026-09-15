@@ -26,6 +26,7 @@ public sealed class MeasurementTests
         });
         await entered.Task.WaitAsync(TestContext.Current.CancellationToken);
         observation.Partition();
+        Assert.True(context.ConnectionClosed.IsCancellationRequested);
         var closeCalls = 0;
         var drain = observation.DrainConnections(
             static _ => true,
@@ -93,6 +94,8 @@ public sealed class MeasurementTests
         try
         {
             Assert.Equal(new[] { "unknown" }, closed);
+            Assert.True(unknown.ConnectionClosed.IsCancellationRequested);
+            Assert.False(healthy.ConnectionClosed.IsCancellationRequested);
             Assert.False(healthyMiddleware.IsCompleted);
             await cancellation.CancelAsync();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => drain);
@@ -292,7 +295,24 @@ public sealed class MeasurementTests
     private static DefaultConnectionContext CreateConnectionContext(string id)
     {
         var pipe = new Pipe();
-        return new(id) { Transport = new TestPipe(pipe.Reader, pipe.Writer) };
+        return new TestConnectionContext(id) { Transport = new TestPipe(pipe.Reader, pipe.Writer) };
+    }
+
+    // DefaultConnectionContext queues Cancel independently of Dispose. These tests own abort synchronously;
+    // separate barriers continue to control middleware and transport completion.
+    private sealed class TestConnectionContext : DefaultConnectionContext
+    {
+        private readonly CancellationTokenSource _closed = new();
+
+        public TestConnectionContext(string id) : base(id) => ConnectionClosed = _closed.Token;
+
+        public override void Abort(ConnectionAbortedException abortReason) => _closed.Cancel();
+
+        public override ValueTask DisposeAsync()
+        {
+            _closed.Dispose();
+            return base.DisposeAsync();
+        }
     }
 
     private readonly struct ReadonlyStatistics(float rawCpuUsagePercentage)
