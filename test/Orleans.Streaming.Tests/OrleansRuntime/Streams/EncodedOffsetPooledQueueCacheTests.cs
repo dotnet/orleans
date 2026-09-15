@@ -30,6 +30,29 @@ public sealed class EncodedOffsetPooledQueueCacheTests
     }
 
     [Fact]
+    public void TypedCursorAcquisition_UsesEncodedOffsetsWhenNumericFieldsDiffer()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var adapter = new EncodedOffsetDataAdapter(useNumericPrefix: false);
+        var cache = CreateCache(adapter);
+        var first = CreateMessage(streamId, "010");
+        first.SequenceNumber = 100;
+        var second = CreateMessage(streamId, "020");
+        second.SequenceNumber = 200;
+        cache.Add([first, second], DateTime.UnixEpoch);
+
+        var result = cache.TryGetCursor(streamId, new EncodedOffsetToken("020"));
+
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        Assert.Null(result.CacheMiss);
+        var move = cache.TryGetNextMessageWithResult(result.Cursor!, out var batch);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, move.Kind);
+        Assert.NotNull(batch);
+        Assert.Equal("020", Assert.IsType<EncodedOffsetToken>(batch.SequenceToken).Offset);
+        Assert.Equal(1, adapter.GetBatchContainerCallCount);
+    }
+
+    [Fact]
     public void Cursor_AfterNewestWaitsUntilExternalOffsetArrives()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -181,7 +204,7 @@ public sealed class EncodedOffsetPooledQueueCacheTests
         };
     }
 
-    private sealed class EncodedOffsetDataAdapter : ICacheDataAdapter
+    private sealed class EncodedOffsetDataAdapter(bool useNumericPrefix = true) : ICacheDataAdapter
     {
         public int CompareCallCount { get; private set; }
         public int GetBatchContainerCallCount { get; private set; }
@@ -200,7 +223,7 @@ public sealed class EncodedOffsetPooledQueueCacheTests
         public int Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
         {
             CompareCallCount++;
-            var numericComparison = cachedMessage.Compare(token);
+            var numericComparison = useNumericPrefix ? cachedMessage.Compare(token) : 0;
             if (numericComparison != 0)
             {
                 return numericComparison;

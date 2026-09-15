@@ -334,6 +334,11 @@ namespace Orleans.Streams
 
                 if (await TryClearState(cancellationToken))
                 {
+                    if (numRemoved != 0)
+                    {
+                        StreamingEvents.EmitSubscriptionUnregistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, GrainContext.Address.SiloAddress);
+                    }
+
                     // If state was cleared expedite Deactivation
                     DeactivateOnIdle();
                 }
