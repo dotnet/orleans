@@ -5,6 +5,7 @@ using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
@@ -57,7 +58,8 @@ public sealed class GrainHostedEventHubMigrationTests
             }
 
             var initialDelivery = WaitForDrain(events, state, siloA);
-            await Wait(state.Balancers[siloA].SetAssigned(true), "initial Event Hubs assignment on A");
+            await Wait(cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting Event Hubs provider on A");
             await Wait(initialDelivery, "Event Hubs delivery through 100 on A");
             var firstA = Assert.Single(state.Epochs);
             var stableId = firstA.Address.GrainId;
@@ -71,6 +73,8 @@ public sealed class GrainHostedEventHubMigrationTests
             var retainedReceiverA = Assert.IsType<EventHubAdapterReceiver>(factoryA.CreateReceiver(queueId));
             Assert.Same(retainedReceiverA, factoryA.CreateQueueCache(queueId));
             Assert.Single(TimersCreated(events, firstA));
+            await Wait(cluster.Silos[1].ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting Event Hubs provider on B");
 
             var firstB = await Migrate(firstA, siloB, relayB, checkpoint: "100", nextAvailable: 101);
             var secondA = await Migrate(firstB, siloA, relayA, checkpoint: "101", nextAvailable: 102);
@@ -125,8 +129,8 @@ public sealed class GrainHostedEventHubMigrationTests
                     evt => evt.Payload is GrainLifecycleEvents.Deactivated value && value.GrainContext.Address.Equals(source.Address),
                     PhaseTimeout, TestContext.Current.CancellationToken);
                 var destinationDrained = WaitForDrain(events, state, destinationSilo, previousEpochCount);
-                await Wait(state.Balancers[source.Address.SiloAddress!].SetAssigned(false), "source relinquishing Event Hubs assignment");
-                await Wait(state.Balancers[destinationSilo].SetAssigned(true), "destination requesting Event Hubs migration");
+                Assert.True(await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(stableId)
+                    .Rebalance(source.Address, destinationSilo), "guarded Event Hubs rebalance"));
                 await Wait(gate.SaveEntered.Task, $"store write {checkpoint} from {source.Address}");
                 await Wait(source.FlushEntered.Task, $"real EventHubAdapterReceiver final flush for {source.Address}");
                 Assert.Equal(checkpoint, source.LastUpdate);
@@ -248,8 +252,11 @@ public sealed class GrainHostedEventHubMigrationTests
                 {
                     configurator.ConfigurePullingAgent(options => options.Configure(value =>
                         value.HostingMode = Orleans.Configuration.StreamPullingAgentHostingMode.Grain));
+                    configurator.ConfigureLifecycle(options => options.Configure(value =>
+                        value.StartupState = Orleans.Configuration.StreamLifecycleOptions.RunState.AgentsStopped));
                     configurator.ConfigureStreamPubSub(StreamPubSubType.ExplicitGrainBasedOnly);
-                    configurator.ConfigurePartitionBalancing((services, _) => new EventHubMigrationBalancer(services, state));
+                    configurator.ConfigurePartitionBalancing((_, _) =>
+                        throw new InvalidOperationException("Grain hosting must not construct a queue balancer."));
                 });
         });
         return builder.Build();
@@ -310,11 +317,21 @@ public sealed class GrainHostedEventHubMigrationTests
 public interface IEventHubMigrationProbe : IGrainExtension
 {
     Task<GrainAddress> GetAddress();
+    Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination);
 }
 
 public sealed class EventHubMigrationProbe(IGrainContextAccessor context) : IEventHubMigrationProbe
 {
     public Task<GrainAddress> GetAddress() => Task.FromResult(context.GrainContext.Address);
+
+    public Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination)
+    {
+        // This provider test assembly has no friend access to the internal hosting interface.
+        var host = context.GrainContext.GrainInstance!;
+        var method = host.GetType().GetMethod(nameof(Rebalance), [typeof(GrainAddress), typeof(SiloAddress), typeof(CancellationToken)]);
+        Assert.NotNull(method);
+        return (Task<bool>)method.Invoke(host, [expectedAddress, destination, CancellationToken.None])!;
+    }
 }
 
 public interface IEventHubMigrationRelay : IGrainWithGuidKey
@@ -444,7 +461,6 @@ public sealed class EventHubMigrationState
     internal ConcurrentQueue<EventHubReceiverEpoch> Epochs { get; } = new();
     internal ConcurrentQueue<long> Delivered { get; } = new();
     internal ConcurrentDictionary<SiloAddress, ControlledEventHubAdapterFactory> Factories { get; } = new();
-    internal ConcurrentDictionary<SiloAddress, EventHubMigrationBalancer> Balancers { get; } = new();
     internal EventHubSaveGate? SaveGate { get; private set; }
     internal int ActiveSources => Volatile.Read(ref _activeSources);
     internal int MaximumActiveSources => Volatile.Read(ref _maximumActiveSources);
@@ -593,31 +609,6 @@ internal sealed class ObservedEventHubCheckpointer(EventHubReceiverEpoch epoch) 
         epoch.FlushEntered.TrySetResult();
         return epoch.Checkpointer.FlushAsync(cancellationToken);
     }
-}
-
-internal sealed class EventHubMigrationBalancer : QueueBalancerBase
-{
-    private QueueId _queue;
-    private bool _assigned;
-
-    internal EventHubMigrationBalancer(IServiceProvider services, EventHubMigrationState state)
-        : base(services, services.GetRequiredService<ILoggerFactory>().CreateLogger<EventHubMigrationBalancer>())
-        => Assert.True(state.Balancers.TryAdd(SiloAddress, this));
-
-    public override Task Initialize(IStreamQueueMapper mapper)
-    {
-        _queue = Assert.Single(mapper.GetAllQueues());
-        return base.Initialize(mapper);
-    }
-
-    internal Task SetAssigned(bool assigned)
-    {
-        Volatile.Write(ref _assigned, assigned);
-        return NotifyListeners();
-    }
-
-    public override IEnumerable<QueueId> GetMyQueues() => Volatile.Read(ref _assigned) ? [_queue] : [];
-    protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos) { }
 }
 
 internal sealed class ControlledEventHubAdapterFactory : EventHubAdapterFactory

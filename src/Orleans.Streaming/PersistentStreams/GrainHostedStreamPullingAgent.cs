@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -11,18 +12,27 @@ namespace Orleans.Streams;
 
 internal interface IGrainHostedStreamPullingAgent : IGrain, IStreamProducerExtension
 {
-    Task<GrainAddress> EnsureRunning(SiloAddress requestedHost, CancellationToken cancellationToken = default);
+    Task<StreamPullingAgentStatus> Probe(CancellationToken cancellationToken = default);
+    Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination, CancellationToken cancellationToken = default);
     Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken = default);
 }
+
+[GenerateSerializer]
+internal readonly record struct StreamPullingAgentStatus(
+    [property: Id(0)] GrainAddress Address,
+    [property: Id(1)] bool IsRunning);
 
 [GrainType(StreamPullingAgentId.GrainTypeName)]
 [StreamPullingAgentPlacement]
 [Immovable]
 internal sealed class GrainHostedStreamPullingAgent(
     StreamPullingAgentRuntime runtime,
+    StreamPullingAgentHostResolver hosts,
     ILogger<GrainHostedStreamPullingAgent> logger) : Grain, IGrainHostedStreamPullingAgent
 {
+    internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("Orleans.Streams.IGrainHostedStreamPullingAgent");
     private StreamPullingAgentRuntime.Provider _provider = null!;
+    private string _providerName = null!;
     private QueueId _queueId;
     private volatile PersistentStreamPullingAgent? _agent;
     internal bool IsRunning => _agent is not null;
@@ -31,6 +41,7 @@ internal sealed class GrainHostedStreamPullingAgent(
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         var (providerName, queueId) = StreamPullingAgentId.Parse(GrainContext.GrainId);
+        _providerName = providerName;
         _queueId = queueId;
         _provider = runtime.GetProvider(providerName);
         if (_provider.IsEligible(queueId))
@@ -39,22 +50,30 @@ internal sealed class GrainHostedStreamPullingAgent(
         }
     }
 
-    public async Task<GrainAddress> EnsureRunning(SiloAddress requestedHost, CancellationToken cancellationToken)
+    public async Task<StreamPullingAgentStatus> Probe(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (requestedHost != GrainContext.Address.SiloAddress)
-        {
-            GrainContext.Migrate(new Dictionary<string, object>
-            {
-                [IPlacementDirector.PlacementHintKey] = requestedHost,
-            }, CancellationToken.None);
-        }
-        else if (_agent is null && _provider.IsEligible(_queueId))
+        if (_agent is null && _provider.IsEligible(_queueId))
         {
             await Start(cancellationToken);
         }
 
-        return GrainContext.Address;
+        return new(GrainContext.Address, IsRunning);
+    }
+
+    public Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!GrainContext.Address.Equals(expectedAddress) || destination == GrainContext.Address.SiloAddress)
+        {
+            return Task.FromResult(false);
+        }
+
+        GrainContext.Migrate(new Dictionary<string, object>
+        {
+            [IPlacementDirector.PlacementHintKey] = destination,
+        }, CancellationToken.None);
+        return Task.FromResult(true);
     }
 
     public Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken)
@@ -62,9 +81,24 @@ internal sealed class GrainHostedStreamPullingAgent(
             ? StopCore(cancellationToken, unregisterProducer: true)
             : Task.CompletedTask;
 
-    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
         // The stable producer registration serves the successor. Pub/sub callbacks route through migration.
-        => StopCore(cancellationToken, unregisterProducer: false);
+        await StopCore(cancellationToken, unregisterProducer: false);
+        if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown && !cancellationToken.IsCancellationRequested)
+        {
+            var survivors = (await hosts.GetEligibleSilos(
+                _providerName, _queueId, StreamPullingAgentId.GrainType, InterfaceType, cancellationToken))
+                .Where(silo => silo != GrainContext.Address.SiloAddress).ToArray();
+            if (survivors.Length > 0)
+            {
+                GrainContext.Migrate(new Dictionary<string, object>
+                {
+                    [IPlacementDirector.PlacementHintKey] = survivors[Random.Shared.Next(survivors.Length)],
+                }, CancellationToken.None);
+            }
+        }
+    }
 
     private async Task Start(CancellationToken cancellationToken)
     {

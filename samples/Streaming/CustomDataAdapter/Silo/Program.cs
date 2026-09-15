@@ -56,7 +56,11 @@ void ConfigureSilo(HostBuilderContext context, ISiloBuilder siloBuilder)
                 if (args.Contains("--grain-hosted-pulling-agents", StringComparer.Ordinal))
                 {
                     configurator.ConfigurePullingAgent(builder => builder.Configure(options =>
-                        options.HostingMode = StreamPullingAgentHostingMode.Grain));
+                    {
+                        options.HostingMode = StreamPullingAgentHostingMode.Grain;
+                        options.GrainHostingProbePeriod = TimeSpan.FromSeconds(30);
+                        options.GrainHostingRebalanceDelay = TimeSpan.FromMinutes(1);
+                    }));
                 }
 
                 configurator.ConfigureEventHub(builder => builder.Configure(options =>

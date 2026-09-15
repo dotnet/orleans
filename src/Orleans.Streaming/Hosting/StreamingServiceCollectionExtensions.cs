@@ -36,6 +36,7 @@ namespace Orleans.Hosting
             services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
             services.AddSingleton<StreamPullingAgentRuntime>();
+            services.AddSingleton<StreamPullingAgentHostResolver>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, StreamPullingAgentRuntime>();
             services.AddSingleton<IGrainPropertiesProvider, StreamPullingAgentGrainPropertiesProvider>();
             services.AddPlacementDirector<StreamPullingAgentPlacement, StreamPullingAgentPlacementDirector>();

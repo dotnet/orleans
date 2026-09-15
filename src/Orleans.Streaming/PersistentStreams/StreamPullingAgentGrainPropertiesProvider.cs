@@ -15,7 +15,7 @@ internal sealed class StreamPullingAgentGrainPropertiesProvider(
 {
     public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
     {
-        if (grainClass != typeof(GrainHostedStreamPullingAgent))
+        if (grainClass != typeof(GrainHostedStreamPullingAgent) && grainClass != typeof(StreamPullingAgentCoordinator))
         {
             return;
         }

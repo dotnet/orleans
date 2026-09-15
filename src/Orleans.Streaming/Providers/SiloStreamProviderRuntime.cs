@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Streams;
@@ -69,7 +70,6 @@ namespace Orleans.Runtime.Providers
             IQueueAdapter queueAdapter,
             CancellationToken cancellationToken)
         {
-            IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             (var deliveryProvider, var queueReaderProvider) = CreateBackoffProviders(streamProviderName);
             var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, this.siloDetails.SiloAddress, streamProviderName);
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
@@ -83,23 +83,28 @@ namespace Orleans.Runtime.Providers
             switch (pullingAgentOptions.HostingMode)
             {
                 case StreamPullingAgentHostingMode.Grain:
-                    if (queueBalancer is LeaseBasedQueueBalancer)
+                    if (pullingAgentOptions.GrainHostingProbePeriod <= TimeSpan.Zero
+                        || pullingAgentOptions.GrainHostingRebalanceDelay <= TimeSpan.Zero)
                     {
                         throw new OrleansConfigurationException(
-                            $"Stream provider '{streamProviderName}' requires system-target hosting with {nameof(LeaseBasedQueueBalancer)}.");
+                            $"Stream provider '{streamProviderName}' requires positive grain-hosting probe and rebalance intervals.");
                     }
 
-                    var provider = new StreamPullingAgentRuntime.Provider(async (context, queueId) => new PersistentStreamPullingAgent(
+                    var provider = new StreamPullingAgentRuntime.Provider(
+                        adapterFactory.GetStreamQueueMapper().GetAllQueues().ToImmutableHashSet(),
+                        pullingAgentOptions,
+                        async (context, queueId) => new PersistentStreamPullingAgent(
                         context, streamProviderName, pubSub, filter, queueId, pullingAgentOptions, queueAdapter,
                         adapterFactory.GetQueueAdapterCache(), await adapterFactory.GetDeliveryFailureHandler(queueId),
                         deliveryProvider, queueReaderProvider, timeProvider, loggerFactory,
                         ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments));
                     ServiceProvider.GetRequiredService<StreamPullingAgentRuntime>().Register(streamProviderName, provider);
                     var grainManager = new GrainHostedStreamPullingManager(
-                        managerId, streamProviderName, provider, queueBalancer, adapterFactory.GetStreamQueueMapper(), instruments, shared);
+                        managerId, streamProviderName, provider, instruments, shared);
                     pullingAgentManager = grainManager.AsReference<IPersistentStreamPullingManager>();
                     break;
                 case StreamPullingAgentHostingMode.SystemTarget:
+                    var queueBalancer = CreateQueueBalancer(streamProviderName);
                     var manager = new PersistentStreamPullingManager(
                         managerId, streamProviderName, pubSub, adapterFactory, queueBalancer, filter,
                         pullingAgentOptions, queueAdapter, deliveryProvider, queueReaderProvider, timeProvider, instruments, shared);

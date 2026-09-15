@@ -167,6 +167,10 @@ namespace Orleans.Configuration
 
         public System.TimeSpan GetQueueMsgsTimerPeriod { get { throw null; } set { } }
 
+        public System.TimeSpan GrainHostingProbePeriod { get { throw null; } set { } }
+
+        public System.TimeSpan GrainHostingRebalanceDelay { get { throw null; } set { } }
+
         public StreamPullingAgentHostingMode HostingMode { get { throw null; } set { } }
 
         public Streams.StreamSubscriptionStartPosition InitialSubscriptionStartPosition { get { throw null; } set { } }

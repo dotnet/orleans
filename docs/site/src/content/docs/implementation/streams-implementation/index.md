@@ -11,6 +11,8 @@ A persistent stream provider connects Orleans streams to a durable queue technol
 
 This page describes the runtime mechanism. For stream APIs and provider selection, see the [streaming documentation](../../streaming/index.md).
 
+The default system-target pipeline is:
+
 ```mermaid
 flowchart LR
     Producer[Stream producer]
@@ -40,9 +42,10 @@ flowchart LR
 
 - an <xref:Orleans.Streams.IQueueAdapter> for enqueue and receive semantics;
 - an <xref:Orleans.Streams.IStreamQueueMapper> for stream-to-queue mapping;
-- an <xref:Orleans.Streams.IStreamQueueBalancer> for silo ownership;
 - an <xref:Orleans.Streams.IQueueAdapterCache> for per-agent caches; and
 - optional failure handlers, filters, and backoff providers.
+
+System-target hosting also resolves an <xref:Orleans.Streams.IStreamQueueBalancer>. Grain hosting uses a coordinator grain to manage placement.
 
 During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. Shutdown stops agents before the provider closes.
 
@@ -56,9 +59,28 @@ The queue mapper deterministically assigns a stream identity to a queue. All pro
 
 The queue balancer assigns queues to silos and publishes ownership changes. With the default system-target hosting, `PersistentStreamPullingManager` serializes those notifications, ignores stale sequences, and starts or stops one silo-local agent per assigned queue.
 
-With <xref:Orleans.Configuration.StreamPullingAgentHostingMode.Grain>, a supervisor invokes one stable grain identity per provider/queue pair. The identity preserves the provider name, queue prefix, numeric queue ID, and uniform hash. The grain directory resolves that identity and arbitrates activation registration. The balancer supplies desired placement; the supervisor requests ordinary activation migration toward the assigned host.
+With <xref:Orleans.Configuration.StreamPullingAgentHostingMode.Grain>, one coordinator grain per named provider manages one stable pulling-agent grain per queue. Agent identity preserves the provider name, queue prefix, numeric queue ID, and uniform hash. The grain directory resolves these identities and arbitrates activation registration.
 
-Placement considers grain-type compatibility, the named provider's availability, its running state, and its current queue assignment. Every 30 seconds, each running supervisor refreshes its assignments and invokes the corresponding grains. This reconciles placement after a failed migration attempt and recreates a failed activation even when external partition traffic supplies no grain calls. Membership-driven balancing also triggers reconciliation. A keep-alive grain timer sustains active polling, and each timer invocation performs at most 16 queue reads so a busy partition regularly reaches the runtime's migration boundary.
+```mermaid
+flowchart LR
+    Inventory[Provider queue inventory] --> Coordinator[Coordinator grain]
+    Membership[Cluster membership] --> Coordinator
+    Hosts[Silo-local lifecycle and liveness] --> Coordinator
+    Coordinator -->|Probe with activation hint| Agents[Pulling-agent grains]
+    Agents -->|Actual address and readiness| Coordinator
+    Coordinator -->|Delayed rebalance RPC| Agents
+    Agents -->|Flush then migrate on silo shutdown| Survivor[Surviving host]
+```
+
+The coordinator periodically probes every queue grain and groups successful observations by silo. Placement hints favor an agent's observed eligible host; queues without an eligible observed host receive a least-loaded-host hint. Calls to existing activations preserve their current location. A separate rebalance RPC requests migration and checks the observed activation address, so a stale request leaves a successor in place.
+
+Placement considers grain type/interface compatibility, named-provider availability, running state, and queue inventory. Queue mappings must agree across hosts of a provider. <xref:Orleans.Configuration.StreamPullingAgentOptions.GrainHostingProbePeriod> controls the probe interval, which defaults to 30 seconds. Cluster membership and provider availability changes also request reconciliation. Silo-local liveness checks keep the coordinator available; after coordinator recovery, probes reconstruct its observed distribution while retaining healthy agent placements.
+
+Optional balancing waits for <xref:Orleans.Configuration.StreamPullingAgentOptions.GrainHostingRebalanceDelay>, which defaults to one minute. Eligible-host changes, incomplete observations, and recovery restart stabilization. Once a complete observation shows persistent imbalance, the coordinator moves only the excess agents needed to bring queue counts within one of each other. A completed rebalance round establishes another delay before further optional moves. Balanced rounds preserve every placement.
+
+This policy balances queue counts. Queue traffic and processing costs determine actual workload, so partition sizing remains an important capacity decision. Missing-agent activation and recovery proceed immediately, while optional redistribution waits for stabilization.
+
+A keep-alive grain timer sustains active polling, and each timer invocation performs at most 16 queue reads so a busy partition regularly reaches the runtime's migration boundary.
 
 ### Grain-hosted handoff
 
@@ -72,11 +94,11 @@ The successful migration path orders these operations:
 
 Receiver, cache, cursor, and SDK-client objects belong to their host. The destination reconstructs subscriptions from pub/sub and consumer handshakes. Event Hubs retains its existing checkpoint storage identity and inclusive restart boundary.
 
-The producer's stable grain ID remains registered across runtime migration and recovery. Pub/sub callbacks route to the successor. Administrative stop unregisters the hosted producer while the activation can still serve interleaved subscription callbacks, then leaves polling stopped until the provider is started.
+The producer's stable grain ID remains registered across runtime migration and recovery. Pub/sub callbacks route to the successor. During graceful silo deactivation, the grain flushes its receiver and requests migration to an eligible surviving host. Administrative stop unregisters the hosted producer while the activation can still serve interleaved subscription callbacks and closes admission on that silo. The coordinator maintains queue coverage on other running provider hosts.
 
 Receiver initialization and final-flush failures propagate to the grain lifecycle. Checkpoint-backed rewindable providers recover failed deactivation, lifecycle cancellation, and process failure using the last durable checkpoint, with at-least-once replay. Each adapter supplies its own acknowledgement and recovery semantics; the selected grain directory supplies activation-registration and failure-recovery guarantees.
 
-Grain hosting uses assignment-based balancing. The built-in lease-based balancer uses system-target hosting so its lease-release obligations stay with the current host lifecycle. See [streaming operations](../../streaming/streaming-operations.md#change-pulling-agent-hosting-mode) for the provider-scoped rollout boundary.
+Queue-balancer configuration, including lease-based queue balancing, applies to system-target hosting. See [streaming operations](../../streaming/streaming-operations.md#change-pulling-agent-hosting-mode) for the provider-scoped rollout boundary and the scope of administrative commands.
 
 Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingManager.cs).
 
@@ -146,7 +168,7 @@ Provider authors should keep these responsibilities separate:
 - <xref:Orleans.Streams.IQueueAdapter> defines external queue reads/writes and rewindability.
 - <xref:Orleans.Streams.IQueueAdapterReceiver> defines receive, acknowledgement, and shutdown.
 - <xref:Orleans.Streams.IStreamQueueMapper> defines stable partition mapping.
-- <xref:Orleans.Streams.IStreamQueueBalancer> defines cluster ownership.
+- <xref:Orleans.Streams.IStreamQueueBalancer> supplies queue assignments for system-target hosting.
 - <xref:Orleans.Streams.IQueueCache> and its cursors define buffering and safe purge.
 - <xref:Orleans.Streams.IStreamFailureHandler> defines delivery failure policy.
 

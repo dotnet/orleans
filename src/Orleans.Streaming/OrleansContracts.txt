@@ -29,7 +29,8 @@ class [GrainType("grainhostedstreampullingmanager")] Orleans.Streams.GrainHosted
 interface [GrainInterfaceType("Orleans.Streams.IConfiguredStreamCheckpointerGrain")] Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
 
 interface [GrainInterfaceType("Orleans.Streams.IGrainHostedStreamPullingAgent")] Orleans.Streams.IGrainHostedStreamPullingAgent [Version(0)]
-  4966EA7A: EnsureRunning(Orleans.Runtime.SiloAddress, System.Threading.CancellationToken) -> Task<Orleans.Runtime.GrainAddress>
+  60ECF350: Probe(System.Threading.CancellationToken) -> Task<Orleans.Streams.StreamPullingAgentStatus>
+  C4C6FC81: Rebalance(Orleans.Runtime.GrainAddress, Orleans.Runtime.SiloAddress, System.Threading.CancellationToken) -> Task<bool>
   54E75FD4: Stop(Orleans.Runtime.SiloAddress, System.Threading.CancellationToken) -> Task
 
 interface [GrainInterfaceType("Orleans.Streams.IPersistentStreamPullingAgent")] Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
@@ -71,8 +72,13 @@ interface [GrainInterfaceType("Orleans.Streams.IStreamProducerExtension")] Orlea
   1341E3D4: AddSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?, System.Threading.CancellationToken) -> Task
   B98BA876: RemoveSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, System.Threading.CancellationToken) -> Task
 
+interface [GrainInterfaceType("Orleans.Streams.IStreamPullingAgentCoordinator")] Orleans.Streams.IStreamPullingAgentCoordinator [Version(0)]
+  233F3872: EnsureRunning(System.Threading.CancellationToken) -> Task
+  2BBC562F: GetAgents(System.Threading.CancellationToken) -> Task<System.Collections.Generic.Dictionary<Orleans.Streams.QueueId, Orleans.Streams.StreamPullingAgentStatus>>
+  38F87745: NotifyHostChanged(System.Threading.CancellationToken) -> Task
+
 interface [GrainInterfaceType("Orleans.Streams.IStreamPullingAgentRuntime")] Orleans.Streams.IStreamPullingAgentRuntime [Version(0)]
-  F4C7C69E: IsEligible(string, Orleans.Streams.QueueId, System.Threading.CancellationToken) -> Task<bool>
+  5FE67993: IsEligible(string, Orleans.Streams.QueueId?, System.Threading.CancellationToken) -> Task<bool>
 
 *RETIRED* class [GrainType("persistentstreampullingagent")] Orleans.Streams.PersistentStreamPullingAgent
 
@@ -83,6 +89,9 @@ class [GrainType("pubsubrendezvous")] Orleans.Streams.PubSubRendezvousGrain
 
 # Orleans.Streams.StreamCheckpointGrain
 class [GrainType("stream.checkpoint")] Orleans.Streams.StreamCheckpointGrain
+
+# Orleans.Streams.StreamPullingAgentCoordinator
+class [GrainType("Orleans.Streams.PullingAgentCoordinator")] Orleans.Streams.StreamPullingAgentCoordinator
 
 class [GrainType("streampullingagentruntime")] Orleans.Streams.StreamPullingAgentRuntime
 
