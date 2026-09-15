@@ -167,7 +167,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task DroppedClientCleanupWaitsForUnregistration()
+        public async Task DroppedClientCleanupCompletesBeforeShutdown()
         {
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var token = new EventSequenceTokenV2(1);
@@ -204,23 +204,41 @@ namespace UnitTests.StreamingTests
             var consumerData = streamData.AddConsumer(
                 subscriptionId,
                 streamId,
-                new DroppedClientConsumer(),
+                new UnavailableConsumer(Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException()),
                 filterData: null,
                 now: DateTime.UtcNow);
             consumerData.IsRegistered = true;
             Assert.True(await accessor.DoHandshakeWithConsumer(consumerData, token));
 
             var deliveryTask = accessor.RunConsumerCursor(consumerData);
-            await unregistrationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Task? shutdownTask = null;
+            try
+            {
+                await unregistrationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-            Assert.Equal(subscriptionId, unregisteredSubscriptionId);
-            Assert.Equal(streamId, unregisteredStreamId);
-            Assert.Equal(CancellationToken.None, unregistrationCancellationToken);
-            Assert.False(deliveryTask.IsCompleted);
+                Assert.Equal(subscriptionId, unregisteredSubscriptionId);
+                Assert.Equal(streamId, unregisteredStreamId);
+                Assert.True(unregistrationCancellationToken.CanBeCanceled);
+                Assert.False(unregistrationCancellationToken.IsCancellationRequested);
+                Assert.False(streamData.Contains(subscriptionId));
+                Assert.Null(consumerData.Cursor);
 
-            unregistration.TrySetResult(true);
-            await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            await accessor.Shutdown();
+                shutdownTask = accessor.Shutdown();
+                await accessor.GetPubSubCache().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.False(shutdownTask.IsCompleted);
+                Assert.False(unregistrationCancellationToken.IsCancellationRequested);
+            }
+            finally
+            {
+                unregistration.TrySetResult(true);
+                await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                shutdownTask ??= accessor.Shutdown();
+                await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            Assert.True(unregistrationCancellationToken.IsCancellationRequested);
+            await pubSub.Received(1).UnregisterConsumer(subscriptionId, streamId, unregistrationCancellationToken);
         }
 
         [TestSuite("BVT")]
@@ -1378,27 +1396,6 @@ namespace UnitTests.StreamingTests
                 => OnHandshake?.Invoke() ?? Task.FromResult(requestedToken);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
-        }
-
-        private sealed class DroppedClientConsumer : IStreamConsumerExtension
-        {
-            public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-                => throw new NotSupportedException();
-
-            public Task<StreamHandshakeToken?> DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-                => throw new NotSupportedException();
-
-            public Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-            {
-                throw (ClientNotAvailableException)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ClientNotAvailableException));
-            }
-
-            public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
-
-            public Task ErrorInStream(GuidId subscriptionId, Exception exc, CancellationToken cancellationToken) => Task.CompletedTask;
-
-            public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
-                => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
         private sealed class ImmediateRecordingConsumer : IStreamConsumerExtension
