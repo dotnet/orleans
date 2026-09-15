@@ -44,6 +44,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly object _deliveryLock = new();
         private bool _isDeliveringReminders;
         private AdmissionGate? _deliveryGate;
+        private Task _deliveryStopped = Task.CompletedTask;
 
         public LocalReminderService(
             GrainReferenceActivator referenceActivator,
@@ -134,8 +135,9 @@ namespace Orleans.Runtime.ReminderService
             cancellationToken.ThrowIfCancellationRequested();
             CheckRuntimeContext();
 
-            try
+            while (true)
             {
+                Task deliveryStopped;
                 lock (_deliveryLock)
                 {
                     if (_isDeliveringReminders)
@@ -143,10 +145,20 @@ namespace Orleans.Runtime.ReminderService
                         return;
                     }
 
-                    _deliveryGate = new();
-                    _isDeliveringReminders = true;
+                    deliveryStopped = _deliveryStopped;
+                    if (deliveryStopped.IsCompletedSuccessfully)
+                    {
+                        _deliveryGate = new();
+                        _isDeliveringReminders = true;
+                        break;
+                    }
                 }
 
+                await deliveryStopped.WaitAsync(cancellationToken);
+            }
+
+            try
+            {
                 foreach (var reminderData in localReminders.Values)
                 {
                     reminderData.TryStart();
@@ -170,25 +182,32 @@ namespace Orleans.Runtime.ReminderService
             await StopDeliveringReminders().WaitAsync(cancellationToken);
         }
 
-        private async Task StopDeliveringReminders()
+        private Task StopDeliveringReminders()
         {
-            Task deliveryQuiescedTask;
             lock (_deliveryLock)
             {
+                if (!_isDeliveringReminders)
+                {
+                    return _deliveryStopped;
+                }
+
                 _isDeliveringReminders = false;
-                deliveryQuiescedTask = _deliveryGate?.CloseAsync() ?? Task.CompletedTask;
+                return _deliveryStopped = StopDeliveringRemindersCore(_deliveryGate!.CloseAsync());
             }
 
-            await deliveryQuiescedTask;
-
-            // Stop all reminders.
-            var tasks = new List<Task>(localReminders.Count);
-            foreach (var reminderData in localReminders.Values)
+            async Task StopDeliveringRemindersCore(Task deliveryQuiesced)
             {
-                tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
-            }
+                await deliveryQuiesced;
 
-            await Task.WhenAll(tasks);
+                // Stop all reminders.
+                var tasks = new List<Task>(localReminders.Count);
+                foreach (var reminderData in localReminders.Values)
+                {
+                    tasks.Add(reminderData.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
+                }
+
+                await Task.WhenAll(tasks);
+            }
         }
 
         private async Task StopReminderService()

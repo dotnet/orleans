@@ -154,6 +154,62 @@ public class ReminderDeliveryAdmissionTests
         Assert.Equal(0, test.Clock.DiagnosticObserver.GetActiveReminderCount(test.GrainId, AdmittedReminder));
     }
 
+    [Fact]
+    public async Task Start_DuringCanceledStop_WaitsForCleanupBeforeReopeningAdmission()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        await using var test = new DeliveryTest();
+        await test.InitializeAsync(cancellation.Token);
+        await test.RegisterAsync(AdmittedReminder, TimeSpan.FromSeconds(1), cancellation.Token);
+        await test.Clock.AdvanceAsync(TimeSpan.FromSeconds(1), cancellation.Token);
+        await test.Admitted.Entered.Task.WaitAsync(cancellation.Token);
+
+        using var stopCancellation = new CancellationTokenSource();
+        var stop = await test.BeginStopAsync(stopCancellation.Token, cancellation.Token);
+        stopCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stop);
+
+        using var startCancellation = new CancellationTokenSource();
+        var canceledStart = await test.BeginStartAsync(startCancellation.Token, cancellation.Token);
+        Assert.False(canceledStart.IsCompleted);
+        startCancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledStart);
+        Assert.Equal(startCancellation.Token, canceled.CancellationToken);
+        Assert.False(test.Admitted.Completion.Task.IsCompleted);
+
+        var restart = await test.BeginStartAsync(CancellationToken.None, cancellation.Token);
+        var repeatedStop = await test.BeginStopAsync(CancellationToken.None, cancellation.Token);
+        await test.QueueAsync(() => test.Service.RegisterOrUpdateReminder(
+            test.GrainId, LateReminder, TimeSpan.FromSeconds(1), Period)).WaitAsync(cancellation.Token);
+        Assert.False(restart.IsCompleted);
+        Assert.False(repeatedStop.IsCompleted);
+        Assert.Equal(0, test.Clock.DiagnosticObserver.GetLocalStartCount(test.GrainId, LateReminder));
+        Assert.Equal(0, test.Late.CallCount);
+
+        test.Admitted.Completion.SetResult();
+        await Task.WhenAll(restart, repeatedStop).WaitAsync(cancellation.Token);
+        await test.Service.TestOnlyRefresh().WaitAsync(cancellation.Token);
+        await Task.WhenAll(
+            test.Clock.DiagnosticObserver.WaitForLocalReminderScheduleAsync(test.GrainId, AdmittedReminder, cancellation.Token),
+            test.Clock.DiagnosticObserver.WaitForLocalReminderScheduleAsync(test.GrainId, LateReminder, cancellation.Token));
+        Assert.Equal(1, test.Clock.DiagnosticObserver.GetLocalStopCount(test.GrainId, AdmittedReminder));
+        Assert.Equal(2, test.Clock.DiagnosticObserver.GetLocalStartCount(test.GrainId, AdmittedReminder));
+        Assert.Equal(1, test.Clock.DiagnosticObserver.GetLocalStartCount(test.GrainId, LateReminder));
+
+        await test.Clock.AdvanceAsync(TimeSpan.FromSeconds(1), cancellation.Token);
+        await test.Late.Entered.Task.WaitAsync(cancellation.Token);
+        await test.Clock.DiagnosticObserver.WaitForTickCountAsync(test.GrainId, 2, cancellation.Token, AdmittedReminder);
+        var nextStop = await test.BeginStopAsync(CancellationToken.None, cancellation.Token);
+        Assert.False(nextStop.IsCompleted);
+        Assert.Equal(1, test.Late.CallCount);
+        test.Late.Completion.SetResult();
+        await nextStop.WaitAsync(cancellation.Token);
+        Assert.Equal(1, test.Clock.DiagnosticObserver.GetTickCount(test.GrainId, LateReminder));
+        Assert.Equal(0, test.Clock.DiagnosticObserver.GetActiveReminderCount(test.GrainId, AdmittedReminder));
+        Assert.Equal(0, test.Clock.DiagnosticObserver.GetActiveReminderCount(test.GrainId, LateReminder));
+    }
+
     public enum DeliveryOutcome
     {
         Success,
@@ -227,6 +283,9 @@ public class ReminderDeliveryAdmissionTests
 
         public Task<Task> BeginStopAsync(CancellationToken stopCancellation, CancellationToken cancellationToken)
             => Queue(() => Service.Stop(stopCancellation)).WaitAsync(cancellationToken);
+
+        public Task<Task> BeginStartAsync(CancellationToken startCancellation, CancellationToken cancellationToken)
+            => Queue(() => Service.Start(startCancellation)).WaitAsync(cancellationToken);
 
         public Task QueueAsync(Func<Task> action) => Queue(action).Unwrap();
 

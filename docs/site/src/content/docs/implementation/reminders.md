@@ -27,7 +27,7 @@ Reminder ownership uses periodic reconciliation. A brief ownership overlap durin
 
 Each local reminder reports one of three states: stopped, running, or tombstone. A stopped reminder keeps its run task inactive. A running reminder computes the next due time from the stored start time and period, waits using the reminder `TimeProvider`, and invokes the target grain through the normal messaging path. A tombstone records a stop reason while refresh reconciliation observes the scheduling decision.
 
-Each delivery owns an `AdmissionGate` token through callback completion and outcome reporting. Stopping the service closes admission, waits for admitted deliveries to finish, and then stops the local reminder loops. Cancellation of a stop wait releases the caller while draining and cleanup continue. Starting delivery after a completed stop creates a fresh gate, and table reconciliation recreates local schedules from durable rows.
+Each delivery owns an `AdmissionGate` token through callback completion and outcome reporting. Stopping the service closes admission, waits for admitted deliveries to finish, and then stops the local reminder loops. Cancellation of a stop wait releases the caller while draining and cleanup continue. A concurrent start waits for that cleanup to finish before creating a fresh gate, and table reconciliation recreates local schedules from durable rows.
 
 The provider durably stores the schedule, while owners generate individual ticks in memory. After owner or process failure, the next owner reconstructs the schedule and calculates the next delivery from current time. Applications reconcile timing gaps from durable business state, and idempotent callbacks tolerate duplicate execution.
 
