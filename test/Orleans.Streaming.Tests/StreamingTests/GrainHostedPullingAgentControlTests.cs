@@ -43,7 +43,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
         var readsAtStop = setup.Reads;
 
-        var grain = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(ProviderName, Queue));
+        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(ProviderName, Queue));
         await grain.AddSubscriber(
             GuidId.GetGuidId(Guid.NewGuid()),
             new QualifiedStreamId(ProviderName, StreamId.Create("namespace", "stream")),
@@ -101,7 +101,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.NextInitialization();
         var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
-        var grain = Assert.IsType<GrainHostedStreamPullingAgent>(context.GrainInstance);
+        var grain = Assert.IsType<PullingAgentGrain>(context.GrainInstance);
         var failure = new InvalidOperationException("Final checkpoint failed.");
         setup.ShutdownFailure = failure;
 
@@ -137,7 +137,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Cluster.DeactivateAsync(grainId).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
 
         setup.InitializationBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        var activation = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
+        var activation = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(grainId)
             .Probe(TestContext.Current.CancellationToken);
         await setup.NextInitialization();
         using var cancellation = new CancellationTokenSource();
@@ -186,7 +186,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.NextInitialization();
         var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
-        var grain = Assert.IsType<GrainHostedStreamPullingAgent>(context.GrainInstance);
+        var grain = Assert.IsType<PullingAgentGrain>(context.GrainInstance);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -195,7 +195,7 @@ public sealed class GrainHostedPullingAgentControlTests
 
         Assert.Equal(0, setup.Shutdowns);
         Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
-        Assert.True((await setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
+        Assert.True((await setup.Cluster.Client.GetGrain<IPullingAgentGrain>(grainId)
             .Probe(TestContext.Current.CancellationToken)).IsRunning);
     }
 
@@ -280,7 +280,7 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(silo.SiloAddress, await setup.NextInitialization());
 
         // The initialization above was triggered by supervision; this call observes its completed activation.
-        var status = await setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
+        var status = await setup.Cluster.Client.GetGrain<IPullingAgentGrain>(grainId)
             .Probe(TestContext.Current.CancellationToken);
         var address = status.Address;
         Assert.True(status.IsRunning);
@@ -303,7 +303,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Command(destination, PersistentStreamProviderCommand.StartAgents);
         Assert.Equal(source.SiloAddress, await setup.NextInitialization());
 
-        var grain = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(ProviderName, Queue));
+        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(ProviderName, Queue));
         var previous = await grain.Probe(TestContext.Current.CancellationToken);
         Assert.True(await grain.Rebalance(previous.Address, destination.SiloAddress, TestContext.Current.CancellationToken));
         Assert.Equal(destination.SiloAddress, await setup.NextInitialization());
@@ -333,8 +333,8 @@ public sealed class GrainHostedPullingAgentControlTests
         private int _coordinatorNotifications;
 
         internal InProcessTestCluster Cluster { get; }
-        internal IStreamPullingAgentCoordinator Coordinator => Cluster.Client.GetGrain<IStreamPullingAgentCoordinator>(
-            StreamPullingAgentCoordinator.GetGrainId(ProviderName));
+        internal IPullingAgentCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingAgentCoordinatorGrain>(
+            PullingAgentCoordinatorGrain.GetGrainId(ProviderName));
         internal FakeTimeProvider Clock { get; } = new();
         internal TaskCompletionSource ShutdownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
@@ -468,8 +468,8 @@ public sealed class GrainHostedPullingAgentControlTests
         {
             public Task Invoke(IOutgoingGrainCallContext context)
             {
-                if (context.TargetId.Equals(StreamPullingAgentCoordinator.GetGrainId(ProviderName))
-                    && context.MethodName == nameof(IStreamPullingAgentCoordinator.NotifyHostChanged))
+                if (context.TargetId.Equals(PullingAgentCoordinatorGrain.GetGrainId(ProviderName))
+                    && context.MethodName == nameof(IPullingAgentCoordinatorGrain.NotifyHostChanged))
                 {
                     Interlocked.Increment(ref setup._coordinatorNotifications);
                 }

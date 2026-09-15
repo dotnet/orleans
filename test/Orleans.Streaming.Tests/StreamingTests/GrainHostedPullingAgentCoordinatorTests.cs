@@ -251,11 +251,11 @@ public sealed class GrainHostedPullingAgentCoordinatorTests
         internal DiagnosticEventCollector Events { get; } = new(GrainLifecycleEvents.ListenerName, GrainTimerEvents.ListenerName);
         internal InProcessTestCluster Cluster { get; }
         internal QueueId[] Queues { get; }
-        internal GrainId CoordinatorId => StreamPullingAgentCoordinator.GetGrainId(ProviderName);
-        internal IStreamPullingAgentCoordinator Coordinator => Cluster.Client.GetGrain<IStreamPullingAgentCoordinator>(CoordinatorId);
+        internal GrainId CoordinatorId => PullingAgentCoordinatorGrain.GetGrainId(ProviderName);
+        internal IPullingAgentCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingAgentCoordinatorGrain>(CoordinatorId);
         internal int Initializations => Volatile.Read(ref _initializations);
         internal int Shutdowns => Volatile.Read(ref _shutdowns);
-        internal IGrainHostedStreamPullingAgent Agent(GrainId id) => Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(id);
+        internal IPullingAgentGrain Agent(GrainId id) => Cluster.Client.GetGrain<IPullingAgentGrain>(id);
 
         internal Setup(int queueCount, short siloCount)
         {

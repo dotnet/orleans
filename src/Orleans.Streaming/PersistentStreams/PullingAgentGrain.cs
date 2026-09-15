@@ -10,10 +10,14 @@ using Orleans.Runtime.Placement;
 
 namespace Orleans.Streams;
 
-internal interface IGrainHostedStreamPullingAgent : IGrain, IStreamProducerExtension
+[GrainInterfaceType("Orleans.Streams.IGrainHostedStreamPullingAgent")]
+internal interface IPullingAgentGrain : IGrain, IStreamProducerExtension
 {
+    [Alias("60ECF350")]
     Task<StreamPullingAgentStatus> Probe(CancellationToken cancellationToken = default);
+    [Alias("C4C6FC81")]
     Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination, CancellationToken cancellationToken = default);
+    [Alias("54E75FD4")]
     Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken = default);
 }
 
@@ -25,10 +29,10 @@ internal readonly record struct StreamPullingAgentStatus(
 [GrainType(StreamPullingAgentId.GrainTypeName)]
 [StreamPullingAgentPlacement]
 [Immovable]
-internal sealed class GrainHostedStreamPullingAgent(
+internal sealed class PullingAgentGrain(
     StreamPullingAgentRuntime runtime,
     StreamPullingAgentHostResolver hosts,
-    ILogger<GrainHostedStreamPullingAgent> logger) : Grain, IGrainHostedStreamPullingAgent
+    ILogger<PullingAgentGrain> logger) : Grain, IPullingAgentGrain
 {
     internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("Orleans.Streams.IGrainHostedStreamPullingAgent");
     private StreamPullingAgentRuntime.Provider _provider = null!;
@@ -166,7 +170,7 @@ internal sealed class GrainHostedStreamPullingAgent(
         }
     }
 
-    private void Unregister() => ((ICollection<KeyValuePair<QueueId, GrainHostedStreamPullingAgent>>)_provider.Agents)
+    private void Unregister() => ((ICollection<KeyValuePair<QueueId, PullingAgentGrain>>)_provider.Agents)
         .Remove(new(_queueId, this));
 
     public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken)

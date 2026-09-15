@@ -18,7 +18,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
     private readonly string _providerName;
     private readonly StreamPullingAgentRuntime.Provider _provider;
     private readonly IInternalGrainFactory _grainFactory;
-    private readonly IStreamPullingAgentCoordinator _coordinator;
+    private readonly IPullingAgentCoordinatorGrain _coordinator;
     private readonly ILogger _logger;
     private readonly AsyncSerialExecutor _executor = new();
     private IGrainTimer? _heartbeat;
@@ -34,7 +34,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         _providerName = providerName;
         _provider = provider;
         _grainFactory = shared.RuntimeClient.InternalGrainFactory;
-        _coordinator = _grainFactory.GetGrain<IStreamPullingAgentCoordinator>(StreamPullingAgentCoordinator.GetGrainId(providerName));
+        _coordinator = _grainFactory.GetGrain<IPullingAgentCoordinatorGrain>(PullingAgentCoordinatorGrain.GetGrainId(providerName));
         _logger = shared.LoggerFactory.CreateLogger<GrainHostedStreamPullingManager>();
         streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(
             _provider.RunningAgentCount, new KeyValuePair<string, object?>("name", providerName)));
@@ -115,7 +115,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         CloseLocalAdmission();
         var hostedQueues = _provider.Agents.Keys.ToArray();
         await Task.WhenAll(hostedQueues.Select(queueId => _grainFactory
-            .GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(_providerName, queueId))
+            .GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(_providerName, queueId))
             .Stop(Silo, CancellationToken.None)));
         EmitState();
         // Membership updates drive reconciliation during silo shutdown.

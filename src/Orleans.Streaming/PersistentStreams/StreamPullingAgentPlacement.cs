@@ -40,7 +40,7 @@ internal sealed class StreamPullingAgentPlacementDirector(StreamPullingAgentHost
 
     public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
     {
-        var isCoordinator = target.GrainIdentity.Type == StreamPullingAgentCoordinator.GrainType;
+        var isCoordinator = target.GrainIdentity.Type == PullingAgentCoordinatorGrain.GrainType;
         var (providerName, queueId) = isCoordinator
             ? (target.GrainIdentity.Key.ToString(), (QueueId?)null)
             : GetAgentIdentity(target.GrainIdentity);
