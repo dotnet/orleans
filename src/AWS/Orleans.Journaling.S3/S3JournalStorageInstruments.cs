@@ -1,10 +1,11 @@
 using System.Diagnostics.Metrics;
+using Amazon.S3;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments)
+internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments, TimeProvider? clock = null)
 {
     private static readonly Lazy<S3JournalStorageInstruments> DirectConstruction = new(CreateDirectConstruction);
     private const string MillisecondsUnit = "ms";
@@ -21,6 +22,20 @@ internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments
     internal const string OperationDelete = "delete";
     internal const string OperationRead = "read";
     internal const string OperationReplace = "replace";
+
+    internal JournalStorageTelemetry Telemetry { get; } = new(instruments, clock);
+
+    internal Task<T> TrackApiCallAsync<T>(string api, Func<Task<T>> call, Func<T, long>? countItems = null)
+        => Telemetry.TrackApiCallAsync(JournalStorageTelemetry.S3, api, call, ClassifyException, countItems: countItems);
+
+    internal void OnRetry(string reason) => Telemetry.OnRetry(JournalStorageTelemetry.S3, reason);
+
+    private static string ClassifyException(Exception exception) => exception switch
+    {
+        AmazonS3Exception { ErrorCode: "SlowDown" } => "throttled",
+        AmazonS3Exception s3 => JournalStorageTelemetry.GetHttpStatus((int)s3.StatusCode),
+        _ => JournalStorageTelemetry.GetExceptionStatus(exception),
+    };
 
     internal static S3JournalStorageInstruments CreateForDirectConstruction() => DirectConstruction.Value;
 

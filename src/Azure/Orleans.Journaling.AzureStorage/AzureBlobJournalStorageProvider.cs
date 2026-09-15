@@ -37,12 +37,28 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             journalFormatKey: journalFormatKey);
     }
 
-    private async Task Initialize(CancellationToken cancellationToken)
+    private Task Initialize(CancellationToken cancellationToken)
+        => _shared.Instruments.Telemetry.TrackOperationAsync(
+            JournalStorageTelemetry.AzureBlob, "initialize", () => InitializeCore(cancellationToken));
+
+    private async Task InitializeCore(CancellationToken cancellationToken)
     {
         var client = await _options.CreateClient!(cancellationToken);
         var container = client.GetBlobContainerClient(_options.ContainerName);
-        await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
+        await _shared.Instruments.TrackApiCallAsync(
+            nameof(BlobContainerClient.CreateIfNotExistsAsync),
+            () => container.CreateIfNotExistsAsync(cancellationToken: cancellationToken),
+            static result => result is null ? JournalStorageTelemetry.AlreadyExists
+                : JournalStorageTelemetry.GetHttpStatus(result.GetRawResponse().Status)).ConfigureAwait(false);
+        if (_containerFactory is DefaultBlobContainerFactory defaultFactory)
+        {
+            await defaultFactory.InitializeAsync(client, cancellationToken, _shared.Instruments).ConfigureAwait(false);
+        }
+        else
+        {
+            await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
+        }
+
         _defaultContainer = container;
     }
 
@@ -53,11 +69,18 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        return new AzureBlobJournalStorage(_shared, journalId);
+        return new InstrumentedJournalStorage(
+            new AzureBlobJournalStorage(_shared, journalId), JournalStorageTelemetry.AzureBlob, _shared.Instruments.Telemetry);
     }
 
-    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
+        CancellationToken cancellationToken = default)
+        => _shared.Instruments.Telemetry.TrackCatalog(
+            JournalStorageTelemetry.AzureBlob, ListCoreAsync(options, cancellationToken));
+
+    private async IAsyncEnumerable<JournalCatalogEntry> ListCoreAsync(
+        ListOptions? options,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -72,14 +95,14 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             ? AzureBlobJournalStorageLayout.GetWalBlobName(maxId) : null;
         var startFrom = range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound)
             ? AzureBlobJournalStorageLayout.GetWalBlobName(lowerBound) : null;
-        await foreach (var page in container.GetBlobsAsync(
+        await foreach (var page in _shared.Instruments.TrackApiPages(nameof(BlobContainerClient.GetBlobsAsync), container.GetBlobsAsync(
             new GetBlobsOptions
             {
                 Traits = range.IncludeMetadata ? BlobTraits.Metadata : BlobTraits.None,
                 Prefix = AzureBlobJournalStorageLayout.GetWalBlobName(range.ListingPrefix ?? string.Empty),
                 StartFrom = startFrom,
             },
-            cancellationToken).AsPages(pageSizeHint: 5000))
+            cancellationToken).AsPages(pageSizeHint: 5000)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in page.Values)
