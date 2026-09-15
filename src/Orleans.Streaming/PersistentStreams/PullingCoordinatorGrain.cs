@@ -12,7 +12,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-internal interface IPullingAgentCoordinatorGrain : IGrain
+internal interface IPullingCoordinatorGrain : IGrain
 {
     [AlwaysInterleave]
     Task EnsureRunning(CancellationToken cancellationToken = default);
@@ -24,14 +24,14 @@ internal interface IPullingAgentCoordinatorGrain : IGrain
 [GrainType(GrainTypeName)]
 [PullingAgentPlacement]
 [Immovable]
-internal sealed class PullingAgentCoordinatorGrain(
+internal sealed class PullingCoordinatorGrain(
     PullingAgentRuntime runtime,
     PullingAgentHostResolver hosts,
     IClusterMembershipService membership,
     [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider clock,
-    ILogger<PullingAgentCoordinatorGrain> logger) : Grain, IPullingAgentCoordinatorGrain
+    ILogger<PullingCoordinatorGrain> logger) : Grain, IPullingCoordinatorGrain
 {
-    internal const string GrainTypeName = "stream.pulling-agent-coordinator";
+    internal const string GrainTypeName = "stream.coordinator";
     internal static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Dictionary<QueueId, Agent> _agents = new();

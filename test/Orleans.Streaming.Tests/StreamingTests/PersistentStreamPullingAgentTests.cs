@@ -492,7 +492,7 @@ namespace UnitTests.StreamingTests
             queueAdapter.Name.Returns("provider");
             queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(receiver);
 
-            return new PullingAgentSystemTarget(
+            return new PullingAgentTarget(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
                 "provider",
                 pubSub!,

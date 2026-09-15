@@ -20,7 +20,7 @@ namespace UnitTests.StreamingTests;
 
 [TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
 [TestCategory("BVT"), TestCategory("Streaming")]
-public sealed class PullingAgentCoordinatorTests
+public sealed class PullingCoordinatorTests
 {
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
 
@@ -251,8 +251,8 @@ public sealed class PullingAgentCoordinatorTests
         internal DiagnosticEventCollector Events { get; } = new(GrainLifecycleEvents.ListenerName, GrainTimerEvents.ListenerName);
         internal InProcessTestCluster Cluster { get; }
         internal QueueId[] Queues { get; }
-        internal GrainId CoordinatorId => PullingAgentCoordinatorGrain.GetGrainId(ProviderName);
-        internal IPullingAgentCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingAgentCoordinatorGrain>(CoordinatorId);
+        internal GrainId CoordinatorId => PullingCoordinatorGrain.GetGrainId(ProviderName);
+        internal IPullingCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingCoordinatorGrain>(CoordinatorId);
         internal int Initializations => Volatile.Read(ref _initializations);
         internal int Shutdowns => Volatile.Read(ref _shutdowns);
         internal IPullingAgentGrain Agent(GrainId id) => Cluster.Client.GetGrain<IPullingAgentGrain>(id);

@@ -74,7 +74,7 @@ public sealed class EventHubGrainMigrationTests
             await Wait(initialDelivery, "Event Hubs delivery through 100 on A");
             var firstA = Assert.Single(state.Epochs);
             var stableId = firstA.Address.GrainId;
-            Assert.Equal("stream.pulling-agent", stableId.Type.ToString());
+            Assert.Equal("stream.agent", stableId.Type.ToString());
             Assert.Equal("20", firstA.LoadedOffset);
             Assert.Equal(new long[] { 20, 100 }, firstA.ReadOffsets.ToArray());
             Assert.Equal(new long[] { 20, 100 }, state.Delivered.ToArray());
@@ -292,7 +292,7 @@ public sealed class EventHubGrainMigrationTests
             var initialDelivery = WaitForDrain(events, state, sourceSilo.SiloAddress);
             await Wait(sourceSilo.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting shutdown-test source provider");
-            var coordinatorId = GrainId.Create("stream.pulling-agent-coordinator", EventHubMigrationState.ProviderName);
+            var coordinatorId = GrainId.Create("stream.coordinator", EventHubMigrationState.ProviderName);
             clock.Advance(TimeSpan.Zero);
             await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(coordinatorId).GetAddress(), "initial coordinator round mailbox barrier");
             clock.Advance(TimeSpan.FromSeconds(1));

@@ -99,7 +99,7 @@ namespace Orleans.Runtime.Providers
                         deliveryProvider, queueReaderProvider, timeProvider, loggerFactory,
                         ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments));
                     ServiceProvider.GetRequiredService<PullingAgentRuntime>().Register(streamProviderName, provider);
-                    var grainManager = new GrainPullingAgentManager(
+                    var grainManager = new GrainPullingManager(
                         managerId, streamProviderName, provider, instruments, shared);
                     pullingAgentManager = grainManager.AsReference<IPersistentStreamPullingManager>();
                     break;

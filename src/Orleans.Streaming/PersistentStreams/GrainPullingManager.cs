@@ -13,18 +13,18 @@ using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 
 namespace Orleans.Streams;
 
-internal sealed class GrainPullingAgentManager : SystemTarget, IPersistentStreamPullingManager
+internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPullingManager
 {
     private readonly string _providerName;
     private readonly PullingAgentRuntime.Provider _provider;
     private readonly IInternalGrainFactory _grainFactory;
-    private readonly IPullingAgentCoordinatorGrain _coordinator;
+    private readonly IPullingCoordinatorGrain _coordinator;
     private readonly ILogger _logger;
     private readonly AsyncSerialExecutor _executor = new();
     private IGrainTimer? _heartbeat;
     private bool _shuttingDown;
 
-    internal GrainPullingAgentManager(
+    internal GrainPullingManager(
         SystemTargetGrainId id,
         string providerName,
         PullingAgentRuntime.Provider provider,
@@ -34,8 +34,8 @@ internal sealed class GrainPullingAgentManager : SystemTarget, IPersistentStream
         _providerName = providerName;
         _provider = provider;
         _grainFactory = shared.RuntimeClient.InternalGrainFactory;
-        _coordinator = _grainFactory.GetGrain<IPullingAgentCoordinatorGrain>(PullingAgentCoordinatorGrain.GetGrainId(providerName));
-        _logger = shared.LoggerFactory.CreateLogger<GrainPullingAgentManager>();
+        _coordinator = _grainFactory.GetGrain<IPullingCoordinatorGrain>(PullingCoordinatorGrain.GetGrainId(providerName));
+        _logger = shared.LoggerFactory.CreateLogger<GrainPullingManager>();
         streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(
             _provider.RunningAgentCount, new KeyValuePair<string, object?>("name", providerName)));
         streamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(ObservePubSubCacheSizes);

@@ -15,7 +15,7 @@ internal sealed class PullingAgentGrainPropertiesProvider(
 {
     public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
     {
-        if (grainClass != typeof(PullingAgentGrain) && grainClass != typeof(PullingAgentCoordinatorGrain))
+        if (grainClass != typeof(PullingAgentGrain) && grainClass != typeof(PullingCoordinatorGrain))
         {
             return;
         }
