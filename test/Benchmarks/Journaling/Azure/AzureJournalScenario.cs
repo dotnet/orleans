@@ -4,6 +4,7 @@ using Azure.Core;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -100,7 +101,7 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
                 var account = (await client.GetAccountInfoAsync(cancellationToken)).Value;
                 report.AccountKind = account.AccountKind.ToString();
                 report.AccountSku = account.SkuName.ToString();
-                VerifyAccount(options.Backend, report.AccountKind, report.AccountSku);
+                VerifyAccount(options.Backend, account.AccountKind, account.SkuName);
                 report.AccountVerification = "data-plane-verified";
             }
 
@@ -331,12 +332,13 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
         }
     }
 
-    internal static void VerifyAccount(AzureJournalBackend backend, string kind, string sku)
+    internal static void VerifyAccount(AzureJournalBackend backend, AccountKind kind, SkuName sku)
     {
         var matches = backend switch
         {
-            AzureJournalBackend.PremiumBlob => kind == "BlockBlobStorage" && sku.StartsWith("Premium_", StringComparison.Ordinal),
-            AzureJournalBackend.StandardBlob => kind is "Storage" or "StorageV2" or "BlobStorage" && sku.StartsWith("Standard_", StringComparison.Ordinal),
+            AzureJournalBackend.PremiumBlob => kind == AccountKind.BlockBlobStorage && sku == SkuName.PremiumLrs,
+            AzureJournalBackend.StandardBlob => kind is AccountKind.Storage or AccountKind.StorageV2 or AccountKind.BlobStorage
+                && sku is SkuName.StandardLrs or SkuName.StandardGrs or SkuName.StandardRagrs or SkuName.StandardZrs,
             _ => false
         };
         if (!matches)
