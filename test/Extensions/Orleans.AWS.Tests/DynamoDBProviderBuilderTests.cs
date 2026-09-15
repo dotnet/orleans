@@ -499,23 +499,25 @@ public sealed class DynamoDBOptionsValidationTests
     }
 
     [Fact]
-    public void RegisteredValidator_MismatchedServiceKeyAndConnectionName_ThrowsWithBothSettingNames()
+    public void RegisteredValidator_MismatchedServiceKeyAndConnectionName_ThrowsWithSectionAndBothSettingNames()
     {
+        const string sectionPath = "Provider:Clustering";
         using var host = new HostBuilder()
             .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Provider:ServiceKey"] = "service-key",
-                ["Provider:ConnectionName"] = "different-connection",
+                [$"{sectionPath}:ServiceKey"] = "service-key",
+                [$"{sectionPath}:ConnectionName"] = "different-connection",
             }))
             .UseOrleans((context, silo) => new DynamoDBClusteringProviderBuilder().Configure(
                 silo,
                 name: null,
-                context.Configuration.GetSection("Provider")))
+                context.Configuration.GetSection(sectionPath)))
             .Build();
 
         var exception = Assert.Throws<OrleansConfigurationException>(
             () => _ = host.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value);
 
+        Assert.Contains(sectionPath, exception.Message, StringComparison.Ordinal);
         Assert.Contains("ServiceKey", exception.Message);
         Assert.Contains("ConnectionName", exception.Message);
     }
