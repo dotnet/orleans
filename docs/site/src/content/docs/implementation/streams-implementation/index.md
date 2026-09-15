@@ -119,19 +119,7 @@ Both hosts use the same `PersistentStreamPullingAgent` processing implementation
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
-### Shutdown and queue handoff
-
-When an agent stops, it closes admission for new background work and stops its polling timer. It waits for receiver initialization, the active queue pump, and accepted producer registrations, subscription handshakes, and deliveries to finish. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Outstanding calls retain their existing messaging timeouts and retry limits while accepted work drains.
-
-The agent then reports final delivery progress to the cache, disposes subscription cursors, and shuts down the receiver so provider-specific checkpoint flushing observes the completed progress. Registrations pending when shutdown starts keep the existing checkpoint, since their subscriber positions are still uncertain. Producer unregistration follows receiver cleanup. When the manager reuses an agent for a reassigned queue, initialization waits for that full cleanup and opens admission for the new run.
-
-Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
-
-A completed handshake establishes the subscription's current cursor and replay position. The latest requested handshake owns reconciliation; responses from superseded requests preserve that ownership. Delivery completions and error handling from an older handshake generation release their work while preserving the replacement position, so final checkpoint progress reflects the accepted rewind.
-
-A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
-
-Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
+Each initialization creates a fresh cancellation scope in both hosting modes. Shutdown cancels outstanding registration, handshake, and delivery waits before releasing queue resources, preserving acknowledged progress for the final checkpoint. Reused system-target agents start their next run with a new, uncanceled scope.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
