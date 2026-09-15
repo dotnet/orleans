@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DurableWorkflows.AppHost/DurableWorkflows.AppHost.csproj" />
+  <Project Path="DurableWorkflows.Service/DurableWorkflows.Service.csproj" />
+  <Project Path="DurableWorkflows.Tests/DurableWorkflows.Tests.csproj" />
+</Solution>

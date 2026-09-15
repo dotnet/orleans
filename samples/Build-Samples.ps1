@@ -27,6 +27,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Orleans package build failed with exit code $LASTEXITCODE."
 }
 
+$unpublishedSampleDependencies = @(
+    (Join-Path $repositoryRoot 'src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj')
+)
+foreach ($project in $unpublishedSampleDependencies) {
+    & dotnet pack $project `
+        --configuration $Configuration `
+        --output $packageSource `
+        -p:Version=$packageVersion `
+        -p:PackDurableTaskAdapter=true `
+        --nologo
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unpublished sample dependency package build failed with exit code $LASTEXITCODE."
+    }
+}
+
 $buildArguments = @(
     'build'
     $sampleSolution

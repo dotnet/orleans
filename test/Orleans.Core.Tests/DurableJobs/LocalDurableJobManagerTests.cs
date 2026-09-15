@@ -542,6 +542,58 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public void GetWritableShardStripe_StableJobIdIsDeterministicAcrossManagers()
+    {
+        var options = CreateOptions();
+        options.ShardStripeCount = 8;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var first = new LocalDurableJobManager.TestAccessor(
+            CreateManager(new TestJobShardManager(), timeProvider, options));
+        var second = new LocalDurableJobManager.TestAccessor(
+            CreateManager(new TestJobShardManager(), timeProvider, options));
+        var request = new ScheduleJobRequest
+        {
+            JobId = "stable-job",
+            Target = GrainId.Create("test", "target"),
+            JobName = "job",
+            DueTime = timeProvider.GetUtcNow()
+        };
+
+        Assert.Equal(first.GetWritableShardStripe(request), second.GetWritableShardStripe(request));
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_TraceEnrichmentPreservesStableJobId()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var dueTime = timeProvider.GetUtcNow().AddMinutes(1);
+        var shardKey = new DateTimeOffset(
+            (dueTime.UtcTicks / options.ShardDuration.Ticks) * options.ShardDuration.Ticks,
+            TimeSpan.Zero);
+        var shard = new SchedulingShard("trace-shard", shardKey, shardKey.Add(options.ShardDuration));
+        new LocalDurableJobManager.TestAccessor(manager).AddWritableShard(shardKey, shard);
+        using var activity = new System.Diagnostics.Activity("schedule").SetIdFormat(
+            System.Diagnostics.ActivityIdFormat.W3C);
+        activity.Start();
+
+        await manager.ScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                JobId = "stable-job",
+                Target = GrainId.Create("test", "target"),
+                JobName = "job",
+                DueTime = dueTime
+            },
+            CancellationToken.None);
+
+        Assert.Equal("stable-job", shard.LastRequest.JobId);
+        Assert.NotNull(shard.LastRequest.TraceParent);
+    }
+
+    [Fact]
     public async Task ExpiredJournaledShard_DrainsUnregistersAndDeletesStorage()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -1247,6 +1299,8 @@ public class LocalDurableJobManagerTests
 
         public bool IsAddingCompleted => false;
 
+        public ScheduleJobRequest LastRequest { get; private set; }
+
         public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => ConsumeAsync();
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
@@ -1264,9 +1318,10 @@ public class LocalDurableJobManagerTests
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
+            LastRequest = request;
             return Task.FromResult<DurableJob?>(new()
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = request.JobId ?? Guid.NewGuid().ToString(),
                 Name = request.JobName,
                 DueTime = request.DueTime,
                 TargetGrainId = request.Target,
