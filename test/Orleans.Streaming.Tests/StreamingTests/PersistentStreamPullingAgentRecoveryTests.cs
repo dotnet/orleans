@@ -64,7 +64,7 @@ public partial class PersistentStreamPullingAgentTests
             source, adapter, cache, checkpointer, startFromNow: false);
         var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
         queueAdapterCache.CreateQueueCache(queueId).Returns(receiver);
-        var pubSub = Substitute.For<IStreamPubSub>();
+        var pubSub = Substitute.For<IStreamPubSubRuntime>();
         pubSub.RegisterProducer(default, default, cancellationToken)
             .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
         var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache, timeProvider, options);
