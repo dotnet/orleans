@@ -7,7 +7,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class GrainBasedPubSubRuntime : IStreamPubSub
+    internal class GrainBasedPubSubRuntime : IStreamPubSubRuntime
     {
         private readonly IGrainFactory grainFactory;
 
@@ -51,6 +51,13 @@ namespace Orleans.Streams
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.UnregisterConsumer(subscriptionId, streamId, cancellationToken);
         }
+
+        public Task UnregisterConsumerFromProducer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId producer,
+            CancellationToken cancellationToken)
+            => GetRendezvousGrain(streamId).UnregisterConsumerFromProducer(subscriptionId, streamId, producer, cancellationToken);
 
         public Task<int> ProducerCount(QualifiedStreamId streamId)
             => ProducerCount(streamId, CancellationToken.None);

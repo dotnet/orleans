@@ -312,7 +312,21 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
+        public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
+            => UnregisterConsumerImpl(subscriptionId, streamId, null, cancellationToken);
+
+        public Task UnregisterConsumerFromProducer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId producer,
+            CancellationToken cancellationToken)
+            => UnregisterConsumerImpl(subscriptionId, streamId, producer, cancellationToken);
+
+        private async Task UnregisterConsumerImpl(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId? detachedProducer,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var consumerState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
@@ -352,7 +366,8 @@ namespace Orleans.Streams
                     await NotifyProducersOfRemovedSubscription(
                         subscriptionId,
                         streamId,
-                        numRemoved == 0 ? cancellationToken : CancellationToken.None);
+                        numRemoved == 0 ? cancellationToken : CancellationToken.None,
+                        detachedProducer);
                 }
                 if (_streamInstruments.PubSubConsumersTotal.Enabled)
                 {
@@ -499,7 +514,11 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task NotifyProducersOfRemovedSubscription(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
+        private async Task NotifyProducersOfRemovedSubscription(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            CancellationToken cancellationToken,
+            GrainId? detachedProducer = null)
         {
             int numProducersBeforeNotify = State.Producers.Count;
             if (numProducersBeforeNotify > 0)
@@ -509,6 +528,7 @@ namespace Orleans.Streams
                 // Notify producers about unregistered consumer.
                 var producers = State.Producers.ToList();
                 List<Task> tasks = producers
+                    .Where(producer => !detachedProducer.HasValue || producer.Producer != detachedProducer.Value)
                     .Select(producerState => ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId, cancellationToken)))
                     .ToList();
                 await Task.WhenAll(tasks);
