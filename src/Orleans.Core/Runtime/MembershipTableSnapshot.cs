@@ -170,25 +170,35 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            foreach (var entry in Entries)
+            var heartbeatAdvanced = false;
+            foreach (var (silo, entry) in Entries)
             {
-                if (!other.Entries.TryGetValue(entry.Key, out var otherEntry))
+                if (!other.Entries.TryGetValue(silo, out var otherEntry)
+                    || entry.Status != otherEntry.Status)
                 {
-                    // Something is amiss.
+                    // Membership changes require a table-version advance.
+                    return false;
+                }
+
+                heartbeatAdvanced |= entry.EffectiveIAmAliveTime > otherEntry.EffectiveIAmAliveTime;
+            }
+
+            if (Entries.Count == other.Entries.Count)
+            {
+                return heartbeatAdvanced;
+            }
+
+            // Cleanup can remove inactive entries without advancing the table version or a heartbeat.
+            // Accept that inventory change while retaining every Active entry and the remaining statuses.
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (previousEntry.Status == SiloStatus.Active && !Entries.ContainsKey(silo))
+                {
                     return false;
                 }
             }
 
-            // This is a successor if any silo has a later EffectiveIAmAliveTime.
-            foreach (var entry in Entries)
-            {
-                if (entry.Value.EffectiveIAmAliveTime > other.Entries[entry.Key].EffectiveIAmAliveTime)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return true;
         }
 
         public override string ToString()

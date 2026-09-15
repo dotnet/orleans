@@ -163,6 +163,7 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
+            cancellationToken.ThrowIfCancellationRequested();
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
