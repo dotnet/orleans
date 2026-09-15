@@ -96,7 +96,7 @@ jobs:
           path: Artifacts/DisseminationEvidence/bin
 
   bounded-cost:
-    name: Bounded original, default-off and enabled costs
+    name: Bounded original, disabled and enabled costs
     needs: version-skew
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -111,7 +111,7 @@ jobs:
         with:
           name: dissemination-binaries
           path: Artifacts/DisseminationEvidence/bin
-      - name: Measure bounded original, default-off and supported-enabled paths
+      - name: Measure bounded original, explicitly disabled and supported-enabled paths
         shell: pwsh
         run: ./.github/scripts/dissemination-evidence.ps1 -Mode Cost -SkipBuild
       - name: Preserve the automatic PR cost evidence

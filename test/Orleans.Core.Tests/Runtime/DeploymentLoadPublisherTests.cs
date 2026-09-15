@@ -26,7 +26,7 @@ namespace NonSilo.Tests.Runtime;
 public class DeploymentLoadPublisherTests
 {
     [Fact]
-    public async Task PublishStatistics_DefaultDisabled_PreservesDirectPublication()
+    public async Task PublishStatistics_ExplicitlyDisabled_PreservesDirectPublication()
     {
         using var rig = CreateTestRig(TimeSpan.FromSeconds(5));
 
@@ -35,17 +35,15 @@ public class DeploymentLoadPublisherTests
         await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(
             rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
         Assert.Empty(rig.Dissemination.ReceivedCalls());
-        Assert.False(new DisseminationOptions().Enabled);
-        Assert.False(new DeploymentLoadPublisherOptions().Dissemination.Enabled);
-        Assert.False(new ClusterMembershipOptions().Dissemination.Enabled);
+        Assert.False(rig.ServiceProvider.GetRequiredService<IOptions<DeploymentLoadPublisherOptions>>().Value.Dissemination.Enabled);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PublishStatistics_ConfirmedPeersUseDissemination(bool confirmed)
+    public async Task PublishStatistics_DefaultEnabled_ConfirmedPeersUseDissemination(bool confirmed)
     {
-        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: null);
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
         rig.Dissemination.GetUnconfirmedPeers(Arg.Any<IDisseminationNamespace>())
             .Returns(confirmed ? [] : new[] { remoteSilo });
@@ -157,7 +155,7 @@ public class DeploymentLoadPublisherTests
     }
 
     [Fact]
-    public async Task UpdateRuntimeStatistics_DefaultDisabled_PreservesDuplicateNotifications()
+    public async Task UpdateRuntimeStatistics_ExplicitlyDisabled_PreservesDuplicateNotifications()
     {
         using var rig = CreateTestRig(TimeSpan.Zero);
         var listener = Substitute.For<ISiloStatisticsChangeListener>();
@@ -433,7 +431,7 @@ public class DeploymentLoadPublisherTests
     private static TestRig CreateTestRig(
         TimeSpan refreshTime,
         ITimerRegistry? timerRegistry = null,
-        bool enableDissemination = false)
+        bool? enableDissemination = false)
     {
         var localSilo = SiloAddress.FromParsableString("127.0.0.1:100@100");
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
@@ -483,7 +481,10 @@ public class DeploymentLoadPublisherTests
         services.AddOptions<DeploymentLoadPublisherOptions>().Configure(options =>
         {
             options.DeploymentLoadPublisherRefreshTime = refreshTime;
-            options.Dissemination.Enabled = enableDissemination;
+            if (enableDissemination is { } enabled)
+            {
+                options.Dissemination.Enabled = enabled;
+            }
         });
         services.AddSingleton<ActivationDirectory>();
         services.AddSingleton(serviceProvider => new SystemTargetShared(

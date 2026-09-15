@@ -203,7 +203,7 @@ public partial class DisseminationProtocolTests
         var transport = new FakeTransport(local, peer);
         var ns = new FakeNamespace(local);
         var clock = new ReviewTimeProvider();
-        var options = new ReviewOptionsMonitor(new DisseminationOptions());
+        var options = new ReviewOptionsMonitor(new DisseminationOptions { Enabled = false });
         var exchanges = Channel.CreateUnbounded<int>();
         var exchangeCount = 0;
         transport.ExchangeAntiEntropyHandler = (destination, _, _) =>
@@ -244,7 +244,7 @@ public partial class DisseminationProtocolTests
             Assert.Equal(1, await exchanges.Reader.ReadAsync(TestContext.Current.CancellationToken));
             await clock.WaitForChange(options.CurrentValue.Overlay.AntiEntropyInterval, TestContext.Current.CancellationToken);
 
-            options.Set(new DisseminationOptions());
+            options.Set(new DisseminationOptions { Enabled = false });
             await clock.WaitForChange(Timeout.InfiniteTimeSpan, TestContext.Current.CancellationToken);
             clock.Advance(TimeSpan.FromDays(1));
             await target.RunOrQueueTask(_ => Task.FromResult(true), TestContext.Current.CancellationToken);

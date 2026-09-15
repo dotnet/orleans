@@ -112,7 +112,7 @@ public partial class DisseminationProtocolTests
     {
         var local = CreateSilo(40321);
         var transport = new FakeTransport(local, CreateSilo(40322));
-        var options = new ReviewOptionsMonitor(new DisseminationOptions());
+        var options = new ReviewOptionsMonitor(new DisseminationOptions { Enabled = false });
         var clock = new ReviewTimeProvider();
         var details = new FakeLocalSiloDetails(local);
         var target = new DisseminationSystemTarget(

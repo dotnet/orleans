@@ -5,8 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.MembershipService;
@@ -35,20 +33,13 @@ public sealed class DisseminationDiagnosticCollection
 public sealed class DisseminationClusterTests
 {
     [Fact]
-    public async Task MembershipUpdatesAreDisseminatedAcrossRealCluster()
+    public async Task MembershipUpdatesAreDisseminatedAcrossRealClusterWithDefaults()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(120));
         var cancellationToken = cancellation.Token;
 
         var builder = new InProcessTestClusterBuilder(3);
-        builder.ConfigureSilo((_, siloBuilder) =>
-        {
-            // Dissemination and the membership namespace are disabled by default; enable both.
-            siloBuilder.Configure<DisseminationOptions>(options => options.Enabled = true);
-            siloBuilder.Configure<ClusterMembershipOptions>(options => options.Dissemination.Enabled = true);
-        });
-
         await using var cluster = builder.Build();
         await cluster.DeployAsync(cancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);

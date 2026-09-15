@@ -9,7 +9,7 @@ public sealed class ScalingTests
 {
     [Fact]
     [Trait("Category", "DisseminationScale")]
-    public async Task Scaling_OriginalLegacy_DefaultOff_EnabledSupported()
+    public async Task Scaling_OriginalLegacy_Disabled_EnabledSupported()
     {
         var sizes = (Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_SIZES") ?? "4,8,16")
             .Split(',').Select(value => int.Parse(value, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
@@ -23,7 +23,7 @@ public sealed class ScalingTests
         RuntimeVariant[] variants =
         [
             new("OriginalLegacy", "Old", Enabled: false),
-            new("CurrentDefaultOff", "New", Enabled: false),
+            new("CurrentDisabled", "New", Enabled: false),
             new("CurrentEnabledSupported", "New", Enabled: true),
         ];
         foreach (var size in sizes)
@@ -225,7 +225,8 @@ public sealed class ScalingTests
                 WarmupRounds = 2,
                 SettlingMarginSeconds = 2,
                 AutomaticLoadPublisherPaused = true,
-                ProductionDisseminationDefaults = variant.Runtime == "New",
+                ProductionDisseminationDefaults = variant.Runtime == "New" && enabled,
+                ExplicitDisseminationOptOut = variant.Runtime == "New" && !enabled,
                 LoadNamespaceSupportConfirmedBeforeOfferedRounds = enabled,
                 IncludesUnconfirmedBootstrapTraffic = enabled && scenario == "churn",
                 LivenessFailureDetectionEnabled = false,
@@ -241,8 +242,8 @@ public sealed class ScalingTests
                 Topology = "per-node actual tree at end, or start for a retired node; raw command snapshots preserve intervening topology changes; role is not time-weighted",
                 Excludes = "controller process CPU/allocation, storage disk byte accounting, cross-machine latency, NIC/TCP wire overhead, production storage/placement/grain work",
                 PartitionComparison = "retire partitioned connections at both endpoints, then confirm healed connections with bidirectional acknowledged control RPCs before the same single publication round on all paths; teardown and readiness remain inside partition recovery time and total cost; silent anti-entropy recovery is asserted separately in VersionSkewTests",
-                OriginalBaselineAttribution = "original-to-current default-off deltas include all intervening source changes, including lifecycle prerequisites and load notification/tombstone/dedup changes; only current off/on isolates enabling the subsystem on the same binary",
-                Interpretation = "separate original-legacy, current-default-off and current-enabled-supported measurements; no asserted improvement or threshold",
+                OriginalBaselineAttribution = "original-to-current disabled deltas include all intervening source changes, including lifecycle prerequisites and load notification/tombstone/dedup changes; only current off/on isolates enabling the subsystem on the same binary",
+                Interpretation = "separate original-legacy, current-explicitly-disabled and current-enabled-supported measurements; enabled defaults are temporary for pre-merge testing",
             },
         };
         await cluster.Save("window-start.json", start);

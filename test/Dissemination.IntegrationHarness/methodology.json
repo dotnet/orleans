@@ -3,7 +3,7 @@
   "purpose": "Executable real-binary compatibility/recovery gates and controlled load evidence, not a microbenchmark or a performance claim.",
   "entrypoint": ".github/scripts/dissemination-evidence.ps1",
   "workflow": ".github/workflows/dissemination-evidence.yml",
-  "automaticPrTrigger": "pull_request and merge_group run both the pinned-binary version-skew gate and measured bounded original-legacy, current-default-off and current-enabled-supported costs. The bounded job reuses published binaries, needs no label or workflow_dispatch registration, and has a 25-minute hard limit.",
+  "automaticPrTrigger": "pull_request and merge_group run both the pinned-binary version-skew gate and measured bounded original-legacy, current-explicitly-disabled and current-enabled-supported costs. The bounded job reuses published binaries, needs no label or workflow_dispatch registration, and has a 25-minute hard limit.",
   "controlledScaleTrigger": "Larger runs require workflow_dispatch with scale=true after the workflow is registered on the default branch. No pull_request_target or write permission.",
   "sliceInventory": [
     ".github/scripts/dissemination-evidence.ps1",
@@ -46,7 +46,7 @@
     "old": "Always build the exact pinned pre-feature main commit; do not apply the lifecycle prerequisite or dissemination patches to it.",
     "manifestHashRpc": "No test uses a cluster-manifest hash RPC. Binary manifest.json files and local DLL SHA256 checks only attest which assemblies each OS process loaded; they are unrelated to the excluded manifest-hash feature.",
     "compatibility": "Probe the actual IDisseminationSystemTarget RPC on an old process, then require a fresh exact production load sample through legacy delivery while that process remains unconfirmed.",
-    "sliceOwnership": "All harness and CI files belong to the dissemination/evidence slice. The current dissemination top inherits the lifecycle and scoped-RPC prerequisites and applies load updates on the publisher scheduler while preserving default-off notification behavior. The pinned old source retains its original runtime implementation."
+    "sliceOwnership": "All harness and CI files belong to the dissemination/evidence slice. The current dissemination top inherits the lifecycle prerequisites and applies load updates on the publisher scheduler while preserving explicitly disabled notification behavior. The pinned old source retains its original runtime implementation."
   },
   "infrastructure": {
     "hosting": "Existing TestClusterHostFactory, SystemTarget and code generation; OS process orchestration follows StandaloneSiloHandle without its single-binary configuration assumption.",
@@ -58,11 +58,11 @@
   "gates": [
     {
       "test": "PartitionHealing_ConfirmsTransportBeforeSinglePublicationRound",
-      "assertions": "Repeat three partition/heal cycles on pinned old, current default-off and current enabled binaries. The first cycle proves an acknowledged control probe fails during the partition; remaining cycles publish and heal immediately. Healing retires old connections at both endpoints while the isolated endpoint rejects new handshakes, then bidirectional control RPCs confirm each exact remote PID. Full load snapshots must converge after one production publication per node with automatic publishers paused."
+      "assertions": "Repeat three partition/heal cycles on pinned old, current explicitly disabled and current enabled binaries. The first cycle proves an acknowledged control probe fails during the partition; remaining cycles publish and heal immediately. Healing retires old connections at both endpoints while the isolated endpoint rejects new handshakes, then bidirectional control RPCs confirm each exact remote PID. Full load snapshots must converge after one production publication per node with automatic publishers paused."
     },
     {
       "test": "PinnedBinaries_RollForward_MixedEnablement_AndRollback",
-      "assertions": "Three pinned old processes are replaced one at a time by one default-disabled and two enabled new processes, then rolled back to pinned old processes. Exact load state equality and stable cross-process RPC PID identity are checked at each stage. Unsupported old IDisseminationSystemTarget RPC failures cannot be inferred from timeouts and must be followed by fresh exact load-state delivery to the still-unconfirmed old process. Disabled new nodes return explicit namespace-unsupported and retain legacy delivery. Enabled peers confirm support. Disabled nodes have no dissemination sends, applies or outgoing anti-entropy."
+      "assertions": "Three pinned old processes are replaced one at a time by one explicitly disabled and two enabled new processes, then rolled back to pinned old processes. Exact load state equality and stable cross-process RPC PID identity are checked at each stage. Unsupported old IDisseminationSystemTarget RPC failures cannot be inferred from timeouts and must be followed by fresh exact load-state delivery to the still-unconfirmed old process. Disabled new nodes return explicit namespace-unsupported and retain legacy delivery. Enabled peers confirm support. Disabled nodes have no dissemination sends, applies or outgoing anti-entropy."
     },
     {
       "test": "PartitionHistoryAndHeartbeat_RequireDisseminationProvenance",
@@ -105,11 +105,11 @@
     }
   ],
   "load": {
-    "test": "Scaling_OriginalLegacy_DefaultOff_EnabledSupported",
-    "comparison": "Three separately labeled paths: pinned original legacy binary; actual current binary with untouched dissemination-off defaults; the same current binary enabled using production dissemination defaults after peers have confirmed support.",
+    "test": "Scaling_OriginalLegacy_Disabled_EnabledSupported",
+    "comparison": "Three separately labeled paths: pinned original legacy binary; actual current binary with dissemination and both namespaces explicitly disabled; the same current binary using temporarily enabled defaults after peers have confirmed support. Enabled defaults provide broader pre-merge test exposure.",
     "runtimePaths": [
       { "name": "OriginalLegacy", "runtime": "Old", "enabled": false },
-      { "name": "CurrentDefaultOff", "runtime": "New", "enabled": false },
+      { "name": "CurrentDisabled", "runtime": "New", "enabled": false },
       { "name": "CurrentEnabledSupported", "runtime": "New", "enabled": true }
     ],
     "automaticPrProfile": { "mode": "Cost", "sizes": [4, 8], "iterations": 3, "pairedRepetitions": 1, "overrideable": false },
@@ -134,7 +134,7 @@
       "Controller CPU/allocation, disk byte costs, production providers, application grains, cross-machine latency and NIC-level wire costs are not measured. This is a closed-loop control-plane workload with a convergence barrier each round, not a saturation-throughput benchmark.",
       "Retained managed memory is a post-GC live-size sample on surviving nodes, not peak memory. Retired process snapshots and all-node RSS/private-memory samples remain in artifacts.",
       "Normal partition cost comparisons include a transport-readiness barrier followed by the same single publication round. The separate anti-entropy-only gate measures silent repair.",
-      "Original-to-current default-off deltas include the lifecycle and scoped-RPC prerequisites and feature registration costs. The current off/on pair uses the identical current binary and isolates enabling the subsystem.",
+      "Original-to-current disabled deltas include the lifecycle prerequisites and feature registration costs. The current off/on pair uses the identical current binary and isolates enabling the subsystem.",
       "Raw samples and repetitions are evidence inputs, not predeclared improvement thresholds or broad-enable approval."
     ]
   },
