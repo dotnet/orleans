@@ -47,6 +47,14 @@ Table enumeration requests up to 1000 header rows per service page and reads ide
 
 Use `await foreach` or dispose a retained enumerator when stopping early. Pass a cancellation token covering the traversal lifetime; cancellation and service errors propagate to the caller.
 
+## Runtime metrics
+
+The `Microsoft.Orleans` meter reports logical journal operations and provider-owned Azure SDK calls separately. Shared `orleans-journaling-provider-*` instruments use `provider=azure_blob` or `provider=azure_table`; SDK call metrics add bounded `api` and `status` tags. API names follow SDK methods such as `GetBlobsAsync`, `QueryAsync`, `AppendBlockAsync`, and `SubmitTransactionAsync`. HTTP outcomes distinguish missing resources, conflicts, throttling, and unavailability, including errors handled by provider recovery or cleanup. `orleans-journaling-provider-retries` counts provider-controlled retries with bounded reason tags.
+
+`orleans-journaling-provider-api-calls` and `orleans-journaling-provider-api-call-duration` measure each SDK task or native listing/query page request. Empty pages count as requests; terminal enumeration completion does not. `orleans-journaling-provider-api-items` records listed blobs, queried entities, and successful Table transaction actions. These request and action counts expose provider work for capacity and cost analysis; Azure billing also reflects SDK-internal retries, multipart transfers, and service pricing.
+
+SDK task latency ends when its response arrives. Stream consumption remains in the logical read duration. Catalog duration measures active enumeration work, including early disposal, while consumer pauses between advances are excluded. Logical operation metrics cover initialization and storage returned by the provider. Application-supplied container factories retain control over their initialization and client calls. Existing `orleans-journaling-azure-blob-*` and `orleans-journaling-azure-table-*` metrics retain their names and behavior.
+
 ## Getting Started
 To use this package, install it via NuGet:
 

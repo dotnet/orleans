@@ -1,11 +1,27 @@
 using System.Diagnostics.Metrics;
+using Azure;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureBlobJournalStorageInstruments(OrleansInstruments instruments)
+internal sealed class AzureBlobJournalStorageInstruments(OrleansInstruments instruments, TimeProvider? clock = null)
 {
+    internal JournalStorageTelemetry Telemetry { get; } = new(instruments, clock);
+
+    internal Task<T> TrackApiCallAsync<T>(
+        string api, Func<Task<T>> call, Func<T, string>? classifyResult = null, Func<T, long>? countItems = null)
+        => Telemetry.TrackApiCallAsync(JournalStorageTelemetry.AzureBlob, api, call, ClassifyException, classifyResult, countItems);
+
+    internal IAsyncEnumerable<Page<T>> TrackApiPages<T>(string api, IAsyncEnumerable<Page<T>> pages)
+        where T : notnull
+        => Telemetry.TrackApiPages(JournalStorageTelemetry.AzureBlob, api, pages, static page => page.Values.Count, ClassifyException);
+
+    private static string ClassifyException(Exception exception)
+        => exception is RequestFailedException request
+            ? JournalStorageTelemetry.GetHttpStatus(request.Status)
+            : JournalStorageTelemetry.GetExceptionStatus(exception);
+
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
     private const string OperationTagName = "operation";
