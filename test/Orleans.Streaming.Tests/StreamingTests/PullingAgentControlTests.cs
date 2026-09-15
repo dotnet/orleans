@@ -333,8 +333,8 @@ public sealed class PullingAgentControlTests
         private int _coordinatorNotifications;
 
         internal InProcessTestCluster Cluster { get; }
-        internal IPullingAgentCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingAgentCoordinatorGrain>(
-            PullingAgentCoordinatorGrain.GetGrainId(ProviderName));
+        internal IPullingCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingCoordinatorGrain>(
+            PullingCoordinatorGrain.GetGrainId(ProviderName));
         internal FakeTimeProvider Clock { get; } = new();
         internal TaskCompletionSource ShutdownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
@@ -468,8 +468,8 @@ public sealed class PullingAgentControlTests
         {
             public Task Invoke(IOutgoingGrainCallContext context)
             {
-                if (context.TargetId.Equals(PullingAgentCoordinatorGrain.GetGrainId(ProviderName))
-                    && context.MethodName == nameof(IPullingAgentCoordinatorGrain.NotifyHostChanged))
+                if (context.TargetId.Equals(PullingCoordinatorGrain.GetGrainId(ProviderName))
+                    && context.MethodName == nameof(IPullingCoordinatorGrain.NotifyHostChanged))
                 {
                     Interlocked.Increment(ref setup._coordinatorNotifications);
                 }

@@ -6,7 +6,7 @@ namespace Orleans.Streams;
 
 internal static class PullingAgentId
 {
-    internal const string GrainTypeName = "stream.pulling-agent";
+    internal const string GrainTypeName = "stream.agent";
     internal static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
 
     internal static GrainId Create(string providerName, QueueId queueId)

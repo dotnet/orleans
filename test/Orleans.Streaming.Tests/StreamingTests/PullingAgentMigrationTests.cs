@@ -47,7 +47,7 @@ public sealed class PullingAgentMigrationTests
 
         var parsed = PullingAgentId.Parse(grainId);
 
-        Assert.Equal("stream.pulling-agent", grainId.Type.ToString());
+        Assert.Equal("stream.agent", grainId.Type.ToString());
         Assert.Equal(providerName, parsed.ProviderName);
         Assert.Equal(prefix, parsed.QueueId.GetStringNamePrefix());
         Assert.Equal(number, parsed.QueueId.GetNumericId());

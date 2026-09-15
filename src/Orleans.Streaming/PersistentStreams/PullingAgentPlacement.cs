@@ -40,7 +40,7 @@ internal sealed class PullingAgentPlacementDirector(PullingAgentHostResolver hos
 
     public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
     {
-        var isCoordinator = target.GrainIdentity.Type == PullingAgentCoordinatorGrain.GrainType;
+        var isCoordinator = target.GrainIdentity.Type == PullingCoordinatorGrain.GrainType;
         var (providerName, queueId) = isCoordinator
             ? (target.GrainIdentity.Key.ToString(), (QueueId?)null)
             : GetAgentIdentity(target.GrainIdentity);

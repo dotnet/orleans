@@ -7,12 +7,12 @@ using Orleans.Streams.Filtering;
 
 namespace Orleans.Streams;
 
-internal sealed class PullingAgentSystemTarget : SystemTarget, IPersistentStreamPullingAgent
+internal sealed class PullingAgentTarget : SystemTarget, IPersistentStreamPullingAgent
 {
     internal PersistentStreamPullingAgent Agent { get; }
     internal QueueId QueueId => Agent.QueueId;
 
-    internal PullingAgentSystemTarget(
+    internal PullingAgentTarget(
         SystemTargetGrainId id,
         string providerName,
         IStreamPubSub pubSub,

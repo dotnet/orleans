@@ -59,7 +59,7 @@ The queue mapper deterministically assigns a stream identity to a queue. All pro
 
 The queue balancer assigns queues to silos and publishes ownership changes. With the default system-target hosting, `PersistentStreamPullingManager` serializes those notifications, ignores stale sequences, and starts or stops one silo-local agent per assigned queue.
 
-With <xref:Orleans.Configuration.StreamPullingAgentHostingMode.Grain>, one `PullingAgentCoordinatorGrain` per named provider manages one stable `PullingAgentGrain` per queue. Agent identity preserves the provider name, queue prefix, numeric queue ID, and uniform hash. The grain directory resolves these identities and arbitrates activation registration.
+With <xref:Orleans.Configuration.StreamPullingAgentHostingMode.Grain>, one `PullingCoordinatorGrain` per named provider manages one stable `PullingAgentGrain` per queue. Agent identity preserves the provider name, queue prefix, numeric queue ID, and uniform hash. The grain directory resolves these identities and arbitrates activation registration.
 
 ```mermaid
 flowchart LR
@@ -106,7 +106,7 @@ Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blo
 
 <a name="pulling-protocol"></a>
 
-`PullingAgentSystemTarget` and `PullingAgentGrain` use the same `PersistentStreamPullingAgent` processing implementation with single-threaded Orleans scheduling. Its loop:
+`PullingAgentTarget` and `PullingAgentGrain` use the same `PersistentStreamPullingAgent` processing implementation with single-threaded Orleans scheduling. Its loop:
 
 1. asks the adapter receiver for a batch;
 1. adds batch containers to its queue cache;
