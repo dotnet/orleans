@@ -30,6 +30,12 @@ internal sealed class AdmissionGate
     /// </returns>
     public Admission TryEnter()
     {
+        // Keep new rejected attempts from prolonging the drain after closure.
+        if (Volatile.Read(ref _state) < 0)
+        {
+            return default;
+        }
+
         if (Interlocked.Increment(ref _state) > 0)
         {
             return new(this);

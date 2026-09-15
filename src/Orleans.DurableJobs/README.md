@@ -108,7 +108,9 @@ Scheduling and activation use the shared `Orleans.Internal.AdmissionGate` utilit
 `using` local and check `Entered` before starting work; disposal releases the admission.
 Each admitted token has one owner which disposes it exactly once. An atomic increment
 reserves a count and observes the closing flag in the same operation; attempts which
-observe closure release their count immediately. Scheduling holds admission through
+observe closure release their count immediately. A preliminary check rejects callers
+which observe closure before incrementing, so further arrivals leave the drain count
+unchanged. Scheduling holds admission through
 completion, and activation holds it until its execution task is published and queued.
 Shutdown atomically sets the closing flag, cancels scheduling, and awaits these operations
 before snapshotting the running shards and canceling execution.
