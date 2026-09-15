@@ -71,6 +71,8 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     bool ICollection<T>.IsReadOnly => false;
 
+    bool IJournaledState.HasPendingChanges => false;
+
     void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 

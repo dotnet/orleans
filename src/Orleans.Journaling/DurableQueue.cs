@@ -91,6 +91,8 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
 
     public int Count => _items.Count;
 
+    bool IJournaledState.HasPendingChanges => false;
+
     void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 

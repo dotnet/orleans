@@ -5,14 +5,17 @@ namespace Orleans.Journaling;
 /// </summary>
 public readonly struct JournalReplayContext
 {
-    internal JournalReplayContext(JournaledStateManager manager)
+    internal JournalReplayContext(JournaledStateManager manager, bool isPending = false)
     {
         ArgumentNullException.ThrowIfNull(manager);
         Manager = manager;
+        IsPending = isPending;
     }
 
     private JournaledStateManager Manager =>
         field ?? throw new InvalidOperationException("The journal replay context is not initialized.");
+
+    internal bool IsPending { get; }
 
     /// <summary>
     /// Gets the configured write journal format key.

@@ -13,6 +13,10 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Initializes the state manager.
     /// </summary>
+    /// <remarks>
+    /// Cancellation is observed before initialization is queued. Once recovery begins, the operation completes
+    /// before returning so callers never observe state while recovery is still mutating it.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask InitializeAsync(CancellationToken cancellationToken);
@@ -34,6 +38,12 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Prepares and persists an update to the journal.
     /// </summary>
+    /// <remarks>
+    /// When the operation writes a snapshot, the complete captured state is replaced atomically. If storage
+    /// fails without reporting an optimistic-concurrency conflict, the captured changes remain pending and can be retried.
+    /// Changes made while storage is awaiting are not consumed by the completed operation.
+    /// An optimistic-concurrency conflict recovers the winning journal generation and discards the losing in-memory changes.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask WriteStateAsync(CancellationToken cancellationToken);
@@ -48,6 +58,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Resets this instance, removing any persistent state.
     /// </summary>
+    /// <remarks>
+    /// Cancellation is observed before deletion is queued. Once deletion begins, the operation completes before returning.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask DeleteStateAsync(CancellationToken cancellationToken);
@@ -62,4 +75,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets a value indicating whether any registered state has changes which have not been written to storage.
+    /// </summary>
+    bool HasPendingWrites => PendingWriteByteCount > 0;
 }
