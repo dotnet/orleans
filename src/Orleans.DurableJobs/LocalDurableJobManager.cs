@@ -82,12 +82,11 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var startTimestamp = _timeProvider.GetTimestamp();
         using var activity = DurableJobsDiagnostics.StartScheduleActivity(in request);
         request = EnsureScheduleRequestHasTraceContext(request, activity);
-        var admitted = false;
+        using var admission = _admission.TryEnter();
         try
         {
             request.Validate();
-            admitted = _admission.TryEnter();
-            if (!admitted)
+            if (!admission.Entered)
             {
                 throw new OperationCanceledException("The durable job manager is stopping.", _schedulingCts.Token);
             }
@@ -172,13 +171,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             _durableJobsInstruments.OnScheduleJobCallFailed(_timeProvider.GetElapsedTime(startTimestamp));
             DurableJobsDiagnostics.SetError(activity, ex);
             throw;
-        }
-        finally
-        {
-            if (admitted)
-            {
-                _admission.Exit();
-            }
         }
     }
 
@@ -573,27 +565,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             return;
         }
 
-        if (!_admission.TryEnter())
+        using var admission = _admission.TryEnter();
+        if (!admission.Entered)
         {
             return;
         }
 
-        try
+        var workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
+        if (!_runningShards.TryAdd(shardId, workItem.Task))
         {
-            var workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
-            if (!_runningShards.TryAdd(shardId, workItem.Task))
-            {
-                return;
-            }
+            return;
+        }
 
-            LogStartingShard(_logger, shardId, shard.StartTime, shard.EndTime);
-            using var _ = new ExecutionContextSuppressor();
-            WorkItemGroup.QueueWorkItem(workItem);
-        }
-        finally
-        {
-            _admission.Exit();
-        }
+        LogStartingShard(_logger, shardId, shard.StartTime, shard.EndTime);
+        using var _ = new ExecutionContextSuppressor();
+        WorkItemGroup.QueueWorkItem(workItem);
     }
 
     private async Task RunShardWithCleanupAsync(IJobShard shard)
@@ -671,51 +657,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         return false;
-    }
-
-    private sealed class AdmissionGate
-    {
-        private const int Closed = int.MinValue;
-        private readonly TaskCompletionSource _drained = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        // The sign bit closes admission; the remaining bits count admitted operations.
-        // Updating both in one atomic state orders every admission against shutdown.
-        private int _state;
-
-        public bool TryEnter()
-        {
-            var state = Volatile.Read(ref _state);
-            while (state >= 0)
-            {
-                var previous = Interlocked.CompareExchange(ref _state, state + 1, state);
-                if (previous == state)
-                {
-                    return true;
-                }
-
-                state = previous;
-            }
-
-            return false;
-        }
-
-        public void Exit()
-        {
-            if (Interlocked.Decrement(ref _state) == Closed)
-            {
-                _drained.TrySetResult();
-            }
-        }
-
-        public Task Close()
-        {
-            if (Interlocked.Or(ref _state, Closed) == 0)
-            {
-                _drained.TrySetResult();
-            }
-
-            return _drained.Task;
-        }
     }
 
     internal sealed class TestAccessor(LocalDurableJobManager manager)

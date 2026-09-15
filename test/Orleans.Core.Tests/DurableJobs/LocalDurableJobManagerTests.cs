@@ -793,11 +793,11 @@ public class LocalDurableJobManagerTests
 
             stop = observer.OnStop(cancellationToken);
             Assert.All(schedulingTokens, token => Assert.True(token.IsCancellationRequested));
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => manager.ScheduleJobAsync(CreateScheduleRequest(start, "after-close"), cancellationToken));
 
             for (var i = 0; i < calls.Length; i++)
             {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => manager.ScheduleJobAsync(CreateScheduleRequest(start, $"after-close-{i}"), cancellationToken));
                 await manager.QueueTask(() => Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
                 Assert.False(stop.IsCompleted);
                 Assert.False(shard.DisposeStarted.Task.IsCompleted);
@@ -823,6 +823,56 @@ public class LocalDurableJobManagerTests
         Assert.Equal(0, shardManager.CreateShardCallCount);
         Assert.Equal(1, shard.DisposeCallCount);
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Fact]
+    public async Task Stop_DuringSchedulingAdmission_DrainsCancellationAndReentrantRejection()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var start = timeProvider.GetUtcNow().AddHours(1);
+        var shard = new BlockingQueueShard("admission-canceled", start, start.AddHours(1));
+        shard.ScheduleJob = (_, _) => throw new InvalidOperationException("Canceled scheduling reached the shard.");
+        var shardManager = new TestJobShardManager();
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions(), logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        accessor.AddWritableShard(start, shard);
+        var request = CreateScheduleRequest(start);
+        Task? stop = null;
+        Task<DurableJob>? rejected = null;
+        var disposeStartedBeforeAdmissionReleased = false;
+        logger.OnLog = eventId =>
+        {
+            if (eventId.Name == "LogSchedulingJob" && stop is null)
+            {
+                stop = observer.OnStop(cancellationToken);
+                rejected = manager.ScheduleJobAsync(request, cancellationToken);
+                disposeStartedBeforeAdmissionReleased = shard.DisposeStarted.Task.IsCompleted;
+            }
+        };
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.ScheduleJobAsync(request, cancellationToken));
+            Assert.NotNull(stop);
+            Assert.NotNull(rejected);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rejected);
+            Assert.False(disposeStartedBeforeAdmissionReleased);
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+        }
+        finally
+        {
+            shard.AllowDispose.TrySetResult();
+            await (stop ?? observer.OnStop(cancellationToken)).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(0, shardManager.CreateShardCallCount);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(shard.ConsumeStarted.Task.IsCompleted);
         AssertSchedulingCacheEmpty(accessor);
     }
 
@@ -1540,6 +1590,8 @@ public class LocalDurableJobManagerTests
             () => manager.ScheduleJobAsync(request, CancellationToken.None));
 
         Assert.Equal("JobName", exception.ParamName);
+        await CreateLifecycleObserver(manager).OnStop(TestContext.Current.CancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     private static ScheduleJobRequest CreateScheduleRequest(DateTimeOffset dueTime, string jobName = "scheduled-job") => new()

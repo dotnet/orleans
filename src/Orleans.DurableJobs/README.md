@@ -103,10 +103,15 @@ builder.UseOrleans(siloBuilder =>
 
 ## Shutdown lifecycle
 
-Scheduling and activation share a lock-free admission counter. Scheduling holds admission
-through completion, and activation holds it until its execution task is published and
-queued. Shutdown atomically closes admission, cancels scheduling, and awaits these
-operations before snapshotting the running shards and canceling execution.
+Scheduling and activation use the shared `Orleans.Internal.AdmissionGate` utility from
+`Orleans.Core` for lock-free admission. Callers keep the returned readonly token in a
+`using` local and check `Entered` before starting work; disposal releases the admission.
+Each admitted token has one owner which disposes it exactly once. An atomic increment
+reserves a count and observes the closing flag in the same operation; attempts which
+observe closure release their count immediately. Scheduling holds admission through
+completion, and activation holds it until its execution task is published and queued.
+Shutdown atomically sets the closing flag, cancels scheduling, and awaits these operations
+before snapshotting the running shards and canceling execution.
 
 Successful writes retain their result, and successful shard creations remain owned even
 when cancellation races with their completion. Shutdown then awaits the active shard check
