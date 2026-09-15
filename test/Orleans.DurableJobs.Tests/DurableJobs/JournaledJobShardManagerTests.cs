@@ -137,7 +137,8 @@ public partial class JournaledJobShardManagerTests
         var assigned = await manager.AssignJobShardsAsync(start.AddHours(1), int.MaxValue, cancellationToken);
 
         Assert.Same(shard, Assert.Single(assigned));
-        Assert.Equal(((JournaledJobShard)shard).StorageId, Assert.Single(storageProvider.OpenedJournalIds));
+        Assert.Equal(JobShardId.StoragePrefix.Value + "/", storageProvider.LastListPrefix.Value);
+        Assert.Empty(storageProvider.OpenedJournalIds);
         await manager.UnregisterShardAsync(shard, cancellationToken);
     }
 
@@ -656,6 +657,7 @@ public partial class JournaledJobShardManagerTests
         public int AppendCount => Volatile.Read(ref _appendCount);
 
         public ConcurrentBag<JournalId> OpenedJournalIds { get; } = new();
+        public JournalId LastListPrefix { get; private set; }
 
         public void BlockAppends()
         {
@@ -683,7 +685,10 @@ public partial class JournaledJobShardManagerTests
         }
 
         public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
-            => _inner.ListAsync(options, cancellationToken);
+        {
+            LastListPrefix = options?.Prefix ?? default;
+            return _inner.ListAsync(options, cancellationToken);
+        }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {

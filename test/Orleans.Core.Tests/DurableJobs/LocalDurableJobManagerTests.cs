@@ -476,7 +476,7 @@ public class LocalDurableJobManagerTests
         }
 
         Assert.Equal(1, shard.DisposeCallCount);
-        Assert.Empty(shardManager.UnregisteredShards);
+        Assert.Same(shard, Assert.Single(shardManager.UnregisteredShards));
         Assert.False(accessor.HasCachedShard(shard.Id));
         Assert.False(shard.ConsumeStarted.Task.IsCompleted);
     }
