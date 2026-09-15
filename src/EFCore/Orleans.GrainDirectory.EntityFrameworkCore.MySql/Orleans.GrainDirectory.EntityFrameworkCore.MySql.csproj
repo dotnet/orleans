@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.GrainDirectory.EntityFrameworkCore.MySql</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core (MySQL) Grain Directory Provider</Title>
+    <Description>Microsoft Orleans grain directory provider backed by Entity Framework Core for MySQL</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.GrainDirectory.EntityFrameworkCore.MySql</AssemblyName>
+    <RootNamespace>Orleans.GrainDirectory.EntityFrameworkCore.MySql</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.GrainDirectory.EntityFrameworkCore\Orleans.GrainDirectory.EntityFrameworkCore.csproj"/>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="GrainDirectory.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

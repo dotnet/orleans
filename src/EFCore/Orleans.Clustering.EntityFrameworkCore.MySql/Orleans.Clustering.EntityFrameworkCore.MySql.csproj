@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.EntityFrameworkCore.MySql</PackageId>
+    <Title>Microsoft Orleans Entity Framework Core (MySQL) Clustering Provider</Title>
+    <Description>Microsoft Orleans clustering provider backed by Entity Framework Core for MySQL</Description>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL MariaDB</PackageTags>
+    <Nullable>enable</Nullable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Clustering.EntityFrameworkCore.MySql</AssemblyName>
+    <RootNamespace>Orleans.Clustering.EntityFrameworkCore.MySql</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\EFCore\Orleans.Clustering.EntityFrameworkCore\Orleans.Clustering.EntityFrameworkCore.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Clustering.sql" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
