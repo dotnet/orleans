@@ -75,6 +75,14 @@ Each `PersistentStreamPullingAgent` is a system target with single-threaded Orle
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
+### Shutdown and admitted work
+
+Each pulling-agent run owns scoped admission for queue reads, stream registrations, subscription attachment, and consumer delivery. Shutdown closes processing admission, cancels processing waits, and drains admitted work and actual receiver initialization before releasing queue resources. Repeated shutdown calls share the same completion. Restart creates fresh admission and cancellation scopes after the prior run finishes.
+
+An unavailable client is detached locally immediately. Durable subscription retirement has its own admission and cancellation lifetime, allowing a finishing delivery to start cleanup after processing admission closes. Once processing drains, shutdown closes retirement admission and waits for persistence and notification retries to finish. Producer-initiated retirement persists the removal and notifies the other producers; the requesting producer has already detached that subscription. Ordinary consumer unregistration notifies every registered producer.
+
+The final delivery-progress scan preserves the checkpoint barrier for registrations which were pending when shutdown began. Cancellation and failed registration retain the prior safe position. Receiver shutdown then flushes the safe checkpoint and releases its resources. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
+
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
 <a name="backpressure"></a>
