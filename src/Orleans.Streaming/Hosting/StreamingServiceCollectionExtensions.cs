@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
+using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
@@ -34,6 +35,10 @@ namespace Orleans.Hosting
             services.TryAddSingleton<StreamInstruments>();
             services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
+            services.AddSingleton<StreamPullingAgentRuntime>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, StreamPullingAgentRuntime>();
+            services.AddSingleton<IGrainPropertiesProvider, StreamPullingAgentGrainPropertiesProvider>();
+            services.AddPlacementDirector<StreamPullingAgentPlacement, StreamPullingAgentPlacementDirector>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();

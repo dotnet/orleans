@@ -87,10 +87,39 @@ namespace Orleans.Configuration
     }
 
     /// <summary>
+    /// Selects the runtime host for persistent-stream pulling agents.
+    /// </summary>
+    public enum StreamPullingAgentHostingMode
+    {
+        /// <summary>
+        /// Hosts each pulling agent as a silo-local system target.
+        /// </summary>
+        SystemTarget,
+
+        /// <summary>
+        /// Hosts each provider/queue pair as a directory-registered grain and rebalances it using activation migration.
+        /// </summary>
+        Grain,
+    }
+
+    /// <summary>
     /// Options for stream pulling agents.
     /// </summary>
     public class StreamPullingAgentOptions
     {
+        /// <summary>
+        /// Gets or sets the runtime host for this provider's pulling agents.
+        /// The default is <see cref="StreamPullingAgentHostingMode.SystemTarget"/>.
+        /// </summary>
+        /// <remarks>
+        /// Grain hosting uses the configured grain directory and the queue balancer's desired placement.
+        /// Select the same mode on every host of a provider. Change modes after stopping and draining
+        /// that provider on all participating silos, then restart from its durable checkpoints.
+        /// Grain hosting supports assignment-based queue balancers; lease-based balancing requires
+        /// coordinated lease transfer and uses system-target hosting.
+        /// </remarks>
+        public StreamPullingAgentHostingMode HostingMode { get; set; }
+
         /// <summary>
         /// Gets or sets the position used for initial subscriptions which do not specify a sequence token or explicit start position.
         /// </summary>

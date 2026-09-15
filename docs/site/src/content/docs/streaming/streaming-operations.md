@@ -57,6 +57,27 @@ Each record contains one published batch of events. A value such as `25` reduces
 
 The bound is measured in records. The aggregate byte size depends on the serialized payloads in those records, including all events in each published batch. Size producer batches and payloads so that a complete dequeue response fits the configured Orleans message-body limit. The queue grain removes records before its response is serialized; an oversized response can therefore lose those records when serialization fails. Tune the count alongside measured response sizes and queue lag.
 
+## Change pulling-agent hosting mode
+
+<xref:Orleans.Configuration.StreamPullingAgentOptions.HostingMode> selects the host for a named provider. `SystemTarget` is the default. `Grain` uses a directory-registered grain for each provider/queue pair and ordinary activation migration for balancing. Configure it through <xref:Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigurePullingAgent*> on every participating silo.
+
+Use an assignment-based balancer, such as the consistent-ring balancer, and configure the named provider on every silo participating in that balancer's assignments. The built-in lease-based balancer requires `SystemTarget` hosting. Custom balancers used with grain hosting must allow the current receiver to continue until the destination's migration request drains it.
+
+Switch modes at a provider-wide drain boundary:
+
+1. Issue <xref:Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.StopAgents> for that provider on every participating silo and await completion.
+1. Confirm that receiver shutdown and final checkpoint persistence succeeded.
+1. Upgrade all participating hosts and configure the same hosting mode on each.
+1. Restart the provider's agents and verify receiver readiness, checkpoint position, and active-agent counts.
+
+Rollback uses the same stop, drain, configure, and restart sequence. Preserve provider names, service identity, queue mapping, consumer groups, and checkpoint storage throughout the change.
+
+Start and stop commands retain their per-silo/provider scope. A stop affects agents still hosted on the addressed silo; a request which reaches an already-moved activation leaves that successor running. Stopping also disables that supervisor's reconciliation timer. Pub/sub callbacks to a stopped activation leave polling stopped. `StartupState` controls automatic startup as usual.
+
+During graceful movement, final checkpoint persistence completes before the destination initializes its receiver. A crash or failed final flush resumes from durable progress, so consumers should handle replay. Event Hubs resumes inclusively at the stored offset.
+
+Correlate the existing pulling-agent and receiver lifecycle events with grain activation/migration diagnostics. Track actual hosts, requested hosts, safe checkpoint positions, migration downtime, and recovery latency. A migration-request reply reports the current address; receiver-initialized and pulling-agent-started events establish destination readiness. Reconciliation runs every 30 seconds in addition to balancing notifications, so include that control traffic and recovery interval when sizing partitions.
+
 ## Observe health
 
 Export Orleans meters and correlate them with broker metrics and application event IDs. Useful Orleans instruments include:

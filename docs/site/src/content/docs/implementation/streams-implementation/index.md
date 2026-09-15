@@ -7,7 +7,7 @@ ms.topic: concept-article
 
 # Persistent stream pulling architecture
 
-A persistent stream provider connects Orleans streams to a durable queue technology. Producers enqueue through an adapter. Silo-local pulling agents own queue partitions, read batches, cache them, discover subscriptions, and deliver events through ordinary Orleans calls.
+A persistent stream provider connects Orleans streams to a durable queue technology. Producers enqueue through an adapter. Pulling agents read queue partitions, cache batches, discover subscriptions, and deliver events through ordinary Orleans calls. Providers select silo-local system-target hosting or grain hosting through <xref:Orleans.Configuration.StreamPullingAgentOptions.HostingMode>.
 
 This page describes the runtime mechanism. For stream APIs and provider selection, see the [streaming documentation](../../streaming/index.md).
 
@@ -54,7 +54,29 @@ API: <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider>. Implement
 
 The queue mapper deterministically assigns a stream identity to a queue. All producers and consumers for a provider must use compatible mapping or events can be written to queues which no intended agent reads.
 
-The queue balancer assigns queues to silos and publishes sequenced ownership changes. `PersistentStreamPullingManager` is a silo-local system target which serializes those notifications, ignores stale sequences, and starts or stops one pulling agent per owned queue. When membership changes, queues move among managers; agents themselves are not virtual and do not migrate.
+The queue balancer assigns queues to silos and publishes ownership changes. With the default system-target hosting, `PersistentStreamPullingManager` serializes those notifications, ignores stale sequences, and starts or stops one silo-local agent per assigned queue.
+
+With <xref:Orleans.Configuration.StreamPullingAgentHostingMode.Grain>, a supervisor invokes one stable grain identity per provider/queue pair. The identity preserves the provider name, queue prefix, numeric queue ID, and uniform hash. The grain directory resolves that identity and arbitrates activation registration. The balancer supplies desired placement; the supervisor requests ordinary activation migration toward the assigned host.
+
+Placement considers grain-type compatibility, the named provider's availability, its running state, and its current queue assignment. Every 30 seconds, each running supervisor refreshes its assignments and invokes the corresponding grains. This reconciles placement after a failed migration attempt and recreates a failed activation even when external partition traffic supplies no grain calls. Membership-driven balancing also triggers reconciliation. A keep-alive grain timer sustains active polling, and each timer invocation performs at most 16 queue reads so a busy partition regularly reaches the runtime's migration boundary.
+
+### Grain-hosted handoff
+
+The successful migration path orders these operations:
+
+1. The source activation stops admitting queue work and cancels outstanding grain-hosted subscription and delivery waits.
+1. Local asynchronous work completes. The final watermark includes acknowledged progress; interrupted registration preserves the prior checkpoint.
+1. Receiver shutdown flushes the safe checkpoint and releases activation-local resources.
+1. The runtime transfers the activation and conditionally registers its successor.
+1. The destination initializes its receiver and cache, loads the durable checkpoint, and starts polling.
+
+Receiver, cache, cursor, and SDK-client objects belong to their host. The destination reconstructs subscriptions from pub/sub and consumer handshakes. Event Hubs retains its existing checkpoint storage identity and inclusive restart boundary.
+
+The producer's stable grain ID remains registered across runtime migration and recovery. Pub/sub callbacks route to the successor. Administrative stop unregisters the hosted producer while the activation can still serve interleaved subscription callbacks, then leaves polling stopped until the provider is started.
+
+Receiver initialization and final-flush failures propagate to the grain lifecycle. Failed deactivation, lifecycle cancellation, and process failure recover using the last durable checkpoint, with at-least-once replay. The selected grain directory supplies activation-registration and failure-recovery guarantees.
+
+Grain hosting uses assignment-based balancing. The built-in lease-based balancer uses system-target hosting so its lease-release obligations stay with the current host lifecycle. See [streaming operations](../../streaming/streaming-operations.md#change-pulling-agent-hosting-mode) for the provider-scoped rollout boundary.
 
 Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamPullingManager.cs).
 
@@ -62,7 +84,7 @@ Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blo
 
 <a name="pulling-protocol"></a>
 
-Each `PersistentStreamPullingAgent` is a system target with single-threaded Orleans scheduling. Its loop:
+Both hosts use the same `PersistentStreamPullingAgent` processing implementation with single-threaded Orleans scheduling. Its loop:
 
 1. asks the adapter receiver for a batch;
 1. adds batch containers to its queue cache;

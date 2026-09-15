@@ -149,6 +149,12 @@ namespace Orleans.Configuration
         public Streams.StreamPubSubType PubSubType { get { throw null; } set { } }
     }
 
+    public enum StreamPullingAgentHostingMode
+    {
+        SystemTarget = 0,
+        Grain = 1
+    }
+
     public partial class StreamPullingAgentOptions
     {
         public static readonly int DEFAULT_BATCH_CONTAINER_BATCH_SIZE;
@@ -160,6 +166,8 @@ namespace Orleans.Configuration
         public int BatchContainerBatchSize { get { throw null; } set { } }
 
         public System.TimeSpan GetQueueMsgsTimerPeriod { get { throw null; } set { } }
+
+        public StreamPullingAgentHostingMode HostingMode { get { throw null; } set { } }
 
         public Streams.StreamSubscriptionStartPosition InitialSubscriptionStartPosition { get { throw null; } set { } }
 

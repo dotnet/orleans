@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Streams.Filtering;
 using Orleans.Streams.Core;
 using Orleans.Internal;
+using Orleans.Timers;
 
 namespace Orleans.Runtime.Providers
 {
@@ -75,23 +76,38 @@ namespace Orleans.Runtime.Providers
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
             var filter = this.ServiceProvider.GetKeyedService<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
             var timeProvider = this.ServiceProvider.GetKeyedService<TimeProvider>(StreamingTimeProviderNames.Streaming) ?? TimeProvider.System;
-            var manager = new PersistentStreamPullingManager(
-                managerId,
-                streamProviderName,
-                this.PubSub(pubsubOptions.PubSubType)!, // Configured StreamPubSubType values always select a runtime.
-                adapterFactory,
-                queueBalancer,
-                filter,
-                pullingAgentOptions,
-                queueAdapter,
-                deliveryProvider,
-                queueReaderProvider,
-                timeProvider,
-                ServiceProvider.GetRequiredService<StreamInstruments>(),
-                ServiceProvider.GetRequiredService<SystemTargetShared>());
+            var pubSub = this.PubSub(pubsubOptions.PubSubType)!;
+            var instruments = ServiceProvider.GetRequiredService<StreamInstruments>();
+            var shared = ServiceProvider.GetRequiredService<SystemTargetShared>();
+            IPersistentStreamPullingManager pullingAgentManager;
+            switch (pullingAgentOptions.HostingMode)
+            {
+                case StreamPullingAgentHostingMode.Grain:
+                    if (queueBalancer is LeaseBasedQueueBalancer)
+                    {
+                        throw new OrleansConfigurationException(
+                            $"Stream provider '{streamProviderName}' requires system-target hosting with {nameof(LeaseBasedQueueBalancer)}.");
+                    }
 
-            // Init the manager only after it was registered locally.
-            var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
+                    var provider = new StreamPullingAgentRuntime.Provider(async (context, queueId) => new PersistentStreamPullingAgent(
+                        context, streamProviderName, pubSub, filter, queueId, pullingAgentOptions, queueAdapter,
+                        adapterFactory.GetQueueAdapterCache(), await adapterFactory.GetDeliveryFailureHandler(queueId),
+                        deliveryProvider, queueReaderProvider, timeProvider, loggerFactory,
+                        ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments));
+                    ServiceProvider.GetRequiredService<StreamPullingAgentRuntime>().Register(streamProviderName, provider);
+                    var grainManager = new GrainHostedStreamPullingManager(
+                        managerId, streamProviderName, provider, queueBalancer, adapterFactory.GetStreamQueueMapper(), instruments, shared);
+                    pullingAgentManager = grainManager.AsReference<IPersistentStreamPullingManager>();
+                    break;
+                case StreamPullingAgentHostingMode.SystemTarget:
+                    var manager = new PersistentStreamPullingManager(
+                        managerId, streamProviderName, pubSub, adapterFactory, queueBalancer, filter,
+                        pullingAgentOptions, queueAdapter, deliveryProvider, queueReaderProvider, timeProvider, instruments, shared);
+                    pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();
+                    break;
+                default:
+                    throw new OrleansConfigurationException($"Invalid pulling-agent hosting mode '{pullingAgentOptions.HostingMode}' for stream provider '{streamProviderName}'.");
+            }
 
             // Need to call it as a grain reference though.
             await pullingAgentManager.Initialize(cancellationToken);
