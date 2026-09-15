@@ -1,7 +1,7 @@
 ---
 title: Heterogeneous Orleans silos
 description: Host different Orleans grain types on different silos.
-ms.date: 08/02/2026
+ms.date: 08/27/2026
 ms.topic: how-to
 ---
 
@@ -51,7 +51,11 @@ Use heterogeneous grain type registration when a silo cannot host the implementa
 - Roll out contract changes before implementations that require them.
 - Avoid removing the last silo for a grain type while requests or durable work still target it.
 
-Clients obtain cluster type information after connecting. Handle deployments so clients don't depend on a grain type before supporting silos are available.
+Clients obtain cluster type information after connecting. The synchronous <xref:Orleans.IGrainFactory.GetGrain*> methods require the current cluster manifest to contain a compatible grain implementation.
+
+When a client or silo can start before a specialized silo is available, use <xref:Orleans.GrainFactoryResolutionExtensions.GetGrainAsync*>. The operation waits until the cluster advertises the selected grain implementation with the caller's interface version, then returns a normal grain reference with its complete, immutable grain identity. Pass a cancellation token or deadline appropriate for application startup.
+
+Use <xref:Orleans.GrainFactoryResolutionExtensions.WaitForGrainTypeAsync*> when startup needs an availability barrier without creating a grain reference.
 
 ## Limitations
 
