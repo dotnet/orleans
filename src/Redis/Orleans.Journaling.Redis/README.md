@@ -64,7 +64,7 @@ Storage errors and cancellation propagate without provider-level retries, restar
 
 ## Redis key layout
 
-Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
+Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<encodedKeyName>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI escaping encodes Unicode scalars, while `%uXXXX` encodes each unpaired UTF-16 surrogate using four uppercase hexadecimal digits. Literal percent signs are escaped as `%25`, so raw journal ids round-trip distinctly from escape sequences and replacement characters. The stored `$journal-id` uses the same encoding to preserve the identity through Redis string transport and custom-mapped discovery. Native scan patterns escape glob characters in the configured key prefix and broaden partial surrogate prefixes before applying the ordinal filters locally.
 
 **Alpha layout upgrade:** When upgrading from the previous hash-only layout, drain durable jobs before deploying the new version, then recreate journals using the new layout.
 

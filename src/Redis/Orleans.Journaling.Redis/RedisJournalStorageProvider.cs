@@ -173,7 +173,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         value = (RedisValue)result[1];
                     }
 
-                    if (!RedisJournalStorage.TryParseJournalId(value.ToString(), out var journalId))
+                    if (!RedisJournalStorage.TryDecodeJournalId(value.ToString(), out var journalId))
                     {
                         throw new InvalidOperationException(
                             $"Redis journal metadata '{batch[i]}' contains an invalid '{RedisJournalStorage.JournalIdMetadataKey}' value.");

@@ -30,7 +30,7 @@ public sealed class RedisJournalStorageCatalogTests
         var id = JournalId.Create("redis", "projection");
         var key = RedisJournalStorage.GetMetadataKey(KeyPrefix, customMapping ? "mapped" : id.Value);
         var database = Substitute.For<IDatabase>();
-        database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns((RedisValue)id.Value);
+        database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns((RedisValue)RedisJournalStorage.EncodeKeyName(id.Value));
         var provider = await CreateProviderAsync(
             database, customMapping ? CustomMappingOptions() : new(), CreateServer(ScanKeysAsync([key])));
         var result = new List<JournalCatalogEntry>();
@@ -76,7 +76,7 @@ public sealed class RedisJournalStorageCatalogTests
             .Returns(call =>
             {
                 metadataReads++;
-                return Task.FromResult((RedisValue)ids[call.ArgAt<RedisKey>(0)].Value);
+                return Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(ids[call.ArgAt<RedisKey>(0)].Value));
             });
         var provider = await CreateProviderAsync(database, CustomMappingOptions(), CreateServer(ScanAsync(TestContext.Current.CancellationToken)));
         var options = new ListOptions { Prefix = nonmatchingId, MinId = firstId, MaxId = new("a") };
@@ -144,7 +144,7 @@ public sealed class RedisJournalStorageCatalogTests
         for (var index = 0; index < keys.Length; index++)
         {
             database.HashGetAsync(keys[index], RedisJournalStorage.JournalIdMetadataKey)
-                .Returns(Task.FromResult((RedisValue)ids[index].Value));
+                .Returns(Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(ids[index].Value)));
         }
 
         var scanned = 0;
@@ -190,7 +190,7 @@ public sealed class RedisJournalStorageCatalogTests
         var scannedKeys = 0;
         var database = Substitute.For<IDatabase>();
         database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey)
-            .Returns(Task.FromResult((RedisValue)id.Value));
+            .Returns(Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(id.Value)));
         var provider = await CreateProviderAsync(database, customMapping ? CustomMappingOptions() : new(), CreateServer(ScanAsync()));
         await using var enumerator = provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
@@ -242,7 +242,7 @@ public sealed class RedisJournalStorageCatalogTests
             .Returns(_ =>
             {
                 metadataReads++;
-                return Task.FromResult((RedisValue)id.Value);
+                return Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(id.Value));
             });
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var provider = await CreateProviderAsync(database, customMapping ? CustomMappingOptions() : new(), CreateServer(ScanAsync(cancellation.Token)));
@@ -292,7 +292,7 @@ public sealed class RedisJournalStorageCatalogTests
         var key = RedisJournalStorage.GetMetadataKey(KeyPrefix, id.Value);
         var database = Substitute.For<IDatabase>();
         database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey)
-            .Returns(Task.FromResult((RedisValue)id.Value));
+            .Returns(Task.FromResult((RedisValue)RedisJournalStorage.EncodeKeyName(id.Value)));
         var disconnected = Substitute.For<IServer>();
         disconnected.IsConnected.Returns(false);
         var provider = await CreateProviderAsync(database, CreateServer(ScanAsync()), disconnected);
@@ -504,6 +504,105 @@ public sealed class RedisJournalStorageCatalogTests
         await AssertNoMetadataReadsAsync(database);
     }
 
+    [Fact]
+    public void KeyEncoding_RoundTripsRawUtf16WithoutAliases()
+    {
+        var cases = new (string Value, string Encoded)[]
+        {
+            ("jobs/\uD800", "jobs%2F%uD800"),
+            ("jobs/\uD801", "jobs%2F%uD801"),
+            ("jobs/\uDC00", "jobs%2F%uDC00"),
+            ("jobs/\uD800\uD800", "jobs%2F%uD800%uD800"),
+            ("jobs/\uDC00\uD800", "jobs%2F%uDC00%uD800"),
+            ("jobs/\uD800x", "jobs%2F%uD800x"),
+            ("jobs/\uFFFD", "jobs%2F%EF%BF%BD"),
+            ("jobs/%uD800", "jobs%2F%25uD800"),
+            ("jobs/\U0001F600", "jobs%2F%F0%9F%98%80"),
+            ("jobs/\u96EA", "jobs%2F%E9%9B%AA"),
+            ("jobs/\0", "jobs%2F%00"),
+            ("jobs/%uD800/\uD800/\U0001F600/%", "jobs%2F%25uD800%2F%uD800%2F%F0%9F%98%80%2F%25"),
+        };
+        var keys = new HashSet<RedisKey>();
+        foreach (var (value, encoded) in cases)
+        {
+            var metadataKey = RedisJournalStorage.GetMetadataKey(KeyPrefix, value);
+            var dataKey = RedisJournalStorage.GetDataKey(KeyPrefix, value);
+
+            Assert.EndsWith($":{encoded}:metadata", metadataKey.ToString());
+            Assert.Equal(metadataKey.ToString()[..^"metadata".Length] + "data", dataKey.ToString());
+            Assert.Equal(new JournalId(value), RedisJournalStorage.GetJournalIdFromMetadataKey(KeyPrefix, metadataKey));
+            Assert.True(keys.Add(metadataKey));
+        }
+    }
+
+    [Theory]
+    [InlineData("%u")]
+    [InlineData("%uD80")]
+    [InlineData("%uGGGG")]
+    [InlineData("%u0041")]
+    [InlineData("%ud800")]
+    [InlineData("%uD800%uDC00")]
+    [InlineData("%FF")]
+    [InlineData("%20")]
+    public void JournalIdDecoding_RejectsNonCanonicalEscapes(string encoded)
+    {
+        Assert.False(RedisJournalStorage.TryDecodeJournalId(encoded, out var id));
+        Assert.Equal(default, id);
+    }
+
+    [Theory]
+    [InlineData(0xD800, false)]
+    [InlineData(0xD800, true)]
+    [InlineData(0xDC00, false)]
+    [InlineData(0xDC00, true)]
+    public async Task ListAsync_DefaultMappingPreservesRawUtf16RangesWithoutMetadataReads(int codeUnit, bool bounded)
+    {
+        var prefix = "jobs/" + (char)codeUnit;
+        var minimum = new JournalId(prefix + "/a");
+        var maximum = new JournalId(prefix + "/b");
+        var future = new JournalId(prefix + "/z");
+        var pairedOrRepeated = new JournalId(prefix + "\uDC00");
+        var ids = new[] { future, minimum, new("jobs/\uFFFD/a"), maximum, pairedOrRepeated, new("jobs/%uD800/a") };
+        var database = Substitute.For<IDatabase>();
+        var server = CreateServer(ScanKeysAsync(ids.Select(id => RedisJournalStorage.GetMetadataKey(KeyPrefix, id.Value))), "jobs/");
+        var provider = await CreateProviderAsync(database, server);
+
+        var result = await ReadIdsAsync(provider, new()
+        {
+            Prefix = new(prefix),
+            MinId = bounded ? minimum : default,
+            MaxId = bounded ? maximum : default,
+        });
+
+        Assert.Equal(bounded ? [minimum, maximum] : new[] { future, minimum, maximum, pairedOrRepeated }, result);
+        _ = server.Received(1).KeysAsync(0, "catalog-tests:journal:{*}:jobs%2F*:metadata", pageSize: 250);
+        await AssertNoMetadataReadsAsync(database);
+    }
+
+    [Fact]
+    public async Task ListAsync_CustomMappingPreservesRawUtf16MetadataFromRedis()
+    {
+        var ids = new JournalId[] { new("jobs/\uD800"), new("jobs/%uD800"), new("jobs/\uDC00") };
+        var encodedIds = new[] { "jobs%2F%uD800", "jobs%2F%25uD800", "jobs%2F%uDC00" };
+        var keys = ids.Select((_, index) => RedisJournalStorage.GetMetadataKey(KeyPrefix, $"opaque-{index}")).ToArray();
+        var database = Substitute.For<IDatabase>();
+        for (var index = 0; index < keys.Length; index++)
+        {
+            database.HashGetAsync(keys[index], RedisJournalStorage.JournalIdMetadataKey)
+                .Returns((RedisValue)Encoding.UTF8.GetBytes(encodedIds[index]));
+        }
+
+        var provider = await CreateProviderAsync(database, CustomMappingOptions(), CreateServer(ScanKeysAsync(keys)));
+
+        var result = await ReadIdsAsync(provider, new() { Prefix = new("jobs/") });
+
+        Assert.Equal(ids, result);
+        foreach (var key in keys)
+        {
+            await database.Received(1).HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey);
+        }
+    }
+
     [Theory]
     [InlineData("jobs/", "z", "a", false)]
     [InlineData("jobs/", "z", "a", true)]
@@ -597,7 +696,7 @@ public sealed class RedisJournalStorageCatalogTests
 
         for (var i = 0; i < completions.Length; i++)
         {
-            completions[i].SetResult(ids[i].Value);
+            completions[i].SetResult(RedisJournalStorage.EncodeKeyName(ids[i].Value));
         }
 
         Assert.True(await moveNext);
@@ -641,7 +740,7 @@ public sealed class RedisJournalStorageCatalogTests
         var key = RedisJournalStorage.GetMetadataKey(KeyPrefix, "opaque");
         var database = Substitute.For<IDatabase>();
         database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns(Task.FromResult(RedisValue.Null));
-        var response = status == 1 ? new RedisValue[] { status, value } : [status];
+        var response = status == 1 ? new RedisValue[] { status, RedisJournalStorage.EncodeKeyName(value!) } : [status];
         database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>())
             .Returns(Task.FromResult(RedisResult.Create(response)));
         var provider = await CreateProviderAsync(database, CustomMappingOptions(), CreateServer(ScanKeysAsync([key])));

@@ -392,6 +392,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private readonly string _journalFormatKey;
     private readonly RedisJournalStorageOptions _options;
     private readonly JournalId _journalId;
+    private readonly string _encodedJournalId;
     private string? _contentETag;
     private long _appendLength;
 
@@ -420,6 +421,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         _journalFormatKey = journalFormatKey;
         _options = options;
         _journalId = journalId;
+        _encodedJournalId = EncodeKeyName(journalId.Value);
     }
 
     public bool IsCompactionRequested => _options.CompactionThresholdBytes > 0 && _appendLength >= _options.CompactionThresholdBytes;
@@ -435,7 +437,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var result = await EvaluateArrayAsync(
             CreateIfNotExistsScript,
             _journalKeys,
-            BuildCreateArguments(eTag, _journalFormatKey, _journalId.Value, callerMetadata)).ConfigureAwait(false);
+            BuildCreateArguments(eTag, _journalFormatKey, _encodedJournalId, callerMetadata)).ConfigureAwait(false);
         var status = GetStatus(result, nameof(CreateIfNotExistsAsync));
         if (status is CollisionStatus or InvalidMetadataStatus)
         {
@@ -488,7 +490,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
             BuildUpdateMetadataArguments(
                 expectedETag,
                 newETag,
-                _journalId.Value,
+                _encodedJournalId,
                 removeValues,
                 setValues)).ConfigureAwait(false);
         var status = GetStatus(result, nameof(UpdateMetadataAsync));
@@ -544,7 +546,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 newETag,
                 payload,
                 _journalFormatKey,
-                _journalId.Value,
+                _encodedJournalId,
             ]).ConfigureAwait(false);
         var status = GetStatus(result, nameof(AppendAsync));
         ThrowForStatus(status, nameof(AppendAsync), expectedContentETag);
@@ -568,7 +570,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
                 newETag,
                 payload,
                 _journalFormatKey,
-                _journalId.Value,
+                _encodedJournalId,
             ]).ConfigureAwait(false);
         var status = GetStatus(result, nameof(ReplaceAsync));
         ThrowForStatus(status, nameof(ReplaceAsync), expectedContentETag);
@@ -590,7 +592,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         var result = await EvaluateArrayAsync(
             DeleteScript,
             _journalKeys,
-            [expectedContentETag, expectedExists ? "1" : "0", _journalId.Value]).ConfigureAwait(false);
+            [expectedContentETag, expectedExists ? "1" : "0", _encodedJournalId]).ConfigureAwait(false);
         var status = GetStatus(result, nameof(DeleteAsync));
         if (status != AppearedStatus)
         {
@@ -615,7 +617,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
             journalIdPrefix = journalIdPrefix[..^1];
         }
 
-        var encodedPrefix = Uri.EscapeDataString(journalIdPrefix ?? string.Empty);
+        var encodedPrefix = EncodeKeyName(journalIdPrefix ?? string.Empty);
         return $"{EscapeRedisPattern(keyPrefix)}:journal:{{*}}:{EscapeRedisPattern(encodedPrefix)}*:metadata";
     }
 
@@ -628,7 +630,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
     private static string GetJournalBaseKey(string keyPrefix, string keyName)
     {
         var hashTag = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(keyName)));
-        return $"{keyPrefix}:journal:{{{hashTag}}}:{Uri.EscapeDataString(keyName)}";
+        return $"{keyPrefix}:journal:{{{hashTag}}}:{EncodeKeyName(keyName)}";
     }
 
     internal static JournalId GetJournalIdFromMetadataKey(string keyPrefix, RedisKey metadataKey)
@@ -643,9 +645,8 @@ internal sealed class RedisJournalStorage : IJournalStorage
             && key.Length > keyNameOffset + suffix.Length
             && key.AsSpan(prefix.Length + hashTagLength, 2).SequenceEqual("}:"))
         {
-            var keyName = Uri.UnescapeDataString(key[keyNameOffset..^suffix.Length]);
-            if (TryParseJournalId(keyName, out var journalId)
-                && GetMetadataKey(keyPrefix, keyName) == metadataKey)
+            if (TryDecodeJournalId(key[keyNameOffset..^suffix.Length], out var journalId)
+                && GetMetadataKey(keyPrefix, journalId.Value) == metadataKey)
             {
                 return journalId;
             }
@@ -787,7 +788,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
             throw new InvalidOperationException($"Redis journal '{_journalId}' has missing or invalid provider metadata.");
         }
 
-        if (!string.Equals(journalId, _journalId.Value, StringComparison.Ordinal))
+        if (!string.Equals(journalId, _encodedJournalId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Redis journal key mapping collision ({operation}): the configured key for JournalId={_journalId} is already owned by journal '{journalId}'.");
@@ -933,18 +934,66 @@ internal sealed class RedisJournalStorage : IJournalStorage
 
     private static bool IsProviderMetadataKey(string key) => key.StartsWith("$", StringComparison.Ordinal);
 
-    internal static bool TryParseJournalId(string value, out JournalId journalId)
+    internal static string EncodeKeyName(string value)
     {
-        try
+        StringBuilder? result = null;
+        var start = 0;
+        for (var index = 0; index < value.Length; index++)
         {
-            journalId = new JournalId(value);
-            return true;
+            var character = value[index];
+            if (!char.IsSurrogate(character))
+            {
+                continue;
+            }
+
+            if (char.IsHighSurrogate(character) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
+            {
+                index++;
+                continue;
+            }
+
+            // URI escaping handles Unicode scalars; %uXXXX preserves individual unpaired UTF-16 code units.
+            result ??= new StringBuilder();
+            result.Append(Uri.EscapeDataString(value[start..index]));
+            result.Append("%u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+            start = index + 1;
         }
-        catch (ArgumentException)
+
+        return result is null
+            ? Uri.EscapeDataString(value)
+            : result.Append(Uri.EscapeDataString(value[start..])).ToString();
+    }
+
+    internal static bool TryDecodeJournalId(string value, out JournalId journalId)
+    {
+        journalId = default;
+        StringBuilder? result = null;
+        var start = 0;
+        while (value.IndexOf("%u", start, StringComparison.Ordinal) is var index && index >= 0)
         {
-            journalId = default;
+            if (index + 6 > value.Length
+                || !ushort.TryParse(value.AsSpan(index + 2, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var codeUnit)
+                || !char.IsSurrogate((char)codeUnit))
+            {
+                return false;
+            }
+
+            result ??= new StringBuilder();
+            result.Append(Uri.UnescapeDataString(value[start..index]));
+            result.Append((char)codeUnit);
+            start = index + 6;
+        }
+
+        var decoded = result is null
+            ? Uri.UnescapeDataString(value)
+            : result.Append(Uri.UnescapeDataString(value[start..])).ToString();
+        if (string.IsNullOrWhiteSpace(decoded) || !string.Equals(EncodeKeyName(decoded), value, StringComparison.Ordinal))
+        {
             return false;
         }
+
+        journalId = new JournalId(decoded);
+        return true;
     }
 
     private static string CreateETag() => Guid.NewGuid().ToString("N");
