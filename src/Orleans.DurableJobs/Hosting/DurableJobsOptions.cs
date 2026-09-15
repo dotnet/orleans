@@ -30,6 +30,21 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Gets or sets how far ahead of the current time shard discovery loads eligible shards.
+    /// A value of zero discovers shards whose start time is at or before the current time.
+    /// The resulting discovery horizon is capped at <see cref="DateTimeOffset.MaxValue"/>.
+    /// Must be non-negative. Default: 10 minutes.
+    /// </summary>
+    public TimeSpan ShardLoadLookaheadPeriod { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Gets or sets the interval between periodic shard discovery and writable-shard cleanup checks.
+    /// Membership changes also trigger a fresh discovery sweep.
+    /// Must be between 1 and 4294967294 milliseconds, inclusive. Default: 5 minutes.
+    /// </summary>
+    public TimeSpan ShardCheckInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Gets or sets the number of writable shards to use for each shard time bucket.
     /// Increasing this value distributes jobs with the same due-time bucket across multiple shard journals.
     /// Default: 1.
@@ -201,6 +216,15 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.ShardDuration <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
+        }
+        if (options.ShardLoadLookaheadPeriod < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardLoadLookaheadPeriod must be non-negative.");
+        }
+        if (options.ShardCheckInterval < TimeSpan.FromMilliseconds(1) ||
+            options.ShardCheckInterval > TimeSpan.FromMilliseconds(uint.MaxValue - 1))
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardCheckInterval must be between 1 and 4294967294 milliseconds, inclusive.");
         }
         if (options.ShardStripeCount <= 0)
         {

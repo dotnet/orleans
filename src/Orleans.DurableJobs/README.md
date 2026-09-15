@@ -81,6 +81,10 @@ builder.UseOrleans(siloBuilder =>
             {
                 // Duration of each job shard (jobs are partitioned by time)
                 options.ShardDuration = TimeSpan.FromMinutes(5);
+
+                // Load eligible shards within this horizon and check at this interval
+                options.ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(10);
+                options.ShardCheckInterval = TimeSpan.FromMinutes(5);
                 
                 // Maximum number of jobs that can execute concurrently on each silo
                 options.MaxConcurrentJobsPerSilo = 100;
@@ -100,6 +104,56 @@ builder.UseOrleans(siloBuilder =>
         });
 });
 ```
+
+## Shard discovery and lookahead
+
+Each silo discovers shards whose start time is within `DurableJobsOptions.ShardLoadLookaheadPeriod`
+of its current Durable Jobs time-provider clock. The default lookahead is ten minutes.
+A discovered shard starts processing once its start time enters `ShardActivationBufferPeriod`.
+`DurableJobsOptions.ShardCheckInterval` controls periodic discovery and writable-shard cleanup
+checks, with a default of five minutes. Membership changes also trigger checks.
+The lookahead accepts non-negative durations; zero selects shards whose start time is at or
+before the current time. The discovery horizon is capped at `DateTimeOffset.MaxValue`.
+The check interval accepts durations from 1 to 4294967294 milliseconds.
+
+Shard journals use names such as
+`jobs/shards/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
+precedes the unique suffix, so ordinal name order is shard-start-time order. Each sweep
+lists the raw `jobs/shards/` prefix with an inclusive `ListOptions.MaxId` bound covering the lookahead
+horizon. The range includes every earlier start time, including jobs overdue after a long
+outage. Future shard identities are filtered by the catalog before candidate metadata reads.
+
+Each periodic or membership check starts a fresh, locally scoped sweep. Discovery requests
+catalog metadata, orders and deduplicates the selected entries, then uses each supplied
+ownership snapshot with an ETag or reads current metadata when that snapshot is unavailable.
+Claims run oldest first and require the snapshot's ETag for conditional updates, so a
+concurrent ownership change rejects a stale claim. Providers used for Durable Jobs supply
+metadata ETags and enforce conditional updates; a missing ETag surfaces as a discovery error.
+Assigned shards are delivered as they are opened, allowing execution to proceed while later
+candidates are evaluated. The claim budget limits new claims;
+locally owned shards remain eligible after that budget is exhausted.
+
+Catalog providers apply raw-prefix and range constraints using their storage capabilities.
+The timestamp representation also supports narrower day/hour prefixes and inclusive `MinId`
+and `MaxId` intervals for callers selecting a specific time window. Recovery starts at the
+shard namespace's beginning so that all overdue jobs remain eligible.
+Azure Table's default mapping uses indexed key ranges. Azure Blob and ordered general-purpose
+S3 listings can seek lower bounds and stop at upper bounds. S3 Express and Redis filter time
+bounds during their provider-defined traversal. Discovery orders the selected names itself
+to provide consistent oldest-first processing across providers. Storage listing work and request
+latency remain provider-dependent. Blob, Table, and Volatile catalogs supply metadata snapshots
+alongside identities; S3 and Redis require separate candidate metadata reads.
+
+The sweep owns its enumeration and selected identity set until completion. Storage errors
+propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
+already delivered to the local manager are tracked before cancellation is observed and
+continue through their execution lifecycle.
+Cancellation flows through listing, metadata, and journal operations.
+
+Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
+increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.
+The public `JobShardManager.AssignJobShardsAsync` method collects the same ordered discovery
+stream into its full-result list.
 
 ## Shutdown lifecycle
 
@@ -121,10 +175,10 @@ requests, awaiting execution, and releasing shards.
 
 Successful scheduling and cancellation writes retain their result, and successful shard
 creations remain owned even when cancellation races with their completion. Shutdown then
-awaits the active shard check and every admitted shard's execution and cleanup. It unregisters cached shards which
-remained inactive using the shutdown token, then disposes them. The journaled provider
-releases populated shards for another silo to claim and deletes empty shards, including
-creations which completed after request cancellation.
+awaits the active sweep and every admitted shard's execution and cleanup. It unregisters
+cached shards which remained inactive using the shutdown token, then disposes them. The
+journaled provider releases populated shards for another silo to claim and deletes empty
+shards, including creations which completed after request cancellation.
 
 ## Usage Examples
 

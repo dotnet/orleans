@@ -430,32 +430,36 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(10), _timeProvider);
+        using var timer = new PeriodicTimer(_options.ShardCheckInterval, _timeProvider);
 
-        Task timerTask = Task.CompletedTask;
+        var timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
+        var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
         while (!_cts.Token.IsCancellationRequested)
         {
             try
             {
-                // Wait for either periodic timer OR signal from membership changes
-                if (timerTask.IsCompleted)
+                var completedTask = await Task.WhenAny(timerTask, signalTask);
+                await completedTask;
+                // Retain the other pending wait: it can complete during discovery.
+                if (ReferenceEquals(completedTask, timerTask))
                 {
                     timerTask = timer.WaitForNextTickAsync(_cts.Token).AsTask();
                 }
-
-                var signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
-                await Task.WhenAny(timerTask, signalTask);
+                else
+                {
+                    signalTask = _shardCheckSignal.WaitAsync(_cts.Token);
+                }
 
                 await ProcessShardCheckCycleAsync(_cts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
                 LogErrorInPeriodicCheck(_logger, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
+                await Task.Delay(TimeSpan.FromSeconds(5), _timeProvider, _cts.Token).SuppressThrowing();
             }
         }
     }
@@ -483,29 +487,38 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             }
         }
 
-        // Compute the slow-start budget for this cycle
+        await ProcessShardDiscoveryAsync(cancellationToken);
+    }
+
+    private async Task ProcessShardDiscoveryAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var now = _timeProvider.GetUtcNow();
+        var maxDueTime = new DateTimeOffset(now.UtcDateTime.AddClamped(_options.ShardLoadLookaheadPeriod));
+        // Compute the slow-start budget for this sweep.
         var budget = ComputeClaimBudget();
-
-        // Query ShardManager for assigned shards (source of truth)
-        var shards = await _shardManager.AssignJobShardsAsync(now.AddHours(1), budget, cancellationToken);
-
-        // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;
-        if (shards.Count > 0)
+        var assignedCount = 0;
+        await foreach (var shard in _shardManager.DiscoverJobShardsAsync(maxDueTime, budget, cancellationToken))
         {
-            LogAssignedShards(_logger, shards.Count);
-            foreach (var shard in shards)
+            // Take responsibility for yielded resources before observing cancellation.
+            if (_shardCache.TryAdd(shard.Id, shard))
             {
-                if (_shardCache.TryAdd(shard.Id, shard))
-                {
-                    newClaimsThisCycle++;
-                }
-
-                if (!_runningShards.ContainsKey(shard.Id))
-                {
-                    TryActivateShard(shard);
-                }
+                newClaimsThisCycle++;
+                _totalClaimedShards++;
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            assignedCount++;
+            if (!_runningShards.ContainsKey(shard.Id))
+            {
+                TryActivateShard(shard);
+            }
+        }
+
+        if (assignedCount > 0)
+        {
+            LogAssignedShards(_logger, assignedCount);
         }
         else
         {
@@ -514,7 +527,6 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         if (newClaimsThisCycle > 0)
         {
-            _totalClaimedShards += newClaimsThisCycle;
             LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
         }
     }
