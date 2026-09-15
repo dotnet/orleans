@@ -22,7 +22,7 @@ internal sealed class AdmissionGate
     private int _state;
 
     /// <summary>
-    /// Attempts to admit an operation, ordered atomically against <see cref="Close"/>.
+    /// Attempts to admit an operation, ordered atomically against <see cref="CloseAsync"/>.
     /// </summary>
     /// <returns>
     /// A token whose <see cref="Admission.Entered"/> property indicates whether the operation was admitted.
@@ -60,7 +60,7 @@ internal sealed class AdmissionGate
     /// <returns>
     /// The shared drain task, also returned by subsequent calls. Pending continuations run asynchronously.
     /// </returns>
-    public Task Close()
+    public Task CloseAsync()
     {
         if (Interlocked.Or(ref _state, Closed) == 0)
         {

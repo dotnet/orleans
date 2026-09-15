@@ -22,7 +22,7 @@ public class AdmissionGateTests
         using (var admission = gate.TryEnter())
         {
             Assert.True(admission.Entered);
-            drained = gate.Close();
+            drained = gate.CloseAsync();
             Assert.False(drained.IsCompleted);
         }
 
@@ -32,18 +32,18 @@ public class AdmissionGateTests
     }
 
     [Fact]
-    public void Close_WhenEmpty_CompletesAndRemainsClosed()
+    public void CloseAsync_WhenEmpty_CompletesAndRemainsClosed()
     {
         var gate = new AdmissionGate();
 
-        var drained = gate.Close();
+        var drained = gate.CloseAsync();
 
         Assert.True(drained.IsCompletedSuccessfully);
         for (var i = 0; i < 3; i++)
         {
             using var rejected = gate.TryEnter();
             Assert.False(rejected.Entered);
-            Assert.Same(drained, gate.Close());
+            Assert.Same(drained, gate.CloseAsync());
             Assert.True(drained.IsCompletedSuccessfully);
         }
     }
@@ -51,7 +51,7 @@ public class AdmissionGateTests
     [Theory]
     [InlineData(1)]
     [InlineData(8)]
-    public void Close_WithOutstandingTokens_CompletesAfterFinalDisposal(int count)
+    public void CloseAsync_WithOutstandingTokens_CompletesAfterFinalDisposal(int count)
     {
         var gate = new AdmissionGate();
         var admissions = new AdmissionGate.Admission[count];
@@ -61,7 +61,7 @@ public class AdmissionGateTests
             Assert.True(admissions[i].Entered);
         }
 
-        var drained = gate.Close();
+        var drained = gate.CloseAsync();
         for (var i = 0; i < count; i++)
         {
             using (var rejected = gate.TryEnter())
@@ -69,7 +69,7 @@ public class AdmissionGateTests
                 Assert.False(rejected.Entered);
             }
 
-            Assert.Same(drained, gate.Close());
+            Assert.Same(drained, gate.CloseAsync());
             Assert.False(drained.IsCompleted);
             admissions[i].Dispose();
         }
@@ -77,11 +77,11 @@ public class AdmissionGateTests
         Assert.True(drained.IsCompletedSuccessfully);
         using var afterDrain = gate.TryEnter();
         Assert.False(afterDrain.Entered);
-        Assert.Same(drained, gate.Close());
+        Assert.Same(drained, gate.CloseAsync());
     }
 
     [Fact]
-    public async Task Close_WithConcurrentCallers_ReturnsSharedDrainTask()
+    public async Task CloseAsync_WithConcurrentCallers_ReturnsSharedDrainTask()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var gate = new AdmissionGate();
@@ -90,7 +90,7 @@ public class AdmissionGateTests
         {
             Assert.True(admission.Entered);
             var callers = Enumerable.Range(0, 8).Select(_ => Task.Factory.StartNew(
-                gate.Close, cancellationToken, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default)).ToArray();
+                gate.CloseAsync, cancellationToken, TaskCreationOptions.DenyChildAttach, TaskScheduler.Default)).ToArray();
             var results = await Task.WhenAll(callers).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             drained = results[0];
             Assert.All(results, result => Assert.Same(drained, result));
@@ -100,7 +100,7 @@ public class AdmissionGateTests
         await drained.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         using var rejected = gate.TryEnter();
         Assert.False(rejected.Entered);
-        Assert.Same(drained, gate.Close());
+        Assert.Same(drained, gate.CloseAsync());
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class AdmissionGateTests
         var failure = new InvalidOperationException("Admitted operation failed.");
         var canceledToken = new CancellationToken(canceled: true);
         var operation = RunAsync();
-        var drained = gate.Close();
+        var drained = gate.CloseAsync();
         try
         {
             Assert.False(operation.IsCompleted);
@@ -158,7 +158,7 @@ public class AdmissionGateTests
         await drained.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         using var rejected = gate.TryEnter();
         Assert.False(rejected.Entered);
-        Assert.Same(drained, gate.Close());
+        Assert.Same(drained, gate.CloseAsync());
 
         async Task RunAsync()
         {
@@ -182,7 +182,7 @@ public class AdmissionGateTests
     [Theory]
     [InlineData(1)]
     [InlineData(8)]
-    public async Task Close_RacingWithEntry_DrainsExactlyTheAdmittedOperations(int count)
+    public async Task CloseAsync_RacingWithEntry_DrainsExactlyTheAdmittedOperations(int count)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         for (var iteration = 0; iteration < 100; iteration++)
@@ -205,7 +205,7 @@ public class AdmissionGateTests
             var closing = Task.Run(async () =>
             {
                 await start.Task;
-                return gate.Close();
+                return gate.CloseAsync();
             }, cancellationToken);
 
             start.SetResult();
@@ -226,14 +226,14 @@ public class AdmissionGateTests
 
             var completion = await closing.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             await completion.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-            Assert.Same(completion, gate.Close());
+            Assert.Same(completion, gate.CloseAsync());
             using var afterDrain = gate.TryEnter();
             Assert.False(afterDrain.Entered);
         }
     }
 
     [Fact]
-    public async Task Close_RacingWithDisposalAndRejectedEntries_CompletesDraining()
+    public async Task CloseAsync_RacingWithDisposalAndRejectedEntries_CompletesDraining()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         for (var iteration = 0; iteration < 100; iteration++)
@@ -258,7 +258,7 @@ public class AdmissionGateTests
             var closing = Task.Run(async () =>
             {
                 await start.Task;
-                return gate.Close();
+                return gate.CloseAsync();
             }, cancellationToken);
 
             start.SetResult();
@@ -268,7 +268,7 @@ public class AdmissionGateTests
 
             using var rejected = gate.TryEnter();
             Assert.False(rejected.Entered);
-            Assert.Same(drained, gate.Close());
+            Assert.Same(drained, gate.CloseAsync());
             Assert.True(drained.IsCompletedSuccessfully);
         }
     }
