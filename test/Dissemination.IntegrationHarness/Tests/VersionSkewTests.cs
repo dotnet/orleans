@@ -153,89 +153,112 @@ public sealed class VersionSkewTests
             var snapshots = await Task.WhenAll(cluster.Active.Select(node => node.Send("refresh")));
             return snapshots.All(snapshot => SameMembership(snapshots[0], snapshot));
         });
-        foreach (var node in cluster.Active)
+        try
         {
-            var isolated = await node.Send("isolate-membership", value: true);
-            Assert.True(isolated.LegacyGossipSuppressed);
-            Assert.True(isolated.MembershipReadsFrozen);
+            foreach (var node in cluster.Active)
+            {
+                var isolated = await node.Send("isolate-membership", value: true);
+                Assert.True(isolated.LegacyGossipSuppressed);
+                Assert.True(isolated.MembershipReadsFrozen);
+            }
+
+            Assert.False((await origin.Send("probe-tree", peer: receiver.Last.Address)).TreeProbeRejected);
+            foreach (var node in cluster.Active)
+            {
+                var quiesced = await node.Send("block-tree", value: true);
+                Assert.NotNull(quiesced.TreeGate);
+                Assert.True(quiesced.TreeGate.Blocked);
+                Assert.Equal(0, quiesced.TreeGate.InFlight);
+            }
+
+            // Verify the native PushBroadcast RPC is intercepted, not just that a local flag was set.
+            Assert.True((await origin.Send("probe-tree", peer: receiver.Last.Address)).TreeProbeRejected);
+            await Task.WhenAll(cluster.Active.Select(node => node.Send("snapshot")));
+            var before = cluster.Active.ToDictionary(node => node.Last.Identity.ProcessId, node => node.Last);
+            var oldVersion = receiver.Last.MembershipVersion;
+            await receiver.Send("partition", value: true);
+            await relay.Send("partition", value: true);
+            var source = await origin.Send("membership-history", count: 40, version: oldVersion);
+            Assert.Equal(oldVersion + 40, source.MembershipVersion);
+            Assert.Equal(0, source.RepairFromVersion); // The actual production namespace evicted the old baseline.
+            var blocked = await receiver.Send("snapshot");
+            Assert.Equal(oldVersion, blocked.MembershipVersion);
+            Assert.Equal(oldVersion, (await relay.Send("snapshot")).MembershipVersion);
+            Assert.False(SameMembership(source, blocked));
+            await receiver.Send("partition", value: false);
+
+            // Only the origin can repair this receiver until its full history-miss repair is observed.
+            // A relay which first learned the target could otherwise serve a valid retained-baseline delta.
+            await cluster.Eventually("anti-entropy-only full repair after a real transport partition and retained-history miss", async () =>
+            {
+                await receiver.Send("snapshot");
+                return SameMembership(source, receiver.Last)
+                    && receiver.Last.Applies.Any(evidence => evidence.Namespace == "membership"
+                        && evidence.FromVersion == 0 && evidence.ToVersion == source.MembershipVersion
+                        && evidence.Result == "Applied" && evidence.Peer is not null);
+            });
+            await relay.Send("partition", value: false);
+            await cluster.Eventually("relay convergence after the receiver's full repair", async () =>
+            {
+                await receiver.Send("snapshot");
+                await relay.Send("snapshot");
+                return SameMembership(source, receiver.Last) && SameMembership(source, relay.Last);
+            });
+            await AssertNoTreeAdmissions(cluster, before);
+            Assert.True(receiver.Last.MembershipReadsFrozen);
+            Assert.True(receiver.Last.LegacyGossipSuppressed);
+            await cluster.Save("history-recovery.json", new { Before = before, After = cluster.Active.Select(node => node.Last) });
+
+            var priorHeartbeatApplications = receiver.Last.Applies.Count(evidence =>
+                evidence.Namespace == "membership" && evidence.Result == "Applied" && evidence.ToVersion == source.MembershipVersion);
+            var heartbeat = await origin.Send("membership-heartbeat");
+            Assert.Equal(source.MembershipVersion, heartbeat.MembershipVersion);
+            Assert.NotNull(heartbeat.HeartbeatTicks);
+            Assert.False(SameMembership(source, heartbeat));
+            await cluster.Eventually("same-version heartbeat fingerprint repair without Publish, gossip, or table reads", async () =>
+            {
+                await receiver.Send("snapshot");
+                await relay.Send("snapshot");
+                return SameMembership(heartbeat, receiver.Last) && SameMembership(heartbeat, relay.Last)
+                    && receiver.Last.Applies.Count(evidence => evidence.Namespace == "membership"
+                        && evidence.FromVersion == 0 && evidence.ToVersion == heartbeat.MembershipVersion
+                        && evidence.Result == "Applied") > priorHeartbeatApplications;
+            });
+            await AssertNoTreeAdmissions(cluster, before);
+            await cluster.Save("same-version-heartbeat-recovery.json", cluster.Active.Select(node => node.Last));
+
+            var expectedLoad = receiver.Last.Load[origin.Last.Address];
+            var expectedVersion = receiver.Last.LoadVersions[origin.Last.Address];
+            var priorLoadApplications = receiver.Last.Applies.Count(evidence =>
+                evidence.Namespace == "load" && evidence.Result == "Applied" && evidence.ToVersion == expectedVersion);
+            await receiver.Send("forget-load", peer: origin.Last.Address);
+            Assert.DoesNotContain(origin.Last.Address, receiver.Last.Load.Keys);
+            await cluster.Eventually("load repair reaches exact state with no new publication or direct refresh", async () =>
+            {
+                await receiver.Send("snapshot");
+                return receiver.Last.Load.TryGetValue(origin.Last.Address, out var actual)
+                    && actual == expectedLoad
+                    && receiver.Last.Applies.Count(evidence => evidence.Namespace == "load"
+                        && evidence.FromVersion == 0 && evidence.ToVersion == expectedVersion
+                        && evidence.Result == "Applied") > priorLoadApplications;
+            });
+            await AssertNoTreeAdmissions(cluster, before);
+            await cluster.Save("load-full-repair.json", receiver.Last);
         }
-
-        Assert.False((await origin.Send("probe-tree", peer: receiver.Last.Address)).TreeProbeRejected);
-        foreach (var node in cluster.Active)
+        finally
         {
-            var quiesced = await node.Send("block-tree", value: true);
-            Assert.NotNull(quiesced.TreeGate);
-            Assert.True(quiesced.TreeGate.Blocked);
-            Assert.Equal(0, quiesced.TreeGate.InFlight);
-        }
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            foreach (var node in cluster.Active)
+            {
+                await node.Send(cleanup.Token, "isolate-membership", value: false);
+                await node.Send(cleanup.Token, "block-tree", value: true);
+                if (node.Last.Partitioned)
+                {
+                    await node.Send(cleanup.Token, "partition", value: false);
+                }
 
-        // Verify the native PushBroadcast RPC is intercepted, not just that a local flag was set.
-        Assert.True((await origin.Send("probe-tree", peer: receiver.Last.Address)).TreeProbeRejected);
-        await Task.WhenAll(cluster.Active.Select(node => node.Send("snapshot")));
-        var before = cluster.Active.ToDictionary(node => node.Last.Identity.ProcessId, node => node.Last);
-        var oldVersion = receiver.Last.MembershipVersion;
-        await receiver.Send("partition", value: true);
-        var source = await origin.Send("membership-history", count: 40, version: oldVersion);
-        Assert.Equal(oldVersion + 40, source.MembershipVersion);
-        Assert.Equal(0, source.RepairFromVersion); // The actual production namespace evicted the old baseline.
-        var blocked = await receiver.Send("snapshot");
-        Assert.Equal(oldVersion, blocked.MembershipVersion);
-        Assert.False(SameMembership(source, blocked));
-        await receiver.Send("partition", value: false);
-
-        await cluster.Eventually("anti-entropy-only full repair after a real transport partition and retained-history miss", async () =>
-        {
-            await receiver.Send("snapshot");
-            await relay.Send("snapshot");
-            return SameMembership(source, receiver.Last) && SameMembership(source, relay.Last)
-                && receiver.Last.Applies.Any(evidence => evidence.Namespace == "membership"
-                    && evidence.FromVersion == 0 && evidence.ToVersion == source.MembershipVersion
-                    && evidence.Result == "Applied" && evidence.Peer is not null);
-        });
-        await AssertNoTreeAdmissions(cluster, before);
-        Assert.True(receiver.Last.MembershipReadsFrozen);
-        Assert.True(receiver.Last.LegacyGossipSuppressed);
-        await cluster.Save("history-recovery.json", new { Before = before, After = cluster.Active.Select(node => node.Last) });
-
-        var priorHeartbeatApplications = receiver.Last.Applies.Count(evidence =>
-            evidence.Namespace == "membership" && evidence.Result == "Applied" && evidence.ToVersion == source.MembershipVersion);
-        var heartbeat = await origin.Send("membership-heartbeat");
-        Assert.Equal(source.MembershipVersion, heartbeat.MembershipVersion);
-        Assert.NotNull(heartbeat.HeartbeatTicks);
-        Assert.False(SameMembership(source, heartbeat));
-        await cluster.Eventually("same-version heartbeat fingerprint repair without Publish, gossip, or table reads", async () =>
-        {
-            await receiver.Send("snapshot");
-            await relay.Send("snapshot");
-            return SameMembership(heartbeat, receiver.Last) && SameMembership(heartbeat, relay.Last)
-                && receiver.Last.Applies.Count(evidence => evidence.Namespace == "membership"
-                    && evidence.FromVersion == 0 && evidence.ToVersion == heartbeat.MembershipVersion
-                    && evidence.Result == "Applied") > priorHeartbeatApplications;
-        });
-        await AssertNoTreeAdmissions(cluster, before);
-        await cluster.Save("same-version-heartbeat-recovery.json", cluster.Active.Select(node => node.Last));
-
-        var expectedLoad = receiver.Last.Load[origin.Last.Address];
-        var expectedVersion = receiver.Last.LoadVersions[origin.Last.Address];
-        var priorLoadApplications = receiver.Last.Applies.Count(evidence =>
-            evidence.Namespace == "load" && evidence.Result == "Applied" && evidence.ToVersion == expectedVersion);
-        await receiver.Send("forget-load", peer: origin.Last.Address);
-        Assert.DoesNotContain(origin.Last.Address, receiver.Last.Load.Keys);
-        await cluster.Eventually("load repair reaches exact state with no new publication or direct refresh", async () =>
-        {
-            await receiver.Send("snapshot");
-            return receiver.Last.Load.TryGetValue(origin.Last.Address, out var actual)
-                && actual == expectedLoad
-                && receiver.Last.Applies.Count(evidence => evidence.Namespace == "load"
-                    && evidence.FromVersion == 0 && evidence.ToVersion == expectedVersion
-                    && evidence.Result == "Applied") > priorLoadApplications;
-        });
-        await AssertNoTreeAdmissions(cluster, before);
-        await cluster.Save("load-full-repair.json", receiver.Last);
-        foreach (var node in cluster.Active)
-        {
-            await node.Send("isolate-membership", value: false);
-            await node.Send("block-tree", value: false);
+                await node.Send(cleanup.Token, "block-tree", value: false);
+            }
         }
     }
 
