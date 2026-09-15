@@ -1365,7 +1365,7 @@ namespace UnitTests.StreamingTests
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
             public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
-            public Func<Task<StreamHandshakeToken?>>? OnHandshake { get; set; }
+            public Func<CancellationToken, Task<StreamHandshakeToken?>>? OnHandshake { get; set; } = getSequenceToken;
             public Func<IBatchContainer, Task<StreamHandshakeToken?>>? OnDelivery { get; set; }
             public Func<Exception, Task>? OnError { get; set; }
 
@@ -1398,7 +1398,7 @@ namespace UnitTests.StreamingTests
             }
 
             public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
-                => getSequenceToken?.Invoke(cancellationToken) ?? OnHandshake?.Invoke() ?? Task.FromResult(requestedToken);
+                => OnHandshake?.Invoke(cancellationToken) ?? Task.FromResult(requestedToken);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
@@ -3444,7 +3444,7 @@ namespace UnitTests.StreamingTests
             var busyId = new QualifiedStreamId("provider", StreamId.Create("busy", Guid.NewGuid()));
             var (accessor, _, idleStream) = await CreateInitializedAgentWithStream(
                 idleId, new EventSequenceTokenV2(1), cache,
-                new StreamPullingAgentOptions(), timeProvider);
+                new StreamPullingAgentOptions(), timeProvider: timeProvider);
             await accessor.RegisterStream(busyId, new EventSequenceTokenV2(2), DateTime.UtcNow);
             var busyStream = (await accessor.GetPubSubCache())[busyId];
 
@@ -3509,6 +3509,7 @@ namespace UnitTests.StreamingTests
                 StreamSequenceToken registrationToken,
                 IQueueCache queueCache,
                 StreamPullingAgentOptions options,
+                IStreamFilter? filter = null,
                 TimeProvider? timeProvider = null,
                 IQueueAdapterReceiver? receiver = null,
                 IStreamFailureHandler? failureHandler = null)
@@ -3527,6 +3528,7 @@ namespace UnitTests.StreamingTests
                 queueAdapterCache: queueAdapterCache,
                 timeProvider: timeProvider,
                 options: options,
+                streamFilter: filter,
                 failureHandler: failureHandler);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
