@@ -123,11 +123,11 @@ namespace Orleans.Streams
             try
             {
                 var publisherState = new PubSubPublisherState(streamId, streamProducer);
-                State.Producers.Add(publisherState);
+                var added = State.Producers.Add(publisherState);
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
                 await ((IStorage)_storage).WriteStateAsync(cancellationToken);
                 StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                if (_streamInstruments.PubSubProducersTotal.Enabled)
+                if (added && _streamInstruments.PubSubProducersTotal.Enabled)
                 {
                     tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
                     _streamInstruments.PubSubProducersTotal.Add(1, tags.Value);

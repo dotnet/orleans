@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
@@ -24,5 +25,10 @@ internal sealed class StreamInstruments(OrleansInstruments instruments)
     internal void RegisterPersistentStreamPubSubCacheSizeObserve(Func<Measurement<int>> observeValue)
     {
         _persistentStreamPubSubCacheSize = instruments.Meter.CreateObservableGauge<int>(InstrumentNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, observeValue);
+    }
+
+    internal void RegisterPersistentStreamPubSubCacheSizeObserve(Func<IEnumerable<Measurement<int>>> observeValues)
+    {
+        _persistentStreamPubSubCacheSize = instruments.Meter.CreateObservableGauge<int>(InstrumentNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE, observeValues);
     }
 }
