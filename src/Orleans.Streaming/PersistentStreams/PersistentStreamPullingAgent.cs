@@ -262,8 +262,10 @@ namespace Orleans.Streams
                 StreamingEvents.EmitPullingAgentStopped(streamProviderName, Silo, QueueId);
             }
 
-            var inFlightRegistrations = pubSubCache.Values
-                .Select(v => v.RegistrationTask)
+            // Cancellation can remove pending registrations from the cache; retain them for producer cleanup.
+            var streams = pubSubCache.ToArray();
+            var inFlightRegistrations = streams
+                .Select(v => v.Value.RegistrationTask)
                 .OfType<Task>()
                 .ToArray();
             _shutdownCancellation?.Cancel();
@@ -313,7 +315,7 @@ namespace Orleans.Streams
             }
 
             var unregisterTasks = new List<Task>();
-            foreach (var tuple in pubSubCache)
+            foreach (var tuple in streams)
             {
                 tuple.Value.DisposeAll(logger);
                 if (unregisterProducer)

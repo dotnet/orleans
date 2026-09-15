@@ -3043,8 +3043,10 @@ namespace UnitTests.StreamingTests
         [TestSuite("BVT")]
         [TestProvider("None")]
         [TestArea("Streaming")]
-        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations()
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Shutdown_SkipsDeliveryProgressForPendingRegistrations(bool unregisterProducer)
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var registrationStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -3095,13 +3097,17 @@ namespace UnitTests.StreamingTests
                 var token = await registrationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.True(token.CanBeCanceled);
                 queueCache.ClearDeliveryProgress();
-                await testAccessor.Shutdown().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await agent.GrainContext.RunOrQueueTask(() => agent.Shutdown(CancellationToken.None, unregisterProducer: unregisterProducer))
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
                 Assert.True(token.IsCancellationRequested);
                 Assert.False(registration.Task.IsCompleted);
                 Assert.Empty(queueCache.DeliveryProgressTokens);
                 Assert.Equal(0, queueCache.DeliveryProgressCallCount);
+                await pubSub.Received(unregisterProducer ? 1 : 0).UnregisterProducer(
+                    new QualifiedStreamId("provider", streamId), agent.GrainContext.GrainId, CancellationToken.None);
+                Assert.Empty(await testAccessor.GetPubSubCache());
             }
             finally
             {
