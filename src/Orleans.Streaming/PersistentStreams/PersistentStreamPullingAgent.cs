@@ -153,16 +153,9 @@ namespace Orleans.Streams
         Task ITestAccessor.Shutdown() => GrainContext.RunOrQueueTask(() => Shutdown(CancellationToken.None));
 
         /// <summary>
-        /// Take responsibility for a new queues that was assigned to me via a new range.
-        /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
-        /// ERROR HANDLING:
-        ///     The responsibility to handle initialization and shutdown failures is inside the INewQueueAdapterReceiver code.
-        ///     The agent will call Initialize once and log an error. It will not call initialize again.
-        ///     The receiver itself may attempt later to recover from this error and do initialization again.
-        ///     The agent will assume initialization has succeeded and will subsequently start calling pumping receive.
-        ///     Same applies to shutdown.
+        /// Creates activation-local queue resources and starts polling. Grain hosts await receiver readiness;
+        /// system-target hosts retain receiver-managed initialization retries during polling.
         /// </summary>
-        /// <returns></returns>
         public async Task Initialize(CancellationToken cancellationToken, bool waitForReceiver = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -213,7 +206,7 @@ namespace Orleans.Streams
 
             if (waitForReceiver && receiverInitTask is { } initialization)
             {
-                await initialization;
+                await initialization.WaitAsync(cancellationToken);
                 receiverInitTask = null;
             }
 

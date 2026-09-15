@@ -114,7 +114,7 @@ namespace Orleans.Configuration
         /// <remarks>
         /// Grain hosting uses the configured grain directory and the queue balancer's desired placement.
         /// Select the same mode on every host of a provider. Change modes after stopping and draining
-        /// that provider on all participating silos, then restart from its durable checkpoints.
+        /// that provider on all participating silos, then restart its receivers.
         /// Grain hosting supports assignment-based queue balancers; lease-based balancing requires
         /// coordinated lease transfer and uses system-target hosting.
         /// </remarks>

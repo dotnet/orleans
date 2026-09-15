@@ -72,9 +72,9 @@ Switch modes at a provider-wide drain boundary:
 
 Rollback uses the same stop, drain, configure, and restart sequence. Preserve provider names, service identity, queue mapping, consumer groups, and checkpoint storage throughout the change.
 
-Start and stop commands retain their per-silo/provider scope. A stop affects agents still hosted on the addressed silo; a request which reaches an already-moved activation leaves that successor running. Stopping also disables that supervisor's reconciliation timer. Pub/sub callbacks to a stopped activation leave polling stopped. `StartupState` controls automatic startup as usual.
+Start and stop commands retain their per-silo/provider scope. A stop closes local activation admission and drains initializing and running receivers on the addressed silo; a request which reaches an already-moved activation leaves that successor running. Stopping also disables that supervisor's reconciliation timer. Pub/sub callbacks to a stopped activation leave polling stopped. `StartupState` controls automatic startup as usual.
 
-During graceful movement, final checkpoint persistence completes before the destination initializes its receiver. A crash or failed final flush resumes from durable progress, so consumers should handle replay. Event Hubs resumes inclusively at the stored offset.
+For checkpoint-backed providers, graceful movement completes final checkpoint persistence before the destination initializes its receiver. A crash or failed final flush resumes from durable progress, so consumers should handle replay. Event Hubs resumes inclusively at the stored offset. Other adapters retain their existing acknowledgement and recovery semantics.
 
 Correlate the existing pulling-agent and receiver lifecycle events with grain activation/migration diagnostics. Track actual hosts, requested hosts, safe checkpoint positions, migration downtime, and recovery latency. A migration-request reply reports the current address; receiver-initialized and pulling-agent-started events establish destination readiness. Reconciliation runs every 30 seconds in addition to balancing notifications, so include that control traffic and recovery interval when sizing partitions.
 

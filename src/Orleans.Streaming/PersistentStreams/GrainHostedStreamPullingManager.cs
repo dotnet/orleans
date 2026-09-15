@@ -45,7 +45,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         _grainFactory = shared.RuntimeClient.InternalGrainFactory;
         _logger = shared.LoggerFactory.CreateLogger<GrainHostedStreamPullingManager>();
         streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(
-            _provider.Agents.Count, new KeyValuePair<string, object?>("name", providerName)));
+            _provider.RunningAgentCount, new KeyValuePair<string, object?>("name", providerName)));
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
@@ -161,8 +161,11 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         EmitState();
     }
 
-    private void EmitState() => StreamingEvents.EmitPullingAgentManagerState(
-        _providerName, Silo, _provider.Agents.Keys, _provider.Agents.Count);
+    private void EmitState()
+    {
+        var runningQueues = _provider.GetRunningQueues();
+        StreamingEvents.EmitPullingAgentManagerState(_providerName, Silo, runningQueues, runningQueues.Length);
+    }
 
     public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg, CancellationToken cancellationToken)
     {
@@ -178,7 +181,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
             case PersistentStreamProviderCommand.GetAgentsState:
                 return _provider.State;
             case PersistentStreamProviderCommand.GetNumberRunningAgents:
-                return _provider.Agents.Count;
+                return _provider.RunningAgentCount;
             default:
                 throw new OrleansException($"PullingAgentManager does not support command {command}.");
         }
