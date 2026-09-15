@@ -1,8 +1,11 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using NATS.Client.Core;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
@@ -102,6 +105,35 @@ public sealed class NatsStreamProviderBuilderTests
         Assert.DoesNotContain("token", description, StringComparison.Ordinal);
         Assert.Contains("first.example", description, StringComparison.Ordinal);
         Assert.Contains("second.example", description, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Initialize_SharedConnection_LogsCredentialRedactedEndpoints()
+    {
+        var connection = Substitute.For<INatsConnection>();
+        connection.Opts.Returns(NatsOpts.Default with
+        {
+            Url = "nats://sample-user:sample-password@first.example:4222,nats://sample-token@second.example:4222",
+        });
+        connection.ConnectAsync().Returns(ValueTask.CompletedTask);
+        connection.ConnectionState.Returns(NatsConnectionState.Closed);
+        var logger = new FakeLogger<NatsConnectionManager>();
+        using var loggerFactory = Substitute.For<ILoggerFactory>();
+        loggerFactory.CreateLogger(Arg.Any<string>()).Returns(logger);
+        var manager = new NatsConnectionManager("orders", loggerFactory, new NatsOptions
+        {
+            StreamName = "orders-stream",
+            Connection = connection,
+        });
+
+        await manager.Initialize(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Error, entry.Level);
+        Assert.Equal(
+            "Unable to connect to NATS server 'nats://first.example:4222/,nats://second.example:4222/'.",
+            entry.Message);
+        await connection.Received(1).ConnectAsync();
     }
 
     [Theory]

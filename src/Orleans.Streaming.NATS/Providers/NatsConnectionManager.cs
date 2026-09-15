@@ -43,7 +43,7 @@ internal sealed partial class NatsConnectionManager
         {
             this._usesSharedConnection = true;
             this._natsConnection = sharedConnection;
-            this._natsServer = "the keyed NATS connection";
+            this._natsServer = GetLogSafeServerDescription(sharedConnection.Opts.Url);
         }
         else
         {

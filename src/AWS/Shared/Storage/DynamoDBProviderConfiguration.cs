@@ -46,7 +46,7 @@ namespace Orleans.Reminders.DynamoDB
                 && !string.Equals(serviceKey, connectionName, StringComparison.OrdinalIgnoreCase))
             {
                 throw new OrleansConfigurationException(
-                    "DynamoDB provider configuration cannot specify different ServiceKey and ConnectionName values.");
+                    $"DynamoDB provider configuration section '{providerSection.Path}' cannot specify different ServiceKey and ConnectionName values.");
             }
 
             var referenceName = serviceKey ?? connectionName;
