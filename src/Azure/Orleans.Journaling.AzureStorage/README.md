@@ -5,6 +5,13 @@ Microsoft Orleans Journaling for Azure Storage provides an Azure Storage impleme
 
 Blob names are derived from the configured journal storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type. The WAL blob name and checkpoint blob name can be customized using `AzureBlobJournalStorageOptions.GetWalBlobName` and `GetCheckpointBlobName`.
 
+## Adopting the alpha storage layouts
+
+Deploy the new Blob WAL/checkpoint layout into a fresh container and the new default Table partition
+encoding into a fresh table. For state retained from an earlier alpha deployment, complete the
+[application-owned state transfer and cutover](../../Orleans.Journaling/README.md#adopting-the-alpha-storage-layouts)
+using the earlier package and configuration before switching traffic.
+
 ## Using an alternative blob layout
 
 By default, WAL blobs are named `wal/<journalId>` and checkpoint blobs are named `checkpoints/<journalId>/<snapshotId>`. The separate prefixes let catalog discovery select WAL blobs directly, keeping retained checkpoints out of listing pages. Configure the blob name delegates to use an alternative layout, such as a shared prefix, file extensions, tenant-specific paths, or names which match an existing storage convention. Each delegate returns a container-relative blob name, and checkpoint names should include the supplied snapshot id to avoid collisions. Catalog discovery uses the default WAL layout in the configured container; custom delegates participating in discovery produce `wal/<journalId>` for each journal.

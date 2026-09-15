@@ -6,6 +6,13 @@ Microsoft Orleans Journaling for Redis provides a Redis-backed implementation of
 
 The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts. Journal discovery scans metadata keys on each connected primary Redis server. The default key mapping preserves journal ids in the keys, so discovery does not read the metadata hashes. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
 
+## Adopting the alpha storage layout
+
+Deploy the new reversible key layout with a fresh `KeyPrefix`. This layout applies to both default and
+custom `GetKeyName` mappings. For state retained from an earlier alpha deployment, complete the
+[application-owned state transfer and cutover](../../Orleans.Journaling/README.md#adopting-the-alpha-storage-layouts)
+using the earlier package and configuration before switching traffic.
+
 ## Getting Started
 
 Install the package:
