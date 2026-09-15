@@ -70,6 +70,7 @@
     <Project Path="src/Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
     <Project Path="src/Orleans.Clustering.ZooKeeper/Orleans.Clustering.ZooKeeper.csproj" />
     <Project Path="src/Orleans.Connections.Security/Orleans.Connections.Security.csproj" />
+    <Project Path="src/Orleans.Connections.Security.Entra/Orleans.Connections.Security.Entra.csproj" />
     <Project Path="src/Orleans.Hosting.Kubernetes/Orleans.Hosting.Kubernetes.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/AdoNet/">
@@ -134,6 +135,7 @@
     <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
     <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
+    <Project Path="test/Orleans.Connections.Security.Entra.Tests/Orleans.Connections.Security.Entra.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />

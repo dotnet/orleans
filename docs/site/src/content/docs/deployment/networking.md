@@ -84,7 +84,10 @@ Allow only the required paths:
 - Application ingress: the application's HTTP, gRPC, or other public protocol.
 - Provider endpoints: the identities and destinations required by each configured provider.
 
-Don't expose the silo port or gateway port to the public internet. If clients cross an untrusted network, use [Orleans TLS](../host/transport-layer-security.md) and enforce workload identity at the surrounding network boundary.
+Don't expose the silo port or gateway port to the public internet. Protect
+Orleans traffic with [TLS](../host/transport-layer-security.md), and use
+[authenticated Orleans connections](../host/authenticated-silo-connections.md)
+when silos or clients must prove workload identity at the transport boundary.
 
 ## Validate connectivity
 

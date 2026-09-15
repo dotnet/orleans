@@ -69,6 +69,10 @@
     <Project Path="site/src/content/docs/host/snippets/aspire/SharedContracts/SharedContracts.csproj" />
     <Project Path="site/src/content/docs/host/snippets/aspire/Silo/Silo.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/authenticated-silo-connections/" />
+  <Folder Name="/site/src/content/docs/host/snippets/authenticated-silo-connections/csharp/">
+    <Project Path="site/src/content/docs/host/snippets/authenticated-silo-connections/csharp/AuthenticatedSiloConnections.Snippets.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/host/snippets/connection-middleware/">
     <Project Path="site/src/content/docs/host/snippets/connection-middleware/ConnectionMiddleware.csproj" />
   </Folder>

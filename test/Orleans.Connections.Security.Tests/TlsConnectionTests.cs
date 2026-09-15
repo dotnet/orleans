@@ -1,5 +1,12 @@
+using System.Collections.Concurrent;
+using System.Net.Security;
+using System.Text;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Hosting;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
@@ -26,15 +33,36 @@ namespace Orleans.Connections.Security.Tests
     /// - Authenticating clients and silos
     /// </summary>
     [TestCategory("BVT")]
-    [Trait("Category", "BVT")]
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Security")]
     public class TlsConnectionTests
     {
+        [Fact]
+        public void UseGatewayTls_ThrowsWhenConfiguredMoreThanOnce()
+        {
+            var builder = Host.CreateApplicationBuilder();
+
+            builder.UseOrleans(siloBuilder =>
+            {
+                siloBuilder.UseGatewayTls(options => options.LocalServerCertificateSelector = static (_, _) => null!);
+
+                var exception = Assert.Throws<InvalidOperationException>(
+                    () => siloBuilder.UseGatewayTls(
+                        options => options.LocalServerCertificateSelector = static (_, _) => null!));
+
+                Assert.Equal("Gateway TLS has already been configured.", exception.Message);
+            });
+        }
+
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
         private const string ClientCertificateModeKey = "CertificateMode";
+        private const string ClientCertificateSelectorKey = "ClientCertificateSelector";
+        private const string ProtocolRecorderKey = "ProtocolRecorder";
+        private const string AuthenticatedSiloProtocol = "orleans-auth-test";
+        private const string OrleansProtocol = "Orleans1";
+        private static readonly ConcurrentDictionary<string, ProtocolRecorder> ProtocolRecorders = new();
 
         /// <summary>
         /// Tests the certificate utility functions for creating self-signed certificates.
@@ -46,12 +74,77 @@ namespace Orleans.Connections.Security.Tests
         [Fact]
         public void CanCreateCertificates()
         {
-            var original = TestCertificateHelper.CreateSelfSignedCertificate(
+            using var original = TestCertificateHelper.CreateSelfSignedCertificate(
                 CertificateSubjectName,
                 new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid });
             var encoded = TestCertificateHelper.ConvertToBase64(original);
-            var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
+            using var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
+        }
+
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsNullCertificate()
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    certificate: null,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsCertificateWithoutClientAuthenticationEku()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ServerAuthenticationOid]);
+
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    certificate,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsCertificateWithoutPrivateKey()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ClientAuthenticationOid]);
+#if NET9_0_OR_GREATER
+            using var publicCertificate =
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificate.RawData);
+#else
+#pragma warning disable SYSLIB0057
+            using var publicCertificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.RawData);
+#pragma warning restore SYSLIB0057
+#endif
+
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    publicCertificate,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
+        [Fact]
+        public void OptionalClientCertificateWithoutPrivateKey_IsIgnored()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ClientAuthenticationOid]);
+#if NET9_0_OR_GREATER
+            using var publicCertificate =
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificate.RawData);
+#else
+#pragma warning disable SYSLIB0057
+            using var publicCertificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.RawData);
+#pragma warning restore SYSLIB0057
+#endif
+
+            Assert.Null(TlsClientConnectionMiddleware.ValidateCertificate(
+                publicCertificate,
+                RemoteCertificateMode.AllowCertificate));
         }
 
         /// <summary>
@@ -71,6 +164,7 @@ namespace Orleans.Connections.Security.Tests
 
                 var certificateModeString = configuration[ClientCertificateModeKey];
                 var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString!);
+                var useCertificateSelector = bool.Parse(configuration[ClientCertificateSelectorKey]!);
 
                 clientBuilder.UseTls(options =>
                 {
@@ -79,7 +173,14 @@ namespace Orleans.Connections.Security.Tests
                     // Allow any certificate for testing (in production, validate properly)
                     options.AllowAnyRemoteCertificate();
                     // Client's certificate for mutual TLS
-                    options.LocalCertificate = localCertificate;
+                    if (useCertificateSelector)
+                    {
+                        options.LocalClientCertificateSelector = (_, _, _, _, _) => localCertificate;
+                    }
+                    else
+                    {
+                        options.LocalCertificate = localCertificate;
+                    }
                     // Require server to present a certificate
                     options.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
                     // Configure whether server requires client certificate
@@ -147,14 +248,18 @@ namespace Orleans.Connections.Security.Tests
         /// - Data integrity is maintained (echo test)
         /// </summary>
         [Theory]
-        [InlineData(null, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(null, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
-        public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode)
+        [InlineData(null, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, true)]
+        public async Task TlsEndToEnd(
+            string[]? oids,
+            RemoteCertificateMode certificateMode,
+            bool useCertificateSelector)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             TestCluster? testCluster = default;
@@ -165,13 +270,14 @@ namespace Orleans.Connections.Security.Tests
                     .AddClientBuilderConfigurator<TlsClientConfigurator>();
 
                 // Create a self-signed certificate with specified OIDs
-                var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
 
                 // Pass certificate through configuration (simulates real deployment)
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
                 builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();
+                builder.Properties[ClientCertificateSelectorKey] = useCertificateSelector.ToString();
 
                 testCluster = builder.Build();
                 await testCluster.DeployAsync(cancellationToken);
@@ -198,6 +304,197 @@ namespace Orleans.Connections.Security.Tests
                     }
                 }
             }
+        }
+
+        [Fact]
+        public async Task SeparateSiloAndGatewayTls_NegotiateConfiguredApplicationProtocols()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var recorderId = Guid.NewGuid().ToString();
+            var recorder = new ProtocolRecorder();
+            Assert.True(ProtocolRecorders.TryAdd(recorderId, recorder));
+
+            TestCluster? testCluster = default;
+            try
+            {
+                using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                    CertificateSubjectName,
+                    [TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid]);
+                var builder = new TestClusterBuilder()
+                    .AddSiloBuilderConfigurator<AlpnTlsServerConfigurator>()
+                    .AddClientBuilderConfigurator<AlpnTlsClientConfigurator>();
+                builder.Options.InitialSilosCount = 2;
+                builder.Properties[CertificateConfigKey] = TestCertificateHelper.ConvertToBase64(certificate);
+                builder.Properties[ProtocolRecorderKey] = recorderId;
+
+                testCluster = builder.Build();
+                await testCluster.DeployAsync(cancellationToken);
+
+                var grain = testCluster.Client.GetGrain<IPingGrain>("alpn");
+                Assert.Equal("ping", await grain.Echo("ping"));
+
+                Assert.Contains(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.SiloInbound));
+                Assert.Contains(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.SiloOutbound));
+                Assert.Contains(OrleansProtocol, recorder.GetProtocols(ConnectionPath.GatewayInbound));
+                Assert.Contains(OrleansProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
+                Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.GatewayInbound));
+                Assert.DoesNotContain(AuthenticatedSiloProtocol, recorder.GetProtocols(ConnectionPath.ClientOutbound));
+                Assert.Contains(
+                    System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    recorder.GetRevocationModes(ConnectionPath.SiloOutbound));
+                Assert.Contains(
+                    System.Security.Cryptography.X509Certificates.X509RevocationMode.Online,
+                    recorder.GetRevocationModes(ConnectionPath.ClientOutbound));
+            }
+            finally
+            {
+                ProtocolRecorders.TryRemove(recorderId, out _);
+                if (testCluster is not null)
+                {
+                    await testCluster.StopAllSilosAsync(cancellationToken);
+                    testCluster.Dispose();
+                }
+            }
+        }
+
+        private sealed class AlpnTlsServerConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder)
+            {
+                var configuration = hostBuilder.GetConfiguration();
+                var certificate = TestCertificateHelper.ConvertFromBase64(configuration[CertificateConfigKey]!);
+                var recorder = ProtocolRecorders[configuration[ProtocolRecorderKey]!];
+
+                hostBuilder.UseOrleans((_, siloBuilder) =>
+                {
+                    siloBuilder.UseSiloTls(options =>
+                    {
+                        ConfigureTls(options, certificate);
+                        options.OnAuthenticateAsClient = (_, authenticationOptions) =>
+                        {
+                            recorder.RecordRevocationMode(
+                                ConnectionPath.SiloOutbound,
+                                authenticationOptions.CertificateRevocationCheckMode);
+                            authenticationOptions.CertificateRevocationCheckMode =
+                                System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+                            authenticationOptions.TargetHost = CertificateSubjectName;
+                            authenticationOptions.ApplicationProtocols =
+                            [
+                                new SslApplicationProtocol(AuthenticatedSiloProtocol),
+                                new SslApplicationProtocol(OrleansProtocol)
+                            ];
+                        };
+                        options.OnAuthenticateAsServer = (_, authenticationOptions) =>
+                        {
+                            authenticationOptions.ApplicationProtocols =
+                            [
+                                new SslApplicationProtocol(AuthenticatedSiloProtocol),
+                                new SslApplicationProtocol(OrleansProtocol)
+                            ];
+                        };
+                    });
+
+                    siloBuilder.UseGatewayTls(options =>
+                    {
+                        ConfigureTls(options, certificate);
+                        options.RemoteCertificateMode = RemoteCertificateMode.NoCertificate;
+                    });
+
+                    siloBuilder.Configure<SiloConnectionOptions>(options =>
+                    {
+                        options.ConfigureSiloInboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.SiloInbound)));
+                        options.ConfigureSiloOutboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.SiloOutbound)));
+                        options.ConfigureGatewayInboundConnection(
+                            builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.GatewayInbound)));
+                    });
+                });
+            }
+        }
+
+        private sealed class AlpnTlsClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                var recorder = ProtocolRecorders[configuration[ProtocolRecorderKey]!];
+                clientBuilder.UseTls(options =>
+                {
+                    options.AllowAnyRemoteCertificate();
+                    options.CheckCertificateRevocation = true;
+                    options.OnAuthenticateAsClient = (_, authenticationOptions) =>
+                    {
+                        recorder.RecordRevocationMode(
+                            ConnectionPath.ClientOutbound,
+                            authenticationOptions.CertificateRevocationCheckMode);
+                        authenticationOptions.CertificateRevocationCheckMode =
+                            System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+                        authenticationOptions.TargetHost = CertificateSubjectName;
+                    };
+                });
+
+                clientBuilder.Configure<ClientConnectionOptions>(options =>
+                    options.ConfigureConnection(
+                        builder => builder.UseMiddleware(new ProtocolRecordingMiddleware(recorder, ConnectionPath.ClientOutbound))));
+            }
+        }
+
+        private static void ConfigureTls(TlsOptions options, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate)
+        {
+            options.LocalCertificate = certificate;
+            options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+            options.AllowAnyRemoteCertificate();
+            options.RemoteCertificateMode = RemoteCertificateMode.AllowCertificate;
+            options.CheckCertificateRevocation = true;
+        }
+
+        private sealed class ProtocolRecordingMiddleware(ProtocolRecorder recorder, ConnectionPath path) : IConnectionMiddleware
+        {
+            public async Task OnConnectionAsync(ConnectionContext context, ConnectionDelegate next)
+            {
+                var feature = context.Features.Get<ITlsApplicationProtocolFeature>();
+                recorder.Record(path, feature is null ? null : Encoding.ASCII.GetString(feature.ApplicationProtocol.Span));
+                await next(context);
+            }
+        }
+
+        private sealed class ProtocolRecorder
+        {
+            private readonly ConcurrentDictionary<ConnectionPath, ConcurrentBag<string>> _protocols = new();
+            private readonly ConcurrentDictionary<
+                ConnectionPath,
+                ConcurrentBag<System.Security.Cryptography.X509Certificates.X509RevocationMode>> _revocationModes = new();
+
+            public void Record(ConnectionPath path, string? protocol)
+            {
+                _protocols.GetOrAdd(path, static _ => []).Add(protocol ?? "<none>");
+            }
+
+            public string[] GetProtocols(ConnectionPath path)
+            {
+                return _protocols.TryGetValue(path, out var protocols) ? protocols.ToArray() : [];
+            }
+
+            public void RecordRevocationMode(
+                ConnectionPath path,
+                System.Security.Cryptography.X509Certificates.X509RevocationMode mode)
+            {
+                _revocationModes.GetOrAdd(path, static _ => []).Add(mode);
+            }
+
+            public System.Security.Cryptography.X509Certificates.X509RevocationMode[] GetRevocationModes(
+                ConnectionPath path)
+            {
+                return _revocationModes.TryGetValue(path, out var modes) ? modes.ToArray() : [];
+            }
+        }
+
+        private enum ConnectionPath
+        {
+            SiloInbound,
+            SiloOutbound,
+            GatewayInbound,
+            ClientOutbound
         }
     }
 
