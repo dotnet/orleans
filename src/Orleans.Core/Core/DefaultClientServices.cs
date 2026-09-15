@@ -129,7 +129,10 @@ namespace Orleans
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
-            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
+            services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>>(sp =>
+                new ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>(
+                    sp.GetRequiredService<ConnectionManager>(),
+                    ct => sp.GetRequiredService<OutsideRuntimeClient>().StopObserverInvocationsAsync().WaitAsync(ct)));
 
             services.AddKeyedSingleton<IConnectionFactory>(
                 ClientOutboundConnectionFactory.ServicesKey,

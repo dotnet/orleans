@@ -36,8 +36,9 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly IServiceScope _serviceProviderScope;
-        private bool disposing;
+        private int _disposeRequested;
         private Task? messagePump;
+        private Task? _shutdownTask;
 
         public HostedClient(
             InsideRuntimeClient runtimeClient,
@@ -210,22 +211,66 @@ namespace Orleans.Runtime
                 // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
                 this.runtimeClient.ReceiveResponse(msg);
             }
+            else if (InvokableObjectManager.IsCancellationRequest(msg))
+            {
+                this.invokableObjects.Dispatch(msg);
+            }
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(msg);
+                if (!this.incomingMessages.Writer.TryWrite(msg))
+                {
+                    this.invokableObjects.RejectMessage(msg);
+                }
             }
         }
 
         /// <inheritdoc />
         void IDisposable.Dispose()
         {
-            if (this.disposing) return;
-            this.disposing = true;
-            _serviceProviderScope.Dispose();
-            Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
-            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
+            if (Interlocked.Exchange(ref _disposeRequested, 1) != 0) return;
+            _ = DisposeAfterDrainAsync();
+        }
+
+        private async Task DisposeAfterDrainAsync()
+        {
+            try
+            {
+                await StopAsync().ConfigureAwait(false);
+                _serviceProviderScope.Dispose();
+            }
+            catch (Exception exception)
+            {
+                LogErrorDisposing(this.logger, exception);
+            }
+            finally
+            {
+                Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
+            }
+        }
+
+        private Task StopAsync()
+        {
+            lock (lockObj)
+            {
+                return _shutdownTask ??= DrainAsync();
+            }
+
+            async Task DrainAsync()
+            {
+                this.incomingMessages.Writer.TryComplete();
+                try
+                {
+                    if (this.messagePump is { } pump)
+                    {
+                        await pump.ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    await this.invokableObjects.StopAsync().ConfigureAwait(false);
+                }
+            }
         }
 
         private void Start()
@@ -287,12 +332,7 @@ namespace Orleans.Runtime
 
             async Task OnStop(CancellationToken cancellation)
             {
-                this.incomingMessages.Writer.TryComplete();
-
-                if (this.messagePump != null)
-                {
-                    await messagePump.WaitAsync(cancellation).SuppressThrowing();
-                }
+                await StopAsync().WaitAsync(cancellation).SuppressThrowing();
             }
         }
 
@@ -415,5 +455,10 @@ namespace Orleans.Runtime
             Level = LogLevel.Error,
             Message = "RunClientMessagePump has thrown an exception. Continuing.")]
         private static partial void LogErrorMessagePumpException(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error disposing the hosted client after draining observer invocations.")]
+        private static partial void LogErrorDisposing(ILogger logger, Exception exception);
     }
 }
