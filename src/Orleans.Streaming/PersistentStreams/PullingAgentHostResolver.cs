@@ -8,7 +8,7 @@ using Orleans.Runtime.Versions;
 
 namespace Orleans.Streams;
 
-internal sealed class StreamPullingAgentHostResolver(
+internal sealed class PullingAgentHostResolver(
     IClusterManifestProvider manifestProvider,
     GrainVersionManifest versionManifest,
     IClusterMembershipService membership,
@@ -39,10 +39,10 @@ internal sealed class StreamPullingAgentHostResolver(
             members.TryGetValue(silo, out var member) && member.Status == SiloStatus.Active
             && manifests.TryGetValue(silo, out var manifest)
             && manifest.Grains.TryGetValue(grainType, out var properties)
-            && properties.Properties.ContainsKey(StreamPullingAgentPlacementDirector.ProviderPropertyPrefix + providerName))
+            && properties.Properties.ContainsKey(PullingAgentPlacementDirector.ProviderPropertyPrefix + providerName))
             .Distinct().ToArray();
         var eligibility = await Task.WhenAll(candidates.Select(silo => grainFactory
-            .GetSystemTarget<IStreamPullingAgentRuntime>(StreamPullingAgentRuntime.TargetType, silo)
+            .GetSystemTarget<IPullingAgentRuntime>(PullingAgentRuntime.TargetType, silo)
             .IsEligible(providerName, queueId, cancellationToken).WaitAsync(cancellationToken)));
         return candidates.Where((_, index) => eligibility[index]).ToArray();
     }

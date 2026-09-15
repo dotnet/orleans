@@ -9,17 +9,17 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-internal interface IStreamPullingAgentRuntime : ISystemTarget
+internal interface IPullingAgentRuntime : ISystemTarget
 {
     Task<bool> IsEligible(string providerName, QueueId? queueId, CancellationToken cancellationToken = default);
 }
 
-internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAgentRuntime, ILifecycleParticipant<ISiloLifecycle>
+internal sealed class PullingAgentRuntime : SystemTarget, IPullingAgentRuntime, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType TargetType = SystemTargetGrainId.CreateGrainType("stream-pulling-agent-runtime");
     private readonly ConcurrentDictionary<string, Provider> _providers = new(StringComparer.Ordinal);
 
-    public StreamPullingAgentRuntime(SystemTargetShared shared) : base(TargetType, shared)
+    public PullingAgentRuntime(SystemTargetShared shared) : base(TargetType, shared)
     {
         shared.ActivationDirectory.RecordNewTarget(this);
     }

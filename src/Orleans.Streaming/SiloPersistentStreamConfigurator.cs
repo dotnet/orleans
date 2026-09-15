@@ -69,7 +69,7 @@ namespace Orleans.Hosting
             : base(name, configureDelegate)
         {
             this.ConfigureDelegate(services => services.AddSiloStreaming());
-            this.ConfigureDelegate(services => services.AddSingleton(new StreamPullingAgentProviderRegistration(this.Name)));
+            this.ConfigureDelegate(services => services.AddSingleton(new PullingAgentProviderRegistration(this.Name)));
             this.ConfigureComponent(PersistentStreamProvider.Create);
             // PersistentStreamProvider implements IControllable.
             this.ConfigureComponent((s, n) => (s.GetRequiredKeyedService<IStreamProvider>(n) as IControllable)!);

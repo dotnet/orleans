@@ -10,32 +10,28 @@ using Orleans.Runtime.Placement;
 
 namespace Orleans.Streams;
 
-[GrainInterfaceType("Orleans.Streams.IGrainHostedStreamPullingAgent")]
 internal interface IPullingAgentGrain : IGrain, IStreamProducerExtension
 {
-    [Alias("60ECF350")]
-    Task<StreamPullingAgentStatus> Probe(CancellationToken cancellationToken = default);
-    [Alias("C4C6FC81")]
+    Task<PullingAgentStatus> Probe(CancellationToken cancellationToken = default);
     Task<bool> Rebalance(GrainAddress expectedAddress, SiloAddress destination, CancellationToken cancellationToken = default);
-    [Alias("54E75FD4")]
     Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer]
-internal readonly record struct StreamPullingAgentStatus(
+internal readonly record struct PullingAgentStatus(
     [property: Id(0)] GrainAddress Address,
     [property: Id(1)] bool IsRunning);
 
-[GrainType(StreamPullingAgentId.GrainTypeName)]
-[StreamPullingAgentPlacement]
+[GrainType(PullingAgentId.GrainTypeName)]
+[PullingAgentPlacement]
 [Immovable]
 internal sealed class PullingAgentGrain(
-    StreamPullingAgentRuntime runtime,
-    StreamPullingAgentHostResolver hosts,
+    PullingAgentRuntime runtime,
+    PullingAgentHostResolver hosts,
     ILogger<PullingAgentGrain> logger) : Grain, IPullingAgentGrain
 {
-    internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("Orleans.Streams.IGrainHostedStreamPullingAgent");
-    private StreamPullingAgentRuntime.Provider _provider = null!;
+    internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("Orleans.Streams.IPullingAgentGrain");
+    private PullingAgentRuntime.Provider _provider = null!;
     private string _providerName = null!;
     private QueueId _queueId;
     private volatile PersistentStreamPullingAgent? _agent;
@@ -45,7 +41,7 @@ internal sealed class PullingAgentGrain(
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        var (providerName, queueId) = StreamPullingAgentId.Parse(GrainContext.GrainId);
+        var (providerName, queueId) = PullingAgentId.Parse(GrainContext.GrainId);
         _providerName = providerName;
         _queueId = queueId;
         _provider = runtime.GetProvider(providerName);
@@ -55,7 +51,7 @@ internal sealed class PullingAgentGrain(
         }
     }
 
-    public async Task<StreamPullingAgentStatus> Probe(CancellationToken cancellationToken)
+    public async Task<PullingAgentStatus> Probe(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (_agent is null && _provider.IsEligible(_queueId))
@@ -96,7 +92,7 @@ internal sealed class PullingAgentGrain(
         if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown && !cancellationToken.IsCancellationRequested)
         {
             var survivors = (await hosts.GetEligibleSilos(
-                _providerName, _queueId, StreamPullingAgentId.GrainType, InterfaceType, cancellationToken))
+                _providerName, _queueId, PullingAgentId.GrainType, InterfaceType, cancellationToken))
                 .Where(silo => silo != GrainContext.Address.SiloAddress).ToArray();
             if (survivors.Length > 0)
             {

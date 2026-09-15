@@ -20,8 +20,8 @@ namespace Orleans.Streams
     {
         private static readonly TimeSpan QUEUES_PRINT_PERIOD = TimeSpan.FromMinutes(5);
 
-        private readonly Dictionary<QueueId, SystemTargetStreamPullingAgent> queuesToAgentsMap;
-        private readonly Dictionary<QueueId, SystemTargetStreamPullingAgent> deactivatedAgents = new();
+        private readonly Dictionary<QueueId, PullingAgentSystemTarget> queuesToAgentsMap;
+        private readonly Dictionary<QueueId, PullingAgentSystemTarget> deactivatedAgents = new();
         private readonly string streamProviderName;
         private readonly IStreamPubSub pubSub;
         private readonly SystemTargetShared _systemTargetShared;
@@ -77,7 +77,7 @@ namespace Orleans.Streams
                 throw new ArgumentNullException(nameof(streamQueueBalancer), "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             }
 
-            queuesToAgentsMap = new Dictionary<QueueId, SystemTargetStreamPullingAgent>();
+            queuesToAgentsMap = new Dictionary<QueueId, PullingAgentSystemTarget>();
             streamProviderName = strProviderName;
             pubSub = streamPubSub;
             this.options = options;
@@ -277,7 +277,7 @@ namespace Orleans.Streams
             // Create agents for queues in range that we don't yet have.
             // First create them and store in local queuesToAgentsMap.
             // Only after that Initialize them all.
-            var agents = new List<SystemTargetStreamPullingAgent>();
+            var agents = new List<PullingAgentSystemTarget>();
             foreach (var queueId in myQueues)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -298,7 +298,7 @@ namespace Orleans.Streams
                         var agentIdNumber = Interlocked.Increment(ref nextAgentId);
                         var agentId = SystemTargetGrainId.Create(Constants.StreamPullingAgentType, this.Silo, $"{streamProviderName}_{agentIdNumber}_{queueId:H}");
                         IStreamFailureHandler deliveryFailureHandler = await adapterFactory.GetDeliveryFailureHandler(queueId);
-                        agent = new SystemTargetStreamPullingAgent(
+                        agent = new PullingAgentSystemTarget(
                             agentId,
                             streamProviderName,
                             pubSub,
@@ -354,7 +354,7 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task InitAgent(SystemTargetStreamPullingAgent agent, CancellationToken cancellationToken)
+        private async Task InitAgent(PullingAgentSystemTarget agent, CancellationToken cancellationToken)
         {
             // Init the agent only after it was registered locally.
             var agentGrainRef = agent.AsReference<IPersistentStreamPullingAgent>();
@@ -382,7 +382,7 @@ namespace Orleans.Streams
             }
             // Stop the agents that for queues that are not in my range anymore.
             LogInfoRemovingAgents(queuesToRemove.Count, new(queuesToRemove));
-            var agents = new List<SystemTargetStreamPullingAgent>(queuesToRemove.Count);
+            var agents = new List<PullingAgentSystemTarget>(queuesToRemove.Count);
             var removeTasks = new List<Task>();
             foreach (var queueId in queuesToRemove)
             {
@@ -593,7 +593,7 @@ namespace Orleans.Streams
         )]
         private partial void LogErrorCreatingAgent(Exception exc);
 
-        private readonly struct AgentsLogRecord(List<SystemTargetStreamPullingAgent> agents)
+        private readonly struct AgentsLogRecord(List<PullingAgentSystemTarget> agents)
         {
             public override string ToString() => Utils.EnumerableToString(agents, agent => agent.QueueId.ToString());
         }

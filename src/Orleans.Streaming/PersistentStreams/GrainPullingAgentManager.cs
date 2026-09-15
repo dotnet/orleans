@@ -13,10 +13,10 @@ using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 
 namespace Orleans.Streams;
 
-internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersistentStreamPullingManager
+internal sealed class GrainPullingAgentManager : SystemTarget, IPersistentStreamPullingManager
 {
     private readonly string _providerName;
-    private readonly StreamPullingAgentRuntime.Provider _provider;
+    private readonly PullingAgentRuntime.Provider _provider;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly IPullingAgentCoordinatorGrain _coordinator;
     private readonly ILogger _logger;
@@ -24,10 +24,10 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
     private IGrainTimer? _heartbeat;
     private bool _shuttingDown;
 
-    internal GrainHostedStreamPullingManager(
+    internal GrainPullingAgentManager(
         SystemTargetGrainId id,
         string providerName,
-        StreamPullingAgentRuntime.Provider provider,
+        PullingAgentRuntime.Provider provider,
         StreamInstruments streamInstruments,
         SystemTargetShared shared) : base(id, shared)
     {
@@ -35,7 +35,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         _provider = provider;
         _grainFactory = shared.RuntimeClient.InternalGrainFactory;
         _coordinator = _grainFactory.GetGrain<IPullingAgentCoordinatorGrain>(PullingAgentCoordinatorGrain.GetGrainId(providerName));
-        _logger = shared.LoggerFactory.CreateLogger<GrainHostedStreamPullingManager>();
+        _logger = shared.LoggerFactory.CreateLogger<GrainPullingAgentManager>();
         streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(
             _provider.RunningAgentCount, new KeyValuePair<string, object?>("name", providerName)));
         streamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(ObservePubSubCacheSizes);
@@ -59,7 +59,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
 
         _provider.State = RunState.AgentsStarted;
         _heartbeat ??= RegisterGrainTimer(KeepCoordinatorAlive, _provider.Options.GrainHostingProbePeriod, _provider.Options.GrainHostingProbePeriod);
-        await StreamPullingAgentPlacement.WithHint(Silo, () => _coordinator.EnsureRunning(cancellationToken));
+        await PullingAgentPlacement.WithHint(Silo, () => _coordinator.EnsureRunning(cancellationToken));
         await _coordinator.NotifyHostChanged(cancellationToken);
         EmitState();
     });
@@ -97,7 +97,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
 
         try
         {
-            await StreamPullingAgentPlacement.WithHint(Silo, () => _coordinator.EnsureRunning(cancellationToken));
+            await PullingAgentPlacement.WithHint(Silo, () => _coordinator.EnsureRunning(cancellationToken));
             EmitState();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -115,7 +115,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         CloseLocalAdmission();
         var hostedQueues = _provider.Agents.Keys.ToArray();
         await Task.WhenAll(hostedQueues.Select(queueId => _grainFactory
-            .GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(_providerName, queueId))
+            .GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queueId))
             .Stop(Silo, CancellationToken.None)));
         EmitState();
         // Membership updates drive reconciliation during silo shutdown.

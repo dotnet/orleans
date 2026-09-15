@@ -8,7 +8,7 @@ using Orleans.Runtime.Placement;
 namespace Orleans.Streams;
 
 [GenerateSerializer]
-internal sealed class StreamPullingAgentPlacement : PlacementStrategy
+internal sealed class PullingAgentPlacement : PlacementStrategy
 {
     internal static TResult WithHint<TResult>(SiloAddress silo, Func<TResult> send)
     {
@@ -32,9 +32,9 @@ internal sealed class StreamPullingAgentPlacement : PlacementStrategy
     }
 }
 
-internal sealed class StreamPullingAgentPlacementAttribute() : PlacementAttribute(new StreamPullingAgentPlacement());
+internal sealed class PullingAgentPlacementAttribute() : PlacementAttribute(new PullingAgentPlacement());
 
-internal sealed class StreamPullingAgentPlacementDirector(StreamPullingAgentHostResolver hosts) : IPlacementDirector
+internal sealed class PullingAgentPlacementDirector(PullingAgentHostResolver hosts) : IPlacementDirector
 {
     internal const string ProviderPropertyPrefix = "stream-pulling-agent-provider:";
 
@@ -62,7 +62,7 @@ internal sealed class StreamPullingAgentPlacementDirector(StreamPullingAgentHost
 
     private static (string ProviderName, QueueId? QueueId) GetAgentIdentity(GrainId grainId)
     {
-        var (providerName, queueId) = StreamPullingAgentId.Parse(grainId);
+        var (providerName, queueId) = PullingAgentId.Parse(grainId);
         return (providerName, queueId);
     }
 }

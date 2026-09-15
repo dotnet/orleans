@@ -29,7 +29,7 @@ namespace UnitTests.StreamingTests;
 [TestProvider("None")]
 [TestArea("Streaming")]
 [TestCategory("BVT"), TestCategory("Streaming")]
-public sealed class GrainHostedPullingAgentMigrationTests
+public sealed class PullingAgentMigrationTests
 {
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
 
@@ -43,23 +43,23 @@ public sealed class GrainHostedPullingAgentMigrationTests
     public void PullingAgentId_RoundTripsExactProviderAndQueueIdentity(string providerName, string prefix, uint number, uint hash)
     {
         var queueId = QueueId.GetQueueId(prefix, number, hash);
-        var grainId = StreamPullingAgentId.Create(providerName, queueId);
+        var grainId = PullingAgentId.Create(providerName, queueId);
 
-        var parsed = StreamPullingAgentId.Parse(grainId);
+        var parsed = PullingAgentId.Parse(grainId);
 
-        Assert.Equal("Orleans.Streams.PullingAgent", grainId.Type.ToString());
+        Assert.Equal("stream.pulling-agent", grainId.Type.ToString());
         Assert.Equal(providerName, parsed.ProviderName);
         Assert.Equal(prefix, parsed.QueueId.GetStringNamePrefix());
         Assert.Equal(number, parsed.QueueId.GetNumericId());
         Assert.Equal(hash, parsed.QueueId.GetUniformHashCode());
         Assert.Equal(queueId, parsed.QueueId);
-        Assert.Equal(grainId, StreamPullingAgentId.Create(providerName, QueueId.GetQueueId(prefix, number, hash)));
+        Assert.Equal(grainId, PullingAgentId.Create(providerName, QueueId.GetQueueId(prefix, number, hash)));
     }
 
     [Fact]
     public void PullingAgentId_EncodesLengthPrefixedNamesAndFixedWidthNumbers()
     {
-        var grainId = StreamPullingAgentId.Create("ab:c", QueueId.GetQueueId("Q:", 0x12u, 0x34u));
+        var grainId = PullingAgentId.Create("ab:c", QueueId.GetQueueId("Q:", 0x12u, 0x34u));
 
         Assert.Equal("4:ab:c2:Q:0000001200000034", grainId.Key.ToString());
     }
@@ -80,7 +80,7 @@ public sealed class GrainHostedPullingAgentMigrationTests
             ("a:b", "c", 0, 0),
             ("a", "b:c", 0, 0),
         ];
-        var grainIds = identities.Select(identity => StreamPullingAgentId.Create(
+        var grainIds = identities.Select(identity => PullingAgentId.Create(
             identity.Provider,
             QueueId.GetQueueId(identity.Prefix, identity.Number, identity.Hash))).ToArray();
 
@@ -158,7 +158,7 @@ public sealed class GrainHostedPullingAgentMigrationTests
             await Wait(cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IControllable>(PullingAgentMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting production provider on source");
             await Wait(sourceDrained, "production host acknowledgement through 100");
-            var stableId = StreamPullingAgentId.Create(PullingAgentMigrationState.ProviderName, PullingAgentMigrationState.QueueId);
+            var stableId = PullingAgentId.Create(PullingAgentMigrationState.ProviderName, PullingAgentMigrationState.QueueId);
             var original = state.SourceSession.Address;
             Assert.Equal(stableId, original.GrainId);
             Assert.True(cluster.TryGetGrainContext(stableId, out var context));
@@ -657,7 +657,7 @@ public sealed class MigrationPullingAgentRelay(PullingAgentMigrationState state)
     public async Task<GrainAddress[]> ProbeHostedProducer(GrainId producerId, SiloAddress requestedHost)
     {
         var producer = GrainFactory.GetGrain<IPullingAgentGrain>(producerId);
-        Task<StreamPullingAgentStatus>[] calls;
+        Task<PullingAgentStatus>[] calls;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, requestedHost);
         try
         {
@@ -715,10 +715,10 @@ public sealed class MigrationPullingAgentConsumer(PullingAgentMigrationState sta
     }
 
     Task<StreamHandshakeToken?> IStreamConsumerExtension.DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-        => throw new NotSupportedException("This spike delivers queue batches.");
+        => throw new NotSupportedException("This test consumer receives queue batches.");
 
     Task<StreamHandshakeToken?> IStreamConsumerExtension.DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
-        => throw new NotSupportedException("This spike delivers queue batches.");
+        => throw new NotSupportedException("This test consumer receives queue batches.");
 
     public Task CompleteStream(GuidId subscriptionId, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -728,7 +728,7 @@ public sealed class MigrationPullingAgentConsumer(PullingAgentMigrationState sta
 
 public sealed class PullingAgentMigrationState
 {
-    internal const string ProviderName = "grain-hosted-migration-spike";
+    internal const string ProviderName = "pulling-agent-migration";
     internal const string FlushFailureMessage = "Controlled checkpoint flush failed.";
     internal static readonly QueueId QueueId = QueueId.GetQueueId("migration", 0, 0);
     private long _durableOffset = 20;
@@ -838,7 +838,7 @@ internal sealed class MigrationQueueAdapter(PullingAgentMigrationState state, Mi
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId) => new MigrationQueueReceiver(state, session);
     public IQueueCache CreateQueueCache(QueueId queueId) => new MigrationQueueCache(session);
     public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
-        => throw new NotSupportedException("The spike has a controlled read-only source.");
+        => throw new NotSupportedException("The migration test uses a controlled read-only source.");
 }
 
 internal sealed class HostedMigrationAdapterFactory(PullingAgentMigrationState state, IGrainContextAccessor contextAccessor) : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IStreamQueueMapper
@@ -860,7 +860,7 @@ internal sealed class HostedMigrationAdapterFactory(PullingAgentMigrationState s
     public IQueueCache CreateQueueCache(QueueId queueId)
     {
         var context = contextAccessor.GrainContext;
-        Assert.Equal(StreamPullingAgentId.GrainType, context.GrainId.Type);
+        Assert.Equal(PullingAgentId.GrainType, context.GrainId.Type);
         var session = new MigrationReceiverSession(context.Address);
         Assert.True(_sessions.TryAdd(context.ActivationId, session));
         state.Sessions.Enqueue(session);
@@ -871,7 +871,7 @@ internal sealed class HostedMigrationAdapterFactory(PullingAgentMigrationState s
         => new MigrationQueueReceiver(state, _sessions[contextAccessor.GrainContext.ActivationId]);
 
     public Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
-        => throw new NotSupportedException("The spike has a controlled read-only source.");
+        => throw new NotSupportedException("The migration test uses a controlled read-only source.");
 }
 
 internal sealed class MigrationQueueReceiver(PullingAgentMigrationState state, MigrationReceiverSession session) : IQueueAdapterReceiver
@@ -966,7 +966,7 @@ internal sealed class MigrationQueueCache(MigrationReceiverSession session) : IQ
         }
 
         public void Refresh(StreamSequenceToken nextToken) { }
-        public void RecordDeliveryFailure() => throw new InvalidOperationException("Unexpected delivery failure in the migration spike.");
+        public void RecordDeliveryFailure() => throw new InvalidOperationException("Unexpected delivery failure in the migration test.");
         public void Dispose() { }
     }
 }

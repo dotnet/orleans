@@ -35,11 +35,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<StreamInstruments>();
             services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
-            services.AddSingleton<StreamPullingAgentRuntime>();
-            services.AddSingleton<StreamPullingAgentHostResolver>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, StreamPullingAgentRuntime>();
-            services.AddSingleton<IGrainPropertiesProvider, StreamPullingAgentGrainPropertiesProvider>();
-            services.AddPlacementDirector<StreamPullingAgentPlacement, StreamPullingAgentPlacementDirector>();
+            services.AddSingleton<PullingAgentRuntime>();
+            services.AddSingleton<PullingAgentHostResolver>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PullingAgentRuntime>();
+            services.AddSingleton<IGrainPropertiesProvider, PullingAgentGrainPropertiesProvider>();
+            services.AddPlacementDirector<PullingAgentPlacement, PullingAgentPlacementDirector>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();
             services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();

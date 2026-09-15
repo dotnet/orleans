@@ -7,10 +7,10 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-internal sealed record StreamPullingAgentProviderRegistration(string Name);
+internal sealed record PullingAgentProviderRegistration(string Name);
 
-internal sealed class StreamPullingAgentGrainPropertiesProvider(
-    IEnumerable<StreamPullingAgentProviderRegistration> providers,
+internal sealed class PullingAgentGrainPropertiesProvider(
+    IEnumerable<PullingAgentProviderRegistration> providers,
     IOptionsMonitor<StreamPullingAgentOptions> options) : IGrainPropertiesProvider
 {
     public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
@@ -24,7 +24,7 @@ internal sealed class StreamPullingAgentGrainPropertiesProvider(
         {
             if (options.Get(provider.Name).HostingMode == StreamPullingAgentHostingMode.Grain)
             {
-                properties[StreamPullingAgentPlacementDirector.ProviderPropertyPrefix + provider.Name] = "true";
+                properties[PullingAgentPlacementDirector.ProviderPropertyPrefix + provider.Name] = "true";
             }
         }
     }

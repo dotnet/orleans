@@ -20,7 +20,7 @@ namespace UnitTests.StreamingTests;
 
 [TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
 [TestCategory("BVT"), TestCategory("Streaming")]
-public sealed class GrainHostedPullingAgentCoordinatorTests
+public sealed class PullingAgentCoordinatorTests
 {
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
 
@@ -222,7 +222,7 @@ public sealed class GrainHostedPullingAgentCoordinatorTests
         Assert.Equal(1, setup.Shutdowns);
     }
 
-    private static void AssertBalanced(Dictionary<QueueId, StreamPullingAgentStatus> agents, IEnumerable<SiloAddress> eligible)
+    private static void AssertBalanced(Dictionary<QueueId, PullingAgentStatus> agents, IEnumerable<SiloAddress> eligible)
     {
         Assert.All(agents.Values, status => Assert.True(status.IsRunning));
         var counts = eligible.Select(silo => agents.Values.Count(status => status.Address.SiloAddress == silo)).Order().ToArray();
@@ -231,7 +231,7 @@ public sealed class GrainHostedPullingAgentCoordinatorTests
         Assert.Equal(Enumerable.Repeat(low, counts.Length - highCount).Concat(Enumerable.Repeat(low + 1, highCount)), counts);
     }
 
-    private static void AssertSameAgents(Dictionary<QueueId, StreamPullingAgentStatus> expected, Dictionary<QueueId, StreamPullingAgentStatus> actual)
+    private static void AssertSameAgents(Dictionary<QueueId, PullingAgentStatus> expected, Dictionary<QueueId, PullingAgentStatus> actual)
     {
         Assert.Equal(expected.Keys.Order(), actual.Keys.Order());
         foreach (var entry in expected)
@@ -298,7 +298,7 @@ public sealed class GrainHostedPullingAgentCoordinatorTests
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null)
                 .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
 
-        internal async Task<Dictionary<QueueId, StreamPullingAgentStatus>> Round()
+        internal async Task<Dictionary<QueueId, PullingAgentStatus>> Round()
         {
             await Coordinator.GetAgents(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
             var previous = Events.GetEvents(nameof(GrainTimerEvents.TickStop)).Select(evt => evt.Payload).ToHashSet();
