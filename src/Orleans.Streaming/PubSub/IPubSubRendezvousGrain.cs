@@ -9,7 +9,11 @@ namespace Orleans.Streams
     internal interface IPubSubRendezvousGrain : IGrainWithStringKey
     {
         [Alias("B5FFB7F3")]
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken = default);
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(
+            QualifiedStreamId streamId,
+            GrainId streamProducer,
+            MembershipVersion membershipVersion = default,
+            CancellationToken cancellationToken = default);
 
         [Alias("C017B47D")]
         Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken = default);
