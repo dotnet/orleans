@@ -61,6 +61,220 @@ public abstract class StreamQueueCheckpointerTests
     }
 
     [Fact]
+    public async Task Reset_ClearsPersistedCheckpoint()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+
+        await checkpointer.Reset(CancellationToken.None);
+
+        Assert.False(checkpointer.CheckpointExists);
+        Assert.Equal(NoCheckpoint, await checkpointer.Load(CancellationToken.None));
+        Assert.Equal(NoCheckpoint, store.PersistedCheckpoint);
+        Assert.Equal([NoCheckpoint], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint], store.CompletedWrites);
+    }
+
+    [Fact]
+    public async Task Reset_WhenCanceledBehindPendingWrite_RetryRemainsSerialized()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedWrite = store.BlockNextWrite();
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        using var cancellation = new CancellationTokenSource();
+
+        var canceledReset = checkpointer.Reset(cancellation.Token);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledReset);
+
+        var retry = checkpointer.Reset(CancellationToken.None);
+        Assert.False(retry.IsCompleted);
+        Assert.Equal(["20"], store.WriteAttempts);
+
+        blockedWrite.SetResult();
+        await retry;
+
+        Assert.Equal(["20", NoCheckpoint], store.WriteAttempts);
+        Assert.Equal(["20", NoCheckpoint], store.CompletedWrites);
+        Assert.Equal(NoCheckpoint, store.PersistedCheckpoint);
+        Assert.False(checkpointer.CheckpointExists);
+    }
+
+    [Fact]
+    public async Task Reset_AfterPendingWriteFails_ClearsCheckpoint()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        store.FailNextWrite(new InvalidOperationException("checkpoint write failed"));
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+
+        await checkpointer.Reset(CancellationToken.None);
+
+        Assert.Equal(["20", NoCheckpoint], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint], store.CompletedWrites);
+        Assert.Equal(NoCheckpoint, store.PersistedCheckpoint);
+        Assert.False(checkpointer.CheckpointExists);
+    }
+
+    [Fact]
+    public async Task Reset_WhenWriteFails_PreservesConcurrentUpdate()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        store.FailNextWrite(new InvalidOperationException("checkpoint reset failed"));
+        var reset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        blockedReset.SetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reset);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal([NoCheckpoint, "20"], store.WriteAttempts);
+        Assert.Equal(["20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenWriteFails_ReconcilesConcurrentRegressedUpdate()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("100");
+        var blockedReset = store.BlockNextWrite();
+        store.FailNextWrite(new InvalidOperationException("checkpoint reset failed"));
+        var reset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+
+        checkpointer.Update("50", TestTimeUtc, CancellationToken.None);
+        blockedReset.SetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reset);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        var expected = RegressionPolicy is OffsetRegressionPolicy.Ignore ? "100" : "50";
+        Assert.Equal(expected, store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenNestedResetFails_ClearsThrottleMarker()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        var firstReset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        store.FailNextWrite(new InvalidOperationException("nested checkpoint reset failed"));
+        var secondReset = checkpointer.Reset(CancellationToken.None);
+
+        blockedReset.SetResult();
+        await firstReset;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => secondReset);
+
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        await store.WaitForCompletedWrites(2).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([NoCheckpoint, NoCheckpoint, "20"], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint, "20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenUpdatePrecedesFailedNestedReset_RestoresUpdate()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        var firstReset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        store.FailNextWrite(new InvalidOperationException("nested checkpoint reset failed"));
+        var secondReset = checkpointer.Reset(CancellationToken.None);
+
+        blockedReset.SetResult();
+        await firstReset;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => secondReset);
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal([NoCheckpoint, NoCheckpoint, "20"], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint, "20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenAllNestedResetsFail_RestoresCheckpoint()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        store.FailNextWrite(new InvalidOperationException("first checkpoint reset failed"));
+        var firstReset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        var secondReset = checkpointer.Reset(CancellationToken.None);
+        store.FailNextWrite(new InvalidOperationException("second checkpoint reset failed"));
+
+        blockedReset.SetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => firstReset);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => secondReset);
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.True(checkpointer.CheckpointExists);
+        Assert.Equal([NoCheckpoint, NoCheckpoint], store.WriteAttempts);
+        Assert.Empty(store.CompletedWrites);
+        Assert.Equal("10", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenUpdateAndFlushOverlap_PersistsSubsequentUpdate()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var resetWrite = store.BlockNextWrite();
+        var reset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        var flush = checkpointer.FlushAsync(CancellationToken.None);
+        resetWrite.SetResult();
+
+        await Task.WhenAll(reset, flush);
+        Assert.Equal([NoCheckpoint, "20"], store.CompletedWrites);
+
+        checkpointer.Update("30", TestTimeUtc + PersistInterval, CancellationToken.None);
+        await store.WaitForCompletedWrites(3).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([NoCheckpoint, "20", "30"], store.CompletedWrites);
+        Assert.Equal("30", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenQueuedBehindSave_PreservesSubsequentUpdate()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedWrite = store.BlockNextWrite();
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        var reset = checkpointer.Reset(CancellationToken.None);
+
+        checkpointer.Update("30", TestTimeUtc + PersistInterval, CancellationToken.None);
+        blockedWrite.SetResult();
+        await reset;
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal(["20", NoCheckpoint, "30"], store.WriteAttempts);
+        Assert.Equal(["20", NoCheckpoint, "30"], store.CompletedWrites);
+        Assert.Equal("30", store.PersistedCheckpoint);
+    }
+
+    [Fact]
+    public async Task Reset_WhenUpdateArrivesDuringReset_PersistsBeforeReturning()
+    {
+        var (checkpointer, store) = await CreateLoadedSubject("10");
+        var blockedReset = store.BlockNextWrite();
+        var reset = checkpointer.Reset(CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+
+        checkpointer.Update("20", TestTimeUtc, CancellationToken.None);
+        blockedReset.SetResult();
+        await reset;
+
+        Assert.Equal([NoCheckpoint, "20"], store.WriteAttempts);
+        Assert.Equal([NoCheckpoint, "20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
+    }
+
+    [Fact]
     public async Task Update_PersistsCheckpoint()
     {
         var (checkpointer, store) = await CreateLoadedSubject("10");

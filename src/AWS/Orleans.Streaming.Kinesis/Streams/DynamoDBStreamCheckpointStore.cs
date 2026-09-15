@@ -256,7 +256,7 @@ namespace Orleans.Streaming.Kinesis
             }
 
             if (!item.TryGetValue(CheckpointAttribute, out var checkpoint)
-                || string.IsNullOrEmpty(checkpoint.S)
+                || checkpoint.S is null
                 || !item.TryGetValue(VersionAttribute, out var version)
                 || !long.TryParse(version.N, NumberStyles.None, CultureInfo.InvariantCulture, out _version)
                 || _version <= 0)

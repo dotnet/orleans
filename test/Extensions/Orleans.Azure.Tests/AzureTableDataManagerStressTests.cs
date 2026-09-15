@@ -149,7 +149,7 @@ namespace Tester.AzureUtils
                 dataObject.PartitionKey = partitionKey;
                 dataObject.RowKey = rowKey;
                 dataObject.StringData = rowKey;
-                var promise = manager.UpsertTableEntryAsync(dataObject);
+                var promise = manager.UpsertTableEntryAsync(dataObject, cancellationToken);
                 promises.Add(promise);
                 if ((i % batchSize) == 0 && i > 0)
                 {
