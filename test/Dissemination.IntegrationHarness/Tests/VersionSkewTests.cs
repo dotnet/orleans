@@ -96,7 +96,7 @@ public sealed class VersionSkewTests
 
         var disabled = replacements[0];
         var enabled = replacements.Skip(1).ToArray();
-        await cluster.Eventually("enabled peers confirm support, default-disabled peers remain legacy", async () =>
+        await cluster.Eventually("enabled peers confirm support, explicitly disabled peers remain legacy", async () =>
         {
             foreach (var node in enabled)
             {

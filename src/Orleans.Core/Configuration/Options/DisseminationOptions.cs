@@ -10,8 +10,8 @@ public sealed class DisseminationOptions
     /// <summary>
     /// Gets or sets a value indicating whether the dissemination subsystem is enabled.
     /// </summary>
-    /// <value><see langword="false"/> by default.</value>
-    public bool Enabled { get; set; }
+    /// <value><see langword="true"/> during pre-merge testing.</value>
+    public bool Enabled { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the maximum number of concurrent local dissemination broadcast attempts.
@@ -122,8 +122,8 @@ public sealed class DisseminationNamespaceOptions
     /// <summary>
     /// Gets or sets a value indicating whether this namespace is enabled.
     /// </summary>
-    /// <value><see langword="false"/> by default.</value>
-    public bool Enabled { get; set; }
+    /// <value><see langword="true"/> during pre-merge testing.</value>
+    public bool Enabled { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the dissemination priority for this namespace.

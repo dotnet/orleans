@@ -72,7 +72,7 @@ The projection cache tracks its source snapshot as well as its table version. Sa
 
 ## Configuration and defaults
 
-The subsystem and each namespace default to disabled. Enable <xref:Orleans.Configuration.DisseminationOptions.Enabled> together with <xref:Orleans.Configuration.DisseminationNamespaceOptions.Enabled> on the selected integration to activate broadcast and repair. Defaults bound concurrency, memory retention, payload size, and repair work:
+The subsystem and both built-in namespaces are temporarily enabled by default for pre-merge testing, so existing cluster tests exercise broadcast and repair. Set <xref:Orleans.Configuration.DisseminationOptions.Enabled> to `false` to select the direct-delivery control path, or set <xref:Orleans.Configuration.DisseminationNamespaceOptions.Enabled> to `false` on an individual integration. Restore the opt-in defaults before merging this testing change. Defaults bound concurrency, memory retention, payload size, and repair work:
 
 | Option | Default | Effect |
 |---|---:|---|
@@ -93,7 +93,7 @@ Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceO
 
 The anti-entropy loop waits without periodic timer wakeups while the subsystem is disabled. An options-change notification wakes the loop when enablement changes; disabling it returns the loop to the dormant wait. Shutdown removes the options subscription and observes the loop's completion.
 
-Enablement requires representative measurements of convergence, RPC volume, serialized bytes, allocation, CPU, and tail latency across stable membership, churn, and partition recovery. Tree delivery can reduce RPC counts while increasing serialized bytes through forwarding and repair. Compare the original runtime, the updated default-off path, and the enabled path at the intended cluster sizes and publication rates, including skewed peer speeds and rolling upgrades.
+Enablement requires representative measurements of convergence, RPC volume, serialized bytes, allocation, CPU, and tail latency across stable membership, churn, and partition recovery. Tree delivery can reduce RPC counts while increasing serialized bytes through forwarding and repair. Compare the original runtime, the updated explicitly disabled path, and the enabled path at the intended cluster sizes and publication rates, including skewed peer speeds and rolling upgrades.
 
 ## Broadcast pumps and backpressure
 

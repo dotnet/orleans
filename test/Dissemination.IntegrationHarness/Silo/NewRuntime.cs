@@ -13,9 +13,12 @@ internal static class NewRuntime
 {
     public static void Configure(IServiceCollection services, NodeConfiguration configuration)
     {
-        // The disabled leg must exercise untouched production defaults, not explicit Enabled=false.
+        // Preserve the opt-out control while the candidate defaults are enabled for pre-merge testing.
         if (!configuration.Enabled)
         {
+            services.Configure<DisseminationOptions>(options => options.Enabled = false);
+            services.Configure<ClusterMembershipOptions>(options => options.Dissemination.Enabled = false);
+            services.Configure<DeploymentLoadPublisherOptions>(options => options.Dissemination.Enabled = false);
             return;
         }
 
@@ -27,7 +30,6 @@ internal static class NewRuntime
 
         services.Configure<DisseminationOptions>(options =>
         {
-            options.Enabled = true;
             if (configuration.FastRecovery)
             {
                 options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(250);
@@ -37,13 +39,12 @@ internal static class NewRuntime
                 options.MaxConcurrentSends = 4;
             }
         });
-        services.Configure<ClusterMembershipOptions>(options => Enable(options.Dissemination, configuration.FastRecovery));
-        services.Configure<DeploymentLoadPublisherOptions>(options => Enable(options.Dissemination, configuration.FastRecovery));
+        services.Configure<ClusterMembershipOptions>(options => ConfigureRecovery(options.Dissemination, configuration.FastRecovery));
+        services.Configure<DeploymentLoadPublisherOptions>(options => ConfigureRecovery(options.Dissemination, configuration.FastRecovery));
     }
 
-    private static void Enable(DisseminationNamespaceOptions options, bool fastRecovery)
+    private static void ConfigureRecovery(DisseminationNamespaceOptions options, bool fastRecovery)
     {
-        options.Enabled = true;
         if (fastRecovery)
         {
             options.ExpectedUpdateCadence = TimeSpan.FromMilliseconds(100);
