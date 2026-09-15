@@ -46,6 +46,11 @@ namespace Orleans.Streams
         [NonSerialized]
         public StreamSequenceToken? LastProcessedToken;
 
+        [NonSerialized]
+        public bool IsCaughtUp;
+        [NonSerialized]
+        public int PendingHandshakes;
+
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
             SubscriptionId = subscriptionId;
@@ -56,6 +61,7 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            IsCaughtUp = false;
             PendingBatch = null;
             if (Cursor is { } cursor)
             {
