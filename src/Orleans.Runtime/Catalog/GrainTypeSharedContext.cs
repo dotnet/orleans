@@ -134,7 +134,11 @@ public sealed class GrainTypeSharedContext
             return (TComponent)Logger;
         }
 
-        if (_components is null) return default;
+        if (typeof(TComponent) == typeof(GrainCanInterleave))
+        {
+            return (TComponent?)(object?)InterleavingPredicate;
+        }
+
         _components.TryGetValue(typeof(TComponent), out var resultObj);
         return (TComponent?)resultObj;
     }
@@ -156,7 +160,11 @@ public sealed class GrainTypeSharedContext
             return Logger;
         }
 
-        if (_components is null) return default;
+        if (componentType == typeof(GrainCanInterleave))
+        {
+            return InterleavingPredicate;
+        }
+
         _components.TryGetValue(componentType, out var resultObj);
         return resultObj;
     }
@@ -167,6 +175,12 @@ public sealed class GrainTypeSharedContext
     /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent{TComponent}"/>.</typeparam>
     public void SetComponent<TComponent>(TComponent? instance)
     {
+        if (typeof(TComponent) == typeof(GrainCanInterleave))
+        {
+            InterleavingPredicate = (GrainCanInterleave?)(object?)instance;
+            return;
+        }
+
         if (instance == null)
         {
             _components.Remove(typeof(TComponent));
@@ -175,6 +189,8 @@ public sealed class GrainTypeSharedContext
 
         _components[typeof(TComponent)] = instance;
     }
+
+    internal GrainCanInterleave? InterleavingPredicate { get; private set; }
 
     /// <summary>
     /// Gets the duration after which idle grains are eligible for collection.
