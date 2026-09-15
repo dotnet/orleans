@@ -267,9 +267,11 @@ public partial class DisseminationProtocolTests
     {
         private readonly object _lock = new();
         private readonly List<Action<DisseminationOptions, string?>> _listeners = [];
+        private readonly TaskCompletionSource _unsubscribed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private DisseminationOptions _current = initial;
 
         public DisseminationOptions CurrentValue => Volatile.Read(ref _current);
+        public Task Unsubscribed => _unsubscribed.Task;
         public DisseminationOptions Get(string? name) => CurrentValue;
         public int SubscriptionCount
         {
@@ -295,6 +297,8 @@ public partial class DisseminationProtocolTests
                 {
                     _listeners.Remove(listener);
                 }
+
+                _unsubscribed.TrySetResult();
             });
         }
 

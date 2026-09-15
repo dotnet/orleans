@@ -172,20 +172,14 @@ internal sealed class MembershipDisseminationNamespace(
 
         if (snapshot.Version == currentSnapshot.Version)
         {
-            // Same-version snapshots can still advance IAmAlive state.
+            // Same-version snapshots can advance liveness or remove inactive entries.
             if (!snapshot.IsSuccessorTo(currentSnapshot))
             {
                 return DisseminationApplyResult.Duplicate;
             }
-
-            await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-            RememberSnapshot(membershipManager.CurrentSnapshot);
-            return DisseminationApplyResult.Applied;
         }
 
-        await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        RememberSnapshot(membershipManager.CurrentSnapshot);
-        return DisseminationApplyResult.Applied;
+        return await ApplySnapshot(currentSnapshot, snapshot, cancellationToken);
     }
 
     private DisseminationValue CreateSnapshotValue(MembershipTableSnapshot snapshot) => new(
@@ -238,9 +232,20 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Duplicate;
         }
 
+        return await ApplySnapshot(current, snapshot, cancellationToken);
+    }
+
+    private async ValueTask<DisseminationApplyResult> ApplySnapshot(
+        MembershipTableSnapshot previous,
+        MembershipTableSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        RememberSnapshot(membershipManager.CurrentSnapshot);
-        return DisseminationApplyResult.Applied;
+        var current = membershipManager.CurrentSnapshot;
+        RememberSnapshot(current);
+        return MembershipSnapshotsEqual(previous, current)
+            ? DisseminationApplyResult.Duplicate
+            : DisseminationApplyResult.Applied;
     }
 
     private void RememberSnapshot(MembershipTableSnapshot snapshot)
