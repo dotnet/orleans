@@ -291,7 +291,8 @@ namespace Orleans.Streams
 
             // Canceled registrations can remove themselves from the cache before producer cleanup.
             var streams = pubSubCache.ToArray();
-            var hasPendingRegistrations = streams.Any(static entry => entry.Value.RegistrationTask is not null);
+            var hasPendingSubscriptions = streams.Any(static entry => entry.Value.RegistrationTask is not null
+                || entry.Value.AllConsumers().Any(static consumer => consumer.PendingHandshakes != 0));
             _shutdownCancellation?.Cancel();
 
             Task? localReceiverInitTask = receiverInitTask;
@@ -313,9 +314,8 @@ namespace Orleans.Streams
                 _retirementCancellation.Dispose();
             }
 
-            // Registrations drained during shutdown can exit before discovering subscribers.
-            // Preserve their checkpoint barrier even after their tasks have completed.
-            if (!hasPendingRegistrations)
+            // Canceled registrations and handshakes retain their pre-shutdown checkpoint barrier.
+            if (!hasPendingSubscriptions)
             {
                 NotifyDeliveryProgress();
             }
@@ -1107,18 +1107,23 @@ namespace Orleans.Streams
             }
 
             var partitionStartToken = availableMessages[0].SequenceToken;
-            foreach (var streamData in pubSubCache.Values)
+            var groupedMessages = availableMessages.ToLookup(static container => container.StreamId);
+            foreach (var (streamId, streamData) in pubSubCache)
             {
-                StartInactiveCursors(streamData, partitionStartToken, ShutdownToken);
+                if (!groupedMessages.Contains(streamId.StreamId))
+                {
+                    StartInactiveCursors(streamData, partitionStartToken, ShutdownToken, onlyProgressAware: true);
+                }
             }
 
-            foreach (var group in availableMessages.GroupBy(container => container.StreamId))
+            foreach (var group in groupedMessages)
             {
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 if (pubSubCache.TryGetValue(streamId, out var streamData))
                 {
                     streamData.RefreshActivity(now);
+                    StartInactiveCursors(streamData, startToken, ShutdownToken);
                 }
                 else
                 {
@@ -1417,13 +1422,22 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken, CancellationToken cancellationToken)
+        private void StartInactiveCursors(
+            StreamConsumerCollection streamData,
+            StreamSequenceToken startToken,
+            CancellationToken cancellationToken,
+            bool onlyProgressAware = false)
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
                 if (IsShutdown)
                 {
                     return;
+                }
+
+                if (onlyProgressAware && consumerData.Cursor is not IQueueCacheCursorProgress)
+                {
+                    continue;
                 }
 
                 // Some consumer might not be fully registered yet
@@ -1651,7 +1665,12 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        LogErrorDeliveringMessages(consumerData.StreamId, exc);
+                        var isCancellation = exc is OperationCanceledException && cancellationToken.IsCancellationRequested;
+                        if (!isCancellation)
+                        {
+                            LogErrorDeliveringMessages(consumerData.StreamId, exc);
+                        }
+
                         if (handshakeGeneration != consumerData.HandshakeGeneration)
                         {
                             continue;
@@ -1666,7 +1685,7 @@ namespace Orleans.Streams
                             consumerData.Cursor?.RecordDeliveryFailure();
                         }
 
-                        if (exc is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                        if (isCancellation)
                         {
                             throw;
                         }
