@@ -721,9 +721,10 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var cancellationToken = TestContext.Current.CancellationToken;
             var client = Substitute.For<IAmazonS3>();
             var requests = new List<PutObjectRequest>();
+            var metadataRequests = new List<GetObjectMetadataRequest>();
             client.PutObjectAsync(Arg.Do<PutObjectRequest>(requests.Add), Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
-            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+            client.GetObjectMetadataAsync(Arg.Do<GetObjectMetadataRequest>(metadataRequests.Add), Arg.Any<CancellationToken>())
                 .Returns(_ => Task.FromResult(CreateWalProperties(requests[0], "etag-1")));
             var options = new S3JournalStorageOptions { BucketName = BucketName };
             if (customMapping)
@@ -745,7 +746,16 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             Assert.Equal($"wal/{baseKey}", requests[2].Key);
             Assert.Equal("etag-1", requests[2].IfMatch);
             Assert.Equal(requests[1].Key, requests[2].Metadata[S3JournalStorage.CheckpointMetadataKey]);
-            await client.Received(1).GetObjectMetadataAsync(
+            // S3 Express refreshes WAL properties, then queries the append-part count.
+            Assert.Collection(metadataRequests,
+                request => Assert.Null(request.PartNumber),
+                request => Assert.Equal(1, request.PartNumber));
+            Assert.All(metadataRequests, request =>
+            {
+                Assert.Equal(BucketName, request.BucketName);
+                Assert.Equal("etag-1", request.EtagToMatch);
+            });
+            await client.Received(2).GetObjectMetadataAsync(
                 Arg.Is<GetObjectMetadataRequest>(request => request.Key == $"wal/{baseKey}"),
                 cancellationToken);
         }
