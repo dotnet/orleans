@@ -1291,7 +1291,7 @@ namespace UnitTests.StreamingTests
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
             public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
-            public Func<Task<StreamHandshakeToken?>>? OnHandshake { get; set; }
+            public Func<CancellationToken, Task<StreamHandshakeToken?>>? OnHandshake { get; set; } = getSequenceToken;
             public Func<IBatchContainer, Task<StreamHandshakeToken?>>? OnDelivery { get; set; }
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
@@ -1323,7 +1323,7 @@ namespace UnitTests.StreamingTests
             }
 
             public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)
-                => getSequenceToken?.Invoke(cancellationToken) ?? OnHandshake?.Invoke() ?? Task.FromResult(requestedToken);
+                => OnHandshake?.Invoke(cancellationToken) ?? Task.FromResult(requestedToken);
 
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
@@ -2948,7 +2948,7 @@ namespace UnitTests.StreamingTests
             var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakeStarted.TrySetResult();
                     return releaseHandshake.Task;
@@ -2985,7 +2985,9 @@ namespace UnitTests.StreamingTests
                 else
                 {
                     Assert.Empty(scenario.Checkpoints);
-                    Assert.False(attachment.IsCompleted);
+                    await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.False(releaseHandshake.Task.IsCompleted);
+                    Assert.Equal(0, scenario.Busy.PendingHandshakes);
                 }
             }
             finally
@@ -3015,7 +3017,7 @@ namespace UnitTests.StreamingTests
             var releaseReplay = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakeStarted.TrySetResult();
                     return releaseHandshake.Task;
@@ -3116,7 +3118,7 @@ namespace UnitTests.StreamingTests
             var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakeStarted.TrySetResult();
                     return releaseHandshake.Task;
@@ -3181,7 +3183,9 @@ namespace UnitTests.StreamingTests
                 if (outcome == "pending")
                 {
                     Assert.Empty(scenario.Checkpoints);
-                    Assert.False(attachment.IsCompleted);
+                    await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.False(releaseHandshake.Task.IsCompleted);
+                    Assert.Equal(0, scenario.Idle.PendingHandshakes);
                 }
                 else
                 {
@@ -3566,7 +3570,7 @@ namespace UnitTests.StreamingTests
                 queueAdapterCache: queueAdapterCache,
                 timeProvider: timeProvider,
                 options: options,
-                filter: filter);
+                streamFilter: filter);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
             await InitializeAgent(agent);
             await accessor.RegisterStream(streamId, registrationToken, DateTime.UtcNow);
