@@ -18,10 +18,16 @@ exercises grain scheduling and workflow latency with the same backend choices.
 
 Premium **BlockBlobStorage accounts support append blobs**. The account tier is
 the comparison axis; both Blob cases execute the same WAL and checkpoint code.
-Place the benchmark host and accounts in the same Azure region, use equivalent
-redundancy settings, and keep compute, payload, history, concurrency, and
-catalog distribution constant between runs. Record account configuration and
-service-side metrics alongside each report.
+The standalone runner accepts the supported standard SDK SKUs for `StandardBlob`
+and records the actual SKU in `AccountSku`; `data-plane-verified` describes the
+account kind/SKU check. Operators select redundancy on their existing accounts.
+The playground provisions matched `Standard_LRS` and `Premium_LRS` presets.
+
+For account-tier comparisons, place the benchmark host and accounts in the same
+Azure region, match redundancy settings, and keep compute, payload, history,
+concurrency, and catalog distribution constant between runs. Different
+redundancy settings introduce an additional comparison dimension. Record account
+configuration and service-side metrics alongside each report.
 
 **Real Azure runs incur storage, transaction, and possible network charges.**
 They require `--allow-azure true`. Use existing test accounts and an Entra
