@@ -103,11 +103,15 @@ builder.UseOrleans(siloBuilder =>
 
 ## Shutdown lifecycle
 
-Shutdown atomically closes scheduling and activation admission, cancels scheduling, and
-awaits every admitted call before canceling execution. Successful writes retain their
-result, and successful shard creations remain owned even when cancellation races with
-their completion. Shutdown then awaits the active shard check and every admitted shard's
-execution and cleanup before disposing cached shards which remained inactive.
+Scheduling and activation share a lock-free admission counter. Scheduling holds admission
+through completion, and activation holds it until its execution task is published and
+queued. Shutdown atomically closes admission, cancels scheduling, and awaits these
+operations before snapshotting the running shards and canceling execution.
+
+Successful writes retain their result, and successful shard creations remain owned even
+when cancellation races with their completion. Shutdown then awaits the active shard check
+and every admitted shard's execution and cleanup before disposing cached shards which
+remained inactive.
 
 ## Usage Examples
 
