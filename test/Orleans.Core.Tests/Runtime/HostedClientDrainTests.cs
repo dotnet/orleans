@@ -72,7 +72,7 @@ public class HostedClientDrainTests
             Assert.Equal(
                 new[] { "1601:entered", "1601:exiting", "1602:entered", "1602:exiting" },
                 fixture.Events.ToArray());
-            Assert.Equal(2, first.ClassifierCalls);
+            Assert.Equal(3, first.ClassifierCalls);
             fixture.AssertScopeLive();
         }
         finally

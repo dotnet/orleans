@@ -32,6 +32,58 @@ public class AdmissionGateTests
     }
 
     [Fact]
+    public void TryEnterUnscoped_AfterExit_AdmitsUntilClosed()
+    {
+        var gate = new AdmissionGate();
+        Assert.True(gate.TryEnterUnscoped());
+        gate.Exit();
+
+        Assert.True(gate.TryEnterUnscoped());
+        var drained = gate.CloseAsync();
+        Assert.False(gate.TryEnterUnscoped());
+        Assert.False(drained.IsCompleted);
+
+        gate.Exit();
+        Assert.True(drained.IsCompletedSuccessfully);
+        Assert.False(gate.TryEnterUnscoped());
+        Assert.Same(drained, gate.CloseAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ScopedAndUnscopedAdmissions_DrainTogether(bool exitUnscopedFirst)
+    {
+        var gate = new AdmissionGate();
+        Assert.True(gate.TryEnterUnscoped());
+        Task drained;
+        using (var scoped = gate.TryEnter())
+        {
+            Assert.True(scoped.Entered);
+            drained = gate.CloseAsync();
+            Assert.False(gate.TryEnterUnscoped());
+            using var rejected = gate.TryEnter();
+            Assert.False(rejected.Entered);
+
+            if (exitUnscopedFirst)
+            {
+                gate.Exit();
+            }
+
+            Assert.False(drained.IsCompleted);
+        }
+
+        if (!exitUnscopedFirst)
+        {
+            Assert.False(drained.IsCompleted);
+            gate.Exit();
+        }
+
+        Assert.True(drained.IsCompletedSuccessfully);
+        Assert.Same(drained, gate.CloseAsync());
+    }
+
+    [Fact]
     public void CloseAsync_WhenEmpty_CompletesAndRemainsClosed()
     {
         var gate = new AdmissionGate();
@@ -115,10 +167,13 @@ public class AdmissionGateTests
     }
 
     [Theory]
-    [InlineData("return")]
-    [InlineData("exception")]
-    [InlineData("cancellation")]
-    public async Task UsingToken_AcrossAwait_DrainsWhenScopeEnds(string outcome)
+    [InlineData("return", false)]
+    [InlineData("exception", false)]
+    [InlineData("cancellation", false)]
+    [InlineData("return", true)]
+    [InlineData("exception", true)]
+    [InlineData("cancellation", true)]
+    public async Task Admission_AcrossAwait_DrainsWhenOperationEnds(string outcome, bool unscoped)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var gate = new AdmissionGate();
@@ -162,8 +217,28 @@ public class AdmissionGateTests
 
         async Task RunAsync()
         {
-            using var admission = gate.TryEnter();
-            Assert.True(admission.Entered);
+            if (unscoped)
+            {
+                Assert.True(gate.TryEnterUnscoped());
+                try
+                {
+                    await RunBodyAsync();
+                }
+                finally
+                {
+                    gate.Exit();
+                }
+            }
+            else
+            {
+                using var admission = gate.TryEnter();
+                Assert.True(admission.Entered);
+                await RunBodyAsync();
+            }
+        }
+
+        async Task RunBodyAsync()
+        {
             await resume.Task;
             if (outcome == "exception")
             {
@@ -180,9 +255,11 @@ public class AdmissionGateTests
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(8)]
-    public async Task CloseAsync_RacingWithEntry_DrainsExactlyTheAdmittedOperations(int count)
+    [InlineData(1, false)]
+    [InlineData(8, false)]
+    [InlineData(1, true)]
+    [InlineData(8, true)]
+    public async Task CloseAsync_RacingWithEntry_DrainsExactlyTheAdmittedOperations(int count, bool unscoped)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         for (var iteration = 0; iteration < 100; iteration++)
@@ -195,11 +272,30 @@ public class AdmissionGateTests
             var workers = decisions.Select(decision => Task.Run(async () =>
             {
                 await start.Task;
-                using var admission = gate.TryEnter();
-                decision.SetResult(admission.Entered);
-                if (admission.Entered)
+                if (unscoped)
                 {
-                    await release.Task;
+                    var entered = gate.TryEnterUnscoped();
+                    decision.SetResult(entered);
+                    if (entered)
+                    {
+                        try
+                        {
+                            await release.Task;
+                        }
+                        finally
+                        {
+                            gate.Exit();
+                        }
+                    }
+                }
+                else
+                {
+                    using var admission = gate.TryEnter();
+                    decision.SetResult(admission.Entered);
+                    if (admission.Entered)
+                    {
+                        await release.Task;
+                    }
                 }
             }, cancellationToken)).ToArray();
             var closing = Task.Run(async () =>

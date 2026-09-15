@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -78,6 +79,9 @@ namespace Orleans
         internal static bool IsCancellationRequest(Message message) =>
             message.BodyObject is IInvokable request && request.GetInterfaceType() == typeof(IGrainCallCancellationExtension);
 
+        private AdmissionGate GetAdmissionGate(Message message) =>
+            IsCancellationRequest(message) ? _cancellations : _invocations;
+
         internal void RejectMessage(Message message)
         {
             LogRejectingMessageDuringShutdown(logger, message);
@@ -108,8 +112,6 @@ namespace Orleans
 
         public sealed partial class LocalObjectData : IGrainContext, IGrainCallCancellationExtension
         {
-            internal readonly record struct PendingMessage(Message Message, AdmissionGate.Admission Admission);
-
             private const int MaxPendingCancellations = 1_024;
             private static readonly Func<object?, Task> HandleFunc = self => ((LocalObjectData)self!).LocalObjectMessagePumpAsync();
             private readonly InvokableObjectManager _manager;
@@ -122,14 +124,14 @@ namespace Orleans
             {
                 this.LocalObject = new WeakReference(obj);
                 this.ObserverId = observerId;
-                this.Messages = new Queue<PendingMessage>();
+                this.Messages = new Queue<Message>();
                 this.Running = false;
                 _manager = manager;
             }
 
             internal WeakReference LocalObject { get; }
             internal ObserverGrainId ObserverId { get; }
-            internal Queue<PendingMessage> Messages { get; }
+            internal Queue<Message> Messages { get; }
             internal bool Running { get; set; }
 
             GrainId IGrainContext.GrainId => this.ObserverId.GrainId;
@@ -180,9 +182,8 @@ namespace Orleans
             public void ReceiveMessage(object msg)
             {
                 var message = (Message)msg;
-                var gate = IsCancellationRequest(message) ? _manager._cancellations : _manager._invocations;
-                var admission = gate.TryEnter();
-                if (!admission.Entered)
+                var gate = _manager.GetAdmissionGate(message);
+                if (!gate.TryEnterUnscoped())
                 {
                     _manager.RejectMessage(message);
                     return;
@@ -191,19 +192,19 @@ namespace Orleans
                 var ownsAdmission = true;
                 try
                 {
-                    // Queue publication transfers this token to the pump or interleaved invocation.
-                    ReceiveMessage(message, admission, ref ownsAdmission);
+                    // Queue publication transfers admission ownership to the pump or interleaved invocation.
+                    ReceiveMessage(message, ref ownsAdmission);
                 }
                 finally
                 {
                     if (ownsAdmission)
                     {
-                        admission.Dispose();
+                        gate.Exit();
                     }
                 }
             }
 
-            private void ReceiveMessage(Message message, AdmissionGate.Admission admission, ref bool ownsAdmission)
+            private void ReceiveMessage(Message message, ref bool ownsAdmission)
             {
                 var obj = this.LocalObject.Target;
                 if (obj is null)
@@ -229,10 +230,10 @@ namespace Orleans
                             var task = Task.Factory.StartNew(
                                 static state =>
                                 {
-                                    var (self, pending) = ((LocalObjectData, PendingMessage))state!;
-                                    return self.ProcessMessageAsync(pending);
+                                    var (self, msg) = ((LocalObjectData, Message))state!;
+                                    return self.ProcessMessageAsync(msg);
                                 },
-                                (this, new PendingMessage(message, admission)),
+                                (this, message),
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
                                 TaskScheduler.Default).Unwrap();
@@ -260,7 +261,7 @@ namespace Orleans
                     }
                     else
                     {
-                        this.Messages.Enqueue(new PendingMessage(message, admission));
+                        this.Messages.Enqueue(message);
                         ownsAdmission = false;
                         start = !this.Running;
                         this.Running = true;
@@ -312,7 +313,7 @@ namespace Orleans
                     await ProcessMessageAsync(message);
                 }
 
-                bool TryDequeueMessage(out PendingMessage message)
+                bool TryDequeueMessage([NotNullWhen(true)] out Message? message)
                 {
                     lock (Messages)
                     {
@@ -323,7 +324,7 @@ namespace Orleans
                         }
                         else
                         {
-                            _runningRequests.Add(message.Message, _messagePumpTask);
+                            _runningRequests.Add(message!, _messagePumpTask);
                         }
 
                         return result;
@@ -331,10 +332,8 @@ namespace Orleans
                 }
             }
 
-            private async Task ProcessMessageAsync(PendingMessage pending)
+            private async Task ProcessMessageAsync(Message message)
             {
-                using var admission = pending.Admission;
-                var message = pending.Message;
                 try
                 {
                     if (message.IsExpired)
@@ -412,6 +411,9 @@ namespace Orleans
                     {
                         _runningRequests.Remove(message);
                     }
+
+                    // Generated interface metadata is stable throughout the request's lifetime.
+                    _manager.GetAdmissionGate(message).Exit();
                 }
             }
 
@@ -534,7 +536,6 @@ namespace Orleans
                 void TryCancelRequest()
                 {
                     Message? message = null;
-                    AdmissionGate.Admission admission = default;
                     var wasWaiting = false;
                     var key = (senderGrainId, messageId);
                     lock (Messages)
@@ -554,11 +555,10 @@ namespace Orleans
                             // Check the waiting requests.
                             foreach (var waitingRequest in Messages)
                             {
-                                var waiting = waitingRequest.Message;
+                                var waiting = waitingRequest;
                                 if (waiting.Id == messageId && waiting.SendingGrain == senderGrainId)
                                 {
                                     message = waiting;
-                                    admission = waitingRequest.Admission;
                                     wasWaiting = true;
 
                                     // Remove the message, since it will be rejected immediately (outside the lock) without being executed.
@@ -566,7 +566,7 @@ namespace Orleans
                                     for (var i = 0; i < initialCount; i++)
                                     {
                                         var current = Messages.Dequeue();
-                                        if (!ReferenceEquals(current.Message, message))
+                                        if (!ReferenceEquals(current, message))
                                         {
                                             Messages.Enqueue(current);
                                         }
@@ -592,9 +592,13 @@ namespace Orleans
                         // If the message did begin executing, wait for it to observe the cancellation token and respond itself.
                         if (wasWaiting)
                         {
-                            using (admission)
+                            try
                             {
                                 SendCanceledResponse(message);
+                            }
+                            finally
+                            {
+                                _manager.GetAdmissionGate(message).Exit();
                             }
 
                             didCancel = true;
