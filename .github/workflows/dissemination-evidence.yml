@@ -3,7 +3,7 @@ name: Dissemination evidence
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/dissemination-evidence.yml'
       - '.github/scripts/dissemination-evidence.ps1'
@@ -33,9 +33,9 @@ on:
         type: boolean
         default: false
       sizes:
-        description: 'Comma-separated process counts (3..32, maximum six sizes)'
+        description: 'Comma-separated process counts (3..128, maximum six sizes)'
         type: string
-        default: '4,8,16'
+        default: '8,16,32,64,100'
       iterations:
         description: 'Publication rounds per scenario (3..200)'
         type: number
@@ -43,7 +43,7 @@ on:
       repetitions:
         description: 'Paired off/on repetitions (1..5)'
         type: number
-        default: 1
+        default: 2
 
 permissions:
   contents: read
@@ -59,6 +59,7 @@ env:
 jobs:
   version-skew:
     name: Pinned-binary upgrade, rollback and recovery
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'dissemination-scale'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -123,11 +124,15 @@ jobs:
           path: Artifacts/DisseminationEvidence/results/Cost
 
   scaling:
-    name: Larger controlled dissemination cost comparison
-    if: github.event_name == 'workflow_dispatch' && inputs.scale
+    name: Dissemination scaling (${{ matrix.size }} silos)
+    if: (github.event_name == 'workflow_dispatch' && inputs.scale) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'dissemination-scale'))
     needs: [version-skew, bounded-cost]
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        size: ${{ fromJSON(format('[{0}]', inputs.sizes || '8,16,32,64,100')) }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -139,21 +144,23 @@ jobs:
         with:
           name: dissemination-binaries
           path: Artifacts/DisseminationEvidence/bin
-      - name: Measure stable, churn and partition windows on all three paths
+      - name: Measure paired current-binary stable scaling
         shell: pwsh
         env:
-          EVIDENCE_SIZES: ${{ inputs.sizes || '4,8,16' }}
+          EVIDENCE_SIZE: ${{ matrix.size }}
           EVIDENCE_ITERATIONS: ${{ inputs.iterations || 10 }}
-          EVIDENCE_REPETITIONS: ${{ inputs.repetitions || 1 }}
+          EVIDENCE_REPETITIONS: ${{ inputs.repetitions || 2 }}
         run: |
           ./.github/scripts/dissemination-evidence.ps1 -Mode Scale -SkipBuild `
-            -Sizes $env:EVIDENCE_SIZES `
+            -Sizes $env:EVIDENCE_SIZE `
             -Iterations ([int]$env:EVIDENCE_ITERATIONS) `
-            -Repetitions ([int]$env:EVIDENCE_REPETITIONS)
+            -Repetitions ([int]$env:EVIDENCE_REPETITIONS) `
+            -RuntimePaths Current -Scenarios stable `
+            -SiloProcessorCount 1 -GCConserveMemory 9
       - name: Preserve raw cost windows, per-node load and failure evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: dissemination-scale-evidence
+          name: dissemination-scale-${{ matrix.size }}-evidence
           retention-days: 30
           path: Artifacts/DisseminationEvidence/results

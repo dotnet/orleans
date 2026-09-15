@@ -9,7 +9,9 @@ internal sealed record NodeConfiguration(
     int SiloPort,
     int ParentProcessId,
     bool Enabled,
-    bool FastRecovery = true);
+    bool FastRecovery = true,
+    int SiloProcessorCount = 0,
+    int GCConserveMemory = 0);
 
 internal sealed record Command(
     int Id,
@@ -236,6 +238,8 @@ internal sealed record NodeSnapshot
     public required string[] ForwardingTargets { get; init; }
     public string[] TopologyMembers { get; init; } = [];
     public int Fanout { get; init; }
+    public int AntiEntropyPeerCount { get; init; }
+    public double AntiEntropyIntervalMilliseconds { get; init; }
     public required Dictionary<string, MetricValue> Metrics { get; init; }
     public required ApplyEvidence[] Applies { get; init; }
     public long TransportBytesWritten { get; init; }
@@ -248,6 +252,8 @@ internal sealed record NodeSnapshot
     public long ManagedHeapBytes { get; init; }
     public long WorkingSetBytes { get; init; }
     public long PrivateBytes { get; init; }
+    public int ProcessorCount { get; init; }
+    public bool ServerGC { get; init; }
     public int PendingControlCalls { get; init; }
     public int StartedControlCalls { get; init; }
     public int CancelledControlCalls { get; init; }

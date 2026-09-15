@@ -10,6 +10,14 @@ param(
     [int] $Iterations = 10,
     [ValidateRange(1, 5)]
     [int] $Repetitions = 1,
+    [ValidateSet('All', 'Current')]
+    [string] $RuntimePaths = 'All',
+    [ValidatePattern('^(stable|churn|partition)(,(stable|churn|partition)){0,2}$')]
+    [string] $Scenarios = 'stable,churn,partition',
+    [ValidateRange(0, 64)]
+    [int] $SiloProcessorCount = 0,
+    [ValidateRange(0, 9)]
+    [int] $GCConserveMemory = 0,
     [switch] $SkipBuild
 )
 
@@ -21,6 +29,10 @@ if ($Mode -eq 'Cost') {
     $Sizes = '4,8'
     $Iterations = 3
     $Repetitions = 1
+    $RuntimePaths = 'All'
+    $Scenarios = 'stable,churn,partition'
+    $SiloProcessorCount = 0
+    $GCConserveMemory = 0
 }
 
 $baselineSha = '6739589254b746a8790cf53524e6abe372bb53d4'
@@ -31,8 +43,32 @@ $results = Join-Path $artifacts "results/$Mode"
 New-Item -ItemType Directory -Force $binaries, $results | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'test/Dissemination.IntegrationHarness/methodology.json') -Destination $results
 foreach ($size in $Sizes.Split(',')) {
-    if ([int]$size -lt 3 -or [int]$size -gt 32) {
-        throw 'Silo counts must be between 3 and 32.'
+    if ([int]$size -lt 3 -or [int]$size -gt 128) {
+        throw 'Silo counts must be between 3 and 128.'
+    }
+}
+
+if ($Mode -eq 'Scale' -and $IsLinux) {
+    $memory = Get-Content -LiteralPath '/proc/meminfo'
+    $availableLine = $memory | Where-Object { $_ -match '^MemAvailable:\s+(\d+)\s+kB$' }
+    if (!$availableLine -or $availableLine -notmatch '^MemAvailable:\s+(\d+)\s+kB$') {
+        throw 'Cannot establish available host memory for the scale run.'
+    }
+    $availableBytes = [long]$Matches[1] * 1024
+    $largestSize = ($Sizes.Split(',') | ForEach-Object { [int]$_ } | Measure-Object -Maximum).Maximum
+    $requiredBytes = [long]$largestSize * 128MB + 1GB
+    @{
+        AvailableBytes = $availableBytes
+        RequiredPlanningBytes = $requiredBytes
+        PlanningBytesPerSilo = 128MB
+        ControllerHeadroomBytes = 1GB
+        HostProcessorCount = [Environment]::ProcessorCount
+        SiloProcessorCount = $SiloProcessorCount
+        GCConserveMemory = $GCConserveMemory
+        MemoryInformation = $memory
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $results 'host-resources.json')
+    if ($availableBytes -lt $requiredBytes) {
+        throw "Insufficient host memory for $largestSize silo processes: available=$availableBytes, planning requirement=$requiredBytes. Use a larger runner."
     }
 }
 
@@ -136,6 +172,10 @@ $env:ORLEANS_DISSEMINATION_SIZES = $Sizes
 $env:ORLEANS_DISSEMINATION_ITERATIONS = $Iterations.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:ORLEANS_DISSEMINATION_REPETITIONS = $Repetitions.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:ORLEANS_DISSEMINATION_PROFILE = $Mode
+$env:ORLEANS_DISSEMINATION_RUNTIME_PATHS = $RuntimePaths
+$env:ORLEANS_DISSEMINATION_SCENARIOS = $Scenarios
+$env:ORLEANS_DISSEMINATION_SILO_PROCESSOR_COUNT = $SiloProcessorCount.ToString([System.Globalization.CultureInfo]::InvariantCulture)
+$env:ORLEANS_DISSEMINATION_GC_CONSERVE_MEMORY = $GCConserveMemory.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $runner = Join-Path $binaries 'Runner/Dissemination.IntegrationHarness.Tests.dll'
 if (!(Test-Path -LiteralPath $runner)) {
     throw "Published runner not found: $runner"
@@ -154,6 +194,10 @@ $minimum = if ($Mode -eq 'Gate') { '7' } else { '1' }
     Sizes = $Sizes
     Iterations = $Iterations
     Repetitions = $Repetitions
+    RuntimePaths = $RuntimePaths
+    Scenarios = $Scenarios
+    SiloProcessorCount = $SiloProcessorCount
+    GCConserveMemory = $GCConserveMemory
     StartUtc = [DateTimeOffset]::UtcNow
     Command = "dotnet $runner --filter-class $testClass --minimum-expected-tests $minimum --report-trx"
     Limitation = 'Loopback OS processes; controlled test membership provider; not cross-machine production throughput.'
@@ -164,7 +208,7 @@ try {
     if ($Mode -eq 'Gate') {
         Invoke-DotNet @(
             $runner, '--filter-class', 'Orleans.Dissemination.IntegrationHarness.MeasurementTests',
-            '--minimum-expected-tests', '10', '--report-trx',
+            '--minimum-expected-tests', '16', '--report-trx',
             '--results-directory', (Join-Path $results 'instrument-checks')
         )
     }

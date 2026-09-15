@@ -4,7 +4,7 @@
   "entrypoint": ".github/scripts/dissemination-evidence.ps1",
   "workflow": ".github/workflows/dissemination-evidence.yml",
   "automaticPrTrigger": "pull_request and merge_group run both the pinned-binary version-skew gate and measured bounded original-legacy, current-explicitly-disabled and current-enabled-supported costs. The bounded job reuses published binaries, needs no label or workflow_dispatch registration, and has a 25-minute hard limit.",
-  "controlledScaleTrigger": "Larger runs require workflow_dispatch with scale=true after the workflow is registered on the default branch. No pull_request_target or write permission.",
+  "controlledScaleTrigger": "The dissemination-scale PR label or workflow_dispatch with scale=true runs an independent job per size, defaulting to 8,16,32,64,100 real silo processes. Remove the label after collecting evidence to keep subsequent pushes on the small profile. Jobs use read-only permissions.",
   "sliceInventory": [
     ".github/scripts/dissemination-evidence.ps1",
     ".github/workflows/dissemination-evidence.yml",
@@ -20,6 +20,7 @@
     "test/Dissemination.IntegrationHarness/Tests/MeasurementTests.cs",
     "test/Dissemination.IntegrationHarness/Tests/ProcessCluster.cs",
     "test/Dissemination.IntegrationHarness/Tests/ScalingTests.cs",
+    "test/Dissemination.IntegrationHarness/Tests/ScalingComparison.cs",
     "test/Dissemination.IntegrationHarness/Tests/VersionSkewTests.cs"
   ],
   "runtimeDependencies": {
@@ -105,7 +106,7 @@
     }
   ],
   "load": {
-    "test": "Scaling_OriginalLegacy_Disabled_EnabledSupported",
+    "test": "Scaling_SelectedRuntimePathsConverge",
     "comparison": "Three separately labeled paths: pinned original legacy binary; actual current binary with dissemination and both namespaces explicitly disabled; the same current binary using temporarily enabled defaults after peers have confirmed support. Enabled defaults provide broader pre-merge test exposure.",
     "runtimePaths": [
       { "name": "OriginalLegacy", "runtime": "Old", "enabled": false },
@@ -113,17 +114,21 @@
       { "name": "CurrentEnabledSupported", "runtime": "New", "enabled": true }
     ],
     "automaticPrProfile": { "mode": "Cost", "sizes": [4, 8], "iterations": 3, "pairedRepetitions": 1, "overrideable": false },
-    "manualDefaults": { "mode": "Scale", "sizes": [4, 8, 16], "iterations": 10, "pairedRepetitions": 1 },
-    "controls": { "sizes": "1..6 comma-separated sizes, each 3..32", "iterations": "3..200", "pairedRepetitions": "1..5" },
+    "largeScaleDefaults": { "mode": "Scale", "sizes": [8, 16, 32, 64, 100], "iterations": 10, "pairedRepetitions": 2, "runtimePaths": "Current", "scenarios": ["stable"], "siloProcessorCount": 1, "gcConserveMemory": 9 },
+    "controls": { "sizes": "1..6 distinct comma-separated sizes, each 3..128", "iterations": "3..200", "pairedRepetitions": "1..5", "runtimePaths": "All or Current", "scenarios": "distinct stable, churn, partition selections" },
+    "largeScaleResources": "All sizes in the large curve use the same one-logical-processor and GCConserveMemory=9 child-process policy on standard shared-host CI capacity. Effective worker processor count and server-GC mode are recorded and processor count is asserted. Linux preflight requires available memory of 128 MiB per requested silo plus 1 GiB controller headroom, and saves host-resources.json. This is a planning guard, not a memory cap or proof against resource exhaustion. An inadequate runner fails before starting the measurement.",
+    "largeScaleScope": "Large jobs compare the identical current binary with dissemination explicitly off versus enabled defaults, with order reversed on the second repetition. The ordinary 4/8-silo three-path stable/churn/partition profile remains unchanged. Script options support additional scenarios on a suitably provisioned host.",
+    "comparisonReports": "comparisons.json and GitHub job summaries pair equal-size/scenario/repetition current-off/current-on samples. Pair validation checks actual live silo count, identical binary hash/revision, environment, iterations and offered publications. Reports include raw totals, costs per publication, median/P95 convergence, retained managed memory, and explicit incomplete-pair counts.",
     "scenarios": "Stable; graceful stop/restart at the same endpoint every other round; real connection partition and heal with old pooled connections retired at both endpoints before reopening and confirming transport readiness via bidirectional acknowledged control RPCs. Teardown, readiness probes and retries share a 60-second deadline and remain inside recovery latency and total cost. Each path then offers the same single publication round. Gate artifacts separately cover silent repair, retained-history misses and same-version heartbeat recovery.",
     "cadence": "Pause automatic deployment-load timers after startup. Invoke the actual production PublishStatistics method once per active node per offered round, then require exact dictionary inventory and values using cached JsonSerializerOptions with IncludeFields=true, including every public readonly EnvironmentStatistics field. Extra departed or restarted generations fail the same comparison as missing or mismatched values.",
-    "window": "Two warmup publication rounds and complete enabled-peer capability discovery before measuring. Replacements also finish capability discovery before offered rounds; their bootstrap/fallback/discovery costs remain inside the churn window. Two-second OS-counter sampling margins on all paths. Full-GC retained-memory probes are after the CPU/allocation window.",
+    "window": "Two warmup publication rounds and complete enabled-peer capability discovery before measuring. Discovery has a minimum 90-second controller budget, expanded to two full peer rotations plus 60 seconds using the actual advertised repair cadence and peer count. Production repair settings stay unchanged. Startup/warmup/preparation duration, CPU and allocations are reported separately. Replacements also finish capability discovery before offered rounds; their bootstrap/fallback/discovery costs remain inside the churn window. Two-second OS-counter sampling margins on all paths. Full-GC retained-memory probes are after the CPU/allocation window.",
     "metrics": [
       "All transmitted request AND one-way RPC messages; responses reported in the separate total-message count",
       "Complete serialized Orleans message bytes, including headers/body, from message-size observations",
       "Actual process-wide System.Net.Sockets sent/received bytes, sampled each second; transport-pipe submitted/read bytes separately",
       "Process CPU time, GC total allocated bytes, post-full-GC retained managed bytes, working set and private bytes",
       "Per-round exact state-convergence latency and partition recovery latency",
+      "Separate per-round publication duration and residual convergence wait, retaining the original end-to-end latency and 100 ms polling cadence",
       "Per-node counters, actual originator/forwarding targets, tree rank and upper-tree role; raw snapshots preserve topology changes",
       "Raw protocol payload, namespace-batch and anti-entropy counters, never substituted for total RPC or byte counts"
     ],
@@ -144,7 +149,7 @@
     "siloCommandSeconds": 60,
     "controllerCommandSeconds": 70,
     "convergenceSeconds": 60,
-    "scaleCapabilityDiscoverySeconds": 90,
+    "scaleCapabilityDiscovery": "max(90 seconds, two complete peer rotations at actual repair cadence plus 60 seconds)",
     "membershipLockSeconds": 10,
     "shutdownSeconds": 35,
     "individualProcessLifetimeMinutes": 45,
@@ -159,6 +164,6 @@
     "gate": "dissemination-gate-evidence: TRX, identity/probe snapshots, isolated repair checkpoints, bounded shutdown outcomes, raw logs, methodology and binlogs",
     "binaries": "dissemination-binaries: pinned old/current/runner publish directories plus SHA manifests for explicit replay using -SkipBuild",
     "automaticCost": "dissemination-bounded-cost-evidence: cost-results.json and per-window/raw artifacts for the fixed automatic PR profile, including actual restart and partition counts",
-    "scale": "dissemination-scale-evidence: cost-results.json, per-window cost.json, raw start/finish/warmup/node snapshots and partial results on failure"
+    "scale": "dissemination-scale-<size>-evidence: cost-results.json, comparisons.json, host-resources.json, per-window cost.json, raw start/finish/warmup/node snapshots and partial results on failure"
   }
 }

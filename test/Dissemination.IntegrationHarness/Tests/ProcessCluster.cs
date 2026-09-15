@@ -23,7 +23,7 @@ internal sealed class ProcessCluster : IAsyncDisposable
     private readonly string _membershipDirectory;
     private int _sequence;
 
-    public ProcessCluster(string scenario, bool fastRecovery = true)
+    public ProcessCluster(string scenario, bool fastRecovery = true, int siloProcessorCount = 0, int gcConserveMemory = 0)
     {
         var artifactRoot = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_RESULTS")
             ?? throw new InvalidOperationException("Run .github/scripts/dissemination-evidence.ps1 first, or set ORLEANS_DISSEMINATION_{OLD,NEW,RESULTS}.");
@@ -32,12 +32,20 @@ internal sealed class ProcessCluster : IAsyncDisposable
         _membershipDirectory = Path.Combine(Directory, "membership");
         System.IO.Directory.CreateDirectory(_membershipDirectory);
         FastRecovery = fastRecovery;
+        Assert.InRange(siloProcessorCount, 0, 64);
+        Assert.InRange(gcConserveMemory, 0, 9);
+        SiloProcessorCount = siloProcessorCount;
+        GCConserveMemory = gcConserveMemory;
     }
 
     public string Directory { get; }
     public bool FastRecovery { get; }
+    public int SiloProcessorCount { get; }
+    public int GCConserveMemory { get; }
     public IReadOnlyList<SiloProcess> All => _all;
     public SiloProcess[] Active => _all.Where(node => !node.Stopped).ToArray();
+    public double LastPublicationMilliseconds { get; private set; }
+    public double LastConvergenceWaitMilliseconds { get; private set; }
 
     public async Task<SiloProcess> Start(string runtime, bool enabled, int? port = null)
     {
@@ -57,7 +65,8 @@ internal sealed class ProcessCluster : IAsyncDisposable
         var name = $"{runtime}-{_sequence++}-{(enabled ? "enabled" : "default")}";
         var node = new SiloProcess(
             binaryDirectory,
-            new(name, Path.GetFileName(Directory), _membershipDirectory, port ?? AvailablePort(), Environment.ProcessId, enabled, FastRecovery),
+            new(name, Path.GetFileName(Directory), _membershipDirectory, port ?? AvailablePort(), Environment.ProcessId,
+                enabled, FastRecovery, SiloProcessorCount, GCConserveMemory),
             Directory,
             manifest);
         _all.Add(node);
@@ -104,12 +113,16 @@ internal sealed class ProcessCluster : IAsyncDisposable
             expected.Add(snapshot.Address, snapshot.Load[snapshot.Address]);
         }
 
+        var publicationMilliseconds = clock.Elapsed.TotalMilliseconds;
         await Eventually("exact production load state at every active process", async () =>
         {
             var snapshots = await Task.WhenAll(Active.Select(node => node.Send("snapshot")));
             return snapshots.All(snapshot => MatchesExpectedLoad(snapshot.Load, expected));
         }, expected: expected);
-        return clock.Elapsed.TotalMilliseconds;
+        var elapsed = clock.Elapsed.TotalMilliseconds;
+        LastPublicationMilliseconds = publicationMilliseconds;
+        LastConvergenceWaitMilliseconds = elapsed - publicationMilliseconds;
+        return elapsed;
     }
 
     internal static bool MatchesExpectedLoad(
@@ -260,6 +273,17 @@ internal sealed class SiloProcess : IAsyncDisposable
             },
         };
         _pending[0] = _ready;
+        if (configuration.SiloProcessorCount > 0)
+        {
+            _process.StartInfo.Environment["DOTNET_PROCESSOR_COUNT"] =
+                configuration.SiloProcessorCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (configuration.GCConserveMemory > 0)
+        {
+            _process.StartInfo.Environment["DOTNET_GCConserveMemory"] =
+                configuration.GCConserveMemory.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
     }
 
     public NodeConfiguration Configuration { get; }
@@ -290,6 +314,10 @@ internal sealed class SiloProcess : IAsyncDisposable
         Assert.Equal(_manifest.Runtime == "New", Last.Identity.HasDissemination);
         Assert.Equal(Configuration.Enabled, Last.Enabled);
         Assert.Equal(Configuration.Enabled, Last.NamespaceEnabled);
+        if (Configuration.SiloProcessorCount > 0)
+        {
+            Assert.Equal(Configuration.SiloProcessorCount, Last.ProcessorCount);
+        }
         var actualDirectory = Path.GetDirectoryName(Path.GetFullPath(Last.Identity.AssemblyPath));
         Assert.Equal(Path.GetFullPath(_process.StartInfo.WorkingDirectory), actualDirectory);
         foreach (var name in new[] { "Orleans.Runtime", "Orleans.Core", "Orleans.Core.Abstractions", "Orleans.Serialization" })

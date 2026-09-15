@@ -76,6 +76,8 @@ internal static class NewRuntime
             ForwardingTargets = topology.ForwardingTreeTargets.Select(address => address.ToParsableString()).ToArray(),
             TopologyMembers = topology.Members.Select(address => address.ToParsableString()).ToArray(),
             Fanout = options.Overlay.GetFanOutFactor(topology.Members.Length),
+            AntiEntropyPeerCount = options.Overlay.AntiEntropyPeerCount,
+            AntiEntropyIntervalMilliseconds = options.Overlay.AntiEntropyInterval.TotalMilliseconds,
             TreeGate = services.GetService<DisseminationTreeGate>()?.Snapshot,
         };
     }

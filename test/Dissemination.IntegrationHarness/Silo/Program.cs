@@ -338,6 +338,8 @@ internal static class Program
             ManagedHeapBytes = GC.GetTotalMemory(forceFullCollection: false),
             WorkingSetBytes = process.WorkingSet64,
             PrivateBytes = process.PrivateMemorySize64,
+            ProcessorCount = Environment.ProcessorCount,
+            ServerGC = System.Runtime.GCSettings.IsServerGC,
             PendingControlCalls = services.GetRequiredService<ControlTarget>().Pending,
             StartedControlCalls = services.GetRequiredService<ControlTarget>().Started,
             CancelledControlCalls = services.GetRequiredService<ControlTarget>().Cancelled,
