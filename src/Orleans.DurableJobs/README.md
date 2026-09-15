@@ -129,8 +129,8 @@ ownership snapshot with an ETag or reads current metadata when that snapshot is 
 Claims run oldest first and require the snapshot's ETag for conditional updates, so a
 concurrent ownership change rejects a stale claim. Providers used for Durable Jobs supply
 metadata ETags and enforce conditional updates; a missing ETag surfaces as a discovery error.
-Assigned shards are delivered as they are opened, allowing
-execution to proceed while later candidates are evaluated. The claim budget limits new claims;
+Assigned shards are delivered as they are opened, allowing execution to proceed while later
+candidates are evaluated. The claim budget limits new claims;
 locally owned shards remain eligible after that budget is exhausted.
 
 Catalog providers apply raw-prefix and range constraints using their storage capabilities.
@@ -148,9 +148,12 @@ The sweep owns its enumeration and selected identity set until completion. Stora
 propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
 already delivered to the local manager are tracked before cancellation is observed and
 continue through their execution lifecycle.
-Cancellation flows through listing, metadata, and journal operations. Shutdown closes
-activation admission, cancels and awaits the active sweep, then awaits every admitted
-shard's execution and cleanup before disposing cached shards which remained inactive.
+Cancellation flows through listing, metadata, and journal operations. Shutdown atomically
+closes scheduling and activation admission, cancels scheduling, and awaits every admitted call
+before canceling execution. Successful writes retain their result, and successful shard
+creations remain owned even when cancellation races with their completion. Shutdown then
+awaits the active sweep and every admitted shard's execution and cleanup before disposing
+cached shards which remained inactive.
 
 Shorter lookahead periods reduce early loading of recovered shards. Shorter check intervals
 increase sweep frequency and reduce the wait for newly inserted or newly eligible shards.

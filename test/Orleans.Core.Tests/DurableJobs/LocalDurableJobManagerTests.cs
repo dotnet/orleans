@@ -958,6 +958,383 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task Stop_DuringShardCreation_CancelsQueuedSchedulingAndDisposesLateCreation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shard = new BlockingQueueShard("late-creation", timeProvider.GetUtcNow(), timeProvider.GetUtcNow().Add(options.ShardDuration));
+        shard.ScheduleJob = (_, _) => throw new InvalidOperationException("A canceled creation must not schedule a job.");
+        var creation = new TaskCompletionSource<IJobShard>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shardManager = new TestJobShardManager
+        {
+            CreateShard = (_, _, _, token) =>
+            {
+                createStarted.SetResult(token);
+                return creation.Task;
+            }
+        };
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        var scheduling = manager.ScheduleJobAsync(CreateScheduleRequest(shard.StartTime), cancellationToken);
+        var creationToken = await createStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        var queued = manager.ScheduleJobAsync(CreateScheduleRequest(shard.EndTime), cancellationToken);
+        Task? stop = null;
+        try
+        {
+            Assert.False(queued.IsCompleted);
+            Assert.Equal(1, shardManager.CreateShardCallCount);
+            // No background loops: shutdown must wait specifically for the admitted scheduling calls.
+            stop = observer.OnStop(cancellationToken);
+            Assert.True(creationToken.IsCancellationRequested);
+            Assert.False(stop.IsCompleted);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+            Assert.False(scheduling.IsCompleted);
+            Assert.False(shard.DisposeStarted.Task.IsCompleted);
+
+            // Providers can complete successfully despite cancellation; the returned resource is still ours.
+            creation.SetResult(shard);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.False(shard.ConsumeStarted.Task.IsCompleted);
+            Assert.Equal(0, shard.DisposeCallCount);
+        }
+        finally
+        {
+            creation.TrySetResult(shard);
+            shard.AllowDispose.TrySetResult();
+            await (stop ?? observer.OnStop(cancellationToken)).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(1, shardManager.CreateShardCallCount);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Empty(shardManager.UnregisteredShards);
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Theory]
+    [InlineData(false, "success")]
+    [InlineData(false, "failure")]
+    [InlineData(false, "cancellation")]
+    [InlineData(false, "full")]
+    [InlineData(false, "disposed")]
+    [InlineData(true, "success")]
+    [InlineData(true, "failure")]
+    [InlineData(true, "cancellation")]
+    [InlineData(true, "full")]
+    [InlineData(true, "disposed")]
+    public async Task Stop_DuringExistingShardScheduling_AwaitsOutcomeBeforeDisposal(bool active, string outcome)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var start = active ? timeProvider.GetUtcNow() : timeProvider.GetUtcNow().AddHours(1);
+        var shard = new BlockingQueueShard("existing-scheduling", start, start.Add(options.ShardDuration));
+        var scheduleStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var scheduleResult = new TaskCompletionSource<DurableJob?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        shard.ScheduleJob = (_, token) =>
+        {
+            scheduleStarted.SetResult(token);
+            return scheduleResult.Task;
+        };
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        accessor.AddWritableShard(start, shard);
+        if (active)
+        {
+            accessor.TryActivateShard(shard);
+            await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        var request = CreateScheduleRequest(start);
+        var expectedJob = new DurableJob
+        {
+            Id = "accepted-job",
+            Name = request.JobName,
+            DueTime = request.DueTime,
+            TargetGrainId = request.Target,
+            ShardId = shard.Id
+        };
+        var failure = new InvalidOperationException("Scheduling failed");
+        var scheduling = manager.ScheduleJobAsync(request, cancellationToken);
+        var schedulingToken = await scheduleStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        Task? stop = null;
+        try
+        {
+            stop = observer.OnStop(cancellationToken);
+            Assert.True(schedulingToken.IsCancellationRequested);
+            await manager.QueueTask(() => Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.False(shard.DisposeStarted.Task.IsCompleted);
+            Assert.True(accessor.HasCachedShard(shard.Id));
+            Assert.True(accessor.HasWritableShard(start));
+
+            switch (outcome)
+            {
+                case "success":
+                    scheduleResult.SetResult(expectedJob);
+                    Assert.Same(expectedJob, await scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+                    break;
+                case "failure":
+                    scheduleResult.SetException(failure);
+                    Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                        () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken)));
+                    break;
+                case "cancellation":
+                    scheduleResult.SetCanceled(schedulingToken);
+                    var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                        () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+                    Assert.Equal(schedulingToken, exception.CancellationToken);
+                    break;
+                case "full":
+                    scheduleResult.SetResult(null);
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                        () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+                    break;
+                case "disposed":
+                    scheduleResult.SetException(new ObjectDisposedException(shard.Id));
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                        () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unexpected outcome: {outcome}");
+            }
+
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.Equal(0, shard.DisposeCallCount);
+        }
+        finally
+        {
+            scheduleResult.TrySetResult(expectedJob);
+            shard.AllowDispose.TrySetResult();
+            await (stop ?? observer.OnStop(cancellationToken)).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(0, shardManager.CreateShardCallCount);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Equal(active, shard.ConsumeStarted.Task.IsCompleted);
+        Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stop_DuringFailedOrCanceledCreation_DrainsSchedulingWithoutMaskingOutcome(bool canceled)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var creation = new TaskCompletionSource<IJobShard>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shardManager = new TestJobShardManager
+        {
+            CreateShard = (_, _, _, token) =>
+            {
+                createStarted.SetResult(token);
+                return creation.Task;
+            }
+        };
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        var failure = new InvalidOperationException("Creation failed");
+        var scheduling = manager.ScheduleJobAsync(CreateScheduleRequest(timeProvider.GetUtcNow()), cancellationToken);
+        var creationToken = await createStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        var stop = observer.OnStop(cancellationToken);
+        try
+        {
+            Assert.True(creationToken.IsCancellationRequested);
+            Assert.False(stop.IsCompleted);
+            if (canceled)
+            {
+                creation.SetCanceled(creationToken);
+                var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+                Assert.Equal(creationToken, exception.CancellationToken);
+            }
+            else
+            {
+                creation.SetException(failure);
+                Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken)));
+            }
+        }
+        finally
+        {
+            creation.TrySetCanceled(creationToken);
+            await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(1, shardManager.CreateShardCallCount);
+        Assert.Empty(shardManager.UnregisteredShards);
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stop_ClosesSchedulingGateBeforeCallbacksAndRejectsCallsAfterStop(bool existingShard)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var start = timeProvider.GetUtcNow().AddHours(1);
+        var shard = new BlockingQueueShard("shutdown-cache", start, start.Add(options.ShardDuration));
+        shard.ScheduleJob = (_, _) => throw new InvalidOperationException("Scheduling reached a shard after admission closed.");
+        var shardManager = new TestJobShardManager();
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(shardManager, timeProvider, options, logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        accessor.AddWritableShard(start, shard);
+        var request = CreateScheduleRequest(existingShard ? start : shard.EndTime);
+        Task<DurableJob>? rejected = null;
+        logger.OnLog = eventId =>
+        {
+            if (eventId.Name == "LogStopping")
+            {
+                rejected = manager.ScheduleJobAsync(request, cancellationToken);
+            }
+        };
+
+        var stop = observer.OnStop(cancellationToken);
+        try
+        {
+            Assert.NotNull(rejected);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rejected.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.Equal(0, shard.DisposeCallCount);
+        }
+        finally
+        {
+            shard.AllowDispose.TrySetResult();
+            await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => manager.ScheduleJobAsync(request, cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        Assert.Equal(0, shardManager.CreateShardCallCount);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.False(shard.ConsumeStarted.Task.IsCompleted);
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_CanceledRequestOwnsLateCreationUntilShutdown()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var start = timeProvider.GetUtcNow().AddHours(1);
+        var shard = new BlockingQueueShard("caller-canceled-creation", start, start.Add(options.ShardDuration));
+        shard.ScheduleJob = (_, _) => throw new InvalidOperationException("A canceled request must not schedule a job.");
+        var creation = new TaskCompletionSource<IJobShard>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shardManager = new TestJobShardManager { CreateShard = (_, _, _, _) => creation.Task };
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        var scheduling = manager.ScheduleJobAsync(CreateScheduleRequest(start), requestCancellation.Token);
+        Task? stop = null;
+        try
+        {
+            Assert.Equal(1, shardManager.CreateShardCallCount);
+            requestCancellation.Cancel();
+            Assert.False(scheduling.IsCompleted);
+            creation.SetResult(shard);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scheduling.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+            Assert.True(accessor.HasCachedShard(shard.Id));
+            Assert.True(accessor.TryGetWritableShard(start, out var writable));
+            Assert.Same(shard, writable);
+            Assert.False(shard.DisposeStarted.Task.IsCompleted);
+            Assert.False(shard.ConsumeStarted.Task.IsCompleted);
+
+            stop = observer.OnStop(cancellationToken);
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+        }
+        finally
+        {
+            creation.TrySetResult(shard);
+            shard.AllowDispose.TrySetResult();
+            await (stop ?? observer.OnStop(cancellationToken)).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(1, shardManager.CreateShardCallCount);
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Empty(shardManager.UnregisteredShards);
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_ConcurrentCallsShareCreationAndLeaveNoShutdownWork()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var start = timeProvider.GetUtcNow().AddHours(1);
+        var shard = new BlockingQueueShard("shared-creation", start, start.Add(options.ShardDuration));
+        var scheduleCount = 0;
+        shard.ScheduleJob = (request, _) =>
+        {
+            Interlocked.Increment(ref scheduleCount);
+            return Task.FromResult<DurableJob?>(new()
+            {
+                Id = request.JobName,
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = shard.Id
+            });
+        };
+        var creation = new TaskCompletionSource<IJobShard>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shardManager = new TestJobShardManager { CreateShard = (_, _, _, _) => creation.Task };
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var observer = CreateLifecycleObserver(manager);
+        var requests = Enumerable.Range(0, 3).Select(i => CreateScheduleRequest(start, $"job-{i}")).ToArray();
+        var scheduling = requests.Select(request => manager.ScheduleJobAsync(request, cancellationToken)).ToArray();
+        Task? stop = null;
+        try
+        {
+            Assert.Equal(1, shardManager.CreateShardCallCount);
+            Assert.All(scheduling, task => Assert.False(task.IsCompleted));
+            creation.SetResult(shard);
+            var jobs = await Task.WhenAll(scheduling).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.Equal(requests.Select(request => request.JobName), jobs.Select(job => job.Name));
+            Assert.All(jobs, job => Assert.Equal(shard.Id, job.ShardId));
+            Assert.Equal(3, Volatile.Read(ref scheduleCount));
+            Assert.Equal(1, shardManager.CreateShardCallCount);
+            Assert.Equal(1, accessor.CachedShardCount);
+            Assert.True(accessor.TryGetWritableShard(start, out var writable));
+            Assert.Same(shard, writable);
+            Assert.False(shard.DisposeStarted.Task.IsCompleted);
+
+            stop = observer.OnStop(cancellationToken);
+            await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(stop.IsCompleted);
+        }
+        finally
+        {
+            creation.TrySetResult(shard);
+            shard.AllowDispose.TrySetResult();
+            await (stop ?? observer.OnStop(cancellationToken)).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+
+        Assert.Equal(1, shard.DisposeCallCount);
+        Assert.Empty(shardManager.UnregisteredShards);
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Fact]
     public async Task ScheduleJobAsync_WhenWritableShardIsDisposed_RemovesStaleShardAndRetries()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -1463,6 +1840,35 @@ public class LocalDurableJobManagerTests
         Assert.Equal("JobName", exception.ParamName);
     }
 
+    private static ScheduleJobRequest CreateScheduleRequest(DateTimeOffset dueTime, string jobName = "scheduled-job") => new()
+    {
+        Target = GrainId.Create("test", "target"),
+        JobName = jobName,
+        DueTime = dueTime
+    };
+
+    private static ILifecycleObserver CreateLifecycleObserver(LocalDurableJobManager manager)
+    {
+        var lifecycle = Substitute.For<ISiloLifecycle>();
+        ILifecycleObserver? observer = null;
+        lifecycle.Subscribe(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<ILifecycleObserver>())
+            .Returns(call =>
+            {
+                observer = call.ArgAt<ILifecycleObserver>(2);
+                return Substitute.For<IDisposable>();
+            });
+        manager.Participate(lifecycle);
+        Assert.NotNull(observer);
+        return observer;
+    }
+
+    private static void AssertSchedulingCacheEmpty(LocalDurableJobManager.TestAccessor accessor)
+    {
+        Assert.Equal(0, accessor.CachedShardCount);
+        Assert.Equal(0, accessor.WritableShardCount);
+        Assert.Equal(0, accessor.WritableShardKeyCount);
+    }
+
     private static LocalDurableJobManager CreateManager(
         JobShardManager shardManager,
         FakeTimeProvider timeProvider,
@@ -1642,6 +2048,8 @@ public class LocalDurableJobManagerTests
 
         public TaskCompletionSource AllowDispose { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public Func<ScheduleJobRequest, CancellationToken, Task<DurableJob?>>? ScheduleJob { get; set; }
+
         public int DisposeCallCount;
 
         public string Id { get; } = id;
@@ -1673,7 +2081,8 @@ public class LocalDurableJobManagerTests
 
         public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
+        public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) =>
+            ScheduleJob is { } schedule ? schedule(request, cancellationToken) : Task.FromResult<DurableJob?>(null);
 
         public async ValueTask DisposeAsync()
         {
