@@ -579,6 +579,8 @@ namespace Orleans.Journaling
     {
         public VolatileJournalStorageProvider() { }
 
+        public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options, Runtime.OrleansInstruments instruments) { }
+
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }

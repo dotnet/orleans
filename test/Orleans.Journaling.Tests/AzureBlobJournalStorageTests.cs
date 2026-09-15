@@ -21,6 +21,120 @@ public sealed class AzureBlobJournalStorageTests
     private static readonly JournalId TestJournalId = JournalId.FromGrainId(GrainId.Create("test-grain", "0"));
 
     [Fact]
+    public async Task Telemetry_RecordsEverySdkCallAcrossStorageLifecycle()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints, instruments: metrics.Blob);
+
+        Assert.Null(await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        Assert.NotNull(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken);
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, TestContext.Current.CancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
+        await storage.DeleteAsync(TestContext.Current.CancellationToken);
+
+        var expected = new Dictionary<string, int>
+        {
+            ["CreateAsync"] = appendBlobs.CreateCalls.Count,
+            ["GetPropertiesAsync"] = appendBlobs.PropertiesCalls.Count,
+            ["SetMetadataAsync"] = appendBlobs.SetMetadataCalls.Count,
+            ["AppendBlockAsync"] = appendBlobs.AppendCalls.Count,
+            ["UploadAsync"] = checkpoints.UploadCalls.Count,
+            ["DownloadStreamingAsync"] = appendBlobs.DownloadCalls.Count + checkpoints.DownloadCalls.Count,
+            ["DeleteIfExistsAsync"] = appendBlobs.DeleteCalls.Count + checkpoints.DeleteCalls.Count,
+        };
+        var calls = metrics.Calls.GetMeasurementSnapshot();
+        Assert.Equal(expected.Values.Sum(), calls.Count);
+        foreach (var (api, count) in expected)
+        {
+            Assert.True(count > 0, api);
+            Assert.Equal(count, calls.Count(call => Equals(call.Tags["api"], api)));
+        }
+
+        Assert.All(calls, call =>
+        {
+            Assert.Equal(3, call.Tags.Count);
+            Assert.Equal("azure_blob", call.Tags["provider"]);
+            Assert.Equal(1, call.Value);
+        });
+        Assert.Equal("not_found", calls[0].Tags["status"]);
+        Assert.All(calls.Skip(1), call => Assert.Equal("ok", call.Tags["status"]));
+        Assert.Equal(calls.Count, metrics.ApiDuration.GetMeasurementSnapshot().Count);
+    }
+
+    [Fact]
+    public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs, instruments: metrics.Blob);
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        appendBlobs.BeforeSetMetadata = (_, _, _) => throw new RequestFailedException(412, "concurrent update");
+
+        Assert.Null(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+
+        var retries = metrics.Retries.GetMeasurementSnapshot();
+        Assert.Equal([1L, 1L], retries.Select(retry => retry.Value));
+        Assert.All(retries, retry =>
+        {
+            Assert.Equal(2, retry.Tags.Count);
+            Assert.Equal("azure_blob", retry.Tags["provider"]);
+            Assert.Equal("metadata_conflict", retry.Tags["reason"]);
+        });
+        var conflicts = metrics.Calls.GetMeasurementSnapshot().Where(call => Equals(call.Tags["api"], "SetMetadataAsync")).ToArray();
+        Assert.Equal(3, conflicts.Length);
+        Assert.All(conflicts, call => Assert.Equal("conflict", call.Tags["status"]));
+    }
+
+    [Fact]
+    public async Task Telemetry_DeleteIfExistsFalseIsNotFound()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add("blob/wal", [], CheckpointMarkerMetadata("missing-checkpoint", "test"), isSealed: false);
+        var storage = new InstrumentedJournalStorage(
+            CreateStorage(appendBlobs, instruments: metrics.Blob), JournalStorageTelemetry.AzureBlob, metrics.Blob!.Telemetry);
+
+        await storage.DeleteAsync(TestContext.Current.CancellationToken);
+
+        var deletes = metrics.Calls.GetMeasurementSnapshot().Where(call => Equals(call.Tags["api"], "DeleteIfExistsAsync")).ToArray();
+        Assert.Equal(2, deletes.Length);
+        Assert.Equal("ok", deletes[0].Tags["status"]);
+        Assert.Equal("not_found", deletes[1].Tags["status"]);
+        var operation = Assert.Single(metrics.Operations.GetMeasurementSnapshot());
+        Assert.Equal("delete", operation.Tags["operation"]);
+        Assert.Equal("ok", operation.Tags["status"]);
+    }
+
+    [Fact]
+    public async Task Telemetry_DownloadLatencyEndsBeforeConsumerWork()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add("blob/wal", [1], WalMetadata(), isSealed: false);
+        var storage = new InstrumentedJournalStorage(
+            CreateStorage(appendBlobs, instruments: metrics.Blob), JournalStorageTelemetry.AzureBlob, metrics.Blob!.Telemetry);
+        var consumer = new AdvancingConsumer(() => metrics.Clock.Advance(TimeSpan.FromMilliseconds(17)));
+
+        await storage.ReadAsync(consumer, TestContext.Current.CancellationToken);
+
+        var api = Assert.Single(metrics.ApiDuration.GetMeasurementSnapshot());
+        Assert.Equal("DownloadStreamingAsync", api.Tags["api"]);
+        Assert.Equal("ok", api.Tags["status"]);
+        Assert.Equal(0, api.Value);
+        var operation = Assert.Single(metrics.OperationDuration.GetMeasurementSnapshot());
+        Assert.Equal("read", operation.Tags["operation"]);
+        Assert.Equal("ok", operation.Tags["status"]);
+        Assert.Equal(17, operation.Value);
+    }
+
+    [Fact]
     public async Task DeleteAsync_AllowsNextAppendToRecreateWal()
     {
         var appendBlobs = new FakeAppendBlobStore();
@@ -729,7 +843,8 @@ public sealed class AzureBlobJournalStorageTests
         string? journalFormatKey = null,
         bool deleteOldCheckpoints = true,
         string? walBlobName = null,
-        Func<string, string>? getCheckpointName = null)
+        Func<string, string>? getCheckpointName = null,
+        AzureBlobJournalStorageInstruments? instruments = null)
     {
         checkpoints ??= new FakeBlockBlobStore();
         walBlobName ??= "blob/wal";
@@ -739,7 +854,7 @@ public sealed class AzureBlobJournalStorageTests
                 NullLogger<AzureBlobJournalStorage>.Instance,
                 Options.Create(new AzureBlobJournalStorageOptions { DeleteOldCheckpoints = deleteOldCheckpoints }),
                 new FakeBlobClientProvider(appendBlobs, checkpoints, walBlobName, getCheckpointName),
-                CreateAzureBlobJournalStorageInstruments(),
+                instruments ?? CreateAzureBlobJournalStorageInstruments(),
                 mimeType,
                 journalFormatKey),
             TestJournalId);
@@ -821,6 +936,18 @@ public sealed class AzureBlobJournalStorageTests
             var next = new ChunkSegment(buffer, RunningIndex + Memory.Length);
             Next = next;
             return next;
+        }
+    }
+
+    private sealed class AdvancingConsumer(Action advance) : IJournalStorageConsumer
+    {
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
+        {
+            if (buffer.Length > 0)
+            {
+                advance();
+                buffer.Skip(buffer.Length);
+            }
         }
     }
 

@@ -1,4 +1,6 @@
+using Azure.Data.Tables;
 using Azure.Storage.Blobs;
+using DurableJobsJournaling;
 using DurableJobsJournaling.Silo;
 using Orleans.Dashboard;
 using Orleans.Journaling;
@@ -7,27 +9,53 @@ using Orleans.Journaling.Json;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.AddAzureBlobServiceClient("blobs");
 builder.AddKeyedAzureTableServiceClient("tables");
 
-var storageContainer = builder.Configuration.GetValue("Playground:Storage:Container", "durablejobs-journaling-playground");
-var storagePrefix = builder.Configuration.GetValue("Playground:Storage:Prefix", $"run-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}");
+var backend = StorageBackendConfiguration.Parse(builder.Configuration.GetValue("Playground:Storage:Provider", "Azurite"));
+if (backend.UsesTableJournal())
+{
+    builder.AddAzureTableServiceClient("journals");
+    builder.Services.AddOptions<AzureTableJournalStorageOptions>()
+        .Configure<TableServiceClient>((options, client) =>
+        {
+            options.TableServiceClient = client;
+        });
+}
+else
+{
+    builder.AddAzureBlobServiceClient("blobs");
+    builder.Services.AddOptions<AzureBlobJournalStorageOptions>()
+        .Configure<BlobServiceClient>((options, client) =>
+        {
+            options.BlobServiceClient = client;
+        });
+}
 
 builder.UseOrleans(siloBuilder =>
 {
 #pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    if (backend.UsesTableJournal())
+    {
+        siloBuilder.UseAzureTableDurableJobs(options =>
+        {
+            options.TableName = builder.Configuration["Playground:Storage:Table"]
+                ?? throw new InvalidOperationException("Set Playground:Storage:Table to the shared run-specific table name.");
+        });
+    }
+    else
+    {
+        siloBuilder.UseAzureBlobDurableJobs(options =>
+        {
+            options.ContainerName = builder.Configuration["Playground:Storage:Container"]
+                ?? throw new InvalidOperationException("Set Playground:Storage:Container to the shared run-specific container name.");
+        });
+    }
+
     siloBuilder
         .AddDashboard()
         .AddActivityPropagation()
         .AddIncomingGrainCallFilter<GrainRequestMetricsFilter>()
         .AddDistributedGrainDirectory()
-        .UseAzureBlobDurableJobs(
-            options =>
-            {
-                options.ContainerName = storageContainer;
-                options.GetWalBlobName = journalId => $"{storagePrefix}/{journalId.Value}/wal";
-                options.GetCheckpointBlobName = (journalId, snapshotId) => $"{storagePrefix}/{journalId.Value}/chk.{snapshotId}";
-            })
         .UseJsonJournalFormat(DurableJobsJournalingJsonContext.Default)
         .Configure<DurableJobsOptions>(options =>
         {
@@ -45,12 +73,6 @@ builder.UseOrleans(siloBuilder =>
         });
 #pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 });
-
-builder.Services.AddOptions<AzureBlobJournalStorageOptions>()
-    .Configure<BlobServiceClient>((options, blobServiceClient) =>
-    {
-        options.BlobServiceClient = blobServiceClient;
-    });
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

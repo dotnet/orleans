@@ -280,7 +280,49 @@ Core journaling instruments use `operation` and `status` where applicable. Opera
 | `orleans-journaling-storage-operations` | C | Operations, implicit | `operation`, `status` | Journal storage operations by operation and outcome. |
 | `orleans-journaling-write-coalesced-callers` | H | Callers, implicit | `operation` | Number of callers combined into each coalesced journal write. |
 
-Azure journaling storage instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
+### Provider operations and API calls
+
+Provider-agnostic instruments distinguish calls to a provider-created journal storage handle from
+the SDK calls used to implement them. The `provider` attribute is `s3`, `azure_blob`, `azure_table`,
+`redis`, or `volatile`. Logical operations are `create`, `get_metadata`, `update_metadata`, `append`,
+`replace`, `read`, `delete`, and catalog `list`; providers also record lifecycle `initialize` and
+`close` operations where applicable.
+
+The bounded `status` values include `ok`, `error`, `canceled`, `conflict`, `not_found`, `already_exists`,
+`not_applied`, `disposed`, `throttled`, `unavailable`, and `timeout`. For example, a successful Redis
+script which reports an absent journal records SDK status `ok` and logical `get_metadata` status
+`not_found`. An unsuccessful conditional metadata update records `not_applied`, covering both a
+version mismatch and a concurrently absent journal.
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-journaling-provider-operations` | C | Operations, implicit | `provider`, `operation`, `status` | Completed logical storage, catalog, and lifecycle operations by outcome. |
+| `orleans-journaling-provider-operation-duration` | H | `ms` | `provider`, `operation`, `status` | Logical operation execution duration. Catalog enumeration accumulates active advances and cleanup, excluding consumer pauses between entries. |
+| `orleans-journaling-provider-operation-bytes` | C | `bytes` | `provider`, `operation`, `status` | Encoded payload bytes accepted by successful append/replace operations or delivered during reads, including a partial read before an error. |
+| `orleans-journaling-provider-catalog-entries` | C | Entries, implicit | `provider` | Catalog entries delivered to the consumer. |
+| `orleans-journaling-provider-api-calls` | C | Calls, implicit | `provider`, `api`, `status` | Completed provider-issued SDK calls and exposed service-page requests. Redis `scan_keys` counts SDK enumerations. |
+| `orleans-journaling-provider-api-call-duration` | H | `ms` | `provider`, `api`, `status` | SDK call or service-page latency, including SDK-internal retry time. Redis scan enumeration accumulates active SDK advances, excluding consumer pauses. |
+| `orleans-journaling-provider-api-items` | C | Items, implicit | `provider`, `api`, `status` | Items observed in native listing pages, Redis key scans, or supported batch responses. Compare with delivered catalog entries to assess filtering work. |
+| `orleans-journaling-provider-retries` | C | Retries, implicit | `provider`, `reason` | Explicit retries performed by the provider, using bounded reason labels. Retried SDK invocations also contribute to API call counts. |
+
+Catalog metrics start on the first advance. Empty logical ranges count as completed enumerations
+with zero SDK calls. Azure page metrics include successful empty pages and failed page requests;
+the final advance past the last page adds no API call. Early consumer disposal records `disposed`.
+SDK streaming-download latency ends when the SDK returns its response; the outer logical read
+includes stream consumption.
+
+Use SDK call rates by `provider` and `api` to monitor request amplification and latency histograms
+to track dependency p50/p95/p99. Billing-grade transaction totals come from service-side request
+metrics or SDK transport instrumentation: one SDK invocation can contain automatic retries,
+upload chunks, or multiple Redis cursor pages. Redis Lua execution is one SDK script call, while
+the script can execute several server commands. Operation payload bytes describe encoded journal
+data rather than total network traffic.
+
+These instruments use operation/API/outcome labels; resource identities belong in logs and traces.
+The existing state-manager and provider-specific instruments below retain their original meanings,
+so dashboards should keep the layers separate when aggregating counts.
+
+Azure and S3 storage-method instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
 
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
@@ -290,6 +332,9 @@ Azure journaling storage instruments use operations `create`, `get_metadata`, `u
 | `orleans-journaling-azure-table-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by Azure Table journal storage operations. |
 | `orleans-journaling-azure-table-operation-duration` | H | `ms` | `operation`, `status` | Azure Table journal storage operation duration by operation and outcome. |
 | `orleans-journaling-azure-table-operations` | C | Operations, implicit | `operation`, `status` | Azure Table journal storage operations by operation and `ok` or `error` status. |
+| `orleans-journaling-s3-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by S3 journal storage methods. |
+| `orleans-journaling-s3-operation-duration` | H | `ms` | `operation`, `status` | S3 journal storage method duration by operation and outcome. |
+| `orleans-journaling-s3-operations` | C | Operations, implicit | `operation`, `status` | S3 journal storage methods by operation and `ok` or `error` status. |
 
 ## Use the catalog
 
