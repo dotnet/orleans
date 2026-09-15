@@ -1,4 +1,6 @@
+using System.Data;
 using System.Data.Common;
+using System.Text;
 using Microsoft.Data.SqlClient;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
@@ -10,6 +12,9 @@ namespace UnitTests.General
         private const int DeadlockVictimError = 1205;
         private const int DatabaseAlreadyOpenError = 924;
         private const int DatabaseInUseError = 3702;
+        private const int SetupOwnershipError = 50924;
+        private const int SetupCommandTimeoutSeconds = 120;
+        private const string SnapshotSettingsCommand = "EXECUTE sp_executesql @snapshotSettings;";
 
         protected override string ProviderMoniker => "SQLServer";
 
@@ -71,40 +76,15 @@ namespace UnitTests.General
 
             using var commandBuilder = new SqlCommandBuilder();
             var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
-            var setupSucceeded = false;
-            await using var connection = await AcquireSetupConnectionAsync(
-                scriptBatches[0],
+            await ExecuteSetupScriptBatchesWithRetryAsync(
+                scriptBatches,
                 quotedDatabaseName,
                 databaseName,
                 cancellationToken);
-            try
-            {
-                for (var i = 1; i < scriptBatches.Length; i++)
-                {
-                    await ExecuteCommandAsync(connection, scriptBatches[i], cancellationToken);
-                }
-
-                setupSucceeded = true;
-            }
-            finally
-            {
-                using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                try
-                {
-                    await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
-                }
-                catch when (!setupSucceeded)
-                {
-                    // Preserve the setup failure instead of replacing it with a cleanup failure.
-                }
-
-                using var pooledConnection = new SqlConnection(CurrentConnectionString);
-                SqlConnection.ClearPool(pooledConnection);
-            }
         }
 
-        private async Task<SqlConnection> AcquireSetupConnectionAsync(
-            string firstScript,
+        private async Task ExecuteSetupScriptBatchesWithRetryAsync(
+            IReadOnlyList<string> scripts,
             string quotedDatabaseName,
             string databaseName,
             CancellationToken cancellationToken)
@@ -119,18 +99,23 @@ namespace UnitTests.General
             for (var attempt = 1; ; attempt++)
             {
                 var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
-                var acquired = false;
+                var setupCommandStarted = false;
+                var setupSucceeded = false;
                 try
                 {
                     await OpenConnectionAsync(connection, cancellationToken);
-                    await ExecuteCommandAsync(
+                    setupCommandStarted = true;
+                    await ExecuteSetupCommandAsync(
                         connection,
-                        $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{firstScript}",
+                        scripts,
+                        quotedDatabaseName,
                         cancellationToken);
-                    acquired = true;
-                    return connection;
+                    setupSucceeded = true;
+                    return;
                 }
-                catch (SqlException exception) when (IsRetryableDatabaseSetupError(exception.Number) && attempt < maxAttempts)
+                catch (SqlException exception) when (
+                    IsRetryableDatabaseSetupError(exception.Number, setupCommandStarted)
+                    && attempt < maxAttempts)
                 {
                     Console.WriteLine(
                         "SQL Server database '{0}' setup failed with transient error {1} on attempt {2}; retrying.",
@@ -140,34 +125,101 @@ namespace UnitTests.General
                 }
                 finally
                 {
-                    if (!acquired)
+                    if (!setupSucceeded)
                     {
+                        try
+                        {
+                            await connection.DisposeAsync();
+                        }
+                        catch
+                        {
+                            // Preserve the setup failure instead of replacing it with a disposal failure.
+                        }
+
                         using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                         try
                         {
-                            await RestoreMultiUserAsync(connection, quotedDatabaseName, cleanupCancellation.Token);
+                            await RestoreMultiUserAsync(quotedDatabaseName, cleanupCancellation.Token);
                         }
                         catch
                         {
                             // Preserve the setup failure instead of replacing it with a cleanup failure.
                         }
-
-                        await connection.DisposeAsync();
-                        using var pooledConnection = new SqlConnection(CurrentConnectionString);
-                        SqlConnection.ClearPool(pooledConnection);
                     }
+                    else
+                    {
+                        await connection.DisposeAsync();
+                    }
+
+                    using var pooledConnection = new SqlConnection(CurrentConnectionString);
+                    SqlConnection.ClearPool(pooledConnection);
                 }
             }
         }
 
-        private static Task RestoreMultiUserAsync(
+        private static async Task ExecuteSetupCommandAsync(
             SqlConnection connection,
+            IReadOnlyList<string> scripts,
             string quotedDatabaseName,
-            CancellationToken cancellationToken) =>
-            ExecuteCommandAsync(
+            CancellationToken cancellationToken)
+        {
+            await using var command = connection.CreateCommand();
+            var commandText = new StringBuilder(
+                $"""
+                DECLARE @FirstBatchCompleted bit = 0;
+                BEGIN TRY
+                    ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+
+                """);
+
+            for (var i = 0; i < scripts.Count; i++)
+            {
+                var parameterName = $"@Batch{i}";
+                commandText.Append("    EXEC sys.sp_executesql ").Append(parameterName).AppendLine(";");
+                command.Parameters.Add(parameterName, SqlDbType.NVarChar, -1).Value = scripts[i];
+                if (i == 0)
+                {
+                    commandText.AppendLine("    SET @FirstBatchCompleted = 1;");
+                }
+            }
+
+            commandText.Append(
+                $"""
+                    ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;
+                END TRY
+                BEGIN CATCH
+                    IF ERROR_NUMBER() = {DatabaseAlreadyOpenError} AND @FirstBatchCompleted = 0
+                    BEGIN
+                        ;THROW {SetupOwnershipError}, N'Failed to acquire SQL Server setup ownership.', 1;
+                    END;
+
+                    ;THROW;
+                END CATCH;
+                """);
+
+            command.CommandText = commandText.ToString();
+            command.CommandTimeout = SetupCommandTimeoutSeconds;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        private async Task RestoreMultiUserAsync(
+            string quotedDatabaseName,
+            CancellationToken cancellationToken)
+        {
+            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+            {
+                InitialCatalog = "master",
+                Pooling = false,
+                ConnectTimeout = 5
+            };
+
+            await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+            await OpenConnectionAsync(connection, cancellationToken);
+            await ExecuteCommandAsync(
                 connection,
                 $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER WITH ROLLBACK IMMEDIATE;",
                 cancellationToken);
+        }
 
         private static async Task OpenConnectionAsync(SqlConnection connection, CancellationToken cancellationToken)
         {
@@ -253,8 +305,10 @@ namespace UnitTests.General
         internal static bool IsRetryableDatabaseResetError(int errorNumber) =>
             errorNumber is DeadlockVictimError or DatabaseInUseError;
 
-        internal static bool IsRetryableDatabaseSetupError(int errorNumber) =>
-            errorNumber is DatabaseAlreadyOpenError;
+        internal static bool IsRetryableDatabaseSetupError(int errorNumber, bool setupCommandStarted) =>
+            setupCommandStarted
+                ? errorNumber is SetupOwnershipError
+                : errorNumber is DatabaseAlreadyOpenError;
 
         protected override string ExistsDatabaseTemplate
         {
@@ -267,7 +321,18 @@ namespace UnitTests.General
 
         protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string dataBaseName)
         {
-            var batches = setupScript.Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            var snapshotSettingsEnd = setupScript.IndexOf(SnapshotSettingsCommand, StringComparison.Ordinal);
+            if (snapshotSettingsEnd < 0)
+            {
+                throw new InvalidOperationException("The SQL Server setup script does not contain the snapshot settings command.");
+            }
+
+            snapshotSettingsEnd += SnapshotSettingsCommand.Length;
+            var batches = new List<string>
+            {
+                setupScript[..snapshotSettingsEnd]
+            };
+            batches.AddRange(setupScript[snapshotSettingsEnd..].Split(new[] { "GO" }, StringSplitOptions.RemoveEmptyEntries));
 
             //This removes the use of recovery log in case of database crashes, which
             //improves performance to some degree, depending on usage. For non-performance testing only.

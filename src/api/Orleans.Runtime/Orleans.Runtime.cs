@@ -107,6 +107,11 @@ namespace Orleans.Configuration
         public System.TimeSpan RecoveryPeriod { get { throw null; } set { } }
     }
 
+    public sealed partial class ClusterManifestOptions
+    {
+        public bool EnableContentAddressedRetrieval { get { throw null; } set { } }
+    }
+
     public partial class ConsistentRingOptions
     {
         public const int DEFAULT_NUM_VIRTUAL_RING_BUCKETS = 30;

@@ -38,6 +38,13 @@ internal static class InstrumentNames
     // Runtime
     public const string SCHEDULER_NUM_LONG_RUNNING_TURNS = "orleans-scheduler-long-running-turns";
 
+    // Cluster manifests
+    public const string MANIFEST_CACHE_LOOKUPS = "orleans-manifest-cache-lookups";
+    public const string MANIFEST_FALLBACKS = "orleans-manifest-fallbacks";
+    public const string MANIFEST_PEER_PROBES = "orleans-manifest-peer-probes";
+    public const string MANIFEST_PEER_REPAIRS = "orleans-manifest-peer-repairs";
+    public const string MANIFEST_RETRIEVAL_DURATION = "orleans-manifest-retrieval-duration";
+
     // Catalog
     public const string CATALOG_ACTIVATION_COUNT = "orleans-catalog-activations";
     public const string CATALOG_ACTIVATION_WORKING_SET = "orleans-catalog-activation-working-set";
