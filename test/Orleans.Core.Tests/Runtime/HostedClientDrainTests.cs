@@ -54,7 +54,7 @@ public class HostedClientDrainTests
             // message 1602 was admitted to the channel, not merely queued by the test scheduler.
             fixture.Deliver(second);
             Assert.Equal(0, second.InvocationCount);
-            var stop = fixture.Stop();
+            var stop = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(stop.IsCompleted, fixture.DescribeState());
 
             first.ClassifierRelease.TrySetResult();
@@ -116,7 +116,7 @@ public class HostedClientDrainTests
             await fixture.StartAsync();
             fixture.Deliver(invocation);
             await fixture.WaitAsync(invocation.ScopeEntered.Task, "1701: observer held before response");
-            var stop = fixture.Stop();
+            var stop = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(stop.IsCompleted, fixture.DescribeState());
 
             // Model an already-issued outbound call, without SendRequest/routing. Success responses
@@ -187,7 +187,7 @@ public class HostedClientDrainTests
             await fixture.StartAsync();
             fixture.Deliver(invocation);
             await fixture.WaitAsync(invocation.ScopeEntered.Task, "1751: cancellable observer held");
-            var stop = fixture.Stop(); // Closes the channel synchronously.
+            var stop = fixture.Stop(TestContext.Current.CancellationToken); // Closes the channel synchronously.
             Assert.False(stop.IsCompleted, fixture.DescribeState());
             Assert.Equal(0, invocation.CancelCount);
 
@@ -241,7 +241,7 @@ public class HostedClientDrainTests
             // Host teardown can request Dispose after the canceled lifecycle wait has returned.
             await fixture.DisposeOnWorkerAsync("Dispose after canceled OnStop returned");
             fixture.AssertScopeLive();
-            var drain = fixture.Stop();
+            var drain = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(drain.IsCompleted, fixture.DescribeState());
             Assert.False(invocation.Release.Task.IsCompleted);
 
@@ -279,7 +279,7 @@ public class HostedClientDrainTests
             Assert.False(invocation.Exited.Task.IsCompleted, fixture.DescribeState());
             fixture.AssertScopeLive();
 
-            var drain = fixture.Stop();
+            var drain = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(drain.IsCompleted, fixture.DescribeState());
             invocation.Release.TrySetResult();
             await fixture.WaitAsync(drain, "1901: actual drain initiated by direct Dispose");
@@ -311,7 +311,7 @@ public class HostedClientDrainTests
             Assert.False(invocation.Exited.Task.IsCompleted, fixture.DescribeState());
             fixture.AssertScopeLive();
 
-            var drain = fixture.Stop();
+            var drain = fixture.Stop(TestContext.Current.CancellationToken);
             Assert.False(drain.IsCompleted, fixture.DescribeState());
             invocation.Release.TrySetResult();
             await fixture.WaitAsync(drain, "2001: actual drain before ownership assertions");
@@ -470,7 +470,7 @@ public class HostedClientDrainTests
         internal Task StartAsync() =>
             WaitAsync(_lifecycleObserver.OnStart(CancellationToken.None), "captured HostedClient OnStart");
 
-        internal Task Stop(CancellationToken cancellationToken = default)
+        internal Task Stop(CancellationToken cancellationToken)
         {
             // Invoke directly: this closes the channel before returning, not on a scheduled worker.
             var stop = _lifecycleObserver.OnStop(cancellationToken);
@@ -562,19 +562,33 @@ public class HostedClientDrainTests
 
             // Cleanup has an independent, uncanceled backstop. If a worker/drain is unfinished,
             // throw with context and deliberately leave providers intact for any live execution.
-            var drain = Stop();
-            await DrainTestHelpers.AwaitPhaseAsync(
-                Task.WhenAll(_workers.Concat(_stops)), "cleanup: workers and actual hosted drain joined", DescribeState);
-            await DrainTestHelpers.AwaitPhaseAsync(drain, "cleanup: pump and manager drained", DescribeState);
+            var drain = Stop(CancellationToken.None);
+            foreach (var worker in _workers)
+            {
+                try
+                {
+                    await DrainTestHelpers.AwaitCleanupAsync(
+                        worker, "cleanup: Dispose worker joined", DescribeState);
+                }
+                catch (OperationCanceledException) when (worker.IsCanceled && TestContext.Current.CancellationToken.IsCancellationRequested)
+                {
+                    // Task.Run can be canceled before the worker starts. There is no
+                    // worker execution to join; the independently started drain still must finish.
+                }
+            }
+
+            await DrainTestHelpers.AwaitCleanupAsync(
+                Task.WhenAll(_stops), "cleanup: actual hosted drains joined", DescribeState);
+            await DrainTestHelpers.AwaitCleanupAsync(drain, "cleanup: pump and manager drained", DescribeState);
             // Also join bodies which actually entered, so a failing early-drain regression cannot
             // let cleanup dispose providers while those already-started bodies are unwinding.
             // Uninvoked/rejected messages have no Exited signal and are not waited here.
-            await DrainTestHelpers.AwaitPhaseAsync(
+            await DrainTestHelpers.AwaitCleanupAsync(
                 Task.WhenAll(_invocations.Where(invocation => invocation.InvocationCount != 0)
                     .Select(invocation => invocation.Exited.Task)),
                 "cleanup: entered invocation bodies exited", DescribeState);
             ((IDisposable)Hosted).Dispose();
-            await DrainTestHelpers.AwaitPhaseAsync(
+            await DrainTestHelpers.AwaitCleanupAsync(
                 Scopes.ScopeDisposed.Task, "cleanup: owned scope disposal completed", DescribeState);
             _subscription.Dispose();
 
@@ -627,7 +641,8 @@ public class HostedClientDrainTests
                 MarkerLiveOnEntry = ObservedMarker.DisposeCount == 0;
                 _events.Enqueue($"{Id}:entered");
                 ScopeEntered.TrySetResult();
-                await DrainTestHelpers.AwaitPhaseAsync(Release.Task, $"{Id}: body release", _describeState);
+                await DrainTestHelpers.AwaitPhaseAsync(
+                    Release.Task, $"{Id}: body release", _describeState, TestContext.Current.CancellationToken);
                 MarkerLiveBeforeExit = ObservedMarker.DisposeCount == 0;
                 _events.Enqueue($"{Id}:exiting");
                 return Response.Completed;
@@ -691,7 +706,8 @@ public class HostedClientDrainTests
                 {
                     ClassifierEntered.TrySetResult();
                     DrainTestHelpers.AwaitPhaseAsync(
-                        ClassifierRelease.Task, $"{Id}: classifier release on pump worker", _describeState)
+                        ClassifierRelease.Task, $"{Id}: classifier release on pump worker", _describeState,
+                        TestContext.Current.CancellationToken)
                         .GetAwaiter().GetResult();
                 }
 

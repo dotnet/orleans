@@ -16,7 +16,7 @@ internal static class DrainTestHelpers
         Task task,
         string phase,
         Func<string> describeState,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -28,6 +28,11 @@ internal static class DrainTestHelpers
             throw new TimeoutException($"Observer drain did not reach {phase}. {describeState()}", exception);
         }
     }
+
+    internal static Task AwaitCleanupAsync(Task task, string phase, Func<string> describeState) =>
+        // Cleanup deliberately outlives runner cancellation: providers must not be freed
+        // while admitted user work still owns them. The 60-second backstop still applies.
+        AwaitPhaseAsync(task, phase, describeState, CancellationToken.None);
 }
 
 internal sealed class DrainObserver : IGrainObserver

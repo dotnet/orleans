@@ -510,7 +510,8 @@ public class InvokableObjectManagerTests
             try
             {
                 DrainTestHelpers.AwaitPhaseAsync(
-                    responseRelease.Task, "11: response sink Release", fixture.DescribeState).GetAwaiter().GetResult();
+                    responseRelease.Task, "11: response sink Release", fixture.DescribeState,
+                    TestContext.Current.CancellationToken).GetAwaiter().GetResult();
                 responseReturned.TrySetResult();
             }
             catch (Exception exception)
@@ -705,13 +706,13 @@ public class InvokableObjectManagerTests
             }
 
             var drain = Task.WhenAll(_stops.Append(Manager.StopAsync()));
-            await DrainTestHelpers.AwaitPhaseAsync(
+            await DrainTestHelpers.AwaitCleanupAsync(
                 drain, "cleanup: all actual manager drains (provider retained on timeout)", DescribeState);
             foreach (var request in _requests.Values)
             {
                 if (request.InvocationCount != 0)
                 {
-                    await DrainTestHelpers.AwaitPhaseAsync(
+                    await DrainTestHelpers.AwaitCleanupAsync(
                         request.Exited.Task, "cleanup: entered body Exited", DescribeState);
                 }
 

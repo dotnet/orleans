@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -29,53 +30,71 @@ namespace UnitTests.Runtime;
 public class ClientObserverDrainLifecycleTests
 {
     [Fact]
-    public async Task ClusterClientStop_AllowsUpperStageCleanupThenDrainsBeforeConnectionClosure()
+    public async Task ClusterClientStop_AllowsUpperStageCleanupThenDrainsBeforeConnectionClose()
     {
         var lifecycle = new LifecycleProbe();
-        var fixture = new ExternalClientFixture(lifecycle);
+        var fixture = new ExternalClientFixture(lifecycle, includeConnectionLifecycle: true);
         var events = new ConcurrentQueue<string>();
         var source = new CallbackCompletionSource();
-        var outboundCompleted = DrainTestHelpers.CreateSignal();
-        var release = DrainTestHelpers.CreateSignal();
         var callbacks = ReadCallbacks(fixture.Runtime);
         var outbound = new Message
         {
             Direction = Message.Directions.Request,
-            Id = new CorrelationId(2103),
+            Id = new CorrelationId(2104),
             SendingGrain = fixture.ObserverId.GrainId,
-            TargetGrain = ClientGrainId.Create("cleanup-target").GrainId
+            TargetGrain = ClientGrainId.Create("cleanup-outbound-target").GrainId,
         };
         var callback = new CallbackData(
             new SharedCallbackData(
                 message => callbacks.TryRemove(message.Id, out _),
-                NullLogger<CallbackData>.Instance,
-                fixture.TimeProvider,
-                TimeSpan.FromMinutes(1),
-                cancelOnTimeout: false,
-                waitForCancellationAcknowledgement: false,
-                cancellationManager: null),
-            source,
-            outbound,
-            new ApplicationRequestInstruments(fixture.Instruments));
-        var invocation = new ObservedInvocation("unused", async () =>
-        {
-            var result = await AwaitCallbackAsync(source);
-            events.Enqueue("outbound-completed");
-            outboundCompleted.TrySetResult();
-            await release.Task;
-            return Assert.IsType<string>(result);
-        })
+                NullLogger<CallbackData>.Instance, fixture.TimeProvider, TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null),
+            source, outbound, new ApplicationRequestInstruments(fixture.Instruments));
+        var invocation = new ObservedInvocation("unused", async () => $"cleanup-result-{await AwaitCallbackAsync(source)}")
         {
             OnCompleted = () => events.Enqueue("observer-exit")
         };
+        var remaining = new ObservedInvocation("remaining-completed")
+        {
+            OnCompleted = () => events.Enqueue("remaining-observer-exit")
+        };
+        var duringCleanup = new ObservedInvocation("cleanup-admission-open");
+        duringCleanup.Release.TrySetResult();
         var late = new TestInvokable("late-must-not-run");
         late.Release.TrySetResult();
+        TeardownSnapshot? connectionClose = null;
         Task? stop = null;
+        var succeeded = false;
+        fixture.BeforeConnectionDrain = () => events.Enqueue("observer-drain-started");
+        fixture.ConnectionLog.OnClosing = () =>
+        {
+            // Capture synchronously at the REAL Close entry, not in a scheduled Closed
+            // continuation which might resume only after the held observer has been released.
+            Interlocked.CompareExchange(
+                ref connectionClose,
+                new TeardownSnapshot(remaining.Exited.Task.IsCompleted, remaining.CompletionCount),
+                null);
+            events.Enqueue("connection-close");
+        };
         lifecycle.OnStopping = async _ =>
         {
+            events.Enqueue("upper-cleanup-started");
             Assert.False(fixture.Connections.Closed.IsCompleted);
-            Assert.False(callback.IsCompleted);
-            using var body = Response.FromResult("cleanup-completed");
+            Assert.Equal(0, fixture.ConnectionLog.CloseCount);
+            Assert.False(fixture.ConnectionDrainEntered.Task.IsCompleted);
+
+            // Upper-stage cleanup must still have normal observer admission. Interleave
+            // this non-control request so the blocked first observer does not serialize it.
+            fixture.Dispatch(duringCleanup, 2103, alwaysInterleave: true);
+            await fixture.WaitAsync(duringCleanup.Exited.Task, "upper cleanup admits application work", duringCleanup);
+            fixture.AssertCompletedInvocation(duringCleanup, "cleanup-admission-open");
+
+            // Model an outbound operation issued by upper-stage cleanup using the real
+            // callback ledger/ReceiveResponse path. No SendRequest or socket graph is fabricated.
+            Assert.True(callbacks.TryAdd(outbound.Id, callback));
+            Assert.False(source.Completed.Task.IsCompleted);
+            events.Enqueue("upper-outbound-response");
+            using var responseBody = Response.FromResult(941);
             fixture.Runtime.ReceiveResponse(new Message
             {
                 Direction = Message.Directions.Response,
@@ -83,56 +102,116 @@ public class ClientObserverDrainLifecycleTests
                 Id = outbound.Id,
                 SendingGrain = outbound.TargetGrain,
                 TargetGrain = outbound.SendingGrain,
-                BodyObject = body
+                BodyObject = responseBody,
             });
-            await fixture.WaitAsync(outboundCompleted.Task, "upper-stage outbound cleanup completed", invocation);
-            events.Enqueue("upper-stage-stop");
+            await fixture.WaitAsync(source.Completed.Task, "upper cleanup outbound operation completed", invocation);
+            Assert.Equal(941, Assert.IsType<int>(source.Result));
+            Assert.Null(source.Exception);
+            await fixture.WaitAsync(invocation.Exited.Task, "upper cleanup releases original observer", invocation);
+            await fixture.WaitAsync(remaining.WorkEntered.Task, "remaining queued observer entered", remaining);
+            Assert.False(fixture.Connections.Closed.IsCompleted);
+            Assert.Equal(0, fixture.ConnectionLog.CloseCount);
+            events.Enqueue("upper-cleanup-completed");
         };
 
         try
         {
-            Assert.True(callbacks.TryAdd(outbound.Id, callback));
             await fixture.StartFakeLifecycleAsync();
             fixture.Dispatch(invocation, 2101);
             await fixture.WaitAsync(invocation.WorkEntered.Task, "2101 observer held", invocation);
             fixture.AssertHeldInvocation(invocation);
+            fixture.Dispatch(remaining, 2102);
+            Assert.False(remaining.WorkEntered.Task.IsCompleted);
 
+            // A pre-lifecycle drain deadlocks the upper callback which releases invocation.
+            // Omitting/ignoring the adapter hook closes connections while remaining is held.
             stop = fixture.ClusterClient!.StopAsync(TestContext.Current.CancellationToken);
-            await fixture.WaitAsync(lifecycle.StopReturned.Task, "upper lifecycle stage returned", invocation);
-            await fixture.WaitAsync(fixture.ObserverDrainStarted.Task, "client adapter started observer drain", invocation);
-            Assert.False(stop.IsCompleted, fixture.Describe(invocation, stop));
+            await fixture.WaitAsync(lifecycle.StopReturned.Task, "upper-stage cleanup returned successfully", invocation);
+            await fixture.WaitAsync(fixture.ConnectionDrainEntered.Task, "client before-close drain entered", remaining);
+            Assert.Null(lifecycle.StopFailure);
+            Assert.Equal(1, fixture.ConnectionDrainCalls);
+            fixture.AssertCompletedInvocation(invocation, "cleanup-result-941");
+            Assert.False(invocation.Release.Task.IsCompleted); // Upper callback, not test release, unblocked it.
+            fixture.AssertHeldInvocation(remaining);
+            Assert.False(stop.IsCompleted, fixture.Describe(remaining, stop));
             Assert.False(fixture.Connections.Closed.IsCompleted);
-            Assert.False(invocation.Exited.Task.IsCompleted);
+            Assert.Equal(0, fixture.ConnectionLog.CloseCount);
+            Assert.Null(connectionClose);
             Assert.Equal(1, source.CompletionCount);
-            Assert.Null(source.Exception);
-            Assert.Equal("cleanup-completed", source.Result);
+            Assert.True(callback.IsCompleted);
             Assert.Empty(callbacks);
-            fixture.Dispatch(late, 2102);
 
-            release.TrySetResult();
-            await fixture.WaitAsync(stop, "2101 cluster stop after observer release", invocation);
-            await fixture.WaitAsync(fixture.Manager.StopAsync(), "2101 actual manager drain", invocation);
+            fixture.Dispatch(late, 2105);
+            remaining.Release.TrySetResult();
+            await fixture.WaitAsync(stop, "observer drain then real connection close", remaining);
+            await fixture.WaitAsync(fixture.Connections.Closed, "connection manager closed", remaining);
 
-            Assert.True(fixture.Connections.Closed.IsCompletedSuccessfully);
-            Assert.Equal(new[] { "outbound-completed", "upper-stage-stop", "observer-exit" }, events.ToArray());
+            var snapshot = Assert.IsType<TeardownSnapshot>(connectionClose);
+            Assert.True(snapshot.ObserverExited);
+            Assert.Equal(1, snapshot.CompletionCount);
+            Assert.Equal(
+                new[]
+                {
+                    "upper-cleanup-started", "upper-outbound-response", "observer-exit",
+                    "upper-cleanup-completed", "observer-drain-started",
+                    "remaining-observer-exit", "connection-close"
+                },
+                events.ToArray());
             Assert.Equal(1, lifecycle.StartCount);
             Assert.Equal(1, lifecycle.StopCount);
             Assert.Equal(TestContext.Current.CancellationToken, lifecycle.StopToken);
+            Assert.Equal(1, fixture.ConnectionLog.CloseCount);
+            Assert.Equal(1, fixture.ConnectionDrainCalls);
             Assert.Equal(0, late.InvocationCount);
             Assert.False(late.Entered.Task.IsCompleted);
-            fixture.AssertCompletedInvocation(invocation, "cleanup-completed");
+            fixture.AssertCompletedInvocation(remaining, "remaining-completed");
+            Assert.Equal(1, source.CompletionCount);
             fixture.AssertRootIsLive();
+            succeeded = true;
         }
         finally
         {
-            if (!callback.IsCompleted)
+            if (!succeeded)
             {
-                callback.OnHostShutdown();
+                callback.OnHostShutdown(); // Rescue only after failed ordering/completion evidence.
             }
 
-            release.TrySetResult();
+            invocation.ReleaseForCleanup();
+            remaining.ReleaseForCleanup();
+            duringCleanup.ReleaseForCleanup();
             late.ReleaseForCleanup();
             await fixture.CleanupAsync(stop);
+        }
+    }
+
+    [Fact]
+    public async Task SiloConnectionLifecycle_WithoutClientHookClosesNormally()
+    {
+        var log = new ConnectionCloseLogger();
+        // No connections are created: Close's empty-ledger path needs no transport factory.
+        var connections = new ConnectionManager(Options.Create(new ConnectionOptions()), null!, log);
+        var adapter = new ConnectionManagerLifecycleAdapter<ISiloLifecycle>(connections);
+        try
+        {
+            await adapter.OnStart(TestContext.Current.CancellationToken);
+            Assert.False(connections.Closed.IsCompleted);
+            Assert.Equal(0, log.CloseCount);
+            await DrainTestHelpers.AwaitPhaseAsync(
+                adapter.OnStop(TestContext.Current.CancellationToken), "generic silo adapter closes without client hook",
+                () => $"closed={connections.Closed.Status}; closeCalls={log.CloseCount}",
+                TestContext.Current.CancellationToken);
+            Assert.True(connections.Closed.IsCompletedSuccessfully);
+            Assert.Equal(1, log.CloseCount);
+            Assert.Equal(0, connections.ConnectionCount);
+        }
+        finally
+        {
+            if (!connections.Closed.IsCompleted)
+            {
+                await DrainTestHelpers.AwaitCleanupAsync(
+                    connections.Close(CancellationToken.None), "cleanup empty silo connection manager",
+                    () => $"closed={connections.Closed.Status}");
+            }
         }
     }
 
@@ -284,10 +363,10 @@ public class ClientObserverDrainLifecycleTests
     }
 
     [Fact]
-    public async Task ClusterClientStop_CooperativeLifecycleHonorsCallerCancellation()
+    public async Task ClusterClientStop_CancellationAtConnectionBoundaryBoundsWaitNotObserverDrain()
     {
         var lifecycle = new LifecycleProbe();
-        var fixture = new ExternalClientFixture(lifecycle);
+        var fixture = new ExternalClientFixture(lifecycle, includeConnectionLifecycle: true);
         var invocation = new ObservedInvocation("cluster-observer-completed");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         Task? stop = null;
@@ -301,16 +380,26 @@ public class ClientObserverDrainLifecycleTests
             await fixture.WaitAsync(invocation.WorkEntered.Task, "2311 cluster observer held", invocation);
             fixture.AssertHeldInvocation(invocation);
 
-            // The fake subscriber returns promptly and checks the supplied token. This does not
-            // promise bounded shutdown for a lifecycle subscriber which ignores cancellation.
+            // Upper-stage cleanup returns before the real connection adapter starts its drain.
+            // This does not promise a bound for subscribers which ignore cancellation.
             stop = fixture.ClusterClient!.StopAsync(cancellation.Token);
+            await fixture.WaitAsync(lifecycle.StopReturned.Task, "upper-stage cleanup returned", invocation);
+            await fixture.WaitAsync(fixture.ConnectionDrainEntered.Task, "before-close drain waiting on 2311", invocation);
             Assert.False(stop.IsCompleted, fixture.Describe(invocation, stop));
+            Assert.False(fixture.Connections.Closed.IsCompleted);
+            Assert.Equal(0, fixture.ConnectionLog.CloseCount);
             cancellation.Cancel();
             var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
                 () => fixture.WaitAsync(stop, "cluster caller cancellation while observer remains held", invocation));
             Assert.Equal(cancellation.Token, exception.CancellationToken);
             Assert.True(stop.IsCanceled);
             Assert.Equal(1, lifecycle.StartCount);
+            Assert.Equal(1, lifecycle.StopCount);
+            Assert.Null(lifecycle.StopFailure);
+            Assert.Equal(1, fixture.ConnectionDrainCalls);
+            // The adapter's finally still closes connections on a canceled drain wait.
+            Assert.True(fixture.Connections.Closed.IsCompletedSuccessfully);
+            Assert.Equal(1, fixture.ConnectionLog.CloseCount);
             fixture.AssertHeldInvocation(invocation);
 
             actualDrain = fixture.Manager.StopAsync();
@@ -410,6 +499,30 @@ public class ClientObserverDrainLifecycleTests
             ?? throw new InvalidOperationException("OutsideRuntimeClient.callbacks was not a ConcurrentDictionary<CorrelationId, CallbackData>.");
     }
 
+    private sealed record TeardownSnapshot(bool ObserverExited, int CompletionCount);
+
+    private sealed class ConnectionCloseLogger : ILogger<ConnectionManager>
+    {
+        private int _closeCount;
+        internal int CloseCount => Volatile.Read(ref _closeCount);
+        internal Action? OnClosing { get; set; }
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel == LogLevel.Debug;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            // An existing synchronous production log observes actual Close entry without
+            // a private gate field or a continuation that could conceal early closure.
+            if (logLevel == LogLevel.Debug && formatter(state, exception) == "Shutting down connections")
+            {
+                Interlocked.Increment(ref _closeCount);
+                OnClosing?.Invoke();
+            }
+        }
+    }
+
     private sealed record ActivationSnapshot(
         ClientGrainContext Context,
         IServiceProvider Services,
@@ -495,13 +608,15 @@ public class ClientObserverDrainLifecycleTests
         internal int StartCount => Volatile.Read(ref _startCount);
         internal int StopCount => Volatile.Read(ref _stopCount);
         internal CancellationToken StopToken { get; private set; }
+        internal Exception? StopFailure { get; private set; }
         internal Func<CancellationToken, Task>? OnStopping { get; set; }
 
         public void Participate(IClusterClientLifecycle lifecycle)
         {
             Lifecycle = lifecycle as ClusterClientLifecycle
                 ?? throw new InvalidOperationException("ClusterClient did not supply its real ClusterClientLifecycle.");
-            lifecycle.Subscribe("upper-stage-cleanup", ServiceLifecycleStage.RuntimeInitialize, this);
+            // This stage is above ConnectionManager's RuntimeInitialize - 1 subscription.
+            lifecycle.Subscribe("upper-stage-client-cleanup", ServiceLifecycleStage.RuntimeInitialize, this);
         }
 
         public Task OnStart(CancellationToken cancellationToken)
@@ -517,13 +632,24 @@ public class ClientObserverDrainLifecycleTests
             StopToken = cancellationToken;
             Interlocked.Increment(ref _stopCount);
             StopEntered.TrySetResult();
-            if (OnStopping is { } onStopping)
+            try
             {
-                await onStopping(cancellationToken);
-            }
+                if (OnStopping is { } onStopping)
+                {
+                    await onStopping(cancellationToken);
+                }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            StopReturned.TrySetResult();
+                cancellationToken.ThrowIfCancellationRequested();
+                StopReturned.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                // LifecycleSubject logs/suppresses subscriber failures. Keep the original
+                // assertion/phase failure observable rather than treating overall stop as proof.
+                StopFailure = exception;
+                StopReturned.TrySetException(exception);
+                throw;
+            }
         }
     }
 
@@ -535,7 +661,9 @@ public class ClientObserverDrainLifecycleTests
         private readonly RootServiceMarker _rootMarker;
         private readonly GrainId _sender = ClientGrainId.Create("observer-drain-sender").GrainId;
 
-        internal ExternalClientFixture(LifecycleProbe? lifecycle = null)
+        private int _connectionDrainCalls;
+
+        internal ExternalClientFixture(LifecycleProbe? lifecycle = null, bool includeConnectionLifecycle = false)
         {
             _lifecycle = lifecycle;
             var options = Options.Create(new ClientMessagingOptions { LocalAddress = IPAddress.Loopback });
@@ -565,11 +693,26 @@ public class ClientObserverDrainLifecycleTests
             if (lifecycle is not null)
             {
                 services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>>(lifecycle);
+            }
+
+            if (includeConnectionLifecycle)
+            {
+                ArgumentNullException.ThrowIfNull(lifecycle);
+                // Exercise the real generic adapter with the client-only before-close delegate.
+                // DefaultClientServices DI wiring is reviewed separately, not discovered by
+                // scanning/invoking registration factories or constructing a complete client.
+                // No GetConnection/OnConnected calls: the null factory is never used.
+                Connections = new ConnectionManager(
+                    Options.Create(new ConnectionOptions()), null!, ConnectionLog);
                 services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>>(_ =>
                     new ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>(Connections, ct =>
                     {
+                        BeforeConnectionDrain?.Invoke();
                         var drain = runtime.StopObserverInvocationsAsync();
-                        ObserverDrainStarted.TrySetResult();
+                        Interlocked.Increment(ref _connectionDrainCalls);
+                        ConnectionDrainEntered.TrySetResult();
+                        // Operation token deliberately matches the production hook. The
+                        // test observes this wait through a separately runner-bound phase wait.
                         return drain.WaitAsync(ct);
                     }));
             }
@@ -610,27 +753,28 @@ public class ClientObserverDrainLifecycleTests
         internal ClusterClient? ClusterClient { get; }
         internal InvokableObjectManager Manager { get; }
         internal ObserverGrainId ObserverId { get; }
-        internal ConnectionManager Connections { get; } = new(
-            Options.Create(new ConnectionOptions()),
-            connectionFactory: null!,
-            NullLogger<ConnectionManager>.Instance);
-        internal TaskCompletionSource ObserverDrainStarted { get; } = DrainTestHelpers.CreateSignal();
+        internal ConnectionManager Connections { get; } = null!;
+        internal ConnectionCloseLogger ConnectionLog { get; } = new();
+        internal TaskCompletionSource ConnectionDrainEntered { get; } = DrainTestHelpers.CreateSignal();
+        internal int ConnectionDrainCalls => Volatile.Read(ref _connectionDrainCalls);
+        internal Action? BeforeConnectionDrain { get; set; }
 
-        internal void Dispatch(TestInvokable invocation, long id) => Manager.Dispatch(new Message
+        internal void Dispatch(TestInvokable invocation, long id, bool alwaysInterleave = false) => Manager.Dispatch(new Message
         {
             // No ClientMessageCenter or CurrentActivationAddress exists in this unstarted fixture.
             Direction = Message.Directions.OneWay,
             TargetGrain = ObserverId.GrainId,
             SendingGrain = _sender,
             Id = new CorrelationId(id),
+            IsAlwaysInterleave = alwaysInterleave,
             BodyObject = invocation
         });
 
         internal async Task StartFakeLifecycleAsync()
         {
             var lifecycle = _lifecycle ?? throw new InvalidOperationException("No fake lifecycle participant was registered.");
-            await WaitAsync(lifecycle.Lifecycle.OnStart(CancellationToken.None), "only fake lifecycle subscribers started");
-            await WaitAsync(lifecycle.Started.Task, "fake transport start observed");
+            await WaitAsync(lifecycle.Lifecycle.OnStart(CancellationToken.None), "test lifecycle and no-op connection adapter start");
+            await WaitAsync(lifecycle.Started.Task, "upper-stage start observed");
             Assert.Equal(1, lifecycle.StartCount);
             Assert.Equal(0, lifecycle.StopCount);
         }
@@ -642,7 +786,9 @@ public class ClientObserverDrainLifecycleTests
             $"Observer={ObserverId}; Invoke={invocation?.InvocationCount}; Complete={invocation?.CompletionCount}; " +
             $"Entered={invocation?.WorkEntered.Task.Status}; Exited={invocation?.Exited.Task.Status}; " +
             $"Failure={invocation?.Failure}; Operation={operation?.Status}; " +
-            $"LifecycleStart={_lifecycle?.StartCount}; LifecycleStop={_lifecycle?.StopCount}; RootDisposed={_rootMarker.DisposeCount}.";
+            $"LifecycleStart={_lifecycle?.StartCount}; LifecycleStop={_lifecycle?.StopCount}; " +
+            $"DrainCalls={ConnectionDrainCalls}; ConnectionCloseCalls={ConnectionLog.CloseCount}; " +
+            $"RootDisposed={_rootMarker.DisposeCount}.";
 
         internal void AssertHeldInvocation(ObservedInvocation invocation)
         {
@@ -699,7 +845,7 @@ public class ClientObserverDrainLifecycleTests
 
                 try
                 {
-                    await DrainTestHelpers.AwaitPhaseAsync(
+                    await DrainTestHelpers.AwaitCleanupAsync(
                         operation, "cleanup joins recorded stop/dispose operation", () => Describe(null, operation));
                 }
                 catch (OperationCanceledException) when (operation.IsCanceled)
@@ -709,21 +855,24 @@ public class ClientObserverDrainLifecycleTests
             }
 
             var drain = Manager.StopAsync();
-            await DrainTestHelpers.AwaitPhaseAsync(drain, "cleanup actual observer drain", () => Describe(null, drain));
+            await DrainTestHelpers.AwaitCleanupAsync(drain, "cleanup actual observer drain", () => Describe(null, drain));
             if (_lifecycle is { StartCount: > 0, StopCount: 0 } lifecycle)
             {
-                // A drain-first cluster implementation can leave fake teardown uncalled when the
-                // caller cancels. Stop only those fake subscribers after proving the real drain.
+                // Failed/aborted orchestration can leave the upper subscriber uncalled.
+                // Stop remaining lifecycle subscriptions only after proving the real drain.
                 var lifecycleStop = lifecycle.Lifecycle.OnStop(CancellationToken.None);
-                await DrainTestHelpers.AwaitPhaseAsync(
-                    lifecycleStop, "cleanup fake lifecycle stop", () => Describe(null, lifecycleStop));
+                await DrainTestHelpers.AwaitCleanupAsync(
+                    lifecycleStop, "cleanup client lifecycle stop", () => Describe(null, lifecycleStop));
             }
 
             var stop = Runtime.StopAsync(CancellationToken.None);
-            await DrainTestHelpers.AwaitPhaseAsync(stop, "cleanup joins runtime callback monitor", () => Describe(null, stop));
-            if (!Connections.Closed.IsCompleted)
+            await DrainTestHelpers.AwaitCleanupAsync(stop, "cleanup joins runtime callback monitor", () => Describe(null, stop));
+            if (Connections is { } connections && !connections.Closed.IsCompleted)
             {
-                await Connections.Close(CancellationToken.None);
+                // The empty manager owns a CTS even though no network was started.
+                await DrainTestHelpers.AwaitCleanupAsync(
+                    connections.Close(CancellationToken.None), "cleanup empty connection manager",
+                    () => Describe(null, connections.Closed));
             }
 
             GC.KeepAlive(_observer);
