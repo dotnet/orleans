@@ -60,6 +60,17 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
+            this.gateway.RecordClientResponse(msg);
+            ProcessReceivedMessage(msg);
+        }
+
+        private void ProcessReceivedMessage(Message msg)
+        {
+            if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
+            {
+                msg.ClearGatewayRequestRouting();
+            }
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
@@ -164,13 +175,15 @@ namespace Orleans.Runtime.Messaging
             if (msg.Direction == Message.Directions.Request)
             {
                 LogSiloRejectingMessage(this.Log, this.myAddress, msg, reason);
+                this.gateway.RemoveTrackedClientRequest(msg);
+                msg.RestoreGatewayRequestSource();
 
                 // Done retrying, send back an error instead
                 this.messageCenter.SendRejection(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new SiloUnavailableException());
+                    $"Target client {msg.TargetGrain} is unavailable. Message: {msg}. Reason = {reason}",
+                    new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason}"));
             }
             else
             {
