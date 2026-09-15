@@ -11,6 +11,7 @@ namespace Orleans.Journaling;
 
 internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
+    private const int MaximumDefaultJournalIdLength = 512;
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
     private static readonly string[] JournalMetadataSelect =
     [
@@ -74,7 +75,8 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         if (range.IsEmpty
             || (_options.UsesDefaultPartitionKey
                 && range.Prefix is { } prefix
-                && prefix.AsSpan().IndexOfAnyExceptInRange(' ', '~') >= 0))
+                && (prefix.Length > MaximumDefaultJournalIdLength
+                    || prefix.AsSpan().IndexOfAnyExceptInRange(' ', '~') >= 0)))
         {
             yield break;
         }
@@ -114,7 +116,10 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             if (range.LowerBound is { } lowerBound)
             {
                 var lowerKey = GetPartitionKeyBound(lowerBound);
-                filter += TableClient.CreateQueryFilter($" and PartitionKey ge {lowerKey}");
+                // A longer bound sorts after its longest possible stored prefix.
+                filter += lowerBound.Length > MaximumDefaultJournalIdLength
+                    ? TableClient.CreateQueryFilter($" and PartitionKey gt {lowerKey}")
+                    : TableClient.CreateQueryFilter($" and PartitionKey ge {lowerKey}");
             }
 
             if (range.MaxId is { } maxId)
@@ -125,9 +130,11 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
 
             if (range.Prefix is { } prefix)
             {
-                // Encoded keys contain only 0..F, so G bounds every suffix of the encoded prefix.
-                var prefixEnd = AzureTableJournalStorageOptions.EncodePartitionKey(prefix) + "G";
-                filter += TableClient.CreateQueryFilter($" and PartitionKey lt {prefixEnd}");
+                var prefixKey = AzureTableJournalStorageOptions.EncodePartitionKey(prefix);
+                // At the length limit only the exact id can match; shorter prefixes can have descendants.
+                filter += prefix.Length == MaximumDefaultJournalIdLength
+                    ? TableClient.CreateQueryFilter($" and PartitionKey le {prefixKey}")
+                    : TableClient.CreateQueryFilter($" and PartitionKey lt {prefixKey + "G"}");
             }
         }
         else
@@ -151,6 +158,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
 
     private static string GetPartitionKeyBound(string value)
     {
+        value = value[..Math.Min(value.Length, MaximumDefaultJournalIdLength)];
         var index = value.AsSpan().IndexOfAnyExceptInRange(' ', '~');
         if (index < 0)
         {

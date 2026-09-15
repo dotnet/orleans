@@ -605,6 +605,126 @@ public sealed class AzureTableJournalStorageProviderTests
         Assert.Equal(1, Assert.Single(table.QueryCalls).ReturnedCount);
     }
 
+    [Theory]
+    [InlineData(511, false)]
+    [InlineData(511, true)]
+    [InlineData(512, false)]
+    [InlineData(512, true)]
+    public async Task ListAsync_MaximumLengthPrefix_UsesServiceSizedExactBounds(int length, bool bounded)
+    {
+        var prefix = new string('a', length);
+        var ids = new[] { new string('a', 510), new string('a', 511), new string('a', 512), new string('a', 511) + "b", "b" };
+        var table = new FakeTableClient();
+        foreach (var id in ids)
+        {
+            table.AddHeader(new(id));
+        }
+
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var maximum = prefix + "a";
+        var result = await ToListAsync(
+            context.Provider.ListAsync(new()
+            {
+                Prefix = new(prefix),
+                MinId = bounded ? new(prefix) : default,
+                MaxId = bounded ? new(maximum) : default,
+            }, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var expected = ids.Where(id => id.StartsWith(prefix, StringComparison.Ordinal)
+            && (!bounded || string.CompareOrdinal(id, maximum) <= 0)).ToArray();
+        Assert.Equal(expected, result.Select(entry => entry.Id.Value));
+        var query = Assert.Single(table.QueryCalls);
+        Assert.Equal(expected.Length, query.ReturnedCount);
+        var prefixKey = AzureTableJournalStorageOptions.EncodePartitionKey(prefix);
+        Assert.Contains(
+            length == 512
+                ? TableClient.CreateQueryFilter($"PartitionKey le {prefixKey}")
+                : TableClient.CreateQueryFilter($"PartitionKey lt {prefixKey + "G"}"),
+            query.Filter);
+    }
+
+    [Theory]
+    [InlineData(513)]
+    [InlineData(2048)]
+    public async Task ListAsync_OversizedDefaultPrefix_ReturnsEmptyBeforeClientAccess(int length)
+    {
+        using var context = CreateProvider();
+
+        var result = await ToListAsync(
+            context.Provider.ListAsync(new() { Prefix = new(new string('a', length)) }, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result);
+    }
+
+    [Theory]
+    [InlineData(511, -1)]
+    [InlineData(512, -1)]
+    [InlineData(513, -1)]
+    [InlineData(2048, -1)]
+    [InlineData(510, 0x00)]
+    [InlineData(511, 0x00)]
+    [InlineData(512, 0x00)]
+    [InlineData(2048, 0x00)]
+    [InlineData(510, 0x7F)]
+    [InlineData(511, 0x7F)]
+    [InlineData(512, 0x7F)]
+    [InlineData(2048, 0x7F)]
+    [InlineData(510, 0xD800)]
+    [InlineData(511, 0xD800)]
+    [InlineData(512, 0xD800)]
+    [InlineData(2048, 0xD800)]
+    public async Task ListAsync_LongBounds_UseServiceSizedExactOrdinalFilters(int length, int unsupportedCharacter)
+    {
+        var bound = new string('a', length)
+            + (unsupportedCharacter < 0 ? string.Empty : (char)unsupportedCharacter + "/suffix");
+        string[] ids = ["a", new string('a', 511), new string('a', 512), new string('a', 511) + "b", "b"];
+        var table = new FakeTableClient();
+        foreach (var id in ids)
+        {
+            table.AddHeader(new(id));
+        }
+
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
+        var lower = await ToListAsync(
+            context.Provider.ListAsync(new() { MinId = new(bound) }, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+        var upper = await ToListAsync(
+            context.Provider.ListAsync(new() { MaxId = new(bound) }, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        var expectedLower = ids.Where(id => string.CompareOrdinal(id, bound) >= 0).ToArray();
+        var expectedUpper = ids.Where(id => string.CompareOrdinal(id, bound) <= 0).ToArray();
+        Assert.Equal(expectedLower, lower.Select(entry => entry.Id.Value));
+        Assert.Equal(expectedUpper, upper.Select(entry => entry.Id.Value));
+        Assert.Equal([expectedLower.Length, expectedUpper.Length], table.QueryCalls.Select(query => query.ReturnedCount));
+        Assert.All(table.QueryCalls, query => Assert.DoesNotContain("JournalId", query.Filter));
+    }
+
+    [Fact]
+    public async Task ListAsync_CustomMapping_LongIdRetainsCanonicalPropertyFilters()
+    {
+        var id = new JournalId(new string('a', 513));
+        var table = new FakeTableClient();
+        table.AddHeader(id, "custom");
+        var options = CreateOptions(table);
+        options.GetPartitionKey = static _ => "custom";
+        using var context = CreateProvider(options);
+        await StartAsync(context.Provider, TestContext.Current.CancellationToken);
+
+        var result = await ToListAsync(
+            context.Provider.ListAsync(new() { Prefix = id, MinId = id, MaxId = id }, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal([id], result.Select(entry => entry.Id));
+        var query = Assert.Single(table.QueryCalls);
+        Assert.Equal(1, query.ReturnedCount);
+        Assert.DoesNotContain("PartitionKey", query.Filter);
+        Assert.Contains(TableClient.CreateQueryFilter($"JournalId ge {id.Value}"), query.Filter);
+        Assert.Contains(TableClient.CreateQueryFilter($"JournalId le {id.Value}"), query.Filter);
+    }
+
     [Fact]
     public async Task ListAsync_DefaultMapping_RetainsExactLocalRangeFilter()
     {
@@ -1169,8 +1289,11 @@ public sealed class AzureTableJournalStorageProviderTests
             cancellationToken.ThrowIfCancellationRequested();
             // OData filter text must survive transport encoding without surrogate replacement.
             _ = StrictUtf8.GetByteCount(filter!);
-            var clauses = Regex.Matches(filter!, @"(RowKey|PartitionKey|JournalId) (eq|ge|le|lt) '((?:[^']|'')*)'");
+            var clauses = Regex.Matches(filter!, @"(RowKey|PartitionKey|JournalId) (eq|ge|gt|le|lt) '((?:[^']|'')*)'");
             Assert.Equal(filter, string.Join(" and ", clauses.Select(clause => clause.Value)));
+            Assert.All(
+                clauses.Where(clause => clause.Groups[1].Value == "PartitionKey"),
+                clause => Assert.InRange(clause.Groups[3].Value.Replace("''", "'").Length, 0, 1024));
             var values = _entities
                 .Where(entity => clauses.All(clause =>
                 {
@@ -1191,6 +1314,7 @@ public sealed class AzureTableJournalStorageProviderTests
                     {
                         "eq" => comparison == 0,
                         "ge" => comparison >= 0,
+                        "gt" => comparison > 0,
                         "le" => comparison <= 0,
                         "lt" => comparison < 0,
                         _ => throw new InvalidOperationException("Unexpected table filter comparison."),
