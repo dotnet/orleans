@@ -22,6 +22,38 @@ public sealed class RedisJournalStorageCatalogTests
 {
     private const string KeyPrefix = "catalog-tests";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListAsync_IncludeMetadataReturnsUnavailableWithoutFetchingMetadataHashes(bool customMapping)
+    {
+        var id = JournalId.Create("redis", "projection");
+        var key = RedisJournalStorage.GetMetadataKey(KeyPrefix, customMapping ? "mapped" : id.Value);
+        var database = Substitute.For<IDatabase>();
+        database.HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey).Returns((RedisValue)id.Value);
+        var provider = await CreateProviderAsync(
+            database, customMapping ? CustomMappingOptions() : new(), CreateServer(ScanKeysAsync([key])));
+        var result = new List<JournalCatalogEntry>();
+        await foreach (var entry in provider.ListAsync(new() { IncludeMetadata = true }, TestContext.Current.CancellationToken))
+        {
+            result.Add(entry);
+        }
+
+        var listed = Assert.Single(result);
+        Assert.Equal(id, listed.Id);
+        Assert.Null(listed.Metadata);
+        await database.DidNotReceiveWithAnyArgs().HashGetAllAsync(default);
+        await database.DidNotReceive().ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>());
+        if (customMapping)
+        {
+            await database.Received(1).HashGetAsync(key, RedisJournalStorage.JournalIdMetadataKey);
+        }
+        else
+        {
+            await AssertNoMetadataReadsAsync(database);
+        }
+    }
+
     [Fact]
     public async Task ListAsync_CustomMappingYieldsFirstBatchBeforeScanCompletesAndSnapshotsOptions()
     {
@@ -55,7 +87,7 @@ public sealed class RedisJournalStorageCatalogTests
         await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(firstId, enumerator.Current);
+        Assert.Equal(firstId, enumerator.Current.Id);
         Assert.Equal(128, scannedKeys);
         Assert.Equal(128, metadataReads);
         Assert.False(scanCompleted);
@@ -66,7 +98,7 @@ public sealed class RedisJournalStorageCatalogTests
         options.MaxId = new("a");
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(secondId, enumerator.Current);
+        Assert.Equal(secondId, enumerator.Current.Id);
         Assert.Equal(130, scannedKeys);
         Assert.Equal(130, metadataReads);
         Assert.True(scanCompleted);
@@ -125,7 +157,7 @@ public sealed class RedisJournalStorageCatalogTests
             new() { Prefix = JournalId.Create("redis", "list"), MinId = bounded ? earlier : default, MaxId = bounded ? maximum : default },
             TestContext.Current.CancellationToken))
         {
-            result.Add(id);
+            result.Add(id.Id);
         }
 
         Assert.Equal(bounded ? [earlier, maximum] : new[] { future, earlier, maximum, before, partialMatch }, result);
@@ -163,7 +195,7 @@ public sealed class RedisJournalStorageCatalogTests
         await using var enumerator = provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(id, enumerator.Current);
+        Assert.Equal(id, enumerator.Current.Id);
         Assert.Equal(customMapping ? 128 : 1, scannedKeys);
         Assert.False(scanDisposed);
 
@@ -218,7 +250,7 @@ public sealed class RedisJournalStorageCatalogTests
         await using (var enumerator = provider.ListAsync(cancellationToken: cancellation.Token).GetAsyncEnumerator(cancellation.Token))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            Assert.Equal(id, enumerator.Current);
+            Assert.Equal(id, enumerator.Current.Id);
             Assert.Equal(customMapping ? 128 : 1, scannedKeys);
             Assert.Equal(customMapping ? 128 : 0, metadataReads);
             Assert.False(scanDisposed);
@@ -267,7 +299,7 @@ public sealed class RedisJournalStorageCatalogTests
         await using var enumerator = provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(id, enumerator.Current);
+        Assert.Equal(id, enumerator.Current.Id);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => enumerator.MoveNextAsync().AsTask());
 
@@ -364,7 +396,7 @@ public sealed class RedisJournalStorageCatalogTests
         await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(first, enumerator.Current);
+        Assert.Equal(first, enumerator.Current.Id);
         Assert.Equal(1, scanned);
         await AssertNoMetadataReadsAsync(database);
 
@@ -373,7 +405,7 @@ public sealed class RedisJournalStorageCatalogTests
         options.MaxId = new("a");
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(second, enumerator.Current);
+        Assert.Equal(second, enumerator.Current.Id);
         Assert.Equal(4, scanned);
         Assert.False(await enumerator.MoveNextAsync());
         _ = server.Received(1).KeysAsync(0, "catalog-tests:journal:{*}:jobs%2F2026%2F09%2F*:metadata", pageSize: 250);
@@ -571,11 +603,11 @@ public sealed class RedisJournalStorageCatalogTests
         Assert.True(await moveNext);
         Assert.Equal(128, startedReads);
         Assert.False(completedBeforeResponses);
-        Assert.Equal(ids[0], enumerator.Current);
-        var result = new List<JournalId> { enumerator.Current };
+        Assert.Equal(ids[0], enumerator.Current.Id);
+        var result = new List<JournalId> { enumerator.Current.Id };
         while (await enumerator.MoveNextAsync())
         {
-            result.Add(enumerator.Current);
+            result.Add(enumerator.Current.Id);
         }
 
         Assert.Equal(ids, result);
@@ -652,7 +684,7 @@ public sealed class RedisJournalStorageCatalogTests
         var result = new List<JournalId>();
         await foreach (var id in provider.ListAsync(options, TestContext.Current.CancellationToken))
         {
-            result.Add(id);
+            result.Add(id.Id);
         }
 
         return result;

@@ -523,14 +523,14 @@ public sealed class RedisJournalStorageTests
         return new(firstSegment, 0, lastSegment, lastSegment.Memory.Length);
     }
 
-    private static async Task<List<T>> ToListAsync<T>(
-        IAsyncEnumerable<T> source,
+    private static async Task<List<JournalId>> ToListAsync(
+        IAsyncEnumerable<JournalCatalogEntry> source,
         CancellationToken cancellationToken)
     {
-        var result = new List<T>();
+        var result = new List<JournalId>();
         await foreach (var item in source.WithCancellation(cancellationToken))
         {
-            result.Add(item);
+            result.Add(item.Id);
         }
 
         return result;

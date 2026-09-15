@@ -31,6 +31,8 @@ Azure append blobs limit append-block size and block count. The provider accepts
 
 The journal catalog selects append blobs in the `wal/` namespace of the configured container. Custom naming delegates participating in catalog discovery produce `wal/<journalId>` for each journal. The separate checkpoint namespace keeps checkpoints out of listing pages. Raw journal-id prefixes and ASCII lower bounds narrow the native listing, and an ASCII upper bound terminates ordered consumption after the boundary page.
 
+Catalog callers can request a metadata snapshot with each identity. Blob listings project the WAL's format, ETag, and caller-owned metadata in the listing response. The snapshot can replace a separate metadata read; conditional updates use its ETag to detect concurrent changes.
+
 ## Azure Table Storage
 
 Configure <xref:Orleans.Journaling.AzureTableStorageHostingExtensions.AddAzureTableJournalStorage*> with an authenticated <xref:Azure.Data.Tables.TableServiceClient>:
@@ -51,6 +53,8 @@ Compaction is requested at either <xref:Orleans.Journaling.AzureTableJournalStor
 The default partition mapping accepts printable ASCII journal ids (`0x20` through `0x7E`) and encodes each byte as two uppercase hexadecimal digits. It preserves ordinal ordering and prefixes for indexed catalog queries and supports journal ids up to 512 characters. Storage creation validates the id before accessing Azure. This restriction is specific to the default Table mapping.
 
 Customize <xref:Orleans.Journaling.AzureTableJournalStorageOptions.GetPartitionKey> when a different partition layout is required. Custom mappings support other journal-id alphabets, remain unique per journal, and satisfy Azure Table partition-key constraints. Their catalog queries filter the canonical journal-id property and can require a table scan.
+
+Metadata-enabled catalog queries select the header's format and caller-owned metadata together with its ETag. Identity-only queries retain their smaller projection. Each returned metadata snapshot has the same meaning as a direct metadata read and can become stale after it is listed.
 
 ## Optimistic concurrency
 

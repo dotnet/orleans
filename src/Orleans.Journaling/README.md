@@ -110,7 +110,9 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order.
+`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalCatalogEntry>` in provider traversal order.
+Each entry contains its `Id` and optional `Metadata`. Deduplicate by `Id` when unique identities
+are required, since repeated entries can carry different metadata versions.
 `ListOptions.Prefix` matches the raw beginning of `JournalId.Value`, including partial path
 segments. For example, `jobs/shards/20260909` selects timestamped names for that UTC day.
 Use a trailing slash, such as `jobs/shards/`, to select a namespace's descendants.
@@ -123,7 +125,8 @@ var options = new ListOptions
 {
     Prefix = new JournalId("jobs/shards/20260909"),
     MinId = new JournalId("jobs/shards/20260909T1000000000000Z-"),
-    MaxId = new JournalId("jobs/shards/20260909T1200000000000Z~")
+    MaxId = new JournalId("jobs/shards/20260909T1200000000000Z~"),
+    IncludeMetadata = true
 };
 ```
 
@@ -133,14 +136,25 @@ bounds. Applications requiring a uniform result order sort the selected ids usin
 
 Storage providers fetch pages internally and yield matching identities as they discover them. `await foreach` advances the traversal and disposes the enumerator when the loop ends. Consumers which process identities in batches can retain one enumerator across batches, advance it serially, and dispose it after the last pending `MoveNextAsync` completes. Use a cancellation token whose lifetime covers that enumeration.
 
+`IncludeMetadata` defaults to false and is snapshotted with the range options. When true, providers
+include complete metadata available from the listing: journal format, storage ETag, and caller-owned
+properties observed together, using the same semantics as `GetMetadataAsync`. Azure Blob projects
+WAL metadata, Azure Table projects header properties, and Volatile snapshots metadata under its store
+lock. S3 and Redis return null metadata because their listings expose identities rather than the
+complete journal metadata. Projection adds no separate per-journal metadata requests.
+
+Consumers requiring metadata use the supplied snapshot or call `GetMetadataAsync` when it is absent.
+An empty caller-property dictionary is a valid complete snapshot. Treat the ETag as the version of that
+snapshot and pass it to conditional metadata updates; concurrent changes can cause the update to fail.
+
 | Provider | How narrowly discovery scans | Remaining work |
 | --- | --- | --- |
 | Volatile | An ordered key index selects a view covering the requested prefix and bounds. | Snapshots selected keys and checks current journal existence. |
 | Azure Table, default mapping | Printable ASCII ids use two uppercase hex digits per byte, allowing direct indexed prefix and lower/upper key filters. | Queries include the journal header row condition; the service controls work inside the selected key range. |
 | Azure Table, custom mapping | Canonical journal-id filters limit returned headers. | Arbitrary mappings can require a table scan because the journal-id property is not indexed. |
 | Azure Blob | The `wal/` namespace and raw id prefix select WAL blobs; `StartFrom` seeks to an ASCII lower bound and ordered traversal stops at an ASCII upper bound. | The final page can contain WALs beyond the range. Checkpoints occupy a separate namespace. |
-| S3 general-purpose, ordered listing enabled | Identity-mapped keys use native raw prefixes and `StartAfter`, then stop at a safe upper WAL-key bound. | The final page can overrun the range. Custom key mappings use their configured native prefix and identity filtering. |
-| S3 Express directory buckets | A native directory prefix limits the namespace. | Directory prefixes end in `/`; partial-name and time bounds are filtered during unordered traversal. |
+| S3 general-purpose, ordered listing enabled | The `wal/` namespace excludes checkpoints. Identity-mapped keys use native prefixes and an initial `StartAfter` marker preceding the inclusive lower bound, then stop at the upper WAL key. | The final page can overrun the range. Custom key mappings use their configured native prefix and identity filtering. |
+| S3 Express directory buckets | A native slash-terminated prefix within `wal/` limits the namespace and excludes checkpoints. | Partial-name and time bounds are filtered during unordered traversal. |
 | Redis | Readable key names enable native `SCAN MATCH` prefix filtering and local key-range checks before identity metadata reads for the default mapping. | `SCAN MATCH` still traverses the server keyspace. Custom key mappings read canonical ids from matching metadata hashes. |
 
 Blob and ordered S3 native lower/upper optimizations apply where storage ordering agrees with

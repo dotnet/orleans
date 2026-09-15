@@ -123,9 +123,11 @@ lists the raw `jobs/shards/` prefix with an inclusive `ListOptions.MaxId` bound 
 horizon. The range includes every earlier start time, including jobs overdue after a long
 outage. Future shard identities are filtered by the catalog before candidate metadata reads.
 
-Each periodic or membership check starts a fresh, locally scoped sweep. Discovery orders
-and deduplicates the selected identities, then reads current ownership metadata and attempts
-conditional claims oldest first. Assigned shards are delivered as they are opened, allowing
+Each periodic or membership check starts a fresh, locally scoped sweep. Discovery requests
+catalog metadata, orders and deduplicates the selected entries, then uses each supplied
+ownership snapshot or reads metadata when absent. Claims run oldest first and use the
+snapshot's ETag for conditional updates, so a concurrent ownership change rejects a stale claim.
+Assigned shards are delivered as they are opened, allowing
 execution to proceed while later candidates are evaluated. The claim budget limits new claims;
 locally owned shards remain eligible after that budget is exhausted.
 
@@ -137,8 +139,8 @@ Azure Table's default mapping uses indexed key ranges. Azure Blob and ordered ge
 S3 listings can seek lower bounds and stop at upper bounds. S3 Express and Redis filter time
 bounds during their provider-defined traversal. Discovery orders the selected names itself
 to provide consistent oldest-first processing across providers. Storage listing work and request
-latency remain provider-dependent; candidate metadata work scales with the distinct identities
-returned for the due range.
+latency remain provider-dependent. Blob, Table, and Volatile catalogs supply metadata snapshots
+alongside identities; S3 and Redis require separate candidate metadata reads.
 
 The sweep owns its enumeration and selected identity set until completion. Storage errors
 propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards

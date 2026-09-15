@@ -56,7 +56,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         return new RedisJournalStorage(GetDatabase(), _keyPrefix, keyName, _journalFormatKey, _options, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -108,7 +108,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
-                        yield return journalId;
+                        yield return new JournalCatalogEntry(journalId);
                     }
                 }
 
@@ -182,7 +182,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        yield return journalId;
+                        yield return new JournalCatalogEntry(journalId);
                     }
                 }
 

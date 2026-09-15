@@ -10,6 +10,52 @@ namespace Tester.DurableJobs;
 public partial class JournaledJobShardManagerTests
 {
     [Fact]
+    public async Task Discovery_UsesProjectedMetadataAndReadsOnlyEntriesWithoutMetadata()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var projected = await fixture.AddShardAsync("projected", fixture.Now.AddYears(-1));
+        var missing = await fixture.AddShardAsync("missing", fixture.Now);
+        var metadata = await fixture.Storage.CreateStorage(projected).GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(metadata);
+        fixture.Catalog.Metadata.Add(projected, metadata);
+        fixture.Catalog.Ids.AddRange([missing, projected, projected]);
+        fixture.Storage.MetadataReads.Clear();
+
+        AssertAssignedIds([projected, missing], await fixture.DiscoverAsync(maxNewClaims: 2));
+        Assert.Equal(new[] { missing }, fixture.Storage.MetadataReads);
+        Assert.Equal(3, fixture.Catalog.YieldedIds);
+        Assert.Equal(1, fixture.Catalog.ListCalls);
+    }
+
+    [Fact]
+    public async Task Discovery_StaleProjectedMetadataCannotOverwriteConcurrentOwnership()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var id = await fixture.AddShardAsync("stale", fixture.Now);
+        var storage = fixture.Storage.CreateStorage(id);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshot = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(snapshot);
+        fixture.Catalog.Metadata.Add(id, snapshot);
+        fixture.Catalog.Ids.Add(id);
+
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
+        fixture.Membership.SetSiloStatus(other, SiloStatus.Active);
+        var current = await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["DurableJobsOwner"] = other.ToParsableString() },
+            expectedETag: snapshot.ETag, cancellationToken: cancellationToken);
+        Assert.NotNull(current);
+        fixture.Storage.MetadataReads.Clear();
+
+        Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 1));
+        Assert.Empty(fixture.Storage.MetadataReads);
+        var after = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(after);
+        Assert.Equal(current.ETag, after.ETag);
+        Assert.Equal(other.ToParsableString(), after.Properties["DurableJobsOwner"]);
+    }
+
+    [Fact]
     public async Task Discovery_UnorderedCatalogClaimsOldestFirstIncludingYearsOverdue()
     {
         await using var fixture = new DiscoveryFixture();
@@ -336,14 +382,14 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
-    public async Task Discovery_VolatileCatalogHonorsTimestampBound()
+    public async Task Discovery_VolatileCatalogHonorsTimestampBoundAndProjectsMetadata()
     {
         await using var fixture = new DiscoveryFixture(useStorageCatalog: true);
         var due = await fixture.AddShardAsync("due", fixture.Now);
         await fixture.AddShardAsync("future", fixture.Horizon.AddTicks(1));
 
         AssertAssignedIds([due], await fixture.DiscoverAsync(maxNewClaims: 1));
-        Assert.Equal(new[] { due }, fixture.Storage.MetadataReads);
+        Assert.Empty(fixture.Storage.MetadataReads);
     }
 
     [Fact]

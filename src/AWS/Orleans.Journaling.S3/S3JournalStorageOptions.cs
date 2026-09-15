@@ -10,6 +10,8 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class S3JournalStorageOptions
 {
+    internal const string WalObjectKeyPrefix = "wal/";
+
     private IAmazonS3? _s3Client;
 
     /// <summary>
@@ -20,19 +22,24 @@ public sealed class S3JournalStorageOptions
     /// <summary>
     /// Gets or sets the delegate used to generate the base object key for a journal.
     /// </summary>
+    /// <remarks>
+    /// WAL objects use <c>wal/&lt;base-key&gt;</c> and checkpoint objects use
+    /// <c>checkpoints/&lt;base-key&gt;/&lt;snapshot-id&gt;</c>. The delegate must not add these namespaces.
+    /// </remarks>
     public Func<JournalId, string> GetObjectKey { get; set; } = DefaultGetObjectKey;
 
     /// <summary>
-    /// Gets or sets the delegate mapping a non-default catalog prefix to an S3 object-key prefix.
+    /// Gets or sets the delegate mapping a non-default catalog prefix to a base object-key prefix.
     /// </summary>
     /// <remarks>
-    /// The result must be non-empty and include the canonical WAL key of every journal whose id
+    /// The result must be non-empty and include the base object key of every journal whose id
     /// starts with the supplied raw ordinal prefix, including partial segments. Additional matches
     /// are filtered by the catalog. When unset, the default identity <see cref="GetObjectKey"/>
     /// mapping uses the raw journal prefix. Custom object-key mappings must configure this delegate
     /// to use prefixed listings. Unprefixed listings do not require this delegate.
+    /// The provider prepends <c>wal/</c> to the result; the delegate must not add it.
     /// When <see cref="UseOrderedListing"/> is false, the mapped prefix is widened to its nearest
-    /// slash-terminated directory boundary to support directory buckets.
+    /// slash-terminated directory boundary to support directory buckets, while retaining <c>wal/</c>.
     /// </remarks>
     public Func<JournalId, string>? GetObjectKeyPrefix { get; set; }
 
@@ -51,8 +58,9 @@ public sealed class S3JournalStorageOptions
     public bool UseOrderedListing { get; set; }
 
     /// <summary>
-    /// Gets or sets the delegate used to parse journal ids from catalog object keys.
+    /// Gets or sets the delegate used to parse journal ids from base object keys.
     /// </summary>
+    /// <remarks>The catalog removes the <c>wal/</c> namespace before invoking this delegate.</remarks>
     public Func<string, JournalId?> TryParseJournalId { get; set; } = DefaultTryParseJournalId;
 
     /// <summary>
@@ -201,9 +209,9 @@ public sealed class S3JournalStorageOptions
         return GetDefaultCheckpointObjectKey(journalObjectKey, snapshotId);
     }
 
-    internal static string GetDefaultWalObjectKey(string journalObjectKey) => $"{journalObjectKey}/wal";
+    internal static string GetDefaultWalObjectKey(string journalObjectKey) => $"{WalObjectKeyPrefix}{journalObjectKey}";
 
-    internal static string GetDefaultCheckpointObjectKey(string journalObjectKey, string snapshotId) => $"{journalObjectKey}/chk.{snapshotId}";
+    internal static string GetDefaultCheckpointObjectKey(string journalObjectKey, string snapshotId) => $"checkpoints/{journalObjectKey}/{snapshotId}";
 
     internal Func<CancellationToken, Task<IAmazonS3>> GetCreateClient()
         => CreateClient ?? (_ => Task.FromResult<IAmazonS3>(new AmazonS3Client(ClientConfig ?? new AmazonS3Config())));

@@ -336,7 +336,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([last, lower, upper], result);
+        Assert.Equal([last, lower, upper], result.Select(entry => entry.Id));
         Assert.Equal(3, result.Count);
     }
 
@@ -359,7 +359,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(new() { Prefix = prefix }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([partialSegment, child, exact], result);
+        Assert.Equal([partialSegment, child, exact], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         var prefixKey = AzureTableJournalStorageOptions.EncodePartitionKey(prefix.Value);
         Assert.Equal(
@@ -414,7 +414,7 @@ public sealed class AzureTableJournalStorageProviderTests
             TestContext.Current.CancellationToken);
 
         var expected = secondExpected is null ? new[] { firstExpected } : new[] { firstExpected, secondExpected };
-        Assert.Equal(expected, result.Select(id => id.Value));
+        Assert.Equal(expected, result.Select(entry => entry.Id.Value));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(expected.Length, query.ReturnedCount);
         Assert.Equal(1000, query.MaxPerPage);
@@ -504,8 +504,8 @@ public sealed class AzureTableJournalStorageProviderTests
 
                 var expectedLower = values.Where(value => string.CompareOrdinal(value, bound) >= 0).ToArray();
                 var expectedUpper = values.Where(value => string.CompareOrdinal(value, bound) <= 0).ToArray();
-                Assert.Equal(expectedLower, lower.Select(id => id.Value));
-                Assert.Equal(expectedUpper, upper.Select(id => id.Value));
+                Assert.Equal(expectedLower, lower.Select(entry => entry.Id.Value));
+                Assert.Equal(expectedUpper, upper.Select(entry => entry.Id.Value));
                 var lowerQuery = table.QueryCalls[^2];
                 var upperQuery = table.QueryCalls[^1];
                 Assert.Equal(expectedLower.Length, lowerQuery.ReturnedCount);
@@ -581,8 +581,8 @@ public sealed class AzureTableJournalStorageProviderTests
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(values[..expectedUpperCount], upper.Select(id => id.Value));
-        Assert.Equal(values[expectedUpperCount..], lower.Select(id => id.Value));
+        Assert.Equal(values[..expectedUpperCount], upper.Select(entry => entry.Id.Value));
+        Assert.Equal(values[expectedUpperCount..], lower.Select(entry => entry.Id.Value));
         Assert.Equal([expectedUpperCount, values.Length - expectedUpperCount], table.QueryCalls.Select(query => query.ReturnedCount));
     }
 
@@ -601,7 +601,7 @@ public sealed class AzureTableJournalStorageProviderTests
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([longest], result);
+        Assert.Equal([longest], result.Select(entry => entry.Id));
         Assert.Equal(1, Assert.Single(table.QueryCalls).ReturnedCount);
     }
 
@@ -620,7 +620,7 @@ public sealed class AzureTableJournalStorageProviderTests
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([included], result);
+        Assert.Equal([included], result.Select(entry => entry.Id));
         Assert.Equal(2, Assert.Single(table.QueryCalls).ReturnedCount);
     }
 
@@ -646,7 +646,7 @@ public sealed class AzureTableJournalStorageProviderTests
 
         var result = await ToListAsync(listing, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["orders/2", "orders/3"], result.Select(id => id.Value));
+        Assert.Equal(["orders/2", "orders/3"], result.Select(entry => entry.Id.Value));
         Assert.Equal(2, Assert.Single(table.QueryCalls).ReturnedCount);
     }
 
@@ -665,8 +665,8 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([retained], result);
-        Assert.DoesNotContain(deleted, result);
+        Assert.Equal([retained], result.Select(entry => entry.Id));
+        Assert.DoesNotContain(result, entry => entry.Id == deleted);
     }
 
     [Fact]
@@ -696,8 +696,8 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([valid], result);
-        Assert.DoesNotContain(orphan, result);
+        Assert.Equal([valid], result.Select(entry => entry.Id));
+        Assert.DoesNotContain(result, entry => entry.Id == orphan);
     }
 
     [Fact]
@@ -713,7 +713,7 @@ public sealed class AzureTableJournalStorageProviderTests
             TestContext.Current.CancellationToken);
 
         var listed = Assert.Single(result);
-        Assert.Equal(escaped, listed);
+        Assert.Equal(escaped, listed.Id);
         Assert.Equal(
             AzureTableJournalStorageOptions.GetDefaultPartitionKey(escaped),
             table.Entities.Single().PartitionKey);
@@ -740,7 +740,7 @@ public sealed class AzureTableJournalStorageProviderTests
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([included], result);
+        Assert.Equal([included], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(1, query.ReturnedCount);
         Assert.Equal(
@@ -771,7 +771,7 @@ public sealed class AzureTableJournalStorageProviderTests
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([exact, partialSegment], result);
+        Assert.Equal([exact, partialSegment], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(2, query.ReturnedCount);
         Assert.Contains("JournalId ge 'tenant/order' and JournalId lt 'tenant/ordes'", query.Filter);
@@ -800,7 +800,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(new() { Prefix = prefix }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([prefix, child], result);
+        Assert.Equal([prefix, child], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(3, query.ReturnedCount);
         Assert.Equal(
@@ -844,7 +844,7 @@ public sealed class AzureTableJournalStorageProviderTests
 
         Assert.Equal(
             ids.Where(id => string.CompareOrdinal(id, minimum) >= 0 && string.CompareOrdinal(id, maximum) <= 0),
-            result.Select(id => id.Value));
+            result.Select(entry => entry.Id.Value));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(ids.Length, query.ReturnedCount);
         Assert.Equal(
@@ -875,7 +875,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(new() { Prefix = new(prefix) }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([first, second], result);
+        Assert.Equal([first, second], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(4, query.ReturnedCount);
         Assert.Equal(TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}"), query.Filter);
@@ -900,7 +900,7 @@ public sealed class AzureTableJournalStorageProviderTests
             context.Provider.ListAsync(new() { MinId = minimum, MaxId = maximum }, TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal([minimum, maximum], result);
+        Assert.Equal([minimum, maximum], result.Select(entry => entry.Id));
         var query = Assert.Single(table.QueryCalls);
         Assert.Equal(2, query.ReturnedCount);
         Assert.Equal(

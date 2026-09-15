@@ -37,13 +37,16 @@ public sealed class JournalCatalogRangeTests
         {
             Prefix = new("jobs/"),
             MinId = new("jobs/shards/20260909-a"),
-            MaxId = new("jobs/shards/20260909-z")
+            MaxId = new("jobs/shards/20260909-z"),
+            IncludeMetadata = true
         };
         var range = new JournalCatalogRange(options);
         options.Prefix = new("other/");
         options.MinId = new("z");
         options.MaxId = new("z");
+        options.IncludeMetadata = false;
 
+        Assert.True(range.IncludeMetadata);
         Assert.Equal("jobs/shards/20260909-", range.ListingPrefix);
         Assert.Equal("jobs/shards/20260909-a", range.LowerBound);
         Assert.Equal("jobs/shards/20260909-z", range.UpperBound);
@@ -75,7 +78,6 @@ public sealed class JournalCatalogRangeTests
         Assert.Equal("tenant/", range.ListingPrefix);
         Assert.True(range.Contains("tenant/\U0001F600-b"));
         Assert.True(range.Contains("tenant/\U0001F601-a"));
-        Assert.Null(range.GetUpperBoundForSuffix("/wal"));
     }
 
     [Theory]
@@ -139,37 +141,7 @@ public sealed class JournalCatalogRangeTests
     }
 
     [Fact]
-    public void StorageUpperBound_IncludesEveryMatchingSuffixedKey()
-    {
-        string[] ids = ["a", "a!", "a.", "a/", "a/child", "a/wal", "a0", "aa", "b"];
-        string?[] prefixes = [null, "a", "a/"];
-        string?[] minimums = [null, "a", "a/child"];
-        foreach (var prefix in prefixes)
-        {
-            foreach (var minimum in minimums)
-            {
-                foreach (var maximum in ids)
-                {
-                    var range = new JournalCatalogRange(new()
-                    {
-                        Prefix = ToId(prefix),
-                        MinId = ToId(minimum),
-                        MaxId = new(maximum)
-                    });
-                    var upper = range.GetUpperBoundForSuffix("/wal");
-                    Assert.NotNull(upper);
-                    foreach (var id in ids.Where(range.Contains))
-                    {
-                        Assert.True(string.CompareOrdinal(id + "/wal", upper) <= 0,
-                            $"WAL for {id} exceeds cutoff {upper}; prefix={prefix}, min={minimum}, max={maximum}.");
-                    }
-                }
-            }
-        }
-    }
-
-    [Fact]
-    public void DescendantRange_DoesNotExpandCutoffToNamespaceWal()
+    public void DescendantRange_IncludesMaximumAndExcludesNamespaceId()
     {
         const string maximum = "jobs/shards/20260909T1200000000000Z~";
         var range = new JournalCatalogRange(new()
@@ -178,7 +150,8 @@ public sealed class JournalCatalogRangeTests
             MaxId = new(maximum)
         });
 
-        Assert.Equal(maximum + "/wal", range.GetUpperBoundForSuffix("/wal"));
+        Assert.Equal(maximum, range.UpperBound);
+        Assert.True(range.Contains(maximum));
         Assert.False(range.Contains("jobs/shards"));
     }
 

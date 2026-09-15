@@ -648,7 +648,7 @@ public partial class JournaledJobShardManagerTests
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
 
-        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
             => _inner.ListAsync(options, cancellationToken);
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
@@ -804,6 +804,7 @@ public partial class JournaledJobShardManagerTests
     private sealed class ScriptedCatalog : IJournalStorageCatalog
     {
         public List<JournalId> Ids { get; } = [];
+        public Dictionary<JournalId, IJournalMetadata> Metadata { get; } = [];
         public Func<int, CancellationToken, ValueTask>? BeforeMoveNext { get; set; }
         public Func<ValueTask>? OnDispose { get; set; }
         public int ListCalls { get; private set; }
@@ -812,11 +813,12 @@ public partial class JournaledJobShardManagerTests
         public int YieldedIds { get; private set; }
         public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
 
-        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
             Assert.False(options.MaxId.IsDefault);
+            Assert.True(options.IncludeMetadata);
             ListCalls++;
             var prefix = options.Prefix;
             var maxId = options.MaxId;
@@ -824,7 +826,7 @@ public partial class JournaledJobShardManagerTests
             return Enumerate(prefix, maxId, cancellationToken);
         }
 
-        private async IAsyncEnumerable<JournalId> Enumerate(
+        private async IAsyncEnumerable<JournalCatalogEntry> Enumerate(
             JournalId prefix,
             JournalId maxId,
             [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -848,7 +850,9 @@ public partial class JournaledJobShardManagerTests
                     }
 
                     YieldedIds++;
-                    yield return snapshot[index];
+                    var id = snapshot[index];
+                    Metadata.TryGetValue(id, out var metadata);
+                    yield return new JournalCatalogEntry(id, metadata);
                 }
             }
             finally

@@ -45,7 +45,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         return new S3JournalStorage(_shared, GetClient(), journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -68,18 +68,28 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
             listingPrefix = null;
         }
 
-        var objectKeyPrefix = _options.GetObjectKeyPrefixForCatalog(listingPrefix);
-        if (!ordered && objectKeyPrefix is not null)
+        var objectKeyPrefix = S3JournalStorageOptions.GetDefaultWalObjectKey(
+            _options.GetObjectKeyPrefixForCatalog(listingPrefix) ?? string.Empty);
+        if (!ordered)
         {
             var directoryEnd = objectKeyPrefix.LastIndexOf('/') + 1;
-            objectKeyPrefix = directoryEnd == 0 ? null : objectKeyPrefix[..directoryEnd];
+            objectKeyPrefix = objectKeyPrefix[..directoryEnd];
         }
 
-        // A native prefix already excludes earlier keys; seek only when the lower bound narrows it further.
-        var startAfter = ordered && identityMapping && range.LowerBound is { } lowerBound
-            && string.CompareOrdinal(lowerBound, range.ListingPrefix) > 0 && System.Text.Ascii.IsValid(lowerBound)
-            ? lowerBound : null;
-        var maxObjectKey = ordered && identityMapping ? range.GetUpperBoundForSuffix("/wal") : null;
+        string? startAfter = null;
+        if (ordered && identityMapping && range.LowerBound is { Length: > 0 } lowerBound
+            && System.Text.Ascii.IsValid(lowerBound))
+        {
+            // StartAfter is exclusive: use a strictly earlier key to retain the inclusive lower bound.
+            var marker = S3JournalStorageOptions.GetDefaultWalObjectKey(lowerBound[..^1]);
+            if (string.CompareOrdinal(marker, objectKeyPrefix) > 0)
+            {
+                startAfter = marker;
+            }
+        }
+
+        var maxObjectKey = ordered && identityMapping && range.MaxId is { } maxId && System.Text.Ascii.IsValid(maxId)
+            ? S3JournalStorageOptions.GetDefaultWalObjectKey(maxId) : null;
         var client = GetClient();
         var bucketName = GetBucketName();
         string? continuationToken = null;
@@ -109,7 +119,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 
                 if (TryGetJournalId(item.Key, range, out var id))
                 {
-                    yield return id;
+                    // ListObjectsV2 cannot project the complete journal metadata without a separate request.
+                    yield return new JournalCatalogEntry(id);
                 }
             }
 
@@ -122,8 +133,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 
     private bool TryGetJournalId(string objectKey, JournalCatalogRange range, out JournalId journalId)
     {
-        if (objectKey.EndsWith("/wal", StringComparison.Ordinal)
-            && _options.TryParseJournalId(objectKey[..^"/wal".Length]) is { IsDefault: false } id
+        if (objectKey.StartsWith(S3JournalStorageOptions.WalObjectKeyPrefix, StringComparison.Ordinal)
+            && _options.TryParseJournalId(objectKey[S3JournalStorageOptions.WalObjectKeyPrefix.Length..]) is { IsDefault: false } id
             && range.Contains(id.Value))
         {
             var journalObjectKey = _options.GetObjectKeyForJournal(id);

@@ -12,6 +12,13 @@ namespace Orleans.Journaling;
 internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
+    private static readonly string[] JournalMetadataSelect =
+    [
+        AzureTableJournalStorage.JournalIdPropertyName,
+        AzureTableJournalStorage.FormatPropertyName,
+        AzureTableJournalStorage.MetadataPropertyName,
+        nameof(TableEntity.Timestamp),
+    ];
 
     private readonly AzureTableJournalStorageOptions _options;
     private readonly AzureTableJournalStorage.InitializedTableClientProvider _tableClientProvider = new();
@@ -58,7 +65,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         return new AzureTableJournalStorage(_shared, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -77,7 +84,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
         await foreach (var page in table.QueryAsync<TableEntity>(
             filter,
             maxPerPage: 1000,
-            select: JournalIdSelect,
+            select: range.IncludeMetadata ? JournalMetadataSelect : JournalIdSelect,
             cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -87,7 +94,11 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
                 if (TryGetJournalId(entity, out var journalId)
                     && range.Contains(journalId.Value))
                 {
-                    yield return journalId;
+                    yield return new(
+                        journalId,
+                        range.IncludeMetadata
+                            ? AzureTableJournalStorage.CreateJournalMetadataSnapshot(entity.ETag, entity)
+                            : null);
                 }
             }
         }

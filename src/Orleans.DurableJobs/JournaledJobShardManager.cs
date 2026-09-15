@@ -96,24 +96,25 @@ internal sealed class JournaledJobShardManager : JobShardManager
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var storageIds = new SortedSet<JournalId>(Comparer<JournalId>.Create(
+        var storageEntries = new SortedDictionary<JournalId, JournalCatalogEntry>(Comparer<JournalId>.Create(
             static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value)));
         var options = new ListOptions
         {
             Prefix = new JournalId(JobShardId.StoragePrefix.Value + "/"),
-            MaxId = JobShardId.GetMaxJournalId(maxDueTime)
+            MaxId = JobShardId.GetMaxJournalId(maxDueTime),
+            IncludeMetadata = true
         };
-        await foreach (var storageId in _catalog.ListAsync(options, cancellationToken))
+        await foreach (var entry in _catalog.ListAsync(options, cancellationToken))
         {
-            storageIds.Add(storageId);
+            storageEntries.TryAdd(entry.Id, entry);
         }
 
         // Providers can return identities in any order. Names order the selected shards by UTC start time.
         var newClaimCount = 0;
-        foreach (var storageId in storageIds)
+        foreach (var entry in storageEntries.Values)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var (shard, claimed) = await TryAssignShardAsync(storageId, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
+            var (shard, claimed) = await TryAssignShardAsync(entry, maxDueTime, newClaimCount < maxNewClaims, cancellationToken);
             if (claimed)
             {
                 newClaimCount++;
@@ -126,9 +127,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
     }
 
     private async ValueTask<(IJobShard? Shard, bool Claimed)> TryAssignShardAsync(
-        JournalId storageId, DateTimeOffset maxDueTime, bool canClaim, CancellationToken cancellationToken)
+        JournalCatalogEntry entry, DateTimeOffset maxDueTime, bool canClaim, CancellationToken cancellationToken)
     {
-        var descriptor = await GetDescriptorAsync(storageId, cancellationToken);
+        var descriptor = entry.Metadata is { } metadata
+            ? ShardCatalogProperties.From(entry.Id, metadata)
+            : await GetDescriptorAsync(entry.Id, cancellationToken);
         if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
         {
             return default;

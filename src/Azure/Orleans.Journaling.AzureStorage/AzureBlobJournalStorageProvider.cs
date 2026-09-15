@@ -56,7 +56,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         return new AzureBlobJournalStorage(_shared, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -75,6 +75,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         await foreach (var page in container.GetBlobsAsync(
             new GetBlobsOptions
             {
+                Traits = range.IncludeMetadata ? BlobTraits.Metadata : BlobTraits.None,
                 Prefix = AzureBlobJournalStorageLayout.GetWalBlobName(range.ListingPrefix ?? string.Empty),
                 StartFrom = startFrom,
             },
@@ -99,7 +100,11 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
                 if (AzureBlobJournalStorageLayout.TryGetJournalId(item.Name, out var journalId)
                     && range.Contains(journalId.Value))
                 {
-                    yield return journalId;
+                    yield return new(
+                        journalId,
+                        range.IncludeMetadata
+                            ? AzureBlobJournalStorage.CreateJournalMetadata(item.Properties.ETag!.Value, item.Metadata)
+                            : null);
                 }
             }
         }

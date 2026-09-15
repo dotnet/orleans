@@ -4,6 +4,7 @@ internal readonly struct JournalCatalogRange
 {
     public JournalCatalogRange(ListOptions? options)
     {
+        IncludeMetadata = options?.IncludeMetadata ?? false;
         Prefix = options?.Prefix.Value;
         MinId = options?.MinId.Value;
         MaxId = options?.MaxId.Value;
@@ -62,37 +63,13 @@ internal readonly struct JournalCatalogRange
     public string? LowerBound { get; }
     public string? UpperBound { get; }
     public bool IsEmpty { get; }
+    public bool IncludeMetadata { get; }
 
     public bool Contains(string value)
         => !IsEmpty
             && (Prefix is null || value.StartsWith(Prefix, StringComparison.Ordinal))
             && (MinId is null || string.CompareOrdinal(value, MinId) >= 0)
             && (MaxId is null || string.CompareOrdinal(value, MaxId) <= 0);
-
-    public string? GetUpperBoundForSuffix(string suffix)
-    {
-        if (MaxId is null || !System.Text.Ascii.IsValid(MaxId))
-        {
-            return null;
-        }
-
-        var result = MaxId + suffix;
-        // Suffixes can move a shorter matching id beyond MaxId's storage key.
-        for (var length = 1; length < MaxId.Length; length++)
-        {
-            var prefix = MaxId[..length];
-            if (Contains(prefix))
-            {
-                var candidate = prefix + suffix;
-                if (string.CompareOrdinal(candidate, result) > 0)
-                {
-                    result = candidate;
-                }
-            }
-        }
-
-        return result;
-    }
 
     private static string? GetPrefixEnd(string? prefix)
     {

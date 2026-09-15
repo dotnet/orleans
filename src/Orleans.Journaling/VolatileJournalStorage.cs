@@ -60,7 +60,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -97,16 +97,22 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
 
             var store = _storage[key];
+            IJournalMetadata? metadata = null;
             lock (store.SyncRoot)
             {
                 if (!store.Exists)
                 {
                     continue;
                 }
+
+                if (range.IncludeMetadata)
+                {
+                    metadata = store.GetMetadata();
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            yield return new JournalId(key);
+            yield return new JournalCatalogEntry(new JournalId(key), metadata);
         }
 
         cancellationToken.ThrowIfCancellationRequested();

@@ -9,6 +9,7 @@ using Azure.Data.Tables;
 using Azure.Data.Tables.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -23,6 +24,208 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class JournalStorageCatalogTests
 {
+    [Theory]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    public async Task AzureListAsync_IncludeMetadataProjectsCompleteSnapshotWithoutPerJournalRequests(string kind)
+    {
+        await using var context = await CreateAsync(kind, ["tenant/a", "tenant/b", "tenant/c"]);
+        var entries = await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(["tenant/a", "tenant/b", "tenant/c"], entries.Select(entry => entry.Id.Value));
+        Assert.Equal(2, context.Native.Requests.Count);
+        Assert.Equal(0, context.Native.MetadataRequests);
+        AssertMetadataProjection(context.Native, kind, includeMetadata: true);
+        foreach (var entry in entries)
+        {
+            var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
+            Assert.Equal("test", metadata.Format);
+            Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
+            Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
+
+            var current = await context.Provider.CreateStorage(entry.Id).GetMetadataAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(current);
+            Assert.Equal(current.Format, metadata.Format);
+            Assert.Equal(current.ETag, metadata.ETag);
+            Assert.Equal(current.Properties, metadata.Properties);
+        }
+
+        Assert.Equal(entries.Count, context.Native.MetadataRequests);
+    }
+
+    [Theory]
+    [InlineData("AzureBlob", false)]
+    [InlineData("AzureBlob", true)]
+    [InlineData("AzureTable", false)]
+    [InlineData("AzureTable", true)]
+    public async Task AzureListAsync_IncludeMetadataIsSnapshottedAcrossPages(string kind, bool includeMetadata)
+    {
+        await using var context = await CreateAsync(kind, ["tenant/a", "tenant/b", "tenant/c"]);
+        var options = new ListOptions { IncludeMetadata = !includeMetadata };
+        var listing = context.Catalog.ListAsync(options, TestContext.Current.CancellationToken);
+        options.IncludeMetadata = includeMetadata;
+        await using (var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken))
+        {
+            Assert.True(await enumerator.MoveNextAsync());
+            Assert.Equal(includeMetadata, enumerator.Current.Metadata is not null);
+            options.IncludeMetadata = !includeMetadata;
+            var count = 1;
+            while (await enumerator.MoveNextAsync())
+            {
+                Assert.Equal(includeMetadata, enumerator.Current.Metadata is not null);
+                count++;
+            }
+
+            Assert.Equal(3, count);
+        }
+
+        Assert.Equal(2, context.Native.Requests.Count);
+        Assert.Equal(0, context.Native.MetadataRequests);
+        AssertMetadataProjection(context.Native, kind, includeMetadata);
+        var next = await DrainEntriesAsync(listing);
+        Assert.Equal(3, next.Count);
+        Assert.All(next, entry => Assert.Equal(!includeMetadata, entry.Metadata is not null));
+        Assert.Equal(0, context.Native.MetadataRequests);
+    }
+
+    [Theory]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    public async Task AzureListAsync_ProjectedETagRejectsStaleMetadataUpdate(string kind)
+    {
+        await using var context = await CreateAsync(kind, ["tenant/a"]);
+        var entry = Assert.Single(await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
+        Assert.Equal(0, context.Native.MetadataRequests);
+        context.Native.CurrentETag = new ETag("changed");
+
+        var updated = await context.Provider.CreateStorage(entry.Id).UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "bob" },
+            expectedETag: metadata.ETag,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(updated);
+        Assert.Equal(1, context.Native.MetadataRequests);
+        Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
+        Assert.Equal("alice", metadata.Properties["owner"]);
+    }
+
+    [Theory]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    public async Task AzureListAsync_EmptyMetadataStillReturnsCompleteVersionedSnapshot(string kind)
+    {
+        var blob = Blob("wal/tenant/a");
+        blob.Metadata.Clear();
+        var header = Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("tenant/a")), "tenant/a");
+        header[AzureTableJournalStorage.FormatPropertyName] = string.Empty;
+        header[AzureTableJournalStorage.MetadataPropertyName] = "{}";
+        await using var context = await CreateAsync(kind, [], blobs: [blob], headers: [header]);
+
+        var entry = Assert.Single(await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+
+        Assert.Equal(new JournalId("tenant/a"), entry.Id);
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
+        Assert.Null(metadata.Format);
+        Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
+        Assert.Empty(metadata.Properties);
+        Assert.Equal(0, context.Native.MetadataRequests);
+    }
+
+    [Theory]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    public async Task AzureListAsync_MetadataSnapshotRetainsObservedPropertiesAfterStorageChanges(string kind)
+    {
+        var blob = Blob("wal/tenant/a");
+        var header = Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("tenant/a")), "tenant/a");
+        await using var context = await CreateAsync(kind, [], blobs: [blob], headers: [header]);
+        var entry = Assert.Single(await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
+
+        blob.Metadata["owner"] = "bob";
+        header[AzureTableJournalStorage.MetadataPropertyName] = """{"owner":"bob"}""";
+        context.Native.CurrentETag = new ETag("changed");
+        var current = await context.Provider.CreateStorage(entry.Id).GetMetadataAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(current);
+        Assert.Equal("bob", current.Properties["owner"]);
+        Assert.Equal(new ETag("changed").ToString(), current.ETag);
+        Assert.Equal("test", metadata.Format);
+        Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
+        Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
+        Assert.Equal(1, context.Native.MetadataRequests);
+    }
+
+    [Theory]
+    [InlineData("Volatile")]
+    [InlineData("AzureBlob")]
+    [InlineData("AzureTable")]
+    [InlineData("S3")]
+    public async Task ListAsync_DefaultProjectionReturnsIdsWithoutMetadata(string kind)
+    {
+        await using var context = await CreateAsync(kind, ["tenant/a"]);
+        var entry = Assert.Single(await DrainEntriesAsync(context.Catalog.ListAsync(
+            cancellationToken: TestContext.Current.CancellationToken)));
+
+        Assert.Equal(new JournalId("tenant/a"), entry.Id);
+        Assert.Null(entry.Metadata);
+        Assert.Equal(0, context.Native.MetadataRequests);
+        if (kind is "AzureBlob" or "AzureTable")
+        {
+            AssertMetadataProjection(context.Native, kind, includeMetadata: false);
+        }
+    }
+
+    [Fact]
+    public async Task S3ListAsync_IncludeMetadataRetainsIdentityOnlyProjection()
+    {
+        await using var context = await CreateAsync("S3", ["tenant/a"]);
+        var entry = Assert.Single(await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+
+        Assert.Equal(new JournalId("tenant/a"), entry.Id);
+        Assert.Null(entry.Metadata);
+        context.AssertNoS3MetadataRequests();
+    }
+
+    [Theory]
+    [InlineData("{", typeof(InvalidOperationException))]
+    [InlineData("{\"owner\":null}", typeof(ArgumentNullException))]
+    public async Task AzureTableListAsync_MalformedProjectedMetadataPropagates(string json, Type exceptionType)
+    {
+        var header = Header(AzureTableJournalStorageOptions.GetDefaultPartitionKey(new("tenant/a")), "tenant/a");
+        header[AzureTableJournalStorage.MetadataPropertyName] = json;
+        await using var context = await CreateAsync("AzureTable", [], headers: [header]);
+
+        var exception = await Record.ExceptionAsync(() => DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+
+        Assert.IsType(exceptionType, exception);
+        Assert.Equal(0, context.Native.MetadataRequests);
+        Assert.Equal(["tenant/a"], await DrainAsync(context.Catalog.ListAsync(
+            cancellationToken: TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task AzureBlobListAsync_MalformedProjectedMetadataPropagates()
+    {
+        var blob = Blob("wal/tenant/a");
+        blob.Metadata["owner"] = null!;
+        await using var context = await CreateAsync("AzureBlob", [], blobs: [blob]);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { IncludeMetadata = true }, TestContext.Current.CancellationToken)));
+
+        Assert.Equal(0, context.Native.MetadataRequests);
+        Assert.Equal(["tenant/a"], await DrainAsync(context.Catalog.ListAsync(
+            cancellationToken: TestContext.Current.CancellationToken)));
+    }
+
     [Theory]
     [InlineData("Volatile")]
     [InlineData("AzureBlob")]
@@ -70,14 +273,14 @@ public sealed class JournalStorageCatalogTests
         options.MaxId = new("tenant/b");
         await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await enumerator.MoveNextAsync());
-        var result = new List<string> { enumerator.Current.Value };
+        var result = new List<string> { enumerator.Current.Id.Value };
 
         options.Prefix = new("other");
         options.MinId = new("other/q");
         options.MaxId = default;
         while (await enumerator.MoveNextAsync())
         {
-            result.Add(enumerator.Current.Value);
+            result.Add(enumerator.Current.Id.Value);
         }
 
         AssertMembership(["tenant/a", "tenant/b"], result);
@@ -154,10 +357,10 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Empty(context.Native.Requests);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(kind == "AzureBlob" ? "tenant/a" : "tenant/z", enumerator.Current.Value);
+        Assert.Equal(kind == "AzureBlob" ? "tenant/a" : "tenant/z", enumerator.Current.Id.Value);
         Assert.Single(context.Native.Requests);
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal(kind == "AzureBlob" ? "tenant/b" : "tenant/a", enumerator.Current.Value);
+        Assert.Equal(kind == "AzureBlob" ? "tenant/b" : "tenant/a", enumerator.Current.Id.Value);
         Assert.Single(context.Native.Requests);
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => enumerator.MoveNextAsync().AsTask());
@@ -187,7 +390,7 @@ public sealed class JournalStorageCatalogTests
         await using (var enumerator = context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            Assert.Equal(kind == "AzureBlob" ? "a" : "z", enumerator.Current.Value);
+            Assert.Equal(kind == "AzureBlob" ? "a" : "z", enumerator.Current.Id.Value);
             Assert.Single(context.Native.Requests);
         }
 
@@ -207,7 +410,7 @@ public sealed class JournalStorageCatalogTests
             new() { Prefix = new("tenant/") }, TestContext.Current.CancellationToken).GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
-        Assert.Equal("tenant/valid", enumerator.Current.Value);
+        Assert.Equal("tenant/valid", enumerator.Current.Id.Value);
         Assert.Equal([0, 1], context.Native.Requests.Select(request => request.ResultCount));
         Assert.False(await enumerator.MoveNextAsync());
         Assert.Equal(2, context.Native.Requests.Count);
@@ -282,7 +485,7 @@ public sealed class JournalStorageCatalogTests
         {
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(cancellation.Token, request.CancellationToken);
-            Assert.Equal(kind == "AzureBlob" ? "wal/tenant" : null, request.Prefix);
+            Assert.Equal(kind == "AzureBlob" ? "wal/tenant" : kind == "S3" ? "wal/" : null, request.Prefix);
         });
         if (kind == "AzureTable")
         {
@@ -452,7 +655,7 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(2, context.Native.Requests.Count);
         Assert.All(context.Native.Requests, request =>
         {
-            Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : prefix, request.Prefix);
+            Assert.Equal("wal/" + prefix, request.Prefix);
             Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : null, request.LowerStart);
             Assert.Equal(kind == "AzureBlob" ? 5000 : 1000, request.Maximum);
             Assert.Equal(2, request.ResultCount);
@@ -508,7 +711,7 @@ public sealed class JournalStorageCatalogTests
             new() { Prefix = new("tenant"), MaxId = new("tenant/z") }, cancellation.Token).GetAsyncEnumerator(cancellation.Token))
         {
             Assert.True(await enumerator.MoveNextAsync());
-            Assert.Equal("tenant", enumerator.Current.Value);
+            Assert.Equal("tenant", enumerator.Current.Id.Value);
             if (cancel)
             {
                 cancellation.Cancel();
@@ -598,8 +801,8 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal([2, 1], context.Native.Requests.Select(request => request.ResultCount));
         Assert.All(context.Native.Requests, request =>
         {
-            Assert.Equal(kind == "AzureBlob" ? "wal/" + common : common, request.Prefix);
-            Assert.Equal(kind == "AzureBlob" ? "wal/" + minimum : request.Cursor is null ? minimum : null, request.LowerStart);
+            Assert.Equal("wal/" + common, request.Prefix);
+            Assert.Equal(kind == "AzureBlob" ? "wal/" + minimum : request.Cursor is null ? "wal/" + minimum[..^1] : null, request.LowerStart);
         });
     }
 
@@ -615,17 +818,17 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(ids[1..3], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new(prefix) }, TestContext.Current.CancellationToken)));
         var request = Assert.Single(context.Native.Requests);
-        Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : prefix, request.Prefix);
+        Assert.Equal("wal/" + prefix, request.Prefix);
         Assert.Equal(kind == "AzureBlob" ? "wal/" + prefix : null, request.LowerStart);
         Assert.Equal(2, request.ResultCount);
     }
 
     [Theory]
-    [InlineData("journals", null, null, "journals", null)]
-    [InlineData("journals", "journal", "journals/zeta", "journals", null)]
-    [InlineData("journals", "journals", "journals/zeta", "journals", null)]
-    [InlineData("journals", "journals/alpha", "journals/alpha", "journals/alpha", null)]
-    [InlineData("journals/", "journals/alpha", "journals/zeta", "journals/", "journals/alpha")]
+    [InlineData("journals", null, null, "wal/journals", null)]
+    [InlineData("journals", "journal", "journals/zeta", "wal/journals", null)]
+    [InlineData("journals", "journals", "journals/zeta", "wal/journals", null)]
+    [InlineData("journals", "journals/alpha", "journals/alpha", "wal/journals/alpha", null)]
+    [InlineData("journals/", "journals/alpha", "journals/zeta", "wal/journals/", "wal/journals/alph")]
     public async Task S3ListAsync_OrderedSeekOnlyNarrowsBeyondNativePrefix(
         string prefix, string? minId, string? maxId, string nativePrefix, string? startAfter)
     {
@@ -645,7 +848,7 @@ public sealed class JournalStorageCatalogTests
         Assert.All(context.Native.Requests, request =>
         {
             Assert.Equal(nativePrefix, request.Prefix);
-            Assert.Equal(startAfter, request.LowerStart);
+            Assert.Equal(request.Cursor is null ? startAfter : null, request.LowerStart);
         });
         Assert.Equal(result.Count, context.Native.Requests.Sum(request => request.ResultCount));
     }
@@ -708,8 +911,10 @@ public sealed class JournalStorageCatalogTests
         Assert.DoesNotContain(" or ", context.Native.Filter);
     }
 
-    [Fact]
-    public async Task AzureTableListAsync_CustomMappingFiltersCanonicalIdsAndEscapesQueryLiterals()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AzureTableListAsync_CustomMappingFiltersCanonicalIdsAndEscapesQueryLiterals(bool includeMetadata)
     {
         const string prefix = "tenant'one";
         string[] ids = [prefix, prefix + "/a", prefix + "/a/child", prefix + "/z"];
@@ -717,8 +922,14 @@ public sealed class JournalStorageCatalogTests
             headers: ids.Select((id, index) => Header($"opaque-{index}", id)).ToArray(),
             configureTable: options => options.GetPartitionKey = id => $"opaque-{Array.IndexOf(ids, id.Value)}");
 
-        Assert.Equal(ids[..3], await DrainAsync(context.Catalog.ListAsync(
-            new() { Prefix = new(prefix), MaxId = new(prefix + "/a/child") }, TestContext.Current.CancellationToken)));
+        var entries = await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { Prefix = new(prefix), MaxId = new(prefix + "/a/child"), IncludeMetadata = includeMetadata },
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(ids[..3], entries.Select(entry => entry.Id.Value));
+        Assert.All(entries, entry => Assert.Equal(includeMetadata, entry.Metadata is not null));
+        AssertMetadataProjection(context.Native, "AzureTable", includeMetadata);
+        Assert.Equal(0, context.Native.MetadataRequests);
         Assert.Contains("JournalId ge 'tenant''one'", context.Native.Filter);
         Assert.Contains("JournalId le 'tenant''one/a/child'", context.Native.Filter);
         Assert.DoesNotContain("PartitionKey ", context.Native.Filter);
@@ -749,8 +960,8 @@ public sealed class JournalStorageCatalogTests
         var mapped = new List<string>();
         string[] keys =
         [
-            "current/tenant/z/wal", "current/tenant/alias/wal", "current/tenant/a/chk.1",
-            "current/tenant/a/wal", "current/other/x/wal", "invalid/wal", "default/wal",
+            "wal/current/tenant/z", "wal/current/tenant/alias", "checkpoints/current/tenant/a/1",
+            "wal/current/tenant/a", "wal/current/other/x", "wal/invalid", "wal/default",
         ];
         await using var context = await CreateAsync("S3", [], keys: keys, configureS3: options =>
         {
@@ -773,7 +984,7 @@ public sealed class JournalStorageCatalogTests
             ["tenant/z", "tenant/a"],
             await DrainAsync(context.Catalog.ListAsync(new() { Prefix = new("tenant") }, TestContext.Current.CancellationToken)));
         Assert.Equal(["tenant/z", "tenant/z", "tenant/a"], mapped);
-        Assert.All(context.Native.Requests, request => Assert.Equal("current/", request.Prefix));
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/current/", request.Prefix));
     }
 
     [Fact]
@@ -789,8 +1000,8 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("tenant", "tenant-a", "tenant-b", null)]
-    [InlineData("jobs/shards/202609", "jobs/shards/20260909-a", "jobs/shards/20260909-b", "jobs/shards/")]
+    [InlineData("tenant", "tenant-a", "tenant-b", "wal/")]
+    [InlineData("jobs/shards/202609", "jobs/shards/20260909-a", "jobs/shards/20260909-b", "wal/jobs/shards/")]
     public async Task S3ListAsync_DirectoryModeWidensPartialPrefixWithoutLosingBoundedIds(
         string prefix, string minimum, string maximum, string? nativePrefix)
     {
@@ -814,7 +1025,7 @@ public sealed class JournalStorageCatalogTests
     {
         string[] ids = ["tenant/z", "tenant/a", "tenant/b", "tenant/0"];
         var mapping = ids.Select((id, index) => (id, key: $"current/{index}/{id}")).ToDictionary(item => item.id, item => item.key);
-        await using var context = await CreateAsync("S3", [], keys: ids.Select(id => mapping[id] + "/wal").ToArray(), configureS3: options =>
+        await using var context = await CreateAsync("S3", [], keys: ids.Select(id => "wal/" + mapping[id]).ToArray(), configureS3: options =>
         {
             options.UseOrderedListing = ordered;
             options.GetObjectKey = id => mapping[id.Value];
@@ -827,18 +1038,18 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(4, context.Native.Requests.Sum(request => request.ResultCount));
         Assert.All(context.Native.Requests, request =>
         {
-            Assert.Equal("current/", request.Prefix);
+            Assert.Equal("wal/current/", request.Prefix);
             Assert.Null(request.LowerStart);
         });
     }
 
     [Theory]
-    [InlineData(false, "current/tenant/")]
-    [InlineData(true, "current/tenant/a")]
+    [InlineData(false, "wal/current/tenant/")]
+    [InlineData(true, "wal/current/tenant/a")]
     public async Task S3ListAsync_CustomMapperAcceptsRawPartialPrefixes(bool ordered, string nativePrefix)
     {
         await using var context = await CreateAsync("S3", [], keys:
-            ["current/tenant/aa/wal", "current/tenant/ab/wal", "current/tenant/ac/wal"], configureS3: options =>
+            ["wal/current/tenant/aa", "wal/current/tenant/ab", "wal/current/tenant/ac"], configureS3: options =>
         {
             options.UseOrderedListing = ordered;
             options.GetObjectKey = id => "current/" + id.Value;
@@ -859,7 +1070,7 @@ public sealed class JournalStorageCatalogTests
     [Fact]
     public async Task S3ListAsync_CustomMappingWithBoundsOnlyDoesNotRequirePrefixMapper()
     {
-        await using var context = await CreateAsync("S3", [], keys: ["current/tenant/a/wal", "current/tenant/z/wal"], configureS3: options =>
+        await using var context = await CreateAsync("S3", [], keys: ["wal/current/tenant/a", "wal/current/tenant/z"], configureS3: options =>
         {
             options.UseOrderedListing = true;
             options.GetObjectKey = id => "current/" + id.Value;
@@ -869,7 +1080,7 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(["tenant/a"], await DrainAsync(context.Catalog.ListAsync(
             new() { MinId = new("tenant/a"), MaxId = new("tenant/b") }, TestContext.Current.CancellationToken)));
         var request = Assert.Single(context.Native.Requests);
-        Assert.Null(request.Prefix);
+        Assert.Equal("wal/", request.Prefix);
         Assert.Null(request.LowerStart);
     }
 
@@ -878,7 +1089,7 @@ public sealed class JournalStorageCatalogTests
     [InlineData("")]
     public async Task S3ListAsync_CustomMappingRequiresValidExplicitPrefix(string? mappedPrefix)
     {
-        await using var context = await CreateAsync("S3", [], keys: ["current/tenant/wal"], configureS3: options =>
+        await using var context = await CreateAsync("S3", [], keys: ["wal/current/tenant"], configureS3: options =>
         {
             options.GetObjectKey = id => "current/" + id.Value;
             options.TryParseJournalId = key => new JournalId(key["current/".Length..]);
@@ -893,7 +1104,7 @@ public sealed class JournalStorageCatalogTests
         Assert.Contains(nameof(S3JournalStorageOptions.GetObjectKeyPrefix), failure.Message);
         Assert.Empty(context.Native.Requests);
         Assert.Equal(["tenant"], await DrainAsync(context.Catalog.ListAsync(cancellationToken: TestContext.Current.CancellationToken)));
-        Assert.Null(Assert.Single(context.Native.Requests).Prefix);
+        Assert.Equal("wal/", Assert.Single(context.Native.Requests).Prefix);
     }
 
     [Theory]
@@ -939,25 +1150,65 @@ public sealed class JournalStorageCatalogTests
         Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
     }
 
-    private static async Task<List<string>> DrainAsync(IAsyncEnumerable<JournalId> source)
+    private static async Task<List<string>> DrainAsync(IAsyncEnumerable<JournalCatalogEntry> source)
     {
         var result = new List<string>();
-        await foreach (var id in source)
+        await foreach (var entry in source)
         {
-            result.Add(id.Value);
+            result.Add(entry.Id.Value);
         }
 
         return result;
     }
 
+    private static async Task<List<JournalCatalogEntry>> DrainEntriesAsync(IAsyncEnumerable<JournalCatalogEntry> source)
+    {
+        var result = new List<JournalCatalogEntry>();
+        await foreach (var entry in source)
+        {
+            result.Add(entry);
+        }
+
+        return result;
+    }
+
+    private static void AssertMetadataProjection(NativeState state, string kind, bool includeMetadata)
+    {
+        if (kind == "AzureBlob")
+        {
+            Assert.Equal(includeMetadata ? BlobTraits.Metadata : BlobTraits.None, Assert.Single(state.BlobTraits));
+        }
+        else
+        {
+            Assert.Equal(includeMetadata
+                ? [AzureTableJournalStorage.JournalIdPropertyName, AzureTableJournalStorage.FormatPropertyName,
+                    AzureTableJournalStorage.MetadataPropertyName, nameof(TableEntity.Timestamp)]
+                : new[] { AzureTableJournalStorage.JournalIdPropertyName }, state.Select);
+        }
+    }
+
     private static BlobItem Blob(string name, BlobType type = BlobType.Append)
         => BlobsModelFactory.BlobItem(
             name: name, deleted: false,
-            properties: BlobsModelFactory.BlobItemProperties(accessTierInferred: false, blobType: type));
+            properties: BlobsModelFactory.BlobItemProperties(accessTierInferred: false, blobType: type, eTag: new ETag("listed")),
+            metadata: new Dictionary<string, string>
+            {
+                [AzureBlobJournalStorage.FormatMetadataKey] = "test",
+                [AzureBlobJournalStorage.CheckpointMetadataKey] = "checkpoints/previous/snapshot",
+                [AzureBlobJournalStorage.CheckpointOffsetMetadataKey] = "0",
+                [AzureBlobJournalStorage.WalGenerationMetadataKey] = "generation",
+                ["owner"] = "alice",
+            });
 
     private static TableEntity Header(string partition, string? id = null)
     {
-        var result = new TableEntity(partition, AzureTableJournalStorage.HeaderRowKey);
+        var result = new TableEntity(partition, AzureTableJournalStorage.HeaderRowKey)
+        {
+            ETag = new ETag("listed"),
+            Timestamp = DateTimeOffset.UnixEpoch,
+            [AzureTableJournalStorage.FormatPropertyName] = "test",
+            [AzureTableJournalStorage.MetadataPropertyName] = """{"owner":"alice"}""",
+        };
         if (id is not null)
         {
             result[AzureTableJournalStorage.JournalIdPropertyName] = id;
@@ -1048,7 +1299,7 @@ public sealed class JournalStorageCatalogTests
                         .Returns(Task.FromResult(new HeadBucketResponse()));
                     var s3Options = new S3JournalStorageOptions { BucketName = "journals", S3Client = _client, UseOrderedListing = false };
                     configureS3?.Invoke(s3Options);
-                    var objects = (keys ?? ids.Select(id => $"{id}/wal").ToArray()).Select(key => new S3Object { Key = key }).ToArray();
+                    var objects = (keys ?? ids.Select(id => $"wal/{id}").ToArray()).Select(key => new S3Object { Key = key }).ToArray();
                     var continuationRecords = new Dictionary<string, S3Object[]>();
                     _client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>()).Returns(call =>
                     {
@@ -1105,6 +1356,10 @@ public sealed class JournalStorageCatalogTests
         public IJournalStorageProvider Provider { get; }
         public IJournalStorageCatalog Catalog { get; }
 
+        public void AssertNoS3MetadataRequests()
+            => Assert.DoesNotContain(_client!.ReceivedCalls(), call => call.GetMethodInfo().Name
+                is nameof(IAmazonS3.GetObjectMetadataAsync) or nameof(IAmazonS3.GetObjectAsync));
+
         public Task InitializeAsync()
             => Provider is VolatileJournalStorageProvider
                 ? Task.CompletedTask : _lifecycle.StartAsync(TestContext.Current.CancellationToken);
@@ -1138,6 +1393,9 @@ public sealed class JournalStorageCatalogTests
         public Exception? SetupFailure { get; set; }
         public string? Filter { get; set; }
         public string[]? Select { get; set; }
+        public List<BlobTraits> BlobTraits { get; } = [];
+        public int MetadataRequests { get; set; }
+        public ETag? CurrentETag { get; set; }
 
         public NativePage<T> Fetch<T>(T[] records, string? cursor, int? maximum, string? prefix, CancellationToken cancellationToken, string? lowerStart = null)
         {
@@ -1191,6 +1449,9 @@ public sealed class JournalStorageCatalogTests
 
     private sealed class FakeContainer(NativeState state, BlobItem[] records) : BlobContainerClient
     {
+        protected override AppendBlobClient GetAppendBlobClientCore(string blobName)
+            => new FakeAppendBlob(state, records, blobName);
+
         public override Task<Response<BlobContainerInfo>> CreateIfNotExistsAsync(
             PublicAccessType publicAccessType = PublicAccessType.None,
             IDictionary<string, string>? metadata = null,
@@ -1208,13 +1469,38 @@ public sealed class JournalStorageCatalogTests
 
         public override AsyncPageable<BlobItem> GetBlobsAsync(GetBlobsOptions options, CancellationToken cancellationToken = default)
         {
-            Assert.Equal(BlobTraits.None, options.Traits);
+            state.BlobTraits.Add(options.Traits);
             Assert.Equal(BlobStates.None, options.States);
             return new FakePageable<BlobItem>(
                 state, records.Where(item => (options.Prefix is null || item.Name.StartsWith(options.Prefix, StringComparison.Ordinal))
                         && (options.StartFrom is null || string.CompareOrdinal(item.Name, options.StartFrom) >= 0))
-                    .OrderBy(item => item.Name, StringComparer.Ordinal).ToArray(),
+                    .OrderBy(item => item.Name, StringComparer.Ordinal)
+                    .Select(item => BlobsModelFactory.BlobItem(
+                        name: item.Name, deleted: false, properties: item.Properties,
+                        metadata: options.Traits.HasFlag(BlobTraits.Metadata)
+                            ? new Dictionary<string, string>(item.Metadata) : null))
+                    .ToArray(),
                 null, options.Prefix, cancellationToken, options.StartFrom);
+        }
+    }
+
+    private sealed class FakeAppendBlob(NativeState state, BlobItem[] records, string name) : AppendBlobClient
+    {
+        public override Task<Response<BlobProperties>> GetPropertiesAsync(
+            BlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            state.MetadataRequests++;
+            var item = Assert.Single(records, item => item.Name == name);
+            var eTag = state.CurrentETag ?? item.Properties.ETag!.Value;
+            if (conditions?.IfMatch is { } expected && expected != eTag)
+            {
+                throw new RequestFailedException(412, "The metadata snapshot is stale.");
+            }
+
+            return Task.FromResult(Response.FromValue(
+                BlobsModelFactory.BlobProperties(eTag: eTag, blobType: BlobType.Append, metadata: item.Metadata),
+                new FakeResponse()));
         }
     }
 
@@ -1236,6 +1522,22 @@ public sealed class JournalStorageCatalogTests
 
     private sealed class FakeTable(NativeState state, TableEntity[] records) : TableClient
     {
+        public override Task<Response<T>> GetEntityAsync<T>(
+            string partitionKey, string rowKey, IEnumerable<string>? select = null, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            state.MetadataRequests++;
+            var entity = Assert.Single(records, entity => entity.PartitionKey == partitionKey && entity.RowKey == rowKey);
+            var snapshot = new TableEntity(new Dictionary<string, object>(entity))
+            {
+                PartitionKey = partitionKey,
+                RowKey = rowKey,
+                ETag = state.CurrentETag ?? entity.ETag,
+                Timestamp = entity.Timestamp,
+            };
+            return Task.FromResult(Response.FromValue((T)(ITableEntity)snapshot, new FakeResponse()));
+        }
+
         public override Task<Response<TableItem>> CreateIfNotExistsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(Response.FromValue(new TableItem("journals"), new FakeResponse()));
 
@@ -1247,13 +1549,21 @@ public sealed class JournalStorageCatalogTests
             state.Select = select?.ToArray();
             Assert.Equal(1000, maxPerPage);
             Assert.NotNull(filter);
-            Assert.Equal([AzureTableJournalStorage.JournalIdPropertyName], Assert.IsType<string[]>(state.Select));
+            Assert.NotNull(state.Select);
             var values = records.Where(entity => MatchesFilter(entity, filter)).Select(entity =>
             {
                 var projected = new TableEntity(entity.PartitionKey, entity.RowKey);
-                if (entity.TryGetValue(AzureTableJournalStorage.JournalIdPropertyName, out var value))
+                foreach (var property in state.Select)
                 {
-                    projected[AzureTableJournalStorage.JournalIdPropertyName] = value;
+                    if (property == nameof(TableEntity.Timestamp))
+                    {
+                        projected.Timestamp = entity.Timestamp;
+                        projected.ETag = entity.ETag;
+                    }
+                    else if (entity.TryGetValue(property, out var value))
+                    {
+                        projected[property] = value;
+                    }
                 }
 
                 return (T)(ITableEntity)projected;

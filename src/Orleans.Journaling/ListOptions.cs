@@ -28,4 +28,15 @@ public sealed class ListOptions
     /// <see cref="StringComparison.Ordinal"/>. The default value does not impose an upper bound.
     /// </summary>
     public JournalId MaxId { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the catalog includes metadata available from its listing operation.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    /// <remarks>
+    /// Providers project a complete metadata snapshot when available without a separate per-journal
+    /// metadata request. Otherwise, <see cref="JournalCatalogEntry.Metadata"/> is <see langword="null"/>.
+    /// Callers which require missing metadata can retrieve it using <see cref="IJournalStorage.GetMetadataAsync"/>.
+    /// </remarks>
+    public bool IncludeMetadata { get; set; }
 }
