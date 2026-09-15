@@ -59,8 +59,10 @@ public sealed class GrainTypeSharedContext
             throw new KeyNotFoundException($"Could not find corresponding grain class for grain of type {grainType}");
         }
 
+        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
+        GrainTypeMetrics = CatalogInstruments.GetGrainTypeMetrics(grainType);
+        Interlocked.CompareExchange(ref GrainTypeMetrics.GrainClassName, RuntimeTypeNameFormatter.Format(grainClass), null);
         SerializerSessionPool = serializerSessionPool;
-        GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
         SchedulerLogger = loggerFactory.CreateLogger<WorkItemGroup>();
         MessagingOptions = messagingOptions.Value;
@@ -74,7 +76,6 @@ public sealed class GrainTypeSharedContext
         SchedulingOptions = schedulingOptions.Value;
         Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
-        CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
         MessagingProcessingInstruments = serviceProvider.GetRequiredService<MessagingProcessingInstruments>();
 
@@ -88,8 +89,10 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain instance type name, if available.
     /// </summary>
-    public string GrainTypeName { get; }
+    public string GrainTypeName => GrainTypeMetrics.GrainClassName!;
 
+    internal GrainTypeMetrics GrainTypeMetrics { get; }
+    internal string GrainTypeMetricName => GrainTypeMetrics.GrainTypeTagValue;
     internal CatalogInstruments CatalogInstruments { get; }
     internal GrainInstruments GrainInstruments { get; }
     internal MessagingProcessingInstruments MessagingProcessingInstruments { get; }
@@ -249,7 +252,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnCreateActivation(IGrainContext grainContext)
     {
-        GrainInstruments.IncrementGrainCounts(GrainTypeName);
+        GrainInstruments.IncrementGrainCounts(GrainTypeMetrics);
     }
 
     /// <summary>
@@ -258,7 +261,7 @@ public sealed class GrainTypeSharedContext
     /// <param name="grainContext">The grain activation.</param>
     public void OnDestroyActivation(IGrainContext grainContext)
     {
-        GrainInstruments.DecrementGrainCounts(GrainTypeName);
+        GrainInstruments.DecrementGrainCounts(GrainTypeMetrics);
     }
 }
 
