@@ -30,15 +30,29 @@ namespace NonSilo.Tests.DurableJobs;
 [TestCategory("BVT"), TestCategory("DurableJobs")]
 public class LocalDurableJobManagerTests
 {
-    [Fact]
-    public async Task Stop_DuringAssignmentReadinessCheckRejectsActivationAndAwaitsCleanup()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stop_DuringAssignmentReadinessCheckRejectsActivationAndAwaitsCleanup(bool useSiloLifecycle)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var shardManager = new TestJobShardManager();
         var manager = CreateManager(shardManager, timeProvider, CreateOptions());
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
-        var observer = CreateLifecycleObserver(manager);
+        var lifecycleLogger = new RecordingLogger<SiloLifecycleSubject>();
+        ILifecycleObserver observer;
+        if (useSiloLifecycle)
+        {
+            var lifecycle = new SiloLifecycleSubject(lifecycleLogger);
+            manager.Participate(lifecycle);
+            observer = lifecycle;
+        }
+        else
+        {
+            observer = CreateLifecycleObserver(manager);
+        }
+
         var shard = new BlockingQueueShard("final-activation", timeProvider.GetUtcNow(), timeProvider.GetUtcNow().AddHours(1));
         var discoveredShard = Substitute.For<IJobShard>();
         Task? stop = null;
@@ -47,6 +61,7 @@ public class LocalDurableJobManagerTests
         {
             // The assigned shard is cached and checking readiness when shutdown closes admission.
             stop ??= observer.OnStop(cancellationToken);
+            // OnStop returns its task so this check can finish while shutdown awaits the loop.
             return shard.StartTime;
         });
         discoveredShard.EndTime.Returns(shard.EndTime);
@@ -76,6 +91,7 @@ public class LocalDurableJobManagerTests
         Assert.Empty(shardManager.UnregisteredShards);
         Assert.False(accessor.HasCachedShard(shard.Id));
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
+        Assert.DoesNotContain(lifecycleLogger.Entries, entry => entry.Level == LogLevel.Error);
     }
 
     [Fact]
