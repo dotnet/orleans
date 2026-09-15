@@ -1588,7 +1588,7 @@ namespace Orleans.Streams
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
-                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, cancellationToken).Ignore();
+                await pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, CancellationToken.None);
                 return true;
             }
 
