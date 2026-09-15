@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -9,8 +11,6 @@ using Orleans.Runtime;
 using Orleans.Statistics;
 using TestGrains;
 using Xunit;
-using System.Diagnostics.Metrics;
-using System.Threading.Channels;
 
 namespace UnitTests.Runtime
 {
