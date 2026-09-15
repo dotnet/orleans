@@ -163,6 +163,13 @@ namespace Orleans.Runtime.Messaging
 
         public void OnConnected(SiloAddress address, Connection connection)
         {
+            // Outbound preambles run under the acquisition's existing admission until initialization completes.
+            if (this.connectionTasks.ContainsKey(connection))
+            {
+                OnConnected(address, connection, null);
+                return;
+            }
+
             using var admission = this.connectionEstablishment.TryEnter();
             if (!admission.Entered)
             {

@@ -35,10 +35,14 @@ namespace Orleans.Runtime.Messaging
         private readonly List<Message> inflight = new List<Message>(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _middlewareCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly IDuplexPipe _underlyingTransport;
         private IDuplexPipe? _transport;
         private Task? _processIncomingTask;
         private Task? _processOutgoingTask;
         private Task? _closeTask;
+        private int _runState;
+        private bool _openedSocket;
         private long _lastMessageReceivedTimestamp;
 
         protected Connection(
@@ -47,6 +51,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon shared)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
+            _underlyingTransport = connection.Transport;
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
@@ -57,6 +62,7 @@ namespace Orleans.Runtime.Messaging
 
             this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint)!;
             this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint)!;
+            this.Context.ConnectionClosed.UnsafeRegister(OnConnectionClosedDelegate, this);
         }
 
         public ConnectionCommon Shared => shared;
@@ -99,10 +105,11 @@ namespace Orleans.Runtime.Messaging
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task Run()
         {
+            var runMiddleware = Interlocked.CompareExchange(ref _runState, 1, 0) == 0;
             Exception? error = default;
             try
             {
-                if (this.IsValid)
+                if (runMiddleware)
                 {
                     // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
                     await this.middleware(this.Context);
@@ -114,6 +121,11 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                if (runMiddleware)
+                {
+                    _middlewareCompleted.TrySetResult();
+                }
+
                 await this.CloseAsync(error);
             }
         }
@@ -121,9 +133,8 @@ namespace Orleans.Runtime.Messaging
         private static Task OnConnectedAsync(ConnectionContext context)
         {
             var connection = context.Features.Get<Connection>();
-            context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
-
             connection!.shared.NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
+            connection._openedSocket = true;
             return connection.RunInternal();
         }
 
@@ -170,6 +181,12 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+            // Either Run owns middleware completion, or closing permanently prevents middleware from starting.
+            if (Interlocked.CompareExchange(ref _runState, 2, 0) == 0)
+            {
+                _middlewareCompleted.TrySetResult();
+            }
+
             _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
             _initializationTcs.Task.Ignore();
 
@@ -183,15 +200,11 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            this.shared.NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
-
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
 
-            var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
-            var transport = transportFeature?.Transport ?? this.Context.Transport;
-            transport.Input.CancelPendingRead();
-            transport.Output.CancelPendingFlush();
+            _underlyingTransport.Input.CancelPendingRead();
+            _underlyingTransport.Output.CancelPendingFlush();
 
             // Try to gracefully stop the reader/writer loops, if they are running.
             if (_processIncomingTask is { IsCompleted: false } incoming)
@@ -220,20 +233,22 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            // Only wait for the transport to close if the connection actually started being processed.
-            if (_processIncomingTask is not null && _processOutgoingTask is not null)
+            // Abort also releases transport work while TLS or the Orleans preamble is still initializing.
+            try
             {
-                // Abort the connection and wait for the transport to signal that it's closed before disposing it.
-                try
-                {
-                    this.Context.Abort();
-                }
-                catch (Exception exception)
-                {
-                    LogWarningExceptionAbortingConnection(this.Log, exception, this);
-                }
+                this.Context.Abort();
+            }
+            catch (Exception exception)
+            {
+                LogWarningExceptionAbortingConnection(this.Log, exception, this);
+            }
 
-                await _transportConnectionClosed.Task;
+            await _transportConnectionClosed.Task;
+            await _middlewareCompleted.Task;
+
+            if (_openedSocket)
+            {
+                this.shared.NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
             }
 
             try

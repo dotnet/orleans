@@ -33,6 +33,8 @@ Shutdown first blocks new application traffic while allowing responses and membe
 
 `ConnectionManager` closes establishment admission before canceling pending attempts and signaling existing connections to close. Each admitted producer remains owned until it publishes its connection or completes failure cleanup, including its connection runner. Shutdown then closes any late publications and drains the remaining outbound runners through middleware cleanup. The shutdown cancellation source stays valid until those operations finish; a canceled host stop preserves it for operations still unwinding. Inbound listeners stop accepting connections and close their tracked connections before awaiting the manager's closed signal and disposing their transport listener.
 
+Connection closure aborts the underlying transport to release pending TLS handshakes and Orleans preamble exchange. Middleware then completes its cleanup and restores the original transport before the connection context is disposed. A connection closed before its queued runner starts completes this same transport shutdown while preventing middleware startup.
+
 ## Design trade-offs
 
 - Per-endpoint connection state avoids global coordination but means every silo must observe and repair its own broken paths.
