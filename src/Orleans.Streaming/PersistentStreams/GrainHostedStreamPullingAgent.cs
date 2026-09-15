@@ -24,7 +24,8 @@ internal sealed class GrainHostedStreamPullingAgent(
 {
     private StreamPullingAgentRuntime.Provider _provider = null!;
     private QueueId _queueId;
-    private PersistentStreamPullingAgent? _agent;
+    private volatile PersistentStreamPullingAgent? _agent;
+    internal bool IsRunning => _agent is not null;
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -66,22 +67,35 @@ internal sealed class GrainHostedStreamPullingAgent(
 
     private async Task Start(CancellationToken cancellationToken)
     {
-        var agent = await _provider.CreateAgent(GrainContext, _queueId);
+        // Register before awaiting initialization so provider stop also drains activations being started by callbacks.
+        if (!_provider.TryRegisterAgent(_queueId, this))
+        {
+            return;
+        }
+
+        PersistentStreamPullingAgent? agent = null;
         try
         {
+            agent = await _provider.CreateAgent(GrainContext, _queueId);
             await agent.Initialize(cancellationToken, waitForReceiver: true);
             _agent = agent;
-            _provider.Agents[_queueId] = this;
         }
         catch
         {
             try
             {
-                await agent.Shutdown(CancellationToken.None, suppressReceiverShutdownErrors: false, unregisterProducer: false);
+                if (agent is not null)
+                {
+                    await agent.Shutdown(CancellationToken.None, suppressReceiverShutdownErrors: false, unregisterProducer: false);
+                }
             }
             catch (Exception exception)
             {
                 logger.LogError(exception, "Failed to clean up pulling agent {GrainId} after initialization failed.", GrainContext.GrainId);
+            }
+            finally
+            {
+                Unregister();
             }
 
             throw;
@@ -102,10 +116,12 @@ internal sealed class GrainHostedStreamPullingAgent(
         }
         finally
         {
-            ((ICollection<KeyValuePair<QueueId, GrainHostedStreamPullingAgent>>)_provider.Agents)
-                .Remove(new(_queueId, this));
+            Unregister();
         }
     }
+
+    private void Unregister() => ((ICollection<KeyValuePair<QueueId, GrainHostedStreamPullingAgent>>)_provider.Agents)
+        .Remove(new(_queueId, this));
 
     public Task AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken)
         => _agent?.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData, cancellationToken) ?? Task.CompletedTask;

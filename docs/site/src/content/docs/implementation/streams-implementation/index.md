@@ -74,7 +74,7 @@ Receiver, cache, cursor, and SDK-client objects belong to their host. The destin
 
 The producer's stable grain ID remains registered across runtime migration and recovery. Pub/sub callbacks route to the successor. Administrative stop unregisters the hosted producer while the activation can still serve interleaved subscription callbacks, then leaves polling stopped until the provider is started.
 
-Receiver initialization and final-flush failures propagate to the grain lifecycle. Failed deactivation, lifecycle cancellation, and process failure recover using the last durable checkpoint, with at-least-once replay. The selected grain directory supplies activation-registration and failure-recovery guarantees.
+Receiver initialization and final-flush failures propagate to the grain lifecycle. Checkpoint-backed rewindable providers recover failed deactivation, lifecycle cancellation, and process failure using the last durable checkpoint, with at-least-once replay. Each adapter supplies its own acknowledgement and recovery semantics; the selected grain directory supplies activation-registration and failure-recovery guarantees.
 
 Grain hosting uses assignment-based balancing. The built-in lease-based balancer uses system-target hosting so its lease-release obligations stay with the current host lifecycle. See [streaming operations](../../streaming/streaming-operations.md#change-pulling-agent-hosting-mode) for the provider-scoped rollout boundary.
 

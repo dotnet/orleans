@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Configuration;
@@ -47,7 +48,19 @@ internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAg
 
     internal sealed class Provider(Func<IGrainContext, QueueId, Task<PersistentStreamPullingAgent>> createAgent)
     {
-        internal volatile StreamLifecycleOptions.RunState State;
+        private readonly object _lifecycleLock = new();
+        private volatile StreamLifecycleOptions.RunState _state;
+        internal StreamLifecycleOptions.RunState State
+        {
+            get => _state;
+            set
+            {
+                lock (_lifecycleLock)
+                {
+                    _state = value;
+                }
+            }
+        }
         internal ImmutableHashSet<QueueId> DesiredQueues
         {
             get => Volatile.Read(ref _desiredQueues);
@@ -56,7 +69,23 @@ internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAg
 
         private ImmutableHashSet<QueueId> _desiredQueues = ImmutableHashSet<QueueId>.Empty;
         internal ConcurrentDictionary<QueueId, GrainHostedStreamPullingAgent> Agents { get; } = new();
+        internal int RunningAgentCount => Agents.Count(static entry => entry.Value.IsRunning);
+        internal QueueId[] GetRunningQueues() => Agents.Where(static entry => entry.Value.IsRunning).Select(static entry => entry.Key).ToArray();
         internal bool IsEligible(QueueId queueId) => State == StreamLifecycleOptions.RunState.AgentsStarted && DesiredQueues.Contains(queueId);
         internal Task<PersistentStreamPullingAgent> CreateAgent(IGrainContext context, QueueId queueId) => createAgent(context, queueId);
+
+        internal bool TryRegisterAgent(QueueId queueId, GrainHostedStreamPullingAgent agent)
+        {
+            lock (_lifecycleLock)
+            {
+                if (!IsEligible(queueId))
+                {
+                    return false;
+                }
+
+                Agents[queueId] = agent;
+                return true;
+            }
+        }
     }
 }
