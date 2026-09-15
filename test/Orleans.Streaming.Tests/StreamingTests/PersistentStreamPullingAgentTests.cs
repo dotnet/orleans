@@ -171,6 +171,7 @@ namespace UnitTests.StreamingTests
             var unregistration = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var unregisteredSubscriptionId = default(GuidId);
             QualifiedStreamId? unregisteredStreamId = null;
+            var unregistrationCancellationToken = default(CancellationToken);
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default!, default, TestContext.Current.CancellationToken)
                 .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
@@ -179,6 +180,7 @@ namespace UnitTests.StreamingTests
                 {
                     unregisteredSubscriptionId = call.ArgAt<GuidId>(0);
                     unregisteredStreamId = call.ArgAt<QualifiedStreamId>(1);
+                    unregistrationCancellationToken = call.ArgAt<CancellationToken>(2);
                     unregistrationStarted.TrySetResult(true);
                     return unregistration.Task;
                 });
@@ -207,6 +209,7 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(subscriptionId, unregisteredSubscriptionId);
             Assert.Equal(streamId, unregisteredStreamId);
+            Assert.Equal(CancellationToken.None, unregistrationCancellationToken);
             Assert.False(deliveryTask.IsCompleted);
 
             unregistration.TrySetResult(true);
