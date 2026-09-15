@@ -6,7 +6,7 @@ using Orleans.Caching;
 
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IAsyncDisposable
+internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IGrainDirectoryCacheEntrySource, IAsyncDisposable
 {
     private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
     private readonly IDisposable _cacheSizeRegistration;
@@ -58,9 +58,35 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
         }
     }
 
+    public bool TryGetEntry(GrainId key, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+    {
+        if (TryGetItem(key, out var item)
+            && item is GrainDirectoryCacheEntry result
+            && result.IsValid)
+        {
+            entry = result;
+            return true;
+        }
+
+        entry = null;
+        return false;
+    }
+
+    protected override LruItem CreateItem(GrainId key, (GrainAddress ActivationAddress, int Version) value)
+        => new GrainDirectoryCacheEntry(this, key, value, GetCurrentTimestamp());
+
+    internal void Touch(GrainDirectoryCacheEntry entry) => TouchItem(entry);
+
+    protected override void UpdateItem(LruItem item, (GrainAddress ActivationAddress, int Version) value)
+        => ((GrainDirectoryCacheEntry)item).Update(value);
+
+    protected override void OnItemRemoved(LruItem item)
+        => ((GrainDirectoryCacheEntry)item).Invalidate();
+
     public new async ValueTask DisposeAsync()
     {
         _cacheSizeRegistration.Dispose();
+        Clear();
         await base.DisposeAsync();
     }
 
