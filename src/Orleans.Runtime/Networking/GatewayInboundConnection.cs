@@ -111,6 +111,7 @@ namespace Orleans.Runtime.Messaging
         protected override async Task RunInternal()
         {
             var preamble = await connectionPreambleHelper.Read(this.Context);
+            NegotiateProtocolVersion(this.connectionOptions.ProtocolVersion, preamble.NetworkProtocolVersion);
 
             await connectionPreambleHelper.Write(
                 this.Context,

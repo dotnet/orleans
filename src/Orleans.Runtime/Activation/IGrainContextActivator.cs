@@ -308,7 +308,7 @@ namespace Orleans.Runtime
 
     internal interface IMayInterleavePredicate
     {
-        bool Invoke(object instance, IInvokable bodyObject);
+        bool Invoke(object instance, IInvokable? bodyObject);
     }
 
     internal class ReentrantPredicate : IMayInterleavePredicate
@@ -319,7 +319,7 @@ namespace Orleans.Runtime
 
         public static ReentrantPredicate Instance { get; } = new();
 
-        public bool Invoke(object _, IInvokable bodyObject) => true;
+        public bool Invoke(object _, IInvokable? bodyObject) => true;
     }
 
     internal class MayInterleaveStaticPredicate : IMayInterleavePredicate
@@ -331,7 +331,7 @@ namespace Orleans.Runtime
             _mayInterleavePredicate = mayInterleavePredicate;
         }
 
-        public bool Invoke(object _, IInvokable bodyObject) => _mayInterleavePredicate(bodyObject);
+        public bool Invoke(object _, IInvokable? bodyObject) => bodyObject is not null && _mayInterleavePredicate(bodyObject);
     }
 
     internal class MayInterleaveInstancedPredicate<T> : IMayInterleavePredicate where T : class
@@ -343,7 +343,7 @@ namespace Orleans.Runtime
             _mayInterleavePredicate = mayInterleavePredicateInfo.CreateDelegate<Func<T, IInvokable, bool>>();
         }
 
-        public bool Invoke(object instance, IInvokable bodyObject) => _mayInterleavePredicate((T)instance, bodyObject);
+        public bool Invoke(object instance, IInvokable? bodyObject) => bodyObject is not null && _mayInterleavePredicate((T)instance, bodyObject);
     }
 
     internal class MayInterleaveConfigurator : IConfigureGrainContext
@@ -373,9 +373,10 @@ namespace Orleans.Runtime
         public List<IMayInterleavePredicate?> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate?>();
         public bool MayInterleave(object? instance, Message message)
         {
+            var request = message.BodyObject as IInvokable;
             foreach (var predicate in this.MayInterleavePredicates)
             {
-                if (predicate!.Invoke(instance!, (IInvokable)message.BodyObject!)) return true;
+                if (predicate!.Invoke(instance!, request)) return true;
             }
 
             return false;

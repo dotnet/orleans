@@ -2406,7 +2406,7 @@ internal sealed partial class ActivationData :
             }
 
             var didCancel = false;
-            if (message is not null && message.BodyObject is IInvokable request)
+            if (message is not null)
             {
                 if (wasWaiting)
                 {
@@ -2414,9 +2414,14 @@ internal sealed partial class ActivationData :
                     _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
                     didCancel = true;
                 }
-                else
+                else if (message.BodyObject is IInvokable request)
                 {
                     didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                }
+                else
+                {
+                    // Assume the request is not cancellable.
+                    didCancel = true;
                 }
             }
 
