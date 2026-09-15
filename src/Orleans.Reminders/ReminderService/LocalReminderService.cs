@@ -43,8 +43,7 @@ namespace Orleans.Runtime.ReminderService
         private Task? runTask;
         private readonly object _deliveryLock = new();
         private bool _isDeliveringReminders;
-        private int _activeReminderDeliveries;
-        private TaskCompletionSource? _deliveryQuiesced;
+        private AdmissionGate? _deliveryGate;
 
         public LocalReminderService(
             GrainReferenceActivator referenceActivator,
@@ -144,6 +143,7 @@ namespace Orleans.Runtime.ReminderService
                         return;
                     }
 
+                    _deliveryGate = new();
                     _isDeliveringReminders = true;
                 }
 
@@ -172,21 +172,14 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task StopDeliveringReminders()
         {
-            Task? deliveryQuiescedTask = null;
+            Task deliveryQuiescedTask;
             lock (_deliveryLock)
             {
                 _isDeliveringReminders = false;
-                if (_activeReminderDeliveries > 0)
-                {
-                    _deliveryQuiesced ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
-                    deliveryQuiescedTask = _deliveryQuiesced.Task;
-                }
+                deliveryQuiescedTask = _deliveryGate?.CloseAsync() ?? Task.CompletedTask;
             }
 
-            if (deliveryQuiescedTask is not null)
-            {
-                await deliveryQuiescedTask;
-            }
+            await deliveryQuiescedTask;
 
             // Stop all reminders.
             var tasks = new List<Task>(localReminders.Count);
@@ -921,34 +914,12 @@ namespace Orleans.Runtime.ReminderService
             return stopTask;
         }
 
-        private bool TryBeginSingleReminderDelivery()
+        private AdmissionGate.Admission TryBeginSingleReminderDelivery()
         {
             lock (_deliveryLock)
             {
-                if (!_isDeliveringReminders)
-                {
-                    return false;
-                }
-
-                ++_activeReminderDeliveries;
-                return true;
+                return _deliveryGate?.TryEnter() ?? default;
             }
-        }
-
-        private void CompleteSingleReminderDelivery()
-        {
-            TaskCompletionSource? quiesced = null;
-            lock (_deliveryLock)
-            {
-                --_activeReminderDeliveries;
-                if (_activeReminderDeliveries == 0)
-                {
-                    quiesced = _deliveryQuiesced;
-                    _deliveryQuiesced = null;
-                }
-            }
-
-            quiesced?.SetResult();
         }
 
         private Task DoResponsibilitySanityCheck(GrainId grainId, string debugInfo)
@@ -1344,7 +1315,13 @@ namespace Orleans.Runtime.ReminderService
                     while (await WaitForNextTick(previousTickTime, previousScheduleVersion) is { } scheduledTick)
                     {
                         var entry = PrepareTick(scheduledTick.ScheduleVersion);
-                        if (entry is null || !_shared.TryBeginSingleReminderDelivery())
+                        if (entry is null)
+                        {
+                            continue;
+                        }
+
+                        using var admission = _shared.TryBeginSingleReminderDelivery();
+                        if (!admission.Entered)
                         {
                             continue;
                         }
@@ -1392,11 +1369,6 @@ namespace Orleans.Runtime.ReminderService
                         {
                             LogWarningFiringReminder(_shared.logger, entry.ReminderName, entry.GrainId, exception);
                         }
-                        finally
-                        {
-                            _shared.CompleteSingleReminderDelivery();
-                        }
-
                         previousTickTime = scheduledTick.TickTime;
                         previousScheduleVersion = scheduledTick.ScheduleVersion;
                     }
