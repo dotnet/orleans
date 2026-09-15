@@ -36,9 +36,22 @@ namespace Orleans.Streaming.EventHubs
         }
 
         /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
         public Task<IStreamQueueCheckpointer<string>> Create(string partition)
+            => Create(partition, CancellationToken.None);
+
+        /// <inheritdoc />
+        public Task<IStreamQueueCheckpointer<string>> Create(
+            string partition,
+            CancellationToken cancellationToken)
         {
-            return EventHubCheckpointer.Create(options, providerName, partition, this.clusterOptions.ServiceId.ToString(), loggerFactory);
+            return EventHubCheckpointer.Create(
+                options,
+                providerName,
+                partition,
+                this.clusterOptions.ServiceId.ToString(),
+                loggerFactory,
+                cancellationToken);
         }
 
         /// <summary>
@@ -75,6 +88,24 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="loggerFactory">The logger factory.</param>
         /// <returns>A task which resolves to the initialized checkpointer.</returns>
         public static async Task<IStreamQueueCheckpointer<string>> Create(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
+            => await Create(
+                options,
+                streamProviderName,
+                partition,
+                serviceId,
+                loggerFactory,
+                CancellationToken.None);
+
+        /// <summary>
+        /// Factory function that creates and initializes the checkpointer.
+        /// </summary>
+        public static async Task<IStreamQueueCheckpointer<string>> Create(
+            AzureTableStreamCheckpointerOptions options,
+            string streamProviderName,
+            string partition,
+            string serviceId,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken)
         {
             var inner = await AzureTableStreamQueueCheckpointer.Create(
                 options,
@@ -83,7 +114,8 @@ namespace Orleans.Streaming.EventHubs
                 serviceId,
                 loggerFactory,
                 StreamCheckpointComparers.Numeric,
-                StreamQueueCheckpointEntity.EventHubPartitionKeyPrefix);
+                StreamQueueCheckpointEntity.EventHubPartitionKeyPrefix,
+                cancellationToken);
             return new EventHubCheckpointer(inner);
         }
 

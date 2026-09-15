@@ -67,9 +67,17 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void UpdateCache(GrainId grainId, SiloAddress siloAddress) { }
 
-        public void InvalidateCache(GrainId grainId) { }
+        public void InvalidateCache(GrainId grainId)
+        {
+            if (!ClientGrainId.TryParse(grainId, out var clientGrainId))
+            {
+                ThrowNotClientGrainId(grainId);
+            }
 
-        public void InvalidateCache(GrainAddress address) { }
+            _clientDirectory.InvalidateCache(clientGrainId.GrainId);
+        }
+
+        public void InvalidateCache(GrainAddress address) => InvalidateCache(address.GrainId);
 
         public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {

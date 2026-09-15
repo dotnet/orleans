@@ -31,10 +31,39 @@ namespace Orleans.Tests.SqlUtils
     /// </summary>
     internal class DbStoredQueries
     {
+#if STREAMING_ADONET || TESTER_SQLUTILS
+        private const string CurrentStreamingSchemaVersion = "2";
+
+        private static readonly string[] RequiredStreamingQueryKeys =
+        [
+            nameof(StreamSchemaVersionKey),
+            nameof(AppendStreamMessageKey),
+            nameof(AcquireStreamPartitionKey),
+            nameof(ReadStreamMessagesKey),
+            nameof(AdvanceStreamCheckpointKey),
+            nameof(GetStreamPartitionBoundsKey),
+            nameof(CleanupStreamMessagesKey)
+        ];
+
+        private static readonly string[] LegacyStreamingQueryKeys =
+        [
+            "QueueStreamMessageKey",
+            "GetStreamMessagesKey",
+            "ConfirmStreamMessagesKey",
+            "FailStreamMessageKey",
+            "EvictStreamMessagesKey",
+            "EvictStreamDeadLettersKey"
+        ];
+#endif
+
         private readonly Dictionary<string, string> queries;
 
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
+#if STREAMING_ADONET || TESTER_SQLUTILS
+            ValidateStreamingSchema(queries);
+#endif
+
             var fields = typeof(DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
             var missingQueryKeys = fields.Except(queries.Keys).ToArray();
@@ -45,6 +74,34 @@ namespace Orleans.Tests.SqlUtils
             }
             this.queries = queries;
         }
+
+#if STREAMING_ADONET || TESTER_SQLUTILS
+        private static void ValidateStreamingSchema(Dictionary<string, string> queries)
+        {
+            var hasLegacyKeys = LegacyStreamingQueryKeys.Any(queries.ContainsKey);
+            var missingKeys = RequiredStreamingQueryKeys.Where(key => !queries.ContainsKey(key)).ToArray();
+            var hasExpectedVersion = queries.TryGetValue(nameof(StreamSchemaVersionKey), out var version)
+                && string.Equals(version, CurrentStreamingSchemaVersion, StringComparison.Ordinal);
+
+            if (hasExpectedVersion && !hasLegacyKeys && missingKeys.Length == 0)
+            {
+                return;
+            }
+
+            var detectedVersion = version ?? "legacy or missing";
+            var missingDescription = missingKeys.Length == 0 ? "none" : string.Join(", ", missingKeys);
+            var legacyDescription = LegacyStreamingQueryKeys.Where(queries.ContainsKey).ToArray() is { Length: > 0 } legacyKeys
+                ? string.Join(", ", legacyKeys)
+                : "none";
+            throw new InvalidOperationException(
+                $"The ADO.NET streaming schema is incompatible. Expected stream partition schema version {CurrentStreamingSchemaVersion}, " +
+                $"but detected '{detectedVersion}'. Missing query keys: {missingDescription}. Legacy query keys: {legacyDescription}. " +
+                "This alpha schema has no in-place migration. Drop the legacy OrleansStreamMessage, " +
+                "OrleansStreamDeadLetter, OrleansStreamControl, and OrleansStreamMessageSequence objects, drop OrleansStreamPartition if it " +
+                "exists, remove the streaming routines and OrleansQuery rows, and then apply the current SQL Server, PostgreSQL, or MySQL " +
+                "streaming script. Existing alpha queue rows are not compatible and will not be migrated.");
+        }
+#endif
 
         /// <summary>
         /// The query that's used to get all the stored queries.
@@ -143,34 +200,39 @@ namespace Orleans.Tests.SqlUtils
 #if STREAMING_ADONET || TESTER_SQLUTILS
 
         /// <summary>
-        /// A query template to enqueue a message into the stream table.
+        /// The stream partition schema version marker.
         /// </summary>
-        internal string QueueStreamMessageKey => queries[nameof(QueueStreamMessageKey)];
+        internal string StreamSchemaVersionKey => queries[nameof(StreamSchemaVersionKey)];
 
         /// <summary>
-        /// A query template to dequeue messages from the stream table.
+        /// A query template to append a record to a stream partition.
         /// </summary>
-        internal string GetStreamMessagesKey => queries[nameof(GetStreamMessagesKey)];
+        internal string AppendStreamMessageKey => queries[nameof(AppendStreamMessageKey)];
 
         /// <summary>
-        /// A query template to confirm message delivery from the stream table.
+        /// A query template to acquire stream partition ownership.
         /// </summary>
-        internal string ConfirmStreamMessagesKey => queries[nameof(ConfirmStreamMessagesKey)];
+        internal string AcquireStreamPartitionKey => queries[nameof(AcquireStreamPartitionKey)];
 
         /// <summary>
-        /// A query template to evict a single message (by moving it to dead letters).
+        /// A query template to read ordered stream records after an exclusive position.
         /// </summary>
-        internal string FailStreamMessageKey => queries[nameof(FailStreamMessageKey)];
+        internal string ReadStreamMessagesKey => queries[nameof(ReadStreamMessagesKey)];
 
         /// <summary>
-        /// A query template to batch evict messages (by moving them to dead letters).
+        /// A query template to advance an epoch-fenced checkpoint.
         /// </summary>
-        internal string EvictStreamMessagesKey => queries[nameof(EvictStreamMessagesKey)];
+        internal string AdvanceStreamCheckpointKey => queries[nameof(AdvanceStreamCheckpointKey)];
 
         /// <summary>
-        /// A query template to evict expired dead letters (by deleting them).
+        /// A query template to read a partition checkpoint and partition history bounds.
         /// </summary>
-        internal string EvictStreamDeadLettersKey => queries[nameof(EvictStreamDeadLettersKey)];
+        internal string GetStreamPartitionBoundsKey => queries[nameof(GetStreamPartitionBoundsKey)];
+
+        /// <summary>
+        /// A query template to perform bounded stream partition retention cleanup.
+        /// </summary>
+        internal string CleanupStreamMessagesKey => queries[nameof(CleanupStreamMessagesKey)];
 
 #endif
 
@@ -504,14 +566,39 @@ namespace Orleans.Tests.SqlUtils
                 set => Add(nameof(MessageId), value);
             }
 
+            internal long AfterMessageId
+            {
+                set => Add(nameof(AfterMessageId), value);
+            }
+
             internal byte[] Payload
             {
                 set => Add(nameof(Payload), value);
             }
 
-            internal int ExpiryTimeout
+            internal byte[] StreamIdBytes
             {
-                set => Add(nameof(ExpiryTimeout), value);
+                set => Add(nameof(StreamIdBytes), value);
+            }
+
+            internal int StreamNamespaceLength
+            {
+                set => Add(nameof(StreamNamespaceLength), value);
+            }
+
+            internal bool StartFromNow
+            {
+                set => Add(nameof(StartFromNow), value);
+            }
+
+            internal long OwnerEpoch
+            {
+                set => Add(nameof(OwnerEpoch), value);
+            }
+
+            internal long Checkpoint
+            {
+                set => Add(nameof(Checkpoint), value);
             }
 
             internal int MaxCount
@@ -519,29 +606,24 @@ namespace Orleans.Tests.SqlUtils
                 set => Add(nameof(MaxCount), value);
             }
 
-            internal int MaxAttempts
+            internal int RetentionPeriodSeconds
             {
-                set => Add(nameof(MaxAttempts), value);
+                set => Add(nameof(RetentionPeriodSeconds), value);
             }
 
-            internal int RemovalTimeout
+            internal int? MaximumRetentionPeriodSeconds
             {
-                set => Add(nameof(RemovalTimeout), value);
+                set => Add(nameof(MaximumRetentionPeriodSeconds), value, DbType.Int32);
             }
 
-            internal int VisibilityTimeout
+            internal int CleanupIntervalSeconds
             {
-                set => Add(nameof(VisibilityTimeout), value);
+                set => Add(nameof(CleanupIntervalSeconds), value);
             }
 
-            internal int EvictionInterval
+            internal int CleanupBatchSize
             {
-                set => Add(nameof(EvictionInterval), value);
-            }
-
-            internal int EvictionBatchSize
-            {
-                set => Add(nameof(EvictionBatchSize), value);
+                set => Add(nameof(CleanupBatchSize), value);
             }
 
             internal string EventIds

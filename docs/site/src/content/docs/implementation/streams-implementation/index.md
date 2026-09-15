@@ -75,13 +75,23 @@ Each `PersistentStreamPullingAgent` is a system target with single-threaded Orle
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
+### Shutdown and admitted work
+
+Each pulling-agent run owns scoped admission for queue reads, stream registrations, subscription attachment, and consumer delivery. Shutdown closes processing admission, cancels processing waits, and drains admitted work and actual receiver initialization before releasing queue resources. Repeated shutdown calls share the same completion. Restart creates fresh admission and cancellation scopes after the prior run finishes.
+
+An unavailable client is detached locally immediately. Durable subscription retirement has its own admission and cancellation lifetime, allowing a finishing delivery to start cleanup after processing admission closes. Once processing drains, shutdown closes retirement admission and waits for persistence and notification retries to finish. Producer-initiated retirement persists the removal and notifies the other producers; the requesting producer has already detached that subscription. Ordinary consumer unregistration notifies every registered producer.
+
+The final delivery-progress scan preserves the checkpoint barrier for registrations which were pending when shutdown began. Cancellation and failed registration retain the prior safe position. Receiver shutdown then flushes the safe checkpoint and releases its resources. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
+
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
 <a name="backpressure"></a>
 
 An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an <xref:Orleans.Streams.IQueueCacheCursor>, so a slow consumer does not directly block a fast consumer at a later cursor.
 
-The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+The cache tracks the earliest contiguous partition position which is safe across active subscriptions. A matching record becomes safe after delivery or intentional filtering. A cursor also advances safely across records for other streams when no earlier matching delivery is pending, so a quiet stream does not pin an otherwise busy partition. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+
+For compatible, ordered queue tokens, a subscription which has processed its stream's latest read record and drained its cursor can advance with the queue's read boundary. Pending registrations, handshakes, deliveries, and recovery keep checkpoint calculation constrained to established subscription progress.
 
 ```mermaid
 flowchart TB
@@ -97,11 +107,13 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest safe subscription scan/delivery watermark, and persists a checkpoint which resumes strictly after that position.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a supported historical position. A start token is inclusive and remains unsafe until its record is delivered or intentionally filtered. A delivery handshake token confirms that its position was already processed. Exact `EventSequenceToken` and `EventSequenceTokenV2` values interoperate for legacy compatibility. Derived tokens compare only with the same concrete type unless the provider overrides equality, ordering, and hashing together. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
 
 ## Delivery and failure semantics
 

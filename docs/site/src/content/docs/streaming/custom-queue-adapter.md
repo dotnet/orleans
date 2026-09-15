@@ -53,7 +53,7 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 Custom pooled caches use <xref:Orleans.Providers.Streams.Common.ICacheDataAdapter.Compare*> to position cursors against cached messages. The default implementation compares `SequenceNumber` and `EventIndex`, preserving the numeric ordering used by existing providers. Override it when the authoritative provider position is encoded in <xref:Orleans.Providers.Streams.Common.CachedMessage.Segment>; return an order consistent with the token produced by <xref:Orleans.Providers.Streams.Common.ICacheDataAdapter.GetSequenceToken*> so cache bounds, block selection, and cache-miss detection use the same position contract.
 
-`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
+`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a partitioned stream transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the stream partition position, and register it as a named component with `ConfigureComponent`. Treat a requested cursor start as inclusive: selecting that position does not confirm its record. Persist only the earliest contiguous partition position which every subscription has delivered, intentionally filtered, or safely scanned as belonging to another stream. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 
 For a durable custom checkpoint backend, implement <xref:Orleans.Streams.IStreamCheckpointStore> and pass it to <xref:Orleans.Streams.StreamQueueCheckpointer> with <xref:Orleans.Streams.StreamQueueCheckpointerOptions>. Load the checkpointer before processing the partition. Each store update receives the expected backend version and returns the resulting <xref:Orleans.Streams.StreamCheckpointStoreState>, so a version conflict supplies the authoritative checkpoint and version for retry or reconciliation.
 
@@ -98,7 +98,9 @@ Test the adapter against the real queue service, including:
 1. queue ownership moving between silos during membership changes;
 1. duplicate delivery and consumer idempotency;
 1. stable stream-to-partition mapping across restarts and upgrades;
-1. sustained load beyond cache capacity to verify backpressure and queue retention; and
+1. sustained load beyond cache capacity to verify backpressure and queue retention;
+1. quiet and busy streams sharing a partition, including restart after the quiet cursor scans unrelated records;
+1. cancellation while partition ownership acquisition is blocked, followed by reassignment and late command completion; and
 1. sequence-token equality, ordering, and hashing in both comparison directions.
 
 Monitor queue depth and oldest-message age by partition, receive and acknowledgement latency, redelivery count, throttling, pulling-agent errors, and consumer delivery failures. Alert before retention or visibility limits can cause data loss or a redelivery storm.
