@@ -10,13 +10,6 @@ Buckets should be created ahead of time for AWS S3 Express One Zone. `CreateBuck
 
 Metadata updates rewrite the current WAL using a conditional single-object upload. Publish a checkpoint to compact the WAL before updating metadata when the replacement object would exceed S3's 5 GB (5,000,000,000 byte) single-upload limit. Checkpoint snapshots use the same upload limit.
 
-## Adopting the alpha storage layout
-
-Deploy the new WAL/checkpoint layout into a fresh bucket. For state retained from an earlier alpha
-deployment, complete the
-[application-owned state transfer and cutover](../../Orleans.Journaling/README.md#adopting-the-alpha-storage-layouts)
-using the earlier package and configuration before switching traffic.
-
 ## Object layout
 
 `GetObjectKey` maps a logical journal id to its base object key (the identity mapping by default). WAL and checkpoint objects use separate namespaces:

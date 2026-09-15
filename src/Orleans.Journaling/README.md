@@ -108,30 +108,6 @@ Inside the operation payload array, element 0 is the command name, followed by c
 
 Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
 
-## Adopting the alpha storage layouts
-
-**Deploy these alpha layouts into fresh storage namespaces.** Use a new Azure Blob container,
-Azure Table table, S3 bucket, or Redis `KeyPrefix`. The Blob and S3 WAL/checkpoint namespaces,
-default Table partition encoding, and Redis key suffixes change the persisted addresses of journals.
-Earlier-layout journals remain at their original addresses and require the earlier provider
-package and configuration for recovery. Pointing the new defaults at that storage can make those
-journals appear missing.
-
-For an existing alpha deployment whose state must be retained, prepare and rehearse an
-application-owned export/import before upgrading:
-
-1. Quiesce application writes and job execution, and preserve the original storage, package versions,
-   and configuration together with a recoverable backup.
-2. Recover and export the required state using the earlier application and provider. Import it through
-   the upgraded application into the fresh namespace, preserving logical identities, caller-owned
-   metadata, and pending work as required by the application.
-3. Verify catalog completeness and recovered application state, including pending jobs, before switching
-   traffic and resuming execution. Retain the original deployment and backup through cutover, and account
-   for post-cutover writes in the application's rollback procedure.
-
-The application supplies and validates that state-transfer procedure. Keep the earlier deployment
-in service until it is ready. All silos sharing a journal namespace must use the same storage layout.
-
 ## Catalog enumeration
 
 `IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalCatalogEntry>` in provider traversal order.

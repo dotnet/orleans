@@ -6,13 +6,6 @@ Microsoft Orleans Journaling for Redis provides a Redis-backed implementation of
 
 The provider stores each journal as Redis string data plus Redis hash metadata. Per-journal reads and mutations use atomic Lua scripts. Journal discovery scans metadata keys on each connected primary Redis server. The default key mapping preserves journal ids in the keys, so discovery does not read the metadata hashes. Configure Redis persistence, such as AOF with an appropriate `appendfsync` setting, according to the durability guarantees required by your application.
 
-## Adopting the alpha storage layout
-
-Deploy the new reversible key layout with a fresh `KeyPrefix`. This layout applies to both default and
-custom `GetKeyName` mappings. For state retained from an earlier alpha deployment, complete the
-[application-owned state transfer and cutover](../../Orleans.Journaling/README.md#adopting-the-alpha-storage-layouts)
-using the earlier package and configuration before switching traffic.
-
 ## Getting Started
 
 Install the package:
@@ -71,7 +64,7 @@ Storage errors and cancellation propagate without provider-level retries, restar
 
 ## Redis key layout
 
-Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. The reversible key name is outside the existing SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
+Keys have the form `<keyPrefix>:journal:{<SHA256(keyName)>}:<Uri.EscapeDataString(keyName)>:metadata` or the same base with a `:data` suffix. This layout applies to both default and custom `GetKeyName` mappings. The reversible key name is outside the SHA-256 hash tag, preserving Redis Cluster colocation of each journal's data and metadata for atomic Lua operations. URI encoding preserves literal percent signs, separators, Unicode, and Redis glob characters in journal ids; the scan pattern also escapes glob characters in the configured key prefix.
 
 ## Documentation
 
