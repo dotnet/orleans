@@ -2,12 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\..\'))</RepositoryRoot>
   </PropertyGroup>
 
   <!-- <client_packages> -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.DynamoDB" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
@@ -19,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AdoNet\Orleans.Streaming.AdoNet\Orleans.Streaming.AdoNet.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,7 +1,7 @@
 ---
 title: Stream with Amazon Kinesis
 description: Configure Amazon Kinesis Data Streams for Orleans, including durable DynamoDB checkpoints.
-ms.date: 08/07/2026
+ms.date: 08/25/2026
 ms.topic: how-to
 ---
 
@@ -9,7 +9,7 @@ ms.topic: how-to
 
 The [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) package connects Orleans persistent streams to [Amazon Kinesis Data Streams](https://docs.aws.amazon.com/streams/latest/dev/introduction.html). Each Kinesis shard is an Orleans queue, so the number of open shards bounds physical read parallelism. Kinesis retention determines how far a consumer can replay.
 
-Create the Kinesis data stream before starting Orleans. The provider discovers its shards but doesn't create, delete, split, or merge the stream.
+Provision the Kinesis data stream before starting Orleans. The provider maps every non-expired shard returned by Kinesis to an Orleans queue. Infrastructure automation owns stream creation, retention, encryption, and shard-count changes.
 
 ## Configure the silo
 
@@ -25,6 +25,40 @@ Configure every Orleans client which publishes through the provider with the sam
 :::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_client":::
 
 When explicit credentials aren't configured, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html). In production, prefer workload credentials such as an IAM role. Set <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.Service> when using a custom Kinesis-compatible endpoint.
+
+## Configure Kinesis with Aspire
+
+The Aspire application model uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete durable topology through AWS CDK. The CDK stack owns the Kinesis stream, DynamoDB `PubSubStore`, and DynamoDB checkpoint table.
+
+Define stable physical names, stream capacity, retention, table schemas, and deployment identity once:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_topology":::
+
+Create the AWS SDK configuration and CDK stack, then feed the same topology into the constructs and Orleans:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_streaming_apphost":::
+
+The provider configuration references the AWS SDK metadata and emits the Kinesis resource identity plus DynamoDB checkpoint selection:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_provider_configuration":::
+
+`WithReference(stream)` maps the CDK `StreamArn` output to `AWS:Resources:orders-stream:StreamArn`. The provider validates the ARN, while the shared topology supplies the effective stream name and region. The DynamoDB references map each `TableName` output through its service key. Provider-local configuration carries the checkpoint region and `PubSubStore` service ID in every deployment mode. Run-mode environment contains AWS profile and region metadata when the AWS SDK configuration selects them, and the AWS SDK credential chain supplies workload credentials.
+
+The `PubSubStore` table uses the `GrainReference` partition key and `GrainType` sort key required by DynamoDB grain storage. The checkpoint table uses `CheckpointNamespace` and `Partition`. CDK configures both tables for on-demand billing, and Orleans receives `CreateIfNotExists=false`, `UpdateIfExists=false`, and `UseProvisionedThroughput=false` for the infrastructure-owned grain storage. The direct checkpoint provider receives `CreateIfNotExists=false` and `UseProvisionedThroughput=false`.
+
+The silo waits for the CDK stack and activates generated configuration:
+
+:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="kinesis_streaming_silo":::
+
+The publishing client waits for both the stack and silo, then activates the same stream provider name and physical stream:
+
+:::code language="csharp" source="../host/snippets/aspire/Client/ClientProgram.cs" id="kinesis_streaming_client":::
+
+The CDK stack deploys through CloudFormation in the account and region selected by the AWS SDK configuration. Grant the AppHost identity permission to create and update the stack. Bootstrap the environment when constructs use CDK assets. See [Provisioning application resources with AWS CDK](https://github.com/aws/integrations-on-dotnet-aspire-for-aws/blob/main/src/Aspire.Hosting.AWS/README.md#provisioning-application-resources-with-aws-cdk) for the integration contract.
+
+Keep `ClusterId`, `ServiceId`, provider name, stream name, and table names stable across rolling deployments. `PubSubStore` preserves explicit subscriptions, and the checkpoint table preserves the last delivered sequence number for every shard. A deliberate cutover can introduce new names, run both topologies during migration, drain consumers, and then retire the previous resources.
+
+For local Kinesis-compatible and DynamoDB services, configure `Service`, `Checkpoint:Service`, or the AWS SDK service-specific `AWS_ENDPOINT_URL_KINESIS` and `AWS_ENDPOINT_URL_DYNAMODB` variables. Keep the same stream and table identities so local activation exercises the deployed configuration contract.
 
 ## Choose checkpoint storage
 
@@ -56,6 +90,6 @@ Grant the application only the Kinesis data-plane and DynamoDB table permissions
 
 Monitor Kinesis iterator age, read throttling, provisioned throughput, and retention together with the [Orleans streaming metrics](streaming-operations.md#observe-health). <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.GetRecordsInterval> defaults to the fastest interval allowed by Kinesis for each shard.
 
-Live resharding isn't supported. If the shard topology changes while the provider is running, receivers stop rather than risk incorrect queue ownership. Restart the Orleans stream provider after splitting or merging shards.
+When the shard topology changes, receivers stop after detecting the new topology so ownership remains unambiguous. Restart the Orleans stream provider after the CDK or operational shard update completes. Increasing shard count changes read parallelism while the stable stream name, subscriptions, and checkpoints continue to identify the same durable stream.
 
 For a complete configuration which uses DynamoDB for clustering, grain state, reminders, and Kinesis checkpoints, see the [AWS Kinesis and DynamoDB sample](https://github.com/dotnet/orleans/tree/main/samples/AWS/KinesisDynamoDB).

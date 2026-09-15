@@ -42,11 +42,9 @@ var builder = Host.CreateApplicationBuilder(args)
             // Configure DynamoDB clustering
             .UseDynamoDBClustering(options =>
             {
-                options.AccessKey = "YOUR_AWS_ACCESS_KEY";
-                options.SecretKey = "YOUR_AWS_SECRET_KEY";
-                options.Region = "us-east-1";
+                options.Service = "us-east-1";
                 options.TableName = "OrleansClusteringTable";
-                options.CreateIfNotExists = true;
+                options.UseProvisionedThroughput = false;
             });
     });
 
@@ -64,6 +62,12 @@ Console.WriteLine($"Grain response: {response}");
 // Keep the host running until the application is shut down
 await host.WaitForShutdownAsync();
 ```
+
+The AWS SDK credential chain supplies credentials when explicit keys and a profile are omitted. `ProfileName` selects a named profile. `AccessKey`, `SecretKey`, and `Token` configure explicit session credentials.
+
+## Aspire
+
+AWS Aspire can run DynamoDB Local and provide CDK or CloudFormation table outputs to Orleans. See [Use Amazon DynamoDB with Aspire](https://dotnet.github.io/orleans/docs/host/dynamodb-aspire/) for clustering, grain storage, reminders, identity, and table lifecycle guidance.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
