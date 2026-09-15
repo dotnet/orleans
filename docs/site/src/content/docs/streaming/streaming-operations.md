@@ -80,6 +80,8 @@ Start and stop commands retain their per-silo/provider scope. A stop closes loca
 
 Caller cancellation is checked before stop admission. Once admitted, receiver cleanup completes under its own timeouts even if the caller stops waiting or a deactivation deadline expires. This keeps active receiver resources tracked until their cleanup finishes.
 
+Silo shutdown closes local admission and coordinator liveness checks, then grain deactivation performs the final receiver flush and producer-preserving migration. A failed drain remains observable to deactivation until a successful receiver restart. Explicit `StopAgents` commands perform an administrative drain and unregister the local producer.
+
 For checkpoint-backed providers, graceful movement completes final checkpoint persistence before the destination initializes its receiver. A crash or failed final flush resumes from durable progress, so consumers should handle replay. Event Hubs resumes inclusively at the stored offset. Other adapters retain their existing acknowledgement and recovery semantics.
 
 Correlate pulling-agent and receiver lifecycle events with grain activation/migration diagnostics. Track actual hosts, requested hosts, safe checkpoint positions, migration downtime, and recovery latency. A rebalance reply reports request acceptance; subsequent probes and receiver lifecycle events establish actual destination readiness. Include one probe per queue per interval, silo-local coordinator liveness calls, and membership-triggered rounds when sizing control traffic.
