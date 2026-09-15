@@ -3173,9 +3173,12 @@ public partial class DisseminationProtocolTests
             TestContext.Current.CancellationToken));
         timeProvider.Advance(ns.Options.MaxCoalescingDelay);
         await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var flush = protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
 
         timeProvider.Advance(ns.Options.StaleItemTtl);
         await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        // Complete the failed attempt's requeue before shutdown wakes the disabled namespace.
+        await flush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         ns.Options.Enabled = false;
         await protocol.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
