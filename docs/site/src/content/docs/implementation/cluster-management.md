@@ -113,7 +113,7 @@ Official providers adapt transactions, ETags, lightweight transactions, or compa
 Membership is deliberately separate from the services which consume it:
 
 - `LocalGrainDirectory` adjusts consistent-hash ownership after view changes.
-- the experimental distributed directory runs an explicit range-transfer protocol.
+- the experimental distributed directory uses [view-synchronous cluster services](view-synchronous-cluster-services.md) to coordinate range transfer, recovery, and fencing.
 - placement removes unavailable or overloaded candidates.
 - clients refresh the gateway list.
 - persistent-stream queue balancers redistribute queue responsibility.
