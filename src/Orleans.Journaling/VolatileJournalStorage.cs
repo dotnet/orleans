@@ -14,6 +14,8 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> _storageKeys = new(StringComparer.Ordinal);
+    private readonly object _catalogLock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
@@ -41,36 +43,76 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         }
 
         var journalFormatKey = GetJournalFormatKey();
-        var store = _storage.GetOrAdd(journalId.Value, static key => new VolatileJournalStorage.Store(key));
+        if (!_storage.TryGetValue(journalId.Value, out var store))
+        {
+            lock (_catalogLock)
+            {
+                if (!_storage.TryGetValue(journalId.Value, out store))
+                {
+                    store = new VolatileJournalStorage.Store(journalId.Value);
+                    _storageKeys.Add(journalId.Value);
+                    _storage[journalId.Value] = store;
+                }
+            }
+        }
+
         return new VolatileJournalStorage(store, journalFormatKey);
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
-        foreach (var (key, store) in _storage)
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        string[] keys;
+        lock (_catalogLock)
+        {
+            if (_storageKeys.Count == 0)
+            {
+                keys = [];
+            }
+            else
+            {
+                var lower = range.LowerBound ?? _storageKeys.Min!;
+                var upper = range.UpperBound ?? _storageKeys.Max!;
+                keys = string.CompareOrdinal(lower, upper) <= 0
+                    ? _storageKeys.GetViewBetween(lower, upper).ToArray()
+                    : [];
+            }
+        }
+
+        foreach (var key in keys)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var journalId = new JournalId(key);
-            if (!prefix.IsPrefixOf(journalId))
+            if (!range.Contains(key))
             {
                 continue;
             }
 
+            var store = _storage[key];
+            IJournalMetadata? metadata = null;
             lock (store.SyncRoot)
             {
                 if (!store.Exists)
                 {
                     continue;
                 }
+
+                if (range.IncludeMetadata)
+                {
+                    metadata = store.GetMetadata();
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            yield return journalId;
+            yield return new JournalCatalogEntry(new JournalId(key), metadata);
         }
 
         cancellationToken.ThrowIfCancellationRequested();

@@ -1042,11 +1042,14 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     private IJournalMetadata CreateJournalMetadata(ETag eTag, TableEntity entity)
     {
         ValidateHeaderJournalId(entity);
-        return new JournalMetadata(
+        return CreateJournalMetadataSnapshot(eTag, entity);
+    }
+
+    internal static IJournalMetadata CreateJournalMetadataSnapshot(ETag eTag, TableEntity entity)
+        => new JournalMetadata(
             NormalizeFormat(entity.GetString(FormatPropertyName)),
             eTag == default ? null : eTag.ToString(),
             DeserializeCallerMetadata(entity.GetString(MetadataPropertyName)));
-    }
 
     private void ValidateHeaderJournalId(TableEntity entity)
     {

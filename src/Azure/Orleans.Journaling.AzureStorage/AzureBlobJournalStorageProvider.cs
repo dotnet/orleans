@@ -56,33 +56,55 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         return new AzureBlobJournalStorage(_shared, journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
-        var container = GetDefaultContainerClient();
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
 
+        var container = GetDefaultContainerClient();
+        var maxBlobName = range.MaxId is { } maxId && System.Text.Ascii.IsValid(maxId)
+            ? AzureBlobJournalStorageLayout.GetWalBlobName(maxId) : null;
+        var startFrom = range.LowerBound is { } lowerBound && System.Text.Ascii.IsValid(lowerBound)
+            ? AzureBlobJournalStorageLayout.GetWalBlobName(lowerBound) : null;
         await foreach (var page in container.GetBlobsAsync(
-            traits: BlobTraits.None,
-            states: BlobStates.None,
-            prefix: prefix.IsDefault ? null : prefix.Value,
-            cancellationToken: cancellationToken).AsPages(pageSizeHint: 5000))
+            new GetBlobsOptions
+            {
+                Traits = range.IncludeMetadata ? BlobTraits.Metadata : BlobTraits.None,
+                Prefix = AzureBlobJournalStorageLayout.GetWalBlobName(range.ListingPrefix ?? string.Empty),
+                StartFrom = startFrom,
+            },
+            cancellationToken).AsPages(pageSizeHint: 5000))
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in page.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append
-                    || !item.Name.EndsWith("/wal", StringComparison.Ordinal))
+                // Azure's flat List Blobs API returns names in lexical order. Every matching WAL
+                // is at or below this raw-name bound, including the WAL for MaxId itself.
+                if (maxBlobName is not null && string.CompareOrdinal(item.Name, maxBlobName) > 0)
+                {
+                    yield break;
+                }
+
+                if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append)
                 {
                     continue;
                 }
 
-                if (TryParseJournalId(item.Name[..^"/wal".Length], out var journalId) && prefix.IsPrefixOf(journalId))
+                if (AzureBlobJournalStorageLayout.TryGetJournalId(item.Name, out var journalId)
+                    && range.Contains(journalId.Value))
                 {
-                    yield return journalId;
+                    yield return new(
+                        journalId,
+                        range.IncludeMetadata
+                            ? AzureBlobJournalStorage.CreateJournalMetadata(item.Properties.ETag!.Value, item.Metadata)
+                            : null);
                 }
             }
         }
@@ -101,20 +123,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private BlobContainerClient GetDefaultContainerClient()
         => _defaultContainer ?? throw new InvalidOperationException(
             $"{nameof(AzureBlobJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
-
-    private static bool TryParseJournalId(string value, out JournalId journalId)
-    {
-        try
-        {
-            journalId = new JournalId(value);
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            journalId = default;
-            return false;
-        }
-    }
 
     private static IJournalFormat GetJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
     {

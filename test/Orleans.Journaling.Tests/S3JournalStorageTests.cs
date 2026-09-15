@@ -189,8 +189,8 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 IsTruncated = false,
                 S3Objects =
                 [
-                    new S3Object { Key = "tenant/journals/alpha/wal" },
-                    new S3Object { Key = "tenant/other/beta/wal" },
+                    new S3Object { Key = "wal/tenant/journals/alpha" },
+                    new S3Object { Key = "wal/tenant/other/beta" },
                 ],
             };
             client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
@@ -198,23 +198,380 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"tenant/{id.Value}";
+            options.GetObjectKeyPrefix = static prefix => $"tenant/{prefix.Value}";
+            options.UseOrderedListing = true;
             options.TryParseJournalId = static key => key.StartsWith("tenant/", StringComparison.Ordinal)
                 ? new JournalId(key["tenant/".Length..])
                 : null;
             var provider = CreateProvider(options);
             await provider.InitializeAsync(CancellationToken.None);
 
-            var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(
+                new() { Prefix = new("journals"), MinId = new("journals/alpha"), MaxId = new("journals/gamma") },
+                CancellationToken.None))
             {
-                listed.Add(journalId);
+                listed.Add(entry);
             }
 
-            Assert.Equal(["journals/alpha"], listed.Select(static id => id.Value));
+            Assert.Equal(["journals/alpha"], listed.Select(static entry => entry.Id.Value));
             await client.Received(1).ListObjectsV2Async(
-                Arg.Is<ListObjectsV2Request>(request => request.Prefix == null),
+                Arg.Is<ListObjectsV2Request>(request => request.Prefix == "wal/tenant/journals/" && request.StartAfter == null),
                 Arg.Any<CancellationToken>());
             await provider.CloseAsync(CancellationToken.None);
+        }
+
+        [Theory]
+        [InlineData(false, false, false)]
+        [InlineData(false, false, true)]
+        [InlineData(false, true, false)]
+        [InlineData(false, true, true)]
+        [InlineData(true, false, false)]
+        [InlineData(true, false, true)]
+        [InlineData(true, true, false)]
+        [InlineData(true, true, true)]
+        public async Task ListAsync_ListsOnlyWalNamespaceWithoutMetadataRequests(bool ordered, bool customMapping, bool prefixed)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var basePrefix = customMapping ? "tenant/" : string.Empty;
+            string[] objectKeys =
+            [
+                $"wal/{basePrefix}journals/alpha",
+                $"wal/{basePrefix}journals/beta",
+                $"checkpoints/{basePrefix}journals/alpha/snapshot",
+                $"{basePrefix}journals/legacy/wal",
+                "unrelated",
+            ];
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    return Task.FromResult(new ListObjectsV2Response
+                    {
+                        IsTruncated = false,
+                        S3Objects = objectKeys
+                            .Where(key => key.StartsWith(request.Prefix, StringComparison.Ordinal))
+                            .Select(key => new S3Object { Key = key, ETag = "object-etag" })
+                            .ToList(),
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = ordered;
+            var parsedKeys = new List<string>();
+            if (customMapping)
+            {
+                options.GetObjectKey = static id => $"tenant/{id.Value}";
+                if (prefixed)
+                {
+                    options.GetObjectKeyPrefix = static prefix => $"tenant/{prefix.Value}";
+                }
+
+                options.TryParseJournalId = key =>
+                {
+                    parsedKeys.Add(key);
+                    return key.StartsWith("tenant/", StringComparison.Ordinal)
+                        ? new JournalId(key["tenant/".Length..]) : null;
+                };
+            }
+
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(
+                new() { Prefix = prefixed ? new("journ") : default, IncludeMetadata = true },
+                cancellationToken))
+            {
+                listed.Add(entry);
+            }
+
+            Assert.Equal(["journals/alpha", "journals/beta"], listed.Select(entry => entry.Id.Value));
+            Assert.All(listed, entry => Assert.Null(entry.Metadata));
+            var listingRequest = Assert.Single(requests);
+            Assert.Equal(prefixed ? $"wal/{basePrefix}{(ordered ? "journ" : string.Empty)}" : "wal/", listingRequest.Prefix);
+            Assert.Null(listingRequest.StartAfter);
+            Assert.Null(listingRequest.ContinuationToken);
+            if (customMapping)
+            {
+                Assert.Equal(["tenant/journals/alpha", "tenant/journals/beta"], parsedKeys);
+            }
+
+            await client.DidNotReceive().GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>());
+            await client.DidNotReceive().GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>());
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Theory]
+        [InlineData("journals/", "journals/a1", "journals/c", "wal/journals/", "wal/journals/a")]
+        [InlineData(null, "journals/a1", "journals/c", "wal/journals/", "wal/journals/a")]
+        [InlineData("journals/", "journals/a", "journals/c", "wal/journals/", null)]
+        [InlineData(null, "journals/a", "journals/a2", "wal/journals/a", null)]
+        [InlineData(null, "a", "c", "wal/", null)]
+        public async Task ListAsync_OrderedBoundsIncludeExactLowerId(
+            string? prefix, string minId, string maxId, string nativePrefix, string? startAfter)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            // Include the shorter key used as the exclusive marker, the minimum itself, and both adjacent keys.
+            string[] objectKeys = [$"wal/{minId[..^1]}", $"wal/{minId[..^1]}!", $"wal/{minId}", $"wal/{minId}0", $"wal/{maxId}", $"wal/{maxId}0"];
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    Assert.Null(request.ContinuationToken);
+                    return Task.FromResult(new ListObjectsV2Response
+                    {
+                        IsTruncated = true,
+                        NextContinuationToken = "beyond-upper-bound",
+                        S3Objects = objectKeys
+                            .Where(key => key.StartsWith(request.Prefix, StringComparison.Ordinal)
+                                && (request.StartAfter is null || string.CompareOrdinal(key, request.StartAfter) > 0))
+                            .Order(StringComparer.Ordinal)
+                            .Select(key => new S3Object { Key = key })
+                            .ToList(),
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = true;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(
+                new() { Prefix = prefix is null ? default : new(prefix), MinId = new(minId), MaxId = new(maxId) },
+                cancellationToken))
+            {
+                listed.Add(entry);
+            }
+
+            Assert.Equal([minId, $"{minId}0", maxId], listed.Select(entry => entry.Id.Value));
+            var listingRequest = Assert.Single(requests);
+            Assert.Equal(nativePrefix, listingRequest.Prefix);
+            Assert.Equal(startAfter, listingRequest.StartAfter);
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Fact]
+        public async Task ListAsync_UnorderedUpperBoundRetainsAllOverdueIdsAcrossPages()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call => Task.FromResult(call.Arg<ListObjectsV2Request>().ContinuationToken is null
+                    ? new ListObjectsV2Response
+                    {
+                        S3Objects = [new S3Object { Key = "wal/journals/9999999" }],
+                        IsTruncated = true,
+                        NextContinuationToken = "overdue",
+                    }
+                    : new ListObjectsV2Response
+                    {
+                        S3Objects =
+                        [
+                            new S3Object { Key = "wal/journals/1000000" },
+                            new S3Object { Key = "wal/journals/0000001" },
+                        ],
+                        IsTruncated = false,
+                    }));
+            var options = CreateOptions();
+            options.S3Client = client;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(
+                new() { Prefix = new("journals/"), MaxId = new("journals/1000000") },
+                cancellationToken))
+            {
+                listed.Add(entry);
+            }
+
+            Assert.Equal(["journals/1000000", "journals/0000001"], listed.Select(entry => entry.Id.Value));
+            await client.Received(2).ListObjectsV2Async(
+                Arg.Is<ListObjectsV2Request>(request => request.Prefix == "wal/journals/" && request.StartAfter == null),
+                cancellationToken);
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task ListAsync_NullObjectCollectionHonorsContinuation(bool ordered, bool hasContinuation)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    Assert.Equal(cancellationToken, call.Arg<CancellationToken>());
+                    return Task.FromResult(requests.Count switch
+                    {
+                        1 => new ListObjectsV2Response
+                        {
+                            S3Objects = null,
+                            IsTruncated = hasContinuation,
+                            NextContinuationToken = hasContinuation ? "next" : null
+                        },
+                        2 when hasContinuation => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "wal/journals/alpha" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "last"
+                        },
+                        3 when hasContinuation => new ListObjectsV2Response
+                        {
+                            S3Objects = null,
+                            IsTruncated = false
+                        },
+                        _ => throw new InvalidOperationException("Unexpected extra listing request.")
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = ordered;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(new() { Prefix = new("journals/") }, cancellationToken))
+            {
+                listed.Add(entry);
+            }
+
+            Assert.Equal(hasContinuation ? new[] { "journals/alpha" } : [], listed.Select(entry => entry.Id.Value));
+            Assert.Equal(hasContinuation ? new string?[] { null, "next", "last" } : [null],
+                requests.Select(request => request.ContinuationToken));
+            Assert.All(requests, request =>
+            {
+                Assert.Equal("journaling-tests", request.BucketName);
+                Assert.Equal("wal/journals/", request.Prefix);
+                Assert.Null(request.StartAfter);
+            });
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ListAsync_OrderedSeekIsOnlySentOnInitialPage(bool emptyFirstPage)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var requests = new List<ListObjectsV2Request>();
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<ListObjectsV2Request>();
+                    requests.Add(request);
+                    Assert.Equal(cancellationToken, call.Arg<CancellationToken>());
+                    Assert.False(request.StartAfter is not null && request.ContinuationToken is not null);
+                    return Task.FromResult(requests.Count switch
+                    {
+                        1 => new ListObjectsV2Response
+                        {
+                            S3Objects = emptyFirstPage ? null : [new S3Object { Key = "wal/journals/b100" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "opaque-next"
+                        },
+                        2 => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "wal/journals/c100" }],
+                            IsTruncated = true,
+                            NextContinuationToken = "opaque-last"
+                        },
+                        3 => new ListObjectsV2Response
+                        {
+                            S3Objects = [new S3Object { Key = "wal/journals/d100" }],
+                            IsTruncated = false
+                        },
+                        _ => throw new InvalidOperationException("Unexpected extra listing request.")
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.UseOrderedListing = true;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(
+                new() { Prefix = new("journals/"), MinId = new("journals/b100"), MaxId = new("journals/d100") },
+                cancellationToken))
+            {
+                listed.Add(entry);
+            }
+
+            Assert.Equal(emptyFirstPage ? new[] { "journals/c100", "journals/d100" } : ["journals/b100", "journals/c100", "journals/d100"],
+                listed.Select(entry => entry.Id.Value));
+            Assert.Equal(new string?[] { "wal/journals/b10", null, null }, requests.Select(request => request.StartAfter));
+            Assert.Equal(new string?[] { null, "opaque-next", "opaque-last" }, requests.Select(request => request.ContinuationToken));
+            Assert.All(requests, request => Assert.Equal("wal/journals/", request.Prefix));
+            await provider.CloseAsync(cancellationToken);
+        }
+
+        [Fact]
+        public async Task ListAsync_NullObjectCollectionObservesResponseCancellation()
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    cancellation.Cancel();
+                    return Task.FromResult(new ListObjectsV2Response
+                    {
+                        S3Objects = null,
+                        IsTruncated = true,
+                        NextContinuationToken = "next"
+                    });
+                });
+            var options = CreateOptions();
+            options.S3Client = client;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(TestContext.Current.CancellationToken);
+
+            await using var enumerator = provider.ListAsync(cancellationToken: cancellation.Token).GetAsyncEnumerator(cancellation.Token);
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            await client.Received(1).ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), cancellation.Token);
+            await provider.CloseAsync(TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task ListAsync_NullObjectCollectionPreservesLaterServiceFailure()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var failure = new AmazonS3Exception("The continuation request failed.");
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(call => call.Arg<ListObjectsV2Request>().ContinuationToken is null
+                    ? Task.FromResult(new ListObjectsV2Response
+                    {
+                        S3Objects = null,
+                        IsTruncated = true,
+                        NextContinuationToken = "next"
+                    })
+                    : Task.FromException<ListObjectsV2Response>(failure));
+            var options = CreateOptions();
+            options.S3Client = client;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(cancellationToken);
+
+            await using var enumerator = provider.ListAsync(cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
+            Assert.Same(failure, await Assert.ThrowsAsync<AmazonS3Exception>(() => enumerator.MoveNextAsync().AsTask()));
+            await client.Received(2).ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), cancellationToken);
+            await client.Received(1).ListObjectsV2Async(
+                Arg.Is<ListObjectsV2Request>(request => request.ContinuationToken == "next"), cancellationToken);
+            await provider.CloseAsync(cancellationToken);
         }
 
         [Fact]
@@ -227,13 +584,14 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     IsTruncated = false,
                     S3Objects =
                     [
-                        new S3Object { Key = "current/journals/alpha/wal" },
-                        new S3Object { Key = "legacy/journals/alpha/wal" },
+                        new S3Object { Key = "wal/current/journals/alpha" },
+                        new S3Object { Key = "wal/legacy/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"current/{id.Value}";
+            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}";
             options.TryParseJournalId = static key =>
                 key.EndsWith("journals/alpha", StringComparison.Ordinal)
                     ? new JournalId("journals/alpha")
@@ -241,13 +599,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var provider = CreateProvider(options);
             await provider.InitializeAsync(CancellationToken.None);
 
-            var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
             {
-                listed.Add(journalId);
+                listed.Add(entry);
             }
 
-            Assert.Equal(["journals/alpha"], listed.Select(static id => id.Value));
+            Assert.Equal(["journals/alpha"], listed.Select(static entry => entry.Id.Value));
             await provider.CloseAsync(CancellationToken.None);
         }
 
@@ -261,12 +619,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     IsTruncated = false,
                     S3Objects =
                     [
-                        new S3Object { Key = "legacy/journals/alpha/wal" },
+                        new S3Object { Key = "wal/legacy/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();
             options.S3Client = client;
             options.GetObjectKey = static id => $"current/{id.Value}";
+            options.GetObjectKeyPrefix = static prefix => $"current/{prefix.Value}";
             options.TryParseJournalId = static key =>
                 key.EndsWith("journals/alpha", StringComparison.Ordinal)
                     ? new JournalId("journals/alpha")
@@ -274,10 +633,10 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var provider = CreateProvider(options);
             await provider.InitializeAsync(CancellationToken.None);
 
-            var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
             {
-                listed.Add(journalId);
+                listed.Add(entry);
             }
 
             Assert.Empty(listed);
@@ -292,7 +651,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 .Returns(Task.FromResult(new ListObjectsV2Response
                 {
                     IsTruncated = false,
-                    S3Objects = [new S3Object { Key = "invalid/wal" }],
+                    S3Objects = [new S3Object { Key = "wal/invalid" }],
                 }));
             var options = CreateOptions();
             options.S3Client = client;
@@ -300,10 +659,10 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             var provider = CreateProvider(options);
             await provider.InitializeAsync(CancellationToken.None);
 
-            var listed = new List<JournalId>();
-            await foreach (var journalId in provider.ListAsync(cancellationToken: CancellationToken.None))
+            var listed = new List<JournalCatalogEntry>();
+            await foreach (var entry in provider.ListAsync(cancellationToken: CancellationToken.None))
             {
-                listed.Add(journalId);
+                listed.Add(entry);
             }
 
             Assert.Empty(listed);
@@ -354,6 +713,53 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
     [TestCategory("BVT")]
     public sealed class S3JournalStorageRequestTests
     {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ReplaceAsync_SeparatesWalAndCheckpointNamespaces(bool customMapping)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var client = Substitute.For<IAmazonS3>();
+            var requests = new List<PutObjectRequest>();
+            var metadataRequests = new List<GetObjectMetadataRequest>();
+            client.PutObjectAsync(Arg.Do<PutObjectRequest>(requests.Add), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult(new PutObjectResponse { ETag = $"etag-{requests.Count}" }));
+            client.GetObjectMetadataAsync(Arg.Do<GetObjectMetadataRequest>(metadataRequests.Add), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult(CreateWalProperties(requests[0], "etag-1")));
+            var options = new S3JournalStorageOptions { BucketName = BucketName };
+            if (customMapping)
+            {
+                options.GetObjectKey = static id => $"tenant/{id.Value}";
+            }
+
+            var storage = CreateStorage(client, options);
+            await storage.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>([1, 2]), cancellationToken);
+
+            var baseKey = customMapping ? "tenant/journals/test" : "journals/test";
+            Assert.Equal(3, requests.Count);
+            Assert.Equal($"wal/{baseKey}", requests[0].Key);
+            Assert.Equal("*", requests[0].IfNoneMatch);
+            var checkpointPrefix = $"checkpoints/{baseKey}/";
+            Assert.StartsWith(checkpointPrefix, requests[1].Key);
+            Assert.True(Guid.TryParseExact(requests[1].Key[checkpointPrefix.Length..], "N", out _));
+            Assert.Equal($"wal/{baseKey}", requests[2].Key);
+            Assert.Equal("etag-1", requests[2].IfMatch);
+            Assert.Equal(requests[1].Key, requests[2].Metadata[S3JournalStorage.CheckpointMetadataKey]);
+            // S3 Express refreshes WAL properties, then queries the append-part count.
+            Assert.Collection(metadataRequests,
+                request => Assert.Null(request.PartNumber),
+                request => Assert.Equal(1, request.PartNumber));
+            Assert.All(metadataRequests, request =>
+            {
+                Assert.Equal(BucketName, request.BucketName);
+                Assert.Equal("etag-1", request.EtagToMatch);
+            });
+            await client.Received(2).GetObjectMetadataAsync(
+                Arg.Is<GetObjectMetadataRequest>(request => request.Key == $"wal/{baseKey}"),
+                cancellationToken);
+        }
+
         [Fact]
         public async Task AppendAsync_DefaultS3ExpressPath_UsesWriteOffsetAndAdvancesState()
         {
@@ -1179,11 +1585,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.PutObjectAsync(
                     Arg.Do<PutObjectRequest>(request =>
                     {
-                        if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                        if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                         {
                             createRequest = request;
                         }
-                        else if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                        else if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                         {
                             checkpointName = request.Key;
                         }
@@ -1192,12 +1598,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 .Returns(call =>
                 {
                     var request = call.Arg<PutObjectRequest>();
-                    if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                    if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "etag-1" });
                     }
 
-                    if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                    if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "checkpoint-etag" });
                     }
@@ -1244,11 +1650,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.PutObjectAsync(
                     Arg.Do<PutObjectRequest>(request =>
                     {
-                        if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                        if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                         {
                             createRequest = request;
                         }
-                        else if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                        else if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                         {
                             checkpointName = request.Key;
                         }
@@ -1257,12 +1663,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 .Returns(call =>
                 {
                     var request = call.Arg<PutObjectRequest>();
-                    if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                    if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "etag-1" });
                     }
 
-                    if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                    if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "checkpoint-etag" });
                     }
@@ -1311,11 +1717,11 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.PutObjectAsync(
                     Arg.Do<PutObjectRequest>(request =>
                     {
-                        if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                        if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                         {
                             createRequest = request;
                         }
-                        else if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                        else if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                         {
                             checkpointName = request.Key;
                         }
@@ -1324,12 +1730,12 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 .Returns(call =>
                 {
                     var request = call.Arg<PutObjectRequest>();
-                    if (request.IfNoneMatch == "*" && request.Key.EndsWith("/wal", StringComparison.Ordinal))
+                    if (request.IfNoneMatch == "*" && request.Key.StartsWith("wal/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "etag-1" });
                     }
 
-                    if (request.Key.Contains("/chk.", StringComparison.Ordinal))
+                    if (request.Key.StartsWith("checkpoints/", StringComparison.Ordinal))
                     {
                         return Task.FromResult(new PutObjectResponse { ETag = "checkpoint-etag" });
                     }
@@ -1589,13 +1995,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         await CreateStorage("journals/alpha").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await CreateStorage("other/beta").AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
-        var listed = new List<JournalId>();
-        await foreach (var journalId in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
+        var listed = new List<JournalCatalogEntry>();
+        await foreach (var entry in provider.ListAsync(new() { Prefix = new JournalId("journals") }, CancellationToken.None))
         {
-            listed.Add(journalId);
+            listed.Add(entry);
         }
 
-        Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static id => id.Value).Order(StringComparer.Ordinal));
+        Assert.Equal(["journals/alpha", "journals/zeta"], listed.Select(static entry => entry.Id.Value).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -1693,7 +2099,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             UseConditionalDelete = false,
             StorageClass = null,
             MetadataOnlyConflictInitialBackoff = TimeSpan.Zero,
-            GetObjectKey = id => id.Value,
+            UseOrderedListing = true,
         };
     }
 

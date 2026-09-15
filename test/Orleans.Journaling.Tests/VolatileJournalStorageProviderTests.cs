@@ -8,6 +8,127 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class VolatileJournalStorageProviderTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListAsync_MetadataProjectionFlagIsSnapshottedAtEnumerationStart(bool includeMetadata)
+    {
+        var provider = new VolatileJournalStorageProvider();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        foreach (var id in new[] { "a", "b" })
+        {
+            await provider.CreateStorage(new(id)).CreateIfNotExistsAsync(
+                new Dictionary<string, string> { ["owner"] = id }, cancellationToken);
+        }
+
+        var options = new ListOptions { IncludeMetadata = !includeMetadata };
+        var listing = provider.ListAsync(options, cancellationToken);
+        options.IncludeMetadata = includeMetadata;
+        await using var enumerator = listing.GetAsyncEnumerator(cancellationToken);
+        foreach (var id in new[] { "a", "b" })
+        {
+            Assert.True(await enumerator.MoveNextAsync());
+            Assert.Equal(new JournalId(id), enumerator.Current.Id);
+            if (includeMetadata)
+            {
+                var metadata = Assert.IsType<JournalMetadata>(enumerator.Current.Metadata);
+                var stored = await provider.CreateStorage(new(id)).GetMetadataAsync(cancellationToken);
+                Assert.NotNull(stored);
+                Assert.Equal(stored.Format, metadata.Format);
+                Assert.Equal(stored.ETag, metadata.ETag);
+                Assert.Equal(stored.Properties, metadata.Properties);
+            }
+            else
+            {
+                Assert.Null(enumerator.Current.Metadata);
+            }
+
+            options.IncludeMetadata = !includeMetadata;
+        }
+
+        Assert.False(await enumerator.MoveNextAsync());
+    }
+
+    [Fact]
+    public async Task ListAsync_MetadataSnapshotPreservesPropertiesAndRejectsStaleConditionalUpdate()
+    {
+        var provider = new VolatileJournalStorageProvider();
+        var id = new JournalId("metadata/snapshot");
+        var storage = provider.CreateStorage(id);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "first" }, cancellationToken);
+        await using var enumerator = provider.ListAsync(
+            new() { IncludeMetadata = true }, cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(id, enumerator.Current.Id);
+        var snapshot = Assert.IsType<JournalMetadata>(enumerator.Current.Metadata);
+        Assert.NotNull(snapshot.ETag);
+
+        var updated = await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["owner"] = "second", ["added"] = "value" },
+            expectedETag: snapshot.ETag, cancellationToken: cancellationToken);
+        Assert.NotNull(updated);
+        Assert.NotEqual(snapshot.ETag, updated.ETag);
+        Assert.Equal(new Dictionary<string, string> { ["owner"] = "first" }, snapshot.Properties);
+        Assert.Null(await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["owner"] = "stale" },
+            expectedETag: snapshot.ETag, cancellationToken: cancellationToken));
+        var current = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(current);
+        Assert.Equal(updated.ETag, current.ETag);
+        Assert.Equal(updated.Properties, current.Properties);
+    }
+
+    [Fact]
+    public async Task ListAsync_UsesRawPrefixAndSnapshotsInclusiveRange()
+    {
+        var provider = new VolatileJournalStorageProvider();
+        string[] ids = ["jobs/20260908-a", "jobs/20260909-a", "jobs/20260909-b", "jobs/20260909-c", "jobs/20260910-a", "other"];
+        foreach (var value in ids)
+        {
+            await provider.CreateStorage(new(value)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var options = new ListOptions { Prefix = new("other") };
+        var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
+        options.Prefix = new("jobs/20260909");
+        options.MinId = new("jobs/20260909-b");
+        options.MaxId = new("jobs/20260909-c");
+        await using var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal("jobs/20260909-b", enumerator.Current.Id.Value);
+
+        options.Prefix = new("other");
+        options.MinId = default;
+        options.MaxId = default;
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal("jobs/20260909-c", enumerator.Current.Id.Value);
+        Assert.False(await enumerator.MoveNextAsync());
+        Assert.Equal([new JournalId("other")], await ToListAsync(listing, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ListAsync_RangeIndexIncludesRecreatedStoresAndExcludesDeletedStores()
+    {
+        var provider = new VolatileJournalStorageProvider();
+        var lower = new JournalId("range/b");
+        var upper = new JournalId("range/d");
+        foreach (var name in new[] { "range/a", "range/b", "range/c", "range/d", "range/e" })
+        {
+            await provider.CreateStorage(new(name)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var deleted = provider.CreateStorage(new("range/c"));
+        await deleted.DeleteAsync(TestContext.Current.CancellationToken);
+        var options = new ListOptions { MinId = lower, MaxId = upper };
+        Assert.Equal([lower, upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+
+        await deleted.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal([lower, new JournalId("range/c"), upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+        options.MinId = new("z");
+        Assert.Empty(await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public async Task CreateIfNotExists_ListAndGetMetadataUseJournalIds()
     {
@@ -144,14 +265,14 @@ public sealed class VolatileJournalStorageProviderTests
                 cancellationToken: TestContext.Current.CancellationToken).AsTask());
     }
 
-    private static async Task<List<T>> ToListAsync<T>(
-        IAsyncEnumerable<T> source,
+    private static async Task<List<JournalId>> ToListAsync(
+        IAsyncEnumerable<JournalCatalogEntry> source,
         CancellationToken cancellationToken)
     {
-        var result = new List<T>();
+        var result = new List<JournalId>();
         await foreach (var item in source.WithCancellation(cancellationToken))
         {
-            result.Add(item);
+            result.Add(item.Id);
         }
 
         return result;

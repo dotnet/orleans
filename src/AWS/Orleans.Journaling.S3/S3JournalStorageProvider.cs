@@ -45,12 +45,51 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         return new S3JournalStorage(_shared, GetClient(), journalId);
     }
 
-    public async IAsyncEnumerable<JournalId> ListAsync(
+    public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         ListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var prefix = options?.Prefix ?? default;
+        var range = new JournalCatalogRange(options);
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var ordered = _options.UseOrderedListing;
+        var identityMapping = _options.UsesDefaultObjectKey;
+        var listingPrefix = range.ListingPrefix;
+        if (!identityMapping
+            && (string.IsNullOrWhiteSpace(listingPrefix)
+                || _options.GetObjectKeyPrefix is null && range.Prefix is null))
+        {
+            // A common prefix inferred from bounds can be whitespace, which cannot be represented
+            // as a JournalId for a custom mapper. Bounds alone also do not require a prefix mapper.
+            listingPrefix = null;
+        }
+
+        var objectKeyPrefix = S3JournalStorageOptions.GetDefaultWalObjectKey(
+            _options.GetObjectKeyPrefixForCatalog(listingPrefix) ?? string.Empty);
+        if (!ordered)
+        {
+            var directoryEnd = objectKeyPrefix.LastIndexOf('/') + 1;
+            objectKeyPrefix = objectKeyPrefix[..directoryEnd];
+        }
+
+        string? startAfter = null;
+        if (ordered && identityMapping && range.LowerBound is { Length: > 0 } lowerBound
+            && System.Text.Ascii.IsValid(lowerBound))
+        {
+            // StartAfter is exclusive: use a strictly earlier key to retain the inclusive lower bound.
+            var marker = S3JournalStorageOptions.GetDefaultWalObjectKey(lowerBound[..^1]);
+            if (string.CompareOrdinal(marker, objectKeyPrefix) > 0)
+            {
+                startAfter = marker;
+            }
+        }
+
+        var maxObjectKey = ordered && identityMapping && range.MaxId is { } maxId && System.Text.Ascii.IsValid(maxId)
+            ? S3JournalStorageOptions.GetDefaultWalObjectKey(maxId) : null;
         var client = GetClient();
         var bucketName = GetBucketName();
         string? continuationToken = null;
@@ -61,18 +100,27 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 new ListObjectsV2Request
                 {
                     BucketName = bucketName,
+                    Prefix = objectKeyPrefix,
+                    StartAfter = continuationToken is null ? startAfter : null,
                     MaxKeys = 1000,
                     ContinuationToken = continuationToken,
                 },
                 cancellationToken).ConfigureAwait(false);
 
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (var item in response.S3Objects)
+            // AWS SDK v4 represents an empty listing page with a null collection.
+            foreach (var item in response.S3Objects ?? [])
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (TryGetJournalId(item.Key, prefix, out var id))
+                if (maxObjectKey is not null && string.CompareOrdinal(item.Key, maxObjectKey) > 0)
                 {
-                    yield return id;
+                    yield break;
+                }
+
+                if (TryGetJournalId(item.Key, range, out var id))
+                {
+                    // ListObjectsV2 cannot project the complete journal metadata without a separate request.
+                    yield return new JournalCatalogEntry(id);
                 }
             }
 
@@ -83,11 +131,11 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    private bool TryGetJournalId(string objectKey, JournalId prefix, out JournalId journalId)
+    private bool TryGetJournalId(string objectKey, JournalCatalogRange range, out JournalId journalId)
     {
-        if (objectKey.EndsWith("/wal", StringComparison.Ordinal)
-            && _options.TryParseJournalId(objectKey[..^"/wal".Length]) is { IsDefault: false } id
-            && prefix.IsPrefixOf(id))
+        if (objectKey.StartsWith(S3JournalStorageOptions.WalObjectKeyPrefix, StringComparison.Ordinal)
+            && _options.TryParseJournalId(objectKey[S3JournalStorageOptions.WalObjectKeyPrefix.Length..]) is { IsDefault: false } id
+            && range.Contains(id.Value))
         {
             var journalObjectKey = _options.GetObjectKeyForJournal(id);
             var canonicalWalObjectKey = S3JournalStorageOptions.GetWalObjectKeyForJournal(id, journalObjectKey);

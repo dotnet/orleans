@@ -19,8 +19,8 @@ Configure <xref:Orleans.Journaling.AzureBlobStorageHostingExtensions.AddAzureBlo
 
 Each journal uses:
 
-- An append blob at `<journalId>/wal` by default.
-- Immutable checkpoint blobs at `<journalId>/chk.<snapshotId>`.
+- An append blob at `wal/<journalId>` by default.
+- Immutable checkpoint blobs at `checkpoints/<journalId>/<snapshotId>`.
 - WAL metadata which identifies the current checkpoint, journal format, and optimistic-concurrency state.
 
 Recovery reads the published checkpoint followed by the WAL tail. A replacement uploads the new checkpoint and then atomically publishes it through WAL metadata. The provider performs best-effort cleanup of obsolete checkpoints after publication when <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.DeleteOldCheckpoints> is `true`, which is the default.
@@ -29,7 +29,9 @@ Customize <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.GetWalBlobName
 
 Azure append blobs limit append-block size and block count. The provider accepts an encoded append batch up to 100 MiB, requests compaction after 49,000 committed blocks, and reserves additional headroom before the 50,000-block service limit.
 
-The journal catalog discovers the default `/wal` naming shape. Preserve that suffix when custom names need catalog listing, or provide the application-specific discovery mechanism required by the caller.
+The journal catalog selects append blobs in the `wal/` namespace of the configured container. Custom naming delegates participating in catalog discovery produce `wal/<journalId>` for each journal. The separate checkpoint namespace keeps checkpoints out of listing pages. Raw journal-id prefixes and ASCII lower bounds narrow the native listing, and an ASCII upper bound terminates ordered consumption after the boundary page.
+
+Catalog callers can request a metadata snapshot with each identity. Blob listings project the WAL's format, ETag, and caller-owned metadata in the listing response. The snapshot can replace a separate metadata read; conditional updates use its ETag to detect concurrent changes.
 
 ## Azure Table Storage
 
@@ -48,7 +50,11 @@ A single append batch is limited to 2 MiB by the provider's entity group transac
 
 Compaction is requested at either <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionRowCountThreshold> (10,000 rows by default) or <xref:Orleans.Journaling.AzureTableJournalStorageOptions.CompactionSizeThreshold> (32 MiB by default).
 
-Customize <xref:Orleans.Journaling.AzureTableJournalStorageOptions.GetPartitionKey> when a different partition layout is required. The mapping must remain unique per journal and satisfy Azure Table partition-key constraints.
+The default partition mapping accepts printable ASCII journal ids (`0x20` through `0x7E`) and encodes each byte as two uppercase hexadecimal digits. It preserves ordinal ordering and prefixes for indexed catalog queries and supports journal ids up to 512 characters. Storage creation validates the id before accessing Azure. This restriction is specific to the default Table mapping.
+
+Customize <xref:Orleans.Journaling.AzureTableJournalStorageOptions.GetPartitionKey> when a different partition layout is required. Custom mappings support other journal-id alphabets, remain unique per journal, and satisfy Azure Table partition-key constraints. Their catalog queries filter the canonical journal-id property and can require a table scan.
+
+Metadata-enabled catalog queries select the header's format and caller-owned metadata together with its ETag. Identity-only queries retain their smaller projection. Each returned metadata snapshot has the same meaning as a direct metadata read and can become stale after it is listed.
 
 ## Optimistic concurrency
 

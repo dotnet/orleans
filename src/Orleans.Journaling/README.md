@@ -110,21 +110,59 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalId>` in provider traversal order. Pass `ListOptions` with `Prefix` to select an exact journal id and its descendants, or omit the options to enumerate all ids. Options are read when enumeration begins.
+`IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalCatalogEntry>` in provider traversal order.
+Each entry contains its `Id` and optional `Metadata`. Deduplicate by `Id` when unique identities
+are required, since repeated entries can carry different metadata versions.
+`ListOptions.Prefix` matches the raw beginning of `JournalId.Value`, including partial path
+segments. For example, `jobs/shards/20260909` selects timestamped names for that UTC day.
+Use a trailing slash, such as `jobs/shards/`, to select a namespace's descendants.
+`MinId` and `MaxId` supply inclusive lower and upper bounds. All three constraints use
+`StringComparison.Ordinal` and are snapshotted when enumeration begins. Default values
+leave the corresponding constraint open. Disjoint constraints produce an empty result.
 
-When updating callers of the former prefix overload, pass `new ListOptions { Prefix = prefix }`. Applications which require ordinal ordering can materialize the sequence and sort `JournalId.Value` using `StringComparer.Ordinal`.
+```csharp
+var options = new ListOptions
+{
+    Prefix = new JournalId("jobs/shards/20260909"),
+    MinId = new JournalId("jobs/shards/20260909T1000000000000Z-"),
+    MaxId = new JournalId("jobs/shards/20260909T1200000000000Z~"),
+    IncludeMetadata = true
+};
+```
+
+Providers can narrow the native prefix further using the common prefix of the lower and upper
+bounds. Applications requiring a uniform result order sort the selected ids using
+`StringComparer.Ordinal`.
 
 Storage providers fetch pages internally and yield matching identities as they discover them. `await foreach` advances the traversal and disposes the enumerator when the loop ends. Consumers which process identities in batches can retain one enumerator across batches, advance it serially, and dispose it after the last pending `MoveNextAsync` completes. Use a cancellation token whose lifetime covers that enumeration.
 
-| Provider | Internal traversal | Client memory |
-| --- | --- | --- |
-| Volatile | Enumerates the existing concurrent storage dictionary, checks journal existence, and applies the prefix | Constant additional traversal state; the storage dictionary holds the journals. |
-| Azure Blob | Requests up to 5000 blobs per service page, then applies WAL and hierarchical prefix filtering | Proportional to the current service page. |
-| Azure Table | Requests up to 1000 journal headers per service page, then decodes canonical or reversible legacy ids and applies the prefix | Proportional to the current service page. |
-| S3 | Requests up to 1000 bucket objects per `ListObjectsV2` page, then applies canonical WAL and prefix filtering | Proportional to the current service page; includes unordered S3 Express listings. |
-| Redis | Scans primary-server metadata keys and reads canonical ids in bounded batches, suppressing repeated ids | Read-batch state plus a seen-id set which grows with the catalog. `SCAN` count remains a service work hint. |
+`IncludeMetadata` defaults to false and is snapshotted with the range options. When true, providers
+include complete metadata available from the listing: journal format, storage ETag, and caller-owned
+properties observed together, using the same semantics as `GetMetadataAsync`. Azure Blob projects
+WAL metadata, Azure Table projects header properties, and Volatile snapshots metadata under its store
+lock. S3 and Redis return null metadata because their listings expose identities rather than the
+complete journal metadata. Projection adds no separate per-journal metadata requests.
 
-One `MoveNextAsync` can traverse multiple empty or filtered storage pages before yielding an identity. A consumer's identity or metadata-read budget therefore bounds returned candidates, while storage services determine internal scan work, request latency, and retries. Table header queries can inspect additional rows internally, and S3 custom mappings require a bucket traversal.
+Consumers requiring metadata use the supplied snapshot or call `GetMetadataAsync` when it is absent.
+An empty caller-property dictionary is a valid complete snapshot. Treat the ETag as the version of that
+snapshot and pass it to conditional metadata updates; concurrent changes can cause the update to fail.
+
+| Provider | How narrowly discovery scans | Remaining work |
+| --- | --- | --- |
+| Volatile | An ordered key index selects a view covering the requested prefix and bounds. | Snapshots selected keys and checks current journal existence. |
+| Azure Table, default mapping | Printable ASCII ids use two uppercase hex digits per byte, allowing direct indexed prefix and lower/upper key filters. | Queries include the journal header row condition; the service controls work inside the selected key range. |
+| Azure Table, custom mapping | Canonical journal-id filters limit returned headers. | Arbitrary mappings can require a table scan because the journal-id property is not indexed. |
+| Azure Blob | The `wal/` namespace and raw id prefix select WAL blobs; `StartFrom` seeks to an ASCII lower bound and ordered traversal stops at an ASCII upper bound. | The final page can contain WALs beyond the range. Checkpoints occupy a separate namespace. |
+| S3 general-purpose, ordered listing enabled | The `wal/` namespace excludes checkpoints. Identity-mapped keys use native prefixes and an initial `StartAfter` marker preceding the inclusive lower bound, then stop at the upper WAL key. | The final page can overrun the range. Custom key mappings use their configured native prefix and identity filtering. |
+| S3 Express directory buckets | A native slash-terminated prefix within `wal/` limits the namespace and excludes checkpoints. | Partial-name and time bounds are filtered during unordered traversal. |
+| Redis | Readable key names enable native `SCAN MATCH` prefix filtering and local key-range checks before identity metadata reads for the default mapping. | `SCAN MATCH` still traverses the server keyspace. Custom key mappings read canonical ids from matching metadata hashes. |
+
+Blob and ordered S3 native lower/upper optimizations apply where storage ordering agrees with
+ordinal identity ordering, including the fixed-width ASCII timestamp names. Other bounds
+remain enforced while traversing storage. S3 ordered listing is an explicit
+`UseOrderedListing` capability setting for general-purpose buckets.
+The selected identity count, transferred keys, and backend scan work are separate costs:
+server-side filtering can reduce transferred data while the service still examines a wider keyspace.
 
 Enumeration observes live storage. Concurrent changes follow each provider's listing semantics; callers should tolerate repeated identities during changes and use subsequent enumerations to discover later updates. Journal existence can change between discovery and a storage operation. Cancellation and storage errors propagate through enumeration. Dispose a failed enumerator and begin a new enumeration when retrying a listing operation.
 
