@@ -68,6 +68,8 @@ Namespaces select a membership scope before topology construction:
 
 Fanout is derived from the target hop count and bounded by the configured minimum and maximum, or selected by the code-configured callback. A membership or fanout change creates a new topology from the next snapshot; acknowledged ledgers and anti-entropy repair convergence across the transition.
 
+The projection cache tracks its source snapshot as well as its table version. Same-version cleanup of Joining, ShuttingDown, or Stopping participants refreshes routing and peer selection. Heartbeat-only updates and cleanup of non-participants reuse the existing topology, while repaired projections retain rotation progress. The successor guard preserves the newer inventory when concurrent reads arrive out of order.
+
 ## Configuration and defaults
 
 The subsystem and each namespace default to disabled. Enable <xref:Orleans.Configuration.DisseminationOptions.Enabled> together with <xref:Orleans.Configuration.DisseminationNamespaceOptions.Enabled> on the selected integration to activate broadcast and repair. Defaults bound concurrency, memory retention, payload size, and repair work:

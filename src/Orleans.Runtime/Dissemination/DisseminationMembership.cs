@@ -11,30 +11,33 @@ internal sealed class DisseminationMembership(
     IOptions<DisseminationOptions> options)
 {
     private readonly object _membershipLock = new();
-    private DisseminationMembershipSnapshots? _currentSnapshots;
+    private CachedMembership? _current;
 
     public DisseminationMembershipSnapshots CurrentSnapshots
     {
         get
         {
             var membershipSnapshot = membershipManager.CurrentSnapshot;
-            var current = Volatile.Read(ref _currentSnapshots);
-            if (current is not null && current.MembershipVersion == membershipSnapshot.Version)
+            var current = Volatile.Read(ref _current);
+            if (current is not null && ReferenceEquals(current.Source, membershipSnapshot))
             {
-                return current;
+                return current.Snapshots;
             }
 
             lock (_membershipLock)
             {
-                current = Volatile.Read(ref _currentSnapshots);
-                if (current is not null && current.MembershipVersion >= membershipSnapshot.Version)
+                current = Volatile.Read(ref _current);
+                if (current is not null && !membershipSnapshot.IsSuccessorTo(current.Source))
                 {
-                    return current;
+                    return current.Snapshots;
                 }
 
-                current = ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay, current);
-                Volatile.Write(ref _currentSnapshots, current);
-                return current;
+                // Same-version heartbeats and removal of non-participants retain the existing topology.
+                var snapshots = current is { } previous && HasSameTopology(previous, membershipSnapshot)
+                    ? previous.Snapshots
+                    : ComputeMembership(membershipSnapshot, localSiloDetails.SiloAddress, options.Value.Overlay, current?.Snapshots);
+                Volatile.Write(ref _current, new(membershipSnapshot, snapshots));
+                return snapshots;
             }
         }
     }
@@ -61,6 +64,29 @@ internal sealed class DisseminationMembership(
         await RefreshMembership(cancellationToken);
         snapshots = CurrentSnapshots;
         return snapshots.GetSnapshot(scope).ContainsMember(member) ? snapshots : null;
+    }
+
+    private static bool HasSameTopology(CachedMembership current, MembershipTableSnapshot source)
+    {
+        if (current.Source.Version != source.Version)
+        {
+            return false;
+        }
+
+        if (current.Source.Entries.Count == source.Entries.Count)
+        {
+            return true;
+        }
+
+        foreach (var member in current.Snapshots.AllMembers.Members)
+        {
+            if (!source.Entries.ContainsKey(member))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static DisseminationMembershipSnapshots ComputeMembership(
@@ -113,6 +139,8 @@ internal sealed class DisseminationMembership(
         SiloStatus.Stopping => 3,
         _ => 4,
     };
+
+    private sealed record CachedMembership(MembershipTableSnapshot Source, DisseminationMembershipSnapshots Snapshots);
 }
 
 internal sealed class DisseminationMembershipSnapshots(
