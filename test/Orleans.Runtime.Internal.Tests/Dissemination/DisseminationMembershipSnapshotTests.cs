@@ -416,6 +416,105 @@ public class DisseminationMembershipSnapshotTests
         Assert.Equal(4, manager.SnapshotReadCount);
     }
 
+    [Theory]
+    [InlineData(SiloStatus.Joining)]
+    [InlineData(SiloStatus.ShuttingDown)]
+    [InlineData(SiloStatus.Stopping)]
+    public void SameVersionCleanupRefreshesEligibleTopologyAndPreservesRotation(SiloStatus removedStatus)
+    {
+        var members = CreateSilos(4);
+        var source = new MembershipTableSnapshot(new MembershipVersion(42),
+            CreateSourceSnapshot(42, members[0], members[1], members[2]).Entries.Add(
+                members[3], CreateScopeMembershipEntry(members[3], removedStatus, 3)));
+        var manager = new MutableMembershipManager(source, TestContext.Current.CancellationToken);
+        var membership = new DisseminationMembership(manager, new ScopeLocalSiloDetails(members[0]),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var before = membership.CurrentSnapshots;
+        Assert.Equal(new[] { members[1] }, before.AllMembers.SelectAntiEntropyPeers(1));
+
+        manager.SetSnapshot(new(source.Version, source.Entries.Remove(members[3])));
+        var after = membership.CurrentSnapshots;
+
+        Assert.NotSame(before, after);
+        Assert.Equal(source.Version, after.MembershipVersion);
+        Assert.Equal(members[..3], after.AllMembers.Members);
+        Assert.Equal(members[..3], after.ActiveMembers.Members);
+        Assert.DoesNotContain(members[3], after.AllMembers.OriginatorTreeTargets);
+        Assert.DoesNotContain(members[3], after.AllMembers.ForwardingTreeTargets);
+        Assert.Equal(new[] { members[2] }, after.AllMembers.SelectAntiEntropyPeers(1));
+        Assert.Same(after, membership.CurrentSnapshots);
+    }
+
+    [Theory]
+    [InlineData(SiloStatus.Created)]
+    [InlineData(SiloStatus.Dead)]
+    public void SameVersionCleanupOfNonParticipantsReusesTopology(SiloStatus removedStatus)
+    {
+        var members = CreateSilos(3);
+        var source = new MembershipTableSnapshot(new MembershipVersion(42),
+            CreateSourceSnapshot(42, members[0], members[1]).Entries.Add(
+                members[2], CreateScopeMembershipEntry(members[2], removedStatus, 2)));
+        var manager = new MutableMembershipManager(source, TestContext.Current.CancellationToken);
+        var membership = new DisseminationMembership(manager, new ScopeLocalSiloDetails(members[0]),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var before = membership.CurrentSnapshots;
+
+        manager.SetSnapshot(new(source.Version, source.Entries.Remove(members[2])));
+
+        Assert.Same(before, membership.CurrentSnapshots);
+        Assert.Equal(members[..2], membership.CurrentSnapshot.Members);
+    }
+
+    [Fact]
+    public void SameVersionHeartbeatReusesTopologyAndRotation()
+    {
+        var members = CreateSilos(3);
+        var source = CreateSourceSnapshot(42, members[0], members[1], members[2]);
+        var manager = new MutableMembershipManager(source, TestContext.Current.CancellationToken);
+        var membership = new DisseminationMembership(manager, new ScopeLocalSiloDetails(members[0]),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var before = membership.CurrentSnapshots;
+        Assert.Equal(new[] { members[1] }, before.AllMembers.SelectAntiEntropyPeers(1));
+        manager.SetSnapshot(new(source.Version, source.Entries.SetItem(members[1],
+            source.Entries[members[1]].WithIAmAliveTime(DateTime.UnixEpoch.AddMinutes(1)))));
+
+        var after = membership.CurrentSnapshots;
+
+        Assert.Same(before, after);
+        Assert.Equal(new[] { members[2] }, after.AllMembers.SelectAntiEntropyPeers(1));
+    }
+
+    [Fact]
+    public async Task StaleConcurrentReadCannotRestoreSameVersionRemovedParticipant()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var members = CreateSilos(3);
+        var source = new MembershipTableSnapshot(new MembershipVersion(42),
+            CreateSourceSnapshot(42, members[0], members[1]).Entries.Add(
+                members[2], CreateScopeMembershipEntry(members[2], SiloStatus.Joining, 2)));
+        var manager = new MutableMembershipManager(source, cancellationToken) { BlockSecondSnapshotRead = true };
+        var membership = new DisseminationMembership(manager, new ScopeLocalSiloDetails(members[0]),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        Assert.Contains(members[2], membership.CurrentSnapshot.Members);
+        var stale = Task.Run(() => membership.CurrentSnapshots);
+        DisseminationMembershipSnapshots updated;
+        try
+        {
+            await manager.SecondReadCaptured.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            manager.SetSnapshot(new(source.Version, source.Entries.Remove(members[2])));
+            updated = membership.CurrentSnapshots;
+            Assert.DoesNotContain(members[2], updated.AllMembers.Members);
+        }
+        finally
+        {
+            manager.ReleaseSecondRead();
+        }
+
+        Assert.Same(updated, await stale.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        Assert.Same(updated, membership.CurrentSnapshots);
+        Assert.Equal(source.Version, updated.MembershipVersion);
+    }
+
     private static (
         DisseminationMembershipSnapshots Snapshots,
         CountingMembershipManager Manager,
