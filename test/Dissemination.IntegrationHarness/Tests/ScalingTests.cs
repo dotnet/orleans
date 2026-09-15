@@ -9,14 +9,21 @@ public sealed class ScalingTests
 {
     [Fact]
     [Trait("Category", "DisseminationScale")]
-    public async Task Scaling_OriginalLegacy_Disabled_EnabledSupported()
+    public async Task Scaling_SelectedRuntimePathsConverge()
     {
         var sizes = (Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_SIZES") ?? "4,8,16")
             .Split(',').Select(value => int.Parse(value, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
         var iterations = Setting("ITERATIONS", 10, 3, 200);
         var repetitions = Setting("REPETITIONS", 1, 1, 5);
-        Assert.All(sizes, size => Assert.InRange(size, 3, 32));
+        Assert.All(sizes, size => Assert.InRange(size, 3, 128));
         Assert.InRange(sizes.Length, 1, 6);
+        Assert.Equal(sizes.Length, sizes.Distinct().Count());
+        var scenarios = (Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_SCENARIOS") ?? "stable,churn,partition").Split(',');
+        Assert.InRange(scenarios.Length, 1, 3);
+        Assert.Equal(scenarios.Length, scenarios.Distinct().Count());
+        Assert.All(scenarios, scenario => Assert.Contains(scenario, new[] { "stable", "churn", "partition" }));
+        var paths = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_RUNTIME_PATHS") ?? "All";
+        Assert.Contains(paths, new[] { "All", "Current" });
 
         var records = new List<object>();
         var output = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_RESULTS")!;
@@ -26,31 +33,50 @@ public sealed class ScalingTests
             new("CurrentDisabled", "New", Enabled: false),
             new("CurrentEnabledSupported", "New", Enabled: true),
         ];
+        if (paths == "Current")
+        {
+            variants = variants[1..];
+        }
+
         foreach (var size in sizes)
         {
-            foreach (var scenario in new[] { "stable", "churn", "partition" })
+            foreach (var scenario in scenarios)
             {
                 for (var repetition = 0; repetition < repetitions; repetition++)
                 {
-                    // Rotate all three paths to expose thermal/cache/order effects across repetitions.
+                    // Rotate paths to expose order effects across repetitions.
                     for (var order = 0; order < variants.Length; order++)
                     {
                         var variant = variants[(repetition + order) % variants.Length];
                         var record = await Measure(size, scenario, variant, iterations, repetition, order);
                         records.Add(record);
-                        await File.WriteAllTextAsync(Path.Combine(output, "cost-results.json"),
-                            JsonSerializer.Serialize(records, new JsonSerializerOptions { WriteIndented = true }),
+                        var json = JsonSerializer.Serialize(records, new JsonSerializerOptions { WriteIndented = true });
+                        await File.WriteAllTextAsync(Path.Combine(output, "cost-results.json"), json, TestContext.Current.CancellationToken);
+                        await File.WriteAllTextAsync(Path.Combine(output, "comparisons.json"),
+                            JsonSerializer.Serialize(ScalingComparison.Create(json), new JsonSerializerOptions { WriteIndented = true }),
                             TestContext.Current.CancellationToken);
                     }
                 }
             }
+        }
+
+        var report = ScalingComparison.Create(JsonSerializer.Serialize(records));
+        Assert.Equal(0, report.IncompletePairs);
+        Assert.Equal(sizes.Length * scenarios.Length * repetitions, report.Pairs.Length);
+        if (Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY") is { Length: > 0 } summary)
+        {
+            await File.AppendAllTextAsync(summary, report.ToMarkdown(), TestContext.Current.CancellationToken);
         }
     }
 
     private static async Task<object> Measure(int size, string scenario, RuntimeVariant variant, int iterations, int repetition, int order)
     {
         var enabled = variant.Enabled;
-        await using var cluster = new ProcessCluster($"scale-{size}-{scenario}-{variant.Name}-{repetition}", fastRecovery: false);
+        var siloProcessorCount = Setting("SILO_PROCESSOR_COUNT", 0, 0, 64);
+        var gcConserveMemory = Setting("GC_CONSERVE_MEMORY", 0, 0, 9);
+        var bootstrap = Stopwatch.StartNew();
+        await using var cluster = new ProcessCluster(
+            $"scale-{size}-{scenario}-{variant.Name}-{repetition}", fastRecovery: false, siloProcessorCount, gcConserveMemory);
         for (var index = 0; index < size; index++)
         {
             await cluster.Start(variant.Runtime, enabled);
@@ -70,9 +96,14 @@ public sealed class ScalingTests
         await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         var start = (await Task.WhenAll(cluster.Active.Select(node => node.Send("measure"))))
             .ToDictionary(snapshot => snapshot.Identity.ProcessId);
+        Assert.Equal(size, start.Count);
+        Assert.All(start.Values, snapshot => Assert.Equal(size, snapshot.ActiveMembers.Length));
+        var bootstrapMilliseconds = bootstrap.Elapsed.TotalMilliseconds;
         var startedAt = DateTimeOffset.UtcNow;
         var clock = Stopwatch.StartNew();
         var latencies = new List<double>();
+        var publicationLatencies = new List<double>();
+        var convergenceWaits = new List<double>();
         var recoveryLatencies = new List<double>();
         var offeredPublications = 0;
         var restarts = 0;
@@ -108,13 +139,19 @@ public sealed class ScalingTests
                 var recovery = Stopwatch.StartNew();
                 // Establish delivery paths before offering the next sample, including on the one-way legacy path.
                 await cluster.HealPartition(victim);
-                latencies.Add(await cluster.PublishAndConverge());
-                offeredPublications += size;
+                await PublishRound();
                 recoveryLatencies.Add(recovery.Elapsed.TotalMilliseconds);
                 continue;
             }
 
+            await PublishRound();
+        }
+
+        async Task PublishRound()
+        {
             latencies.Add(await cluster.PublishAndConverge());
+            publicationLatencies.Add(cluster.LastPublicationMilliseconds);
+            convergenceWaits.Add(cluster.LastConvergenceWaitMilliseconds);
             offeredPublications += size;
         }
 
@@ -197,6 +234,7 @@ public sealed class ScalingTests
             RuntimePath = variant.Name,
             Runtime = finish[0].Identity,
             Size = size,
+            LiveSilos = start.Count,
             Scenario = scenario,
             Enabled = enabled,
             Iterations = iterations,
@@ -209,6 +247,8 @@ public sealed class ScalingTests
             WindowStartedAtUtc = startedAt,
             WindowFinishedAtUtc = finishedAt,
             ConvergenceMilliseconds = latencies,
+            PublicationMilliseconds = publicationLatencies,
+            ConvergenceAfterPublicationMilliseconds = convergenceWaits,
             PartitionRecoveryMilliseconds = recoveryLatencies,
             TotalRpcs = nodes.Sum(node => node.Rpcs),
             TotalMessages = nodes.Sum(node => node.SentMessages),
@@ -218,8 +258,20 @@ public sealed class ScalingTests
             CpuMilliseconds = nodes.Sum(node => node.CpuMilliseconds),
             AllocatedBytes = nodes.Sum(node => node.AllocatedBytes),
             RetainedManagedBytes = nodes.Sum(node => node.RetainedManagedBytes),
+            BootstrapMilliseconds = bootstrapMilliseconds,
+            BootstrapCpuMilliseconds = start.Values.Sum(snapshot => snapshot.CpuMilliseconds),
+            BootstrapAllocatedBytes = start.Values.Sum(snapshot => snapshot.AllocatedBytes),
             Nodes = nodes,
-            Environment = new { RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription, System.Environment.ProcessorCount },
+            Environment = new
+            {
+                RuntimeInformation.OSDescription,
+                RuntimeInformation.FrameworkDescription,
+                System.Environment.ProcessorCount,
+                SiloProcessorCount = siloProcessorCount,
+                GCConserveMemory = gcConserveMemory,
+                WorkerProcessorCounts = start.Values.Select(snapshot => snapshot.ProcessorCount).Distinct().Order().ToArray(),
+                WorkerServerGC = start.Values.Select(snapshot => snapshot.ServerGC).Distinct().Order().ToArray(),
+            },
             Methodology = new
             {
                 WarmupRounds = 2,
@@ -238,7 +290,7 @@ public sealed class ScalingTests
                 TransportBytes = "bytes advanced at the real connection transport pipe, including handshake; may include buffered bytes lost when a partition aborts a connection",
                 RetainedMemory = "full GC live managed bytes on surviving nodes only; not a peak; RSS/private bytes and retired-node snapshots also retained",
                 Includes = "all silo work during the window, including control/snapshot/instrumentation overhead and legacy fallback; restart startup/shutdown costs included for churn",
-                Observation = "state polling on all three paths; detailed counters only at window boundaries; per-value DiagnosticListener capture disabled in scale runs",
+                Observation = "identical state polling on selected paths; detailed counters only at window boundaries; per-value DiagnosticListener capture disabled in scale runs",
                 Topology = "per-node actual tree at end, or start for a retired node; raw command snapshots preserve intervening topology changes; role is not time-weighted",
                 Excludes = "controller process CPU/allocation, storage disk byte accounting, cross-machine latency, NIC/TCP wire overhead, production storage/placement/grain work",
                 PartitionComparison = "retire partitioned connections at both endpoints, then confirm healed connections with bidirectional acknowledged control RPCs before the same single publication round on all paths; teardown and readiness remain inside partition recovery time and total cost; silent anti-entropy recovery is asserted separately in VersionSkewTests",
@@ -252,12 +304,28 @@ public sealed class ScalingTests
         return record;
     }
 
-    private static Task ConfirmSupport(ProcessCluster cluster) =>
-        cluster.Eventually("all enabled peers confirm support before offered publication rounds", async () =>
+    private static Task ConfirmSupport(ProcessCluster cluster)
+    {
+        var timeout = TimeSpan.FromSeconds(90);
+        foreach (var node in cluster.Active)
+        {
+            Assert.True(node.Last.AntiEntropyPeerCount > 0);
+            Assert.True(node.Last.AntiEntropyIntervalMilliseconds > 0);
+            var rounds = Math.Ceiling((cluster.Active.Length - 1.0) / node.Last.AntiEntropyPeerCount);
+            var rotationBudget = TimeSpan.FromMilliseconds(2 * rounds * node.Last.AntiEntropyIntervalMilliseconds)
+                + TimeSpan.FromSeconds(60);
+            if (rotationBudget > timeout)
+            {
+                timeout = rotationBudget;
+            }
+        }
+
+        return cluster.Eventually("all enabled peers confirm support before offered publication rounds", async () =>
         {
             var snapshots = await Task.WhenAll(cluster.Active.Select(node => node.Send("snapshot")));
             return snapshots.All(snapshot => snapshot.UnconfirmedPeers.Length == 0);
-        }, TimeSpan.FromSeconds(90));
+        }, timeout);
+    }
 
     private sealed record RuntimeVariant(string Name, string Runtime, bool Enabled);
 
