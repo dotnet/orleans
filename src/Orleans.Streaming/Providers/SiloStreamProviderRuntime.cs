@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Providers
                             $"Stream provider '{streamProviderName}' requires positive grain-hosting probe and rebalance intervals.");
                     }
 
-                    var provider = new StreamPullingAgentRuntime.Provider(
+                    var provider = new PullingAgentRuntime.Provider(
                         adapterFactory.GetStreamQueueMapper().GetAllQueues().ToImmutableHashSet(),
                         pullingAgentOptions,
                         async (context, queueId) => new PersistentStreamPullingAgent(
@@ -98,8 +98,8 @@ namespace Orleans.Runtime.Providers
                         adapterFactory.GetQueueAdapterCache(), await adapterFactory.GetDeliveryFailureHandler(queueId),
                         deliveryProvider, queueReaderProvider, timeProvider, loggerFactory,
                         ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments));
-                    ServiceProvider.GetRequiredService<StreamPullingAgentRuntime>().Register(streamProviderName, provider);
-                    var grainManager = new GrainHostedStreamPullingManager(
+                    ServiceProvider.GetRequiredService<PullingAgentRuntime>().Register(streamProviderName, provider);
+                    var grainManager = new GrainPullingAgentManager(
                         managerId, streamProviderName, provider, instruments, shared);
                     pullingAgentManager = grainManager.AsReference<IPersistentStreamPullingManager>();
                     break;

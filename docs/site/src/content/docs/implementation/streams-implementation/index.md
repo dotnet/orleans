@@ -106,7 +106,7 @@ Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blo
 
 <a name="pulling-protocol"></a>
 
-Both hosts use the same `PersistentStreamPullingAgent` processing implementation with single-threaded Orleans scheduling. Its loop:
+`PullingAgentSystemTarget` and `PullingAgentGrain` use the same `PersistentStreamPullingAgent` processing implementation with single-threaded Orleans scheduling. Its loop:
 
 1. asks the adapter receiver for a batch;
 1. adds batch containers to its queue cache;

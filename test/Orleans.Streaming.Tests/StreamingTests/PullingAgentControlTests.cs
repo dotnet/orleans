@@ -19,7 +19,7 @@ namespace UnitTests.StreamingTests;
 
 [TestSuite("BVT"), TestProvider("None"), TestArea("Streaming")]
 [TestCategory("BVT"), TestCategory("Streaming")]
-public sealed class GrainHostedPullingAgentControlTests
+public sealed class PullingAgentControlTests
 {
     private const string ProviderName = "grain-hosted-control";
     private static readonly QueueId Queue = QueueId.GetQueueId("Control", 0, 1);
@@ -43,7 +43,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
         var readsAtStop = setup.Reads;
 
-        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(ProviderName, Queue));
+        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(PullingAgentId.Create(ProviderName, Queue));
         await grain.AddSubscriber(
             GuidId.GetGuidId(Guid.NewGuid()),
             new QualifiedStreamId(ProviderName, StreamId.Create("namespace", "stream")),
@@ -82,7 +82,7 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(0, setup.Shutdowns);
         Assert.Equal(1, setup.CoordinatorNotifications);
         Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
         context.Deactivate(new(DeactivationReasonCode.ShuttingDown, "Exercise grain-owned silo-shutdown cleanup."), TestContext.Current.CancellationToken);
         await context.Deactivated.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
@@ -99,7 +99,7 @@ public sealed class GrainHostedPullingAgentControlTests
         var silo = setup.Cluster.Silos[0];
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
         var grain = Assert.IsType<PullingAgentGrain>(context.GrainInstance);
         var failure = new InvalidOperationException("Final checkpoint failed.");
@@ -133,7 +133,7 @@ public sealed class GrainHostedPullingAgentControlTests
         var silo = setup.Cluster.Silos[0];
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         await setup.Cluster.DeactivateAsync(grainId).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
 
         setup.InitializationBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -184,7 +184,7 @@ public sealed class GrainHostedPullingAgentControlTests
         var silo = setup.Cluster.Silos[0];
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
         var grain = Assert.IsType<PullingAgentGrain>(context.GrainInstance);
         using var cancellation = new CancellationTokenSource();
@@ -207,7 +207,7 @@ public sealed class GrainHostedPullingAgentControlTests
         var silo = setup.Cluster.Silos[0];
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -268,7 +268,7 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(1, cacheGaugeRegistrations);
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
-        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
         Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var original));
         var originalAddress = original.Address;
 
@@ -303,7 +303,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.Command(destination, PersistentStreamProviderCommand.StartAgents);
         Assert.Equal(source.SiloAddress, await setup.NextInitialization());
 
-        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(ProviderName, Queue));
+        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(PullingAgentId.Create(ProviderName, Queue));
         var previous = await grain.Probe(TestContext.Current.CancellationToken);
         Assert.True(await grain.Rebalance(previous.Address, destination.SiloAddress, TestContext.Current.CancellationToken));
         Assert.Equal(destination.SiloAddress, await setup.NextInitialization());

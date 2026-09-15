@@ -12,30 +12,26 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-[GrainInterfaceType("Orleans.Streams.IStreamPullingAgentCoordinator")]
 internal interface IPullingAgentCoordinatorGrain : IGrain
 {
     [AlwaysInterleave]
-    [Alias("233F3872")]
     Task EnsureRunning(CancellationToken cancellationToken = default);
     [AlwaysInterleave]
-    [Alias("38F87745")]
     Task NotifyHostChanged(CancellationToken cancellationToken = default);
-    [Alias("2BBC562F")]
-    Task<Dictionary<QueueId, StreamPullingAgentStatus>> GetAgents(CancellationToken cancellationToken = default);
+    Task<Dictionary<QueueId, PullingAgentStatus>> GetAgents(CancellationToken cancellationToken = default);
 }
 
 [GrainType(GrainTypeName)]
-[StreamPullingAgentPlacement]
+[PullingAgentPlacement]
 [Immovable]
 internal sealed class PullingAgentCoordinatorGrain(
-    StreamPullingAgentRuntime runtime,
-    StreamPullingAgentHostResolver hosts,
+    PullingAgentRuntime runtime,
+    PullingAgentHostResolver hosts,
     IClusterMembershipService membership,
     [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider clock,
     ILogger<PullingAgentCoordinatorGrain> logger) : Grain, IPullingAgentCoordinatorGrain
 {
-    internal const string GrainTypeName = "Orleans.Streams.PullingAgentCoordinator";
+    internal const string GrainTypeName = "stream.pulling-agent-coordinator";
     internal static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Dictionary<QueueId, Agent> _agents = new();
@@ -59,7 +55,7 @@ internal sealed class PullingAgentCoordinatorGrain(
         _options = provider.Options;
         foreach (var queue in provider.Queues)
         {
-            _agents.Add(queue, new(GrainFactory.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(_providerName, queue))));
+            _agents.Add(queue, new(GrainFactory.GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queue))));
         }
 
         EnsureTimer();
@@ -88,7 +84,7 @@ internal sealed class PullingAgentCoordinatorGrain(
         return Task.CompletedTask;
     }
 
-    public Task<Dictionary<QueueId, StreamPullingAgentStatus>> GetAgents(CancellationToken cancellationToken)
+    public Task<Dictionary<QueueId, PullingAgentStatus>> GetAgents(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_agents.Where(static entry => entry.Value.Status.HasValue)
@@ -149,7 +145,7 @@ internal sealed class PullingAgentCoordinatorGrain(
         try
         {
             var eligible = (await hosts.GetEligibleSilos(
-                _providerName, null, StreamPullingAgentId.GrainType,
+                _providerName, null, PullingAgentId.GrainType,
                 PullingAgentGrain.InterfaceType, cancellationToken)).ToHashSet();
             if (!_eligibleSilos.SetEquals(eligible))
             {
@@ -229,7 +225,7 @@ internal sealed class PullingAgentCoordinatorGrain(
     {
         try
         {
-            var status = await StreamPullingAgentPlacement.WithHint(hint, () => agent.Grain.Probe(cancellationToken))
+            var status = await PullingAgentPlacement.WithHint(hint, () => agent.Grain.Probe(cancellationToken))
                 .WaitAsync(cancellationToken);
             agent.Status = status;
             if (status.IsRunning && eligible.Contains(status.Address.SiloAddress!))
@@ -326,6 +322,6 @@ internal sealed class PullingAgentCoordinatorGrain(
     private sealed class Agent(IPullingAgentGrain grain)
     {
         internal IPullingAgentGrain Grain { get; } = grain;
-        internal StreamPullingAgentStatus? Status { get; set; }
+        internal PullingAgentStatus? Status { get; set; }
     }
 }

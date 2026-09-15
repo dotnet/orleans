@@ -29,7 +29,7 @@ namespace ServiceBus.Tests.StreamingTests;
 [TestProvider("EventHub")]
 [TestArea("Streaming")]
 [TestCategory("BVT"), TestCategory("EventHub"), TestCategory("Streaming")]
-public sealed class GrainHostedEventHubMigrationTests
+public sealed class EventHubGrainMigrationTests
 {
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
 
@@ -74,7 +74,7 @@ public sealed class GrainHostedEventHubMigrationTests
             await Wait(initialDelivery, "Event Hubs delivery through 100 on A");
             var firstA = Assert.Single(state.Epochs);
             var stableId = firstA.Address.GrainId;
-            Assert.Equal("Orleans.Streams.PullingAgent", stableId.Type.ToString());
+            Assert.Equal("stream.pulling-agent", stableId.Type.ToString());
             Assert.Equal("20", firstA.LoadedOffset);
             Assert.Equal(new long[] { 20, 100 }, firstA.ReadOffsets.ToArray());
             Assert.Equal(new long[] { 20, 100 }, state.Delivered.ToArray());
@@ -292,7 +292,7 @@ public sealed class GrainHostedEventHubMigrationTests
             var initialDelivery = WaitForDrain(events, state, sourceSilo.SiloAddress);
             await Wait(sourceSilo.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting shutdown-test source provider");
-            var coordinatorId = GrainId.Create("Orleans.Streams.PullingAgentCoordinator", EventHubMigrationState.ProviderName);
+            var coordinatorId = GrainId.Create("stream.pulling-agent-coordinator", EventHubMigrationState.ProviderName);
             clock.Advance(TimeSpan.Zero);
             await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(coordinatorId).GetAddress(), "initial coordinator round mailbox barrier");
             clock.Advance(TimeSpan.FromSeconds(1));

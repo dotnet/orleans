@@ -4,9 +4,9 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-internal static class StreamPullingAgentId
+internal static class PullingAgentId
 {
-    internal const string GrainTypeName = "Orleans.Streams.PullingAgent";
+    internal const string GrainTypeName = "stream.pulling-agent";
     internal static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
 
     internal static GrainId Create(string providerName, QueueId queueId)
