@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -24,6 +25,8 @@ namespace Orleans.Runtime.Messaging
         private static uint nextConnection;
 
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new();
+        private readonly ConcurrentDictionary<Connection, Task> connectionTasks = new();
+        private readonly AdmissionGate connectionEstablishment = new();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
         private readonly ILogger logger;
@@ -107,6 +110,12 @@ namespace Orleans.Runtime.Messaging
 
         private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
+            using var admission = this.connectionEstablishment.TryEnter();
+            if (!admission.Entered)
+            {
+                throw new OperationCanceledException("Shutting down");
+            }
+
             await Task.Yield();
             while (true)
             {
@@ -152,16 +161,35 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void OnConnected(SiloAddress address, Connection connection) => OnConnected(address, connection, null);
+        public void OnConnected(SiloAddress address, Connection connection)
+        {
+            using var admission = this.connectionEstablishment.TryEnter();
+            if (!admission.Entered)
+            {
+                throw new OperationCanceledException("Shutting down");
+            }
+
+            OnConnected(address, connection, null);
+        }
 
         private void OnConnected(SiloAddress address, Connection connection, ConnectionEntry? entry)
         {
             lock (this.lockObj)
             {
+                if (!connection.IsValid)
+                {
+                    throw new ConnectionAbortedException("Connection closed during initialization");
+                }
+
+                // The outbound attempt owns its pending task until initialization finishes.
+                if (entry is not null)
+                {
+                    entry.PendingConnection = null;
+                }
+
                 entry ??= GetOrCreateEntry(address);
                 entry.Connections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
                 entry.LastFailure = default;
-                entry.PendingConnection = null;
             }
 
             ConnectionEvents.EmitEstablished(connection, address);
@@ -207,6 +235,8 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
             CancellationTokenSource? openConnectionCancellation = default;
+            Connection? connection = default;
+            Task? connectionTask = default;
 
             try
             {
@@ -217,12 +247,13 @@ namespace Orleans.Runtime.Messaging
                 openConnectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token, default);
                 openConnectionCancellation.CancelAfter(this.connectionOptions.OpenConnectionTimeout);
 
-                var connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token);
+                connection = await this.connectionFactory.ConnectAsync(address, openConnectionCancellation.Token);
+                openConnectionCancellation.Token.ThrowIfCancellationRequested();
 
                 ConnectionEvents.EmitConnected(address);
                 LogInformationConnectedToEndpoint(this.logger, address);
 
-                this.StartConnection(address, connection);
+                connectionTask = this.StartConnection(address, connection);
 
                 await connection.Initialized.WaitAsync(openConnectionCancellation.Token);
                 this.OnConnected(address, connection, entry);
@@ -231,6 +262,23 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
+                if (connection is not null)
+                {
+                    try
+                    {
+                        await connection.CloseAsync(exception);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        LogWarningConnectionCleanupFailed(this.logger, cleanupException, address);
+                    }
+
+                    if (connectionTask is not null)
+                    {
+                        await connectionTask;
+                    }
+                }
+
                 this.OnConnectionFailed(entry);
 
                 LogWarningConnectionAttemptFailed(this.logger, exception, address);
@@ -292,6 +340,7 @@ namespace Orleans.Runtime.Messaging
             Justification = "Shutdown callbacks must complete synchronously before connections are scanned, while aggregating all callback failures.")]
         public async Task Close(CancellationToken ct)
         {
+            var establishmentDrained = this.connectionEstablishment.CloseAsync();
             var shutdownCompleted = false;
             try
             {
@@ -302,10 +351,9 @@ namespace Orleans.Runtime.Messaging
                 var cycles = 0;
                 for (var closeTasks = new List<Task>(); ; closeTasks.Clear())
                 {
-                    var pendingConnections = false;
+                    var pendingEstablishment = !establishmentDrained.IsCompleted;
                     foreach (var kv in connections)
                     {
-                        pendingConnections |= kv.Value.PendingConnection != null;
                         foreach (var connection in kv.Value.Connections)
                         {
                             try
@@ -318,8 +366,18 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
 
-                    if (closeTasks.Count > 0)
+                    // Runners remain owned through middleware cleanup, even after routing entries are removed.
+                    foreach (var (connection, task) in this.connectionTasks)
                     {
+                        closeTasks.Add(connection.CloseAsync(exception: null));
+                        closeTasks.Add(task);
+                    }
+
+                    if (closeTasks.Count > 0 || pendingEstablishment)
+                    {
+                        // Signal existing connections before waiting for producers which may need those signals.
+                        // The next scan also closes connections published while this drain was in progress.
+                        closeTasks.Add(establishmentDrained);
                         await Task.WhenAll(closeTasks).WaitAsync(ct).SuppressThrowing();
                         if (ct.IsCancellationRequested)
                         {
@@ -327,7 +385,7 @@ namespace Orleans.Runtime.Messaging
                             break;
                         }
                     }
-                    else if (!pendingConnections)
+                    else
                     {
                         shutdownCompleted = true;
                         break;
@@ -362,6 +420,11 @@ namespace Orleans.Runtime.Messaging
 
             bool IsQuiescent()
             {
+                if (!establishmentDrained.IsCompleted || !this.connectionTasks.IsEmpty)
+                {
+                    return false;
+                }
+
                 foreach (var entry in connections.Values)
                 {
                     if (entry.PendingConnection is not null || !entry.Connections.IsEmpty)
@@ -374,13 +437,17 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void StartConnection(SiloAddress address, Connection connection)
+        private Task StartConnection(SiloAddress address, Connection connection)
         {
+            var started = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = started.Task.Unwrap();
+            this.connectionTasks[connection] = completion;
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, address, connection) = ((ConnectionManager, SiloAddress, Connection))state!;
-                t.RunConnectionAsync(address, connection).Ignore();
-            }, (this, address, connection));
+                var (manager, address, connection, started) = state;
+                started.SetResult(manager.RunConnectionAsync(address, connection));
+            }, (this, address, connection, started), preferLocal: false);
+            return completion;
         }
 
         private async Task RunConnectionAsync(SiloAddress address, Connection connection)
@@ -400,6 +467,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 this.OnConnectionTerminated(address, connection, error);
+                this.connectionTasks.TryRemove(connection, out _);
             }
         }
 
@@ -487,6 +555,12 @@ namespace Orleans.Runtime.Messaging
             Message = "Connection attempt to endpoint {EndPoint} failed"
         )]
         private static partial void LogWarningConnectionAttemptFailed(ILogger logger, Exception exception, SiloAddress endPoint);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Exception cleaning up connection attempt to endpoint {EndPoint}"
+        )]
+        private static partial void LogWarningConnectionCleanupFailed(ILogger logger, Exception exception, SiloAddress endPoint);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

@@ -102,8 +102,11 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             try
             {
-                // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
-                await this.middleware(this.Context);
+                if (this.IsValid)
+                {
+                    // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
+                    await this.middleware(this.Context);
+                }
             }
             catch (Exception exception)
             {
@@ -186,8 +189,8 @@ namespace Orleans.Runtime.Messaging
             this.outgoingMessageWriter.TryComplete();
 
             var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
-            var transport = transportFeature?.Transport ?? _transport;
-            transport!.Input.CancelPendingRead();
+            var transport = transportFeature?.Transport ?? this.Context.Transport;
+            transport.Input.CancelPendingRead();
             transport.Output.CancelPendingFlush();
 
             // Try to gracefully stop the reader/writer loops, if they are running.

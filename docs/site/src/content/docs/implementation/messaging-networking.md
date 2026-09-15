@@ -31,6 +31,8 @@ When a connection terminates, the base connection sends each in-flight message t
 
 Shutdown first blocks new application traffic while allowing responses and membership traffic needed to complete the stop protocol. `MessageCenter` rejects or drops blocked messages, stops accepting client messages, and then closes connections. Inbound requests arriving at a stopping silo are rejected or dropped according to message direction, so callers must still handle a rejection or timeout.
 
+`ConnectionManager` closes establishment admission before canceling pending attempts and signaling existing connections to close. Each admitted producer remains owned until it publishes its connection or completes failure cleanup, including its connection runner. Shutdown then closes any late publications and drains the remaining outbound runners through middleware cleanup. The shutdown cancellation source stays valid until those operations finish; a canceled host stop preserves it for operations still unwinding. Inbound listeners stop accepting connections and close their tracked connections before awaiting the manager's closed signal and disposing their transport listener.
+
 ## Design trade-offs
 
 - Per-endpoint connection state avoids global coordination but means every silo must observe and repair its own broken paths.
