@@ -162,7 +162,7 @@ public sealed class GrainHostedPullingAgentMigrationTests
             var original = state.SourceSession.Address;
             Assert.Equal(stableId, original.GrainId);
             Assert.True(cluster.TryGetGrainContext(stableId, out var context));
-            Assert.IsType<GrainHostedStreamPullingAgent>(context.GrainInstance);
+            Assert.IsType<PullingAgentGrain>(context.GrainInstance);
             Assert.Equal(1, await Wait(consumer.GetProducerCount(), "initial real rendezvous producer count"));
             Assert.Equal(20, state.DurableOffset);
 
@@ -174,7 +174,7 @@ public sealed class GrainHostedPullingAgentMigrationTests
                 TestContext.Current.CancellationToken);
             await Wait(cluster.Silos[1].ServiceProvider.GetRequiredKeyedService<IControllable>(PullingAgentMigrationState.ProviderName)
                 .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting production provider on destination");
-            Assert.True(await Wait(cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(stableId)
+            Assert.True(await Wait(cluster.Client.GetGrain<IPullingAgentGrain>(stableId)
                 .Rebalance(original, state.DestinationSilo, TestContext.Current.CancellationToken), "explicit production-host rebalance"));
             await Wait(state.FlushEntered.Task, "production host final checkpoint flush");
             Assert.Equal(100, state.SourceSession.AcknowledgedOffset);
@@ -656,7 +656,7 @@ public sealed class MigrationPullingAgentRelay(PullingAgentMigrationState state)
 
     public async Task<GrainAddress[]> ProbeHostedProducer(GrainId producerId, SiloAddress requestedHost)
     {
-        var producer = GrainFactory.GetGrain<IGrainHostedStreamPullingAgent>(producerId);
+        var producer = GrainFactory.GetGrain<IPullingAgentGrain>(producerId);
         Task<StreamPullingAgentStatus>[] calls;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, requestedHost);
         try

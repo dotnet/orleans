@@ -12,24 +12,28 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams;
 
-internal interface IStreamPullingAgentCoordinator : IGrain
+[GrainInterfaceType("Orleans.Streams.IStreamPullingAgentCoordinator")]
+internal interface IPullingAgentCoordinatorGrain : IGrain
 {
     [AlwaysInterleave]
+    [Alias("233F3872")]
     Task EnsureRunning(CancellationToken cancellationToken = default);
     [AlwaysInterleave]
+    [Alias("38F87745")]
     Task NotifyHostChanged(CancellationToken cancellationToken = default);
+    [Alias("2BBC562F")]
     Task<Dictionary<QueueId, StreamPullingAgentStatus>> GetAgents(CancellationToken cancellationToken = default);
 }
 
 [GrainType(GrainTypeName)]
 [StreamPullingAgentPlacement]
 [Immovable]
-internal sealed class StreamPullingAgentCoordinator(
+internal sealed class PullingAgentCoordinatorGrain(
     StreamPullingAgentRuntime runtime,
     StreamPullingAgentHostResolver hosts,
     IClusterMembershipService membership,
     [FromKeyedServices(TimeProviderNames.Grains)] TimeProvider clock,
-    ILogger<StreamPullingAgentCoordinator> logger) : Grain, IStreamPullingAgentCoordinator
+    ILogger<PullingAgentCoordinatorGrain> logger) : Grain, IPullingAgentCoordinatorGrain
 {
     internal const string GrainTypeName = "Orleans.Streams.PullingAgentCoordinator";
     internal static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
@@ -55,7 +59,7 @@ internal sealed class StreamPullingAgentCoordinator(
         _options = provider.Options;
         foreach (var queue in provider.Queues)
         {
-            _agents.Add(queue, new(GrainFactory.GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(_providerName, queue))));
+            _agents.Add(queue, new(GrainFactory.GetGrain<IPullingAgentGrain>(StreamPullingAgentId.Create(_providerName, queue))));
         }
 
         EnsureTimer();
@@ -146,7 +150,7 @@ internal sealed class StreamPullingAgentCoordinator(
         {
             var eligible = (await hosts.GetEligibleSilos(
                 _providerName, null, StreamPullingAgentId.GrainType,
-                GrainHostedStreamPullingAgent.InterfaceType, cancellationToken)).ToHashSet();
+                PullingAgentGrain.InterfaceType, cancellationToken)).ToHashSet();
             if (!_eligibleSilos.SetEquals(eligible))
             {
                 _eligibleSilos = eligible;
@@ -319,9 +323,9 @@ internal sealed class StreamPullingAgentCoordinator(
         _shutdown.Dispose();
     }
 
-    private sealed class Agent(IGrainHostedStreamPullingAgent grain)
+    private sealed class Agent(IPullingAgentGrain grain)
     {
-        internal IGrainHostedStreamPullingAgent Grain { get; } = grain;
+        internal IPullingAgentGrain Grain { get; } = grain;
         internal StreamPullingAgentStatus? Status { get; set; }
     }
 }

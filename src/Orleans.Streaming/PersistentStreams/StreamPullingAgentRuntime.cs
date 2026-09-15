@@ -69,13 +69,13 @@ internal sealed class StreamPullingAgentRuntime : SystemTarget, IStreamPullingAg
         }
         internal ImmutableHashSet<QueueId> Queues { get; } = queues;
         internal StreamPullingAgentOptions Options { get; } = options;
-        internal ConcurrentDictionary<QueueId, GrainHostedStreamPullingAgent> Agents { get; } = new();
+        internal ConcurrentDictionary<QueueId, PullingAgentGrain> Agents { get; } = new();
         internal int RunningAgentCount => Agents.Count(static entry => entry.Value.IsRunning);
         internal QueueId[] GetRunningQueues() => Agents.Where(static entry => entry.Value.IsRunning).Select(static entry => entry.Key).ToArray();
         internal bool IsEligible(QueueId queueId) => State == StreamLifecycleOptions.RunState.AgentsStarted && Queues.Contains(queueId);
         internal Task<PersistentStreamPullingAgent> CreateAgent(IGrainContext context, QueueId queueId) => createAgent(context, queueId);
 
-        internal bool TryRegisterAgent(QueueId queueId, GrainHostedStreamPullingAgent agent)
+        internal bool TryRegisterAgent(QueueId queueId, PullingAgentGrain agent)
         {
             lock (_lifecycleLock)
             {
