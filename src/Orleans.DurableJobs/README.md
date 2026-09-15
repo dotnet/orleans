@@ -101,6 +101,14 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
+## Shutdown lifecycle
+
+Shutdown atomically closes scheduling and activation admission, cancels scheduling, and
+awaits every admitted call before canceling execution. Successful writes retain their
+result, and successful shard creations remain owned even when cancellation races with
+their completion. Shutdown then awaits the active shard check and every admitted shard's
+execution and cleanup before disposing cached shards which remained inactive.
+
 ## Usage Examples
 
 ### Basic Job Scheduling
