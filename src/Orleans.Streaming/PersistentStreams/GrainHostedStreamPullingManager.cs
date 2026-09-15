@@ -71,13 +71,14 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         _provider.State = RunState.AgentsStopped;
         _heartbeat?.Dispose();
         _heartbeat = null;
-        return _executor.AddNext(() => StopHostedAgents(notifyCoordinator, cancellationToken));
+        return _executor.AddNext(() => StopHostedAgents(notifyCoordinator));
     }
 
     public async Task Stop(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _shuttingDown = true;
-        await StopAgents(cancellationToken);
+        await StopAgents(CancellationToken.None);
     }
 
     private async Task KeepCoordinatorAlive(CancellationToken cancellationToken)
@@ -101,7 +102,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         }
     }
 
-    private async Task StopHostedAgents(bool notifyCoordinator, CancellationToken cancellationToken)
+    private async Task StopHostedAgents(bool notifyCoordinator)
     {
         notifyCoordinator |= _provider.State == RunState.AgentsStarted;
         _provider.State = RunState.AgentsStopped;
@@ -110,18 +111,14 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         var hostedQueues = _provider.Agents.Keys.ToArray();
         await Task.WhenAll(hostedQueues.Select(queueId => _grainFactory
             .GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(_providerName, queueId))
-            .Stop(Silo, cancellationToken)));
+            .Stop(Silo, CancellationToken.None)));
         EmitState();
         // Membership updates drive reconciliation during silo shutdown.
         if (notifyCoordinator && !_shuttingDown)
         {
             try
             {
-                await _coordinator.NotifyHostChanged(cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
+                await _coordinator.NotifyHostChanged(CancellationToken.None);
             }
             catch (Exception exception)
             {

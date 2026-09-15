@@ -77,14 +77,17 @@ internal sealed class GrainHostedStreamPullingAgent(
     }
 
     public Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken)
-        => expectedHost == GrainContext.Address.SiloAddress
-            ? StopCore(cancellationToken, unregisterProducer: true)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return expectedHost == GrainContext.Address.SiloAddress
+            ? StopCore(unregisterProducer: true)
             : Task.CompletedTask;
+    }
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         // The stable producer registration serves the successor. Pub/sub callbacks route through migration.
-        await StopCore(cancellationToken, unregisterProducer: false);
+        await StopCore(unregisterProducer: false);
         if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown && !cancellationToken.IsCancellationRequested)
         {
             var survivors = (await hosts.GetEligibleSilos(
@@ -137,7 +140,7 @@ internal sealed class GrainHostedStreamPullingAgent(
         }
     }
 
-    private async Task StopCore(CancellationToken cancellationToken, bool unregisterProducer)
+    private async Task StopCore(bool unregisterProducer)
     {
         if (_agent is not { } agent)
         {
@@ -147,7 +150,8 @@ internal sealed class GrainHostedStreamPullingAgent(
         _agent = null;
         try
         {
-            await agent.Shutdown(cancellationToken, suppressReceiverShutdownErrors: false, unregisterProducer);
+            // Caller deadlines bound observation; admitted receiver cleanup completes under its own timeouts.
+            await agent.Shutdown(CancellationToken.None, suppressReceiverShutdownErrors: false, unregisterProducer);
         }
         finally
         {

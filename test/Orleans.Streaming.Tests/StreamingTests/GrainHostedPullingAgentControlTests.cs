@@ -9,6 +9,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -75,9 +76,7 @@ public sealed class GrainHostedPullingAgentControlTests
         await setup.NextInitialization();
         Assert.Equal(1, setup.CoordinatorNotifications);
 
-        var managerId = SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, silo.SiloAddress, ProviderName);
-        var manager = silo.ServiceProvider.GetRequiredService<IInternalGrainFactory>()
-            .GetSystemTarget<IPersistentStreamPullingManager>(managerId.GrainId);
+        var manager = setup.GetManager(silo);
         await manager.Stop(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, setup.Shutdowns);
@@ -85,8 +84,10 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
     }
 
-    [Fact]
-    public async Task StopAgents_DrainsActivationTriggeredWhileReceiverIsInitializing()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopAgents_DrainsActivationTriggeredWhileReceiverIsInitializing(bool cancelAfterAdmission)
     {
         await using var setup = new Setup(1);
         await setup.Deploy();
@@ -100,18 +101,32 @@ public sealed class GrainHostedPullingAgentControlTests
         var activation = setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
             .Probe(TestContext.Current.CancellationToken);
         await setup.NextInitialization();
-        var stopping = setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
+        using var cancellation = new CancellationTokenSource();
+        var stopping = setup.GetManager(silo).StopAgents(cancellation.Token);
         try
         {
             Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped, await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
             Assert.False(stopping.IsCompleted);
             Assert.False(activation.IsCompleted);
+            if (cancelAfterAdmission)
+            {
+                cancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                    stopping.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken));
+                Assert.False(activation.IsCompleted);
+            }
         }
         finally
         {
             setup.InitializationBarrier.TrySetResult();
             await activation.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
-            await stopping;
+            if (!cancelAfterAdmission)
+            {
+                await stopping.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            }
+
+            await setup.GetManager(silo).StopAgents(TestContext.Current.CancellationToken)
+                .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
         }
 
         var readsAtStop = setup.Reads;
@@ -119,6 +134,49 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(2, setup.Initializations);
         Assert.Equal(2, setup.Shutdowns);
         Assert.Equal(readsAtStop, setup.Reads);
+        Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+    }
+
+    [Fact]
+    public async Task GrainStop_CanceledBeforeAdmissionPreservesRunningAgent()
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
+        var grain = Assert.IsType<GrainHostedStreamPullingAgent>(context.GrainInstance);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            context.RunOrQueueTask(() => grain.Stop(silo.SiloAddress, cancellation.Token)));
+
+        Assert.Equal(0, setup.Shutdowns);
+        Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+        Assert.True((await setup.Cluster.Client.GetGrain<IGrainHostedStreamPullingAgent>(grainId)
+            .Probe(TestContext.Current.CancellationToken)).IsRunning);
+    }
+
+    [Fact]
+    public async Task Deactivation_WithCanceledDeadlineStillShutsDownReceiver()
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Exercise an expired deactivation deadline."), cancellation.Token);
+        await context.Deactivated.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, setup.Shutdowns);
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
     }
 
@@ -309,6 +367,11 @@ public sealed class GrainHostedPullingAgentControlTests
 
             return result;
         }
+
+        internal IPersistentStreamPullingManager GetManager(InProcessSiloHandle silo)
+            => silo.ServiceProvider.GetRequiredService<IInternalGrainFactory>()
+                .GetSystemTarget<IPersistentStreamPullingManager>(
+                    SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, silo.SiloAddress, ProviderName).GrainId);
 
         private IQueueAdapterFactory CreateFactory(string name, SiloAddress silo)
         {
