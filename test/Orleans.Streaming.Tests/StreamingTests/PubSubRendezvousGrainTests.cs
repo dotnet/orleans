@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Runtime")]
-    public class PubSubRendezvousGrainTests : OrleansTestingBase, IClassFixture<PubSubRendezvousGrainTests.Fixture>
+    public partial class PubSubRendezvousGrainTests : OrleansTestingBase, IClassFixture<PubSubRendezvousGrainTests.Fixture>
     {
         private readonly Fixture fixture;
 

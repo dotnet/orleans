@@ -427,7 +427,7 @@ public class StreamConsumerLifecycleTests
         }
 
         public StreamDirectory GetStreamDirectory() => throw new NotSupportedException();
-        public IStreamPubSub? PubSub(StreamPubSubType pubSubType) => throw new NotSupportedException();
+        public IStreamPubSubRuntime? PubSub(StreamPubSubType pubSubType) => throw new NotSupportedException();
 
         public void FailNextObserverRegistration(Exception exception)
             => nextObserverRegistrationFailure = exception;

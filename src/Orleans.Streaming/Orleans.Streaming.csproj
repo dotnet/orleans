@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     <InternalsVisibleTo Include="LoadTestGrains" />
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
