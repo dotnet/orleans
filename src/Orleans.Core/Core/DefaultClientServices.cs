@@ -15,6 +15,7 @@ using Orleans.Networking.Shared;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Placement;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -90,6 +91,13 @@ namespace Orleans
             services.TryAddSingleton<GrainFactory>();
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
             services.TryAddSingleton<GrainReferenceActivator>();
+            services.TryAddSingleton<UniversalReferenceBindingResolver>();
+            services.TryAddSingleton<ClusterLocatorResolver>();
+            services.TryAddSingleton<ClusterReferenceResolver>();
+            services.TryAddSingleton<ClusterPlacementStrategyResolver>();
+            services.TryAddSingleton<ClusterPlacementDirectorResolver>();
+            services.TryAddSingleton<IInterClusterTransport, UnavailableInterClusterTransport>();
+            services.TryAddSingleton<IMetaclusterTopologyProvider, StaticMetaclusterTopologyProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, GrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.TryAddSingleton<RpcProvider>();
@@ -117,6 +125,7 @@ namespace Orleans
 
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
+            services.AddTransient<IConfigurationValidator, MetaclusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
             services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 

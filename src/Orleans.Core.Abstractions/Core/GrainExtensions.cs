@@ -128,6 +128,17 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Returns the universal reference corresponding to the provided addressable object.
+        /// </summary>
+        /// <param name="grain">The addressable object.</param>
+        /// <returns>The universal reference corresponding to the provided addressable object.</returns>
+        public static UniversalReference GetUniversalReference(this IAddressable grain)
+        {
+            ArgumentNullException.ThrowIfNull(grain);
+            return grain.AsReference().UniversalReference;
+        }
+
+        /// <summary>
         /// Gets the exception message which is thrown when a grain argument has a non-supported implementation type.
         /// </summary>
         /// <param name="grain">The argument.</param>

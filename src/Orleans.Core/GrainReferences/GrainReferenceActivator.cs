@@ -64,6 +64,35 @@ namespace Orleans.GrainReferences
         }
 
         /// <summary>
+        /// Creates a grain reference for the provided universal identity.
+        /// </summary>
+        public GrainReference CreateReference(UniversalReference reference)
+        {
+            if (reference.GrainId.IsDefault)
+            {
+                throw new ArgumentException("The universal reference grain identity must be initialized.", nameof(reference));
+            }
+
+            if (!_activators.TryGetValue((reference.GrainId.Type, reference.InterfaceType), out var entry))
+            {
+                entry = CreateActivator(reference.GrainId.Type, reference.InterfaceType);
+            }
+
+            if (string.IsNullOrWhiteSpace(reference.ServiceId))
+            {
+                if (reference.Binding != UniversalReferenceBinding.Virtual || reference.ClusterId is not null)
+                {
+                    throw new ArgumentException("The legacy reference payload contains federated binding data without a service identity.", nameof(reference));
+                }
+
+                return entry.CreateReference(reference.GrainId);
+            }
+
+            reference.Validate();
+            return entry.CreateReference(reference);
+        }
+
+        /// <summary>
         /// Creates a grain reference activator for the provided arguments.
         /// </summary>
         /// <param name="grainType">The grain type.</param>
@@ -108,6 +137,7 @@ namespace Orleans.GrainReferences
         private readonly CodecProvider _codecProvider;
         private readonly GrainVersionManifest _versionManifest;
         private readonly IServiceProvider _serviceProvider;
+        private readonly UniversalReferenceBindingResolver _bindingResolver;
         private IGrainReferenceRuntime? _grainReferenceRuntime;
 
         /// <summary>
@@ -121,12 +151,14 @@ namespace Orleans.GrainReferences
             GrainVersionManifest manifest,
             CodecProvider codecProvider,
             CopyContextPool copyContextPool,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            UniversalReferenceBindingResolver bindingResolver)
         {
             _versionManifest = manifest;
             _codecProvider = codecProvider;
             _copyContextPool = copyContextPool;
             _serviceProvider = serviceProvider;
+            _bindingResolver = bindingResolver;
         }
 
         /// <inheritdoc />
@@ -149,7 +181,10 @@ namespace Orleans.GrainReferences
                 InvokeMethodOptions.None,
                 _codecProvider,
                 _copyContextPool,
-                _serviceProvider);
+                _serviceProvider,
+                _bindingResolver.ServiceId,
+                _bindingResolver.ClusterId,
+                _bindingResolver.GetBinding(grainType));
             activator = new UntypedGrainReferenceActivator(shared);
             return true;
         }
@@ -174,6 +209,12 @@ namespace Orleans.GrainReferences
             public GrainReference CreateReference(GrainId grainId)
             {
                 return GrainReference.FromGrainId(_shared, grainId);
+            }
+
+            /// <inheritdoc />
+            public GrainReference CreateReference(UniversalReference reference)
+            {
+                return GrainReference.FromUniversalReference(_shared, reference);
             }
         }
     }
@@ -291,6 +332,7 @@ namespace Orleans.GrainReferences
         private readonly GrainPropertiesResolver _propertiesResolver;
         private readonly RpcProvider _rpcProvider;
         private readonly GrainVersionManifest _grainVersionManifest;
+        private readonly UniversalReferenceBindingResolver _bindingResolver;
         private IGrainReferenceRuntime? _grainReferenceRuntime;
 
         /// <summary>
@@ -308,7 +350,8 @@ namespace Orleans.GrainReferences
             RpcProvider rpcProvider,
             CopyContextPool copyContextPool,
             CodecProvider codecProvider,
-            GrainVersionManifest grainVersionManifest)
+            GrainVersionManifest grainVersionManifest,
+            UniversalReferenceBindingResolver bindingResolver)
         {
             _serviceProvider = serviceProvider;
             _propertiesResolver = propertiesResolver;
@@ -316,6 +359,7 @@ namespace Orleans.GrainReferences
             _copyContextPool = copyContextPool;
             _codecProvider = codecProvider;
             _grainVersionManifest = grainVersionManifest;
+            _bindingResolver = bindingResolver;
         }
 
         /// <inheritdoc />
@@ -347,7 +391,10 @@ namespace Orleans.GrainReferences
                 invokeMethodOptions,
                 _codecProvider,
                 _copyContextPool,
-                _serviceProvider);
+                _serviceProvider,
+                _bindingResolver.ServiceId,
+                _bindingResolver.ClusterId,
+                _bindingResolver.GetBinding(grainType));
             activator = new GrainReferenceActivator(proxyType, shared);
             return true;
         }
@@ -358,7 +405,8 @@ namespace Orleans.GrainReferences
         private sealed class GrainReferenceActivator : IGrainReferenceActivator
         {
             private readonly GrainReferenceShared _shared;
-            private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
+            private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _createFromKey;
+            private readonly Func<GrainReferenceShared, UniversalReference, GrainReference>? _createFromUniversalReference;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
@@ -371,6 +419,9 @@ namespace Orleans.GrainReferences
 
                 var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
                     ?? throw new SerializerException("Invalid proxy type: " + referenceType);
+                var universalReferenceConstructor = referenceType.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    new[] { typeof(GrainReferenceShared), typeof(UniversalReference) });
 
                 var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
                 var il = method.GetILGenerator();
@@ -379,10 +430,40 @@ namespace Orleans.GrainReferences
                 il.Emit(OpCodes.Ldarg_2);
                 il.Emit(OpCodes.Newobj, ctor);
                 il.Emit(OpCodes.Ret);
-                _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+                _createFromKey = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+
+                if (universalReferenceConstructor is not null)
+                {
+                    var universalReferenceMethod = new DynamicMethod(
+                        referenceType.Name,
+                        typeof(GrainReference),
+                        new[] { typeof(object), typeof(GrainReferenceShared), typeof(UniversalReference) });
+                    var universalReferenceIl = universalReferenceMethod.GetILGenerator();
+                    universalReferenceIl.Emit(OpCodes.Ldarg_1);
+                    universalReferenceIl.Emit(OpCodes.Ldarg_2);
+                    universalReferenceIl.Emit(OpCodes.Newobj, universalReferenceConstructor);
+                    universalReferenceIl.Emit(OpCodes.Ret);
+                    _createFromUniversalReference = universalReferenceMethod.CreateDelegate<Func<GrainReferenceShared, UniversalReference, GrainReference>>();
+                }
             }
 
-            public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);
+            public GrainReference CreateReference(GrainId grainId) => _createFromKey(_shared, grainId.Key);
+
+            public GrainReference CreateReference(UniversalReference reference)
+            {
+                if (_createFromUniversalReference is not null)
+                {
+                    return _createFromUniversalReference(_shared, reference);
+                }
+
+                if (reference.Equals(_shared.CreateUniversalReference(reference.GrainId)))
+                {
+                    return _createFromKey(_shared, reference.GrainId.Key);
+                }
+
+                throw new NotSupportedException(
+                    $"Proxy type '{_createFromKey.Method.DeclaringType}' does not support cluster-bound references.");
+            }
         }
     }
 
@@ -412,5 +493,20 @@ namespace Orleans.GrainReferences
         /// <param name="grainId">The grain id.</param>
         /// <returns>A new grain reference.</returns>
         public GrainReference CreateReference(GrainId grainId);
+
+        /// <summary>
+        /// Creates a new grain reference for the provided universal identity.
+        /// </summary>
+        /// <param name="reference">The universal reference.</param>
+        /// <returns>A new grain reference.</returns>
+        public GrainReference CreateReference(UniversalReference reference)
+        {
+            if (!string.IsNullOrWhiteSpace(reference.ServiceId))
+            {
+                throw new NotSupportedException("This grain reference activator does not support universal references.");
+            }
+
+            return CreateReference(reference.GrainId);
+        }
     }
 }

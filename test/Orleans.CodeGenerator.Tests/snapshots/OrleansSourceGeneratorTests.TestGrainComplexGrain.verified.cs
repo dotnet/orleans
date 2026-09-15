@@ -110,6 +110,11 @@ namespace OrleansCodeGen.TestProject
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
         }
 
+        public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
+        {
+            _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
+        }
+
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
