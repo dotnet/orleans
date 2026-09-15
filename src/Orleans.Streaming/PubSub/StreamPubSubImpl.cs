@@ -8,12 +8,12 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class StreamPubSubImpl : IStreamPubSub
+    internal class StreamPubSubImpl : IStreamPubSubRuntime
     {
-        private readonly IStreamPubSub explicitPubSub;
+        private readonly IStreamPubSubRuntime explicitPubSub;
         private readonly ImplicitStreamPubSub implicitPubSub;
 
-        public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
+        public StreamPubSubImpl(IStreamPubSubRuntime explicitPubSub, ImplicitStreamPubSub implicitPubSub)
         {
             if (explicitPubSub == null)
             {
@@ -67,6 +67,15 @@ namespace Orleans.Streams
                 ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId, cancellationToken)
                 : explicitPubSub.UnregisterConsumer(subscriptionId, streamId, cancellationToken);
         }
+
+        public Task UnregisterConsumerFromProducer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId producer,
+            CancellationToken cancellationToken)
+            => implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
+                ? implicitPubSub.UnregisterConsumerFromProducer(subscriptionId, streamId, producer, cancellationToken)
+                : explicitPubSub.UnregisterConsumerFromProducer(subscriptionId, streamId, producer, cancellationToken);
 
         public Task<int> ProducerCount(QualifiedStreamId streamId)
             => ProducerCount(streamId, CancellationToken.None);
