@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -135,6 +136,21 @@ public sealed class GrainHostedPullingAgentControlTests
         await using var setup = new Setup(1);
         await setup.Deploy();
         var silo = setup.Cluster.Silos[0];
+        var meter = silo.ServiceProvider.GetRequiredService<OrleansInstruments>().Meter;
+        var cacheGaugeRegistrations = 0;
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (instrument, _) =>
+            {
+                if (ReferenceEquals(instrument.Meter, meter)
+                    && instrument.Name == InstrumentNames.STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE)
+                {
+                    Interlocked.Increment(ref cacheGaugeRegistrations);
+                }
+            },
+        };
+        listener.Start();
+        Assert.Equal(1, cacheGaugeRegistrations);
         setup.Owner = silo.SiloAddress;
         await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
         await setup.NextInitialization();
@@ -156,6 +172,7 @@ public sealed class GrainHostedPullingAgentControlTests
         Assert.Equal(originalAddress.SiloAddress, address.SiloAddress);
         Assert.NotEqual(originalAddress.ActivationId, address.ActivationId);
         Assert.Equal(2, setup.Initializations);
+        Assert.Equal(1, cacheGaugeRegistrations);
         Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
     }
 

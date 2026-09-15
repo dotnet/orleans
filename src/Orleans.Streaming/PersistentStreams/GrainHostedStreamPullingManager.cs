@@ -46,6 +46,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
         _logger = shared.LoggerFactory.CreateLogger<GrainHostedStreamPullingManager>();
         streamInstruments.RegisterPersistentStreamPullingAgentsObserve(() => new Measurement<int>(
             _provider.RunningAgentCount, new KeyValuePair<string, object?>("name", providerName)));
+        streamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(ObservePubSubCacheSizes);
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
@@ -165,6 +166,16 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
     {
         var runningQueues = _provider.GetRunningQueues();
         StreamingEvents.EmitPullingAgentManagerState(_providerName, Silo, runningQueues, runningQueues.Length);
+    }
+
+    private IEnumerable<Measurement<int>> ObservePubSubCacheSizes()
+    {
+        foreach (var entry in _provider.Agents)
+        {
+            yield return new Measurement<int>(
+                entry.Value.PubSubCacheSize,
+                new KeyValuePair<string, object?>("name", $"{_providerName}.{entry.Key}"));
+        }
     }
 
     public async Task<object?> ExecuteCommand(PersistentStreamProviderCommand command, object? arg, CancellationToken cancellationToken)

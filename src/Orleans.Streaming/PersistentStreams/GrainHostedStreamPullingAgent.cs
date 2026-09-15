@@ -26,6 +26,7 @@ internal sealed class GrainHostedStreamPullingAgent(
     private QueueId _queueId;
     private volatile PersistentStreamPullingAgent? _agent;
     internal bool IsRunning => _agent is not null;
+    internal int PubSubCacheSize => _agent?.PubSubCacheSize ?? 0;
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
