@@ -131,7 +131,12 @@ namespace Orleans.Streams
 
             try
             {
-                if (_streamInstruments.PubSubProducersAdded.Enabled)
+                var publisherState = new PubSubPublisherState(streamId, streamProducer);
+                var added = State.Producers.Add(publisherState);
+                LogPubSubCounts("RegisterProducer {0}", streamProducer);
+                await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
+                if (added && _streamInstruments.PubSubProducersTotal.Enabled)
                 {
                     tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
                     _streamInstruments.PubSubProducersAdded.Add(1, tags.Value);

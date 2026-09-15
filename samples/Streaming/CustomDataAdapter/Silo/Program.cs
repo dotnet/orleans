@@ -3,6 +3,7 @@ using Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 
 using Silo;
 
@@ -52,6 +53,12 @@ void ConfigureSilo(HostBuilderContext context, ISiloBuilder siloBuilder)
             Constants.StreamProvider,
             (ISiloEventHubStreamConfigurator configurator) =>
             {
+                if (args.Contains("--grain-hosted-pulling-agents", StringComparer.Ordinal))
+                {
+                    configurator.ConfigurePullingAgent(builder => builder.Configure(options =>
+                        options.HostingMode = StreamPullingAgentHostingMode.Grain));
+                }
+
                 configurator.ConfigureEventHub(builder => builder.Configure(options =>
                 {
                     options.ConfigureEventHubConnection(

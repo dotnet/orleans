@@ -494,7 +494,7 @@ namespace UnitTests.StreamingTests
             queueAdapter.Name.Returns("provider");
             queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(receiver);
 
-            return new PersistentStreamPullingAgent(
+            return new SystemTargetStreamPullingAgent(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
                 "provider",
                 pubSub!,
@@ -507,7 +507,7 @@ namespace UnitTests.StreamingTests
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 timeProvider ?? TimeProvider.System,
-                shared);
+                shared).Agent;
         }
 
         private sealed class RecordingSimpleQueueCache()
@@ -3957,7 +3957,7 @@ namespace UnitTests.StreamingTests
         }
 
         private static Task InitializeAgent(PersistentStreamPullingAgent agent) =>
-            agent.RunOrQueueTask(() => agent.Initialize(TestContext.Current.CancellationToken));
+            agent.GrainContext.RunOrQueueTask(() => agent.Initialize(TestContext.Current.CancellationToken));
 
         private static async Task<(
             PersistentStreamPullingAgent.ITestAccessor Accessor,
@@ -4704,18 +4704,18 @@ namespace UnitTests.StreamingTests
 
             queueCache.ClearDeliveryProgress();
             var shutdownTask = testAccessor.Shutdown();
-            await testAccessor.GetPubSubCache();
+            await agent.GrainContext.RunOrQueueTask(() => Task.CompletedTask);
+            Assert.False(shutdownTask.IsCompleted);
+            Assert.False(receiverShutdownStarted.Task.IsCompleted);
+
+            registration.SetResult(new HashSet<PubSubSubscriptionState>());
+            await shutdownTask;
+            await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.False(shutdownTask.IsCompleted);
             Assert.False(receiverShutdownStarted.Task.IsCompleted);
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
-
-            // Complete registration so shutdown can proceed cleanly.
-            registration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await shutdownTask;
-            Assert.True(receiverShutdownStarted.Task.IsCompletedSuccessfully);
-            Assert.Empty(queueCache.DeliveryProgressTokens);
         }
 
         [TestSuite("BVT")]
