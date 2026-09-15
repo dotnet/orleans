@@ -116,6 +116,31 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task AssignJobShardsAsync_OpensOnlyShardNamespaceDescendants()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5011), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = new DateTimeOffset(2026, 9, 9, 0, 0, 0, TimeSpan.Zero);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken);
+        foreach (var id in new[] { "jobs/shards", "jobs/shards-extra/unrelated", "jobs/shards2/unrelated" })
+        {
+            await storageProvider.CreateStorage(new(id)).CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+        }
+
+        storageProvider.OpenedJournalIds.Clear();
+        var assigned = await manager.AssignJobShardsAsync(start.AddHours(1), int.MaxValue, cancellationToken);
+
+        Assert.Same(shard, Assert.Single(assigned));
+        Assert.Equal(((JournaledJobShard)shard).StorageId, Assert.Single(storageProvider.OpenedJournalIds));
+        await manager.UnregisterShardAsync(shard, cancellationToken);
+    }
+
+    [Fact]
     public async Task ClosedLocalShard_CanStillPersistRemovals()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -624,6 +649,8 @@ public partial class JournaledJobShardManagerTests
 
         public int AppendCount => Volatile.Read(ref _appendCount);
 
+        public ConcurrentBag<JournalId> OpenedJournalIds { get; } = new();
+
         public void BlockAppends()
         {
             lock (_appendGate)
@@ -643,7 +670,11 @@ public partial class JournaledJobShardManagerTests
             }
         }
 
-        public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
+        public IJournalStorage CreateStorage(JournalId journalId)
+        {
+            OpenedJournalIds.Add(journalId);
+            return new CountingJournalStorage(this, _inner.CreateStorage(journalId));
+        }
 
         public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
             => _inner.ListAsync(options, cancellationToken);

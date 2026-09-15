@@ -152,14 +152,15 @@ snapshot and pass it to conditional metadata updates; concurrent changes can cau
 | Volatile | An ordered key index selects a view covering the requested prefix and bounds. | Snapshots selected keys and checks current journal existence. |
 | Azure Table, default mapping | Printable ASCII ids use two uppercase hex digits per byte, allowing direct indexed prefix and lower/upper key filters. | Queries include the journal header row condition; the service controls work inside the selected key range. |
 | Azure Table, custom mapping | Canonical journal-id filters limit returned headers. | Arbitrary mappings can require a table scan because the journal-id property is not indexed. |
-| Azure Blob | The `wal/` namespace and raw id prefix select WAL blobs; `StartFrom` seeks to an ASCII lower bound and ordered traversal stops at an ASCII upper bound. | The final page can contain WALs beyond the range. Checkpoints occupy a separate namespace. |
+| Azure Blob | The `wal/` namespace and raw id prefix select WAL blobs; conservative ASCII bounds narrow traversal safely in both flat and hierarchical namespaces. | Widened bounds and the final page can include additional candidates, filtered against the original ordinal range. Checkpoints occupy a separate namespace. |
 | S3 general-purpose, ordered listing enabled | The `wal/` namespace excludes checkpoints. Identity-mapped keys use native prefixes and an initial `StartAfter` marker preceding the inclusive lower bound, then stop at the upper WAL key. | The final page can overrun the range. Custom key mappings use their configured native prefix and identity filtering. |
 | S3 Express directory buckets | A native slash-terminated prefix within `wal/` limits the namespace and excludes checkpoints. | Partial-name and time bounds are filtered during unordered traversal. |
 | Redis | Readable key names enable native `SCAN MATCH` prefix filtering and local key-range checks before identity metadata reads for the default mapping. | `SCAN MATCH` still traverses the server keyspace. Custom key mappings read canonical ids from matching metadata hashes. |
 
-Blob and ordered S3 native lower/upper optimizations apply where storage ordering agrees with
-ordinal identity ordering, including the fixed-width ASCII timestamp names. Other bounds
-remain enforced while traversing storage. S3 ordered listing is an explicit
+Blob native bounds preserve the shared listing prefix and widen suffixes where punctuation or
+directory separators affect storage ordering. Ordered S3 native lower/upper optimizations apply
+where storage ordering agrees with ordinal identity ordering, including fixed-width ASCII
+timestamp names. All original bounds remain enforced while traversing storage. S3 ordered listing is an explicit
 `UseOrderedListing` capability setting for general-purpose buckets.
 The selected identity count, transferred keys, and backend scan work are separate costs:
 server-side filtering can reduce transferred data while the service still examines a wider keyspace.

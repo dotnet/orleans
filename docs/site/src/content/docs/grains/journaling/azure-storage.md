@@ -29,7 +29,9 @@ Customize <xref:Orleans.Journaling.AzureBlobJournalStorageOptions.GetWalBlobName
 
 Azure append blobs limit append-block size and block count. The provider accepts an encoded append batch up to 100 MiB, requests compaction after 49,000 committed blocks, and reserves additional headroom before the 50,000-block service limit.
 
-The journal catalog selects append blobs in the `wal/` namespace of the configured container. Custom naming delegates participating in catalog discovery produce `wal/<journalId>` for each journal. The separate checkpoint namespace keeps checkpoints out of listing pages. Raw journal-id prefixes and ASCII lower bounds narrow the native listing, and an ASCII upper bound terminates ordered consumption after the boundary page.
+The journal catalog selects append blobs in the `wal/` namespace of the configured container. Custom naming delegates participating in catalog discovery produce `wal/<journalId>` for each journal. The separate checkpoint namespace keeps checkpoints out of listing pages. Raw journal-id prefixes and conservative ASCII bounds narrow the native listing on both flat-namespace and hierarchical-namespace (HNS) accounts.
+
+HNS recursive listings sort `/` before other characters. The catalog preserves each bound's shared listing prefix and widens the remaining suffix when punctuation or directory separators affect ordering. For example, an inclusive range from `a!` through `a/0` starts at `wal/a` and completes after crossing `wal/a0`. Every returned candidate is checked against the original ordinal range. Shared prefixes keep timestamp scans narrow; wider boundaries can transfer additional candidates. Both account types use the same listing algorithm and configured Blob client.
 
 Catalog callers can request a metadata snapshot with each identity. Blob listings project the WAL's format, ETag, and caller-owned metadata in the listing response. The snapshot can replace a separate metadata read; conditional updates use its ETag to detect concurrent changes.
 

@@ -85,7 +85,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         var newClaimCount = 0;
         var membershipSnapshot = _membershipService.CurrentSnapshot;
 
-        await foreach (var entry in _catalog.ListAsync(new() { Prefix = JobShardId.StoragePrefix }, cancellationToken))
+        await foreach (var entry in _catalog.ListAsync(new() { Prefix = new(JobShardId.StoragePrefix.Value + "/") }, cancellationToken))
         {
             var descriptor = await GetDescriptorAsync(entry.Id, cancellationToken);
             if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)

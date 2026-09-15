@@ -24,6 +24,19 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class JournalStorageCatalogTests
 {
+    private static readonly IComparer<string> HnsBlobNameComparer = Comparer<string>.Create(static (left, right) =>
+    {
+        for (var index = 0; index < Math.Min(left.Length, right.Length); index++)
+        {
+            if (left[index] != right[index])
+            {
+                return left[index] == '/' ? -1 : right[index] == '/' ? 1 : left[index].CompareTo(right[index]);
+            }
+        }
+
+        return left.Length.CompareTo(right.Length);
+    });
+
     [Theory]
     [InlineData("AzureBlob")]
     [InlineData("AzureTable")]
@@ -631,9 +644,105 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob")]
-    [InlineData("S3")]
-    public async Task OrderedListAsync_TimePrefixedNamespaceStopsBeforeFuturePages(string kind)
+    [InlineData(null, "a!", null, "wal/", "wal/a")]
+    [InlineData(null, null, "a/0", "wal/", null)]
+    [InlineData(null, "a!", "a/0", "wal/a", "wal/a")]
+    [InlineData("a/", "a/0", "a/9", "wal/a/", "wal/a/0")]
+    [InlineData("a!", "a!", "a!extra", "wal/a!", "wal/a!")]
+    [InlineData("a/", "0", "z", "wal/a/", "wal/a/")]
+    public async Task AzureBlobListAsync_ConservativeBoundsPreserveOrdinalMembership(
+        string? prefix, string? minimum, string? maximum, string nativePrefix, string? startFrom)
+    {
+        string[] ids = ["a!", "a!extra", "a.", "a/0", "a/9", "a0", "a00", "b", "z", "zz"];
+        var expected = ids.Where(id => (prefix is null || id.StartsWith(prefix, StringComparison.Ordinal))
+            && (minimum is null || string.CompareOrdinal(id, minimum) >= 0)
+            && (maximum is null || string.CompareOrdinal(id, maximum) <= 0)).ToArray();
+        foreach (var hierarchicalNamespace in new[] { false, true })
+        {
+            await using var context = await CreateAsync("AzureBlob", ids);
+            context.Native.HierarchicalNamespace = hierarchicalNamespace;
+
+            AssertMembership(expected, await DrainAsync(context.Catalog.ListAsync(
+                new()
+                {
+                    Prefix = prefix is null ? default : new(prefix),
+                    MinId = minimum is null ? default : new(minimum),
+                    MaxId = maximum is null ? default : new(maximum)
+                }, TestContext.Current.CancellationToken)));
+            Assert.NotEmpty(context.Native.Requests);
+            Assert.All(context.Native.Requests, request =>
+            {
+                Assert.Equal(nativePrefix, request.Prefix);
+                Assert.Equal(startFrom, request.LowerStart);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AzureBlobListAsync_ConservativeBoundsStopAfterBoundaryPage(bool hierarchicalNamespace)
+    {
+        var ids = new[] { "a!", "a/0", "a/9", "a0" }
+            .Concat(Enumerable.Range(0, 256).Select(index => $"a0{index:D3}")).ToArray();
+        await using var context = await CreateAsync("AzureBlob", ids);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
+        context.Native.EmptyFirstPage = true;
+        context.Native.Failure = new InvalidOperationException("The tail beyond the conservative upper bound must not be requested.");
+        context.Native.FailureAtRequest = 5;
+
+        var entries = await DrainEntriesAsync(context.Catalog.ListAsync(
+            new() { MinId = new("a!"), MaxId = new("a/0"), IncludeMetadata = true }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(hierarchicalNamespace ? new[] { "a/0", "a!" } : ["a!", "a/0"], entries.Select(entry => entry.Id.Value));
+        Assert.Equal([0, 2, 2, 2], context.Native.Requests.Select(request => request.ResultCount));
+        Assert.All(context.Native.Requests, request =>
+        {
+            Assert.Equal("wal/a", request.Prefix);
+            Assert.Equal("wal/a", request.LowerStart);
+            Assert.Equal(TestContext.Current.CancellationToken, request.CancellationToken);
+        });
+        AssertMetadataProjection(context.Native, "AzureBlob", includeMetadata: true);
+        Assert.All(entries, entry =>
+        {
+            var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
+            Assert.Equal("test", metadata.Format);
+            Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
+            Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
+        });
+        Assert.Equal(1, context.Native.DisposedEnumerators);
+        Assert.Equal(0, context.Native.MetadataRequests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AzureBlobListAsync_AsciiBoundCharactersPreserveOrdinalMembership(bool hierarchicalNamespace)
+    {
+        string[] ids =
+        [
+            "tenant/a!", "tenant/a!extra", "tenant/a-", "tenant/a.", "tenant/a/0", "tenant/a/9",
+            "tenant/a0", "tenant/aA", "tenant/a\u007f", "tenant/a\u00e9", "tenant/a\U0001F600", "tenant/a\uffff"
+        ];
+        await using var context = await CreateAsync("AzureBlob", ids);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
+        for (var character = 0; character < 128; character++)
+        {
+            var bound = "tenant/a" + (char)character;
+            AssertMembership(ids.Where(id => string.CompareOrdinal(id, bound) >= 0).ToArray(),
+                await DrainAsync(context.Catalog.ListAsync(
+                    new() { Prefix = new("tenant/"), MinId = new(bound) }, TestContext.Current.CancellationToken)));
+            AssertMembership(ids.Where(id => string.CompareOrdinal(id, bound) <= 0).ToArray(),
+                await DrainAsync(context.Catalog.ListAsync(
+                    new() { Prefix = new("tenant/"), MaxId = new(bound) }, TestContext.Current.CancellationToken)));
+        }
+    }
+
+    [Theory]
+    [InlineData("AzureBlob", false)]
+    [InlineData("AzureBlob", true)]
+    [InlineData("S3", false)]
+    public async Task OrderedListAsync_TimePrefixedNamespaceStopsBeforeFuturePages(string kind, bool hierarchicalNamespace)
     {
         const string prefix = "jobs/shards/";
         const string overdue = prefix + "20250101T0000000000000Z-11111111111111111111111111111111";
@@ -645,6 +754,7 @@ public sealed class JournalStorageCatalogTests
         ids.Add("jobs/shards");
 
         await using var context = await CreateAsync(kind, ids.ToArray(), configureS3: options => options.UseOrderedListing = true);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
         context.Native.Failure = new InvalidOperationException("future tail must not be requested");
         context.Native.FailureAtRequest = 3;
 
@@ -781,11 +891,14 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob", false)]
-    [InlineData("AzureBlob", true)]
-    [InlineData("S3", false)]
-    [InlineData("S3", true)]
-    public async Task OrderedListAsync_SeeksMinimumBeforeFetchingAnyPageAndIncludesBothEndpoints(string kind, bool includePrefix)
+    [InlineData("AzureBlob", false, false)]
+    [InlineData("AzureBlob", false, true)]
+    [InlineData("AzureBlob", true, false)]
+    [InlineData("AzureBlob", true, true)]
+    [InlineData("S3", false, false)]
+    [InlineData("S3", true, false)]
+    public async Task OrderedListAsync_SeeksMinimumBeforeFetchingAnyPageAndIncludesBothEndpoints(
+        string kind, bool includePrefix, bool hierarchicalNamespace)
     {
         const string day = "jobs/shards/20260909";
         const string common = day + "T1200000000000Z-";
@@ -794,6 +907,7 @@ public sealed class JournalStorageCatalogTests
         var ids = Enumerable.Range(0, 256).Select(index => common + index.ToString("x32", CultureInfo.InvariantCulture))
             .Concat([minimum, maximum, common + "f0000000000000000000000000000000"]).ToArray();
         await using var context = await CreateAsync(kind, ids, configureS3: options => options.UseOrderedListing = true);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
 
         Assert.Equal([minimum, maximum], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = includePrefix ? new(day) : default, MinId = new(minimum), MaxId = new(maximum) }, TestContext.Current.CancellationToken)));
@@ -807,13 +921,15 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob")]
-    [InlineData("S3")]
-    public async Task OrderedListAsync_PushesPartialDayPrefixWithoutAddingSeparator(string kind)
+    [InlineData("AzureBlob", false)]
+    [InlineData("AzureBlob", true)]
+    [InlineData("S3", false)]
+    public async Task OrderedListAsync_PushesPartialDayPrefixWithoutAddingSeparator(string kind, bool hierarchicalNamespace)
     {
         const string prefix = "jobs/shards/202609";
         string[] ids = ["jobs/shards/20260831-a", prefix + "01-a", prefix + "09-b", "jobs/shards/20261001-a"];
         await using var context = await CreateAsync(kind, ids, configureS3: options => options.UseOrderedListing = true);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
 
         Assert.Equal(ids[1..3], await DrainAsync(context.Catalog.ListAsync(
             new() { Prefix = new(prefix) }, TestContext.Current.CancellationToken)));
@@ -854,12 +970,14 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob")]
-    [InlineData("S3")]
-    public async Task OrderedListAsync_UnicodeBoundsDoNotUseUnsafeNativeOrdering(string kind)
+    [InlineData("AzureBlob", false)]
+    [InlineData("AzureBlob", true)]
+    [InlineData("S3", false)]
+    public async Task OrderedListAsync_UnicodeBoundsDoNotUseUnsafeNativeOrdering(string kind, bool hierarchicalNamespace)
     {
         string[] ids = ["a", "\ud800\udc00", "\ue000", "\uffff"];
         await using var context = await CreateAsync(kind, ids, configureS3: options => options.UseOrderedListing = true);
+        context.Native.HierarchicalNamespace = hierarchicalNamespace;
 
         AssertMembership(ids[1..3], await DrainAsync(context.Catalog.ListAsync(
             new() { MinId = new(ids[1]), MaxId = new(ids[2]) }, TestContext.Current.CancellationToken)));
@@ -1082,6 +1200,39 @@ public sealed class JournalStorageCatalogTests
         var request = Assert.Single(context.Native.Requests);
         Assert.Equal("wal/", request.Prefix);
         Assert.Null(request.LowerStart);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task S3ListAsync_WhitespaceCommonPrefixPreservesBoundsWithPrefixMapper(bool ordered, bool customMapping)
+    {
+        string[] ids = [" 0", " a", " m", " z", " zz"];
+        var mappedPrefixes = new List<string>();
+        var basePrefix = customMapping ? "current/" : string.Empty;
+        await using var context = await CreateAsync("S3", [],
+            keys: ids.Select(id => $"wal/{basePrefix}{id}").ToArray(), configureS3: options =>
+            {
+                options.UseOrderedListing = ordered;
+                if (customMapping)
+                {
+                    options.GetObjectKey = id => basePrefix + id.Value;
+                    options.TryParseJournalId = key => new JournalId(key[basePrefix.Length..]);
+                }
+
+                options.GetObjectKeyPrefix = prefix =>
+                {
+                    mappedPrefixes.Add(prefix.Value);
+                    return basePrefix + prefix.Value;
+                };
+            });
+
+        Assert.Equal([" a", " m", " z"], await DrainAsync(context.Catalog.ListAsync(
+            new() { MinId = new(" a"), MaxId = new(" z") }, TestContext.Current.CancellationToken)));
+        Assert.Empty(mappedPrefixes);
+        Assert.All(context.Native.Requests, request => Assert.Equal("wal/", request.Prefix));
     }
 
     [Theory]
@@ -1384,6 +1535,7 @@ public sealed class JournalStorageCatalogTests
     {
         public List<NativeRequest> Requests { get; } = [];
         public bool EmptyFirstPage { get; set; }
+        public bool HierarchicalNamespace { get; set; }
         public Exception? Failure { get; set; }
         public int FailureAtRequest { get; set; }
         public Action? BeforeResponse { get; set; }
@@ -1471,10 +1623,11 @@ public sealed class JournalStorageCatalogTests
         {
             state.BlobTraits.Add(options.Traits);
             Assert.Equal(BlobStates.None, options.States);
+            var comparer = state.HierarchicalNamespace ? HnsBlobNameComparer : StringComparer.Ordinal;
             return new FakePageable<BlobItem>(
                 state, records.Where(item => (options.Prefix is null || item.Name.StartsWith(options.Prefix, StringComparison.Ordinal))
-                        && (options.StartFrom is null || string.CompareOrdinal(item.Name, options.StartFrom) >= 0))
-                    .OrderBy(item => item.Name, StringComparer.Ordinal)
+                        && (options.StartFrom is null || comparer.Compare(item.Name, options.StartFrom) >= 0))
+                    .OrderBy(item => item.Name, comparer)
                     .Select(item => BlobsModelFactory.BlobItem(
                         name: item.Name, deleted: false, properties: item.Properties,
                         metadata: options.Traits.HasFlag(BlobTraits.Metadata)

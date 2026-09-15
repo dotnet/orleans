@@ -59,9 +59,8 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
         var ordered = _options.UseOrderedListing;
         var identityMapping = _options.UsesDefaultObjectKey;
         var listingPrefix = range.ListingPrefix;
-        if (!identityMapping
-            && (string.IsNullOrWhiteSpace(listingPrefix)
-                || _options.GetObjectKeyPrefix is null && range.Prefix is null))
+        if (string.IsNullOrWhiteSpace(listingPrefix) && (!identityMapping || _options.GetObjectKeyPrefix is not null)
+            || !identityMapping && _options.GetObjectKeyPrefix is null && range.Prefix is null)
         {
             // A common prefix inferred from bounds can be whitespace, which cannot be represented
             // as a JournalId for a custom mapper. Bounds alone also do not require a prefix mapper.

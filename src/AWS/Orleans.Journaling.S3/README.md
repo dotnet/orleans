@@ -19,7 +19,9 @@ Metadata updates rewrite the current WAL using a conditional single-object uploa
 
 For example, journal `jobs/00001234` uses `wal/jobs/00001234` and checkpoint objects under `checkpoints/jobs/00001234/`. Checkpoint names are stored in the WAL metadata. Catalog requests always stay under `wal/`, so checkpoints do not consume listing pages.
 
-S3 Express directory buckets benefit from slash-delimited prefixes, but this layout does not introduce time partitions or a discovery horizon. Unordered listings scan the selected WAL directory and retain every matching overdue journal, however old. Applications can supply hierarchical base keys, provided their prefix and reverse mappings satisfy the catalog contract.
+S3 Express directory buckets benefit from slash-delimited prefixes. Unordered listings scan the selected WAL directory and retain every matching overdue journal, however old. Applications can supply hierarchical base keys, provided their prefix and reverse mappings satisfy the catalog contract.
+
+**Alpha layout upgrade:** When upgrading from the previous `<base-key>/wal` layout, drain durable jobs before deploying the new version, then recreate journals using the new layout.
 
 ## Catalog enumeration
 
