@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BenchmarkDotNet.Running;
 using Benchmarks.Journaling;
+using Benchmarks.Journaling.Azure;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Placement;
@@ -340,6 +341,18 @@ internal class Program
                 typeof(DurableListJournalBenchmarks),
                 typeof(DurableCommandReaderBenchmarks)
             ]).Run(args);
+        },
+        ["Journaling.Azure"] = args =>
+        {
+            Environment.ExitCode = AzureJournalRunner.RunCommandAsync(args).GetAwaiter().GetResult();
+        },
+        ["Journaling.Azure.Bdn"] = args =>
+        {
+            var summaries = BenchmarkSwitcher.FromTypes([typeof(AzureJournalBenchmarks)]).Run(args).ToArray();
+            if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
+            {
+                Environment.ExitCode = 1;
+            }
         },
         ["suite"] = args =>
         {

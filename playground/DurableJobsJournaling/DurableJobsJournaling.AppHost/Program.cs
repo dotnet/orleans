@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.Azure;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
+using DurableJobsJournaling;
 using DurableJobsJournaling.AppHost.OpenTelemetryCollector;
 using Microsoft.Extensions.Configuration;
 
@@ -28,34 +29,38 @@ var otelCollector = builder.AddOpenTelemetryCollector("otelcollector", Path.Comb
 
 const string OtelMetricExportIntervalMilliseconds = "5000";
 
-var storageProvider = builder.Configuration.GetValue("Playground:Storage:Provider", "Azurite");
-var useAzurite = storageProvider.Equals("Azurite", StringComparison.OrdinalIgnoreCase);
-var useAzure = storageProvider.Equals("Azure", StringComparison.OrdinalIgnoreCase);
+var backend = StorageBackendConfiguration.Parse(builder.Configuration.GetValue("Playground:Storage:Provider", "Azurite"));
 
 var storage = builder.AddAzureStorage("storage");
-if (useAzurite)
+if (backend.IsEmulator())
 {
     storage.RunAsEmulator();
 }
-else if (useAzure)
+else
 {
     storage.ConfigureInfrastructure(infrastructure =>
     {
         var storageAccount = infrastructure.GetProvisionableResources().OfType<StorageAccount>().Single();
-        storageAccount.Kind = StorageKind.BlockBlobStorage;
-        storageAccount.Sku = new StorageSku { Name = StorageSkuName.PremiumLrs };
-        storageAccount.AccessTier.ClearValue();
-        RemoveUnsupportedPremiumBlobStorageOutputs(infrastructure);
+        storageAccount.Kind = backend == StorageBackend.PremiumBlob ? StorageKind.BlockBlobStorage : StorageKind.StorageV2;
+        storageAccount.Sku = new StorageSku { Name = backend == StorageBackend.PremiumBlob ? StorageSkuName.PremiumLrs : StorageSkuName.StandardLrs };
+        if (backend == StorageBackend.PremiumBlob)
+        {
+            storageAccount.AccessTier.ClearValue();
+            RemoveUnsupportedPremiumBlobStorageOutputs(infrastructure);
+        }
     });
 }
-else
+var tableStorage = backend == StorageBackend.PremiumBlob ? builder.AddAzureStorage("clusteringstorage") : storage;
+if (backend == StorageBackend.PremiumBlob)
 {
-    throw new InvalidOperationException($"Unknown Playground:Storage:Provider value '{storageProvider}'. Use 'Azurite' or 'Azure'.");
+    tableStorage.ConfigureInfrastructure(infrastructure =>
+    {
+        var storageAccount = infrastructure.GetProvisionableResources().OfType<StorageAccount>().Single();
+        storageAccount.Sku = new StorageSku { Name = StorageSkuName.StandardLrs };
+    });
 }
 
-var blobs = storage.AddBlobs("blobs");
-var tableStorage = useAzurite ? storage : builder.AddAzureStorage("clusteringstorage");
-if (useAzure && builder.ExecutionContext.IsPublishMode)
+if (!backend.IsEmulator() && builder.ExecutionContext.IsPublishMode)
 {
     storage.ClearDefaultRoleAssignments();
     tableStorage.ClearDefaultRoleAssignments();
@@ -66,18 +71,28 @@ var tables = tableStorage.AddTables("tables");
 var orleans = builder.AddOrleans("cluster")
     .WithClustering(tables);
 
-var storagePrefix = $"run-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}";
+var runId = Guid.NewGuid().ToString("N");
 var silo = builder.AddProject<Projects.DurableJobsJournaling_Silo>("silo")
     .WithReference(orleans)
-    .WithReference(blobs)
     .WithReference(tables)
-    .WaitFor(blobs)
     .WaitFor(tables)
     .WaitFor(otelCollector)
     .WithReplicas(1)
-    .WithEnvironment("Playground__Storage__Container", "durablejobs-journaling-playground")
-    .WithEnvironment("Playground__Storage__Prefix", storagePrefix)
+    .WithEnvironment("Playground__Storage__Provider", backend.ToString())
+    .WithEnvironment("Playground__Storage__Container", $"durablejobs-{runId}")
+    .WithEnvironment("Playground__Storage__Table", $"durablejobs{runId}")
     .WithEnvironment("OTEL_METRIC_EXPORT_INTERVAL", OtelMetricExportIntervalMilliseconds);
+
+if (backend.UsesTableJournal())
+{
+    var journals = storage.AddTables("journals");
+    silo.WithReference(journals).WaitFor(journals);
+}
+else
+{
+    var blobs = storage.AddBlobs("blobs");
+    silo.WithReference(blobs).WaitFor(blobs);
+}
 
 builder.AddProject<Projects.DurableJobsJournaling_Web>("web")
     .WithReference(orleans.AsClient())
