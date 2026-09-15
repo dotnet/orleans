@@ -197,6 +197,42 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void DelayedForwardDoesNotReplaceNewerSameIdAttempt()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(original));
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(retry));
+        var delayedForward = CreateMessage(1, Message.Directions.Request, Silo1);
+        delayedForward.GatewayRequestAttempt = original.GatewayRequestAttempt;
+        delayedForward.ForwardCount = 1;
+
+        Assert.False(tracker.Track(delayedForward));
+
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
+        Assert.Equal(retry.GatewayRequestAttempt, current.GatewayRequestAttempt);
+        Assert.NotEqual(original.GatewayRequestAttempt, current.GatewayRequestAttempt);
+    }
+
+    [Fact]
+    public void RemovedAttemptCannotRecreateTrackingOnDelayedForward()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(request, Message.ResponseTypes.Success)));
+        request.TargetSilo = Silo2;
+        request.ForwardCount = 1;
+
+        Assert.False(tracker.Track(request));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ForwardingUpdateAdvancesDestinationAndAttempt()
     {
         var tracker = CreateTracker();

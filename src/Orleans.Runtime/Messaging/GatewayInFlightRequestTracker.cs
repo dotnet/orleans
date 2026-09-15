@@ -35,9 +35,15 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
+            _requests ??= [];
             if (request.GatewayRequestAttempt == 0)
             {
                 request.GatewayRequestAttempt = Interlocked.Increment(ref _nextAttempt);
+            }
+            else if (!_requests.TryGetValue(request.Id, out var current)
+                || current.Attempt != request.GatewayRequestAttempt)
+            {
+                return false;
             }
 
             var trackedRequest = new TrackedRequest(
@@ -56,7 +62,6 @@ namespace Orleans.Runtime.Messaging
                 explicitTimeToLive.HasValue,
                 retentionPeriod);
 
-            _requests ??= [];
             _requests[request.Id] = trackedRequest;
             _forwardingUpdates?.Remove(request.Id);
             _deferredResponses?.Remove(request.Id);
