@@ -41,7 +41,7 @@ namespace Orleans.DurableJobs
     {
         Applied = 0,
         JobNotFound = 1,
-        OwnershipLost = 2,
+        OwnershipLost = 2
     }
 
     [GenerateSerializer]
@@ -95,7 +95,6 @@ namespace Orleans.DurableJobs
     public partial interface IDurableJobFeatureHandler
     {
         bool CanHandle(string jobName);
-
         System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
     }
 
@@ -136,8 +135,8 @@ namespace Orleans.DurableJobs
         System.Threading.Tasks.Task<DurableJobMutationResult> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface ILocalDurableJobManager
@@ -179,9 +178,9 @@ namespace Orleans.DurableJobs
 
         public System.Threading.Tasks.Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, System.Threading.CancellationToken cancellationToken) { throw null; }
-
         public System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public abstract partial class JobShardManager
