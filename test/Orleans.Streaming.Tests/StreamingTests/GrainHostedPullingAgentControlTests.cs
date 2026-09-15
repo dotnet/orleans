@@ -67,7 +67,7 @@ public sealed class GrainHostedPullingAgentControlTests
     }
 
     [Fact]
-    public async Task LifecycleStop_DrainsAgentsWithoutSendingCoordinatorNotification()
+    public async Task LifecycleStop_DefersReceiverDrainToGrainDeactivation()
     {
         await using var setup = new Setup(1);
         await setup.Deploy();
@@ -79,9 +79,48 @@ public sealed class GrainHostedPullingAgentControlTests
         var manager = setup.GetManager(silo);
         await manager.Stop(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, setup.Shutdowns);
+        Assert.Equal(0, setup.Shutdowns);
         Assert.Equal(1, setup.CoordinatorNotifications);
+        Assert.Equal(1, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
+        context.Deactivate(new(DeactivationReasonCode.ShuttingDown, "Exercise grain-owned silo-shutdown cleanup."), TestContext.Current.CancellationToken);
+        await context.Deactivated.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, setup.Shutdowns);
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+    }
+
+    [Fact]
+    public async Task FailedStop_RemainsObservableToDeactivationUntilSuccessfulRestart()
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var grainId = StreamPullingAgentId.Create(ProviderName, Queue);
+        Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var context));
+        var grain = Assert.IsType<GrainHostedStreamPullingAgent>(context.GrainInstance);
+        var failure = new InvalidOperationException("Final checkpoint failed.");
+        setup.ShutdownFailure = failure;
+
+        var stopFailure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            setup.Command(silo, PersistentStreamProviderCommand.StopAgents));
+        Assert.Equal(failure.Message, stopFailure.Message);
+        var deactivationFailure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            context.RunOrQueueTask(() => grain.OnDeactivateAsync(
+                new(DeactivationReasonCode.ShuttingDown, "Observe the previous failed drain."),
+                TestContext.Current.CancellationToken)));
+        Assert.Same(failure, deactivationFailure);
+        Assert.Equal(1, setup.Shutdowns);
+
+        setup.ShutdownFailure = null;
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        await setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
+        Assert.Equal(2, setup.Initializations);
+        Assert.Equal(2, setup.Shutdowns);
     }
 
     [Theory]
@@ -300,6 +339,7 @@ public sealed class GrainHostedPullingAgentControlTests
         internal TaskCompletionSource ShutdownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
         internal TaskCompletionSource? InitializationBarrier { get; set; }
+        internal Exception? ShutdownFailure { get; set; }
         internal int Initializations => Volatile.Read(ref _initializations);
         internal int Shutdowns => Volatile.Read(ref _shutdowns);
         internal int Reads => Volatile.Read(ref _reads);
@@ -404,6 +444,11 @@ public sealed class GrainHostedPullingAgentControlTests
                 {
                     Interlocked.Increment(ref _shutdowns);
                     ShutdownEntered.TrySetResult();
+                    if (ShutdownFailure is { } failure)
+                    {
+                        return Task.FromException(failure);
+                    }
+
                     return ShutdownBarrier?.Task ?? Task.CompletedTask;
                 });
                 return receiver;

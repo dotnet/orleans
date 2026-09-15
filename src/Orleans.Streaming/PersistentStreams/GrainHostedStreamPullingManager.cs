@@ -68,17 +68,24 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
     {
         cancellationToken.ThrowIfCancellationRequested();
         var notifyCoordinator = _provider.State == RunState.AgentsStarted;
-        _provider.State = RunState.AgentsStopped;
-        _heartbeat?.Dispose();
-        _heartbeat = null;
+        CloseLocalAdmission();
         return _executor.AddNext(() => StopHostedAgents(notifyCoordinator));
     }
 
-    public async Task Stop(CancellationToken cancellationToken)
+    public Task Stop(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shuttingDown = true;
-        await StopAgents(CancellationToken.None);
+        CloseLocalAdmission();
+        // Grain deactivation owns the final flush and producer-preserving migration during silo shutdown.
+        return Task.CompletedTask;
+    }
+
+    private void CloseLocalAdmission()
+    {
+        _provider.State = RunState.AgentsStopped;
+        _heartbeat?.Dispose();
+        _heartbeat = null;
     }
 
     private async Task KeepCoordinatorAlive(CancellationToken cancellationToken)
@@ -105,9 +112,7 @@ internal sealed class GrainHostedStreamPullingManager : SystemTarget, IPersisten
     private async Task StopHostedAgents(bool notifyCoordinator)
     {
         notifyCoordinator |= _provider.State == RunState.AgentsStarted;
-        _provider.State = RunState.AgentsStopped;
-        _heartbeat?.Dispose();
-        _heartbeat = null;
+        CloseLocalAdmission();
         var hostedQueues = _provider.Agents.Keys.ToArray();
         await Task.WhenAll(hostedQueues.Select(queueId => _grainFactory
             .GetGrain<IGrainHostedStreamPullingAgent>(StreamPullingAgentId.Create(_providerName, queueId))

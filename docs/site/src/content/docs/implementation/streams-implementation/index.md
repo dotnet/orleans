@@ -47,7 +47,7 @@ flowchart LR
 
 System-target hosting also resolves an <xref:Orleans.Streams.IStreamQueueBalancer>. Grain hosting uses a coordinator grain to manage placement.
 
-During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. Shutdown stops agents before the provider closes.
+During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. System-target hosting drains agents during provider shutdown. Grain hosting closes local admission and coordinator liveness checks at provider shutdown, then lets grain deactivation perform final receiver cleanup and migration.
 
 By default, pulling agents start automatically. Explicit grain-based and implicit subscriptions are both enabled.
 
@@ -96,7 +96,7 @@ Receiver, cache, cursor, and SDK-client objects belong to their host. The destin
 
 The producer's stable grain ID remains registered across runtime migration and recovery. Pub/sub callbacks route to the successor. During graceful silo deactivation, the grain flushes its receiver and requests migration to an eligible surviving host. Administrative stop unregisters the hosted producer while the activation can still serve interleaved subscription callbacks and closes admission on that silo. The coordinator maintains queue coverage on other running provider hosts.
 
-Receiver initialization and final-flush failures propagate to the grain lifecycle. Checkpoint-backed rewindable providers recover failed deactivation, lifecycle cancellation, and process failure using the last durable checkpoint, with at-least-once replay. Each adapter supplies its own acknowledgement and recovery semantics; the selected grain directory supplies activation-registration and failure-recovery guarantees.
+Receiver initialization and final-flush failures propagate to the grain lifecycle. An agent retains a failed drain outcome for its deactivation callback; a successful receiver restart establishes a fresh lifecycle. Checkpoint-backed rewindable providers recover failed deactivation, lifecycle cancellation, and process failure using the last durable checkpoint, with at-least-once replay. Each adapter supplies its own acknowledgement and recovery semantics; the selected grain directory supplies activation-registration and failure-recovery guarantees.
 
 Queue-balancer configuration, including lease-based queue balancing, applies to system-target hosting. See [streaming operations](../../streaming/streaming-operations.md#change-pulling-agent-hosting-mode) for the provider-scoped rollout boundary and the scope of administrative commands.
 

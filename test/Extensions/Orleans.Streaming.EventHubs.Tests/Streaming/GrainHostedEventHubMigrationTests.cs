@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
+using Orleans.Diagnostics;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -29,6 +31,14 @@ namespace ServiceBus.Tests.StreamingTests;
 public sealed class GrainHostedEventHubMigrationTests
 {
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
+
+    [Fact]
+    public Task GrainHosting_SiloShutdownFlushesDuringDeactivationAndPreservesProducer()
+        => RunGracefulShutdown(failFlush: false);
+
+    [Fact]
+    public Task GrainHosting_FailedDeactivationFlushSurfacesFailureAndSuppressesMigration()
+        => RunGracefulShutdown(failFlush: true);
 
     [Fact]
     public async Task GrainHosting_RebalancesEventHubReceiverFromAToBToAAfterCheckpointFlush()
@@ -233,6 +243,141 @@ public sealed class GrainHostedEventHubMigrationTests
         }
     }
 
+    private static async Task RunGracefulShutdown(bool failFlush)
+    {
+        var state = new EventHubMigrationState { ObserveMigration = true };
+        await using var cluster = CreateCluster(state);
+        using var events = new DiagnosticEventCollector(StreamingEvents.ListenerName, GrainLifecycleEvents.ListenerName);
+        GrainAddress? observedAddress = null;
+        var callbackCompleted = new TaskCompletionSource<Activity>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var activities = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activity =>
+            {
+                if (observedAddress is { } address && activity.OperationName == ActivityNames.OnDeactivate
+                    && Equals(activity.GetTagItem(ActivityTagKeys.GrainId), address.GrainId.ToString())
+                    && Equals(activity.GetTagItem(ActivityTagKeys.ActivationId), address.ActivationId.ToString()))
+                {
+                    callbackCompleted.TrySetResult(activity);
+                }
+            },
+        };
+        ActivitySource.AddActivityListener(activities);
+        Task stopping = Task.CompletedTask;
+        try
+        {
+            await Deploy(cluster);
+            var sourceSilo = cluster.Silos[0];
+            var survivor = cluster.Silos[1];
+            var consumer = cluster.Client.GetGrain<IEventHubMigrationConsumer>(Guid.NewGuid());
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, survivor.SiloAddress);
+            try
+            {
+                Assert.Equal(survivor.SiloAddress, await Wait(consumer.Subscribe(), "surviving Event Hubs consumer subscription"));
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+
+            var rendezvous = Assert.Single(events.GetEvents(nameof(GrainLifecycleEvents.Activated))
+                .Select(evt => evt.Payload).OfType<GrainLifecycleEvents.Activated>(),
+                evt => evt.GrainContext.GrainInstance?.GetType().Name == "PubSubRendezvousGrain");
+            Assert.Equal(survivor.SiloAddress, rendezvous.GrainContext.Address.SiloAddress);
+            var initialDelivery = WaitForDrain(events, state, sourceSilo.SiloAddress);
+            await Wait(sourceSilo.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting shutdown-test source provider");
+            await Wait(initialDelivery, "source Event Hubs acknowledgement through 100");
+            var source = Assert.Single(state.Epochs);
+            observedAddress = source.Address;
+            Assert.Equal("20", state.Persisted.Checkpoint);
+            Assert.Equal(1, await Wait(consumer.GetProducerCount(), "initial real rendezvous producer registration"));
+            await Wait(survivor.ServiceProvider.GetRequiredKeyedService<IControllable>(EventHubMigrationState.ProviderName)
+                .ExecuteCommand((int)PersistentStreamProviderCommand.StartAgents, null), "starting surviving Event Hubs provider");
+
+            var gate = state.ArmSave(source, failFlush ? EventHubWriteFailure.Failed : EventHubWriteFailure.None);
+            var deactivating = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivating),
+                evt => evt.Payload is GrainLifecycleEvents.Deactivating value && value.GrainContext.Address.Equals(source.Address),
+                PhaseTimeout, TestContext.Current.CancellationToken);
+            var deactivated = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivated),
+                evt => evt.Payload is GrainLifecycleEvents.Deactivated value && value.GrainContext.Address.Equals(source.Address),
+                PhaseTimeout, TestContext.Current.CancellationToken);
+            var successorDelivered = WaitForDrain(events, state, survivor.SiloAddress, afterEpoch: 1);
+            stopping = cluster.StopSiloAsync(sourceSilo, TestContext.Current.CancellationToken);
+            await Wait(gate.SaveEntered.Task, "runtime-deactivation Event Hubs checkpoint write");
+            await Wait(source.FlushEntered.Task, "Event Hubs receiver flush from grain deactivation");
+            var lifecycle = Assert.IsType<GrainLifecycleEvents.Deactivating>((await Wait(deactivating, "source grain deactivation entry")).Payload);
+            Assert.Equal(DeactivationReasonCode.ShuttingDown, lifecycle.Reason.ReasonCode);
+            var flushActivity = Assert.IsType<Activity>(source.FlushActivity);
+            Assert.Equal(ActivityNames.OnDeactivate, flushActivity.OperationName);
+            Assert.Equal(source.Address.ActivationId.ToString(), flushActivity.GetTagItem(ActivityTagKeys.ActivationId));
+            Assert.False(deactivated.IsCompleted);
+            Assert.False(callbackCompleted.Task.IsCompleted);
+            Assert.Equal("100", source.LastUpdate);
+            Assert.Equal("20", state.Persisted.Checkpoint);
+            Assert.Equal(0, source.CloseCount);
+            Assert.Equal(0, source.CacheDisposeCount);
+            var sourceReads = source.ReadCount;
+            Assert.Equal(1, await Wait(consumer.GetProducerCount(), "retained producer during blocked runtime deactivation"));
+            Assert.Equal(0, state.LoadsOn(survivor.SiloAddress));
+            Assert.Equal(0, state.ReadsOn(survivor.SiloAddress));
+            Assert.Single(state.Epochs);
+            Assert.Equal(sourceReads, source.ReadCount);
+
+            state.AvailableThrough = 101;
+            gate.Release.TrySetResult();
+            await Wait(deactivated, "source grain completing runtime deactivation");
+            var outcome = await Wait(callbackCompleted.Task, "observable runtime OnDeactivateAsync outcome");
+            await Wait(stopping, "graceful source silo shutdown");
+            Assert.Equal(1, source.FlushCount);
+            Assert.Equal(1, source.CloseCount);
+            Assert.Equal(1, source.CacheDisposeCount);
+            if (failFlush)
+            {
+                Assert.Equal(ActivityStatusCode.Error, outcome.Status);
+                Assert.Equal(typeof(InvalidOperationException).FullName, outcome.GetTagItem(ActivityTagKeys.ExceptionType));
+                Assert.Equal(EventHubMigrationState.StoreFailureMessage, outcome.GetTagItem(ActivityTagKeys.ExceptionMessage));
+                Assert.Equal(2, gate.WriteAttempts);
+                Assert.Equal(0, source.DehydrationCount);
+                Assert.Equal("20", state.Persisted.Checkpoint);
+            }
+            else
+            {
+                Assert.Equal(ActivityStatusCode.Unset, outcome.Status);
+                Assert.Equal(1, source.DehydrationCount);
+                Assert.Equal("100", state.Persisted.Checkpoint);
+            }
+
+            await Wait(cluster.WaitForLivenessToStabilizeAsync(), "surviving silo membership");
+            // After failure this ordinary lookup may cold-activate the grain; source dehydration
+            // above distinguishes that recovery from a cooperative transfer of the failed activation.
+            var address = await Wait(cluster.Client.GetGrain<IEventHubMigrationProbe>(source.Address.GrainId).GetAddress(),
+                "successor address after source shutdown");
+            await Wait(successorDelivered, "successor Event Hubs delivery through 101");
+            var successor = Assert.Single(state.Epochs, epoch => epoch.Ordinal == 2);
+            var checkpoint = failFlush ? "20" : "100";
+            Assert.Equal(checkpoint, successor.LoadedOffset);
+            Assert.Equal(checkpoint, successor.SourceStartOffset);
+            Assert.Equal(failFlush ? new long[] { 20, 100, 101 } : [100, 101], successor.ReadOffsets.ToArray());
+            Assert.Equal(source.Address.GrainId, address.GrainId);
+            Assert.Equal(survivor.SiloAddress, address.SiloAddress);
+            Assert.NotEqual(source.Address.ActivationId, address.ActivationId);
+            Assert.Equal(successor.Address, address);
+            Assert.Equal(1, successor.LoadCount);
+            Assert.Equal(new long[] { 20, 100, 101 }, state.Delivered.ToArray());
+            Assert.Equal(1, state.MaximumActiveSources);
+            Assert.Equal(1, await Wait(consumer.GetProducerCount(), "stable producer after shutdown recovery"));
+        }
+        finally
+        {
+            state.ReleaseSave();
+            await Wait(stopping, "source shutdown cleanup");
+        }
+    }
+
     private static InProcessTestCluster CreateCluster(EventHubMigrationState state)
     {
         var builder = new InProcessTestClusterBuilder(2);
@@ -356,6 +501,7 @@ public sealed class EventHubMigrationRelay(EventHubMigrationState state) : Grain
 public interface IEventHubMigrationConsumer : IGrainWithGuidKey
 {
     Task<SiloAddress> Subscribe();
+    Task<int> GetProducerCount();
 }
 
 public sealed class EventHubMigrationConsumer(EventHubMigrationState state) : Grain, IEventHubMigrationConsumer, IAsyncObserver<long>
@@ -364,6 +510,15 @@ public sealed class EventHubMigrationConsumer(EventHubMigrationState state) : Gr
     {
         await this.GetStreamProvider(EventHubMigrationState.ProviderName).GetStream<long>(state.StreamId).SubscribeAsync(this);
         return GrainContext.Address.SiloAddress!;
+    }
+
+    public Task<int> GetProducerCount()
+    {
+        // Query the real pub/sub runtime without adding friend access for this provider test assembly.
+        var runtimeType = typeof(IStreamPubSub).Assembly.GetType("Orleans.Streams.IStreamProviderRuntime", throwOnError: true)!;
+        var runtime = ServiceProvider.GetRequiredService(runtimeType);
+        var pubSub = (IStreamPubSub)runtimeType.GetMethod("PubSub")!.Invoke(runtime, [StreamPubSubType.ExplicitGrainBasedOnly])!;
+        return pubSub.ProducerCount(new QualifiedStreamId(EventHubMigrationState.ProviderName, state.StreamId), CancellationToken.None);
     }
 
     public Task OnNextAsync(long item, StreamSequenceToken? token = null)
@@ -457,6 +612,7 @@ public sealed class EventHubMigrationState
     private int _activeSources;
     private int _maximumActiveSources;
     private long _availableThrough = 100;
+    internal bool ObserveMigration { get; init; }
     internal StreamId StreamId { get; } = StreamId.Create("event-hubs-migration", Guid.NewGuid());
     internal ConcurrentQueue<EventHubReceiverEpoch> Epochs { get; } = new();
     internal ConcurrentQueue<long> Delivered { get; } = new();
@@ -551,6 +707,8 @@ internal sealed class EventHubReceiverEpoch(GrainAddress address, int ordinal)
     internal int CloseCount;
     internal int CacheDisposeCount;
     internal int FlushCount;
+    internal int DehydrationCount;
+    internal Activity? FlushActivity;
     internal ConcurrentQueue<long> ReadOffsets { get; } = new();
     internal TaskCompletionSource FlushEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
@@ -570,8 +728,19 @@ internal sealed class EventHubMigrationCheckpointerFactory(EventHubMigrationStat
             CheckpointComparer = StreamCheckpointComparers.Numeric,
         });
         epoch.Checkpointer = checkpointer;
+        if (state.ObserveMigration)
+        {
+            context.GrainContext.ObservableLifecycle.AddMigrationParticipant(new MigrationObservation(epoch));
+        }
+
         state.Epochs.Enqueue(epoch);
         return Task.FromResult<IStreamQueueCheckpointer<string>>(new ObservedEventHubCheckpointer(epoch));
+    }
+
+    private sealed class MigrationObservation(EventHubReceiverEpoch epoch) : IGrainMigrationParticipant
+    {
+        public void OnDehydrate(IDehydrationContext context) => Interlocked.Increment(ref epoch.DehydrationCount);
+        public void OnRehydrate(IRehydrationContext context) { }
     }
 
     private sealed class Store(EventHubMigrationState state, EventHubReceiverEpoch epoch) : IStreamCheckpointStore
@@ -606,6 +775,7 @@ internal sealed class ObservedEventHubCheckpointer(EventHubReceiverEpoch epoch) 
     public Task FlushAsync(CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref epoch.FlushCount);
+        epoch.FlushActivity = Activity.Current;
         epoch.FlushEntered.TrySetResult();
         return epoch.Checkpointer.FlushAsync(cancellationToken);
     }

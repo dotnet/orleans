@@ -35,6 +35,7 @@ internal sealed class GrainHostedStreamPullingAgent(
     private string _providerName = null!;
     private QueueId _queueId;
     private volatile PersistentStreamPullingAgent? _agent;
+    private Task _shutdownTask = Task.CompletedTask;
     internal bool IsRunning => _agent is not null;
     internal int PubSubCacheSize => _agent?.PubSubCacheSize ?? 0;
 
@@ -116,6 +117,7 @@ internal sealed class GrainHostedStreamPullingAgent(
         {
             agent = await _provider.CreateAgent(GrainContext, _queueId);
             await agent.Initialize(cancellationToken, waitForReceiver: true);
+            _shutdownTask = Task.CompletedTask;
             _agent = agent;
         }
         catch
@@ -140,14 +142,19 @@ internal sealed class GrainHostedStreamPullingAgent(
         }
     }
 
-    private async Task StopCore(bool unregisterProducer)
+    private Task StopCore(bool unregisterProducer)
     {
         if (_agent is not { } agent)
         {
-            return;
+            return _shutdownTask;
         }
 
         _agent = null;
+        return _shutdownTask = ShutdownAgent(agent, unregisterProducer);
+    }
+
+    private async Task ShutdownAgent(PersistentStreamPullingAgent agent, bool unregisterProducer)
+    {
         try
         {
             // Caller deadlines bound observation; admitted receiver cleanup completes under its own timeouts.
