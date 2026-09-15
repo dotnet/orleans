@@ -174,8 +174,14 @@ internal sealed class JournaledJobShardManager : JobShardManager
             return default;
         }
 
-        _jobShardCache[claimedShard.Id] = claimedShard;
-        return (claimedShard, true);
+        if (_jobShardCache.TryAdd(claimedShard.Id, claimedShard))
+        {
+            return (claimedShard, true);
+        }
+
+        // Unregister can still own the previous instance after releasing storage ownership.
+        await claimedShard.DisposeAsync();
+        return (null, true);
     }
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)

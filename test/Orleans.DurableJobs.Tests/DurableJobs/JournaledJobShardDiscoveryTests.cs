@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -445,6 +447,66 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task Discovery_ConcurrentUnregisterDisposesDuplicateClaimAndPreservesCachedShard()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storage = new CountingJournalStorageProvider(delayAppends: false);
+        await using var services = CreateServices(storage);
+        var factory = new TrackingJournaledStateManagerFactory(services.GetRequiredService<IJournaledStateManagerFactory>());
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo, stateManagerFactory: factory);
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        await using var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken);
+        await ScheduleJobAsync(shard, "retained-job", cancellationToken);
+        var storageId = ((JournaledJobShard)shard).StorageId;
+        var releaseStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.AfterMetadataUpdate = async (id, metadata, token) =>
+        {
+            if (id == storageId && metadata is not null && !metadata.Properties.ContainsKey("DurableJobsOwner"))
+            {
+                releaseStarted.TrySetResult();
+                await allowRelease.Task.WaitAsync(token);
+            }
+        };
+
+        var unregister = manager.UnregisterShardAsync(shard, cancellationToken);
+        List<IJobShard> discovered = [];
+        try
+        {
+            await releaseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.False(unregister.IsCompleted);
+
+            discovered = await manager.AssignJobShardsAsync(start.AddHours(1), 1, cancellationToken);
+            Assert.Empty(discovered);
+            Assert.Equal(2, factory.Managers.Count);
+            Assert.Equal(0, factory.Managers[0].DisposeCalls);
+            Assert.Equal(1, factory.Managers[1].DisposeCalls);
+            Assert.Same(shard, Assert.Single(await manager.AssignJobShardsAsync(start.AddHours(1), 0, cancellationToken)));
+        }
+        finally
+        {
+            allowRelease.TrySetResult();
+            await unregister;
+            foreach (var instance in discovered)
+            {
+                await instance.DisposeAsync();
+            }
+        }
+
+        Assert.Equal(1, factory.Managers[0].DisposeCalls);
+        storage.AfterMetadataUpdate = null;
+        await using var recovered = Assert.Single(await manager.AssignJobShardsAsync(start.AddHours(1), 0, cancellationToken));
+        Assert.NotSame(shard, recovered);
+        Assert.Equal(3, factory.Managers.Count);
+        Assert.Equal(1, await recovered.GetJobCountAsync());
+        await DrainAndUnregisterAsync(manager, recovered, cancellationToken);
+        Assert.All(factory.Managers, stateManager => Assert.Equal(1, stateManager.DisposeCalls));
+    }
+
+    [Fact]
     public async Task Discovery_VolatileCatalogHonorsTimestampBoundAndProjectsMetadata()
     {
         await using var fixture = new DiscoveryFixture(useStorageCatalog: true);
@@ -535,4 +597,34 @@ public partial class JournaledJobShardManagerTests
 
     private static void AssertAssignedIds(IEnumerable<JournalId> expected, IEnumerable<IJobShard> actual)
         => Assert.Equal(expected.Select(id => JobShardId.FromJournalId(id).Value), actual.Select(shard => shard.Id));
+
+    private sealed class TrackingJournaledStateManagerFactory(IJournaledStateManagerFactory inner) : IJournaledStateManagerFactory
+    {
+        public List<TrackingJournaledStateManager> Managers { get; } = [];
+
+        public IJournaledStateManager Create(JournalId journalId)
+        {
+            var manager = new TrackingJournaledStateManager(inner.Create(journalId));
+            Managers.Add(manager);
+            return manager;
+        }
+    }
+
+    private sealed class TrackingJournaledStateManager(IJournaledStateManager inner) : IJournaledStateManager
+    {
+        public int DisposeCalls { get; private set; }
+        public long PendingWriteByteCount => inner.PendingWriteByteCount;
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
+        public void RegisterState(string name, IJournaledState state) => inner.RegisterState(name, state);
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => inner.TryGetState(name, out state);
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => inner.RevertPendingChangesAsync(cancellationToken);
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
+
+        public async ValueTask DisposeAsync()
+        {
+            await inner.DisposeAsync();
+            DisposeCalls++;
+        }
+    }
 }

@@ -626,6 +626,7 @@ public partial class JournaledJobShardManagerTests
         public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
         public ConcurrentQueue<(JournalId Id, string? ExpectedETag)> MetadataUpdates { get; } = new();
         public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
+        public Func<JournalId, IJournalMetadata?, CancellationToken, ValueTask>? AfterMetadataUpdate { get; set; }
         public bool OmitMetadataETags { get; set; }
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly Func<CancellationToken, ValueTask>? _onAppend;
@@ -726,14 +727,20 @@ public partial class JournaledJobShardManagerTests
                     : metadata;
             }
 
-            public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+            public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,
                 IEnumerable<string>? remove = null,
                 string? expectedETag = null,
                 CancellationToken cancellationToken = default)
             {
                 owner.MetadataUpdates.Enqueue((journalId, expectedETag));
-                return inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+                var metadata = await inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+                if (owner.AfterMetadataUpdate is { } afterUpdate)
+                {
+                    await afterUpdate(journalId, metadata, cancellationToken);
+                }
+
+                return metadata;
             }
 
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
@@ -909,10 +916,11 @@ public partial class JournaledJobShardManagerTests
         IServiceProvider services,
         TestClusterMembershipService membership,
         SiloAddress siloAddress,
-        DurableJobsOptions? options = null)
+        DurableJobsOptions? options = null,
+        IJournaledStateManagerFactory? stateManagerFactory = null)
         => new(
             new TestLocalSiloDetails(siloAddress),
-            services.GetRequiredService<IJournaledStateManagerFactory>(),
+            stateManagerFactory ?? services.GetRequiredService<IJournaledStateManagerFactory>(),
             services.GetRequiredService<IJournalStorageProvider>(),
             services.GetRequiredService<IJournalStorageCatalog>(),
             membership,
