@@ -21,6 +21,11 @@
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\..\..\..\src\AWS\Orleans.Streaming.SQS.Aspire\Orleans.Streaming.SQS.Aspire.csproj"
+                      IsAspireProjectResource="false" />
+  </ItemGroup>
+
   <!-- Project references removed - Silo and Client are library projects
        used only for the snippet examples. We provide stub IProjectMetadata
        types in Projects.cs for compilation. -->

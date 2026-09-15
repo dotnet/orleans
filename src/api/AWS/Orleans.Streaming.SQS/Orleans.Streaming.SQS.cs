@@ -52,6 +52,15 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddSqsStreams(this ISiloBuilder builder, string name, System.Action<SiloSqsStreamConfigurator> configure) { throw null; }
     }
 
+    public sealed partial class SqsStreamProviderBuilder : Providers.IProviderBuilder<ISiloBuilder>, Providers.IProviderBuilder<IClientBuilder>
+    {
+        public SqsStreamProviderBuilder() { }
+
+        public void Configure(IClientBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+
+        public void Configure(ISiloBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+    }
+
     public partial class SiloSqsStreamConfigurator : SiloPersistentStreamConfigurator
     {
         public SiloSqsStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) : base(default!, default!, default!) { }
