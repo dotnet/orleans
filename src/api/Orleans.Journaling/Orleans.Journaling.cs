@@ -271,7 +271,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageCatalog
     {
-        System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJournalStorageConsumer
@@ -362,6 +362,38 @@ namespace Orleans.Journaling
         protected void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }
 
         protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }
+    }
+
+    public readonly partial struct JournalCatalogEntry : System.IEquatable<JournalCatalogEntry>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public JournalCatalogEntry(JournalId Id, IJournalMetadata? Metadata = null) { }
+
+        public JournalId Id { get { throw null; } init { } }
+
+        public IJournalMetadata? Metadata { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out JournalId Id, out IJournalMetadata? Metadata) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(JournalCatalogEntry other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(JournalCatalogEntry left, JournalCatalogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(JournalCatalogEntry left, JournalCatalogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
     }
 
     public sealed partial class JournaledStateManagerOptions
@@ -511,6 +543,12 @@ namespace Orleans.Journaling
 
     public sealed partial class ListOptions
     {
+        public bool IncludeMetadata { get { throw null; } set { } }
+
+        public JournalId MaxId { get { throw null; } set { } }
+
+        public JournalId MinId { get { throw null; } set { } }
+
         public JournalId Prefix { get { throw null; } set { } }
     }
 
@@ -545,7 +583,7 @@ namespace Orleans.Journaling
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
 
-        public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

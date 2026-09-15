@@ -908,7 +908,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private static IJournalMetadata CreateJournalMetadata(ETag eTag, IDictionary<string, string>? metadata)
+    internal static IJournalMetadata CreateJournalMetadata(ETag eTag, IDictionary<string, string>? metadata)
         => new JournalMetadata(
             GetFormatKeyMetadata(metadata),
             eTag == default ? null : eTag.ToString(),

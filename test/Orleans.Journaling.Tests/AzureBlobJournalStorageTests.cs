@@ -162,12 +162,58 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public void DefaultWalAndCheckpointNames_UseFixedWalAndSnapshotPrefix()
+    public void DefaultWalAndCheckpointNames_UseSeparatePrefixes()
     {
         var journalId = new JournalId("journals/test");
 
-        Assert.Equal("journals/test/wal", AzureBlobJournalStorageOptions.GetDefaultWalBlobName(journalId));
-        Assert.Equal("journals/test/chk.snapshot", AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(journalId, "snapshot"));
+        var options = new AzureBlobJournalStorageOptions();
+        Assert.Equal("wal/journals/test", options.GetWalBlobNameForJournal(journalId));
+        Assert.Equal("checkpoints/journals/test/snapshot", options.GetCheckpointBlobNameForJournal(journalId, "snapshot"));
+    }
+
+    [Fact]
+    public async Task DefaultLayout_ReplaceReplayAndDeleteFollowPublishedCheckpointNames()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var options = new AzureBlobJournalStorageOptions();
+        var walName = options.GetWalBlobNameForJournal(TestJournalId);
+        AzureBlobJournalStorage Create() => CreateStorage(
+            appendBlobs,
+            checkpoints,
+            journalFormatKey: "json-lines",
+            walBlobName: walName,
+            getCheckpointName: snapshotId => options.GetCheckpointBlobNameForJournal(TestJournalId, snapshotId));
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storage = Create();
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), cancellationToken);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), cancellationToken);
+        var firstCheckpoint = Assert.Single(checkpoints.UploadCalls).Name;
+        Assert.StartsWith($"checkpoints/{TestJournalId.Value}/", firstCheckpoint);
+        Assert.Equal(firstCheckpoint, appendBlobs.CreateCalls[^1].Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
+        Assert.Equal("wal/" + TestJournalId.Value, appendBlobs.CreateCalls[^1].Name);
+        Assert.Equal(new ETag("\"append-1\""), appendBlobs.CreateCalls[^1].IfMatch);
+
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), cancellationToken);
+        var secondCheckpoint = checkpoints.UploadCalls[^1].Name;
+        Assert.NotEqual(firstCheckpoint, secondCheckpoint);
+        Assert.StartsWith($"checkpoints/{TestJournalId.Value}/", secondCheckpoint);
+        Assert.False(checkpoints.Exists(firstCheckpoint));
+        Assert.True(checkpoints.Exists(secondCheckpoint));
+        Assert.Equal(secondCheckpoint, appendBlobs.CreateCalls[^1].Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([4]), cancellationToken);
+
+        var recovered = Create();
+        var consumer = new CapturingJournalStorageConsumer();
+        await recovered.ReadAsync(consumer, cancellationToken);
+        Assert.Equal([3, 4], consumer.Bytes.ToArray());
+        Assert.Equal(secondCheckpoint, Assert.Single(checkpoints.DownloadCalls).Name);
+
+        await recovered.DeleteAsync(cancellationToken);
+        Assert.False(appendBlobs.Exists(walName));
+        Assert.False(checkpoints.Exists(secondCheckpoint));
+        Assert.Equal(2, checkpoints.DeleteCalls.Count);
     }
 
     [Fact]

@@ -23,6 +23,11 @@ public sealed class AzureBlobJournalStorageOptions
     /// <summary>
     /// Gets or sets the delegate used to generate the write-ahead log blob name for a journal.
     /// </summary>
+    /// <remarks>
+    /// The default name is <c>wal/{journalId.Value}</c>. Catalog discovery uses this layout in
+    /// <see cref="ContainerName"/>. Custom delegates which participate in catalog discovery must
+    /// produce the same name for each journal id.
+    /// </remarks>
     public Func<JournalId, string> GetWalBlobName { get; set; } = DefaultGetWalBlobName;
 
     private static readonly Func<JournalId, string> DefaultGetWalBlobName =
@@ -35,7 +40,7 @@ public sealed class AzureBlobJournalStorageOptions
     /// The delegate receives the journal id and an opaque snapshot id generated for the checkpoint.
     /// The snapshot id is currently formatted as a 32-character hexadecimal string using <c>Guid.ToString("N")</c>.
     /// The returned value must be a container-relative blob name. The default value is
-    /// <c>{journalId.Value}/chk.{snapshotId}</c>.
+    /// <c>checkpoints/{journalId.Value}/{snapshotId}</c>.
     /// </remarks>
     public Func<JournalId, string, string> GetCheckpointBlobName { get; set; } = DefaultGetCheckpointBlobName;
 
@@ -142,7 +147,7 @@ public sealed class AzureBlobJournalStorageOptions
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        return $"{journalId.Value}/wal";
+        return AzureBlobJournalStorageLayout.GetWalBlobName(journalId.Value);
     }
 
     internal static string GetDefaultCheckpointBlobName(JournalId journalId, string snapshotId)
@@ -153,7 +158,7 @@ public sealed class AzureBlobJournalStorageOptions
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
-        return $"{journalId.Value}/chk.{snapshotId}";
+        return AzureBlobJournalStorageLayout.GetCheckpointBlobName(journalId.Value, snapshotId);
     }
 
     /// <summary>

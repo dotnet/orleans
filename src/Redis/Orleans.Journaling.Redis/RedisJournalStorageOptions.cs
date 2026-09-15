@@ -40,7 +40,11 @@ public sealed class RedisJournalStorageOptions
     /// <summary>
     /// Gets or sets the delegate used to convert a journal id to the Redis key name component.
     /// </summary>
-    public Func<JournalId, string> GetKeyName { get; set; } = static journalId => journalId.Value;
+    /// <remarks>
+    /// The default mapping preserves the journal id, allowing discovery to filter keys by prefix
+    /// and recover ids without reading metadata. Custom mappings require metadata reads to recover journal ids.
+    /// </remarks>
+    public Func<JournalId, string> GetKeyName { get; set; } = DefaultGetKeyName;
 
     /// <summary>
     /// Gets or sets the journal length, in bytes, at which <see cref="IJournalStorage.IsCompactionRequested"/> returns <see langword="true"/>.
@@ -81,6 +85,10 @@ public sealed class RedisJournalStorageOptions
         ArgumentException.ThrowIfNullOrWhiteSpace(keyName);
         return keyName;
     }
+
+    internal bool UsesDefaultKeyName => GetKeyName == DefaultGetKeyName;
+
+    private static string DefaultGetKeyName(JournalId journalId) => journalId.Value;
 }
 
 internal sealed class RedactRedisConfigurationOptionsAttribute : RedactAttribute

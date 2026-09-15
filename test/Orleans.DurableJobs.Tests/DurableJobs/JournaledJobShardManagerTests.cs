@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -113,6 +114,32 @@ public partial class JournaledJobShardManagerTests
         Assert.Empty(await ToListAsync(storageProvider.ListAsync(
             new() { Prefix = JobShardId.StoragePrefix },
             cancellationToken), cancellationToken));
+    }
+
+    [Fact]
+    public async Task AssignJobShardsAsync_OpensOnlyShardNamespaceDescendants()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5011), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = new DateTimeOffset(2026, 9, 9, 0, 0, 0, TimeSpan.Zero);
+        var shard = await manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken);
+        foreach (var id in new[] { "jobs/shards", "jobs/shards-extra/unrelated", "jobs/shards2/unrelated" })
+        {
+            await storageProvider.CreateStorage(new(id)).CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+        }
+
+        storageProvider.OpenedJournalIds.Clear();
+        var assigned = await manager.AssignJobShardsAsync(start.AddHours(1), int.MaxValue, cancellationToken);
+
+        Assert.Same(shard, Assert.Single(assigned));
+        Assert.Equal(JobShardId.StoragePrefix.Value + "/", storageProvider.LastListPrefix.Value);
+        Assert.Empty(storageProvider.OpenedJournalIds);
+        await manager.UnregisterShardAsync(shard, cancellationToken);
     }
 
     [Fact]
@@ -567,7 +594,7 @@ public partial class JournaledJobShardManagerTests
         }
     }
 
-    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null)
+    private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null)
     {
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
@@ -576,7 +603,7 @@ public partial class JournaledJobShardManagerTests
         builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
         builder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
-        builder.Services.AddSingleton((IJournalStorageCatalog)storageProvider);
+        builder.Services.AddSingleton(catalog ?? (IJournalStorageCatalog)storageProvider);
         return builder.Services.BuildServiceProvider();
     }
 
@@ -597,6 +624,11 @@ public partial class JournaledJobShardManagerTests
 
     private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
+        public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
+        public ConcurrentQueue<(JournalId Id, string? ExpectedETag)> MetadataUpdates { get; } = new();
+        public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
+        public Func<JournalId, IJournalMetadata?, CancellationToken, ValueTask>? AfterMetadataUpdate { get; set; }
+        public bool OmitMetadataETags { get; set; }
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly Func<CancellationToken, ValueTask>? _onAppend;
         private readonly object _appendGate = new();
@@ -624,6 +656,9 @@ public partial class JournaledJobShardManagerTests
 
         public int AppendCount => Volatile.Read(ref _appendCount);
 
+        public ConcurrentBag<JournalId> OpenedJournalIds { get; } = new();
+        public JournalId LastListPrefix { get; private set; }
+
         public void BlockAppends()
         {
             lock (_appendGate)
@@ -643,10 +678,17 @@ public partial class JournaledJobShardManagerTests
             }
         }
 
-        public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
+        public IJournalStorage CreateStorage(JournalId journalId)
+        {
+            OpenedJournalIds.Add(journalId);
+            return new CountingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
+        }
 
-        public IAsyncEnumerable<JournalId> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
-            => _inner.ListAsync(options, cancellationToken);
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            LastListPrefix = options?.Prefix ?? default;
+            return _inner.ListAsync(options, cancellationToken);
+        }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {
@@ -669,22 +711,42 @@ public partial class JournaledJobShardManagerTests
             }
         }
 
-        private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, IJournalStorage inner) : IJournalStorage
+        private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, JournalId journalId, IJournalStorage inner) : IJournalStorage
         {
             public bool IsCompactionRequested => inner.IsCompactionRequested;
 
             public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
-            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
-                => inner.GetMetadataAsync(cancellationToken);
+            public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+            {
+                owner.MetadataReads.Enqueue(journalId);
+                if (owner.BeforeMetadataRead is { } beforeRead)
+                {
+                    await beforeRead(journalId, cancellationToken);
+                }
 
-            public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+                var metadata = await inner.GetMetadataAsync(cancellationToken);
+                return owner.OmitMetadataETags && metadata is not null
+                    ? new JournalMetadata(metadata.Format, properties: metadata.Properties)
+                    : metadata;
+            }
+
+            public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,
                 IEnumerable<string>? remove = null,
                 string? expectedETag = null,
                 CancellationToken cancellationToken = default)
-                => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+            {
+                owner.MetadataUpdates.Enqueue((journalId, expectedETag));
+                var metadata = await inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+                if (owner.AfterMetadataUpdate is { } afterUpdate)
+                {
+                    await afterUpdate(journalId, metadata, cancellationToken);
+                }
+
+                return metadata;
+            }
 
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
                 => inner.ReadAsync(consumer, cancellationToken);
@@ -703,14 +765,167 @@ public partial class JournaledJobShardManagerTests
         }
     }
 
+    private sealed class DiscoveryFixture : IAsyncDisposable
+    {
+        private readonly ServiceProvider _services;
+        private readonly HashSet<IJobShard> _opened = [];
+
+        public DiscoveryFixture(bool useStorageCatalog = false)
+        {
+            Catalog = new ScriptedCatalog();
+            _services = CreateServices(Storage, catalog: useStorageCatalog ? Storage : Catalog);
+            Membership.SetSiloStatus(Silo, SiloStatus.Active);
+            Manager = CreateManager(_services, Membership, Silo);
+        }
+
+        public DateTimeOffset Now { get; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        public DateTimeOffset Horizon => Now.AddHours(1);
+        public SiloAddress Silo { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5100), 0);
+        public CountingJournalStorageProvider Storage { get; } = new(delayAppends: false);
+        public ScriptedCatalog Catalog { get; }
+        public TestClusterMembershipService Membership { get; } = new();
+        public JournaledJobShardManager Manager { get; }
+
+        public async Task<JournalId> AddShardAsync(string name, DateTimeOffset start, SiloAddress? owner = null, bool poisoned = false)
+        {
+            var timestampedId = JobShardId.New(start);
+            var id = new JobShardId(timestampedId.Value[..^32] + name).ToJournalId();
+            var properties = new Dictionary<string, string>
+            {
+                ["DurableJobsMinDueTime"] = start.ToString("O"),
+                ["DurableJobsMaxDueTime"] = start.AddHours(1).ToString("O"),
+                ["DurableJobsPoisoned"] = poisoned.ToString(),
+                ["DurableJobsClosed"] = bool.TrueString
+            };
+            if (owner is not null)
+            {
+                properties["DurableJobsOwner"] = owner.ToParsableString();
+            }
+
+            await Storage.CreateStorage(id).CreateIfNotExistsAsync(properties, TestContext.Current.CancellationToken);
+            return id;
+        }
+
+        public Task<List<IJobShard>> DiscoverAsync(int maxNewClaims = int.MaxValue, DateTimeOffset? horizon = null)
+            => DiscoverWithCancellationAsync(TestContext.Current.CancellationToken, maxNewClaims, horizon);
+
+        public async Task<List<IJobShard>> DiscoverWithCancellationAsync(CancellationToken cancellationToken, int maxNewClaims = int.MaxValue, DateTimeOffset? horizon = null)
+        {
+            var result = new List<IJobShard>();
+            await foreach (var shard in DiscoverStreamAsync(cancellationToken, maxNewClaims, horizon))
+            {
+                result.Add(shard);
+            }
+
+            return result;
+        }
+
+        public async IAsyncEnumerable<IJobShard> DiscoverStreamAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken,
+            int maxNewClaims = int.MaxValue,
+            DateTimeOffset? horizon = null)
+        {
+            await foreach (var shard in Manager.DiscoverJobShardsAsync(horizon ?? Horizon, maxNewClaims, cancellationToken))
+            {
+                _opened.Add(shard);
+                yield return shard;
+            }
+        }
+
+        public async Task<List<IJobShard>> AssignAsync()
+        {
+            var result = await Manager.AssignJobShardsAsync(Horizon, 0, TestContext.Current.CancellationToken);
+            _opened.UnionWith(result);
+            return result;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await Task.WhenAll(_opened.Select(shard => shard.DisposeAsync().AsTask()));
+            }
+            finally
+            {
+                await _services.DisposeAsync();
+            }
+        }
+    }
+
+    private sealed class ScriptedCatalog : IJournalStorageCatalog
+    {
+        public List<JournalId> Ids { get; } = [];
+        public Dictionary<JournalId, IJournalMetadata> Metadata { get; } = [];
+        public Func<int, CancellationToken, ValueTask>? BeforeMoveNext { get; set; }
+        public Func<ValueTask>? OnDispose { get; set; }
+        public int ListCalls { get; private set; }
+        public int MoveNextCalls { get; private set; }
+        public int DisposeCalls { get; private set; }
+        public int YieldedIds { get; private set; }
+        public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
+
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Assert.NotNull(options);
+            Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
+            Assert.False(options.MaxId.IsDefault);
+            Assert.True(options.IncludeMetadata);
+            ListCalls++;
+            var prefix = options.Prefix;
+            var maxId = options.MaxId;
+            Requests.Add((prefix, maxId));
+            return Enumerate(prefix, maxId, cancellationToken);
+        }
+
+        private async IAsyncEnumerable<JournalCatalogEntry> Enumerate(
+            JournalId prefix,
+            JournalId maxId,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var snapshot = Ids.Where(id => id.Value.StartsWith(prefix.Value, StringComparison.Ordinal)
+                && StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0).ToArray();
+            try
+            {
+                for (var index = 0; ; index++)
+                {
+                    MoveNextCalls++;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (BeforeMoveNext is { } beforeMoveNext)
+                    {
+                        await beforeMoveNext(index, cancellationToken);
+                    }
+
+                    if (index == snapshot.Length)
+                    {
+                        yield break;
+                    }
+
+                    YieldedIds++;
+                    var id = snapshot[index];
+                    Metadata.TryGetValue(id, out var metadata);
+                    yield return new JournalCatalogEntry(id, metadata);
+                }
+            }
+            finally
+            {
+                DisposeCalls++;
+                if (OnDispose is { } onDispose)
+                {
+                    await onDispose();
+                }
+            }
+        }
+    }
+
     private static JournaledJobShardManager CreateManager(
         IServiceProvider services,
         TestClusterMembershipService membership,
         SiloAddress siloAddress,
-        DurableJobsOptions? options = null)
+        DurableJobsOptions? options = null,
+        IJournaledStateManagerFactory? stateManagerFactory = null)
         => new(
             new TestLocalSiloDetails(siloAddress),
-            services.GetRequiredService<IJournaledStateManagerFactory>(),
+            stateManagerFactory ?? services.GetRequiredService<IJournaledStateManagerFactory>(),
             services.GetRequiredService<IJournalStorageProvider>(),
             services.GetRequiredService<IJournalStorageCatalog>(),
             membership,

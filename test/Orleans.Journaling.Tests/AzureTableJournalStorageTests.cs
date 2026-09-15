@@ -38,6 +38,41 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
+    public async Task AppendAsync_DefaultMapping_LongestPrintableAsciiId_RoundTrips()
+    {
+        var store = new FakeTableStore();
+        var journalId = new JournalId(new string('~', 512));
+        var storage = CreateStorage(store, journalId: journalId);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(store, journalId: journalId).ReadAsync(consumer, TestContext.Current.CancellationToken);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        var header = Assert.Single(store.AddCalls);
+        Assert.Equal(string.Concat(Enumerable.Repeat("7E", 512)), header.PartitionKey);
+        Assert.Equal(journalId.Value, header.Properties[AzureTableJournalStorage.JournalIdPropertyName]);
+    }
+
+    [Fact]
+    public async Task AppendAsync_CustomMapping_RoundTripsUnicodeJournalIdAndCanonicalHeader()
+    {
+        var store = new FakeTableStore();
+        var journalId = new JournalId("café/😀\0");
+        static void Configure(AzureTableJournalStorageOptions options) => options.GetPartitionKey = _ => "custom";
+        var storage = CreateStorage(store, journalId: journalId, configure: Configure);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(store, journalId: journalId, configure: Configure).ReadAsync(consumer, TestContext.Current.CancellationToken);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        var header = Assert.Single(store.AddCalls);
+        Assert.Equal("custom", header.PartitionKey);
+        Assert.Equal(journalId.Value, header.Properties[AzureTableJournalStorage.JournalIdPropertyName]);
+    }
+
+    [Fact]
     public async Task AppendAsync_ChunksLargePayloadAcrossPropertiesAndRows()
     {
         var store = new FakeTableStore();
@@ -186,16 +221,16 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public async Task LegacyHeader_ReadsAndMigratesThroughMetadataAppendReplaceAndDelete()
+    public async Task CanonicalHeader_PreservesIdentityThroughMetadataAppendReplaceAndDelete()
     {
         var store = new FakeTableStore();
         store.PutEntity(
             TestPartitionKey,
             AzureTableJournalStorage.HeaderRowKey,
-            CreateLegacyHeaderProperties("legacy", rowCount: 1, length: 1, metadataJson: """{"owner":"alice"}"""));
+            CreateHeaderProperties("current", rowCount: 1, length: 1, metadataJson: """{"owner":"alice"}"""));
         store.PutEntity(
             TestPartitionKey,
-            FormatDataRowKey("legacy", 0),
+            FormatDataRowKey("current", 0),
             new Dictionary<string, object> { ["Data00"] = new byte[] { 1 } });
         var storage = CreateStorage(store, compactionRowCountThreshold: 2);
 
@@ -206,7 +241,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.Equal([1], consumer.Bytes.ToArray());
         Assert.Equal("alice", Assert.IsAssignableFrom<IJournalMetadata>(metadata).Properties["owner"]);
         Assert.NotNull(await storage.UpdateMetadataAsync(
-            set: new Dictionary<string, string> { ["migrated"] = "true" },
+            set: new Dictionary<string, string> { ["updated"] = "true" },
             cancellationToken: CancellationToken.None));
         Assert.Equal(
             TestJournalId.Value,
@@ -747,9 +782,9 @@ public sealed class AzureTableJournalStorageTests
     }
 
     [Fact]
-    public void DefaultPartitionKey_EscapesJournalIdValue()
+    public void DefaultPartitionKey_HexEncodesJournalIdValue()
     {
-        Assert.Equal("journals%2Ftest", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
+        Assert.Equal("6A6F75726E616C732F74657374", AzureTableJournalStorageOptions.GetDefaultPartitionKey(new JournalId("journals/test")));
     }
 
     [Fact]
@@ -1786,20 +1821,6 @@ public sealed class AzureTableJournalStorageTests
 
         return result;
     }
-
-    private static Dictionary<string, object> CreateLegacyHeaderProperties(
-        string generation,
-        long rowCount,
-        long length,
-        string metadataJson)
-        => new()
-        {
-            [AzureTableJournalStorage.FormatPropertyName] = string.Empty,
-            [AzureTableJournalStorage.GenerationPropertyName] = generation,
-            [AzureTableJournalStorage.RowCountPropertyName] = rowCount,
-            [AzureTableJournalStorage.LengthPropertyName] = length,
-            [AzureTableJournalStorage.MetadataPropertyName] = metadataJson,
-        };
 
     private static string FormatDataRowKey(string generation, long sequence) => $"{generation}-{sequence:D12}";
 
