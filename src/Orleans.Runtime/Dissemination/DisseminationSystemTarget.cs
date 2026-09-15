@@ -97,9 +97,9 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
                 {
                     await _antiEntropyTask.WaitAsync(cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
                 {
-                    // Expected during silo shutdown.
+                    // The loop observes owned shutdown; caller cancellation is reported after cleanup.
                 }
                 catch (Exception exception)
                 {
@@ -111,6 +111,8 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
 
             _shutdownCts.Dispose();
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private async Task RunAntiEntropyLoop(CancellationToken cancellationToken)

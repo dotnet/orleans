@@ -188,7 +188,29 @@ namespace Orleans.Runtime
                 }
             }
 
-            return false;
+            if (Entries.Count == other.Entries.Count)
+            {
+                return false;
+            }
+
+            // Cleanup can remove inactive entries without advancing the table version or a heartbeat.
+            // Accept that inventory change while retaining every Active entry and the remaining statuses.
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (Entries.TryGetValue(silo, out var entry))
+                {
+                    if (entry.Status != previousEntry.Status)
+                    {
+                        return false;
+                    }
+                }
+                else if (previousEntry.Status == SiloStatus.Active)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public override string ToString()

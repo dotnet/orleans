@@ -260,7 +260,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipNamespaceLegacyInventoryDivergenceConvergesAfterHeartbeatWithFullRepair()
+    public async Task MembershipNamespaceLegacyInventoryDivergenceConvergesWithoutHeartbeatWithFullRepair()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var retired = CreateSilo(39541);
@@ -311,8 +311,16 @@ public partial class DisseminationProtocolTests
             }, cancellationToken);
             var full = Assert.Single(GetAntiEntropyResponseValues(response)).Value;
             Assert.Equal((0L, 2L), (full.FromVersion, full.ToVersion));
-            // Inventory-only cleanup need not be published by the manager: retired entries are already dead.
+            Assert.Equal(DisseminationApplyResult.Applied, await receiver.ApplyValueAsync(full, cancellationToken));
+            AssertMembershipState(target, receiverManager.MembershipTableSnapshot);
+            Assert.Equal(Assert.Single(source.Digests), Assert.Single(receiver.Digests));
             Assert.Equal(DisseminationApplyResult.Duplicate, await receiver.ApplyValueAsync(full, cancellationToken));
+            var converged = await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+            {
+                Sender = transport.Peers[0],
+                Digests = new() { [source.Name] = [Assert.Single(receiver.Digests)] },
+            }, cancellationToken);
+            Assert.Empty(GetAntiEntropyResponseValues(converged));
 
             var heartbeatTarget = CreateMembershipSnapshot(
                 2,
