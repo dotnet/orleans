@@ -642,8 +642,11 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options,
         bool antiEntropy)
     {
-        var result = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
-        var totalCount = values.Values.Sum(static entries => (long)entries.Count);
+        long totalCount = 0;
+        foreach (var entries in values.Values)
+        {
+            totalCount += entries.Count;
+        }
         var cursorKey = (peer, antiEntropy);
         long position;
         lock (_receivedBatchCursorLock)
@@ -654,6 +657,19 @@ internal sealed partial class DisseminationProtocol
                 : 0;
         }
 
+        if (position == 0 && FitsReceiveBudget(values, totalCount, options))
+        {
+            var fastPathMembers = _membership.CurrentSnapshots.AllMembers;
+            lock (_receivedBatchCursorLock)
+            {
+                _receivedBatchCursors.Remove(cursorKey);
+                PruneReceivedBatchCursors(fastPathMembers);
+            }
+
+            return values;
+        }
+
+        var result = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
         var skip = position;
         var examined = 0;
         var byteCount = 0;
@@ -725,6 +741,51 @@ Complete:
                 _receivedBatchCursors.Remove(cursorKey);
             }
 
+            PruneReceivedBatchCursors(members);
+        }
+
+        return result;
+    }
+
+    private bool FitsReceiveBudget(
+        Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> values,
+        long itemCount,
+        DisseminationOptions options)
+    {
+        if (itemCount > options.MaxBatchItems)
+        {
+            return false;
+        }
+
+        var remainingBytes = options.MaxBatchBytes;
+        foreach (var (namespaceName, entries) in values)
+        {
+            if (entries.Count == 0 || !TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
+            {
+                return false;
+            }
+
+            var maxPayloadBytes = disseminationNamespace.Options.MaxPayloadBytes;
+            foreach (var entry in entries)
+            {
+                var length = entry.Value.Payload.Length;
+                if (remainingBytes == 0 || length > maxPayloadBytes || length > remainingBytes)
+                {
+                    return false;
+                }
+
+                remainingBytes -= length;
+            }
+        }
+
+        return true;
+    }
+
+    // Called under _receivedBatchCursorLock.
+    private void PruneReceivedBatchCursors(DisseminationMembershipSnapshot members)
+    {
+        if (_receivedBatchCursors.Count > MaxRetainedNonMemberResponseCursors)
+        {
             var nonMembers = _receivedBatchCursors
                 .Where(entry => !members.ContainsMember(entry.Key.Peer))
                 .OrderByDescending(static entry => entry.Value.LastAccess)
@@ -736,8 +797,6 @@ Complete:
                 _receivedBatchCursors.Remove(key);
             }
         }
-
-        return result;
     }
 
     public ValueTask<DisseminationAntiEntropyResponse> ReceiveAntiEntropy(
@@ -1259,11 +1318,12 @@ Complete:
     {
         lock (_peerSupportLock)
         {
-            foreach (var peer in _confirmedPeerNamespaces.Keys
-                .Where(peer => !membership.ContainsMember(peer))
-                .ToArray())
+            foreach (var peer in _confirmedPeerNamespaces.Keys)
             {
-                _confirmedPeerNamespaces.Remove(peer);
+                if (!membership.ContainsMember(peer))
+                {
+                    _confirmedPeerNamespaces.Remove(peer);
+                }
             }
         }
     }

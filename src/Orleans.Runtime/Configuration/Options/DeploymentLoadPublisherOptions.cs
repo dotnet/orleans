@@ -28,6 +28,10 @@ namespace Orleans.Configuration
         /// unavailable, declines the update, throws, or cannot accept it within the refresh interval, direct
         /// publication targets all active peers.
         /// </remarks>
-        public DisseminationNamespaceOptions Dissemination { get; set; } = new() { ExpectedUpdateCadence = TimeSpan.FromSeconds(5) };
+        public DisseminationNamespaceOptions Dissemination { get; set; } = new()
+        {
+            ExpectedUpdateCadence = TimeSpan.FromSeconds(5),
+            MaxCoalescingDelay = TimeSpan.FromMilliseconds(10),
+        };
     }
 }

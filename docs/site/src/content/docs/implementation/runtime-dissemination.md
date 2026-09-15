@@ -53,6 +53,8 @@ Membership uses the membership-table version plus a liveness fingerprint in its 
 
 Deployment-load versions are sample timestamps. Each repair is a full latest value. Application runs on the deployment-load publisher's scheduler and accepts samples only for Active silo generations in the membership oracle. Terminal membership transitions remove placement statistics, and the oracle's monotonic membership state rejects later samples for departed generations.
 
+After the owner accepts a load sample, its serialized payload is reused for forwarding and repair. Inventory maintenance enumerates namespace keys directly; membership exposes its single key, and deployment load uses the active-silo oracle. Version and fingerprint construction is reserved for operations which use that information. Receive batches which fit all item, byte, and namespace limits are processed directly from their existing collections; truncated batches retain bounded cursor selection.
+
 ## Deterministic topology
 
 Every silo derives routing from the same ordered membership projection. Members are ordered by status and silo address. Silo addresses order by generation, port, and IP address, providing stable ordering across membership storage providers with different timestamp precision. Joining, Active, ShuttingDown, and Stopping entries participate.
@@ -90,6 +92,8 @@ The subsystem and both built-in namespaces are temporarily enabled by default fo
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPayloadBytes> | 1 MiB | Maximum serialized value size for the namespace. |
 
 Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceOptions>. Operators can enable and tune membership and deployment-load dissemination independently while retaining the local concurrency and per-message bounds.
+
+Deployment load uses a 10 ms coalescing window and a 5-second expected update cadence. The shorter window batches nearby samples while limiting the delay added at each forwarding hop. Membership retains high priority and bypasses coalescing.
 
 The anti-entropy loop waits without periodic timer wakeups while the subsystem is disabled. An options-change notification wakes the loop when enablement changes; disabling it returns the loop to the dormant wait. Shutdown removes the options subscription and observes the loop's completion.
 

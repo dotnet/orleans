@@ -133,15 +133,13 @@ internal sealed partial class DisseminationBroadcastQueue
         DisseminationMembershipSnapshots membershipSnapshots,
         CancellationToken cancellationToken)
     {
-        // Namespace digests are the authoritative inventory, so clean ledger entries can disappear with their keys.
+        // Namespace identities are the authoritative inventory for retiring clean ledger entries.
         var activeKeys = new Dictionary<DisseminationNamespace, HashSet<DisseminationKey>>();
         foreach (var disseminationNamespace in _disseminationNamespaces)
         {
             if (disseminationNamespace.Options.Enabled)
             {
-                activeKeys[disseminationNamespace.Name] = disseminationNamespace.Digests
-                    .Select(static entry => entry.Key)
-                    .ToHashSet();
+                activeKeys[disseminationNamespace.Name] = disseminationNamespace.Keys.ToHashSet();
             }
         }
 
@@ -455,7 +453,7 @@ internal sealed partial class DisseminationBroadcastQueue
             var droppedDirtyCount = 0;
             lock (_lock)
             {
-                foreach (var (namespaceName, namespaceState) in _statesByNamespace.ToArray())
+                foreach (var (namespaceName, namespaceState) in _statesByNamespace)
                 {
                     if (!membershipSnapshots.GetSnapshot(namespaceState.Namespace.MembershipScope).ContainsMember(Peer))
                     {
@@ -466,7 +464,7 @@ internal sealed partial class DisseminationBroadcastQueue
                     }
 
                     activeKeys.TryGetValue(namespaceName, out var namespaceKeys);
-                    foreach (var (key, keyState) in namespaceState.Keys.ToArray())
+                    foreach (var (key, keyState) in namespaceState.Keys)
                     {
                         if (!keyState.Dirty
                             && !keyState.InFlight
@@ -971,10 +969,12 @@ internal sealed partial class DisseminationBroadcastQueue
                     // RPC completion is not application evidence; only the returned receiver versions advance the ledger.
                     _owner._responseObserver?.Invoke(Peer, response);
                     var acknowledgments = CreateAcknowledgmentLookup(response.Acknowledgments);
-                    var unsupportedNamespaces = response.UnsupportedNamespaces.ToHashSet();
+                    var unsupportedNamespaces = response.UnsupportedNamespaces.Count > 0
+                        ? response.UnsupportedNamespaces.ToHashSet()
+                        : null;
                     foreach (var sent in sentKeys)
                     {
-                        if (unsupportedNamespaces.Contains(sent.Work.Namespace.Name))
+                        if (unsupportedNamespaces?.Contains(sent.Work.Namespace.Name) == true)
                         {
                             CompleteUnsupported(sent.Work.Namespace.Name, initialWork);
                             continue;
@@ -1016,9 +1016,17 @@ internal sealed partial class DisseminationBroadcastQueue
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var transportLifetime = valuesByNamespace.Values
-                .SelectMany(static values => values)
-                .Min(static value => value.TimeToLive);
+            var transportLifetime = TimeSpan.MaxValue;
+            foreach (var values in valuesByNamespace.Values)
+            {
+                foreach (var value in values)
+                {
+                    if (value.TimeToLive < transportLifetime)
+                    {
+                        transportLifetime = value.TimeToLive;
+                    }
+                }
+            }
             if (transportLifetime <= TimeSpan.Zero)
             {
                 return null;
@@ -1554,7 +1562,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
             public void PruneKnownVersions(HashSet<DisseminationKey>? activeKeys)
             {
-                foreach (var key in KnownVersions.Keys.ToArray())
+                foreach (var key in KnownVersions.Keys)
                 {
                     if (activeKeys is null || !activeKeys.Contains(key))
                     {
