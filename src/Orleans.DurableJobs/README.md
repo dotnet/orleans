@@ -126,6 +126,9 @@ outage. Future shard identities are filtered by the catalog before candidate met
 Each periodic or membership check starts a fresh, locally scoped sweep. Discovery requests
 catalog metadata, orders and deduplicates the selected entries, then uses each supplied
 ownership snapshot with an ETag or reads current metadata when that snapshot is unavailable.
+For a snapshot naming the local silo as owner, discovery reuses the cached shard or reads
+current metadata on a cache miss. The refreshed descriptor determines eligibility, ownership,
+and any required conditional claim before a new instance is opened.
 Claims run oldest first and require the snapshot's ETag for conditional updates, so a
 concurrent ownership change rejects a stale claim. Providers used for Durable Jobs supply
 metadata ETags and enforce conditional updates; a missing ETag surfaces as a discovery error.

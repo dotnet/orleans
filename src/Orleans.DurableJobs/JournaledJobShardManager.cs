@@ -132,6 +132,15 @@ internal sealed class JournaledJobShardManager : JobShardManager
         var descriptor = entry.Metadata is { ETag: not null } metadata
             ? ShardCatalogProperties.From(entry.Id, metadata)
             : await GetDescriptorAsync(entry.Id, cancellationToken);
+        JournaledJobShard? cachedShard = null;
+        if (descriptor?.Owner is { } snapshotOwner && snapshotOwner.Equals(SiloAddress)
+            && !_jobShardCache.TryGetValue(descriptor.ShardId.Value, out cachedShard)
+            && entry.Metadata is { ETag: not null })
+        {
+            // A listed local owner can have released the shard since the snapshot was taken.
+            descriptor = await GetDescriptorAsync(entry.Id, cancellationToken);
+        }
+
         if (descriptor is null || descriptor.Poisoned || descriptor.StartTime > maxDueTime)
         {
             return default;
@@ -147,7 +156,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         cancellationToken.ThrowIfCancellationRequested();
         if (descriptor.Owner is { } owner && owner.Equals(SiloAddress))
         {
-            return (await GetOrOpenShardAsync(descriptor, cancellationToken), false);
+            return (cachedShard ?? await GetOrOpenShardAsync(descriptor, cancellationToken), false);
         }
 
         var isAdopted = false;

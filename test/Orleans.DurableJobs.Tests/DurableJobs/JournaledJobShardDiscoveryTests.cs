@@ -120,6 +120,122 @@ public partial class JournaledJobShardManagerTests
         Assert.Equal(other.ToParsableString(), after.Properties["DurableJobsOwner"]);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discovery_ProjectedLocalOwnerRevalidatesAfterUnregister(bool deleteEmptyShard)
+    {
+        await using var fixture = new DiscoveryFixture();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var shard = await fixture.Manager.CreateShardAsync(
+            fixture.Now, fixture.Horizon, new Dictionary<string, string>(), cancellationToken);
+        if (!deleteEmptyShard)
+        {
+            Assert.NotNull(await shard.TryScheduleJobAsync(new()
+            {
+                Target = GrainId.Create("type", "target"),
+                JobName = "retained-job",
+                DueTime = fixture.Now
+            }, cancellationToken));
+        }
+
+        var id = ((JournaledJobShard)shard).StorageId;
+        var storage = fixture.Storage.CreateStorage(id);
+        var snapshot = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(snapshot);
+        fixture.Catalog.Metadata.Add(id, snapshot);
+        fixture.Catalog.Ids.Add(id);
+        fixture.Catalog.OnDispose = async () => await fixture.Manager.UnregisterShardAsync(shard, cancellationToken);
+        fixture.Storage.MetadataReads.Clear();
+        fixture.Storage.MetadataUpdates.Clear();
+
+        Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 0));
+        Assert.Equal(new[] { id, id }, fixture.Storage.MetadataReads);
+        Assert.Equal(deleteEmptyShard ? 0 : 1, fixture.Storage.MetadataUpdates.Count);
+        var current = await storage.GetMetadataAsync(cancellationToken);
+        if (deleteEmptyShard)
+        {
+            Assert.Null(current);
+        }
+        else
+        {
+            Assert.NotNull(current);
+            Assert.False(current.Properties.ContainsKey("DurableJobsOwner"));
+            fixture.Catalog.OnDispose = null;
+            fixture.Storage.MetadataReads.Clear();
+            fixture.Storage.MetadataUpdates.Clear();
+
+            var recovered = Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 1));
+            Assert.NotSame(shard, recovered);
+            Assert.True(recovered.IsAddingCompleted);
+            Assert.Equal(1, await recovered.GetJobCountAsync());
+            Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+            Assert.Equal((id, current.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
+            Assert.Same(recovered, Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discovery_ProjectedLocalOwnerRevalidatesCurrentEligibility(bool poisoned)
+    {
+        await using var fixture = new DiscoveryFixture();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var id = await fixture.AddShardAsync("formerly-local", fixture.Now, fixture.Silo);
+        var storage = fixture.Storage.CreateStorage(id);
+        var snapshot = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(snapshot);
+        fixture.Catalog.Metadata.Add(id, snapshot);
+        fixture.Catalog.Ids.Add(id);
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
+        fixture.Membership.SetSiloStatus(other, SiloStatus.Active);
+        IJournalMetadata? current = null;
+        fixture.Catalog.OnDispose = async () =>
+        {
+            current = await storage.UpdateMetadataAsync(
+                poisoned
+                    ? new Dictionary<string, string> { ["DurableJobsPoisoned"] = bool.TrueString }
+                    : new Dictionary<string, string> { ["DurableJobsOwner"] = other.ToParsableString() },
+                expectedETag: snapshot.ETag, cancellationToken: cancellationToken);
+            Assert.NotNull(current);
+        };
+        fixture.Storage.MetadataReads.Clear();
+        fixture.Storage.MetadataUpdates.Clear();
+
+        Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 1));
+        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Equal((id, snapshot.ETag), Assert.Single(fixture.Storage.MetadataUpdates));
+        var after = await storage.GetMetadataAsync(cancellationToken);
+        Assert.NotNull(current);
+        Assert.NotNull(after);
+        Assert.Equal(current.ETag, after.ETag);
+        Assert.Equal(poisoned ? fixture.Silo.ToParsableString() : other.ToParsableString(), after.Properties["DurableJobsOwner"]);
+        Assert.Equal(poisoned.ToString(), after.Properties["DurableJobsPoisoned"]);
+    }
+
+    [Fact]
+    public async Task Discovery_ProjectedLocalOwnerReadsCurrentMetadataOnCacheMissAndReusesCachedInstance()
+    {
+        await using var fixture = new DiscoveryFixture();
+        var id = await fixture.AddShardAsync("local", fixture.Now, fixture.Silo);
+        var snapshot = await fixture.Storage.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(snapshot);
+        fixture.Catalog.Metadata.Add(id, snapshot);
+        fixture.Catalog.Ids.Add(id);
+        fixture.Storage.MetadataReads.Clear();
+
+        var shard = Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0));
+        AssertAssignedIds([id], [shard]);
+        Assert.Equal(new[] { id }, fixture.Storage.MetadataReads);
+        Assert.Empty(fixture.Storage.MetadataUpdates);
+
+        fixture.Storage.MetadataReads.Clear();
+        Assert.Same(shard, Assert.Single(await fixture.DiscoverAsync(maxNewClaims: 0)));
+        Assert.Empty(fixture.Storage.MetadataReads);
+        Assert.Empty(fixture.Storage.MetadataUpdates);
+    }
+
     [Fact]
     public async Task Discovery_UnorderedCatalogClaimsOldestFirstIncludingYearsOverdue()
     {
