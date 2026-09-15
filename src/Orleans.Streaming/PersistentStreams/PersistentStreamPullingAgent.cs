@@ -40,7 +40,7 @@ namespace Orleans.Streams
         private readonly TimeProvider _timeProvider;
         private readonly ITimerRegistry _timerRegistry;
         private readonly IGrainFactory _grainFactory;
-        private readonly HashSet<Task> _backgroundTasks = new();
+        private AdmissionGate _workAdmission = new();
         private CancellationTokenSource? _shutdownCancellation;
         private CancellationToken ShutdownToken => _shutdownCancellation?.Token ?? CancellationToken.None;
         internal IGrainContext GrainContext { get; }
@@ -159,6 +159,7 @@ namespace Orleans.Streams
         public async Task Initialize(CancellationToken cancellationToken, bool waitForReceiver = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _workAdmission = new AdmissionGate();
             _shutdownCancellation = new CancellationTokenSource();
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
@@ -251,6 +252,7 @@ namespace Orleans.Streams
             bool unregisterProducer = true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var workDrained = _workAdmission.CloseAsync();
             // Stop pulling from queues that are not in my range anymore.
             LogInfoShutdown(GetType().Name, new(QueueId));
 
@@ -264,10 +266,7 @@ namespace Orleans.Streams
 
             // Cancellation can remove pending registrations from the cache; retain them for producer cleanup.
             var streams = pubSubCache.ToArray();
-            var inFlightRegistrations = streams
-                .Select(v => v.Value.RegistrationTask)
-                .OfType<Task>()
-                .ToArray();
+            var hasPendingRegistrations = streams.Any(static entry => entry.Value.RegistrationTask is not null);
             _shutdownCancellation?.Cancel();
 
             Task? localReceiverInitTask = receiverInitTask;
@@ -277,19 +276,10 @@ namespace Orleans.Streams
                 receiverInitTask = null;
             }
 
-            await _activePumpTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            await Task.WhenAll(inFlightRegistrations)
-                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-            while (_backgroundTasks.Count > 0)
-            {
-                await Task.WhenAll(_backgroundTasks.ToArray())
-                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-                _backgroundTasks.RemoveWhere(static task => task.IsCompleted);
-            }
+            await workDrained;
 
             // A registration interrupted by shutdown has not established its subscribers' safe positions.
-            if (inFlightRegistrations.Length == 0)
+            if (!hasPendingRegistrations)
             {
                 NotifyDeliveryProgress();
             }
@@ -343,30 +333,6 @@ namespace Orleans.Streams
             }
         }
 
-        private void TrackBackgroundTask(Task task)
-        {
-            if (task.IsCompleted)
-            {
-                task.Ignore();
-                return;
-            }
-
-            _backgroundTasks.Add(task);
-            ObserveCompletion().Ignore();
-
-            async Task ObserveCompletion()
-            {
-                try
-                {
-                    await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-                }
-                finally
-                {
-                    _backgroundTasks.Remove(task);
-                }
-            }
-        }
-
         public Task AddSubscriber(
             GuidId subscriptionId,
             QualifiedStreamId streamId,
@@ -377,9 +343,10 @@ namespace Orleans.Streams
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugAddSubscriber(streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            TrackBackgroundTask(AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
                 .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
-                    $"Failed to add subscription for stream {streamId}."));
+                    $"Failed to add subscription for stream {streamId}.")
+                .Ignore();
             return Task.CompletedTask;
         }
 
@@ -391,7 +358,8 @@ namespace Orleans.Streams
             string? filterData,
             StreamSequenceToken? cacheToken)
         {
-            if (IsShutdown) return;
+            using var admission = _workAdmission.TryEnter();
+            if (!admission.Entered || IsShutdown) return;
 
             if (!pubSubCache.TryGetValue(streamId, out var streamDataCollection))
             {
@@ -415,7 +383,7 @@ namespace Orleans.Streams
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
-                    TrackBackgroundTask(RunConsumerCursor(data, ShutdownToken));
+                    RunConsumerCursor(data, ShutdownToken).Ignore();
             }
         }
 
@@ -842,6 +810,9 @@ namespace Orleans.Streams
 
         private async Task PumpQueue(QueueId queueId, CancellationToken cancellationToken)
         {
+            using var admission = _workAdmission.TryEnter();
+            if (!admission.Entered) return;
+
             try
             {
                 Task? localReceiverInitTask = receiverInitTask;
@@ -1117,10 +1088,13 @@ namespace Orleans.Streams
 
             async Task RegisterStreamAsync()
             {
-                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-
+                using var admission = _workAdmission.TryEnter();
                 try
                 {
+                    if (!admission.Entered) return;
+
+                    await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
                     if (IsShutdown || cancellationToken.IsCancellationRequested)
                     {
                         return;
@@ -1229,7 +1203,7 @@ namespace Orleans.Streams
                     if (consumerData.State == StreamConsumerDataState.Inactive)
                     {
                         // wake up inactive consumers
-                        TrackBackgroundTask(RunConsumerCursor(consumerData, cancellationToken));
+                        RunConsumerCursor(consumerData, cancellationToken).Ignore();
                     }
                 }
                 else
@@ -1245,6 +1219,9 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData, CancellationToken cancellationToken = default)
         {
+            using var admission = _workAdmission.TryEnter();
+            if (!admission.Entered) return;
+
             TagList? tags = null;
             try
             {
