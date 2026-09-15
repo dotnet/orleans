@@ -164,7 +164,7 @@ try {
     if ($Mode -eq 'Gate') {
         Invoke-DotNet @(
             $runner, '--filter-class', 'Orleans.Dissemination.IntegrationHarness.MeasurementTests',
-            '--minimum-expected-tests', '9', '--report-trx',
+            '--minimum-expected-tests', '10', '--report-trx',
             '--results-directory', (Join-Path $results 'instrument-checks')
         )
     }

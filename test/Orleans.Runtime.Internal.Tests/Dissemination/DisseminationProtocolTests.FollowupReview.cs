@@ -15,6 +15,67 @@ namespace UnitTests.Dissemination;
 public partial class DisseminationProtocolTests
 {
     [Fact]
+    public async Task CompletedAsyncApplicationWinsAConcurrentLocalWaitTimeout()
+    {
+        var local = CreateSilo(40401);
+        var sender = CreateSilo(40402);
+        var child = CreateSilo(40403);
+        var clock = new FakeTimeProvider();
+        var ns = new ProtocolReviewNamespace(local, "async-terminal-result-review");
+        ns.Options.StaleItemTtl = TimeSpan.FromSeconds(1);
+        var value = ns.Inner.CreateValue("value", 1);
+        var application = new TaskCompletionSource<DisseminationApplyResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ns.ApplyHandler = (_, _) => new(application.Task);
+        var transport = new FakeTransport(local, sender, child);
+        var protocol = CreateProtocol(transport, [ns], options => options.Overlay.FanOutFactor = static _ => 2, clock);
+        var context = new MembershipReviewContinuationContext();
+        var previousContext = SynchronizationContext.Current;
+        Task<DisseminationBroadcastResponse> receive;
+        SynchronizationContext.SetSynchronizationContext(context);
+        try
+        {
+            receive = protocol.ReceiveBroadcast(new DisseminationBroadcastBatch
+            {
+                Sender = sender,
+                Values = CreateValueGroups(ns.Name, CreateDisseminationValue(sender, value)),
+            }, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        try
+        {
+            clock.Advance(ns.Options.StaleItemTtl);
+            var timedOutWait = await context.TakeContinuation(TestContext.Current.CancellationToken);
+            Assert.False(receive.IsCompleted);
+            ns.Inner.PublishValue(value);
+            application.SetResult(DisseminationApplyResult.Applied);
+            timedOutWait.Callback(timedOutWait.State);
+            for (var index = 0; index < 4 && !receive.IsCompleted; index++)
+            {
+                var continuation = await context.TakeContinuation(TestContext.Current.CancellationToken);
+                continuation.Callback(continuation.State);
+            }
+
+            var response = await receive.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(1, Assert.Single(response.Acknowledgments[ns.Name]).Version);
+            await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            Assert.Equal(child, Assert.Single(transport.BroadcastBatches).Peer);
+            Assert.Equal(1, ns.GetVersion("value"));
+            await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
+            Assert.NotEmpty(transport.AntiEntropyRequests);
+            Assert.All(transport.AntiEntropyRequests, request => Assert.False(request.Request.Digests.ContainsKey(ns.Name)));
+        }
+        finally
+        {
+            application.TrySetResult(DisseminationApplyResult.Rejected);
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task CompletedApplicationRemainsAppliedWhenItsLocalDeadlineRacesCompletion()
     {
         var local = CreateSilo(39651);
