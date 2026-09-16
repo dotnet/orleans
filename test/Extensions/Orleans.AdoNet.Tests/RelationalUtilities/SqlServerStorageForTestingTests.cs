@@ -13,7 +13,11 @@ public class SqlServerStorageForTestingTests
 
     [Theory]
     [InlineData(1205, true)]
+    [InlineData(924, true)]
     [InlineData(3702, true)]
+    [InlineData(5061, true)]
+    [InlineData(5064, true)]
+    [InlineData(5069, true)]
     [InlineData(18456, false)]
     public void ClassifiesRetryableDatabaseResetErrors(int errorNumber, bool expected)
     {
@@ -21,14 +25,17 @@ public class SqlServerStorageForTestingTests
     }
 
     [Theory]
-    [InlineData(924, false, true)]
-    [InlineData(924, true, false)]
-    [InlineData(50924, true, true)]
-    [InlineData(1205, false, false)]
-    [InlineData(18456, false, false)]
-    public void ClassifiesRetryableDatabaseSetupErrors(int errorNumber, bool setupCommandStarted, bool expected)
+    [InlineData(-2, true)]
+    [InlineData(924, true)]
+    [InlineData(1205, true)]
+    [InlineData(3702, true)]
+    [InlineData(5061, true)]
+    [InlineData(5064, true)]
+    [InlineData(5069, true)]
+    [InlineData(18456, false)]
+    public void ClassifiesRetryableDatabaseSetupErrors(int errorNumber, bool expected)
     {
-        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseSetupError(errorNumber, setupCommandStarted));
+        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseSetupError(errorNumber));
     }
 
     [Fact]
@@ -57,7 +64,7 @@ public class SqlServerStorageForTestingTests
     }
 
     [Fact]
-    public async Task SetupOwnsSingleUserSlotWhileApplyingSchema()
+    public async Task SetupConfiguresDatabaseWhileClientsReconnect()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var storage = Assert.IsType<SqlServerStorageForTesting>(
@@ -83,11 +90,8 @@ public class SqlServerStorageForTestingTests
             await Task.WhenAll(reconnectAttempts.Select(attempt => attempt.Task)).WaitAsync(cancellationToken);
             await storage.ExecuteSetupScriptBatchesAsync(
                 [
-                    $"""
-                    ALTER DATABASE [{TestDatabaseName}] SET READ_COMMITTED_SNAPSHOT OFF;
-                    ALTER DATABASE [{TestDatabaseName}] SET READ_COMMITTED_SNAPSHOT ON;
-                    """,
                     """
+                    WAITFOR DELAY '00:00:00.250';
                     IF OBJECT_ID(N'[SetupOwnershipBoundary]', 'U') IS NULL
                     CREATE TABLE SetupOwnershipBoundary(Id INT NOT NULL);
                     """
@@ -103,21 +107,26 @@ public class SqlServerStorageForTestingTests
 
         var databaseState = await storage.Storage.ReadAsync(
             """
-            SELECT user_access_desc, is_read_committed_snapshot_on, OBJECT_ID(N'[SetupOwnershipBoundary]', 'U')
+            SELECT user_access_desc, recovery_model_desc, snapshot_isolation_state_desc, is_read_committed_snapshot_on,
+                OBJECT_ID(N'[SetupOwnershipBoundary]', 'U')
             FROM sys.databases
             WHERE name = @DatabaseName
             """,
             command => command.AddParameter("DatabaseName", TestDatabaseName),
             (record, _, _) => Task.FromResult((
                 record.GetString(0),
-                record.GetBoolean(1),
-                record.IsDBNull(2) ? (int?)null : record.GetInt32(2))),
+                record.GetString(1),
+                record.GetString(2),
+                record.GetBoolean(3),
+                record.IsDBNull(4) ? (int?)null : record.GetInt32(4))),
             cancellationToken: cancellationToken);
 
         var state = Assert.Single(databaseState);
         Assert.Equal("MULTI_USER", state.Item1);
-        Assert.True(state.Item2);
-        Assert.NotNull(state.Item3);
+        Assert.Equal("SIMPLE", state.Item2);
+        Assert.Equal("ON", state.Item3);
+        Assert.True(state.Item4);
+        Assert.NotNull(state.Item5);
     }
 
     private static async Task ReconnectAndHoldUntilCanceledAsync(
