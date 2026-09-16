@@ -163,6 +163,7 @@ public partial class PersistentStreamPullingAgentTests
 
             Assert.True(token.IsCancellationRequested);
             Assert.True(data.IsRegistered);
+            Assert.True(handshake.Task.IsCompletedSuccessfully);
             Assert.Equal(0, data.PendingHandshakes);
             Assert.Empty(consumer.DeliveredTokens);
             Assert.Equal(0, cache.DeliveryProgressCallCount);

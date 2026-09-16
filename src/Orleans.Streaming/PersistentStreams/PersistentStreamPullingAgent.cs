@@ -466,7 +466,7 @@ namespace Orleans.Streams
                 try
                 {
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                         i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId, ShutdownToken).WaitAsync(ShutdownToken),
+                         i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId, ShutdownToken),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown
@@ -1845,7 +1845,7 @@ namespace Orleans.Streams
         {
             try
             {
-                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken).WaitAsync(cancellationToken);
+                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken);
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
 
                 return newToken;
@@ -1911,7 +1911,7 @@ namespace Orleans.Streams
                     RequestContext.Clear(); // clear RequestContext before await!
                 }
             }
-            await errorDeliveryTask.WaitAsync(cancellationToken);
+            await errorDeliveryTask;
         }
 
         private async Task<bool> ErrorProtocol(
@@ -1943,12 +1943,12 @@ namespace Orleans.Streams
             if (isDeliveryError)
             {
                 await streamFailureHandler.OnDeliveryFailure(
-                        consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token).WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                        consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             else
             {
                 await streamFailureHandler.OnSubscriptionFailure(
-                    consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token).WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
             if (!IsCurrent()) return false;
@@ -2057,7 +2057,7 @@ namespace Orleans.Streams
         {
             try
             {
-                var streamData = await pubSub.RegisterProducer(streamId, meAsStreamProducer, cancellationToken).WaitAsync(cancellationToken);
+                var streamData = await pubSub.RegisterProducer(streamId, meAsStreamProducer, cancellationToken);
                 return streamData;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
