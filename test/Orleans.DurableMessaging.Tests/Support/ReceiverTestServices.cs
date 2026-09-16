@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -14,79 +15,106 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 internal static class ReceiverTestServices
 {
+    public const string InboxJobName = "orleans.messaging.inbox-drain";
+
+    public static Type GetImplementationType(string name) =>
+        typeof(IDurableInbox).Assembly.GetType($"Orleans.DurableMessaging.{name}", throwOnError: true)!;
+
     public static void Add(IServiceCollection services, Action<DurableInboxOptions> configure)
     {
+        var inboxType = GetImplementationType("DurableInbox");
+        var extensionType = GetImplementationType("DurableInboxExtension");
+        var instrumentsType = GetImplementationType("DurableMessagingInstruments");
+        var pumpResultsType = GetImplementationType("DurableMessagingPumpResults");
+        var participantType = GetImplementationType("DurableMessagingGrainParticipant");
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
         services.AddOptions<DurableInboxOptions>().Configure(configure);
-        services.TryAddSingleton<DurableMessagingInstruments>();
+        services.TryAddSingleton(instrumentsType);
 
-        services.TryAddScoped<DurableInboxExtension>(sp =>
-        {
-            var stateManager = sp.GetRequiredService<IJournaledStateManager>();
-            var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
-            return new DurableInboxExtension(
-                sp.GetRequiredService<IGrainContext>(),
-                sp.GetRequiredService<IGrainFactory>(),
-                sp.GetRequiredService<ITimerRegistry>(),
-                stateManager,
-                sp.GetRequiredService<SerializerSessionPool>(),
-                sp.GetRequiredService<ILogger<DurableInboxExtension>>(),
-                sp.GetRequiredService<DurableMessagingInstruments>(),
-                sp.GetRequiredService<DurableInbox>(),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(DurableMessagingStateNames.Inbox),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>(DurableMessagingStateNames.InboxProcessed),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters),
-                sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId),
-                sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle),
-                sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId),
-                sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence),
-                sp.GetRequiredService<IDurableOutbox>(),
-                sp.GetRequiredService<ILocalDurableJobManager>(),
-                sp.GetRequiredService<IDurableJobHandlerRegistry>(),
-                sp.GetRequiredService<DurableMessagingPumpResults>(),
-                sp.GetRequiredService<TimeProvider>(),
-                sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
-                options);
-        });
+        services.TryAddScoped(extensionType, sp => CreateInstance(
+            extensionType,
+            sp.GetRequiredService<IGrainContext>(),
+            sp.GetRequiredService<IGrainFactory>(),
+            sp.GetRequiredService<ITimerRegistry>(),
+            sp.GetRequiredService<IJournaledStateManager>(),
+            sp.GetRequiredService<SerializerSessionPool>(),
+            sp.GetRequiredService(typeof(ILogger<>).MakeGenericType(extensionType)),
+            sp.GetRequiredService(instrumentsType),
+            sp.GetRequiredService(inboxType),
+            GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
+            GetDictionary<(GrainId, Guid), DateTimeOffset>(sp, "inbox-processed"),
+            GetInternalDictionary<(GrainId, Guid)>(sp, "InboxMessageState", "inbox-message-state"),
+            GetInternalDictionary<(GrainId, Guid)>(sp, "InboxDeadLetter", "inbox-dead-letters"),
+            GetValue<string>(sp, "inbox-job-id"),
+            GetValue<DurableJob>(sp, "inbox-job-handle"),
+            GetValue<string>(sp, "inbox-completed-job-id"),
+            GetValue<long>(sp, "inbox-job-sequence"),
+            sp.GetRequiredService<IDurableOutbox>(),
+            sp.GetRequiredService<ILocalDurableJobManager>(),
+            sp.GetRequiredService<IDurableJobHandlerRegistry>(),
+            sp.GetRequiredService(pumpResultsType),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
+            sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value));
 
         services.TryAddKeyedScoped<IGrainExtension>(
             typeof(IDurableInboxExtension),
-            (sp, _) => sp.GetRequiredService<DurableInboxExtension>());
-        services.TryAddScoped<DurableInbox>(sp =>
+            (sp, _) => (IGrainExtension)sp.GetRequiredService(extensionType));
+        services.TryAddScoped(inboxType, sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
-            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState);
-            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters);
-            _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId);
-            _ = sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle);
-            _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId);
-            _ = sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence);
+            _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxMessageState", "inbox-message-state");
+            _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxDeadLetter", "inbox-dead-letters");
+            _ = GetValue<string>(sp, "inbox-job-id");
+            _ = GetValue<DurableJob>(sp, "inbox-job-handle");
+            _ = GetValue<string>(sp, "inbox-completed-job-id");
+            _ = GetValue<long>(sp, "inbox-job-sequence");
             _ = sp.GetRequiredService<IDurableOutbox>();
-            return new DurableInbox(
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(DurableMessagingStateNames.Inbox),
+            return CreateInstance(
+                inboxType,
+                GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
                 sp.GetServices<IInboxHandler>(),
                 options.MaxCapacity);
         });
-        services.TryAddScoped<IDurableInbox>(sp => sp.GetRequiredService<DurableInbox>());
+        services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
         services.AddScoped<IDurableOutbox, JournaledTestOutbox>();
-        services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
-        services.TryAddScoped(sp =>
+        services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
+        services.TryAddScoped(pumpResultsType, sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
             var completedRetentionPeriod = TimeSpan.FromMinutes(10);
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;
-            return new DurableMessagingPumpResults(
+            return CreateInstance(
+                pumpResultsType,
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
                 completedRetentionPeriod,
                 TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
-                maxRetainedEntries: 65_536);
+                65_536);
         });
-        services.TryAddScoped<DurableMessagingGrainParticipant>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
+        services.TryAddScoped(participantType);
+        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IJournaledGrainParticipant), participantType));
     }
+
+    private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName)
+        where TKey : notnull =>
+        services.GetRequiredKeyedService<IDurableDictionary<TKey, TValue>>($"__orleans.durable-messaging.{stateName}");
+
+    private static object GetInternalDictionary<TKey>(IServiceProvider services, string valueType, string stateName) =>
+        services.GetRequiredKeyedService(
+            typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), GetImplementationType(valueType)),
+            $"__orleans.durable-messaging.{stateName}");
+
+    private static IDurableValue<T> GetValue<T>(IServiceProvider services, string stateName) =>
+        services.GetRequiredKeyedService<IDurableValue<T>>($"__orleans.durable-messaging.{stateName}");
+
+    private static object CreateInstance(Type type, params object?[] arguments) =>
+        Activator.CreateInstance(
+            type,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
+            binder: null,
+            arguments,
+            culture: null)!;
 }

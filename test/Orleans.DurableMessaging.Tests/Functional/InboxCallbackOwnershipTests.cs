@@ -22,7 +22,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         await receiver.SeedInboxStateAsync(envelope.Value, null, null);
         var extension = GetExtension(receiver);
         var orphan = CreateJob(receiver, "orphan", "old-shard", "old:1");
-        using var schedule = Fixture.JobManagerProbe.BlockNext(DurableInboxExtension.JobName);
+        using var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
         var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
 
@@ -30,11 +30,11 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         await schedule.WaitUntilEnteredAsync();
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, orphan)).Status);
         Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
-        Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
 
         schedule.Continue();
         await write.WaitUntilEnteredAsync();
-        var scheduled = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        var scheduled = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, orphan)).Status);
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, scheduled)).Status);
         Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
@@ -45,7 +45,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var owned = Fixture.GetSnapshot(receiver);
         Assert.Same(scheduled, owned.InboxJob);
         Assert.Equal(scheduled.Metadata!["orleans.messaging.ownership-id"], owned.InboxJobId);
-        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
         handler.Release();
 
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
@@ -72,13 +72,13 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
 
-        var lifecycle = await Assert.ThrowsAsync<InvalidOperationException>(() => extension.OnStart(TestContext.Current.CancellationToken));
+        var lifecycle = await Assert.ThrowsAsync<InvalidOperationException>(() => ((ILifecycleObserver)extension).OnStart(TestContext.Current.CancellationToken));
         var callback = await Assert.ThrowsAsync<InvalidOperationException>(async () => await ExecuteAsync(extension, handle));
 
         Assert.Equal(lifecycle.Message, callback.Message);
         Assert.Contains(fault == "mismatched-metadata" ? "metadata does not match" : "both be present or both be absent", lifecycle.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
-        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
         Assert.Equal(1, Fixture.GetSnapshot(receiver).InboxCount);
         Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
     }
@@ -145,7 +145,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         handler.Release();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
-        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
     }
 
     [Fact]
@@ -156,11 +156,11 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         _ = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         using var envelope = CreateEnvelope(receiver, NewMessage(94, "duplicate-jobs"), route);
-        Fixture.JobManagerProbe.DuplicateNext(DurableInboxExtension.JobName);
+        Fixture.JobManagerProbe.DuplicateNext(ReceiverTestServices.InboxJobName);
         var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var delivery = DeliverAsync(receiver, envelope.Value);
         await write.WaitUntilEnteredAsync();
-        var jobs = Fixture.JobManagerProbe.GetScheduledJobs(DurableInboxExtension.JobName, receiver.GetGrainId());
+        var jobs = Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId());
         Assert.Equal(2, jobs.Count);
         var extension = GetExtension(receiver);
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, jobs[0])).Status);
@@ -178,10 +178,11 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         Assert.Equal(1, completed.MaxConcurrentHandlers);
     }
 
-    private DurableInboxExtension GetExtension(IDurableMessagingTestGrain receiver) =>
-        Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<DurableInboxExtension>();
+    private IDurableJobFeatureHandler GetExtension(IDurableMessagingTestGrain receiver) =>
+        (IDurableJobFeatureHandler)Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService(
+            ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
 
-    private static ValueTask<DurableJobRunResult> ExecuteAsync(DurableInboxExtension extension, DurableJob job) =>
+    private static ValueTask<DurableJobRunResult> ExecuteAsync(IDurableJobFeatureHandler extension, DurableJob job) =>
         extension.ExecuteJobAsync(new CallbackContext(job), TestContext.Current.CancellationToken);
 
     private static DurableJob CreateJob(IDurableMessagingTestGrain receiver, string id, string shardId, string? ownershipId) =>
@@ -189,10 +190,13 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         {
             Id = id,
             ShardId = shardId,
-            Name = DurableInboxExtension.JobName,
+            Name = ReceiverTestServices.InboxJobName,
             TargetGrainId = receiver.GetGrainId(),
             DueTime = DateTimeOffset.UtcNow,
-            Metadata = ownershipId is null ? null : DurableMessagingJobOwnership.CreateMetadata(ownershipId)
+            Metadata = ownershipId is null ? null : new Dictionary<string, string>
+            {
+                ["orleans.messaging.ownership-id"] = ownershipId
+            }
         };
 
     private sealed class CallbackContext(DurableJob job) : IJobRunContext
