@@ -340,7 +340,7 @@ public sealed class SqsStreamingResourceTests
             });
 
         Assert.Equal(
-            ["sqs-3973e022-0", "sqs-3973e022-1"],
+            [$"{resource.Stack.Resource.Name}-0", $"{resource.Stack.Resource.Name}-1"],
             resource.Queues.Select(queue => queue.Resource.Name));
         Assert.Equal(
             ["orders-service---0", "orders-service---1"],
@@ -365,6 +365,173 @@ public sealed class SqsStreamingResourceTests
         Assert.Equal("cluster-orders-primary-sqs", hyphenated.Stack.Resource.Name);
         Assert.StartsWith("cluster-orders-primary-sqs-", underscored.Stack.Resource.Name);
         Assert.NotEqual(hyphenated.Stack.Resource.Name, underscored.Stack.Resource.Name);
+        Assert.Equal(
+            Enumerable.Range(0, 8).Select(index => $"orders-service-orders-primary-{index}"),
+            GetQueues(hyphenated).Select(queue => queue.QueueName));
+        Assert.Equal(
+            Enumerable.Range(0, 8).Select(index => $"orders-service-orders_primary-{index}"),
+            GetQueues(underscored).Select(queue => queue.QueueName));
+        Assert.Equal(2, orleans.Streaming.Count);
+    }
+
+    [Theory]
+    [InlineData("Orders", "Orders", false)]
+    [InlineData("Orders", "orders", false)]
+    [InlineData("orders_primary", "Orders_primary", false)]
+    [InlineData("orders-primary", "Orders-primary", true)]
+    public void AddSqsStreaming_ConflictingProviderIdentity_PreservesResourcesAndConfiguration(
+        string existingName,
+        string conflictingName,
+        bool fifoQueue)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var existing = orleans.AddSqsStreaming(
+            existingName, aws, new SqsStreamingOptions { ServiceId = ServiceId });
+        var resources = builder.Resources.ToArray();
+        var constructs = existing.Stack.Resource.Stack.Node.FindAll().ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => orleans.AddSqsStreaming(
+                conflictingName,
+                aws,
+                new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 2, FifoQueue = fifoQueue }));
+
+        Assert.Contains("stream provider", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(existingName, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(conflictingName, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Equal(constructs, existing.Stack.Resource.Stack.Node.FindAll());
+        var provider = Assert.Single(orleans.Streaming);
+        Assert.Equal(existingName, provider.Key);
+        Assert.Same(existing, provider.Value);
+    }
+
+    [Theory]
+    [InlineData("Orders", "orders")]
+    [InlineData("orders_primary", "Orders_primary")]
+    public async Task AddSqsStreaming_ExistingOtherProvider_PreservesResourcesAndServiceId(
+        string existingName,
+        string conflictingName)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering().WithMemoryStreaming(existingName);
+        var existing = orleans.Streaming[existingName];
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        await using var application = builder.Build();
+        var environment = await GetEnvironmentAsync(application.Services, silo.Resource);
+        var resources = builder.Resources.ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => orleans.AddSqsStreaming(
+                conflictingName, aws, new SqsStreamingOptions { ServiceId = ServiceId }));
+
+        Assert.Contains("stream provider", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Same(existing, Assert.Single(orleans.Streaming).Value);
+        Assert.Equal(
+            environment.OrderBy(pair => pair.Key),
+            (await GetEnvironmentAsync(application.Services, silo.Resource)).OrderBy(pair => pair.Key));
+    }
+
+    [Theory]
+    [InlineData("service", "Orders", "service", "orders", false)]
+    [InlineData("service", "orders_primary", "service", "Orders_primary", true)]
+    [InlineData("service-orders", "primary", "service", "orders-primary", false)]
+    [InlineData("service-orders", "primary", "service", "orders-primary", true)]
+    public async Task AddSqsStreaming_ConflictingPhysicalTopology_PreservesResourcesAndConfiguration(
+        string existingServiceId,
+        string existingName,
+        string conflictingServiceId,
+        string conflictingName,
+        bool fifoQueue)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var first = builder.AddOrleans("first").WithDevelopmentClustering();
+        var existing = first.AddSqsStreaming(
+            existingName,
+            aws,
+            new SqsStreamingOptions { ServiceId = existingServiceId, PartitionCount = 1, FifoQueue = fifoQueue });
+        var second = builder.AddOrleans("second").WithDevelopmentClustering();
+        var silo = builder.AddContainer("silo", "unused").WithReference(second);
+        await using var application = builder.Build();
+        var environment = await GetEnvironmentAsync(application.Services, silo.Resource);
+        var resources = builder.Resources.ToArray();
+        var constructs = existing.Stack.Resource.Stack.Node.FindAll().ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => second.AddSqsStreaming(
+                conflictingName,
+                aws,
+                new SqsStreamingOptions
+                {
+                    ServiceId = conflictingServiceId, PartitionCount = 2, FifoQueue = fifoQueue,
+                }));
+
+        var queueName = Assert.IsType<string>(Assert.Single(GetQueues(existing)).QueueName);
+        Assert.Contains(queueName, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("us-east-1", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Equal(constructs, existing.Stack.Resource.Stack.Node.FindAll());
+        Assert.Same(existing, Assert.Single(first.Streaming).Value);
+        Assert.Empty(second.Streaming);
+        Assert.Equal(
+            environment.OrderBy(pair => pair.Key),
+            (await GetEnvironmentAsync(application.Services, silo.Resource)).OrderBy(pair => pair.Key));
+    }
+
+    [Fact]
+    public void AddSqsStreaming_SameQueueNamesInDifferentRegions_CreatesSeparateTopologies()
+    {
+        var builder = CreateBuilder();
+        var east = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var west = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USWest2);
+        var options = new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 1 };
+        var first = builder.AddOrleans("first").AddSqsStreaming(ProviderName, east, options);
+        var second = builder.AddOrleans("second").AddSqsStreaming(ProviderName, west, options);
+
+        Assert.Equal(Assert.Single(GetQueues(first)).QueueName, Assert.Single(GetQueues(second)).QueueName);
+        Assert.NotEqual(first.Stack.Resource.Name, second.Stack.Resource.Name);
+        Assert.Equal(2, builder.Resources.OfType<IStackResource>().Count());
+    }
+
+    [Fact]
+    public void AddSqsStreaming_SameProviderInDifferentServices_CreatesSeparateTopologies()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var first = builder.AddOrleans("first").AddSqsStreaming(
+            ProviderName, aws, new SqsStreamingOptions { ServiceId = "first", PartitionCount = 1 });
+        var second = builder.AddOrleans("second").AddSqsStreaming(
+            ProviderName, aws, new SqsStreamingOptions { ServiceId = "second", PartitionCount = 1 });
+
+        Assert.Equal("first-orders-0", Assert.Single(GetQueues(first)).QueueName);
+        Assert.Equal("second-orders-0", Assert.Single(GetQueues(second)).QueueName);
+        Assert.Equal("first-orders-sqs-0", Assert.Single(first.Queues).Resource.Name);
+        Assert.Equal("second-orders-sqs-0", Assert.Single(second.Queues).Resource.Name);
+    }
+
+    [Theory]
+    [InlineData("cluster-orders-sqs")]
+    [InlineData("cluster-orders-sqs-1")]
+    public void AddSqsStreaming_ConflictingResourceName_PreservesResourcesAndConfiguration(string resourceName)
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        builder.AddContainer(resourceName, "unused");
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var resources = builder.Resources.ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => orleans.AddSqsStreaming(
+                ProviderName, aws, new SqsStreamingOptions { ServiceId = ServiceId, PartitionCount = 2 }));
+
+        Assert.Contains(resourceName, exception.Message, StringComparison.Ordinal);
+        Assert.Equal(resources, builder.Resources);
+        Assert.Empty(orleans.Streaming);
     }
 
     [Fact]
