@@ -133,13 +133,20 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                     ReferenceCodec.MarkValueField(reader.Session);
                     var length = reader.ReadVarUInt32();
 
-                    // To possibly improve efficiency, this could be converted to read a ReadOnlySequence<byte> instead of a byte array.
                     var tempBuffer = new PooledBuffer();
                     try
                     {
-                        reader.ReadBytes(ref tempBuffer, (int)length);
-                        var sequence = tempBuffer.AsReadOnlySequence();
-                        var jsonReader = new Utf8JsonReader(sequence, _options.ReaderOptions);
+                        Utf8JsonReader jsonReader;
+                        if (reader.TryReadBytes((int)length, out var span))
+                        {
+                            jsonReader = new Utf8JsonReader(span, _options.ReaderOptions);
+                        }
+                        else
+                        {
+                            reader.ReadBytes(ref tempBuffer, (int)length);
+                            jsonReader = new Utf8JsonReader(tempBuffer.AsReadOnlySequence(), _options.ReaderOptions);
+                        }
+
                         if (typeof(JsonNode).IsAssignableFrom(type!))
                         {
                             result = JsonNode.Parse(ref jsonReader);
