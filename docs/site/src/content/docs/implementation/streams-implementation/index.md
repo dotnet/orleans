@@ -77,7 +77,7 @@ The default maximum adapter batch-container batch size is 1 and the empty-poll p
 
 ### Shutdown and queue handoff
 
-When an agent stops, it closes admission for new background work and stops its polling timer. It waits for receiver initialization, the active queue pump, and accepted producer registrations, subscription handshakes, and deliveries to finish. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Existing delivery time limits and retry policies govern outstanding consumer calls; shutdown stops further delivery attempts.
+When an agent stops, it closes admission for new background work and stops its polling timer. It waits for receiver initialization, the active queue pump, and accepted producer registrations, subscription handshakes, and deliveries to finish. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Outstanding calls retain their existing messaging timeouts and retry limits while accepted work drains.
 
 The agent then reports final delivery progress to the cache, disposes subscription cursors, and shuts down the receiver so provider-specific checkpoint flushing observes the completed progress. Registrations pending when shutdown starts keep the existing checkpoint, since their subscriber positions are still uncertain. Producer unregistration follows receiver cleanup. When the manager reuses an agent for a reassigned queue, initialization waits for that full cleanup and opens admission for the new run.
 
