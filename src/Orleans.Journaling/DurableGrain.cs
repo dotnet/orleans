@@ -8,14 +8,25 @@ namespace Orleans.Journaling;
 public abstract class DurableGrain : Grain, IGrainBase
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="DurableGrain"/> class and associates its state manager with the grain lifecycle.
+    /// Initializes a new instance of the <see cref="DurableGrain"/> class, associates its state manager
+    /// with the grain lifecycle, and initializes its journaled feature participants.
     /// </summary>
+    /// <remarks>
+    /// All registered <see cref="IJournaledGrainParticipant"/> services are constructed before their
+    /// initializers run in registration order. Initialization completes before journal recovery begins.
+    /// Participant construction and initialization failures propagate to the activation caller.
+    /// </remarks>
     protected DurableGrain()
     {
         StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
         if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
+        }
+
+        foreach (var feature in ServiceProvider.GetServices<IJournaledGrainParticipant>().ToArray())
+        {
+            feature.Initialize();
         }
     }
 
