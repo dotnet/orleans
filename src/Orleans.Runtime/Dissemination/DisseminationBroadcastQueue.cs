@@ -467,7 +467,15 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             for (var index = 0; index < rejections; index++)
             {
-                DisseminationInstruments.OnQueueAdmissionRejected(disseminationNamespace.Name);
+                try
+                {
+                    DisseminationInstruments.OnQueueAdmissionRejected(disseminationNamespace.Name);
+                }
+                catch (Exception exception)
+                {
+                    LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
+                }
+
                 try
                 {
                     DisseminationEvents.EmitQueueAdmissionRejected(
@@ -1182,7 +1190,15 @@ internal sealed partial class DisseminationBroadcastQueue
                 try
                 {
                     var response = await sendTask.WaitAsync(sendCancellation.Token);
-                    DisseminationInstruments.OnBroadcastSent(batch.Values, "tree");
+                    try
+                    {
+                        DisseminationInstruments.OnBroadcastSent(batch.Values, "tree");
+                    }
+                    catch (Exception exception)
+                    {
+                        LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
+                    }
+
                     return response;
                 }
                 catch (OperationCanceledException) when (sendCancellation.IsCancellationRequested)
@@ -1197,15 +1213,27 @@ internal sealed partial class DisseminationBroadcastQueue
             }
             catch (OperationCanceledException) when (lifetimeCancellation.IsCancellationRequested)
             {
-                DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Timeout);
+                EmitSendFailure(DisseminationFailureReason.Timeout);
                 LogDebugBroadcastTransportLifetimeExpired(_owner._logger, Peer, transportLifetime);
                 return null;
             }
             catch (Exception exception)
             {
-                DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Error);
+                EmitSendFailure(DisseminationFailureReason.Error);
                 LogDebugDisseminationSendFailed(_owner._logger, exception, Peer);
                 return null;
+            }
+        }
+
+        private void EmitSendFailure(DisseminationFailureReason reason)
+        {
+            try
+            {
+                DisseminationInstruments.OnBroadcastSendFailure(reason);
+            }
+            catch (Exception exception)
+            {
+                LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
             }
         }
 

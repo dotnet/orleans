@@ -12,6 +12,9 @@ internal interface IDisseminationNamespace
 
     DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.BroadcastTree;
 
+    // Full values can be authority-refresh hints even when their numeric version is older.
+    bool ValidateOlderFullValues => false;
+
     DisseminationNamespaceOptions Options { get; }
 
     IEnumerable<DigestEntry> Digests { get; }

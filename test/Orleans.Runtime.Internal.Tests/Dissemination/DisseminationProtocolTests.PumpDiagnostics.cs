@@ -87,9 +87,11 @@ public partial class DisseminationProtocolTests
         var scheduleMetricFailure = new InvalidOperationException("Retry schedule metric callback fails.");
         var pumpStatuses = new ConcurrentQueue<string>();
         var scheduleMetricFailures = 0;
+        var listenerArmed = 0;
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
-            if (instrument.Meter.Name == DisseminationInstruments.MeterName
+            if (Volatile.Read(ref listenerArmed) != 0
+                && instrument.Meter.Name == DisseminationInstruments.MeterName
                 && (instrument.Name == DisseminationInstruments.PumpFailuresName
                     || failScheduleMetric && instrument.Name == DisseminationInstruments.BroadcastScheduledName))
             {
@@ -98,6 +100,11 @@ public partial class DisseminationProtocolTests
         };
         listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
         {
+            if (Volatile.Read(ref listenerArmed) == 0)
+            {
+                return;
+            }
+
             if (instrument.Name == DisseminationInstruments.PumpFailuresName)
             {
                 pumpStatuses.Enqueue((string)Assert.Single(tags.ToArray(), static tag => tag.Key == "status").Value!);
@@ -163,6 +170,7 @@ public partial class DisseminationProtocolTests
                         && value.Reason == DisseminationBroadcastScheduleReason.Retry,
                     TimeSpan.FromSeconds(5), cancellationToken)
                 : null;
+            Volatile.Write(ref listenerArmed, 1);
             listener.Start();
             clock.ThrowOnNextTimerChanges(failedTimerChanges);
             release[0].TrySetResult();
@@ -261,6 +269,7 @@ public partial class DisseminationProtocolTests
         }
         finally
         {
+            Volatile.Write(ref listenerArmed, 0);
             listener.Dispose();
             clock.ThrowOnNextTimerChanges(0);
             foreach (var completion in release)

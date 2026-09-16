@@ -25,6 +25,8 @@ internal sealed class MembershipDisseminationNamespace(
 
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
 
+    public bool ValidateOlderFullValues => true;
+
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public IEnumerable<DisseminationKey> Keys => MembershipKeys;
@@ -163,11 +165,6 @@ internal sealed class MembershipDisseminationNamespace(
 
         // The membership manager merges maximum per-entry IAmAliveTime before publishing a full snapshot.
         var currentSnapshot = membershipManager.CurrentSnapshot;
-        if (snapshot.Version < currentSnapshot.Version)
-        {
-            return DisseminationApplyResult.Obsolete;
-        }
-
         if (snapshot.Version == currentSnapshot.Version)
         {
             // Same-version snapshots can advance liveness or remove inactive entries.
@@ -177,7 +174,10 @@ internal sealed class MembershipDisseminationNamespace(
             }
         }
 
-        return await ApplySnapshot(currentSnapshot, snapshot, cancellationToken);
+        var result = await ApplySnapshot(currentSnapshot, snapshot, cancellationToken);
+        return snapshot.Version < currentSnapshot.Version && result == DisseminationApplyResult.Duplicate
+            ? DisseminationApplyResult.Obsolete
+            : result;
     }
 
     private DisseminationValue CreateSnapshotValue(MembershipTableSnapshot snapshot) => new(

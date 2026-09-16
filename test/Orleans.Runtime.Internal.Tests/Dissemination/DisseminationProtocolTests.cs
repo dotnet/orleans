@@ -4553,7 +4553,12 @@ public partial class DisseminationProtocolTests
                 return handler(snapshot, cancellationToken);
             }
 
-            CurrentSnapshot = snapshot;
+            var previous = CurrentSnapshot;
+            if (snapshot.IsSuccessorTo(previous))
+            {
+                CurrentSnapshot = MembershipTableSnapshot.Update(previous, snapshot);
+            }
+
             return Task.CompletedTask;
         }
 

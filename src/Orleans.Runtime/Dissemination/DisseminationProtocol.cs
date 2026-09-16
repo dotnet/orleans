@@ -82,14 +82,14 @@ internal sealed partial class DisseminationProtocol
         using var admission = _admission.TryEnter();
         if (!admission.Entered)
         {
-            DisseminationInstruments.OnPublication(disseminationNamespace.Name, accepted: false, reason: "stopping");
+            EmitPublication(disseminationNamespace.Name, accepted: false, reason: "stopping");
             return false;
         }
 
         var options = _options.CurrentValue;
         if (!options.Enabled || !disseminationNamespace.Options.Enabled)
         {
-            DisseminationInstruments.OnPublication(
+            EmitPublication(
                 disseminationNamespace.Name,
                 accepted: false,
                 reason: "disabled");
@@ -105,7 +105,7 @@ internal sealed partial class DisseminationProtocol
             out var publishedVersion,
             out var reason))
         {
-            DisseminationInstruments.OnPublication(
+            EmitPublication(
                 disseminationNamespace.Name,
                 accepted: false,
                 reason: reason);
@@ -118,7 +118,7 @@ internal sealed partial class DisseminationProtocol
             cancellationToken);
         if (membership is null)
         {
-            DisseminationInstruments.OnPublication(
+            EmitPublication(
                 disseminationNamespace.Name,
                 accepted: false,
                 "membership-unavailable");
@@ -135,7 +135,7 @@ internal sealed partial class DisseminationProtocol
                 immediate: disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree && !membership.IsAggregationRoot);
         }
 
-        DisseminationInstruments.OnPublication(
+        EmitPublication(
             disseminationNamespace.Name,
             accepted,
             reason: accepted ? "none" : "queue-rejected");
@@ -174,7 +174,15 @@ internal sealed partial class DisseminationProtocol
         foreach (var (namespaceName, values) in selectedValues)
         {
             var disseminationNamespace = _namespaces[namespaceName];
-            DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
+            try
+            {
+                DisseminationInstruments.OnBroadcastReceived(disseminationNamespace.Name, "tree", values.Count);
+            }
+            catch (Exception exception)
+            {
+                LogDebugProtocolDiagnosticFailed(_logger, exception, batch.Sender, "broadcast-receive");
+            }
+
             ConfirmPeerNamespaces(batch.Sender, [namespaceName]);
             var namespaceKeys = new Dictionary<DisseminationKey, ReceivedKeyState>();
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
@@ -571,7 +579,8 @@ internal sealed partial class DisseminationProtocol
             exchangeTask.Ignore();
             var response = await exchangeTask.WaitAsync(cancellationToken).ConfigureAwait(false);
             // Record exchange metrics after the peer returns so truncation and repair counts reflect the response.
-            DisseminationInstruments.OnAntiEntropyExchange(
+            EmitAntiEntropyExchange(
+                peer,
                 "out",
                 requestDigestCount,
                 GetValueCount(response.Values),
@@ -584,13 +593,13 @@ internal sealed partial class DisseminationProtocol
         }
         catch (OperationCanceledException) when (lifetimeCancellationToken.IsCancellationRequested)
         {
-            DisseminationInstruments.OnAntiEntropyFailure(DisseminationFailureReason.Timeout);
+            EmitAntiEntropyFailure(peer, DisseminationFailureReason.Timeout);
             return null;
         }
         catch (Exception exception)
         {
             // Anti-entropy transport failures are isolated to the peer; random peer selection naturally spreads retries.
-            DisseminationInstruments.OnAntiEntropyFailure(DisseminationFailureReason.Error);
+            EmitAntiEntropyFailure(peer, DisseminationFailureReason.Error);
             LogDebugDisseminationSendFailed(_logger, exception, peer);
             return null;
         }
@@ -955,7 +964,7 @@ Complete:
                     continue;
                 }
 
-                if (localDigest.Version < peerDigest.Version
+                if (localDigest.Version < peerDigest.Version && !requestedNamespace.ValidateOlderFullValues
                     || localDigest.Version == peerDigest.Version
                     && localDigest.Fingerprint == peerDigest.Fingerprint)
                 {
@@ -1051,7 +1060,7 @@ Complete:
             ClearAntiEntropyResponseCursor(request.Sender);
         }
 
-        DisseminationInstruments.OnAntiEntropyExchange("in", GetDigestCount(request.Digests), valueCount, truncated);
+        EmitAntiEntropyExchange(request.Sender, "in", GetDigestCount(request.Digests), valueCount, truncated);
         return new DisseminationAntiEntropyResponse
         {
             Sender = _localSilo,
@@ -1572,7 +1581,7 @@ Complete:
         }
 
         var localVersion = disseminationNamespace.GetVersion(value.Key);
-        if (value.ToVersion < localVersion)
+        if (value.ToVersion < localVersion && !(value.FromVersion == 0 && disseminationNamespace.ValidateOlderFullValues))
         {
             result = DisseminationApplyResult.Obsolete;
             return true;
@@ -1619,6 +1628,42 @@ Complete:
     }
 
     private static int GetDigestCount(Dictionary<DisseminationNamespace, List<DigestEntry>> digest) => digest.Values.Sum(entries => entries.Count);
+
+    private void EmitPublication(DisseminationNamespace namespaceName, bool accepted, string reason)
+    {
+        try
+        {
+            DisseminationInstruments.OnPublication(namespaceName, accepted, reason);
+        }
+        catch (Exception exception)
+        {
+            LogDebugProtocolDiagnosticFailed(_logger, exception, _localSilo, "publication");
+        }
+    }
+
+    private void EmitAntiEntropyExchange(SiloAddress peer, string direction, int digests, int values, bool truncated)
+    {
+        try
+        {
+            DisseminationInstruments.OnAntiEntropyExchange(direction, digests, values, truncated);
+        }
+        catch (Exception exception)
+        {
+            LogDebugProtocolDiagnosticFailed(_logger, exception, peer, "anti-entropy-exchange");
+        }
+    }
+
+    private void EmitAntiEntropyFailure(SiloAddress peer, DisseminationFailureReason reason)
+    {
+        try
+        {
+            DisseminationInstruments.OnAntiEntropyFailure(reason);
+        }
+        catch (Exception exception)
+        {
+            LogDebugProtocolDiagnosticFailed(_logger, exception, peer, "anti-entropy-failure");
+        }
+    }
 
     private static Dictionary<DisseminationKey, DigestEntry> CreateDigestLookup(List<DigestEntry> digest)
     {
@@ -1669,6 +1714,11 @@ Complete:
         IDisseminationNamespace Namespace,
         DigestEntry LocalDigest,
         DigestEntry PeerDigest);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dissemination protocol diagnostic for {Peer} during {Operation} failed.")]
+    private static partial void LogDebugProtocolDiagnosticFailed(ILogger logger, Exception exception, SiloAddress peer, string operation);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
