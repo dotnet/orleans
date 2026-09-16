@@ -1,5 +1,6 @@
 using NSubstitute;
 using Orleans.Concurrency;
+using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
@@ -12,6 +13,30 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 [TestArea("DurableMessaging")]
 public sealed class ActivationValidationTests
 {
+    private static readonly Action<IGrainContext> ValidateActivation = ReceiverTestServices
+        .GetImplementationType("DurableMessagingActivationValidator")
+        .GetMethod("Validate")!
+        .CreateDelegate<Action<IGrainContext>>();
+    private static readonly Action<IJournaledStateManager, IJournaledStateObserver> RegisterObserver = ReceiverTestServices
+        .GetImplementationType("DurableMessagingStateManagerCapabilities")
+        .GetMethod("RegisterObserver")!
+        .CreateDelegate<Action<IJournaledStateManager, IJournaledStateObserver>>();
+
+    [Fact]
+    public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
+    {
+        var sourceAssembly = typeof(IDurableInbox).Assembly;
+        var consumerName = typeof(ActivationValidationTests).Assembly.GetName().Name;
+        var friendDeclarations = sourceAssembly
+            .GetCustomAttributesData()
+            .Where(attribute => attribute.AttributeType.FullName == "System.Runtime.CompilerServices.InternalsVisibleToAttribute")
+            .Select(attribute => attribute.ConstructorArguments[0].Value?.ToString())
+            .ToArray();
+
+        Assert.DoesNotContain(friendDeclarations, declaration =>
+            declaration?.StartsWith(consumerName!, StringComparison.Ordinal) == true);
+    }
+
     [Theory]
     [InlineData("reentrant", "non-reentrant")]
     [InlineData("stateless", "one activation")]
@@ -30,7 +55,7 @@ public sealed class ActivationValidationTests
         var context = Substitute.For<IGrainContext>();
         context.GrainInstance.Returns(grain);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => DurableMessagingActivationValidator.Validate(context));
+        var exception = Assert.Throws<InvalidOperationException>(() => ValidateActivation(context));
 
         Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
         Assert.Contains(grain.GetType().ToString(), exception.Message, StringComparison.Ordinal);
@@ -41,7 +66,7 @@ public sealed class ActivationValidationTests
     {
         var context = Substitute.For<IGrainContext>();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => DurableMessagingActivationValidator.Validate(context));
+        var exception = Assert.Throws<InvalidOperationException>(() => ValidateActivation(context));
 
         Assert.Contains("initialized grain instance", exception.Message, StringComparison.Ordinal);
     }
@@ -55,7 +80,7 @@ public sealed class ActivationValidationTests
         manager.When(value => value.RegisterObserver(observer)).Do(_ => throw cause);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            DurableMessagingStateManagerCapabilities.RegisterObserver(manager, observer));
+            RegisterObserver(manager, observer));
 
         Assert.Contains("IJournaledStateManager.RegisterObserver", exception.Message, StringComparison.Ordinal);
         Assert.Same(cause, exception.InnerException);
@@ -70,7 +95,7 @@ public sealed class ActivationValidationTests
         manager.When(value => value.RegisterObserver(observer)).Do(_ => throw cause);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            DurableMessagingStateManagerCapabilities.RegisterObserver(manager, observer));
+            RegisterObserver(manager, observer));
 
         Assert.Same(cause, exception);
     }
