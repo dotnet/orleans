@@ -8,6 +8,9 @@ namespace Orleans.Streams;
 /// the subscription can advance the prefix immediately. Matching records and subsequent
 /// scans remain pending until the owner acknowledges the entire selected delivery batch.
 /// Cursor selection and materialization failures preserve the position for retry.
+/// Checkpointing owners report failures through this interface. The legacy
+/// <see cref="IQueueCacheCursor.RecordDeliveryFailure"/> callback retains the provider's
+/// receipt-based failure-disposition semantics.
 /// Implementing this cursor capability does not, by itself, make a cache a checkpointing
 /// cache; that capability is advertised by <see cref="ICheckpointingQueueCache"/>.
 /// An observed cache miss remains unresolved until the owner deliberately acquires a new cursor.

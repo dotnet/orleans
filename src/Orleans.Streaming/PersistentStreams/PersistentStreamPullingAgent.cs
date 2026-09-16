@@ -1597,7 +1597,7 @@ namespace Orleans.Streams
                         exceptionOccured = exc;
                         if (progressCursor is not null)
                         {
-                            consumerData.Cursor.RecordDeliveryFailure();
+                            progressCursor.RecordDeliveryFailure();
                         }
                         else
                         {
@@ -1738,7 +1738,11 @@ namespace Orleans.Streams
                             continue;
                         }
 
-                        if (batchCursor is not null && nextBatch.Batch is not null)
+                        if (queueCache is ICheckpointingQueueCache && progressCursor is not null)
+                        {
+                            progressCursor.RecordDeliveryFailure();
+                        }
+                        else if (batchCursor is not null && nextBatch.Batch is not null)
                         {
                             batchCursor.RecordDeliveryFailure(nextBatch.Batch);
                         }
@@ -1765,8 +1769,11 @@ namespace Orleans.Streams
                             forceFaultSubscription,
                             cancellationToken);
                         if (faultedSubscription) return;
-                        // Retry the retained cursor on the next pump, using the existing retry budget.
-                        break;
+                        if (queueCache is ICheckpointingQueueCache || nextBatch.Batch is null)
+                        {
+                            // Retry the retained cursor on the next pump, using the existing retry budget.
+                            break;
+                        }
                     }
                 }
                 consumerData.State = StreamConsumerDataState.Inactive;

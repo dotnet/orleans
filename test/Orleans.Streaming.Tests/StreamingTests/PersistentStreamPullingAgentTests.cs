@@ -547,6 +547,20 @@ namespace UnitTests.StreamingTests
                 => DeliveryProgressTokens.Add(earliestSubscriptionToken);
         }
 
+        private sealed class ReceiptQueueCache(IQueueCache cache) : IQueueCache
+        {
+            public int GetMaxAddCount() => cache.GetMaxAddCount();
+            public void AddToCache(IList<IBatchContainer> messages) => cache.AddToCache(messages);
+            public bool TryPurgeFromCache([System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out IList<IBatchContainer> purgedItems)
+                => cache.TryPurgeFromCache(out purgedItems);
+            public bool IsUnderPressure() => cache.IsUnderPressure();
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token) => cache.GetCacheCursor(streamId, token);
+            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+                => cache.TryGetCacheCursor(streamId, token);
+            public QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition position)
+                => cache.TryGetCacheCursorAtPosition(streamId, position);
+        }
+
         private sealed class RecordingQueueCache : ICheckpointingQueueCache
         {
             public Exception? ProgressException { get; set; }
@@ -643,6 +657,7 @@ namespace UnitTests.StreamingTests
                 public bool MoveNext() => cursor.MoveNext();
                 public void Refresh(StreamSequenceToken token) => cursor.Refresh(token);
                 public void RecordDeliveryFailure() => cursor.RecordDeliveryFailure();
+                void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
                 public void RecordDeliveryFailure(IBatchContainer batch) => cursor.RecordDeliveryFailure();
                 public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)cursor).SafeSequenceToken;
                 public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)cursor).SetDeliveredThrough(token);
@@ -789,6 +804,7 @@ namespace UnitTests.StreamingTests
                 => successfulMoves-- == 0 ? throw Failure : inner.MoveNextWithResult();
             public void Refresh(StreamSequenceToken token) => inner.Refresh(token);
             public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
+            void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
             public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
             public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)inner).RecordDeliverySuccess();
@@ -4151,7 +4167,7 @@ namespace UnitTests.StreamingTests
         private static async Task<CheckpointScenario> CreateCheckpointScenario(
             bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null,
             TimeProvider? timeProvider = null, ILoggerFactory? loggerFactory = null, bool retainPurgeMetadata = false,
-            IBackoffProvider? deliveryBackoff = null)
+            IBackoffProvider? deliveryBackoff = null, bool checkpointing = true)
         {
             IQueueCache cache;
             List<StreamSequenceToken?> checkpoints;
@@ -4176,7 +4192,7 @@ namespace UnitTests.StreamingTests
             var idleId = new QualifiedStreamId("provider", StreamId.Create("idle", Guid.NewGuid()));
             var busyId = new QualifiedStreamId("provider", StreamId.Create("busy", Guid.NewGuid()));
             var (accessor, _, idleStream) = await CreateInitializedAgentWithStream(
-                idleId, new EventSequenceTokenV2(1), cache,
+                idleId, new EventSequenceTokenV2(1), checkpointing ? cache : new ReceiptQueueCache(cache),
                 new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize },
                 filtered ? Substitute.For<IStreamFilter>() : null, timeProvider, loggerFactory: loggerFactory,
                 deliveryBackoff: deliveryBackoff);

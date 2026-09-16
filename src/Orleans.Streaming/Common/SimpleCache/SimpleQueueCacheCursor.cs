@@ -201,6 +201,18 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void RecordDeliveryFailure()
         {
+            MarkPendingDeliveryFailure();
+            ClearPendingDelivery();
+        }
+
+        void IQueueCacheCursorProgress.RecordDeliveryFailure()
+        {
+            MarkPendingDeliveryFailure();
+            RewindPendingDelivery();
+        }
+
+        private void MarkPendingDeliveryFailure()
+        {
             if (CacheMiss is { } observedMiss)
             {
                 throw observedMiss.ToException();
@@ -218,8 +230,6 @@ namespace Orleans.Providers.Streams.Common
                     break;
                 }
             }
-
-            RewindPendingDelivery();
         }
 
         IDisposable IQueueCacheCursorBatchDelivery.ProtectDeliveryBatch()
@@ -240,7 +250,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             deliveryBatch.RecordDeliveryFailure(batch);
-            RewindPendingDelivery();
+            ClearPendingDelivery();
         }
 
         StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken => safeSequenceToken;
