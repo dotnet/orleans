@@ -62,6 +62,7 @@ namespace Orleans.Runtime
                 TargetGrain = request.SendingGrain,
                 SendingSilo = request.TargetSilo,
                 SendingGrain = request.TargetGrain,
+                ForwardCount = request.ForwardCount,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
                 TimeToLive = request.TimeToLive,
                 GatewayRequestAttempt = request.GatewayRequestAttempt,
