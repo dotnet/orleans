@@ -729,6 +729,11 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.Contains("queued before recovery discarded its mutations", exception.Message, StringComparison.Ordinal);
         Assert.Empty(storage.Appends);
+
+        value.Value = 3;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(storage.Appends);
     }
 
     [Fact]

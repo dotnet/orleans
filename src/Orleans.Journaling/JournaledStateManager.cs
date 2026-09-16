@@ -205,13 +205,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             needsRecovery = false;
                             CompleteRecoveryTrigger();
                         }
-                        catch
+                        catch (Exception exception)
                         {
                             lock (_lock)
                             {
                                 if (fenceOnFailure)
                                 {
                                     _state = ManagerState.Fenced;
+                                    FaultQueuedWorkItemsUnderLock(exception);
                                 }
                             }
 
@@ -591,6 +592,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 lock (_lock)
                 {
                     needsRecovery = _state is not ManagerState.Fenced;
+                    if (needsRecovery)
+                    {
+                        FaultQueuedWorkItemsUnderLock(exception);
+                    }
                 }
                 if (_shutdownCancellation.Token.IsCancellationRequested)
                 {
@@ -600,7 +605,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                 try
                 {
-                    FaultQueuedWorkItems(exception);
                     LogErrorProcessingWorkItems(_shared.Logger, exception);
                 }
                 finally
@@ -623,15 +627,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    private void FaultQueuedWorkItems(Exception exception)
+    private void FaultQueuedWorkItemsUnderLock(Exception exception)
     {
-        lock (_lock)
+        while (_workQueue.TryDequeue(out var workItem))
         {
-            while (_workQueue.TryDequeue(out var workItem))
-            {
-                workItem.TrySetException(exception);
-            }
-
+            workItem.TrySetException(exception);
         }
     }
 
@@ -1044,6 +1044,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         foreach (var workItem in _workQueue)
         {
             if (workItem.GetType() != typeof(TWorkItem))
+            {
+                continue;
+            }
+
+            if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem
+                && workItem.RecoveryGeneration != _recoveryGeneration)
             {
                 continue;
             }
