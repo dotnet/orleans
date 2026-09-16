@@ -734,7 +734,6 @@ public partial class JournaledJobShardManagerTests
         public void RegisterState(string name, IJournaledState state) => inner.RegisterState(name, state);
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => inner.TryGetState(name, out state);
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => inner.RevertPendingChangesAsync(cancellationToken);
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
 
         public async ValueTask DisposeAsync()

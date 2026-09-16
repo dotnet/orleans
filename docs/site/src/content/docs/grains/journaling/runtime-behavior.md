@@ -35,29 +35,52 @@ Durable collections encode their operation before applying it to the in-memory c
 Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
 
 > [!IMPORTANT]
-> In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> completes. Recovery can rewind changes that were never acknowledged by storage.
+> In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> completes. Recovery reconstructs durable state in a new activation.
+
+## Safe-to-commit staging
+
+All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
+and proposed output in operation-local data. After establishing that an outcome is safe to commit, apply its
+mutations to durable state and initiate a write. Coordinate that transition with other interleaved operations
+which can affect the same decision. Any caller's write can include staged mutations from other calls.
+
+If an application error occurs after staging and makes those mutations unsafe to commit, end the activation's
+use of the manager and request deactivation. In-flight methods can retain local decisions and references
+across awaits; a fresh activation reconstructs both application and durable state together.
 
 ## Consistency and competing writers
 
 Orleans grain placement normally supplies a single active writer for a grain identity. Journal storage providers also use optimistic concurrency to protect the journal when a stale or competing writer reaches storage.
 
-An append, replacement, or delete with stale storage metadata throws <xref:Orleans.Storage.InconsistentStateException>. The state manager marks the journal for recovery, resets its in-memory durable states, and replays the current stored journal before processing later work. The failed write task remains faulted so the grain call reports an uncertain outcome.
+An append, replacement, or delete with stale storage metadata throws <xref:Orleans.Storage.InconsistentStateException>. The state manager permanently fences further operations, faults queued work, and requests grain deactivation. The failed operation reports its original exception. A new activation replays the stored journal to determine the durable outcome.
 
 Design commands to tolerate retries at the application boundary. Use operation identifiers when a caller can repeat a command after an uncertain network outcome.
 
 ## Storage failures
 
-A normal append failure leaves encoded pending entries available for a later write attempt.
+A failed append, snapshot replacement, delete, or initialization permanently fences that manager instance.
+Queued operations fault, and later write, delete, registration, and initialization requests fail explicitly.
+Existing in-memory state remains available to in-flight calls until deactivation completes. The grain runtime
+starts deactivation as part of handling the failure.
 
-A compaction write has two storage stages: it first appends committed pending entries, then publishes a snapshot replacement. The append can succeed before the replacement fails. In that outcome, <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> faults even though the state mutation is durable in the append history. Treat every failed write as an uncertain application outcome and retry commands using an operation identifier or another idempotency mechanism.
+A storage operation can commit before its acknowledgement is lost. Treat a failed write as an uncertain
+application outcome and reconcile in a new activation using an operation identifier or another idempotency
+mechanism.
 
-Recovery exceptions fault activation or queued work rather than replacing or truncating stored data. Restore the required format/codec registration or repair the backing data before retrying activation.
+Owners of standalone managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory>
+dispose the failed manager and create a new one for the same <xref:Orleans.Journaling.JournalId>. Register
+new durable state instances and initialize them before resuming processing.
+
+Cancelling a write's cancellation token stops the caller's wait. An already queued write continues to its
+storage outcome, so the caller reconciles that outcome before retrying the command.
+
+An initialization failure preserves stored data for diagnosis. Restore the required format/codec registration
+or repair the backing data before creating a fresh manager or retrying activation.
 
 ## Compaction
 
 Each provider reports when its journal crosses a configured storage threshold. The next <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*>:
 
-1. Persists any already-buffered append data.
 1. Builds a snapshot containing the state directory and every active durable state.
 1. Atomically replaces the published journal with the snapshot.
 1. Clears the compaction request after storage acknowledges the replacement.

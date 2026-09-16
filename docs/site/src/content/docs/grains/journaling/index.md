@@ -26,6 +26,10 @@ A journaling grain derives from <xref:Orleans.Journaling.DurableGrain> and recei
 
 Mutations update the activation's in-memory state and add encoded operations to its pending journal buffer. Await <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> at the application durability point. The returned task completes after the storage provider acknowledges the append or snapshot replacement.
 
+Prepare fallible work in operation-local data and stage mutations once they are safe to commit. Interleaved
+calls share the pending journal. A failed journal operation fences the manager and requests grain deactivation;
+a fresh activation reconstructs the durable outcome before processing resumes.
+
 Each named state has a stable stream identity within the grain journal. Keep those names stable across deployments so recovery can bind stored operations to the intended state.
 
 ## Journal lifecycle

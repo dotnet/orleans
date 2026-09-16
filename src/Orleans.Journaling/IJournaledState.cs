@@ -14,7 +14,7 @@ namespace Orleans.Journaling;
 /// both apply the mutation locally and emit the corresponding command to the journal).
 /// </item>
 /// <item>
-/// At the end of the grain turn, the journaled state manager calls
+/// When the application requests a write, the journaled state manager calls
 /// <see cref="AppendEntries"/> (and occasionally <see cref="AppendSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
@@ -25,16 +25,14 @@ namespace Orleans.Journaling;
 /// rather than treating in-memory mutations as durable.
 /// </item>
 /// <item>
-/// On failure, the journaled state manager triggers recovery by calling <see cref="Reset"/>
-/// followed by replaying snapshots and entries from durable storage. Implementations must
-/// therefore make any volatile in-memory bookkeeping fully recoverable from the journal.
+/// A failed journal operation permanently fences the manager and requests grain deactivation.
+/// A new manager initializes new state instances by calling <see cref="Reset"/> and replaying durable entries.
 /// </item>
 /// </list>
 /// <para>
-/// In other words, <em>in-memory mutations are journaled within the same grain turn and become
-/// durable when the journal flushes</em>. Implementations are free to apply mutations eagerly
-/// (before the durable write completes); recovery rebuilds in-memory state from the journal,
-/// so a turn-failure-and-recovery cycle observably rewinds any unflushed changes.
+/// Application code prepares fallible work in operation-local data and stages only mutations which are
+/// safe to commit. Staged mutations are shared by all interleaved callers using the same manager.
+/// Storage acknowledgement establishes durability; recovery takes place in a fresh manager and state instances.
 /// </para>
 /// </remarks>
 public interface IJournaledState
@@ -55,7 +53,7 @@ public interface IJournaledState
     /// </summary>
     /// <remarks>
     /// If the state has any volatile state, it must be cleared by this method.
-    /// This method can be called at any point in the state's lifetime, including during recovery.
+    /// The manager calls this method when binding a stream, deleting the journal, or retiring a state.
     /// </remarks>
     void Reset(JournalStreamWriter writer);
 
