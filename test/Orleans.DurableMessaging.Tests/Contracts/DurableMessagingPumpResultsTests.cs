@@ -40,6 +40,24 @@ public sealed class DurableMessagingPumpResultsTests
         Assert.IsType<OperationCanceledException>(exception);
     }
 
+
+    [Fact]
+    public void AlreadyCanceledToken_CompletesBeforeRegistrationInstallWithoutRetainingRegistration()
+    {
+        var results = new PumpResults();
+        var key = results.CreateKey("job", "id", "run");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.True(results.TryStartWithCancellation(key, out var execution, cancellation.Token));
+
+        Assert.False(results.HasCancellationRegistration(key));
+        Assert.False(results.TryBegin(execution));
+        Assert.True(results.TryTake(key, out var result, out var exception));
+        Assert.Null(result);
+        Assert.IsType<OperationCanceledException>(exception);
+    }
+
     [Fact]
     public void RunningExecution_DoesNotRetainAttemptCancellationRegistration()
     {
@@ -52,6 +70,24 @@ public sealed class DurableMessagingPumpResultsTests
         Assert.True(results.TryBegin(execution));
 
         Assert.False(results.HasCancellationRegistration(key));
+    }
+
+
+    [Fact]
+    public void CompletedWaitingExecution_DoesNotRetainAttemptCancellationRegistration()
+    {
+        var results = new PumpResults();
+        var key = results.CreateKey("job", "id", "run");
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.True(results.TryStartWithCancellation(key, out var execution, cancellation.Token));
+        Assert.True(results.HasCancellationRegistration(key));
+        results.Complete(execution);
+
+        Assert.False(results.HasCancellationRegistration(key));
+        Assert.True(results.TryTake(key, out var result, out var exception));
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Null(exception);
     }
 
     [Fact]

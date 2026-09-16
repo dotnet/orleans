@@ -220,6 +220,7 @@ internal sealed class DurableMessagingPumpResults
         DurableJobRunResult? result,
         Exception? exception)
     {
+        CancellationTokenRegistration registration = default;
         List<Entry>? removed;
         lock (_lock)
         {
@@ -232,11 +233,14 @@ internal sealed class DurableMessagingPumpResults
                 entry.Exception = exception;
                 entry.State = EntryState.Completed;
                 entry.CompletedAt = now;
+                registration = entry.CancellationRegistration;
+                entry.CancellationRegistration = default;
             }
 
             removed = Prune(now, force: _entries.Count > _maxRetainedEntries);
         }
 
+        registration.Dispose();
         DisposeRegistrations(removed);
     }
 
