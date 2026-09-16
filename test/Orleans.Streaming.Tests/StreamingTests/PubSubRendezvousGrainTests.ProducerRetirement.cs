@@ -270,8 +270,8 @@ public partial class PubSubRendezvousGrainTests
                 var cancellationToken = TestContext.Current.CancellationToken;
                 // Register before producers so setup cannot be confused with removal callbacks.
                 await result.PubSub.RegisterConsumer(result.SubscriptionId, result.StreamId, default, null, cancellationToken);
-                var requesterSubscriptions = await result.PubSub.RegisterProducer(result.StreamId, result.RequesterContext.GrainId, cancellationToken);
-                var otherSubscriptions = await result.PubSub.RegisterProducer(result.StreamId, result.OtherContext.GrainId, cancellationToken);
+                var requesterSubscriptions = await result.PubSub.RegisterProducer(result.StreamId, result.RequesterContext.GrainId, cancellationToken: cancellationToken);
+                var otherSubscriptions = await result.PubSub.RegisterProducer(result.StreamId, result.OtherContext.GrainId, cancellationToken: cancellationToken);
                 Assert.Equal(result.SubscriptionId, Assert.Single(requesterSubscriptions).SubscriptionId);
                 Assert.Equal(result.SubscriptionId, Assert.Single(otherSubscriptions).SubscriptionId);
                 return result;
