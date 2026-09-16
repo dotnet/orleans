@@ -9,9 +9,7 @@ internal sealed record NodeConfiguration(
     int SiloPort,
     int ParentProcessId,
     bool Enabled,
-    bool FastRecovery = true,
-    int SiloProcessorCount = 0,
-    int GCConserveMemory = 0);
+    bool FastRecovery = true);
 
 internal sealed record Command(
     int Id,
@@ -44,8 +42,6 @@ internal sealed record AssemblyProof(
     string ModuleVersionId,
     string Sha256,
     string Path);
-
-internal sealed record MetricValue(long Count, double Sum);
 
 internal sealed record TreeGateSnapshot(bool Blocked, int InFlight, long Admitted, long Rejected);
 
@@ -234,27 +230,9 @@ internal sealed record NodeSnapshot
     public required SortedDictionary<string, long> LoadVersions { get; init; }
     public required string[] ActiveMembers { get; init; }
     public required string[] UnconfirmedPeers { get; init; }
-    public required string[] OriginatorTargets { get; init; }
-    public required string[] ForwardingTargets { get; init; }
-    public string[] TopologyMembers { get; init; } = [];
-    public int Fanout { get; init; }
-    public bool AggregationTree { get; init; }
-    public int AntiEntropyPeerCount { get; init; }
-    public double AntiEntropyIntervalMilliseconds { get; init; }
-    public required Dictionary<string, MetricValue> Metrics { get; init; }
+    public long BroadcastsSent { get; init; }
+    public long OutgoingRepairs { get; init; }
     public required ApplyEvidence[] Applies { get; init; }
-    public long TransportBytesWritten { get; init; }
-    public long TransportBytesRead { get; init; }
-    public double SocketBytesSent { get; init; }
-    public double SocketBytesReceived { get; init; }
-    public long SocketCounterSamples { get; init; }
-    public double CpuMilliseconds { get; init; }
-    public long AllocatedBytes { get; init; }
-    public long ManagedHeapBytes { get; init; }
-    public long WorkingSetBytes { get; init; }
-    public long PrivateBytes { get; init; }
-    public int ProcessorCount { get; init; }
-    public bool ServerGC { get; init; }
     public int PendingControlCalls { get; init; }
     public int StartedControlCalls { get; init; }
     public int CancelledControlCalls { get; init; }

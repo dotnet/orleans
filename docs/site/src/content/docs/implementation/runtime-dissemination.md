@@ -111,13 +111,13 @@ The anti-entropy loop waits without periodic timer wakeups while the subsystem i
 
 Enablement requires representative measurements of convergence, RPC volume, serialized bytes, allocation, CPU, and tail latency across stable membership, churn, and partition recovery. Tree delivery can reduce RPC counts while increasing serialized bytes through forwarding and repair. Compare the original runtime, the updated explicitly disabled path, and the enabled path at the intended cluster sizes and publication rates, including skewed peer speeds and rolling upgrades.
 
-### Measuring cluster-size scaling
+### Compatibility and recovery validation
 
-The evidence workflow pairs the same current binary with dissemination disabled and enabled. Reports retain raw totals and normalize RPCs, serialized bytes, allocations, and CPU by offered publication count. Actual live silo count, binary identity, workload, and resource settings must match within each pair. End-to-end convergence is reported alongside publication duration and the remaining convergence wait, making the controller's sequential publication work and 100 ms polling cadence visible.
+The `Dissemination compatibility` workflow builds the pre-feature runtime and current candidate in isolated checkouts, then starts separate silo processes. Assembly identities, hashes, and paths establish which binary each process actually loaded. Rolling-upgrade and rollback tests exercise old binaries alongside enabled and explicitly disabled current binaries.
 
-The opt-in `dissemination-scale` PR label or scale dispatch runs separate jobs at 8, 16, 32, 64, and 100 silo processes. Each size uses ten publication rounds and two order-reversed repetitions of the current off/on stable workload. The regular three-path 4/8-silo stable, churn, and partition checks remain in place. Remove the label after collecting a curve to return subsequent pushes to the small profile.
+Four- and eight-silo partition tests cover all three runtime modes. Healing drains affected connections at both endpoints, including unfinished handshakes, then confirms acknowledged bidirectional control calls before offering one publication round. Convergence requires exact load inventory and values. Recovery diagnostics include connection draining and readiness in elapsed time.
 
-The large curve uses a runtime processor-count override of one and `GCConserveMemory=9` uniformly across sizes and variants. All silo processes share the runner's physical CPUs. Artifacts record the effective processor count, GC mode, host memory, startup costs, per-node measurements, and paired results. A memory preflight reserves a planning allowance of 128 MiB per silo plus 1 GiB for the controller. These single-host results expose protocol scaling under shared CPU and memory; cross-machine capacity and production tail latency require a separately provisioned deployment.
+Additional tests isolate anti-entropy from tree delivery, direct gossip, and membership-table reads to establish history-miss and same-version heartbeat repair. Cancellation and partitioned shutdown have explicit completion bounds. Artifacts retain test results, binary manifests, process logs, and failure snapshots for diagnosis. Performance comparisons use separately maintained, explicitly invoked tooling.
 
 ## Broadcast pumps and backpressure
 

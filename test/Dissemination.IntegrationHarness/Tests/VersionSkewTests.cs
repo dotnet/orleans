@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Xunit;
 
@@ -8,34 +9,51 @@ namespace Orleans.Dissemination.IntegrationHarness;
 public sealed class VersionSkewTests
 {
     [Theory]
-    [InlineData("Old", false)]
-    [InlineData("New", false)]
-    [InlineData("New", true)]
+    [InlineData("Old", false, 4)]
+    [InlineData("Old", false, 8)]
+    [InlineData("New", false, 4)]
+    [InlineData("New", false, 8)]
+    [InlineData("New", true, 4)]
+    [InlineData("New", true, 8)]
     [Trait("Category", "DisseminationProcess")]
-    public async Task PartitionHealing_ConfirmsTransportBeforeSinglePublicationRound(string runtime, bool enabled)
+    public async Task PartitionHealing_ConfirmsTransportBeforeSinglePublicationRound(string runtime, bool enabled, int size)
     {
-        await using var cluster = new ProcessCluster($"partition-publication-{runtime}-{enabled}", fastRecovery: false);
-        var sender = await cluster.Start(runtime, enabled);
-        var receiver = await cluster.Start(runtime, enabled);
+        await using var cluster = new ProcessCluster($"partition-publication-{runtime}-{enabled}-{size}", fastRecovery: false);
+        for (var index = 0; index < size; index++)
+        {
+            await cluster.Start(runtime, enabled);
+        }
+
+        var nodes = cluster.Active;
         await cluster.Stabilize();
         await cluster.AssertControlRpcs();
         await cluster.PublishAndConverge();
 
         for (var iteration = 0; iteration < 3; iteration++)
         {
+            var receiver = nodes[iteration % size];
             await receiver.Send("partition", value: true);
             if (iteration == 0)
             {
-                var probe = await sender.Send("probe-echo", peer: receiver.Last.Address);
+                var probe = await nodes[1].Send("probe-echo", peer: receiver.Last.Address);
                 Assert.Null(probe.RemoteProcessId);
                 Assert.NotNull(probe.ProbeError);
             }
 
-            await sender.Send("publish");
+            foreach (var source in nodes.Where(node => !ReferenceEquals(node, receiver)))
+            {
+                await source.Send("publish");
+            }
+
+            var recovery = Stopwatch.StartNew();
             await cluster.HealPartition(receiver);
             await cluster.PublishAndConverge();
             Assert.All(cluster.Active, node => Assert.False(node.Last.Partitioned));
-            await cluster.Save($"healed-publication-{iteration}.json", cluster.Active.Select(node => node.Last));
+            await cluster.Save($"healed-publication-{iteration}.json", new
+            {
+                RecoveryMilliseconds = recovery.Elapsed.TotalMilliseconds,
+                Nodes = cluster.Active.Select(node => node.Last),
+            });
         }
     }
 
@@ -113,10 +131,8 @@ public sealed class VersionSkewTests
         await disabled.Send("snapshot");
         Assert.False(disabled.Last.Enabled);
         Assert.False(disabled.Last.NamespaceEnabled);
-        Assert.Equal(0, Sum(disabled.Last, "orleans-dissemination-broadcast-sent|"));
-        Assert.Equal(0, disabled.Last.Metrics.Where(pair =>
-            pair.Key.StartsWith("orleans-dissemination-anti-entropy-exchanges|", StringComparison.Ordinal)
-            && pair.Key.Contains("direction=out", StringComparison.Ordinal)).Sum(pair => pair.Value.Sum));
+        Assert.Equal(0, disabled.Last.BroadcastsSent);
+        Assert.Equal(0, disabled.Last.OutgoingRepairs);
         Assert.Empty(disabled.Last.Applies);
 
         // The same original binary is reintroduced, not a flag on the new binary.
@@ -359,6 +375,4 @@ public sealed class VersionSkewTests
         }
     }
 
-    internal static double Sum(NodeSnapshot snapshot, string prefix) =>
-        snapshot.Metrics.Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal)).Sum(pair => pair.Value.Sum);
 }

@@ -39,7 +39,7 @@ internal static class Program
         }
 #endif
         using var lifetime = new CancellationTokenSource(TimeSpan.FromMinutes(45));
-        using var observation = new Observation(configuration.FastRecovery);
+        using var observation = new Observation();
         var membership = new FileMembershipTable(configuration);
         using var host = TestClusterHostFactory.CreateSiloHost(
             configuration.Name,
@@ -58,7 +58,7 @@ internal static class Program
                 services.Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = configuration.ClusterId;
-                    options.ServiceId = "dissemination-evidence";
+                    options.ServiceId = "dissemination-compatibility";
                 });
                 services.Configure<SiloOptions>(options => options.SiloName = configuration.Name);
                 services.Configure<EndpointOptions>(options =>
@@ -137,9 +137,7 @@ internal static class Program
 
             using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(20));
             await host.StopAsync(shutdown.Token).WaitAsync(shutdown.Token);
-            // Drain the last one-second OS socket-counter bucket before recording shutdown cost.
-            await Task.Delay(TimeSpan.FromMilliseconds(1100));
-            await Write(new Response(-1, Snapshot(host.Services, detailed: true), null));
+            await Write(new Response(-1, Snapshot(host.Services), null));
             return 0;
         }
         finally
@@ -159,8 +157,6 @@ internal static class Program
             case "snapshot":
             case "stop":
                 break;
-            case "measure":
-                return Snapshot(services, detailed: true);
             case "verify-load-comparison":
             {
                 var original = new EnvironmentStatistics(10, 20, 100, 100, 900, 900, 1000);
@@ -217,11 +213,6 @@ internal static class Program
                     publisher.PeriodicStatistics.TryRemove(SiloAddress.FromParsableString(command.Peer!), out _);
                     return Task.CompletedTask;
                 }).WaitAsync(cancellationToken);
-                break;
-            case "retained-memory":
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
                 break;
             case "echo":
             {
@@ -299,15 +290,12 @@ internal static class Program
             cancellationToken);
     }
 
-    internal static NodeSnapshot Snapshot(IServiceProvider services, bool? detailed = null)
+    internal static NodeSnapshot Snapshot(IServiceProvider services)
     {
-        var includeDetails = detailed ?? services.GetRequiredService<NodeConfiguration>().FastRecovery;
         var manager = services.GetRequiredService<IMembershipManager>();
         var publisher = services.GetRequiredService<DeploymentLoadPublisher>();
         var observation = services.GetRequiredService<Observation>();
         var membership = manager.CurrentSnapshot;
-        using var process = Process.GetCurrentProcess();
-        var socket = observation.SocketSnapshot;
         var result = new NodeSnapshot
         {
             CapturedAtUtc = DateTimeOffset.UtcNow,
@@ -324,22 +312,9 @@ internal static class Program
             LoadVersions = new(publisher.PeriodicStatistics.ToDictionary(
                 pair => pair.Key.ToParsableString(), pair => pair.Value.DateTime.Ticks), StringComparer.Ordinal),
             UnconfirmedPeers = [],
-            OriginatorTargets = [],
-            ForwardingTargets = [],
-            Metrics = includeDetails ? observation.Metrics() : [],
-            Applies = includeDetails ? observation.Applies() : [],
-            TransportBytesWritten = observation.BytesWritten,
-            TransportBytesRead = observation.BytesRead,
-            SocketBytesSent = socket.Sent,
-            SocketBytesReceived = socket.Received,
-            SocketCounterSamples = socket.Samples,
-            CpuMilliseconds = process.TotalProcessorTime.TotalMilliseconds,
-            AllocatedBytes = GC.GetTotalAllocatedBytes(precise: true),
-            ManagedHeapBytes = GC.GetTotalMemory(forceFullCollection: false),
-            WorkingSetBytes = process.WorkingSet64,
-            PrivateBytes = process.PrivateMemorySize64,
-            ProcessorCount = Environment.ProcessorCount,
-            ServerGC = System.Runtime.GCSettings.IsServerGC,
+            BroadcastsSent = observation.BroadcastsSent,
+            OutgoingRepairs = observation.OutgoingRepairs,
+            Applies = observation.Applies(),
             PendingControlCalls = services.GetRequiredService<ControlTarget>().Pending,
             StartedControlCalls = services.GetRequiredService<ControlTarget>().Started,
             CancelledControlCalls = services.GetRequiredService<ControlTarget>().Cancelled,
