@@ -269,7 +269,11 @@ namespace Orleans.Runtime.Messaging
             // Always write RequestContext last
             if (headers.HasFlag(MessageFlags.HasRequestContextData))
             {
-                WriteRequestContext(ref writer, value.RequestContextData, value.GatewayRequestAttempt);
+                WriteRequestContext(
+                    ref writer,
+                    value.RequestContextData,
+                    value.GatewayRequestAttempt,
+                    value.GatewayForwardingSource);
             }
         }
 
@@ -311,8 +315,12 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasRequestContextData))
             {
-                result.RequestContextData = ReadRequestContext(ref reader, out var gatewayRequestAttempt);
+                result.RequestContextData = ReadRequestContext(
+                    ref reader,
+                    out var gatewayRequestAttempt,
+                    out var gatewayForwardingSource);
                 result.GatewayRequestAttempt = gatewayRequestAttempt;
+                result.GatewayForwardingSource = gatewayForwardingSource;
             }
         }
 
@@ -395,16 +403,22 @@ namespace Orleans.Runtime.Messaging
         private static void WriteRequestContext<TBufferWriter>(
             ref Writer<TBufferWriter> writer,
             Dictionary<string, object>? value,
-            long gatewayRequestAttempt) where TBufferWriter : IBufferWriter<byte>
+            long gatewayRequestAttempt,
+            SiloAddress? gatewayForwardingSource) where TBufferWriter : IBufferWriter<byte>
         {
-            var hasReservedEntry = value?.ContainsKey(Message.GatewayRequestAttemptKey) is true;
-            var count = (value?.Count ?? 0) - (hasReservedEntry ? 1 : 0) + (gatewayRequestAttempt != 0 ? 1 : 0);
+            var hasAttemptEntry = value?.ContainsKey(Message.GatewayRequestAttemptKey) is true;
+            var hasForwardingSourceEntry = value?.ContainsKey(Message.GatewayForwardingSourceKey) is true;
+            var count = (value?.Count ?? 0)
+                - (hasAttemptEntry ? 1 : 0)
+                - (hasForwardingSourceEntry ? 1 : 0)
+                + (gatewayRequestAttempt != 0 ? 1 : 0)
+                + (gatewayForwardingSource is not null ? 1 : 0);
             writer.WriteVarUInt32((uint)count);
             if (value is not null)
             {
                 foreach (var entry in value)
                 {
-                    if (entry.Key == Message.GatewayRequestAttemptKey)
+                    if (entry.Key is Message.GatewayRequestAttemptKey or Message.GatewayForwardingSourceKey)
                     {
                         continue;
                     }
@@ -419,13 +433,21 @@ namespace Orleans.Runtime.Messaging
                 WriteString(ref writer, Message.GatewayRequestAttemptKey);
                 ObjectCodec.WriteField(ref writer, 0, gatewayRequestAttempt);
             }
+
+            if (gatewayForwardingSource is not null)
+            {
+                WriteString(ref writer, Message.GatewayForwardingSourceKey);
+                ObjectCodec.WriteField(ref writer, 0, gatewayForwardingSource);
+            }
         }
 
         private static Dictionary<string, object>? ReadRequestContext<TInput>(
             ref Reader<TInput> reader,
-            out long gatewayRequestAttempt)
+            out long gatewayRequestAttempt,
+            out SiloAddress? gatewayForwardingSource)
         {
             gatewayRequestAttempt = 0;
+            gatewayForwardingSource = null;
             var size = (int)reader.ReadVarUInt32();
             var result = new Dictionary<string, object>(GetRequestContextInitialCapacity(size));
             for (var i = 0; i < size; i++)
@@ -438,6 +460,10 @@ namespace Orleans.Runtime.Messaging
                 if (key == Message.GatewayRequestAttemptKey && value is long attempt)
                 {
                     gatewayRequestAttempt = attempt;
+                }
+                else if (key == Message.GatewayForwardingSourceKey && value is SiloAddress forwardingSource)
+                {
+                    gatewayForwardingSource = forwardingSource;
                 }
                 else
                 {
