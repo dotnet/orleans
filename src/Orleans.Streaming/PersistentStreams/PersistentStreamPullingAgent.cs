@@ -872,7 +872,19 @@ namespace Orleans.Streams
                     queueCache?.UpdatePurgeProtection(HasActiveSubscriptions());
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
-                        return;
+                    {
+                        if (pubSubCache.Values.All(static stream =>
+                            stream.AllConsumers().All(static consumer => consumer.State != StreamConsumerDataState.Active)))
+                        {
+                            NotifyDeliveryProgress();
+                        }
+
+                        maxCacheAddCount = queueCache!.GetMaxAddCount();
+                        if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
+                        {
+                            return;
+                        }
+                    }
 
                     // If read succeeds and there is more data, we continue reading.
                     // If read succeeds and there is no more data, we break out of loop
@@ -1130,7 +1142,7 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Computes delivery progress before shutdown so the queue can persist the latest handoff checkpoint.
+        /// Publishes delivery progress for pressure recovery and the shutdown checkpoint.
         /// </summary>
         private void NotifyDeliveryProgress()
         {
@@ -1178,11 +1190,6 @@ namespace Orleans.Streams
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
                     if (!consumer.IsRegistered || consumer.PendingHandshakes != 0 || consumer.HasUnresolvedHandshake)
-                    {
-                        return false;
-                    }
-
-                    if (consumer.State == StreamConsumerDataState.Active)
                     {
                         return false;
                     }

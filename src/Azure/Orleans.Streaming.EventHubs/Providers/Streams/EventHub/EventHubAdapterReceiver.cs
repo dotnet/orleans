@@ -300,6 +300,11 @@ namespace Orleans.Streaming.EventHubs
 
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
+            if (this.cache is EventHubQueueCache eventHubQueueCache)
+            {
+                eventHubQueueCache.UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
+            }
+
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {

@@ -1358,6 +1358,7 @@ namespace UnitTests.StreamingTests
 
             public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
             {
+                DeliveryProgressTokens.Add(earliestSubscriptionToken);
                 CheckpointedToken = earliestSubscriptionToken;
             }
 
