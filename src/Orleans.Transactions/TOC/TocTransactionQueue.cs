@@ -23,9 +23,8 @@ namespace Orleans.Transactions.TOC
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime,
             TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime, diagnosticIdentity)
+            : base(options, resource, deactivate, storage, clock, logger, timerManager, diagnosticIdentity)
         {
             this.service = service;
         }

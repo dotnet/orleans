@@ -42,6 +42,14 @@ The manager's durable local commit completes the caller's transaction promise. I
 
 The disabled agent explicitly rejects transactional operations. Overload throttling returns transaction-start failures while bounding queued work.
 
+## Activation shutdown
+
+Normal grain deactivation waits for active requests to finish. Transaction queues also run background storage cycles which can continue after a protocol request returns. During lifecycle shutdown, each queue signals cancellation to stop new lock, storage, confirmation, and collection cycles, then waits for its storage worker to finish.
+
+The storage wait covers the active cycle's persistence outcome, state updates, recovery, and batch follow-up callbacks. Its budget comes from the lifecycle cancellation token, which reflects host cancellation and the configured grain deactivation timeout. Cancellation ends the wait while an already-started storage operation retains its outcome-processing path.
+
+Confirmation and collection stop through the queue's shutdown signal. Durable commit and prepare records let subsequent activations resume unresolved protocol work. The queue participates in both state setup cleanup and the final lifecycle stage so normal shutdown and partially completed activation both stop background processing.
+
 ## Trade-offs and boundaries
 
 The protocol favors serializable state transitions and recovery over low latency. Read-only work uses a direct resource path, while write transactions pay for coordination and durable records. Transaction atomicity covers registered transactional resources; applications coordinate or compensate external side effects separately.

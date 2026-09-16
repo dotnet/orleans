@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,13 +20,42 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class ConfirmationWorkerTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancellation_StopsConfirmationAndCollection(bool hasRemoteParticipant)
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var timerManager = new TestTimerManager();
+        var participant = new ParticipantId("me", null!, ParticipantId.Role.Resource);
+        var batchRequests = 0;
+        var storageWorker = new BatchWorkerFromDelegate(() => throw new InvalidOperationException("Unexpected storage work."));
+        var worker = CreateWorker(storageWorker, () =>
+        {
+            batchRequests++;
+            throw new InvalidOperationException("Unexpected collection.");
+        }, participant, timerManager, cancellation.Token);
+        var transactionId = Guid.NewGuid();
+        var participants = new List<ParticipantId>
+        {
+            hasRemoteParticipant ? new ParticipantId("other", null!, ParticipantId.Role.Resource) : participant
+        };
+
+        await SendConfirmationAsync(worker, transactionId, DateTime.UtcNow, participants);
+
+        Assert.Equal(0, batchRequests);
+        Assert.Equal(0, timerManager.DelayCallCount);
+        Assert.True(storageWorker.IsIdle());
+    }
+
     [Fact]
     public async Task CollectionFailure_CompletesAfterRestoreAndRetryUsesRestoredBatch()
     {
         var transactionId = Guid.NewGuid();
         var timestamp = DateTime.UtcNow;
         var timerManager = new TestTimerManager();
-        var activationLifetime = new TestActivationLifetime();
+        using var cancellation = new CancellationTokenSource();
         var participant = new ParticipantId("me", null!, ParticipantId.Role.Resource);
         var speculativeBatch = CreateBatch(transactionId, timestamp, participant, includeCommitRecord: true);
         var restoredBatch = CreateBatch(transactionId, timestamp, participant, includeCommitRecord: true);
@@ -59,9 +89,9 @@ public class ConfirmationWorkerTests
             {
                 throw new InvalidOperationException($"Unexpected storage cycle {cycle}.");
             }
-        }, activationLifetime.OnDeactivating);
+        }, cancellation.Token);
 
-        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, activationLifetime);
+        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, cancellation.Token);
 
         worker.Add(transactionId, timestamp, new List<ParticipantId> { participant });
 
@@ -90,7 +120,7 @@ public class ConfirmationWorkerTests
         var transactionId = Guid.NewGuid();
         var timestamp = DateTime.UtcNow;
         var timerManager = new TestTimerManager();
-        var activationLifetime = new TestActivationLifetime();
+        using var cancellation = new CancellationTokenSource();
         var participant = new ParticipantId("me", null!, ParticipantId.Role.Resource);
         StorageBatch<TestState> currentBatch = CreateBatch(transactionId, timestamp, participant, includeCommitRecord: true);
 
@@ -121,9 +151,9 @@ public class ConfirmationWorkerTests
             }
 
             return Task.CompletedTask;
-        }, activationLifetime.OnDeactivating);
+        }, cancellation.Token);
 
-        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, activationLifetime);
+        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, cancellation.Token);
 
         worker.Add(transactionId, timestamp, new List<ParticipantId> { participant });
 
@@ -159,12 +189,12 @@ public class ConfirmationWorkerTests
     }
 
     [Fact]
-    public async Task Deactivation_UnblocksOutstandingCollectionWait()
+    public async Task Cancellation_UnblocksCollectionBeforeStorageCompletes()
     {
         var transactionId = Guid.NewGuid();
         var timestamp = DateTime.UtcNow;
         var timerManager = new TestTimerManager();
-        var activationLifetime = new TestActivationLifetime();
+        using var cancellation = new CancellationTokenSource();
         var participant = new ParticipantId("me", null!, ParticipantId.Role.Resource);
         StorageBatch<TestState> currentBatch = CreateBatch(transactionId, timestamp, participant, includeCommitRecord: true);
 
@@ -174,22 +204,19 @@ public class ConfirmationWorkerTests
         {
             workStarted.TrySetResult(null);
             await finishWork.Task;
-        }, activationLifetime.OnDeactivating);
+        }, cancellation.Token);
 
-        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, activationLifetime);
+        var worker = CreateWorker(storageWorker, () => currentBatch, participant, timerManager, cancellation.Token);
 
-        worker.Add(transactionId, timestamp, new List<ParticipantId> { participant });
+        var confirmation = SendConfirmationAsync(worker, transactionId, timestamp, new List<ParticipantId> { participant });
 
-        await workStarted.Task;
-        Assert.True(worker.IsConfirmed(transactionId));
-        Assert.Equal(1, activationLifetime.PendingBlockCount);
+        await workStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(confirmation.IsCompleted);
+        cancellation.Cancel();
+        await confirmation.WaitAsync(TestContext.Current.CancellationToken);
 
-        activationLifetime.Deactivate();
-        await activationLifetime.WaitForPendingBlocksToDrainAsync();
-
-        Assert.Equal(0, activationLifetime.PendingBlockCount);
         Assert.Equal(0, timerManager.DelayCallCount);
-        Assert.True(worker.IsConfirmed(transactionId));
+        Assert.False(storageWorker.WaitForCurrentWorkToBeServiced().IsCompleted);
 
         finishWork.TrySetResult(null);
         await storageWorker.WaitForCurrentWorkToBeServiced();
@@ -200,7 +227,7 @@ public class ConfirmationWorkerTests
         Func<StorageBatch<TestState>> getStorageBatch,
         ParticipantId participant,
         ITimerManager timerManager,
-        IActivationLifetime activationLifetime)
+        CancellationToken onDeactivating)
     {
         return new ConfirmationWorker<TestState>(
             Options.Create(new TransactionalStateOptions { ConfirmationRetryDelay = TimeSpan.FromHours(1) }),
@@ -209,8 +236,12 @@ public class ConfirmationWorkerTests
             getStorageBatch,
             NullLogger<ConfirmationWorker<TestState>>.Instance,
             timerManager,
-            activationLifetime);
+            onDeactivating);
     }
+
+    private static Task SendConfirmationAsync(ConfirmationWorker<TestState> worker, Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
+        => (Task)typeof(ConfirmationWorker<TestState>).GetMethod("SendConfirmation", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(worker, new object[] { transactionId, timestamp, participants })!;
 
     private static StorageBatch<TestState> CreateBatch(Guid transactionId, DateTime timestamp, ParticipantId participant, bool includeCommitRecord)
     {
@@ -272,67 +303,6 @@ public class ConfirmationWorkerTests
             }
 
             delay.TrySetResult(result);
-        }
-    }
-
-    private sealed class TestActivationLifetime : IActivationLifetime
-    {
-        private readonly CancellationTokenSource cancellation = new();
-        private readonly TaskCompletionSource<object?> pendingBlocksDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int pendingBlockCount;
-
-        public CancellationToken OnDeactivating => this.cancellation.Token;
-
-        public int PendingBlockCount => this.pendingBlockCount;
-
-        public IDisposable BlockDeactivation()
-        {
-            Interlocked.Increment(ref this.pendingBlockCount);
-            return new Releaser(this);
-        }
-
-        public void Deactivate()
-        {
-            this.cancellation.Cancel();
-            if (this.PendingBlockCount == 0)
-            {
-                this.pendingBlocksDrained.TrySetResult(null);
-            }
-        }
-
-        public Task WaitForPendingBlocksToDrainAsync()
-        {
-            return this.PendingBlockCount == 0 ? Task.CompletedTask : this.pendingBlocksDrained.Task;
-        }
-
-        private void Release()
-        {
-            if (Interlocked.Decrement(ref this.pendingBlockCount) == 0 && this.cancellation.IsCancellationRequested)
-            {
-                this.pendingBlocksDrained.TrySetResult(null);
-            }
-        }
-
-        private sealed class Releaser : IDisposable
-        {
-            private readonly TestActivationLifetime owner;
-            private bool disposed;
-
-            public Releaser(TestActivationLifetime owner)
-            {
-                this.owner = owner;
-            }
-
-            public void Dispose()
-            {
-                if (this.disposed)
-                {
-                    return;
-                }
-
-                this.disposed = true;
-                this.owner.Release();
-            }
         }
     }
 }
