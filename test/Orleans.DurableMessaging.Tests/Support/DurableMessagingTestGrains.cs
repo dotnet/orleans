@@ -11,6 +11,8 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
     Task RetryWriteStateAsync();
+    Task StageEffectAsync(DurableEffect effect);
+    Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
     Task RevertStateAsync();
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
     Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job);
@@ -149,6 +151,20 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
+
+    public async Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope)
+    {
+        var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
+        var result = await extension.DeliverAsync(envelope);
+        DeactivateOnIdle();
+        return result;
+    }
+
+    public Task StageEffectAsync(DurableEffect effect)
+    {
+        _effects[effect.LogicalId] = effect;
+        return Task.CompletedTask;
+    }
 
     public async Task RevertStateAsync() => await StateManager.RevertPendingChangesAsync(CancellationToken.None);
 
