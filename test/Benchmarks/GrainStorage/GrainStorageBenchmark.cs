@@ -66,9 +66,14 @@ public class GrainStorageBenchmark : IDisposable
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Table grain storage benchmarks.");
+            }
+
             hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
             {
-                options.TableServiceClient = new(TestDefaultConfiguration.AzureStorageConnectionString);
+                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
             });
         }
     }
@@ -77,9 +82,14 @@ public class GrainStorageBenchmark : IDisposable
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Blob grain storage benchmarks.");
+            }
+
             hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.AzureStorageConnectionString);
+                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
             });
         }
     }

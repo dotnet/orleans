@@ -35,7 +35,8 @@ public static class AzuriteContainerManager
     /// <summary>
     /// Starts the shared Azurite container or uses the connection inherited by a standalone silo process.
     /// </summary>
-    /// <exception cref="Xunit.Sdk.SkipException">Thrown when Docker cannot host the Azurite container.</exception>
+    /// <exception cref="Xunit.Sdk.SkipException">Thrown locally when the Docker availability check fails.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in CI when the Docker availability check fails.</exception>
     public static void EnsureStarted()
     {
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(ConnectionStringEnvVar)))

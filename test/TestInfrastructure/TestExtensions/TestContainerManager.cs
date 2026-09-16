@@ -16,6 +16,7 @@ internal sealed class TestContainerManager<TContainer>
     private readonly Func<TContainer, CancellationToken, Task> _startAsync;
     private readonly Func<Task<string?>> _getDockerSkipReasonAsync;
     private readonly Action<TContainer>? _onStarted;
+    private readonly bool _isContinuousIntegration;
     private readonly Lazy<Task<string?>> _startSkipReason;
 
     public TestContainerManager(
@@ -23,13 +24,18 @@ internal sealed class TestContainerManager<TContainer>
         Func<TContainer> containerFactory,
         Func<TContainer, CancellationToken, Task> startAsync,
         Action<TContainer>? onStarted = null,
-        Func<Task<string?>>? getDockerSkipReasonAsync = null)
+        Func<Task<string?>>? getDockerSkipReasonAsync = null,
+        bool? isContinuousIntegration = null)
     {
         _serviceName = serviceName;
         _container = new(containerFactory);
         _startAsync = startAsync;
         _getDockerSkipReasonAsync = getDockerSkipReasonAsync ?? (() => DockerSkipReason.Value);
         _onStarted = onStarted;
+        _isContinuousIntegration = isContinuousIntegration
+            ?? (string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Environment.GetEnvironmentVariable("TF_BUILD"), "true", StringComparison.OrdinalIgnoreCase));
         _startSkipReason = new(StartAndGetSkipReasonAsync);
     }
 
@@ -58,30 +64,16 @@ internal sealed class TestContainerManager<TContainer>
         var dockerSkipReason = await _getDockerSkipReasonAsync().ConfigureAwait(false);
         if (dockerSkipReason is not null)
         {
+            if (_isContinuousIntegration)
+            {
+                throw new InvalidOperationException($"{_serviceName} tests require Linux Docker in CI. {dockerSkipReason}");
+            }
+
             return $"{dockerSkipReason} {_serviceName} tests are skipped.";
         }
 
         var container = _container.Value;
-        try
-        {
-            await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (DockerUnavailableException exception)
-        {
-            return GetDockerUnavailableSkipReason(exception);
-        }
-        catch (HttpRequestException exception)
-        {
-            return GetDockerUnavailableSkipReason(exception);
-        }
-        catch (OperationCanceledException exception)
-        {
-            return GetDockerUnavailableSkipReason(exception);
-        }
-        catch (DockerApiException exception)
-        {
-            return GetDockerUnavailableSkipReason(exception);
-        }
+        await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
 
         _onStarted?.Invoke(container);
         return null;

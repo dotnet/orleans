@@ -1,3 +1,6 @@
+using System.Net;
+using Docker.DotNet;
+using DotNet.Testcontainers.Builders;
 using TestExtensions;
 using Xunit;
 
@@ -9,8 +12,10 @@ namespace Orleans.TestingHost.Tests;
 [TestArea("TestingHost")]
 public class TestContainerManagerTests
 {
-    [Fact]
-    public async Task ConcurrentCallersStartContainerAndPublishConnectionOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentCallersStartContainerAndPublishConnectionOnce(bool isContinuousIntegration)
     {
         var container = new object();
         var startEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -28,7 +33,8 @@ public class TestContainerManagerTests
                 await releaseStart.Task;
             },
             _ => publishedConnection = "connection",
-            () => Task.FromResult<string?>(null));
+            () => Task.FromResult<string?>(null),
+            isContinuousIntegration);
 
         var callers = Enumerable.Range(0, 8).Select(_ => manager.EnsureStartedAsync()).ToArray();
         await startEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -41,7 +47,7 @@ public class TestContainerManagerTests
     }
 
     [Fact]
-    public async Task DockerSkipReasonPreventsContainerCreation()
+    public async Task UnavailableLocalDockerSkipsWithoutCreatingContainer()
     {
         var factoryCalls = 0;
         var manager = new TestContainerManager<object>(
@@ -52,49 +58,88 @@ public class TestContainerManagerTests
                 return new();
             },
             static (_, _) => Task.CompletedTask,
-            getDockerSkipReasonAsync: () => Task.FromResult<string?>("Docker is unavailable."));
+            getDockerSkipReasonAsync: () => Task.FromResult<string?>("Docker is unavailable."),
+            isContinuousIntegration: false);
 
         Assert.False(await manager.EnsureStartedAsync());
+        Xunit.Sdk.SkipException? exception = null;
+        try
+        {
+            manager.EnsureStarted();
+        }
+        catch (Xunit.Sdk.SkipException caught)
+        {
+            exception = caught;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Contains("Docker is unavailable. Test service tests are skipped.", exception.Message);
         Assert.Equal(0, factoryCalls);
     }
 
     [Fact]
-    public async Task StartupFailureIsPropagated()
+    public async Task UnavailableCiDockerFailsWithoutCreatingContainer()
     {
-        var expected = new InvalidOperationException("Container startup failed.");
-        var manager = CreateManager((_, _) => Task.FromException(expected));
+        var factoryCalls = 0;
+        var manager = new TestContainerManager<object>(
+            "Test service",
+            () =>
+            {
+                factoryCalls++;
+                return new();
+            },
+            static (_, _) => Task.CompletedTask,
+            getDockerSkipReasonAsync: () => Task.FromResult<string?>("Docker is unavailable."),
+            isContinuousIntegration: true);
 
-        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.EnsureStartedAsync());
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.EnsureStartedAsync());
 
-        Assert.Same(expected, actual);
+        Assert.Equal("Test service tests require Linux Docker in CI. Docker is unavailable.", exception.Message);
+        Assert.Same(exception, Assert.Throws<InvalidOperationException>(manager.EnsureStarted));
+        Assert.Equal(0, factoryCalls);
     }
 
-    [Fact]
-    public async Task StartupCancellationReturnsUnavailable()
+    [Theory]
+    [InlineData(false, "configuration")]
+    [InlineData(true, "configuration")]
+    [InlineData(false, "cancellation")]
+    [InlineData(true, "cancellation")]
+    [InlineData(false, "http")]
+    [InlineData(true, "http")]
+    [InlineData(false, "docker-api")]
+    [InlineData(true, "docker-api")]
+    [InlineData(false, "docker-unavailable")]
+    [InlineData(true, "docker-unavailable")]
+    public async Task StartupFailureIsPropagatedAndCached(bool isContinuousIntegration, string failureKind)
     {
-        var manager = CreateManager((_, _) => Task.FromException(new OperationCanceledException("Container startup timed out.")));
-
-        var started = await manager.EnsureStartedAsync();
-
-        Assert.False(started);
-    }
-
-    [Fact]
-    public async Task StartupHttpFailureReturnsUnavailable()
-    {
-        var manager = CreateManager((_, _) => Task.FromException(new HttpRequestException("Docker connection failed.")));
-
-        var started = await manager.EnsureStartedAsync();
-
-        Assert.False(started);
-    }
-
-    private static TestContainerManager<object> CreateManager(Func<object, CancellationToken, Task> startAsync)
-    {
-        return new(
+        Exception expected = failureKind switch
+        {
+            "configuration" => new InvalidOperationException("Container configuration failed."),
+            "cancellation" => new OperationCanceledException("Container startup timed out."),
+            "http" => new HttpRequestException("Image download failed."),
+            "docker-api" => new DockerApiException(HttpStatusCode.InternalServerError, "Container creation failed."),
+            "docker-unavailable" => new DockerUnavailableException("Docker stopped after the availability check."),
+            _ => throw new ArgumentOutOfRangeException(nameof(failureKind))
+        };
+        var startCalls = 0;
+        var publishCalls = 0;
+        var manager = new TestContainerManager<object>(
             "Test service",
             static () => new(),
-            startAsync,
-            getDockerSkipReasonAsync: () => Task.FromResult<string?>(null));
+            (_, _) =>
+            {
+                startCalls++;
+                return Task.FromException(expected);
+            },
+            _ => publishCalls++,
+            getDockerSkipReasonAsync: () => Task.FromResult<string?>(null),
+            isContinuousIntegration: isContinuousIntegration);
+
+        var actual = await Record.ExceptionAsync(() => manager.EnsureStartedAsync());
+
+        Assert.Same(expected, actual);
+        Assert.Same(expected, Record.Exception(manager.EnsureStarted));
+        Assert.Equal(1, startCalls);
+        Assert.Equal(0, publishCalls);
     }
 }
