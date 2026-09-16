@@ -70,10 +70,16 @@ configurator.ConfigureEventHub(builder => builder.Configure(options =>
 }));
 ```
 
-Buffered publishing is opt-in. Orleans applies backpressure when the configured buffer is full and does not
-complete a stream publication until Event Hubs acknowledges the batch containing it. Pending batches are flushed
-during graceful silo or client shutdown. The values above are examples and should be tuned for the workload;
+Configure `BufferedProducerOptions` to enable buffered publishing. Orleans applies backpressure when the configured
+buffer is full and completes a stream publication when Event Hubs acknowledges its batch. Batch failures propagate
+to the affected publications. Graceful silo or client shutdown drains accepted publications after stopping receivers,
+for both `AddEventHubStreams` and `AddPersistentStreams` registrations. A shutdown deadline bounds the host's wait;
+accepted publications continue draining and cleanup failures are logged. The values above should be tuned for the workload;
 increasing the wait time or buffer size can improve throughput at the cost of latency and memory.
+
+Orleans closes its producer and the connection created from a connection string, credentials, or connection factory.
+A connection factory supplies a new provider-owned connection on each invocation. When configured with an existing
+`EventHubConnection` instance, the caller owns that connection and closes it after its providers have stopped.
 
 The Azure SDK can map the same partition key to a different partition when switching between direct and buffered
 producers. Avoid changing publishing modes while strict ordering must be preserved for active streams.

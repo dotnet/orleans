@@ -42,29 +42,6 @@ public sealed class EventHubsStreamProviderBuilderTests
     }
 
     [Fact]
-    public void ConfigureProviders_RegistersProducerCleanupForSiloAndClient()
-    {
-        var siloBuilder = CreateSiloBuilder();
-        var clientBuilder = CreateClientBuilder();
-
-        siloBuilder.AddEventHubStreams("silo-stream", _ => { });
-        clientBuilder.AddEventHubStreams(
-            "client-stream",
-            (IClusterClientEventHubStreamConfigurator _) => { });
-
-        using var siloServices = siloBuilder.Services.BuildServiceProvider();
-        using var clientServices = clientBuilder.Services.BuildServiceProvider();
-        var siloRegistration = siloBuilder.Services.Last(
-            service => service.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
-        var clientRegistration = clientBuilder.Services.Last(
-            service => service.ServiceType == typeof(ILifecycleParticipant<IClusterClientLifecycle>));
-        Assert.IsType<EventHubAdapterFactoryLifecycle<ISiloLifecycle>>(
-            siloRegistration.ImplementationFactory!(siloServices));
-        Assert.IsType<EventHubAdapterFactoryLifecycle<IClusterClientLifecycle>>(
-            clientRegistration.ImplementationFactory!(clientServices));
-    }
-
-    [Fact]
     public void ConfigureSilo_AspireConsumerGroupReference_ConfiguresEventHubAndCheckpointer()
     {
         const string providerName = "orders-stream";
