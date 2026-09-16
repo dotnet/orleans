@@ -32,33 +32,25 @@ internal static class DurableMessagingJobOwnership
     }
 
 
-    public static bool IsViable(
-        DurableJob? job,
-        string? ownershipId,
-        string jobName,
-        GrainId target) =>
-        job is not null
-        && !string.IsNullOrEmpty(job.Id)
-        && !string.IsNullOrEmpty(job.ShardId)
-        && job.TargetGrainId == target
-        && string.Equals(job.Name, jobName, StringComparison.Ordinal)
-        && TryGetOwnershipId(job, out var jobOwnershipId)
-        && string.Equals(jobOwnershipId, ownershipId, StringComparison.Ordinal);
+    public static bool HasOwner(string? ownershipId, DurableJob? job) =>
+        !string.IsNullOrWhiteSpace(ownershipId) && job is not null;
 
-
-    public static DurableJob RequireViable(
-        DurableJob? job,
-        string ownershipId,
-        string jobName,
-        GrainId target)
+    public static string? GetPairError(string? ownershipId, DurableJob? job)
     {
-        if (!IsViable(job, ownershipId, jobName, target))
+        var hasOwnershipId = !string.IsNullOrWhiteSpace(ownershipId);
+        if (hasOwnershipId != (job is not null))
         {
-            throw new InvalidOperationException(
-                $"Durable Jobs returned an invalid handle for logical ownership '{ownershipId}'.");
+            return "The durable messaging ownership generation and job handle must either both be present or both be absent.";
         }
 
-        return job!;
+        if (hasOwnershipId
+            && (!TryGetOwnershipId(job!, out var jobOwnershipId)
+                || !string.Equals(jobOwnershipId, ownershipId, StringComparison.Ordinal)))
+        {
+            return "The durable messaging job handle metadata does not match its ownership generation.";
+        }
+
+        return null;
     }
 
     public static bool IsSamePhysicalJob(DurableJob? expected, DurableJob? actual) =>

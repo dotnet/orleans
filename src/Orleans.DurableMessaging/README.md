@@ -18,13 +18,14 @@ An outbox enqueue allocates a logical ownership token and durably schedules a wa
 carrying that token before the grain journal captures the envelope, ownership token,
 and returned job handle in one commit. Durable Jobs assigns each scheduled wake-up its
 own physical job ID. Retrying an ambiguous scheduling response can create multiple jobs
-for the same logical owner;
-the committed handle identifies the drain owner. Repeated callbacks for that job
-coalesce, and the other physical jobs complete after the owner is committed.
+for the same logical owner; the committed handle identifies the drain owner. Repeated
+callbacks for that job coalesce, and the other physical jobs complete after the owner is
+committed.
 Each job polls while the envelope is provisional, and dispatch starts after the
 commit. After activation recovery, jobs with neither committed ownership nor pending
-work complete as orphans. If recovered work exists without matching ownership, recovery
-establishes a new generation before the stale job terminates.
+work complete as orphans. If recovered work has neither an ownership generation nor a
+job handle, recovery schedules and commits a new ownership pair before the orphan
+terminates.
 The receiver uses the same schedule-before-commit ordering and returns `Accepted` only
 after the inbox envelope and its durable drain-job ownership are stable.
 

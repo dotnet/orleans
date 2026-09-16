@@ -95,6 +95,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private string _ownershipEpoch = Guid.NewGuid().ToString("N");
     private long _stateGeneration;
     private long? _activeDeliveryGeneration;
+    private string? _ownershipStateError;
 
     private int _metricsActive;
     private int _reportedDepth;
@@ -329,11 +330,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
         if (_jobScheduleConfirmed)
         {
-            _ = DurableMessagingJobOwnership.RequireViable(
-                _job.Value,
-                _jobId.Value!,
-                JobName,
-                _grainContext.GrainId);
             return;
         }
 
@@ -352,11 +348,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 Metadata = DurableMessagingJobOwnership.CreateMetadata(jobId)
             },
             cancellationToken).ConfigureAwait(true);
-        _job.Value = DurableMessagingJobOwnership.RequireViable(
-            scheduledJob,
-            jobId,
-            JobName,
-            _grainContext.GrainId);
+        _job.Value = scheduledJob;
         _jobScheduleConfirmed = true;
         _scheduledOwnershipId = jobId;
         _scheduledJob = scheduledJob;
@@ -367,6 +359,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         _durableOwnershipId = _committingOwnershipId;
         _durableJob = _committingJob;
+        _ownershipStateError = null;
         _pendingMessageIds.ExceptWith(_committingMessageIds);
         if (_committingMessageIds.Count > 0)
         {
@@ -402,6 +395,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _scheduledJob = null;
         _durableOwnershipId = null;
         _durableJob = null;
+        _ownershipStateError = null;
         _jobScheduleConfirmed = false;
         ReconcileOutboxDepth();
     }
@@ -432,8 +426,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _jobScheduleConfirmed = false;
         }
 
+        _ownershipStateError = DurableMessagingJobOwnership.GetPairError(_jobId.Value, _job.Value);
         ReconcileOutboxDepth();
-        if (Count > 0 && NeedsOwnershipRepair())
+        if (Count > 0
+            && _ownershipStateError is null
+            && !DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
         {
             QueueEnsureJobScheduled(replaceExisting: false);
         }
@@ -1059,6 +1056,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         cancellationToken.ThrowIfCancellationRequested();
         DurableMessagingActivationValidator.Validate(_grainContext);
+        ThrowIfOwnershipStateInvalid();
         EnsureMetricsActive();
         if (DurableDeadLetterRetention.Compact(
                 _deadLetters,
@@ -1073,7 +1071,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         if (Count > 0)
         {
             LogPumpStartingOnActivation(_logger, Count);
-            if (NeedsOwnershipRepair())
+            if (!DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
             {
                 QueueEnsureJobScheduled(replaceExisting: false);
             }
@@ -1159,6 +1157,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     internal async Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken)
     {
+        ThrowIfOwnershipStateInvalid();
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
         var token = linkedCancellation.Token;
         while (!token.IsCancellationRequested)
@@ -1177,11 +1176,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     }
 
                     if (!replaceExisting
-                        && DurableMessagingJobOwnership.IsViable(
-                            _job.Value,
-                            _jobId.Value,
-                            JobName,
-                            _grainContext.GrainId)
+                        && DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value)
                         && _scheduledOwnershipId is null)
                     {
                         return;
@@ -1199,11 +1194,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     else
                     {
                         persistOwnership = replaceExisting
-                            || !DurableMessagingJobOwnership.IsViable(
-                                _job.Value,
-                                _jobId.Value,
-                                JobName,
-                                _grainContext.GrainId);
+                            || !DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value);
                         ownershipId = GetOrCreateReplacementOwnershipId();
                         dueTime = _replacementOwnershipDueTime!.Value;
                         var scheduledJob = await _jobManager.ScheduleJobAsync(
@@ -1215,11 +1206,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                                 Metadata = DurableMessagingJobOwnership.CreateMetadata(ownershipId)
                             },
                             token).ConfigureAwait(true);
-                        _scheduledJob = DurableMessagingJobOwnership.RequireViable(
-                            scheduledJob,
-                            ownershipId,
-                            JobName,
-                            _grainContext.GrainId);
+                        _scheduledJob = scheduledJob;
                         _jobScheduleConfirmed = true;
                         _scheduledOwnershipId = ownershipId;
                         _scheduledOwnershipDueTime = dueTime;
@@ -1258,14 +1245,18 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private bool NeedsOwnershipRepair() =>
-        _scheduledOwnershipId is not null
-        || !DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId);
+    private bool HasCommittedOwnership() =>
+        DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value)
+        && string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
+        && DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value);
 
-    private bool HasCommittedViableOwnership() =>
-        string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
-        && DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value)
-        && DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId);
+    private void ThrowIfOwnershipStateInvalid()
+    {
+        if (_ownershipStateError is { } message)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
 
     private string GetOrCreateReplacementOwnershipId()
     {
@@ -1280,6 +1271,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
+        ThrowIfOwnershipStateInvalid();
         if (!DurableMessagingJobOwnership.TryGetOwnershipId(context.Job, out var ownershipId))
         {
             return DurableJobRunResult.Completed;
@@ -1294,7 +1286,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             var disposition = DurableMessagingJobOwnership.ResolveMismatch(
                 _recoveryCompleted,
-                HasCommittedViableOwnership(),
+                HasCommittedOwnership(),
                 DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
                 Count > 0);
             if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
@@ -1432,7 +1424,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
-            if (!DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId))
+            if (!DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
             {
                 if (Count == 0)
                 {

@@ -78,6 +78,7 @@ internal sealed partial class DurableInboxExtension :
     private string _ownershipEpoch = Guid.NewGuid().ToString("N");
     private long _stateGeneration;
     private bool _recoveryCompleted;
+    private string? _ownershipStateError;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -441,19 +442,15 @@ internal sealed partial class DurableInboxExtension :
         var messageCount = includeProvisional ? _inboxDict.Count : GetDurableInboxCount();
         if (messageCount == 0
             || (!replaceExisting
-                && DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId)))
+                && DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value)))
         {
             return;
         }
 
         var previousJobId = _jobId.Value;
         var previousJob = _job.Value;
-        var hasViableOwnership = DurableMessagingJobOwnership.IsViable(
-            previousJob,
-            previousJobId,
-            JobName,
-            _grainContext.GrainId);
-        var jobId = replaceExisting || !hasViableOwnership
+        var hasOwnership = DurableMessagingJobOwnership.HasOwner(previousJobId, previousJob);
+        var jobId = replaceExisting || !hasOwnership
             ? DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence)
             : previousJobId!;
         var dueTime = _pendingJobDueTime ??= _jobTimeProvider.GetUtcNow();
@@ -470,11 +467,7 @@ internal sealed partial class DurableInboxExtension :
                     Metadata = DurableMessagingJobOwnership.CreateMetadata(jobId)
                 },
                 cancellationToken).ConfigureAwait(true);
-            _job.Value = DurableMessagingJobOwnership.RequireViable(
-                scheduledJob,
-                jobId,
-                JobName,
-                _grainContext.GrainId);
+            _job.Value = scheduledJob;
         }
         catch
         {
@@ -529,6 +522,7 @@ internal sealed partial class DurableInboxExtension :
         _committingJob = null;
         _durableOwnershipId = null;
         _durableJob = null;
+        _ownershipStateError = null;
         ReconcileInboxDepth();
     }
 
@@ -574,6 +568,7 @@ internal sealed partial class DurableInboxExtension :
     {
         _durableOwnershipId = _committingOwnershipId;
         _durableJob = _committingJob;
+        _ownershipStateError = null;
         _committingOwnershipId = null;
         _committingJob = null;
         _pendingJobDueTime = null;
@@ -590,8 +585,11 @@ internal sealed partial class DurableInboxExtension :
         _recoveryCompleted = true;
         _provisionalAcceptances.Clear();
         _provisionalScheduleConfirmed = false;
+        _ownershipStateError = DurableMessagingJobOwnership.GetPairError(_jobId.Value, _job.Value);
         ReconcileInboxDepth();
-        if (_inboxDict.Count > 0 && !HasCommittedViableOwnership())
+        if (_inboxDict.Count > 0
+            && _ownershipStateError is null
+            && !DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
         {
             QueueResumeProcessing();
         }
@@ -613,6 +611,7 @@ internal sealed partial class DurableInboxExtension :
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
+        ThrowIfOwnershipStateInvalid();
         if (!DurableMessagingJobOwnership.TryGetOwnershipId(context.Job, out var ownershipId))
         {
             return DurableJobRunResult.Completed;
@@ -622,7 +621,7 @@ internal sealed partial class DurableInboxExtension :
         {
             var disposition = DurableMessagingJobOwnership.ResolveMismatch(
                 _recoveryCompleted,
-                HasCommittedViableOwnership(),
+                HasCommittedOwnership(),
                 DurableMessagingJobOwnership.IsCompleted(_completedJobId.Value, ownershipId),
                 _inboxDict.Count > 0);
             if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
@@ -757,7 +756,7 @@ internal sealed partial class DurableInboxExtension :
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
-            if (!DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId))
+            if (!DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
             {
                 if (GetDurableInboxCount() == 0)
                 {
@@ -1015,11 +1014,7 @@ internal sealed partial class DurableInboxExtension :
     {
         if (Volatile.Read(ref _stateGeneration) != expectedGeneration
             || !_inboxDict.ContainsKey(key)
-            || !DurableMessagingJobOwnership.IsViable(
-                _job.Value,
-                _jobId.Value,
-                JobName,
-                _grainContext.GrainId))
+            || !DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value))
         {
             throw new InvalidOperationException(
                 "Durable inbox acceptance was interrupted by state recovery or deletion.");
@@ -1144,10 +1139,18 @@ internal sealed partial class DurableInboxExtension :
         await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
-    private bool HasCommittedViableOwnership() =>
-        string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
-        && DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value)
-        && DurableMessagingJobOwnership.IsViable(_job.Value, _jobId.Value, JobName, _grainContext.GrainId);
+    private bool HasCommittedOwnership() =>
+        DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value)
+        && string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
+        && DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value);
+
+    private void ThrowIfOwnershipStateInvalid()
+    {
+        if (_ownershipStateError is { } message)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
 
     private bool IsOwnershipTransitionPending(string ownershipId)
     {
@@ -1188,6 +1191,7 @@ internal sealed partial class DurableInboxExtension :
 
     internal async Task ResumeProcessingAsync(CancellationToken cancellationToken)
     {
+        ThrowIfOwnershipStateInvalid();
         cancellationToken.ThrowIfCancellationRequested();
         EnsureMetricsActive();
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
@@ -1207,6 +1211,7 @@ internal sealed partial class DurableInboxExtension :
     {
         cancellationToken.ThrowIfCancellationRequested();
         DurableMessagingActivationValidator.Validate(_grainContext);
+        ThrowIfOwnershipStateInvalid();
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
@@ -1387,7 +1392,7 @@ internal sealed partial class DurableInboxExtension :
     {
         if (_jobId.Value is not { Length: > 0 } jobId
             || GetDurableInboxCount() == 0
-            || !HasCommittedViableOwnership())
+            || !HasCommittedOwnership())
         {
             return;
         }

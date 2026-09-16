@@ -53,6 +53,9 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
         }
         Assert.Single(completed.Effects);
         Assert.Equal(0, completed.InboxCount);
+        completed = await Fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            static snapshot => snapshot.InboxJobId is null && snapshot.InboxJob is null);
         Assert.Null(completed.InboxJob);
         Assert.True(Fixture.Storage.GetSuccessfulWriteCount(journalId) >= 2);
     }

@@ -79,15 +79,17 @@ the generation complete once the committed owner is established.
 Completed-generation tombstones let delayed duplicates terminate. A job which wakes
 before its ownership commit or activation recovery is visible polls the same attempt.
 After recovery, a scheduled generation with no committed owner and no work is a
-confirmed orphan and completes, so Durable Jobs removes it. If recovered work has an
-incomplete ownership pair, recovery schedules a replacement and commits its generation
-and returned handle before the orphan terminates. Callbacks poll until replacement
-ownership commits, preserving the existing durable wake-up if scheduling or persistence
-must retry. Ownership-clear write failures restore the preceding ownership pair, so its
-job retains responsibility. Recovery retains a healthy committed owner; Durable Jobs
-handles that job's shard and silo failover. Pump callbacks execute as non-interleaving
-grain timer turns, keeping infrastructure writes and handler effects within their
-owning journal boundaries.
+confirmed orphan and completes, so Durable Jobs removes it. If recovered work has
+neither an ownership generation nor a job handle, recovery schedules a replacement and
+commits its generation and returned handle before the orphan terminates. Callbacks poll
+until replacement ownership commits, preserving the existing durable wake-up if
+scheduling or persistence must retry. Ownership-clear write failures restore the
+preceding ownership pair, so its job retains responsibility. Recovery retains a healthy
+committed owner; Durable Jobs handles that job's shard and silo failover. A partial pair
+or mismatched ownership metadata reports an invariant violation and blocks activation
+and drain execution. Pump callbacks execute as non-interleaving grain timer turns,
+keeping infrastructure writes and handler effects within their owning journal
+boundaries.
 
 ## Backpressure, retries, and dead letters
 

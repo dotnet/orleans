@@ -18,7 +18,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task DeleteThenWriteStateAsync();
     Task RetryWriteStateAsync();
     Task RevertStateAsync();
-    Task SetInboxJobIdAsync(string jobId);
+    Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
     Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
@@ -198,9 +198,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task RevertStateAsync() => await StateManager.RevertPendingChangesAsync(CancellationToken.None);
 
-    public async Task SetInboxJobIdAsync(string jobId)
+    public async Task SetInboxOwnershipAsync(string ownershipId, DurableJob job)
     {
-        _inboxJobId.Value = jobId;
+        _inboxJobId.Value = ownershipId;
+        _inboxJob.Value = job;
         await WriteStateAsync();
     }
 

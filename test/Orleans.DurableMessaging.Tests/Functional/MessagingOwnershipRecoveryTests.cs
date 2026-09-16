@@ -270,7 +270,20 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
     {
         var receiver = NewGrain();
         var staleJobId = $"stale-{Guid.NewGuid():N}";
-        await receiver.SetInboxJobIdAsync(staleJobId);
+        await receiver.SetInboxOwnershipAsync(
+            staleJobId,
+            new DurableJob
+            {
+                Id = $"stale-job-{Guid.NewGuid():N}",
+                Name = "orleans.messaging.inbox-drain",
+                DueTime = DateTimeOffset.UtcNow,
+                TargetGrainId = receiver.GetGrainId(),
+                ShardId = $"stale-shard-{Guid.NewGuid():N}",
+                Metadata = new Dictionary<string, string>
+                {
+                    ["orleans.messaging.ownership-id"] = staleJobId
+                }
+            });
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/stale-owner");
         using var envelope = CreateEnvelope(receiver, NewMessage(58, "stale-owner"), "messages/stale-owner");
 

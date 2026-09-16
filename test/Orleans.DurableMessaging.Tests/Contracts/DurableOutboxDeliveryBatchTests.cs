@@ -69,7 +69,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
 
     [Fact]
-    public async Task RecoveredLogicalOwnerWithoutHandle_IsReplacedAfterNewHandleIsDurable()
+    public async Task RecoveredLogicalOwnerWithoutHandle_FailsLifecycleAndCallbackBoundaries()
     {
         const string incompleteOwnershipId = "incomplete:1";
         var timerRegistry = Substitute.For<ITimerRegistry>();
@@ -82,30 +82,45 @@ public sealed class DurableOutboxDeliveryBatchTests
             hasDurableJobHandle: false);
 
         fixture.Manager.NotifyRecoveryCompleted();
-        Assert.True((await fixture.ExecuteJobAsync(
-            incompleteOwnershipId,
-            "orphaned-physical-job",
-            "run-before-repair",
-            TestContext.Current.CancellationToken)).IsInProgress);
-        await fixture.StartAsync();
-        await fixture.RunRegisteredTimerAsync();
 
-        Assert.NotEqual(incompleteOwnershipId, fixture.JobId.Value);
-        Assert.NotNull(fixture.Job.Value);
-        Assert.Equal(jobManager.LastJob?.Id, fixture.Job.Value?.Id);
-        Assert.Equal(jobManager.LastJob?.ShardId, fixture.Job.Value?.ShardId);
-        Assert.Equal(
-            fixture.JobId.Value,
-            fixture.Job.Value?.Metadata!["orleans.messaging.ownership-id"]);
-        Assert.Equal(1, jobManager.AttemptCount);
-        Assert.Equal(1, fixture.Manager.WriteCount);
-        Assert.Equal(
-            DurableJobRunStatus.Completed,
-            (await fixture.ExecuteJobAsync(
+        var lifecycleException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.StartAsync());
+        var callbackException = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.ExecuteJobAsync(
                 incompleteOwnershipId,
                 "orphaned-physical-job",
-                "run-after-repair",
-                TestContext.Current.CancellationToken)).Status);
+                "run-after-recovery",
+                TestContext.Current.CancellationToken));
+        Assert.Contains("both be present or both be absent", lifecycleException.Message, StringComparison.Ordinal);
+        Assert.Equal(lifecycleException.Message, callbackException.Message);
+        Assert.Equal(incompleteOwnershipId, fixture.JobId.Value);
+        Assert.Null(fixture.Job.Value);
+        Assert.Equal(0, jobManager.AttemptCount);
+        Assert.Equal(0, fixture.Manager.WriteCount);
+    }
+
+
+    [Fact]
+    public async Task RecoveredHandleWithMismatchedOwnershipMetadata_FailsLifecycleAndCallbackBoundaries()
+    {
+        const string ownershipId = "owner:1";
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            durableJobId: ownershipId);
+        fixture.Job.Value = fixture.CreateJobForTest("physical-job", "different-owner:2");
+
+        fixture.Manager.NotifyRecoveryCompleted();
+
+        var lifecycleException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.StartAsync());
+        var callbackException = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.ExecuteJobAsync(
+                ownershipId,
+                "physical-job",
+                "run",
+                TestContext.Current.CancellationToken));
+        Assert.Contains("metadata does not match", lifecycleException.Message, StringComparison.Ordinal);
+        Assert.Equal(lifecycleException.Message, callbackException.Message);
     }
 
     [Fact]
@@ -959,6 +974,9 @@ public sealed class DurableOutboxDeliveryBatchTests
                 .Invoke(_outbox, [context, cancellationToken])!;
         }
 
+
+        public DurableJob CreateJobForTest(string physicalJobId, string ownershipId) =>
+            CreateJob(physicalJobId, ownershipId);
 
         private DurableJob CreateJob(string physicalJobId, string ownershipId) =>
             new()
