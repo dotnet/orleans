@@ -72,10 +72,11 @@ internal static class NewRuntime
             NamespaceEnabled = ns.Options.Enabled,
             UnconfirmedPeers = services.GetRequiredService<IDisseminationService>()
                 .GetUnconfirmedPeers(ns).Select(address => address.ToParsableString()).Order(StringComparer.Ordinal).ToArray(),
-            OriginatorTargets = topology.OriginatorTreeTargets.Select(address => address.ToParsableString()).ToArray(),
-            ForwardingTargets = topology.ForwardingTreeTargets.Select(address => address.ToParsableString()).ToArray(),
+            OriginatorTargets = topology.GetOriginatorTargets(ns.RoutingMode).Select(address => address.ToParsableString()).ToArray(),
+            ForwardingTargets = topology.GetForwardingTargets(ns.RoutingMode).Select(address => address.ToParsableString()).ToArray(),
             TopologyMembers = topology.Members.Select(address => address.ToParsableString()).ToArray(),
             Fanout = options.Overlay.GetFanOutFactor(topology.Members.Length),
+            AggregationTree = ns.RoutingMode == DisseminationRoutingMode.AggregationTree,
             AntiEntropyPeerCount = options.Overlay.AntiEntropyPeerCount,
             AntiEntropyIntervalMilliseconds = options.Overlay.AntiEntropyInterval.TotalMilliseconds,
             TreeGate = services.GetService<DisseminationTreeGate>()?.Snapshot,

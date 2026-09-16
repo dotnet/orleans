@@ -21,17 +21,17 @@ namespace Orleans.Configuration
         /// Gets or sets dissemination options for deployment load statistics.
         /// </summary>
         /// <remarks>
-        /// When enabled, dissemination replaces per-refresh direct fan-out only for active peers which have
-        /// confirmed support for this namespace. Confirmation remains valid for that silo generation until the peer
-        /// explicitly rejects the namespace or leaves the eligible membership set. During rolling or mixed-version
-        /// operation, active peers without confirmation continue to receive direct publications. If dissemination is
-        /// unavailable, declines the update, throws, or cannot accept it within the refresh interval, direct
-        /// publication targets all active peers.
+        /// When all active peers confirm support, dissemination aggregates updates along a parent/child tree
+        /// using a 250 millisecond batching window by default. Confirmation remains valid for that silo generation
+        /// until the peer explicitly rejects the namespace or leaves the eligible membership set. During bootstrap
+        /// or mixed-version operation, direct publication covers all active peers so that an unsupported intermediate
+        /// node cannot interrupt delivery. Direct publication also covers all active peers when dissemination is
+        /// unavailable, declines the update, throws, or cannot accept it within the refresh interval.
         /// </remarks>
         public DisseminationNamespaceOptions Dissemination { get; set; } = new()
         {
             ExpectedUpdateCadence = TimeSpan.FromSeconds(5),
-            MaxCoalescingDelay = TimeSpan.FromMilliseconds(10),
+            MaxCoalescingDelay = TimeSpan.FromMilliseconds(250),
         };
     }
 }

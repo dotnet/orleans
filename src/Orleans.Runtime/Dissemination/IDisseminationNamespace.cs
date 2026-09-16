@@ -10,6 +10,8 @@ internal interface IDisseminationNamespace
 
     DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
 
+    DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.BroadcastTree;
+
     DisseminationNamespaceOptions Options { get; }
 
     IEnumerable<DigestEntry> Digests { get; }
@@ -39,6 +41,12 @@ internal enum DisseminationMembershipScope
 {
     ActiveMembers,
     AllMembers,
+}
+
+internal enum DisseminationRoutingMode
+{
+    BroadcastTree,
+    AggregationTree,
 }
 
 // A null FromVersion means no known peer baseline; a null ToVersion asks for the highest repairable version.

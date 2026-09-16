@@ -61,6 +61,7 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         OriginatorTreeTargets = ComputeOriginatorTreeTargets(localSilo, localIndex, fanout);
+        AggregationTreeTargets = ComputeAggregationTreeTargets(localIndex, fanout);
     }
 
     public MembershipVersion MembershipVersion { get; }
@@ -70,6 +71,14 @@ internal sealed class DisseminationMembershipSnapshot
     public ImmutableArray<SiloAddress> OriginatorTreeTargets { get; }
 
     public ImmutableArray<SiloAddress> ForwardingTreeTargets { get; }
+
+    public ImmutableArray<SiloAddress> AggregationTreeTargets { get; }
+
+    public ImmutableArray<SiloAddress> GetOriginatorTargets(DisseminationRoutingMode mode) =>
+        mode == DisseminationRoutingMode.AggregationTree ? AggregationTreeTargets : OriginatorTreeTargets;
+
+    public ImmutableArray<SiloAddress> GetForwardingTargets(DisseminationRoutingMode mode) =>
+        mode == DisseminationRoutingMode.AggregationTree ? AggregationTreeTargets : ForwardingTreeTargets;
 
     public bool ContainsMember(SiloAddress silo) => _set.Contains(silo);
 
@@ -132,6 +141,28 @@ internal sealed class DisseminationMembershipSnapshot
             }
 
             result.Add(Members[(int)childIndex]);
+        }
+
+        return result.ToImmutable();
+    }
+
+    private ImmutableArray<SiloAddress> ComputeAggregationTreeTargets(int index, int fanout)
+    {
+        if (index < 0)
+        {
+            return [];
+        }
+
+        var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(fanout + 1, Members.Length - 1));
+        if (index > 0)
+        {
+            result.Add(Members[(index - 1) / fanout]);
+        }
+
+        var firstChild = (long)fanout * index + 1;
+        for (var child = firstChild; child < Members.Length && child < firstChild + fanout; child++)
+        {
+            result.Add(Members[(int)child]);
         }
 
         return result.ToImmutable();

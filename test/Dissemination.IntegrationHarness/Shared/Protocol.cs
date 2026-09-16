@@ -238,6 +238,7 @@ internal sealed record NodeSnapshot
     public required string[] ForwardingTargets { get; init; }
     public string[] TopologyMembers { get; init; } = [];
     public int Fanout { get; init; }
+    public bool AggregationTree { get; init; }
     public int AntiEntropyPeerCount { get; init; }
     public double AntiEntropyIntervalMilliseconds { get; init; }
     public required Dictionary<string, MetricValue> Metrics { get; init; }

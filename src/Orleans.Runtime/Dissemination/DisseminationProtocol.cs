@@ -119,7 +119,7 @@ internal sealed partial class DisseminationProtocol
         // Notifications carry identity only; each peer pump asks the namespace for the latest repair at send time.
         RecordValueUpdate(disseminationNamespace.Name, key, publishedVersion);
         var accepted = true;
-        foreach (var peer in membership.OriginatorTreeTargets)
+        foreach (var peer in membership.GetOriginatorTargets(disseminationNamespace.RoutingMode))
         {
             accepted &= _broadcastQueue.Notify(peer, disseminationNamespace, key);
         }
@@ -215,7 +215,7 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                foreach (var peer in membership.ForwardingTreeTargets)
+                foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode))
                 {
                     if (!Equals(peer, batch.Sender))
                     {

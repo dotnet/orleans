@@ -129,8 +129,17 @@ namespace Orleans.Runtime
                     {
                         var dissemination = _serviceProvider.GetRequiredService<IDisseminationService>();
                         var disseminationNamespace = _serviceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
-                        var unconfirmedPeers = dissemination.GetUnconfirmedPeers(disseminationNamespace).ToHashSet();
-                        directRecipients = members.Where(unconfirmedPeers.Contains).ToArray();
+                        var unconfirmedPeers = dissemination.GetUnconfirmedPeers(disseminationNamespace);
+                        if (unconfirmedPeers.Count == 0)
+                        {
+                            directRecipients = [];
+                        }
+                        else
+                        {
+                            // An unsupported intermediate node can separate otherwise capable tree participants.
+                            var unconfirmed = unconfirmedPeers.ToHashSet();
+                            directRecipients = members.Any(unconfirmed.Contains) ? members : [];
+                        }
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {

@@ -3198,7 +3198,7 @@ public partial class DisseminationProtocolTests
     public void NamespaceOptionsUseExpectedUpdateCadenceDefaults()
     {
         Assert.Equal(TimeSpan.FromSeconds(5), new DeploymentLoadPublisherOptions().Dissemination.ExpectedUpdateCadence);
-        Assert.Equal(TimeSpan.FromMilliseconds(10), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), new ClusterMembershipOptions().Dissemination.ExpectedUpdateCadence);
     }
 
@@ -3949,6 +3949,8 @@ public partial class DisseminationProtocolTests
         public HashSet<DisseminationKey> ExpectedKeys { get; } = new();
 
         public DisseminationNamespace Name => _name;
+
+        public DisseminationRoutingMode RoutingMode { get; set; }
 
         public DisseminationNamespaceOptions Options { get; } = new() { Enabled = true };
 
@@ -6073,14 +6075,14 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task DeploymentLoadPublisherDirectSendsToUnconfirmedActivePeersAfterQueueAcceptance()
+    public async Task DeploymentLoadPublisherDirectSendsToAllActivePeersWhileTreeSupportIsIncomplete()
     {
         var harness = CreateDeploymentLoadPublisherHarness();
         harness.Dissemination.UnconfirmedPeers = [harness.ActiveTwo];
 
         await harness.PublishStatistics(TestContext.Current.CancellationToken);
 
-        AssertDirectRecipients(harness, harness.ActiveTwo);
+        AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
         Assert.Single(harness.Dissemination.PublishCalls);
         Assert.Single(harness.Dissemination.QueryCalls);
     }

@@ -185,7 +185,7 @@ public sealed class ScalingTests
                 snapshot.Identity.ProcessId,
                 snapshot.Address,
                 index >= 0 ? index : null,
-                index >= 0 && index < topology.Fanout,
+                index >= 0 && (topology.AggregationTree ? index <= topology.Fanout : index < topology.Fanout),
                 topology.OriginatorTargets,
                 topology.ForwardingTargets,
                 requestMessages.Count + oneWayMessages.Count,
@@ -205,7 +205,9 @@ public sealed class ScalingTests
                 snapshot.PrivateBytes,
                 Delta(snapshot, baseline, "orleans-dissemination-bytes-sent|").Sum,
                 Delta(snapshot, baseline, "orleans-dissemination-broadcast-sent|").Sum,
-                Delta(snapshot, baseline, "orleans-dissemination-anti-entropy-exchanges|", "direction=out").Sum);
+                Delta(snapshot, baseline, "orleans-dissemination-anti-entropy-exchanges|", "direction=out").Sum,
+                Delta(snapshot, baseline, "orleans-dissemination-broadcast-sent|", "namespace=load").Sum,
+                Delta(snapshot, baseline, "orleans-dissemination-values-sent|", "namespace=load").Sum);
         }).ToArray();
         Assert.All(nodes, node =>
         {
@@ -252,6 +254,10 @@ public sealed class ScalingTests
             PartitionRecoveryMilliseconds = recoveryLatencies,
             TotalRpcs = nodes.Sum(node => node.Rpcs),
             TotalMessages = nodes.Sum(node => node.SentMessages),
+            LoadBroadcastRequests = nodes.Sum(node => node.LoadBroadcastRequests),
+            LoadValueTransmissions = nodes.Sum(node => node.LoadValueTransmissions),
+            LoadBroadcastRequestsPerRound = nodes.Sum(node => node.LoadBroadcastRequests) / iterations,
+            LoadBroadcastRequestsPerSecond = nodes.Sum(node => node.LoadBroadcastRequests) / (elapsed / 1000),
             SerializedBytesSent = nodes.Sum(node => node.SerializedBytesSent),
             SocketBytesSent = nodes.Sum(node => node.SocketBytesSent),
             TransportBytesSubmitted = nodes.Sum(node => node.TransportBytesSubmitted),
@@ -377,5 +383,7 @@ public sealed class ScalingTests
         long PrivateBytes,
         double DisseminationPayloadBytes,
         double DisseminationBroadcasts,
-        double AntiEntropyExchanges);
+        double AntiEntropyExchanges,
+        double LoadBroadcastRequests,
+        double LoadValueTransmissions);
 }
