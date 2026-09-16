@@ -53,6 +53,7 @@ public sealed class JsonCodecTests : IDisposable
 
         var result = Deserialize<object?[]>(_serializer.SerializeToArray(values), input);
 
+        Assert.NotNull(result);
         Assert.Equal(4, result.Length);
         var payload = Assert.IsType<JsonPayload>(result[0]);
         Assert.NotSame(original, payload);
@@ -80,6 +81,7 @@ public sealed class JsonCodecTests : IDisposable
 
         var result = Deserialize<JsonNode?[]>(_serializer.SerializeToArray(values), input);
 
+        Assert.NotNull(result);
         Assert.Equal(values.Length, result.Length);
         Assert.IsType<JsonObject>(result[0]);
         Assert.IsType<JsonArray>(result[1]);
@@ -117,11 +119,12 @@ public sealed class JsonCodecTests : IDisposable
 
         var result = Deserialize<TrackedValue>(bytes, input);
 
+        Assert.NotNull(result);
         Assert.Equal(original.Text, result.Text);
         Assert.True(_converter.ReadFromInput);
     }
 
-    private T Deserialize<T>(byte[] bytes, string input)
+    private T? Deserialize<T>(byte[] bytes, string input)
     {
         switch (input)
         {
