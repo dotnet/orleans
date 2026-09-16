@@ -1,3 +1,5 @@
+using Orleans.Internal;
+
 namespace Orleans.Streaming.AdoNet;
 
 internal interface IStreamMessageQueries
@@ -32,16 +34,9 @@ internal interface IStreamMessageQueries
 internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, IStreamMessageQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
+    private readonly AdmissionGate _admissionGate = new();
     private readonly object _lock = new();
     private readonly Dictionary<long, PendingMessage> _pendingMessages = [];
-
-    /// <summary>
-    /// Flags that no further work should be attempted.
-    /// </summary>
-    private bool _shutdown;
-
-    private int _activeOperations;
-    private TaskCompletionSource? _operationsCompleted;
 
     public AdoNetQueueAdapterReceiver(
         string providerId,
@@ -57,33 +52,23 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     }
 
     /// <summary>
-    /// This receiver does not require initialization.
+    /// Completes initialization immediately.
     /// </summary>
     public Task Initialize(TimeSpan timeout) => Task.CompletedTask;
 
     /// <summary>
-    /// Waits for any outstanding work before shutting down.
+    /// Closes admission, drains accepted operations, and releases pending messages.
     /// </summary>
     public async Task Shutdown(TimeSpan timeout)
     {
-        Task? operationsCompleted;
-        lock (_lock)
+        try
         {
-            _shutdown = true;
-            operationsCompleted = _operationsCompleted?.Task;
+            await _admissionGate.CloseAsync().WaitAsync(timeout);
         }
-
-        if (operationsCompleted is not null)
+        catch (Exception ex)
         {
-            try
-            {
-                await operationsCompleted.WaitAsync(timeout);
-            }
-            catch (Exception ex)
-            {
-                LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
-                return;
-            }
+            LogShutdownFault(ex, clusterOptions.ServiceId, providerId, queueId);
+            return;
         }
 
         List<AdoNetStreamConfirmation> pending;
@@ -120,7 +105,8 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
     /// <inheritdoc />
     public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
     {
-        if (!TryBeginOperation())
+        using var admission = _admissionGate.TryEnter();
+        if (!admission.Entered)
         {
             return [];
         }
@@ -158,10 +144,6 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             LogDequeueFailed(ex, clusterOptions.ServiceId, providerId, queueId);
             throw;
         }
-        finally
-        {
-            EndOperation();
-        }
     }
 
     /// <inheritdoc />
@@ -173,7 +155,8 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             return;
         }
 
-        if (!TryBeginOperation())
+        using var admission = _admissionGate.TryEnter();
+        if (!admission.Entered)
         {
             return;
         }
@@ -183,66 +166,26 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
 
         try
         {
-            try
+            var confirmed = await queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
+            var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
+            lock (_lock)
             {
-                var confirmed = await queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
-                var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
-                lock (_lock)
+                foreach (var message in confirmed)
                 {
-                    foreach (var message in confirmed)
+                    if (receipts.TryGetValue(message.MessageId, out var receipt)
+                        && _pendingMessages.TryGetValue(message.MessageId, out var pending)
+                        && receipt == pending.Dequeued)
                     {
-                        if (receipts.TryGetValue(message.MessageId, out var receipt)
-                            && _pendingMessages.TryGetValue(message.MessageId, out var pending)
-                            && receipt == pending.Dequeued)
-                        {
-                            _pendingMessages.Remove(message.MessageId);
-                        }
+                        _pendingMessages.Remove(message.MessageId);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                LogConfirmationFailed(ex, clusterOptions.ServiceId, providerId, queueId, items);
-                throw;
-            }
         }
-        finally
+        catch (Exception ex)
         {
-            EndOperation();
+            LogConfirmationFailed(ex, clusterOptions.ServiceId, providerId, queueId, items);
+            throw;
         }
-    }
-
-    private bool TryBeginOperation()
-    {
-        lock (_lock)
-        {
-            if (_shutdown)
-            {
-                return false;
-            }
-
-            if (_activeOperations++ == 0)
-            {
-                _operationsCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            return true;
-        }
-    }
-
-    private void EndOperation()
-    {
-        TaskCompletionSource? operationsCompleted = null;
-        lock (_lock)
-        {
-            if (--_activeOperations == 0)
-            {
-                operationsCompleted = _operationsCompleted;
-                _operationsCompleted = null;
-            }
-        }
-
-        operationsCompleted?.TrySetResult();
     }
 
     private void RemoveExpiredPendingMessages()
