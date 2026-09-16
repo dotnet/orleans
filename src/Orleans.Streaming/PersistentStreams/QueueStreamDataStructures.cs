@@ -50,6 +50,8 @@ namespace Orleans.Streams
         public bool IsCaughtUp;
         [NonSerialized]
         public int PendingHandshakes;
+        [NonSerialized]
+        public long HandshakeGeneration;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {

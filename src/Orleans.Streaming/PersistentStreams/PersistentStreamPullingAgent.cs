@@ -543,6 +543,7 @@ namespace Orleans.Streams
                     consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, null);
                 }
             }
+            consumerData.HandshakeGeneration++;
             return true;
         }
 
@@ -1416,6 +1417,7 @@ namespace Orleans.Streams
                 var deliveredAny = false;
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
+                    var handshakeGeneration = consumerData.HandshakeGeneration;
                     var batchCursor = options.BatchContainerBatchSize > 1
                         ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
                         : null;
@@ -1498,14 +1500,25 @@ namespace Orleans.Streams
                         if (nextBatch.Batch is not null)
                         {
                             var batch = nextBatch.Batch;
+                            var handshakeToken = consumerData.StartPositionIsProviderDefault ? null : consumerData.LastToken;
                             StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                i => DeliverBatchToConsumer(consumerData, batch, cancellationToken),
+                                i => DeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
+                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown
+                                    && handshakeGeneration == consumerData.HandshakeGeneration,
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider,
                                 cancellationToken: cancellationToken);
+
+                            // A completed handshake owns its replacement position, including pending replay.
+                            if (handshakeGeneration != consumerData.HandshakeGeneration)
+                            {
+                                continue;
+                            }
+
+                            consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken);
+                            consumerData.StartPositionIsProviderDefault = false;
                             if (newToken is not null)
                             {
                                 _useLegacyDeliveryProgress = true;
@@ -1582,6 +1595,12 @@ namespace Orleans.Streams
                     catch (Exception exc)
                     {
                         _useLegacyDeliveryProgress = true;
+                        LogErrorDeliveringMessages(consumerData.StreamId, exc);
+                        if (handshakeGeneration != consumerData.HandshakeGeneration)
+                        {
+                            continue;
+                        }
+
                         if (batchCursor is not null && nextBatch.Batch is not null)
                         {
                             batchCursor.RecordDeliveryFailure(nextBatch.Batch);
@@ -1590,8 +1609,6 @@ namespace Orleans.Streams
                         {
                             consumerData.Cursor?.RecordDeliveryFailure();
                         }
-
-                        LogErrorDeliveringMessages(consumerData.StreamId, exc);
 
                         exceptionOccured = exc is ClientNotAvailableException || forceFaultSubscription
                             ? exc
@@ -1745,13 +1762,12 @@ namespace Orleans.Streams
         private async Task<StreamHandshakeToken?> DeliverBatchToConsumer(
             StreamConsumerData consumerData,
             IBatchContainer batch,
+            StreamHandshakeToken? handshakeToken,
             CancellationToken cancellationToken)
         {
             try
             {
-                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, cancellationToken);
-                consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
-                consumerData.StartPositionIsProviderDefault = false;
+                StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken);
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
 
                 return newToken;
@@ -1769,12 +1785,12 @@ namespace Orleans.Streams
         private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(
             StreamConsumerData consumerData,
             IBatchContainer batch,
+            StreamHandshakeToken? handshakeToken,
             CancellationToken cancellationToken)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                var handshakeToken = consumerData.StartPositionIsProviderDefault ? null : consumerData.LastToken;
                 return consumerData.StreamConsumer.DeliverBatch(
                     consumerData.SubscriptionId,
                     consumerData.StreamId,
