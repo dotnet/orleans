@@ -52,7 +52,7 @@ public sealed class DurableEnvelopeData
     [Id(3)]
     private string? _bodyType;
 
-    [Id(4), Immutable]
+    [Id(4)]
     private Dictionary<string, string>? _contextTypes;
 
     /// <summary>
@@ -91,7 +91,7 @@ public sealed class DurableEnvelopeData
             || (_bodyType is not null
                 && !string.Equals(
                     _bodyType,
-                    RuntimeTypeNameFormatter.Format(typeof(T)),
+                    TypeNameCache<T>.Formatted,
                     StringComparison.Ordinal)))
         {
             value = default;
@@ -131,7 +131,7 @@ public sealed class DurableEnvelopeData
                 && (!_contextTypes.TryGetValue(key, out var contextType)
                     || !string.Equals(
                         contextType,
-                        RuntimeTypeNameFormatter.Format(typeof(T)),
+                        TypeNameCache<T>.Formatted,
                         StringComparison.Ordinal))))
         {
             value = default;
@@ -217,4 +217,8 @@ public sealed class DurableEnvelopeData
         _contextTypes = contextTypes;
     }
 
+    private static class TypeNameCache<T>
+    {
+        public static readonly string Formatted = RuntimeTypeNameFormatter.Format(typeof(T));
+    }
 }

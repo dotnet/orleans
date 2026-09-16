@@ -66,13 +66,27 @@ internal sealed class DurableMessagingPumpResults
             {
                 if (_entries.Count >= _maxRetainedEntries)
                 {
-                    var candidate = _entries
-                        .Where(static pair => pair.Value.State != EntryState.Running)
-                        .OrderBy(static pair => pair.Value.State == EntryState.Completed ? pair.Value.CompletedAt : pair.Value.CreatedAt)
-                        .FirstOrDefault();
-                    if (candidate.Value is not null && _entries.Remove(candidate.Key))
+                    DurableMessagingPumpExecutionKey? candidateKey = null;
+                    Entry? candidateEntry = null;
+                    DateTimeOffset candidateTime = DateTimeOffset.MaxValue;
+
+                    foreach (var (entryKey, entryValue) in _entries)
                     {
-                        (removed ??= []).Add(candidate.Value);
+                        if (entryValue.State != EntryState.Running)
+                        {
+                            var timestamp = entryValue.State == EntryState.Completed ? entryValue.CompletedAt : entryValue.CreatedAt;
+                            if (candidateEntry is null || timestamp < candidateTime)
+                            {
+                                candidateKey = entryKey;
+                                candidateEntry = entryValue;
+                                candidateTime = timestamp;
+                            }
+                        }
+                    }
+
+                    if (candidateKey is not null && _entries.Remove(candidateKey.Value))
+                    {
+                        (removed ??= []).Add(candidateEntry!);
                     }
                 }
 

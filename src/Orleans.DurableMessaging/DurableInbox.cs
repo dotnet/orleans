@@ -55,7 +55,7 @@ internal sealed class DurableInbox : IDurableInbox
     public int Count => _inbox.Count;
 
     /// <summary>
-    /// Maximum capacity. When reached, DeliverAsync returns Backpressured.
+    /// Gets the maximum inbox capacity.
     /// </summary>
     public int Capacity => _capacity;
 
@@ -142,7 +142,6 @@ internal sealed class DurableInbox : IDurableInbox
         {
             throw new InvalidOperationException($"A handler is already registered for exact route '{routeKey}'.");
         }
-
     }
 
     /// <summary>
@@ -169,7 +168,6 @@ internal sealed class DurableInbox : IDurableInbox
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         return _exactRouteHandlers.TryGetValue(routeKey, out handler);
     }
-
 }
 
 /// <summary>

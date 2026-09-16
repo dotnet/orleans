@@ -25,10 +25,10 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     public IJournalStorage CreateStorage(JournalId journalId) =>
         new ControlledJournalStorage(this, journalId, Inner.CreateStorage(journalId));
 
-    public IAsyncEnumerable<JournalId> ListAsync(
-        JournalId prefix = default,
+    public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
+        ListOptions? options = null,
         CancellationToken cancellationToken = default) =>
-        Inner.ListAsync(prefix, cancellationToken);
+        Inner.ListAsync(options, cancellationToken);
 
     private VolatileJournalStorageProvider Inner =>
         _inner ?? throw new InvalidOperationException("The controlled journal storage provider has not been configured.");
