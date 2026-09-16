@@ -29,6 +29,212 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
     public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForDequeueBookkeepingBeforeRelease()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        var getTask = receiver.GetQueueMessagesAsync(1);
+        Assert.Equal(1, queries.DequeueCalls);
+
+        Task? shutdownTask = null;
+        queries.Dequeue.SetResult(new CallbackList<AdoNetStreamMessage>([message], () =>
+        {
+            shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+            Assert.False(shutdownTask.IsCompleted);
+            Assert.Equal(0, queries.ReleaseCalls);
+        }));
+        var dequeued = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await getTask.WaitAsync(cancellationToken)));
+        Assert.NotNull(shutdownTask);
+        await shutdownTask.WaitAsync(cancellationToken);
+
+        Assert.Equal(message.MessageId, dequeued.SequenceToken.SequenceNumber);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForConcurrentDequeueAndConfirmation(bool confirmationFirst)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        queries.Dequeue.SetResult([message]);
+        var dequeued = await receiver.GetQueueMessagesAsync(1);
+        queries.Dequeue = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmationTask = receiver.MessagesDeliveredAsync(dequeued);
+        var getTask = receiver.GetQueueMessagesAsync(1);
+        Assert.Equal(2, queries.DequeueCalls);
+        Assert.Equal(1, queries.ConfirmationCalls);
+
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+        Assert.False(shutdownTask.IsCompleted);
+        Assert.Empty(await receiver.GetQueueMessagesAsync(1));
+        await receiver.MessagesDeliveredAsync(dequeued);
+        Assert.Equal(2, queries.DequeueCalls);
+        Assert.Equal(1, queries.ConfirmationCalls);
+
+        var redelivered = message with { Dequeued = message.Dequeued + 1 };
+        if (confirmationFirst)
+        {
+            queries.Confirmation.SetResult([new(message.ServiceId, message.ProviderId, message.QueueId, message.MessageId)]);
+            await confirmationTask.WaitAsync(cancellationToken);
+            Assert.False(shutdownTask.IsCompleted);
+            Assert.Equal(0, queries.ReleaseCalls);
+            queries.Dequeue.SetResult([redelivered]);
+        }
+        else
+        {
+            queries.Dequeue.SetResult([redelivered]);
+            await getTask.WaitAsync(cancellationToken);
+            Assert.False(shutdownTask.IsCompleted);
+            Assert.Equal(0, queries.ReleaseCalls);
+            queries.Confirmation.SetResult([new(message.ServiceId, message.ProviderId, message.QueueId, message.MessageId)]);
+        }
+
+        await Task.WhenAll(getTask, confirmationTask, shutdownTask).WaitAsync(cancellationToken);
+        Assert.Equal(1, queries.ReleaseCalls);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(redelivered.MessageId, released.MessageId);
+        Assert.Equal(redelivered.Dequeued, released.Dequeued);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_WaitsForConfirmationBookkeeping()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        queries.Dequeue.SetResult([message]);
+        var dequeued = await receiver.GetQueueMessagesAsync(1);
+        Task? shutdownTask = null;
+        var acknowledgements = new CallbackList<AdoNetStreamConfirmationAck>(
+            [new(message.ServiceId, message.ProviderId, message.QueueId, message.MessageId)], () =>
+        {
+            shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+            Assert.False(shutdownTask.IsCompleted);
+            Assert.Equal(0, queries.ReleaseCalls);
+        });
+        var confirmationTask = receiver.MessagesDeliveredAsync(dequeued);
+        queries.Confirmation.SetResult(acknowledgements);
+
+        await confirmationTask.WaitAsync(cancellationToken);
+        Assert.NotNull(shutdownTask);
+        await shutdownTask.WaitAsync(cancellationToken);
+        Assert.Equal(0, queries.ReleaseCalls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_ReleasesPendingAfterQueryFault(bool confirmation)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        queries.Dequeue.SetResult([message]);
+        var dequeued = await receiver.GetQueueMessagesAsync(1);
+        queries.Dequeue = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task operation = confirmation
+            ? receiver.MessagesDeliveredAsync(dequeued)
+            : receiver.GetQueueMessagesAsync(1);
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+        Assert.False(shutdownTask.IsCompleted);
+
+        var exception = new InvalidOperationException("Query failed");
+        if (confirmation)
+        {
+            queries.Confirmation.SetException(exception);
+        }
+        else
+        {
+            queries.Dequeue.SetException(exception);
+        }
+
+        Assert.Same(exception, await Assert.ThrowsAsync<InvalidOperationException>(() => operation.WaitAsync(cancellationToken)));
+        await shutdownTask.WaitAsync(cancellationToken);
+        Assert.Equal(1, queries.ReleaseCalls);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_ReleasesPendingAfterConversionFault()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        var getTask = receiver.GetQueueMessagesAsync(1);
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+        var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        queries.Dequeue.SetResult([message with { Payload = serializer.SerializeToArray(null!) }]);
+
+        await Assert.ThrowsAsync<NullReferenceException>(() => getTask.WaitAsync(cancellationToken));
+        await shutdownTask.WaitAsync(cancellationToken);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_ReleasesPendingAfterConfirmationPreparationFault()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        queries.Dequeue.SetResult([message]);
+        await receiver.GetQueueMessagesAsync(1);
+        var incompleteBatch = new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [], null);
+
+        await Assert.ThrowsAsync<NullReferenceException>(() => receiver.MessagesDeliveredAsync([incompleteBatch]));
+        await receiver.Shutdown(TimeSpan.FromSeconds(10)).WaitAsync(cancellationToken);
+
+        Assert.Equal(0, queries.ConfirmationCalls);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_TimeoutKeepsAdmissionClosedUntilActualDrain()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        var getTask = receiver.GetQueueMessagesAsync(1);
+
+        await receiver.Shutdown(TimeSpan.Zero).WaitAsync(cancellationToken);
+        Assert.False(getTask.IsCompleted);
+        Assert.Equal(0, queries.ReleaseCalls);
+        await receiver.Initialize(TimeSpan.FromSeconds(10));
+        Assert.Empty(await receiver.GetQueueMessagesAsync(1));
+        Assert.Equal(1, queries.DequeueCalls);
+
+        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
+        Assert.False(shutdownTask.IsCompleted);
+        queries.Dequeue.SetResult([message]);
+        var dequeued = await getTask.WaitAsync(cancellationToken);
+        await shutdownTask.WaitAsync(cancellationToken);
+        await receiver.MessagesDeliveredAsync(dequeued);
+
+        Assert.Equal(0, queries.ConfirmationCalls);
+        Assert.Equal(1, queries.ReleaseCalls);
+        var released = Assert.Single(queries.Released);
+        Assert.Equal(message.MessageId, released.MessageId);
+        Assert.Equal(message.Dequeued, released.Dequeued);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_Shutdown_ClosesIdleReceiver()
+    {
+        var (receiver, queries, message) = CreateReceiver();
+        await receiver.Shutdown(TimeSpan.FromSeconds(10)).WaitAsync(TestContext.Current.CancellationToken);
+        await receiver.Initialize(TimeSpan.FromSeconds(10));
+        Assert.Empty(await receiver.GetQueueMessagesAsync(1));
+        var serializer = fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        await receiver.MessagesDeliveredAsync([AdoNetBatchContainer.FromMessage(serializer, message)]);
+
+        Assert.Equal(0, queries.DequeueCalls);
+        Assert.Equal(0, queries.ConfirmationCalls);
+        Assert.Equal(0, queries.ReleaseCalls);
+    }
+
+    private (AdoNetQueueAdapterReceiver Receiver, BlockingStreamMessageQueries Queries, AdoNetStreamMessage Message) CreateReceiver()
+    {
         var serviceId = $"Service-{Guid.NewGuid()}";
         var providerId = $"Provider-{Guid.NewGuid()}";
         var queueId = $"Queue-{Guid.NewGuid()}";
@@ -44,25 +250,9 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
         var payload = serializer.SerializeToArray(new AdoNetBatchContainer(StreamId.Create("MyNamespace", "MyKey"), [new TestModel(1)], null!));
         var now = DateTime.UtcNow;
         var message = new AdoNetStreamMessage(serviceId, providerId, queueId, 42, 1, now.AddMinutes(5), now.AddHours(1), now, now, payload);
-        var dequeueStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var continueDequeue = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var queries = new BlockingStreamMessageQueries(message, dequeueStarted, continueDequeue, cancellationToken);
-
+        var queries = new BlockingStreamMessageQueries(TestContext.Current.CancellationToken);
         var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, queries, serializer, logger);
-        var getTask = receiver.GetQueueMessagesAsync(1);
-        await dequeueStarted.Task.WaitAsync(cancellationToken);
-
-        var shutdownTask = receiver.Shutdown(TimeSpan.FromSeconds(10));
-        Assert.False(shutdownTask.IsCompleted);
-
-        continueDequeue.SetResult();
-        var dequeued = Assert.IsType<AdoNetBatchContainer>(Assert.Single(await getTask.WaitAsync(cancellationToken)));
-        await shutdownTask.WaitAsync(cancellationToken);
-
-        Assert.Equal(message.MessageId, dequeued.SequenceToken.SequenceNumber);
-        var released = Assert.Single(queries.Released);
-        Assert.Equal(message.MessageId, released.MessageId);
-        Assert.Equal(message.Dequeued, released.Dequeued);
+        return (receiver, queries, message);
     }
 
     [GenerateSerializer]
@@ -70,13 +260,23 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
     public record TestModel(
         [property: Id(0)] int Value);
 
-    private sealed class BlockingStreamMessageQueries(
-        AdoNetStreamMessage message,
-        TaskCompletionSource dequeueStarted,
-        TaskCompletionSource continueDequeue,
-        CancellationToken cancellationToken) : IStreamMessageQueries
+    private sealed class CallbackList<T>(IEnumerable<T> items, Action beforeEnumerating) : List<T>(items), IEnumerable<T>
     {
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            beforeEnumerating();
+            return GetEnumerator();
+        }
+    }
+
+    private sealed class BlockingStreamMessageQueries(CancellationToken cancellationToken) : IStreamMessageQueries
+    {
+        public TaskCompletionSource<IList<AdoNetStreamMessage>> Dequeue { get; set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<IList<AdoNetStreamConfirmationAck>> Confirmation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public IList<AdoNetStreamConfirmation> Released { get; private set; } = [];
+        public int DequeueCalls { get; private set; }
+        public int ConfirmationCalls { get; private set; }
+        public int ReleaseCalls { get; private set; }
 
         public async Task<IList<AdoNetStreamMessage>> GetStreamMessagesAsync(
             string serviceId,
@@ -89,17 +289,19 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
             int evictionInterval,
             int evictionBatchSize)
         {
-            dequeueStarted.SetResult();
-            await continueDequeue.Task.WaitAsync(cancellationToken);
-            return [message];
+            DequeueCalls++;
+            return await Dequeue.Task.WaitAsync(cancellationToken);
         }
 
-        public Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
+        public async Task<IList<AdoNetStreamConfirmationAck>> ConfirmStreamMessagesAsync(
             string serviceId,
             string providerId,
             string queueId,
-            IList<AdoNetStreamConfirmation> messages) =>
-            throw new NotSupportedException();
+            IList<AdoNetStreamConfirmation> messages)
+        {
+            ConfirmationCalls++;
+            return await Confirmation.Task.WaitAsync(cancellationToken);
+        }
 
         public Task<IList<AdoNetStreamConfirmationAck>> ReleaseStreamMessagesAsync(
             string serviceId,
@@ -107,9 +309,10 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
             string queueId,
             IList<AdoNetStreamConfirmation> messages)
         {
+            ReleaseCalls++;
             Released = messages.ToList();
             return Task.FromResult<IList<AdoNetStreamConfirmationAck>>(
-                [new(serviceId, providerId, queueId, message.MessageId)]);
+                messages.Select(message => new AdoNetStreamConfirmationAck(serviceId, providerId, queueId, message.MessageId)).ToList());
         }
     }
 }

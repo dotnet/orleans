@@ -108,6 +108,12 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 }
 ```
 
+## Receiver shutdown
+
+During shutdown or queue reassignment, each receiver closes admission and waits for accepted dequeue and confirmation operations to finish, including batch conversion and receipt bookkeeping. It then releases its pending messages using their current receipts so another receiver can dequeue them promptly.
+
+The shutdown timeout bounds the drain wait and the subsequent release query separately. If the drain times out, the receiver logs a warning and pending messages become eligible for redelivery through their database visibility timeout.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
