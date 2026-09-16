@@ -355,7 +355,12 @@ namespace Orleans.Streams
             HashSet<SiloAddress>? silosRequiringFreshValidation = null;
             foreach (var (siloAddress, version) in siloMembershipVersions)
             {
-                if (!HasMembershipVersion(version) || version > membershipSnapshot.Version)
+                // Recreated membership storage can reuse a persisted version. An absent silo at that
+                // boundary requires a fresh observation to establish its status.
+                if (!HasMembershipVersion(version)
+                    || version > membershipSnapshot.Version
+                    || (version == membershipSnapshot.Version
+                        && membershipSnapshot.GetSiloStatus(siloAddress) == SiloStatus.None))
                 {
                     silosRequiringFreshValidation ??= [];
                     silosRequiringFreshValidation.Add(siloAddress);

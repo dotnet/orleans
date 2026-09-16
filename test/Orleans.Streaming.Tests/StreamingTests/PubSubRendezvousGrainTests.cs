@@ -572,6 +572,88 @@ namespace UnitTests.StreamingTests
             Assert.Equal(SiloStatus.Active, statuses[replacementSilo]);
         }
 
+        [Theory]
+        [InlineData(SiloStatus.Dead, true)]
+        [InlineData(SiloStatus.Active, true)]
+        [InlineData(SiloStatus.None, false)]
+        [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task EqualVersionMissingPublisherRequiresFreshValidation(
+            SiloStatus validatedStatus,
+            bool shouldRegister)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var oldSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+            var replacementSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11112), 2);
+            var snapshot = new ClusterMembershipSnapshot(
+                ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(
+                    replacementSilo,
+                    new(replacementSilo, SiloStatus.Active, "replacement")),
+                new MembershipVersion(2));
+            var versions = new Dictionary<SiloAddress, MembershipVersion>
+            {
+                [oldSilo] = snapshot.Version,
+                [replacementSilo] = snapshot.Version,
+            };
+            var refreshCount = 0;
+
+            var validation = await PubSubRendezvousGrain.GetSiloStatuses(
+                snapshot,
+                versions,
+                (observedSnapshot, silos, actualCancellationToken, requireFresh) =>
+                {
+                    refreshCount++;
+                    Assert.Same(snapshot, observedSnapshot);
+                    Assert.Equal([oldSilo], silos);
+                    Assert.Equal(cancellationToken, actualCancellationToken);
+                    Assert.True(requireFresh);
+                    return ValueTask.FromResult(
+                        new UnknownSiloStatusCache.SiloStatusValidationResult(
+                            new Dictionary<SiloAddress, SiloStatus> { [oldSilo] = validatedStatus },
+                            snapshot));
+                },
+                cancellationToken);
+
+            Assert.Equal(1, refreshCount);
+            Assert.Equal(validatedStatus, validation.Statuses[oldSilo]);
+            Assert.Equal(SiloStatus.Active, validation.Statuses[replacementSilo]);
+            Assert.Equal(
+                shouldRegister,
+                PubSubRendezvousGrain.ShouldRegisterSystemTarget(
+                    replacementSilo,
+                    [oldSilo],
+                    validation.Statuses));
+        }
+
+        [Theory]
+        [InlineData(2, SiloStatus.Active, SiloStatus.Active)]
+        [InlineData(2, SiloStatus.Dead, SiloStatus.Dead)]
+        [InlineData(1, SiloStatus.None, SiloStatus.Dead)]
+        [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task ConclusivePublisherStatusUsesMembershipSnapshot(
+            long publisherVersion,
+            SiloStatus snapshotStatus,
+            SiloStatus expectedStatus)
+        {
+            var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+            var members = ImmutableDictionary<SiloAddress, ClusterMember>.Empty;
+            if (snapshotStatus != SiloStatus.None)
+            {
+                members = members.Add(silo, new(silo, snapshotStatus, "silo"));
+            }
+
+            var snapshot = new ClusterMembershipSnapshot(members, new MembershipVersion(2));
+            var versions = new Dictionary<SiloAddress, MembershipVersion> { [silo] = new(publisherVersion) };
+
+            var validation = await PubSubRendezvousGrain.GetSiloStatuses(
+                snapshot,
+                versions,
+                (_, _, _, _) => throw new InvalidOperationException("The snapshot already establishes the publisher's status."),
+                TestContext.Current.CancellationToken);
+
+            Assert.Same(snapshot, validation.Snapshot);
+            Assert.Equal(expectedStatus, Assert.Single(validation.Statuses).Value);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task FutureReplacementVersionUsesFreshValidation()
         {
