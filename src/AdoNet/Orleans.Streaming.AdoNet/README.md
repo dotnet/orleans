@@ -134,9 +134,9 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 
 ## Receiver shutdown
 
-During shutdown or queue reassignment, each receiver closes admission and waits for accepted dequeue and confirmation operations to finish, including batch conversion and receipt bookkeeping. It then releases its pending messages using their current receipts so another receiver can dequeue them promptly.
+During shutdown or queue reassignment, the pulling agent closes processing admission and drains admitted queue reads, registrations, delivery, and durable subscription retirement. It preserves pending-registration and handshake checkpoint barriers before the receiver flushes durable progress and releases its pooled cache resources.
 
-The shutdown timeout bounds the drain wait and the subsequent release query separately. If the drain times out, the receiver logs a warning and pending messages become eligible for redelivery through their database visibility timeout.
+The receiver bounds its asynchronous shutdown work using the supplied timeout. Receiver replacement waits for outstanding partition acquisition to settle. The next receiver acquires a fresh ownership epoch and resumes after the durable checkpoint, with retained history governed by the configured retention policy.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
