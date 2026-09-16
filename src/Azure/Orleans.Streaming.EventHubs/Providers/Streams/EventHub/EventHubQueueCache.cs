@@ -145,12 +145,28 @@ namespace Orleans.Streaming.EventHubs
             }
 
             UpdateMetadataMemory(previousMetadataSize);
+            ResetBufferIfEmpty();
+        }
+
+        internal void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
+        {
+            if (memoryController?.IsUnderPressure == true
+                && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
+            {
+                var previousMetadataSize = cache.AllocatedSizeInBytes;
+                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(utcNow, earliestSubscriptionToken);
+                UpdateMetadataMemory(previousMetadataSize);
+                ResetBufferIfEmpty();
+            }
+        }
+
+        private void ResetBufferIfEmpty()
+        {
             if (cache.IsEmpty && this.evictionStrategy is ChronologicalEvictionStrategy)
             {
                 currentBuffer = null;
                 preferredBufferSize = EventHubCacheBufferPool.MinBufferSize;
             }
-
         }
 
         /// <summary>
@@ -463,6 +479,6 @@ namespace Orleans.Streaming.EventHubs
 
     internal interface IMemoryPressureEvictionStrategy
     {
-        void PerformMemoryPressurePurge(DateTime nowUtc);
+        void PerformMemoryPressurePurge(DateTime nowUtc, StreamSequenceToken? deliveryBoundary = null);
     }
 }
