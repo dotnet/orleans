@@ -48,3 +48,82 @@ foreach ($case in $cases) {
     }
 }
 Write-Output "Passed $($cases.Count) script-boundary checks."
+
+$root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..' '..'))
+$artifactName = "DisseminationPathCheck-$([Guid]::NewGuid().ToString('N'))"
+$testArtifacts = Join-Path $root 'Artifacts' $artifactName
+$binaries = Join-Path $testArtifacts 'bin'
+$runner = Join-Path $binaries 'Runner' 'Dissemination.PerformanceHarness.Tests.dll'
+$calls = [System.Collections.Generic.List[object]]::new()
+$environment = @{}
+foreach ($entry in Get-ChildItem Env:ORLEANS_DISSEMINATION_*) {
+    $environment[$entry.Name] = $entry.Value
+}
+
+function dotnet {
+    param([Parameter(ValueFromRemainingArguments)][string[]] $Arguments)
+    if ($Arguments[0] -ne $runner) {
+        throw "Unexpected runner path: $($Arguments[0])"
+    }
+    $calls.Add($Arguments)
+    $global:LASTEXITCODE = 0
+}
+
+try {
+    $selection = @{
+        CandidateRepository = 'ReubenBond/orleans'
+        CandidateRef = '3fc0a4610cd2eb5feef27e958fcca59658aaae47'
+        CandidateCommit = '3fc0a4610cd2eb5feef27e958fcca59658aaae47'
+        BaselineCommit = '6739589254b746a8790cf53524e6abe372bb53d4'
+    }
+    foreach ($runtime in @('Old', 'New')) {
+        $directory = Join-Path $binaries $runtime
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        @{
+            Runtime = $runtime
+            SourceRevision = if ($runtime -eq 'Old') { $selection.BaselineCommit } else { $selection.CandidateCommit }
+        } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'manifest.json')
+    }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $runner) | Out-Null
+    New-Item -ItemType File -Path $runner | Out-Null
+    $selection | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $binaries 'selection.json')
+
+    foreach ($separator in @('/', '\')) {
+        & $script -CandidateRepository $selection.CandidateRepository -CandidateRef $selection.CandidateRef `
+            -ArtifactsDirectory "Artifacts$separator$artifactName" -Sizes '3' -Iterations 3 -Repetitions 1 -SkipBuild
+    }
+    if ($calls.Count -ne 4) {
+        throw "Expected measurement and scaling invocations for both path spellings; got $($calls.Count)."
+    }
+    for ($index = 0; $index -lt $calls.Count; $index++) {
+        $expectedClass = if ($index % 2 -eq 0) { 'MeasurementTests' } else { 'ScalingTests' }
+        if ($calls[$index][2] -ne "Orleans.Dissemination.PerformanceHarness.$expectedClass") {
+            throw "Unexpected test selection in invocation $index."
+        }
+    }
+    $runs = @(Get-ChildItem -LiteralPath (Join-Path $testArtifacts 'results') -Directory)
+    if ($runs.Count -ne 2) {
+        throw "Expected two results directories under the same artifact root; got $($runs.Count)."
+    }
+    foreach ($run in $runs) {
+        foreach ($filename in @('invocation.json', 'selection.json', 'methodology.json', 'host-resources.json')) {
+            $null = Get-Content -LiteralPath (Join-Path $run.FullName $filename) -Raw | ConvertFrom-Json
+        }
+        $invocation = Get-Content -LiteralPath (Join-Path $run.FullName 'invocation.json') -Raw | ConvertFrom-Json
+        if ($invocation.ResultsDirectory -ne $run.FullName) {
+            throw 'The recorded results path differs from the created directory.'
+        }
+    }
+    Write-Output 'Passed 2 SkipBuild path checks with worker execution stubbed.'
+}
+finally {
+    foreach ($entry in Get-ChildItem Env:ORLEANS_DISSEMINATION_*) {
+        [Environment]::SetEnvironmentVariable($entry.Name, $null)
+    }
+    foreach ($entry in $environment.GetEnumerator()) {
+        [Environment]::SetEnvironmentVariable($entry.Key, $entry.Value)
+    }
+    if (Test-Path -LiteralPath $testArtifacts) {
+        Remove-Item -LiteralPath $testArtifacts -Recurse -Force
+    }
+}

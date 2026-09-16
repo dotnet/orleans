@@ -106,8 +106,9 @@ the exact repository/ref recorded in `bin\selection.json`:
 ```
 
 `-ArtifactsDirectory` accepts a single named directory under `Artifacts`; paths
-containing existing links/reparse points are rejected. Builds require fresh binary
-output; each replay creates its own results directory.
+accept either slash spelling and are assembled from platform-native components.
+Existing links/reparse points are rejected. Builds require fresh binary output;
+each replay creates its own results directory.
 
 Run only the lightweight controller measurement cases locally:
 
@@ -117,6 +118,20 @@ dotnet test --project test\Dissemination.PerformanceHarness\Tests\Dissemination.
   --framework net10.0 --filter-class '*MeasurementTests' --minimum-expected-tests 15
 ```
 
-The harness projects are selected explicitly by the workflow and remain outside
-the solution's ordinary test runs. The scaling test requires the script's explicit
-manual-run marker and published binary selection.
+Ordinary Linux/Windows CI runs the script checks with worker execution stubbed.
+`ProviderTests\FileMembershipTableTests.cs` is linked into `Orleans.Runtime.Tests`
+alongside the file-backed provider and its protocol. These BVT cases exercise
+persisted membership cleanup: all expired non-active statuses are removed, while
+active rows and rows updated at or after the cutoff retain their ETags. Cleanup uses
+the selected runtime's `EffectiveUpdateTime`, including startup, heartbeat and
+suspect-vote timestamps.
+
+```powershell
+dotnet test --project test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj `
+  --framework net10.0 --filter-class 'Orleans.Dissemination.PerformanceHarness.FileMembershipTableTests' `
+  --minimum-expected-tests 10
+```
+
+The scaling test runs through the script's explicit manual-run marker and published
+binary selection. The measurement controller retains its independent build using
+shared protocol and instrumentation sources.

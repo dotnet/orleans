@@ -7,7 +7,7 @@ param(
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$')]
     [string] $CandidateRef,
     [ValidatePattern('^Artifacts[\\/][A-Za-z0-9][A-Za-z0-9._-]{0,79}$')]
-    [string] $ArtifactsDirectory = 'Artifacts\DisseminationPerformance',
+    [string] $ArtifactsDirectory = (Join-Path 'Artifacts' 'DisseminationPerformance'),
     [ValidatePattern('^\d+(,\d+){0,5}$')]
     [string] $Sizes = '4,8',
     [ValidateRange(3, 200)]
@@ -28,8 +28,8 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $baselineSha = '6739589254b746a8790cf53524e6abe372bb53d4'
-$root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$harnessSource = Join-Path $root 'test\Dissemination.PerformanceHarness'
+$root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..' '..'))
+$harnessSource = Join-Path $root 'test' 'Dissemination.PerformanceHarness'
 $sizesArray = @($Sizes.Split(',') | ForEach-Object { [int]$_ })
 if (@($sizesArray | Select-Object -Unique).Count -ne $sizesArray.Count -or
     @($sizesArray | Where-Object { $_ -lt 3 -or $_ -gt 128 }).Count -gt 0) {
@@ -84,7 +84,7 @@ function Assert-Checkout([string] $Directory, [string] $Repository) {
 }
 
 function Copy-Worker([string] $Checkout) {
-    $destination = Join-Path $Checkout 'test\Dissemination.PerformanceHarness'
+    $destination = Join-Path $Checkout 'test' 'Dissemination.PerformanceHarness'
     if (Test-Path -LiteralPath $destination) {
         throw "Refusing to overwrite an existing runtime harness: $destination"
     }
@@ -98,7 +98,7 @@ function Copy-Worker([string] $Checkout) {
 }
 
 function Publish-Silo([string] $Checkout, [string] $Runtime, [string] $Revision) {
-    $project = Join-Path $Checkout 'test\Dissemination.PerformanceHarness\Silo\Dissemination.Silo.csproj'
+    $project = Join-Path $Checkout 'test' 'Dissemination.PerformanceHarness' 'Silo' 'Dissemination.Silo.csproj'
     $output = Join-Path $binaries $Runtime
     Push-Location $Checkout
     try {
@@ -133,7 +133,8 @@ function Publish-Silo([string] $Checkout, [string] $Runtime, [string] $Revision)
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output 'manifest.json')
 }
 
-$artifacts = [System.IO.Path]::GetFullPath((Join-Path $root $ArtifactsDirectory))
+$artifactName = ($ArtifactsDirectory -split '[\\/]')[1]
+$artifacts = [System.IO.Path]::GetFullPath((Join-Path $root 'Artifacts' $artifactName))
 Assert-NoLinks $artifacts
 if (Test-Path -LiteralPath $artifacts) {
     foreach ($item in Get-ChildItem -LiteralPath $artifacts -Recurse -Force) {
@@ -161,10 +162,10 @@ if (!$SkipBuild) {
     if ($CandidateRef -match '^[0-9a-fA-F]{40}$' -and $candidateSha -ne $CandidateRef) {
         throw "Candidate checkout does not match requested commit $CandidateRef."
     }
-    if (!(Test-Path -LiteralPath (Join-Path $candidate 'src\Orleans.Runtime\Dissemination'))) {
+    if (!(Test-Path -LiteralPath (Join-Path $candidate 'src' 'Orleans.Runtime' 'Dissemination'))) {
         throw 'Select a candidate revision containing the dissemination runtime APIs.'
     }
-    if (Test-Path -LiteralPath (Join-Path $baseline 'src\Orleans.Runtime\Dissemination')) {
+    if (Test-Path -LiteralPath (Join-Path $baseline 'src' 'Orleans.Runtime' 'Dissemination')) {
         throw 'Original runtime unexpectedly contains dissemination.'
     }
     New-Item -ItemType Directory -Force $binaries | Out-Null
@@ -173,7 +174,7 @@ if (!$SkipBuild) {
     Publish-Silo $baseline 'Old' $baselineSha
     Publish-Silo $candidate 'New' $candidateSha
     Invoke-DotNet @(
-        'publish', (Join-Path $harnessSource 'Tests\Dissemination.PerformanceHarness.Tests.csproj'),
+        'publish', (Join-Path $harnessSource 'Tests' 'Dissemination.PerformanceHarness.Tests.csproj'),
         '--configuration', 'Release', '--framework', 'net10.0',
         '--output', (Join-Path $binaries 'Runner'), '--verbosity', 'minimal',
         "-bl:$(Join-Path $artifacts 'build-runner.binlog')"
@@ -195,18 +196,18 @@ if ($selection.CandidateRepository -ne $CandidateRepository -or $selection.Candi
     throw 'Requested revisions must match the downloaded binary selection.json.'
 }
 foreach ($runtime in @('Old', 'New')) {
-    $manifest = Get-Content -LiteralPath (Join-Path $binaries "$runtime\manifest.json") -Raw | ConvertFrom-Json
+    $manifest = Get-Content -LiteralPath (Join-Path $binaries $runtime 'manifest.json') -Raw | ConvertFrom-Json
     $expected = if ($runtime -eq 'Old') { $baselineSha } else { $selection.CandidateCommit }
     if ($manifest.SourceRevision -ne $expected -or $manifest.Runtime -ne $runtime) {
         throw "Binary manifest does not match selected $runtime revision."
     }
 }
 
-$runner = Join-Path $binaries 'Runner\Dissemination.PerformanceHarness.Tests.dll'
+$runner = Join-Path $binaries 'Runner' 'Dissemination.PerformanceHarness.Tests.dll'
 if (!(Test-Path -LiteralPath $runner)) {
     throw "Published runner not found: $runner"
 }
-$results = Join-Path $artifacts "results\$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmss'))-$([Guid]::NewGuid().ToString('N'))"
+$results = Join-Path $artifacts 'results' "$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmss'))-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Force $results | Out-Null
 Copy-Item -LiteralPath (Join-Path $harnessSource 'methodology.json') -Destination $results
 Copy-Item -LiteralPath (Join-Path $binaries 'selection.json') -Destination $results

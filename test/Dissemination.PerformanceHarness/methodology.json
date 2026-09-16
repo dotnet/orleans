@@ -36,7 +36,7 @@
     "churn": "Gracefully stop and restart one process at its original endpoint every other round. Confirm membership and supported enabled peers before the next offered round. Replacement startup, shutdown, discovery and fallback costs remain in the measured window.",
     "partition": "Abort real inbound/outbound silo connections and reject new admissions at one endpoint. Publish once on each remaining node. Recovery drains middleware and close tasks at both endpoints, including unidentified handshakes, then confirms bidirectional acknowledged control RPCs before a single publication per active node. Teardown/readiness/retries remain inside recovery time and total cost, preserving the #11243 barrier.",
     "window": "Identical two-second socket-sampling margins; costs include background runtime, control RPCs and instrumentation. The post-window full-GC retained-memory probe is separate from CPU/allocation costs.",
-    "membership": "Exclusive-file-lease JSON provider with atomic replacement, ETags and incarnation-aware rows. Liveness detection is disabled so the transport partition retains stable membership.",
+    "membership": "Exclusive-file-lease JSON provider with atomic replacement, ETags and incarnation-aware rows. Cleanup removes non-active rows whose runtime EffectiveUpdateTime precedes the cutoff, accounting for startup, heartbeat and suspect votes. Liveness detection is disabled so the transport partition retains stable membership.",
     "metrics": [
       "Request plus one-way Orleans RPC counts; all messages including responses reported separately",
       "Load broadcast requests and logical value transmissions reported separately, with requests per round and per second",

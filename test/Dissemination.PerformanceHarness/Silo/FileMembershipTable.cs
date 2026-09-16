@@ -75,8 +75,8 @@ internal sealed class FileMembershipTable(NodeConfiguration configuration) : IMe
     public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken) => Access(state =>
     {
         foreach (var key in state.Rows.Where(pair =>
-            pair.Value.Entry.Status == (int)SiloStatus.Dead
-            && pair.Value.Entry.IAmAliveTime < beforeDate.UtcDateTime).Select(pair => pair.Key).ToArray())
+            pair.Value.Entry.Status != (int)SiloStatus.Active
+            && pair.Value.Entry.ToEntry().EffectiveUpdateTime < beforeDate.UtcDateTime).Select(pair => pair.Key).ToArray())
         {
             state.Rows.Remove(key);
         }
