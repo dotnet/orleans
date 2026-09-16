@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -14,6 +16,7 @@ using Orleans.Storage;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
+using Orleans.Transactions.TestKit;
 using TestExtensions;
 using Xunit;
 
@@ -25,6 +28,72 @@ namespace Orleans.Transactions.Tests;
 [TestCategory("BVT"), TestCategory("Transactions")]
 public class TransactionQueueStorageWorkTests
 {
+    [Theory]
+    [InlineData(GrainLifecycleStage.SetupState)]
+    [InlineData(GrainLifecycleStage.Last)]
+    public async Task FaultInjectionDelegatedSetup_RegistersStorageDrain(int stopStage)
+    {
+        var storage = new CoordinatedTransactionalStateStorage();
+        var resource = new ParticipantId("state", null!, ParticipantId.Role.Resource);
+        storage.EnqueueLoad(() => Task.FromResult(CreateLoadResponse(
+            Guid.NewGuid(), DateTime.UtcNow, resource, "loaded-etag", includeCommitRecord: false)));
+        var storeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(async _ =>
+        {
+            storeStarted.SetResult();
+            await finishStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            return "stored-etag";
+        });
+        using var services = new ServiceCollection()
+            .AddSingleton<INamedTransactionalStateStorageFactory>(new TestStorageFactory(storage))
+            .AddSingleton<IOptions<TransactionalStateOptions>>(Options.Create(new TransactionalStateOptions()))
+            .AddSingleton<IClock>(new Clock())
+            .AddSingleton<ITimerManager>(new NoOpTimerManager())
+            .BuildServiceProvider();
+        var lifecycle = new TestLifecycle();
+        var context = new TestGrainContext(services, lifecycle);
+        var state = new TransactionalState<TestState>(
+            new TransactionalStateConfiguration { StateName = "state", StorageName = "storage" },
+            new TestGrainContextAccessor(context), null!, null!, NullLogger<TransactionalState<TestState>>.Instance);
+        var wrapper = new FaultInjectionTransactionalState<TestState>(
+            state, null!, null!, NullLogger<FaultInjectionTransactionalState<TestState>>.Instance);
+
+        wrapper.Participate(lifecycle);
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStart(TestContext.Current.CancellationToken);
+
+        Assert.IsType<FaultInjectionTransactionalResource<TestState>>(context.GetResourceFactoryRegistry<ITransactionalResource>()!["state"]());
+        Assert.IsType<FaultInjectionTransactionManager<TestState>>(context.GetResourceFactoryRegistry<ITransactionManager>()!["state"]());
+        var queue = Assert.IsType<TransactionQueue<TestState>>(typeof(TransactionalState<TestState>)
+            .GetField("queue", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(state));
+        var worker = Assert.IsType<BatchWorkerFromDelegate>(typeof(TransactionQueue<TestState>)
+            .GetField("storageWorker", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(queue));
+        await worker.WaitForCurrentWorkToBeServiced().WaitAsync(TestContext.Current.CancellationToken);
+        var batch = CreateDirtyBatch();
+        bool? outcome = null;
+        Task? stop = null;
+        batch.FollowUpAction(success =>
+        {
+            Assert.NotNull(stop);
+            Assert.False(stop.IsCompleted);
+            outcome = success;
+        });
+        typeof(TransactionQueue<TestState>).GetField("storageBatch", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(queue, batch);
+
+        var work = worker.NotifyAndWaitForWorkToBeServiced();
+        await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        stop = lifecycle.Observers[stopStage].OnStop(TestContext.Current.CancellationToken);
+
+        Assert.True(queue.OnDeactivating.IsCancellationRequested);
+        Assert.False(stop.IsCompleted);
+        finishStore.SetResult();
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(outcome);
+        await lifecycle.Observers[GrainLifecycleStage.SetupState].OnStop(TestContext.Current.CancellationToken);
+        await lifecycle.Observers[GrainLifecycleStage.Last].OnStop(TestContext.Current.CancellationToken);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -753,9 +822,56 @@ public class TransactionQueueStorageWorkTests
         public Task WaitForBackgroundWorkAsync() => ((BatchWorker)StorageWorkerField.GetValue(this)!).WaitForCurrentWorkToBeServiced();
     }
 
-    private sealed class TestGrainContextAccessor : IGrainContextAccessor
+    private sealed class TestStorageFactory(ITransactionalStateStorage<TestState> storage) : INamedTransactionalStateStorageFactory
     {
-        public IGrainContext GrainContext => null!;
+        public ITransactionalStateStorage<T> Create<T>(string? storageName, string stateName) where T : class, new()
+        {
+            Assert.Equal("storage", storageName);
+            Assert.Equal("state", stateName);
+            return Assert.IsAssignableFrom<ITransactionalStateStorage<T>>(storage);
+        }
+    }
+
+    private sealed class TestGrainContextAccessor(IGrainContext? context = null) : IGrainContextAccessor
+    {
+        public IGrainContext GrainContext => context!;
+    }
+
+    private sealed class TestGrainContext(IServiceProvider activationServices, IGrainLifecycle lifecycle) : IGrainContext
+    {
+        private readonly Dictionary<Type, object> components = new();
+        public GrainId GrainId { get; } = GrainId.Create("test", "fault-injection");
+        public ActivationId ActivationId { get; } = ActivationId.NewId();
+        public GrainReference GrainReference => new TestGrainReference(GrainId, null!);
+        public GrainAddress Address => GrainAddress.GetAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1), GrainId, ActivationId);
+        public IServiceProvider ActivationServices => activationServices;
+        public IGrainLifecycle ObservableLifecycle => lifecycle;
+        public object? GrainInstance => null;
+        public IWorkItemScheduler Scheduler => throw new NotSupportedException();
+        public Task Deactivated => Task.CompletedTask;
+        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+        public object? GetComponent(Type type) => components.GetValueOrDefault(type);
+        public TComponent? GetComponent<TComponent>() where TComponent : class => GetComponent(typeof(TComponent)) as TComponent;
+
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class
+        {
+            if (value is null)
+            {
+                components.Remove(typeof(TComponent));
+            }
+            else
+            {
+                components[typeof(TComponent)] = value;
+            }
+        }
+
+        public object? GetTarget() => null;
+        public TTarget? GetTarget<TTarget>() where TTarget : class => null;
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public void ReceiveMessage(object message) => throw new NotSupportedException();
+        public void Rehydrate(IRehydrationContext context) => throw new NotSupportedException();
     }
 
     private sealed class TestLifecycle : IGrainLifecycle

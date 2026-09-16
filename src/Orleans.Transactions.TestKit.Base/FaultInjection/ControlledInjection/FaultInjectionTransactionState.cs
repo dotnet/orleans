@@ -235,8 +235,7 @@ namespace Orleans.Transactions.TestKit
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe<FaultInjectionTransactionalState<TState>>(GrainLifecycleStage.SetupState,
-                (ct) => this.txState.OnSetupState(this.SetupResourceFactory, ct));
+            this.txState.Participate(lifecycle, this.SetupResourceFactory);
         }
 
         internal void SetupResourceFactory(IGrainContext context, string stateName, TransactionQueue<TState> queue)
