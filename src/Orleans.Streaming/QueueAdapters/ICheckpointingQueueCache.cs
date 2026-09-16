@@ -6,13 +6,20 @@ namespace Orleans.Streams;
 /// A partition cache whose checkpoints and eviction are bounded by certified delivery progress.
 /// </summary>
 /// <remarks>
-/// Each successful cursor acquisition supplies an <see cref="IQueueCacheCursorProgress"/>.
+/// When <see cref="UsesCertifiedDeliveryProgress"/> is true, each successful cursor acquisition
+/// supplies an <see cref="IQueueCacheCursorProgress"/>.
 /// <see cref="IQueueCache.AddToCache"/> admits a returned read atomically: a recoverable
 /// failure preserves the previously admitted prefix so the same read can be retried.
 /// The associated receiver implements <see cref="IQueueAdapterReceiverReadRecovery"/>.
 /// </remarks>
 public interface ICheckpointingQueueCache : IQueueCache
 {
+    /// <summary>
+    /// Gets whether the initialized provider has selected the certified progress contract.
+    /// </summary>
+    /// <remarks>The selection remains stable for the receiver lifetime and is independent of transient failures.</remarks>
+    bool UsesCertifiedDeliveryProgress => true;
+
     /// <summary>
     /// Publishes the last partition record whose subscription and read-accounting obligations are resolved.
     /// </summary>
@@ -23,5 +30,5 @@ public interface ICheckpointingQueueCache : IQueueCache
     /// Pending discovery or unknown progress withholds the call. With no subscriptions, the
     /// pulling agent supplies the last fully accounted read boundary.
     /// </remarks>
-    void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow);
+    new void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow);
 }

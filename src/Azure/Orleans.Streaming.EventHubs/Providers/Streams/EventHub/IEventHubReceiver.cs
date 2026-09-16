@@ -70,6 +70,7 @@ namespace Orleans.Streaming.EventHubs
         private bool captureBeginningPosition;
         private long? firstSequenceNumber;
         private bool recreateRequired;
+        private bool recoveryEnabled;
 
         public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
@@ -124,12 +125,14 @@ namespace Orleans.Streaming.EventHubs
             this.clientFactory = clientFactory;
             this.readPosition = readPosition;
             this.captureLatestPosition = captureLatestPosition;
+            recoveryEnabled = true;
             captureBeginningPosition = !captureLatestPosition && readPosition.Equals(EventPosition.Earliest);
             client = clientFactory(readPosition);
         }
 
         internal async Task InitializeAsync(CancellationToken cancellationToken)
         {
+            recoveryEnabled = true;
             if (captureLatestPosition || captureBeginningPosition)
             {
                 var properties = await client.GetPartitionPropertiesAsync(cancellationToken);
@@ -162,6 +165,7 @@ namespace Orleans.Streaming.EventHubs
 
         public Task RecoverReadAsync(CancellationToken cancellationToken)
         {
+            if (!recoveryEnabled) throw new InvalidOperationException("Read recovery has not been selected for this receiver.");
             recreateRequired = true;
             return InitializeAsync(cancellationToken);
         }
@@ -174,6 +178,7 @@ namespace Orleans.Streaming.EventHubs
             TimeSpan waitTime,
             CancellationToken cancellationToken)
         {
+            if (!recoveryEnabled) return await client.ReceiveBatchAsync(maxCount, waitTime, cancellationToken);
             await InitializeAsync(cancellationToken);
             try
             {

@@ -1668,6 +1668,8 @@ namespace Orleans.Streams
 
     public partial interface ICheckpointingQueueCache : IQueueCache, IQueueFlowController
     {
+        bool UsesCertifiedDeliveryProgress { get; }
+
         void UpdateDeliveryProgress(StreamSequenceToken safeToken, System.DateTime utcNow);
     }
 
@@ -1741,6 +1743,7 @@ namespace Orleans.Streams
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
+        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
     }
 
     public partial interface IQueueCacheBatchContainerFilter

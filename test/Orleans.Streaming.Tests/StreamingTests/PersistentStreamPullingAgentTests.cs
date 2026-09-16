@@ -294,7 +294,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RegisterStream_RetainsDiscoveryWhenProducerRegistrationTerminates()
+        public async Task RegisterStream_RemovesLegacyEntryWhenProducerRegistrationTerminates()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
@@ -304,9 +304,7 @@ namespace UnitTests.StreamingTests
 
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
-            var pending = Assert.Single(await testAccessor.GetPubSubCache()).Value;
-            Assert.False(pending.StreamRegistered);
-            Assert.Null(pending.RegistrationTask);
+            Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
         [TestSuite("BVT")]

@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -54,6 +52,8 @@ namespace Orleans.Streams
         private IList<IBatchContainer>? _pendingRead;
         private bool _pendingReadAdded;
         private bool _readRecoveryRequired;
+        private ICheckpointingQueueCache? CheckpointingCache
+            => queueCache is ICheckpointingQueueCache { UsesCertifiedDeliveryProgress: true } cache ? cache : null;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
@@ -284,7 +284,7 @@ namespace Orleans.Streams
 
         internal static void ValidateCheckpointingProvider(IQueueCache? cache, IQueueAdapterReceiver receiver)
         {
-            if (cache is ICheckpointingQueueCache)
+            if (cache is ICheckpointingQueueCache { UsesCertifiedDeliveryProgress: true })
             {
                 if (receiver is not IQueueAdapterReceiverReadRecovery)
                 {
@@ -292,28 +292,6 @@ namespace Orleans.Streams
                         $"Checkpointing receiver {receiver.GetType().FullName} must implement {nameof(IQueueAdapterReceiverReadRecovery)}.");
                 }
 
-                return;
-            }
-
-            if (cache is null) return;
-
-            // Match the exact former implicit interface implementation, including inherited methods.
-            foreach (var method in cache.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Public))
-            {
-                if (method.Name != nameof(ICheckpointingQueueCache.UpdateDeliveryProgress)
-                    || method.ReturnType != typeof(void) || method.IsGenericMethod)
-                {
-                    continue;
-                }
-
-                var parameters = method.GetParameters();
-                if (parameters.Length == 2 && parameters[0].ParameterType == typeof(StreamSequenceToken)
-                    && parameters[1].ParameterType == typeof(DateTime))
-                {
-                    throw new OrleansConfigurationException(
-                        $"Queue cache {cache.GetType().FullName} implements the legacy delivery-progress callback. "
-                        + $"Migrate it to {nameof(ICheckpointingQueueCache)} and certified cursor progress.");
-                }
             }
         }
 
@@ -777,7 +755,7 @@ namespace Orleans.Streams
 
         private IQueueCacheCursor ValidateCheckpointCursor(IQueueCacheCursor cursor)
         {
-            if (queueCache is ICheckpointingQueueCache && cursor is not IQueueCacheCursorProgress)
+            if (CheckpointingCache is not null && cursor is not IQueueCacheCursorProgress)
             {
                 try
                 {
@@ -816,7 +794,7 @@ namespace Orleans.Streams
             }
 
             var cursor = ValidateCheckpointCursor(acquisitionResult.Cursor!);
-            var progressCursor = cursor as IQueueCacheCursorProgress;
+            var progressCursor = CheckpointingCache is not null ? cursor as IQueueCacheCursorProgress : null;
             var retainCursor = false;
             try
             {
@@ -968,7 +946,7 @@ namespace Orleans.Streams
                         {
                             AddSubscriber_Impl(consumer.SubscriptionId, consumer.StreamId, default, consumer.FilterData, consumer.PendingStartToken).Ignore();
                         }
-                        else if (consumer.IsRegistered && consumer.PendingHandshakes == 0 && !consumer.HasUnresolvedHandshake
+                        else if (CheckpointingCache is not null && consumer.IsRegistered && consumer.PendingHandshakes == 0 && !consumer.HasUnresolvedHandshake
                             && consumer.State == StreamConsumerDataState.Inactive && consumer.Cursor is IQueueCacheCursorProgress)
                         {
                             RunConsumerCursor(consumer, cancellationToken).Ignore();
@@ -976,7 +954,7 @@ namespace Orleans.Streams
                     }
                 }
 
-                NotifyDeliveryProgress();
+                if (CheckpointingCache is not null) NotifyDeliveryProgress();
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
@@ -1115,7 +1093,7 @@ namespace Orleans.Streams
                 }
                 catch
                 {
-                    _readRecoveryRequired = queueCache is ICheckpointingQueueCache;
+                    _readRecoveryRequired = CheckpointingCache is not null;
                     throw;
                 }
             }
@@ -1127,56 +1105,69 @@ namespace Orleans.Streams
                 return false;
             }
 
-            var readBoundary = GetReadBoundary(multiBatch);
-            if (!_pendingReadAdded)
+            var accountedFor = false;
+            try
             {
-                queueCache?.AddToCache(multiBatch);
-                _pendingReadAdded = true;
-                numMessages += multiBatch.Count;
-                if (_streamInstruments?.PersistentStreamReadMessages.Enabled is true)
+                var readBoundary = GetReadBoundary(multiBatch);
+                if (!_pendingReadAdded)
                 {
-                    tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
-                    _streamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+                    queueCache?.AddToCache(multiBatch);
+                    _pendingReadAdded = true;
+                    numMessages += multiBatch.Count;
+                    if (_streamInstruments?.PersistentStreamReadMessages.Enabled is true)
+                    {
+                        tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
+                        _streamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+                    }
+
+                    LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
                 }
 
-                LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
-            }
+                var groups = multiBatch.ToLookup(static container => container.StreamId);
+                foreach (var stream in pubSubCache.ToArray())
+                {
+                    if (CheckpointingCache is not null && !groups.Contains(stream.Key.StreamId))
+                    {
+                        StartInactiveCursors(stream.Value, multiBatch[0].SequenceToken, CancellationToken.None, onlyProgressAware: true);
+                    }
+                }
 
-            var groups = multiBatch.ToLookup(static container => container.StreamId);
-            foreach (var stream in pubSubCache.ToArray())
+                foreach (var group in groups)
+                {
+                    var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
+                    StreamSequenceToken startToken = group.First().SequenceToken;
+                    if (pubSubCache.TryGetValue(streamId, out var streamData))
+                    {
+                        streamData.RefreshActivity(now);
+                        StartInactiveCursors(streamData, startToken, CancellationToken.None);
+                    }
+                    else
+                    {
+                        streamData = RegisterStream(streamId, startToken, now, CancellationToken.None);
+                    }
+
+                    if (streamData is not null) streamData.LastReadToken = group.Last().SequenceToken;
+                }
+
+                _lastReadToken = readBoundary;
+                _pendingRead = null;
+                _pendingReadAdded = false;
+                accountedFor = true;
+                return !IsShutdown && !cancellationToken.IsCancellationRequested;
+            }
+            finally
             {
-                if (!groups.Contains(stream.Key.StreamId))
+                if (!accountedFor && CheckpointingCache is null)
                 {
-                    StartInactiveCursors(stream.Value, multiBatch[0].SequenceToken, CancellationToken.None, onlyProgressAware: true);
+                    _pendingRead = null;
+                    _pendingReadAdded = false;
                 }
             }
-
-            foreach (var group in groups)
-            {
-                var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
-                StreamSequenceToken startToken = group.First().SequenceToken;
-                if (pubSubCache.TryGetValue(streamId, out var streamData))
-                {
-                    streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken, CancellationToken.None);
-                }
-                else
-                {
-                    streamData = RegisterStream(streamId, startToken, now, CancellationToken.None);
-                }
-
-                if (streamData is not null) streamData.LastReadToken = group.Last().SequenceToken;
-            }
-
-            _lastReadToken = readBoundary;
-            _pendingRead = null;
-            _pendingReadAdded = false;
-            return !IsShutdown && !cancellationToken.IsCancellationRequested;
         }
 
         private StreamSequenceToken? GetReadBoundary(IList<IBatchContainer> batches)
         {
-            if (queueCache is not ICheckpointingQueueCache) return null;
+            if (CheckpointingCache is null) return null;
             var previous = _lastReadToken;
 
             for (var i = 0; i < batches.Count; i++)
@@ -1206,7 +1197,7 @@ namespace Orleans.Streams
             foreach (var tuple in pubSubCache)
             {
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod)
-                    && (queueCache is not ICheckpointingQueueCache
+                    && (CheckpointingCache is null
                         || tuple.Value.AllConsumers().All(consumer =>
                             consumer.IsRegistered && consumer.LastSafePartitionToken is { } safe
                             && tuple.Value.LastReadToken is { } read
@@ -1237,14 +1228,22 @@ namespace Orleans.Streams
         /// </summary>
         private void NotifyDeliveryProgress()
         {
-            if (queueCache is not ICheckpointingQueueCache checkpointingCache) return;
+            if (queueCache is null) return;
+            var checkpointingCache = CheckpointingCache;
 
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-            if (TryGetDeliveryProgress(out var earliest))
+            if (TryGetDeliveryProgress(checkpointingCache is not null, out var earliest))
             {
                 try
                 {
-                    checkpointingCache.UpdateDeliveryProgress(earliest, utcNow);
+                    if (checkpointingCache is not null)
+                    {
+                        checkpointingCache.UpdateDeliveryProgress(earliest!, utcNow);
+                    }
+                    else
+                    {
+                        queueCache.UpdateDeliveryProgress(earliest, utcNow);
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -1253,17 +1252,19 @@ namespace Orleans.Streams
             }
         }
 
-        private bool TryGetDeliveryProgress([NotNullWhen(true)] out StreamSequenceToken? earliest)
+        private bool TryGetDeliveryProgress(bool certified, out StreamSequenceToken? earliest)
         {
             earliest = null;
-            if (_pendingRead is not null || _readRecoveryRequired || _lastReadToken is null)
+            if (certified && (_pendingRead is not null || _readRecoveryRequired || _lastReadToken is null))
             {
                 return false;
             }
 
             foreach (var streamConsumers in pubSubCache.Values)
             {
-                if (!streamConsumers.StreamRegistered || streamConsumers.RegistrationTask is not null)
+                if (certified
+                    ? !streamConsumers.StreamRegistered || streamConsumers.RegistrationTask is not null
+                    : streamConsumers.RegistrationTask is { IsCompleted: false })
                 {
                     return false;
                 }
@@ -1275,7 +1276,7 @@ namespace Orleans.Streams
                         return false;
                     }
 
-                    var current = consumer.LastSafePartitionToken;
+                    var current = certified ? consumer.LastSafePartitionToken : consumer.LastProcessedToken;
                     if (current is null)
                     {
                         return false;
@@ -1303,6 +1304,8 @@ namespace Orleans.Streams
                     }
                 }
             }
+
+            if (!certified) return true;
 
             if (_lastReadToken is { } readBoundary && earliest is not null)
             {
@@ -1450,13 +1453,25 @@ namespace Orleans.Streams
             void RemoveCanceledRegistration()
             {
                 LogWarningFailedToRegisterStream(streamId, new OperationCanceledException(cancellationToken));
+                RemoveLegacyRegistration();
             }
 
             void FailRegistration(Exception exception)
             {
                 LogWarningFailedToRegisterStream(streamId, exception);
                 StreamingEvents.EmitPullingAgentStreamRegistrationFailed(streamProviderName, Silo, QueueId, streamId.StreamId, exception);
+                RemoveLegacyRegistration();
 
+            }
+
+            void RemoveLegacyRegistration()
+            {
+                if (CheckpointingCache is null && pubSubCache.TryGetValue(streamId, out var current)
+                    && ReferenceEquals(current, streamData))
+                {
+                    pubSubCache.Remove(streamId);
+                    streamData.DisposeAll(logger);
+                }
             }
 
             async Task SubscribeWithIsolation(PubSubSubscriptionState item)
@@ -1553,7 +1568,7 @@ namespace Orleans.Streams
                         UpdateCursorProgress(consumerData, progressCursor);
                         if (nextBatch.CursorResult.Kind == QueueCacheCursorMoveResultKind.CacheMiss)
                         {
-                            if (progressCursor is not null)
+                            if (CheckpointingCache is not null && progressCursor is not null)
                             {
                                 throw nextBatch.CursorResult.CacheMiss!.Value.ToException();
                             }
@@ -1595,7 +1610,7 @@ namespace Orleans.Streams
                     catch (Exception exc)
                     {
                         exceptionOccured = exc;
-                        if (progressCursor is not null)
+                        if (CheckpointingCache is not null && progressCursor is not null)
                         {
                             progressCursor.RecordDeliveryFailure();
                         }
@@ -1738,7 +1753,7 @@ namespace Orleans.Streams
                             continue;
                         }
 
-                        if (queueCache is ICheckpointingQueueCache && progressCursor is not null)
+                        if (CheckpointingCache is not null && progressCursor is not null)
                         {
                             progressCursor.RecordDeliveryFailure();
                         }
@@ -1769,7 +1784,7 @@ namespace Orleans.Streams
                             forceFaultSubscription,
                             cancellationToken);
                         if (faultedSubscription) return;
-                        if (queueCache is ICheckpointingQueueCache || nextBatch.Batch is null)
+                        if (CheckpointingCache is not null || nextBatch.Batch is null)
                         {
                             // Retry the retained cursor on the next pump, using the existing retry budget.
                             break;
@@ -2119,7 +2134,7 @@ namespace Orleans.Streams
         private partial void LogWarningUnknownReadProgress(QueueIdLogRecord queueId);
 
         [LoggerMessage(Level = LogLevel.Warning,
-            Message = "Failed to publish certified delivery progress for queue {QueueId}; the next pump will retry.")]
+            Message = "Failed to publish delivery progress for queue {QueueId}.")]
         private partial void LogWarningUpdatingDeliveryProgress(QueueIdLogRecord queueId, Exception exception);
 
         [LoggerMessage(Level = LogLevel.Error,
