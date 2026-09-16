@@ -54,6 +54,7 @@ interface [GrainInterfaceType("Orleans.Streams.IPullingAgentGrain")] Orleans.Str
   C6034157: Stop(Orleans.Runtime.SiloAddress, System.Threading.CancellationToken) -> Task
 
 interface [GrainInterfaceType("Orleans.Streams.IPullingAgentRuntime")] Orleans.Streams.IPullingAgentRuntime [Version(0)]
+  2B82919A: CanRetire(string, Orleans.Streams.QueueId, System.Threading.CancellationToken) -> Task<bool>
   BBB79E98: IsEligible(string, Orleans.Streams.QueueId?, System.Threading.CancellationToken) -> Task<bool>
 
 interface [GrainInterfaceType("Orleans.Streams.IPullingCoordinatorGrain")] Orleans.Streams.IPullingCoordinatorGrain [Version(0)]

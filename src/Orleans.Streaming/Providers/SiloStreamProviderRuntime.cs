@@ -99,7 +99,10 @@ namespace Orleans.Runtime.Providers
                         context, streamProviderName, pubSub, filter, queueId, pullingAgentOptions, queueAdapter,
                         adapterFactory.GetQueueAdapterCache(), await adapterFactory.GetDeliveryFailureHandler(queueId),
                         deliveryProvider, queueReaderProvider, timeProvider, loggerFactory,
-                        ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments));
+                        ServiceProvider.GetRequiredService<ITimerRegistry>(), GrainFactory, instruments))
+                    {
+                        DurablePubSub = pubsubOptions.PubSubType == StreamPubSubType.ImplicitOnly ? null : pubSub,
+                    };
                     ServiceProvider.GetRequiredService<PullingAgentRuntime>().Register(streamProviderName, provider);
                     var grainManager = new GrainPullingManager(
                         managerId, streamProviderName, provider, instruments, shared);

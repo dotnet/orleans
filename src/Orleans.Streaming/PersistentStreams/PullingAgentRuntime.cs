@@ -12,6 +12,7 @@ namespace Orleans.Streams;
 internal interface IPullingAgentRuntime : ISystemTarget
 {
     Task<bool> IsEligible(string providerName, QueueId? queueId, CancellationToken cancellationToken = default);
+    Task<bool> CanRetire(string providerName, QueueId queueId, CancellationToken cancellationToken = default);
 }
 
 internal sealed class PullingAgentRuntime : SystemTarget, IPullingAgentRuntime, ILifecycleParticipant<ISiloLifecycle>
@@ -49,6 +50,14 @@ internal sealed class PullingAgentRuntime : SystemTarget, IPullingAgentRuntime, 
     {
     }
 
+    public Task<bool> CanRetire(string providerName, QueueId queueId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_providers.TryGetValue(providerName, out var provider)
+            && provider.State == StreamLifecycleOptions.RunState.AgentsStopped
+            && provider.Queues.Contains(queueId));
+    }
+
     internal sealed class Provider(
         ImmutableHashSet<QueueId> queues,
         StreamPullingAgentOptions options,
@@ -69,6 +78,7 @@ internal sealed class PullingAgentRuntime : SystemTarget, IPullingAgentRuntime, 
         }
         internal ImmutableHashSet<QueueId> Queues { get; } = queues;
         internal StreamPullingAgentOptions Options { get; } = options;
+        internal IStreamPubSub? DurablePubSub { get; init; }
         internal ConcurrentDictionary<QueueId, PullingAgentGrain> Agents { get; } = new();
         internal int RunningAgentCount => Agents.Count(static entry => entry.Value.IsRunning);
         internal QueueId[] GetRunningQueues() => Agents.Where(static entry => entry.Value.IsRunning).Select(static entry => entry.Key).ToArray();

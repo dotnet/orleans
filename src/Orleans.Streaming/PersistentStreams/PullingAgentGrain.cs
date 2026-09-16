@@ -3,10 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Core;
 using Orleans.Placement;
+using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
+using Orleans.Storage;
 
 namespace Orleans.Streams;
 
@@ -36,6 +40,7 @@ internal sealed class PullingAgentGrain(
     private QueueId _queueId;
     private volatile PersistentStreamPullingAgent? _agent;
     private Task _shutdownTask = Task.CompletedTask;
+    private PullingAgentPublisherRegistry? _publishers;
     internal bool IsRunning => _agent is not null;
     internal int PubSubCacheSize => _agent?.PubSubCacheSize ?? 0;
 
@@ -45,6 +50,17 @@ internal sealed class PullingAgentGrain(
         _providerName = providerName;
         _queueId = queueId;
         _provider = runtime.GetProvider(providerName);
+        if (_provider.DurablePubSub is { } pubSub)
+        {
+            var services = GrainContext.ActivationServices;
+            var storage = services.GetKeyedService<IGrainStorage>(providerName)
+                ?? services.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+            _publishers = new(
+                new StateStorageBridge<PullingAgentPublisherState>(nameof(PullingAgentPublisherState), GrainContext, storage),
+                pubSub, GrainContext.GrainId, logger);
+            await _publishers.Load(cancellationToken);
+        }
+
         if (_provider.IsEligible(queueId))
         {
             await Start(cancellationToken);
@@ -77,12 +93,17 @@ internal sealed class PullingAgentGrain(
         return Task.FromResult(true);
     }
 
-    public Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken)
+    public async Task Stop(SiloAddress expectedHost, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return expectedHost == GrainContext.Address.SiloAddress
-            ? StopCore(unregisterProducer: true)
-            : Task.CompletedTask;
+        if (expectedHost == GrainContext.Address.SiloAddress)
+        {
+            await StopCore(unregisterProducer: _publishers is null);
+            if (_publishers is { } publishers)
+            {
+                await publishers.Retire();
+            }
+        }
     }
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -116,6 +137,8 @@ internal sealed class PullingAgentGrain(
         try
         {
             agent = await _provider.CreateAgent(GrainContext, _queueId);
+            _publishers?.Open();
+            agent.PublisherRegistry = _publishers;
             await agent.Initialize(cancellationToken, waitForReceiver: true);
             _shutdownTask = Task.CompletedTask;
             _agent = agent;
@@ -162,7 +185,17 @@ internal sealed class PullingAgentGrain(
         }
         finally
         {
-            Unregister();
+            try
+            {
+                if (_publishers is { } publishers)
+                {
+                    await publishers.Drain();
+                }
+            }
+            finally
+            {
+                Unregister();
+            }
         }
     }
 

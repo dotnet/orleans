@@ -1,6 +1,8 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans;
@@ -10,9 +12,14 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
+using Orleans.Storage;
+using Orleans.Streaming.Diagnostics;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
+using UnitTests.StorageTests;
 using Xunit;
 
 namespace UnitTests.StreamingTests;
@@ -24,6 +31,94 @@ public sealed class PullingAgentControlTests
     private const string ProviderName = "grain-hosted-control";
     private static readonly QueueId Queue = QueueId.GetQueueId("Control", 0, 1);
     private static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(30);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopAgents_RetiresInactivePublishersAfterMigrationAndPreservesOtherHost(bool namedStorage)
+    {
+        await using var setup = new Setup(2, explicitPubSub: true, namedStorage: namedStorage);
+        using var events = new DiagnosticEventCollector(StreamingEvents.ListenerName);
+        await setup.Deploy();
+        var source = setup.Cluster.Silos[0];
+        var destination = setup.Cluster.Silos[1];
+        await setup.Command(source, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var stream = new QualifiedStreamId(ProviderName, StreamId.Create("retirement", Guid.NewGuid()));
+        var pubSub = new GrainBasedPubSubRuntime(setup.Cluster.Client);
+        var grainId = PullingAgentId.Create(ProviderName, Queue);
+        var grain = setup.Cluster.Client.GetGrain<IPullingAgentGrain>(grainId);
+        await setup.Publish(stream, events);
+        await grain.Probe(TestContext.Current.CancellationToken);
+        await setup.MakeInactive(stream, events);
+        Assert.Equal(1, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+        Assert.True(setup.Cluster.TryGetGrainContext(grainId, out var originalContext));
+        Assert.Equal(0, Assert.IsType<PullingAgentGrain>(originalContext.GrainInstance).PubSubCacheSize);
+        var original = (await grain.Probe(TestContext.Current.CancellationToken)).Address;
+
+        await setup.Command(destination, PersistentStreamProviderCommand.StartAgents);
+        Assert.True(await grain.Rebalance(original, destination.SiloAddress, TestContext.Current.CancellationToken));
+        Assert.Equal(destination.SiloAddress, await setup.NextInitialization());
+        var current = await grain.Probe(TestContext.Current.CancellationToken);
+        Assert.Equal(destination.SiloAddress, current.Address.SiloAddress);
+        Assert.NotEqual(original.ActivationId, current.Address.ActivationId);
+        Assert.Equal(1, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+
+        // A local stop must leave the current remote owner and its durable publishers intact.
+        await setup.Command(source, PersistentStreamProviderCommand.StopAgents);
+        Assert.True((await grain.Probe(TestContext.Current.CancellationToken)).IsRunning);
+        Assert.Equal(1, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+        Assert.Equal(1, await setup.Command(destination, PersistentStreamProviderCommand.GetNumberRunningAgents));
+        await setup.Command(destination, PersistentStreamProviderCommand.StopAgents);
+        Assert.Equal(0, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+        Assert.False((await grain.Probe(TestContext.Current.CancellationToken)).IsRunning);
+        Assert.Equal(2, setup.Initializations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopAgents_RetiresDormantPublishersBeforeSystemTargetRollback(bool namedStorage)
+    {
+        using var services = new ServiceCollection().AddLogging().AddSerializer().BuildServiceProvider();
+        var storage = new MockStorageProvider("PubSubStore", services.GetRequiredService<ILoggerFactory>(), services.GetRequiredService<DeepCopier>());
+        var stream = new QualifiedStreamId(ProviderName, StreamId.Create("rollback", Guid.NewGuid()));
+        await using (var setup = new Setup(1, explicitPubSub: true, namedStorage: namedStorage, storage: storage))
+        {
+            using var events = new DiagnosticEventCollector(StreamingEvents.ListenerName);
+            await setup.Deploy();
+            var silo = setup.Cluster.Silos[0];
+            await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+            await setup.NextInitialization();
+            await setup.Publish(stream, events);
+            var grainId = PullingAgentId.Create(ProviderName, Queue);
+            await setup.Cluster.Client.GetGrain<IPullingAgentGrain>(grainId).Probe(TestContext.Current.CancellationToken);
+            await setup.MakeInactive(stream, events);
+            await setup.GetManager(silo).Stop(TestContext.Current.CancellationToken);
+            await setup.Coordinator.GetAgents(TestContext.Current.CancellationToken);
+            await setup.Cluster.DeactivateAsync(grainId).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+            var pubSub = new GrainBasedPubSubRuntime(setup.Cluster.Client);
+            Assert.Equal(1, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+
+            await setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
+            Assert.Equal(0, await pubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+            Assert.Equal(1, setup.Initializations);
+        }
+
+        await using var rollback = new Setup(1, explicitPubSub: true, namedStorage: namedStorage, storage: storage,
+            hostingMode: StreamPullingAgentHostingMode.SystemTarget);
+        using var rollbackEvents = new DiagnosticEventCollector(StreamingEvents.ListenerName);
+        await rollback.Deploy();
+        var rollbackPubSub = new GrainBasedPubSubRuntime(rollback.Cluster.Client);
+        Assert.Equal(0, await rollbackPubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+        await rollback.Command(rollback.Cluster.Silos[0], PersistentStreamProviderCommand.StartAgents);
+        await rollback.NextInitialization();
+        await rollback.Publish(stream, rollbackEvents);
+        Assert.Equal(1, await rollbackPubSub.ProducerCount(stream, TestContext.Current.CancellationToken));
+        var persisted = Assert.IsType<PubSubGrainState>(storage.GetLastState());
+        Assert.True(Assert.Single(persisted.Producers).Producer.IsSystemTarget());
+    }
 
     [Fact]
     public async Task StartupStopped_RequiresStartAndRemainsStoppedAfterCallbacksAndReconciliation()
@@ -331,6 +426,8 @@ public sealed class PullingAgentControlTests
         private int _shutdowns;
         private int _reads;
         private int _coordinatorNotifications;
+        private readonly ConcurrentQueue<IBatchContainer> _batches = new();
+        private readonly StreamPullingAgentHostingMode _hostingMode;
 
         internal InProcessTestCluster Cluster { get; }
         internal IPullingCoordinatorGrain Coordinator => Cluster.Client.GetGrain<IPullingCoordinatorGrain>(
@@ -345,30 +442,58 @@ public sealed class PullingAgentControlTests
         internal int Reads => Volatile.Read(ref _reads);
         internal int CoordinatorNotifications => Volatile.Read(ref _coordinatorNotifications);
 
-        internal Setup(short siloCount)
+        internal Setup(
+            short siloCount,
+            bool explicitPubSub = false,
+            bool namedStorage = false,
+            IGrainStorage? storage = null,
+            StreamPullingAgentHostingMode hostingMode = StreamPullingAgentHostingMode.Grain)
         {
+            _hostingMode = hostingMode;
             var builder = new InProcessTestClusterBuilder(siloCount);
             builder.ConfigureSilo((_, siloBuilder) =>
             {
                 siloBuilder.Services.AddSingleton<TimeProvider>(Clock);
                 siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
+                siloBuilder.Services.AddKeyedSingleton<TimeProvider>(StreamingTimeProviderNames.Streaming, Clock);
                 siloBuilder.Services.AddSingleton<IOutgoingGrainCallFilter>(new NotificationRecorder(this));
+                if (explicitPubSub)
+                {
+                    var storageName = namedStorage ? ProviderName : "PubSubStore";
+                    if (storage is null)
+                    {
+                        siloBuilder.AddMemoryGrainStorage(storageName);
+                    }
+                    else
+                    {
+                        siloBuilder.Services.AddKeyedSingleton(storageName, storage);
+                    }
+                }
                 siloBuilder.AddPersistentStreams(
                     ProviderName,
-                    (services, name) => CreateFactory(name, services.GetRequiredService<ILocalSiloDetails>().SiloAddress),
+                    (services, name) => CreateFactory(name, services.GetRequiredService<ILocalSiloDetails>().SiloAddress,
+                        services.GetRequiredService<ILoggerFactory>()),
                     configurator =>
                     {
                         configurator.ConfigurePullingAgent(options => options.Configure(value =>
                         {
-                            value.HostingMode = StreamPullingAgentHostingMode.Grain;
+                            value.HostingMode = hostingMode;
                             value.GetQueueMsgsTimerPeriod = TimeSpan.FromSeconds(1);
                         }));
                         configurator.ConfigureLifecycle(options => options.Configure(value =>
                             value.StartupState = StreamLifecycleOptions.RunState.AgentsStopped));
-                        configurator.ConfigurePartitionBalancing((_, _) =>
-                            throw new InvalidOperationException("Grain hosting must not construct a queue balancer."));
+                        if (hostingMode == StreamPullingAgentHostingMode.Grain)
+                        {
+                            configurator.ConfigurePartitionBalancing((_, _) =>
+                                throw new InvalidOperationException("Grain hosting must not construct a queue balancer."));
+                        }
+                        else
+                        {
+                            configurator.UseConsistentRingQueueBalancer();
+                        }
                     });
-                siloBuilder.Services.Configure<StreamPubSubOptions>(ProviderName, options => options.PubSubType = StreamPubSubType.ImplicitOnly);
+                siloBuilder.Services.Configure<StreamPubSubOptions>(ProviderName, options => options.PubSubType =
+                    explicitPubSub ? StreamPubSubType.ExplicitGrainBasedOnly : StreamPubSubType.ImplicitOnly);
             });
             Cluster = builder.Build();
         }
@@ -399,7 +524,7 @@ public sealed class PullingAgentControlTests
         {
             var result = await silo.ServiceProvider.GetRequiredKeyedService<IControllable>(ProviderName).ExecuteCommand((int)command, null)
                 .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
-            if (command == PersistentStreamProviderCommand.StartAgents)
+            if (command == PersistentStreamProviderCommand.StartAgents && _hostingMode == StreamPullingAgentHostingMode.Grain)
             {
                 Clock.Advance(TimeSpan.Zero);
                 await Coordinator.GetAgents(TestContext.Current.CancellationToken).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
@@ -413,15 +538,32 @@ public sealed class PullingAgentControlTests
                 .GetSystemTarget<IPersistentStreamPullingManager>(
                     SystemTargetGrainId.Create(Constants.StreamPullingAgentManagerType, silo.SiloAddress, ProviderName).GrainId);
 
-        private IQueueAdapterFactory CreateFactory(string name, SiloAddress silo)
+        internal async Task Publish(QualifiedStreamId stream, DiagnosticEventCollector events)
         {
-            var mapper = Substitute.For<IStreamQueueMapper>();
+            var registered = events.WaitForEventAsync(nameof(StreamingEvents.PullingAgentStreamRegistered),
+                evt => evt.Payload is StreamingEvents.PullingAgentStreamRegistered value && value.StreamId == stream.StreamId,
+                PhaseTimeout, TestContext.Current.CancellationToken);
+            _batches.Enqueue(new RetirementBatch(stream.StreamId));
+            Clock.Advance(TimeSpan.FromSeconds(1));
+            await registered;
+        }
+
+        internal async Task MakeInactive(QualifiedStreamId stream, DiagnosticEventCollector events)
+        {
+            var inactive = events.WaitForEventAsync(nameof(StreamingEvents.StreamInactive),
+                evt => evt.Payload is StreamingEvents.StreamInactive value && value.StreamId == stream.StreamId,
+                PhaseTimeout, TestContext.Current.CancellationToken);
+            Clock.Advance(new StreamPullingAgentOptions().StreamInactivityPeriod + TimeSpan.FromSeconds(1));
+            await inactive;
+        }
+
+        private IQueueAdapterFactory CreateFactory(string name, SiloAddress silo, ILoggerFactory loggerFactory)
+        {
+            var mapper = Substitute.For<IConsistentRingStreamQueueMapper>();
             mapper.GetAllQueues().Returns([Queue]);
             mapper.GetQueueForStream(Arg.Any<StreamId>()).Returns(Queue);
-            var cache = Substitute.For<IQueueCache>();
-            cache.GetMaxAddCount().Returns(100);
-            var adapterCache = Substitute.For<IQueueAdapterCache>();
-            adapterCache.CreateQueueCache(Queue).Returns(cache);
+            mapper.GetQueuesForRange(Arg.Any<IRingRange>()).Returns([Queue]);
+            var adapterCache = new SimpleQueueAdapterCache(new SimpleQueueCacheOptions { CacheSize = 100 }, name, loggerFactory);
             var adapter = Substitute.For<IQueueAdapter>();
             adapter.Name.Returns(name);
             adapter.Direction.Returns(StreamProviderDirection.ReadOnly);
@@ -438,7 +580,7 @@ public sealed class PullingAgentControlTests
                 receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ =>
                 {
                     Interlocked.Increment(ref _reads);
-                    return Task.FromResult<IList<IBatchContainer>>([]);
+                    return Task.FromResult<IList<IBatchContainer>>(_batches.TryDequeue(out var batch) ? [batch] : []);
                 });
                 receiver.Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(_ =>
                 {
@@ -463,6 +605,14 @@ public sealed class PullingAgentControlTests
         }
 
         public ValueTask DisposeAsync() => Cluster.DisposeAsync();
+
+        private sealed class RetirementBatch(StreamId streamId) : IBatchContainer
+        {
+            public StreamId StreamId => streamId;
+            public StreamSequenceToken SequenceToken { get; } = new EventSequenceTokenV2(1);
+            public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => [];
+            public bool ImportRequestContext() => false;
+        }
 
         private sealed class NotificationRecorder(Setup setup) : IOutgoingGrainCallFilter
         {

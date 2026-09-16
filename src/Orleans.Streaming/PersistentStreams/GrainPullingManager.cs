@@ -113,10 +113,12 @@ internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPulli
     {
         notifyCoordinator |= _provider.State == RunState.AgentsStarted;
         CloseLocalAdmission();
-        var hostedQueues = _provider.Agents.Keys.ToArray();
-        await Task.WhenAll(hostedQueues.Select(queueId => _grainFactory
-            .GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queueId))
-            .Stop(Silo, CancellationToken.None)));
+        foreach (var queueId in _provider.Queues)
+        {
+            await PullingAgentPlacement.WithRetirementHint(Silo, () => _grainFactory
+                .GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queueId))
+                .Stop(Silo, CancellationToken.None));
+        }
         EmitState();
         // Membership updates drive reconciliation during silo shutdown.
         if (notifyCoordinator && !_shuttingDown)
