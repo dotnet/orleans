@@ -624,8 +624,34 @@ namespace Orleans.Runtime.Messaging
             update.ForwardCount = message.ForwardCount;
             update.CacheInvalidationHeader = null;
             update.RequestContextData = null;
-            SendMessage(update);
+            var ingressConnectionTask = connectionManager.GetConnection(update.TargetSilo!);
+            if (ingressConnectionTask.IsCompletedSuccessfully)
+            {
+                ingressConnectionTask.Result.Send(update);
+            }
+            else
+            {
+                _ = SendForwardingUpdateAsync(this, ingressConnectionTask, update);
+            }
+
             destination.Send(message);
+
+            static async Task SendForwardingUpdateAsync(
+                MessageCenter messageCenter,
+                ValueTask<Connection> ingressConnectionTask,
+                Message update)
+            {
+                try
+                {
+                    var ingressConnection = await ingressConnectionTask;
+                    ingressConnection.Send(update);
+                }
+                catch (Exception exception)
+                {
+                    // The terminal response carries the attempt token and forward count, so it can complete without the marker.
+                    LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                }
+            }
         }
 
         private void ResendMessageImpl(
@@ -881,6 +907,15 @@ namespace Orleans.Runtime.Messaging
             Message = "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'"
         )]
         private static partial void LogDebugForwarding(ILogger logger, Exception? exc, Message message, SiloAddress? forwardingAddress, string failedOperation);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Unable to send gateway forwarding update for request {MessageId}; the terminal response will reconcile request ownership."
+        )]
+        private static partial void LogWarningForwardingUpdateFailed(
+            ILogger logger,
+            Exception exception,
+            CorrelationId messageId);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
