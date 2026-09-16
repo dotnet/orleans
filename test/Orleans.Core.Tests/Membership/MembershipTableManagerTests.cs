@@ -1723,6 +1723,77 @@ namespace NonSilo.Tests.Membership
             }
         }
 
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task MembershipTableResetStopsOnlyTheVolatileProviderIncarnation(bool developmentProvider)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var original = await new InMemoryMembershipTable(new TableVersion(100, "old"),
+                Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAllAsync(cancellationToken);
+            var reset = await new InMemoryMembershipTable(new TableVersion(1, "new")).ReadAllAsync(cancellationToken);
+            var backing = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
+            backing.ConfigureReadAll(original);
+            IMembershipTable provider = developmentProvider ? CreateSystemTargetBasedMembershipTable(backing) : backing;
+            await provider.InitializeMembershipTableAsync(true, cancellationToken);
+            using var manager = CreateMembershipTableManager(provider);
+            await manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+            var accepted = manager.MembershipTableSnapshot;
+            Assert.Equal(new MembershipVersion(100), accepted.Version);
+            backing.ConfigureReadAll(reset);
+
+            if (developmentProvider)
+            {
+                var error = await Assert.ThrowsAsync<OrleansException>(
+                    () => manager.Refresh(cancellationToken: cancellationToken, requireFresh: true));
+                Assert.Contains("version decreased from 100 to 1", error.Message, StringComparison.Ordinal);
+                this.fatalErrorHandler.Received(1).OnFatalException(
+                    manager, Arg.Is<string>(reason => reason.Contains("Restart this silo", StringComparison.Ordinal)), null);
+            }
+            else
+            {
+                await manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            }
+
+            Assert.Same(accepted, manager.MembershipTableSnapshot);
+        }
+
+        [Fact]
+        public async Task OlderDevelopmentReadCompletingAfterNewerReadIsNotATableReset()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var original = await new InMemoryMembershipTable(new TableVersion(100, "old"),
+                Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UtcNow)).ReadAllAsync(cancellationToken);
+            var newer = new MembershipTableData(original.Members.ToList(), new TableVersion(101, "new"));
+            var backing = new LegacyMembershipTable(Substitute.For<IMembershipTable>());
+            backing.ConfigureReadAll(original);
+            var provider = CreateSystemTargetBasedMembershipTable(backing);
+            await provider.InitializeMembershipTableAsync(true, cancellationToken);
+            using var manager = CreateMembershipTableManager(provider);
+            await manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+            var read = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
+            backing.ConfigureReadAll(read.Task);
+            var pending = manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+            try
+            {
+                Assert.False(pending.IsCompleted);
+                backing.ConfigureReadAll(newer);
+                await manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+                Assert.Equal(new MembershipVersion(101), manager.MembershipTableSnapshot.Version);
+                read.SetResult(original);
+                await pending.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+
+                Assert.Equal(new MembershipVersion(101), manager.MembershipTableSnapshot.Version);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            }
+            finally
+            {
+                read.TrySetResult(original);
+                await pending.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            }
+        }
+
         private sealed class BackoffTimeProvider : FakeTimeProvider
         {
             public TaskCompletionSource TimerCreated { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
