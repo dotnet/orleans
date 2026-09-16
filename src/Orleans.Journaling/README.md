@@ -94,6 +94,22 @@ All durable state types use the configured JSON codec automatically. Configure `
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
+## Staging and failure boundaries
+
+The pending journal is shared by every caller using a state manager. Prepare fallible work and external
+acknowledgements in operation-local data. Once an outcome is safe to commit, apply its mutations to the
+durable states and await `WriteStateAsync`. Applications are responsible for sequencing that transition
+with other interleaved operations and for making uncertain-outcome retries idempotent.
+
+A failed journal operation permanently fences the manager, faults queued operations, and requests
+deactivation of the associated grain. In-flight calls retain their existing in-memory state while subsequent
+state-manager operations fail explicitly. A new activation recovers the actual durable outcome.
+For a manager created through `IJournaledStateManagerFactory`, dispose the failed instance and create
+another manager for the same `JournalId`, registering new state instances before initialization.
+
+Cancelling a caller's wait leaves an already queued write running. Observe durability through write
+acknowledgement or a fresh activation before deciding whether to retry an application command.
+
 ## Storage format
 
 The JSON journaling format stores journal entries as true JSON Lines: UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should store `JsonJournalExtensions.JournalFormatKey` as the format key and may use `application/jsonl` as the MIME type.

@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Manages the states for a given grain.
+/// Manages the durable states associated with a journal.
 /// </summary>
 public interface IJournaledStateManager : IAsyncDisposable
 {
@@ -11,8 +11,11 @@ public interface IJournaledStateManager : IAsyncDisposable
     ValueTask IAsyncDisposable.DisposeAsync() => default;
 
     /// <summary>
-    /// Initializes the state manager.
+    /// Initializes the state manager by replaying its journal.
     /// </summary>
+    /// <remarks>
+    /// A failed initialization permanently fences this instance. Recover by creating a new manager and new state instances.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask InitializeAsync(CancellationToken cancellationToken);
@@ -34,20 +37,24 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Prepares and persists an update to the journal.
     /// </summary>
+    /// <remarks>
+    /// Stage mutations only after the operation has established that they are safe to commit. Pending changes
+    /// are shared by all callers using this manager. A write failure permanently fences the manager and requests
+    /// deactivation of its owning grain. Owners of standalone managers must dispose the failed instance and
+    /// create a new manager with new state instances to recover durable state.
+    /// Cancellation stops the caller's wait; an already queued write continues to completion.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask WriteStateAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Discards uncommitted mutations and reloads the last durable state.
-    /// </summary>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken);
-
-    /// <summary>
     /// Resets this instance, removing any persistent state.
     /// </summary>
+    /// <remarks>
+    /// Quiesce other operations before deleting state: deletion resets every registered durable state.
+    /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask DeleteStateAsync(CancellationToken cancellationToken);

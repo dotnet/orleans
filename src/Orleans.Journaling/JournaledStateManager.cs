@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
-using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
@@ -21,6 +20,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly Dictionary<uint, IJournaledState> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
+    private readonly IGrainContext? _grainContext;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -29,13 +29,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly RetiredStateTracker _retirementTracker;
     private Task? _workLoop;
     private ManagerState _state;
-    private long _recoveryGeneration;
+    private long _deletionGeneration;
+    private Exception? _failure;
     private bool _migrationSnapshotRequired;
     private int _disposed;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
         : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)))
     {
+        _grainContext = grainContext;
     }
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, JournalId journalId)
@@ -93,6 +95,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         lock (_lock)
         {
+            ThrowIfFenced();
             if (_states.TryGetValue(name, out var existing))
             {
                 if (existing is RetiredState vessel)
@@ -139,7 +142,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
-            ThrowIfInitializationFenced();
+            ThrowIfFenced();
             if (_workLoop is null)
             {
                 _workLoop = Start();
@@ -165,9 +168,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private async Task WorkLoop()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-        var needsRecovery = true;
-        WorkItem? recoveryTrigger = null;
-        Exception? recoveryTriggerException = null;
+        try
+        {
+            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            Fence(exception);
+            return;
+        }
+
         while (!_shutdownCancellation.Token.IsCancellationRequested)
         {
             try
@@ -177,49 +187,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                 while (true)
                 {
-                    if (needsRecovery)
-                    {
-                        bool fenceOnFailure;
-                        lock (_lock)
-                        {
-                            fenceOnFailure = _state is not ManagerState.Unknown;
-                            if (fenceOnFailure)
-                            {
-                                _state = ManagerState.Recovering;
-                            }
-                        }
-
-                        try
-                        {
-                            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                            lock (_lock)
-                            {
-                                if (fenceOnFailure)
-                                {
-                                    _state = ManagerState.Ready;
-                                }
-
-                                _recoveryGeneration++;
-                            }
-
-                            needsRecovery = false;
-                            CompleteRecoveryTrigger();
-                        }
-                        catch (Exception exception)
-                        {
-                            lock (_lock)
-                            {
-                                if (fenceOnFailure)
-                                {
-                                    _state = ManagerState.Fenced;
-                                    FaultQueuedWorkItemsUnderLock(exception);
-                                }
-                            }
-
-                            throw;
-                        }
-                    }
-
                     WorkItem workItem;
                     lock (_lock)
                     {
@@ -254,10 +221,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     try
                     {
                         if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem
-                            && workItem.RecoveryGeneration != Volatile.Read(ref _recoveryGeneration))
+                            && workItem.DeletionGeneration != Volatile.Read(ref _deletionGeneration))
                         {
                             throw new InvalidOperationException(
-                                "The journaled state operation was queued before recovery discarded its mutations. Retry the operation.");
+                                "The journaled state operation was queued before deletion reset its state.");
                         }
 
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -477,20 +444,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                             _journalStreamDirectory.Set(name, id);
                                         }
 
-                                        _recoveryGeneration++;
+                                        _deletionGeneration++;
                                     }
-                                    break;
-                                }
-
-                            case RevertPendingChangesWorkItem:
-                                {
-                                    await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                                    lock (_lock)
-                                    {
-                                        _state = ManagerState.Ready;
-                                        _recoveryGeneration++;
-                                    }
-
                                     break;
                                 }
 
@@ -498,7 +453,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 {
                                     lock (_lock)
                                     {
-                                        ThrowIfInitializationFenced();
+                                        ThrowIfFenced();
                                         _state = ManagerState.Ready;
                                     }
                                     break;
@@ -557,32 +512,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        if (workItem is not RevertPendingChangesWorkItem && IsRecoverySignal(exception))
+                        try
                         {
-                            Debug.Assert(recoveryTrigger is null);
-                            recoveryTrigger = workItem;
-                            recoveryTriggerException = exception;
-                            lock (_lock)
-                            {
-                                _state = ManagerState.Recovering;
-                            }
-
-                            needsRecovery = true;
+                            Fence(exception);
                         }
-                        else if (workItem is RevertPendingChangesWorkItem)
-                        {
-                            lock (_lock)
-                            {
-                                _state = ManagerState.Fenced;
-                                FaultQueuedWorkItemsUnderLock(exception);
-                            }
-
-                            workItem.SetException(exception);
-                        }
-                        else
+                        finally
                         {
                             workItem.SetException(exception);
                         }
+
+                        return;
                     }
                     finally
                     {
@@ -592,41 +531,35 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
             catch (Exception exception)
             {
-                lock (_lock)
-                {
-                    needsRecovery = _state is not ManagerState.Fenced;
-                    if (needsRecovery)
-                    {
-                        FaultQueuedWorkItemsUnderLock(exception);
-                    }
-                }
-                if (_shutdownCancellation.Token.IsCancellationRequested)
-                {
-                    CompleteRecoveryTrigger();
-                    return;
-                }
-
-                try
-                {
-                    LogErrorProcessingWorkItems(_shared.Logger, exception);
-                }
-                finally
-                {
-                    CompleteRecoveryTrigger();
-                }
-            }
-        }
-
-        void CompleteRecoveryTrigger()
-        {
-            if (recoveryTrigger is not { } trigger)
-            {
+                Fence(exception);
                 return;
             }
+        }
+    }
 
-            trigger.SetException(recoveryTriggerException!);
-            recoveryTrigger = null;
-            recoveryTriggerException = null;
+    private void Fence(Exception exception)
+    {
+        lock (_lock)
+        {
+            _state = ManagerState.Fenced;
+            _failure = exception;
+        }
+
+        try
+        {
+            if (!_shutdownCancellation.IsCancellationRequested)
+            {
+                LogErrorProcessingWorkItems(_shared.Logger, exception);
+                _grainContext?.Deactivate(new DeactivationReason(
+                    DeactivationReasonCode.ApplicationError, exception, "Journaled state operation failed."));
+            }
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                FaultQueuedWorkItemsUnderLock(exception);
+            }
         }
     }
 
@@ -636,19 +569,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
             workItem.TrySetException(exception);
         }
-    }
-
-    private static bool IsRecoverySignal(Exception exception)
-    {
-        for (Exception? current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is InconsistentStateException)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private void RetireOrResurectStates()
@@ -935,55 +855,23 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    public async ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Task pendingRecovery;
-        bool didEnqueue;
-        lock (_lock)
-        {
-            _shutdownCancellation.Token.ThrowIfCancellationRequested();
-            if (_state is ManagerState.Unknown)
-            {
-                throw new InvalidOperationException("The journaled state manager has not been initialized.");
-            }
-
-            pendingRecovery = EnqueueOrGetPendingWorkItem<RevertPendingChangesWorkItem>(out didEnqueue);
-            _state = ManagerState.Recovering;
-        }
-
-        if (didEnqueue)
-        {
-            _workSignal.Signal();
-        }
-
-        await pendingRecovery.WaitAsync(cancellationToken);
-    }
-
     private void ThrowIfStateOperationsUnavailable()
     {
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
-        switch (_state)
+        ThrowIfFenced();
+        if (_state is not ManagerState.Ready)
         {
-            case ManagerState.Unknown:
-                throw new InvalidOperationException("The journaled state manager has not been initialized.");
-            case ManagerState.Ready:
-                return;
-            case ManagerState.Recovering:
-                throw new InvalidOperationException("Journaled state operations are unavailable while recovery is in progress.");
-            case ManagerState.Fenced:
-                throw new InvalidOperationException("Journaled state operations are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
-            default:
-                throw new UnreachableException();
+            throw new InvalidOperationException("The journaled state manager has not been initialized.");
         }
     }
 
-    private void ThrowIfInitializationFenced()
+    private void ThrowIfFenced()
     {
         if (_state is ManagerState.Fenced)
         {
             throw new InvalidOperationException(
-                "The journaled state manager is fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+                "Journaled state operations are fenced because an operation failed. Recover using a new grain activation or dispose this manager and create a new instance.",
+                _failure);
         }
     }
 
@@ -1058,7 +946,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
 
             if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem
-                && workItem.RecoveryGeneration != _recoveryGeneration)
+                && workItem.DeletionGeneration != _deletionGeneration)
             {
                 continue;
             }
@@ -1071,7 +959,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         var newWorkItem = new TWorkItem();
         newWorkItem.EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp();
-        newWorkItem.RecoveryGeneration = _recoveryGeneration;
+        newWorkItem.DeletionGeneration = _deletionGeneration;
         newWorkItem.RecordTraceContext();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
@@ -1165,7 +1053,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public long EnqueuedTimestamp { get; set; }
 
-        public long RecoveryGeneration { get; set; }
+        public long DeletionGeneration { get; set; }
 
         public ActivityContext TraceParent { get; private set; }
 
@@ -1254,8 +1142,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private sealed class DeleteStateWorkItem : WorkItem;
 
-    private sealed class RevertPendingChangesWorkItem : WorkItem;
-
     private sealed class RegisterStateWorkItem(string name) : WorkItem(name)
     {
         public string Name => (string)Task.AsyncState!;
@@ -1265,7 +1151,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         Unknown,
         Ready,
-        Recovering,
         Fenced
     }
 

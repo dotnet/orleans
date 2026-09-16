@@ -23,7 +23,7 @@ The [runnable Redis Journaling sample](samples.md#run-the-redis-sample) uses the
 
 The provider stores journal data in Redis strings and journal metadata in Redis hashes. Per-journal reads and mutations use atomic Lua scripts. Catalog operations discover journals by scanning metadata keys on each connected primary Redis server.
 
-Optimistic concurrency protects append, replace, and delete operations. A stale writer receives <xref:Orleans.Storage.InconsistentStateException>, and the Journaling state manager recovers the stored journal before processing later work. Concurrent reads observe either the journal before a replacement or the complete replacement.
+Optimistic concurrency protects append, replace, and delete operations. A stale writer receives <xref:Orleans.Storage.InconsistentStateException>, and the Journaling state manager permanently fences operations and requests grain deactivation. A fresh activation recovers the stored journal. Concurrent reads observe either the journal before a replacement or the complete replacement.
 
 <xref:Orleans.Journaling.RedisJournalStorageOptions> supports:
 
