@@ -4316,6 +4316,8 @@ namespace UnitTests.StreamingTests
                 Assert.False(receiverShutdownStarted.Task.IsCompleted);
                 Assert.Empty(queueCache.DeliveryProgressTokens);
                 Assert.Equal(0, queueCache.DeliveryProgressCallCount);
+                await pubSub.DidNotReceive().UnregisterProducer(
+                    new QualifiedStreamId("provider", streamId), agent.GrainId, Arg.Any<CancellationToken>());
 
                 if (registrationFails)
                 {
