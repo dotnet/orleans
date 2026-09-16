@@ -72,13 +72,13 @@ namespace Orleans.Streaming.EventHubs
         private readonly SemaphoreSlim shutdownLock = new(1, 1);
         private IEventHubReceiver? receiverPendingClose;
         private Task? receiverCloseTask;
-        private bool shutdownCompleted;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
 
         private const int ReceiverShutdown = 0;
         private const int ReceiverRunning = 1;
+        private const int ReceiverShutdownCompleted = 2;
 
         public int GetMaxAddCount()
         {
@@ -135,10 +135,15 @@ namespace Orleans.Streaming.EventHubs
             TimeSpan timeout,
             CancellationToken cancellationToken)
         {
-            LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
-            Interlocked.Exchange(ref this.receiverState, ReceiverRunning);
+            cancellationToken.ThrowIfCancellationRequested();
             using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCancellation.CancelAfter(timeout);
+            LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
+            lock (this.cacheLock)
+            {
+                this.receiverState = ReceiverRunning;
+            }
+
             try
             {
                 await EnsureInitialized(timeoutCancellation.Token);
@@ -330,7 +335,7 @@ namespace Orleans.Streaming.EventHubs
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (this.receiverState == ReceiverShutdown || maxCount <= 0)
+            if (this.receiverState != ReceiverRunning || maxCount <= 0)
             {
                 return new List<IBatchContainer>();
             }
@@ -449,6 +454,7 @@ namespace Orleans.Streaming.EventHubs
             return batches;
         }
 
+        // The SDK translates this service rejection to ArgumentException, preserving the service description.
         private static bool IsInvalidOffsetException(Exception exception)
             => exception is ArgumentException
             && exception.Message.StartsWith("The supplied offset", StringComparison.OrdinalIgnoreCase)
@@ -852,19 +858,24 @@ namespace Orleans.Streaming.EventHubs
             var shutdownCancellationToken = shutdownCancellation?.Token ?? CancellationToken.None;
             await this.shutdownLock.WaitAsync(shutdownCancellationToken);
             var watch = Stopwatch.StartNew();
+            var initializationLockHeld = false;
             try
             {
-                if (this.shutdownCompleted)
-                {
-                    return;
-                }
-
                 lock (this.cacheLock)
                 {
+                    if (this.receiverState == ReceiverShutdownCompleted)
+                    {
+                        return;
+                    }
+
                     this.receiverState = ReceiverShutdown;
                 }
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
+
+                // Recovery owns this lock until reset and detached-resource cleanup finish, even if its pull was canceled.
+                await this.initializationLock.WaitAsync(shutdownCancellationToken);
+                initializationLockHeld = true;
 
                 var shutdownExceptions = new List<Exception>();
 
@@ -922,7 +933,16 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 ThrowIfAny(shutdownExceptions);
-                this.shutdownCompleted = true;
+                lock (this.cacheLock)
+                {
+                    this.checkpointer = null;
+                    this.recoveryCache = null;
+                    this.recoveredCursorProgress = null;
+                    this.recoveryPendingCursors = null;
+                    this.cursors.Clear();
+                    this.flowController = new(MaxMessagesPerRead);
+                    this.receiverState = ReceiverShutdownCompleted;
+                }
 
                 watch.Stop();
                 this.monitor?.TrackShutdown(true, watch.Elapsed, null);
@@ -935,6 +955,11 @@ namespace Orleans.Streaming.EventHubs
             }
             finally
             {
+                if (initializationLockHeld)
+                {
+                    this.initializationLock.Release();
+                }
+
                 this.shutdownLock.Release();
             }
 
