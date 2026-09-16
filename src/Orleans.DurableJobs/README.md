@@ -216,8 +216,10 @@ outage. Future shard identities are filtered by the catalog before candidate met
 
 Each periodic or membership check starts a fresh, locally scoped sweep over every selected
 provider. Candidates share an oldest-first ordering and aggregate claim budget.
-Discovery requests
-catalog metadata, orders and deduplicates the selected entries, then uses each supplied
+Discovery enumerates the selected catalogs in configured order, requesting metadata and
+buffering each provider's candidates until that enumeration succeeds. Once all selected
+catalogs have completed or faulted, discovery orders and deduplicates the successful
+results, then uses each supplied
 ownership snapshot with an ETag or reads current metadata when that snapshot is unavailable.
 For a snapshot naming the local silo as owner, discovery reuses the cached shard or reads
 current metadata on a cache miss. The refreshed descriptor determines eligibility, ownership,
@@ -240,9 +242,12 @@ to provide consistent oldest-first processing across providers. Storage listing 
 latency remain provider-dependent. Blob, Table, and Volatile catalogs supply metadata snapshots
 alongside identities; S3 and Redis require separate candidate metadata reads.
 
-The sweep owns its enumeration and selected identity set until completion. A provider's
-storage errors are reported with its name, healthy providers can continue discovery, and a
-later check retries with a fresh sweep. Shards
+The sweep owns its enumeration and selected identity set until completion. During migration,
+a catalog failure discards that provider's partial results; an assignment failure skips its
+remaining candidates. Errors are reported with the provider name, and a later check retries
+with a fresh sweep. Recovery latency includes every selected catalog's listing requests
+and storage-client retry delays. Configure request timeouts and retry limits on the storage
+clients to match the recovery latency requirements. Shards
 already delivered to the local manager are tracked before cancellation is observed and
 continue through their execution lifecycle.
 Cancellation flows through listing, metadata, and journal operations.

@@ -96,8 +96,20 @@ Successful absence checks across all selected providers establish absence.
 Provider failures that leave a lookup unresolved surface as an
 <xref:System.AggregateException>. If another provider supplies the authoritative
 shard, that binding can be used while the earlier failure remains observable.
-Per-provider discovery failures are reported independently so healthy providers can keep progressing;
-a later fresh sweep retries failed providers.
+Discovery reports each provider's failures with its configured name. A later
+fresh sweep retries failed providers.
+
+Each sweep enumerates the selected catalogs in configured order and buffers each
+provider's candidates until its enumeration succeeds. Shard assignment starts
+after all selected catalogs have completed or faulted, using the successful
+results for the shared oldest-first claim budget. A catalog failure discards that
+provider's partial results.
+
+Recovery latency therefore includes catalog listing requests and storage-client
+retry delays. Configure request timeouts and retry limits on each storage client
+to match the required recovery latency, and monitor catalog latency during the
+drain. The shard check interval schedules fresh sweeps; storage-client settings
+govern pending request attempts.
 
 ## Verify retirement
 
