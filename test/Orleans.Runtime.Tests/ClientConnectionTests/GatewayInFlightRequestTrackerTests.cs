@@ -27,6 +27,30 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void RemovedAttemptCannotClaimRejection()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(request, Message.ResponseTypes.Success)));
+
+        Assert.False(tracker.TryClaimForRejection(request, Silo1, out _));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void TokenlessUntrackedRequestCanClaimRejection()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+
+        Assert.True(tracker.TryClaimForRejection(request, Silo1, out var claimed));
+        Assert.Same(request, claimed);
+    }
+
+    [Fact]
     public void RequestsWithoutFinalDestinationAreNotTracked()
     {
         var tracker = CreateTracker();
@@ -36,6 +60,34 @@ public class GatewayInFlightRequestTrackerTests
         var tracked = tracker.Track(request);
 
         Assert.False(tracked);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void ForwardedResponseCompletesWhenMarkerIsLost()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        response.SendingSilo = Silo2;
+        response.ForwardCount = request.ForwardCount + 1;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void ForwardedResponseWithoutSendingSiloCompletesWhenMarkerIsLost()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Rejection);
+        response.SendingSilo = null;
+        response.ForwardCount = request.ForwardCount + 1;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
         Assert.Equal(0, tracker.Count);
     }
 

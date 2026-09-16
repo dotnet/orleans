@@ -85,6 +85,13 @@ namespace Orleans.Runtime.Messaging
                 return CompletionResult.Superseded;
             }
 
+            if (response.ForwardCount > trackedRequest.ForwardCount)
+            {
+                requests.Remove(response.Id);
+                ClearAuxiliaryState(response.Id);
+                return CompletionResult.Completed;
+            }
+
             if (response.SendingSilo is not { } responseSilo)
             {
                 return CompletionResult.Deferred;
@@ -203,6 +210,12 @@ namespace Orleans.Runtime.Messaging
         {
             if (_requests is not { } requests || !requests.TryGetValue(request.Id, out var trackedRequest))
             {
+                if (request.GatewayRequestAttempt != 0)
+                {
+                    requestToReject = null!;
+                    return false;
+                }
+
                 requestToReject = request;
                 return true;
             }
