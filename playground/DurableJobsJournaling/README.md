@@ -36,11 +36,69 @@ replicas. Blob layout remains `wal/{journalId}` and
 `checkpoints/{journalId}/{snapshotId}`, enabling catalog discovery with the
 provider's default layout.
 
-The run-specific resources preserve journals for inspection. Record the
+Each run registers two named journal bindings, `jobs-a` and `jobs-b`.
+The names resolve independent containers (`durablejobs-...` and
+`durablejobs-b-...`) or tables (`durablejobs...` and `durablejobsb...`).
+By default A is the write provider and B is selected for draining, preparing
+every silo to discover either namespace before B receives work.
+
+The run-specific resources preserve journals for inspection. Azurite uses a
+data volume so storage survives process and AppHost restarts. Record the
 container/table name from Aspire's environment configuration and delete that
 resource when the run's data is no longer needed. For restart/recovery
 experiments, keep the shared resource name and workload identity stable across
 the processes being restarted.
+
+## Exercise a provider cutover
+
+For a minimal deterministic console scenario with pass/fail checks, use the
+[Durable Jobs migration sample](../../samples/DurableJobsMigration/README.md).
+This playground is for interactive load and failure experiments, with
+process-local workflow grain state powering its UI. Use the sample's persisted
+Blob receipts to verify restart recovery.
+
+Use a stable, lowercase alphanumeric run identifier (up to 40 characters) to
+reuse both namespaces across AppHost restarts:
+
+```powershell
+$env:Playground__Storage__RunId = 'migration01'
+$env:Playground__Migration__ReportInventory = 'true'
+$env:Playground__Migration__WriteProviderName = 'jobs-a'
+dotnet run --project playground\DurableJobsJournaling\DurableJobsJournaling.AppHost
+```
+
+Schedule work, stop application scheduling using the load controls, and stop
+the AppHost gracefully. Keep its Azurite volume and stable run identifier.
+Restart with B creating new shards and A still selected for draining:
+
+```powershell
+$env:Playground__Migration__WriteProviderName = 'jobs-b'
+dotnet run --project playground\DurableJobsJournaling\DurableJobsJournaling.AppHost
+```
+
+`DrainOtherProvider` defaults to `true`. Provider selection is fixed at startup;
+restart the silo to apply changes to its bindings.
+For multi-silo rolling experiments, first update every scheduling silo with both
+providers selected, then switch writes. A-configured silos can continue creating
+A shards until their rollout and in-flight scheduling finish. Pause scheduling
+for a strict cutover boundary.
+
+With `ReportInventory=true`, silo logs report a full catalog inventory for each
+selected provider every 30 seconds with a 20-second per-provider timeout.
+This opt-in diagnostic adds catalog traffic. It reports total, owned,
+poisoned, and unrecognized shard counts plus oldest/newest recognized shard
+start times. The total includes unrecognized entries.
+An inspection failure is logged as **UNKNOWN**. The reporter uses read-only
+catalog and metadata operations and writes results to local silo logs.
+
+Keep A's read/write/delete permissions until its full inventory is empty,
+including future and poisoned work, all A writers have stopped, and cleanup has
+succeeded. Retirement requires successful full-zero inventory plus independent
+evidence of completed cluster-wide writer cutover.
+Once these conditions hold, restart with
+`Playground__Migration__DrainOtherProvider=false` to select only B.
+Preserve A's namespace until its drain is verified. To roll back,
+restart with A as write provider and B draining; existing B jobs stay in B.
 
 Cloud backend selection enables Aspire's Azure resource configuration and can
 provision chargeable resources. Use an explicitly approved Azure development

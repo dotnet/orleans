@@ -626,6 +626,12 @@ public partial class JournaledJobShardManagerTests
     {
         public ConcurrentQueue<JournalId> MetadataReads { get; } = new();
         public ConcurrentQueue<(JournalId Id, string? ExpectedETag)> MetadataUpdates { get; } = new();
+        public ConcurrentQueue<JournalId> JournalReads { get; } = new();
+        public ConcurrentQueue<JournalId> JournalAppends { get; } = new();
+        public ConcurrentQueue<JournalId> JournalDeletes { get; } = new();
+        public ConcurrentQueue<JournalId> JournalReplacements { get; } = new();
+        public List<ListOptions?> ListRequests { get; } = [];
+        public Func<ListOptions?, CancellationToken, IAsyncEnumerable<JournalCatalogEntry>>? ListOverride { get; set; }
         public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
         public Func<JournalId, IJournalMetadata?, CancellationToken, ValueTask>? AfterMetadataUpdate { get; set; }
         public bool OmitMetadataETags { get; set; }
@@ -686,8 +692,9 @@ public partial class JournaledJobShardManagerTests
 
         public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
+            ListRequests.Add(options);
             LastListPrefix = options?.Prefix ?? default;
-            return _inner.ListAsync(options, cancellationToken);
+            return ListOverride?.Invoke(options, cancellationToken) ?? _inner.ListAsync(options, cancellationToken);
         }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
@@ -749,19 +756,29 @@ public partial class JournaledJobShardManagerTests
             }
 
             public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
-                => inner.ReadAsync(consumer, cancellationToken);
+            {
+                owner.JournalReads.Enqueue(journalId);
+                return inner.ReadAsync(consumer, cancellationToken);
+            }
 
             public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
+                owner.JournalAppends.Enqueue(journalId);
                 await owner.OnAppendAsync(cancellationToken).ConfigureAwait(false);
                 await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             }
 
             public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
-                => inner.ReplaceAsync(value, cancellationToken);
+            {
+                owner.JournalReplacements.Enqueue(journalId);
+                return inner.ReplaceAsync(value, cancellationToken);
+            }
 
             public ValueTask DeleteAsync(CancellationToken cancellationToken)
-                => inner.DeleteAsync(cancellationToken);
+            {
+                owner.JournalDeletes.Enqueue(journalId);
+                return inner.DeleteAsync(cancellationToken);
+            }
         }
     }
 
@@ -863,12 +880,13 @@ public partial class JournaledJobShardManagerTests
         public int DisposeCalls { get; private set; }
         public int YieldedIds { get; private set; }
         public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
+        public bool ExpectUnbounded { get; set; }
 
         public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
-            Assert.False(options.MaxId.IsDefault);
+            Assert.Equal(ExpectUnbounded, options.MaxId.IsDefault);
             Assert.True(options.IncludeMetadata);
             ListCalls++;
             var prefix = options.Prefix;
@@ -883,7 +901,7 @@ public partial class JournaledJobShardManagerTests
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var snapshot = Ids.Where(id => id.Value.StartsWith(prefix.Value, StringComparison.Ordinal)
-                && StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0).ToArray();
+                && (maxId.IsDefault || StringComparer.Ordinal.Compare(id.Value, maxId.Value) <= 0)).ToArray();
             try
             {
                 for (var index = 0; ; index++)

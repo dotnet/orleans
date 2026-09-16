@@ -25,6 +25,40 @@ At minimum, dashboard and alert on:
 
 Correlate these signals with grain identity, provider dependency health, deployment version, and storage throttling.
 
+### Monitor Durable Jobs provider draining
+
+Track the configured provider name separately from the backend category in
+journaling catalog metrics. Two named Blob providers use the same backend but
+can have different availability and remaining work.
+
+Use <xref:Orleans.DurableJobs.IDurableJobsStorageInspector.InspectAsync*> to
+collect a complete shard-namespace snapshot per selected provider. Record the
+inventory's start/completion timestamps, caller, configured write provider,
+success/failure, counts, and oldest/newest shard start time. Keep the last
+successful result with its timestamp for history; mark current status unknown
+on failure.
+
+Successful inspection also emits a structured Information-level inventory log.
+Provider errors emit structured Error-level logs with the configured provider
+name. Use inspector snapshots and these logs for provider-scoped drain progress;
+existing execution and catalog metrics provide complementary workload signals.
+
+During cutover, alert on old-provider write-permission failures, failed
+discovery or known-ID lookups, inventory failures, poisoned or unrecognized
+entries, and an unexpectedly flat drain curve. Each shard may contain many jobs,
+and retries or rescheduling can extend its
+lifetime beyond its original time window. Oldest/newest shard start times
+describe recognized shard windows; retries and reschedules can move attempts
+beyond those windows.
+
+Normal discovery uses lookahead bounds and can skip future or poisoned work.
+Use the complete inspector results and deployment evidence in the
+[retirement checklist](durable-jobs-migration.md#verify-retirement) to decide
+whether old storage can be removed. Execution throughput and eligible-work
+sweeps provide complementary workload signals. Run inspection as a protected
+operator command or background diagnostic task, and apply authentication and
+authorization to operational interfaces.
+
 ### Monitor catalog traversal and retries
 
 Use `orleans-journaling-provider-catalog-pages` to track pages received during S3 and Azure catalog

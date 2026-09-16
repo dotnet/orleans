@@ -20,6 +20,14 @@ options, storage, catalog, and state-manager factory share the same binding.
 The unnamed overload configures default grain journaling; named registrations
 leave that default independent.
 
+For an account, container, table, or backend cutover, retain the old namespace
+and its mapping under its original binding while new Durable Jobs shards use
+a second binding. During draining, the old account still needs listing,
+conditional ownership updates, journal mutations, and delete permissions.
+Granting only read access prevents successful draining. See
+[Migrate Durable Jobs storage](durable-jobs-migration.md) for the staged rollout,
+full inventory, and retirement criteria.
+
 ## Azure Blob Storage
 
 Configure <xref:Orleans.Journaling.AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage*> with an authenticated <xref:Azure.Storage.Blobs.BlobServiceClient>:

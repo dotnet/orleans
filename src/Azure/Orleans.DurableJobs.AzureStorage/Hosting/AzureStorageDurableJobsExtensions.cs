@@ -1,11 +1,7 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Configuration.Internal;
-using Orleans.DurableJobs;
 using Orleans.Journaling;
-using Orleans.Journaling.Json;
 
 namespace Orleans.Hosting;
 
@@ -31,11 +27,7 @@ public static class AzureStorageDurableJobsExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
-        builder.AddDurableJobs();
-        builder.AddAzureBlobJournalStorage(configure);
-        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
-        builder.Services.UseJournaledDurableJobs();
-        return builder;
+        return builder.AddAzureBlobJournalStorage(configure).UseJournaledDurableJobs();
     }
 
     /// <summary>
@@ -55,13 +47,7 @@ public static class AzureStorageDurableJobsExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddDurableJobs();
-
-        var builder = new ServiceCollectionSiloBuilder(services);
-        builder.AddAzureBlobJournalStorage(configure);
-        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
-
-        services.UseJournaledDurableJobs();
+        new ServiceCollectionSiloBuilder(services).UseAzureBlobDurableJobs(configure);
         return services;
     }
 
@@ -76,11 +62,7 @@ public static class AzureStorageDurableJobsExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(configure);
 
-        builder.AddDurableJobs();
-        builder.AddAzureTableJournalStorage(configure);
-        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
-        builder.Services.UseJournaledDurableJobs();
-        return builder;
+        return builder.AddAzureTableJournalStorage(configure).UseJournaledDurableJobs();
     }
 
     /// <summary>
@@ -95,13 +77,6 @@ public static class AzureStorageDurableJobsExtensions
         ArgumentNullException.ThrowIfNull(configure);
 
         new ServiceCollectionSiloBuilder(services).UseAzureTableDurableJobs(configure);
-        return services;
-    }
-
-    private static IServiceCollection UseJournaledDurableJobs(this IServiceCollection services)
-    {
-        services.TryAddSingleton<JournaledJobShardManager>();
-        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
         return services;
     }
 
