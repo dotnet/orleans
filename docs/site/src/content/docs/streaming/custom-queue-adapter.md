@@ -78,6 +78,8 @@ The runtime validates checkpoint receiver capabilities before initialization or 
 
 The pulling agent owns a successfully returned batch until admission and registration accounting finish. It serializes reads with read recovery, retains failed-registration pins for retry, and drains accepted work before releasing a receiver. A completed recovery repairs only its own read obligation. Subscription replay and handshake generations retain independent ownership.
 
+Checkpointing owners report exhausted deliveries through <xref:Orleans.Streams.IQueueCacheCursorProgress.RecordDeliveryFailure*> so the pending range is replayed. The legacy <xref:Orleans.Streams.IQueueCacheCursor.RecordDeliveryFailure*> callback retains the non-checkpointing provider's failure notification and skip policy. Receipt-based providers continue past an exhausted delivery after their error protocol; their failed receipts retain the provider's acknowledgement or redelivery treatment.
+
 Validate the migration with a held delivery while other streams advance, a failed selected batch followed by retry, a throwing materializer, a failed read followed by an empty certified recovery, partial admission attempts, registration retries, and shutdown during recovery. Verify that a later acknowledgment cannot cross an unresolved gap, that idle subscriptions advance through unrelated records, and that a bare purge call cannot reuse an earlier certificate after a subscription repositions.
 
 ## Register the provider

@@ -13,6 +13,40 @@ namespace UnitTests.StreamingTests;
 
 public partial class PersistentStreamPullingAgentTests
 {
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task ReceiptProvider_ExhaustedDeliveryPreservesItsSkipPolicy()
+    {
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
+        await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff, checkpointing: false);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        var acknowledged = new List<long>();
+        var consumer = new RecordingConsumer
+        {
+            OnDelivery = batch =>
+            {
+                if (batch.SequenceToken.SequenceNumber == 3)
+                {
+                    return Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Delivery failed"));
+                }
+                acknowledged.Add(batch.SequenceToken.SequenceNumber);
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+        };
+        scenario.Idle.StreamConsumer = consumer;
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+
+        Assert.Equal(new long[] { 4 }, acknowledged);
+        Assert.Equal(new long[] { 3, 4 }, consumer.DeliveredTokens.Select(token => token.SequenceNumber));
+        Assert.IsType<StreamEventDeliveryFailureException>(Assert.Single(consumer.Errors));
+        Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
+        await scenario.Accessor.ReportDeliveryProgress();
+        Assert.Empty(scenario.Checkpoints);
+    }
+
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
     [InlineData(false, 1)]
     [InlineData(false, 2)]

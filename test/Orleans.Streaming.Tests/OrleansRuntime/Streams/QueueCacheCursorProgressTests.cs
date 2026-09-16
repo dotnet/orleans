@@ -155,7 +155,7 @@ public class QueueCacheCursorProgressTests
             Assert.Equal(1, Assert.Single(purged).SequenceToken.SequenceNumber);
         }
 
-        cursor.RecordDeliveryFailure();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
         progress.RecordDeliverySuccess(); // No selected retry has been confirmed yet.
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
@@ -189,7 +189,7 @@ public class QueueCacheCursorProgressTests
         var progress = (IQueueCacheCursorProgress)cursor;
         Assert.Equal(2, progress.SafeSequenceToken?.SequenceNumber);
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
-        cursor.RecordDeliveryFailure(); // Latest did not leave a synthetic pending delivery.
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure(); // Latest did not leave a synthetic pending delivery.
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
 
         cache.Add(new(Target, 3), new(Other, 4), new(Target, 5));
@@ -260,7 +260,7 @@ public class QueueCacheCursorProgressTests
         var expected = afterToken ? new[] { 2 } : new[] { 1, 2 };
         Assert.Equal(expected, Assert.IsType<TestBatch>(Read(cursor, 10)).Indices);
         Assert.Null(progress.SafeSequenceToken);
-        cursor.RecordDeliveryFailure();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
         Assert.Equal(expected, Assert.IsType<TestBatch>(Read(cursor, 10)).Indices);
         Assert.Null(progress.SafeSequenceToken);
         progress.RecordDeliverySuccess();
@@ -297,7 +297,7 @@ public class QueueCacheCursorProgressTests
 
         Assert.Throws<InvalidOperationException>(() => cursor.MoveNextWithResult());
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
-        cursor.RecordDeliveryFailure();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
         Read(cursor, 2);
         Read(cursor, 4);
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
@@ -316,7 +316,7 @@ public class QueueCacheCursorProgressTests
         cache.Adapter.FailTokenAt = 3;
         Assert.Throws<InvalidOperationException>(() => cursor.MoveNextWithResult());
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
-        cursor.RecordDeliveryFailure();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
         Read(cursor, 2);
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
@@ -339,7 +339,7 @@ public class QueueCacheCursorProgressTests
         Assert.Equal(1, initialMiss.RequestedToken?.SequenceNumber);
         Assert.Equal(5, initialMiss.LowToken?.SequenceNumber);
         Assert.Equal(5, initialMiss.HighToken?.SequenceNumber);
-        Assert.Throws<QueueCacheMissException>(() => cursor.RecordDeliveryFailure());
+        Assert.Throws<QueueCacheMissException>(() => progress.RecordDeliveryFailure());
         progress.RecordDeliverySuccess();
         Assert.Null(progress.SafeSequenceToken);
         if (cache.Pooled is { } native)
@@ -387,7 +387,7 @@ public class QueueCacheCursorProgressTests
         Assert.Equal(new EventSequenceTokenV2(3).ToString(), miss.Requested);
         Assert.Null(miss.Low);
         Assert.Null(miss.High);
-        Assert.Throws<QueueCacheMissException>(() => cursor.RecordDeliveryFailure());
+        Assert.Throws<QueueCacheMissException>(() => progress.RecordDeliveryFailure());
         progress.RecordDeliverySuccess();
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
         AssertSameCacheMiss(observed, cursor.MoveNextWithResult());
@@ -424,13 +424,13 @@ public class QueueCacheCursorProgressTests
             cache.Pooled.RemoveOldestMessage();
         }
 
-        Assert.Throws<QueueCacheMissException>(() => cursor.RecordDeliveryFailure());
+        Assert.Throws<QueueCacheMissException>(() => progress.RecordDeliveryFailure());
         Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, cursor.MoveNextWithResult().Kind);
         progress.RecordDeliverySuccess();
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
         cache.Add(new TestBatch(Other, 5));
         Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, cursor.MoveNextWithResult().Kind);
-        Assert.Throws<QueueCacheMissException>(() => cursor.RecordDeliveryFailure());
+        Assert.Throws<QueueCacheMissException>(() => progress.RecordDeliveryFailure());
         progress.RecordDeliverySuccess();
         Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, cursor.MoveNextWithResult().Kind);
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
@@ -453,7 +453,7 @@ public class QueueCacheCursorProgressTests
 
         Assert.True(cache.TryPurgeFromCache(out var purged));
         Assert.Equal(1, Assert.Single(purged).SequenceToken.SequenceNumber);
-        cursor.RecordDeliveryFailure();
+        progress.RecordDeliveryFailure();
         Assert.False(cache.TryPurgeFromCache(out _));
         Read(cursor, 2);
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
@@ -463,8 +463,10 @@ public class QueueCacheCursorProgressTests
         Assert.Equal(3, Assert.Single(purged).SequenceToken.SequenceNumber);
     }
 
-    [Fact]
-    public void SimpleFilteredBatchFailureMarksOriginalReceiptAndRewinds()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SimpleFilteredBatchFailurePreservesReceiptSkipAndCertifiedReplay(bool certifiedReplay)
     {
         var cache = new CacheHarness(pooled: false);
         cache.Add(new TestBatch(Target, 10, [0, 1, 2]));
@@ -473,10 +475,20 @@ public class QueueCacheCursorProgressTests
         using (delivery.ProtectDeliveryBatch())
         {
             var selected = Read(cursor, 10);
-            delivery.RecordDeliveryFailure(selected);
+            if (certifiedReplay)
+            {
+                ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
+            }
+            else
+            {
+                delivery.RecordDeliveryFailure(selected);
+            }
         }
 
-        Assert.Equal(new[] { 1, 2 }, Assert.IsType<TestBatch>(Read(cursor, 10)).Indices);
+        if (certifiedReplay)
+        {
+            Assert.Equal(new[] { 1, 2 }, Assert.IsType<TestBatch>(Read(cursor, 10)).Indices);
+        }
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
         Assert.True(cache.Simple!.TryPurgeFromCache(out var purged));

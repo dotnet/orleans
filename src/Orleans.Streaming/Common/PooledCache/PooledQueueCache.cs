@@ -718,6 +718,14 @@ namespace Orleans.Providers.Streams.Common
         internal void RecordDeliverySuccess(object cursorObj)
             => GetCursor(cursorObj).RecordDeliverySuccess();
 
+        internal void AbandonPendingDelivery(object cursorObj)
+        {
+            var cursor = GetCursor(cursorObj);
+            cursor.TakePendingStartToken();
+            cursor.InclusiveStartToken = null;
+            cursor.DeliveredThroughToken = null;
+        }
+
         internal void RecordDeliveryFailure(object cursorObj)
         {
             var cursor = GetCursor(cursorObj);

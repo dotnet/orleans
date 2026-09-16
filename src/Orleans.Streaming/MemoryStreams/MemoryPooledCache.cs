@@ -187,6 +187,9 @@ namespace Orleans.Providers
             }
 
             public void RecordDeliveryFailure()
+                => cache.AbandonPendingDelivery(cursor);
+
+            void IQueueCacheCursorProgress.RecordDeliveryFailure()
             {
                 current = null;
                 cache.RecordDeliveryFailure(cursor);
