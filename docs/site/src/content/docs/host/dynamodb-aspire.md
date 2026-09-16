@@ -67,6 +67,6 @@ Direct provider configuration can set `AccessKey`, `SecretKey`, and `Token` for 
 
 AWS Aspire CDK table references emit the table name under `AWS:Resources:{resource-name}:TableName`. A CloudFormation reference can instead target the provider section directly, such as `Orleans:Clustering`, `Orleans:GrainStorage:Default`, or `Orleans:Reminders`, when the stack exposes an output named `TableName`.
 
-The providers also accept `ConnectionName`, `ConnectionString`, and nested `ConnectionProperties` or `Resource` values. Direct provider values take precedence over referenced resource outputs. A connection string can contain `Service`, `Region`, `ServiceURL`, `Endpoint`, `TableName`, `AccessKey`, `SecretKey`, `Token` or `SessionToken`, and `ProfileName` or `Profile`.
+The providers also accept `ConnectionName`, `ConnectionString`, and nested `ConnectionProperties` or `Resource` values. Direct provider values take precedence over referenced resource outputs, including when an alias such as `Region`, `Endpoint`, `SessionToken`, or `Profile` is used. A connection string can contain `Service`, `Region`, `ServiceURL`, `Endpoint`, `TableName`, `AccessKey`, `SecretKey`, `Token` or `SessionToken`, and `ProfileName` or `Profile`.
 
 For infrastructure-managed tables, set `CreateIfNotExists` and `UpdateIfExists` to `false`. The compiled CDK example uses on-demand billing, so it also sets `UseProvisionedThroughput` to `false`.

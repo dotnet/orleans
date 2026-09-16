@@ -83,12 +83,38 @@ namespace Orleans.Reminders.DynamoDB
 
         public string? GetValue(params string[] names)
         {
-            foreach (var name in names)
+            var value = GetSectionValue(_providerSection, names)
+                ?? GetSectionValue(_providerSection.GetSection("ConnectionProperties"), names)
+                ?? GetSectionValue(_providerSection.GetSection("Resource"), names)
+                ?? GetSectionValue(_providerSection.GetSection("AWS"), names);
+            if (value is not null)
             {
-                var value = GetProviderValue(name);
+                return value;
+            }
+
+            if (_referenceName is not null)
+            {
+                value = GetSectionValue(_configuration.GetSection($"{AwsResourcesConfigurationSection}:{_referenceName}"), names);
                 if (value is not null)
                 {
                     return value;
+                }
+
+                foreach (var name in names)
+                {
+                    value = GetNonEmpty(_configuration[$"{EncodeEnvironmentVariableName(_referenceName)}_{name.ToUpperInvariant()}"]);
+                    if (value is not null)
+                    {
+                        return value;
+                    }
+                }
+            }
+
+            foreach (var name in names)
+            {
+                if (_connectionValues.TryGetValue(name, out value) && GetNonEmpty(value) is { } connectionValue)
+                {
+                    return connectionValue;
                 }
             }
 
@@ -215,28 +241,18 @@ namespace Orleans.Reminders.DynamoDB
             }
         }
 
-        private string? GetProviderValue(string name)
+        private static string? GetSectionValue(IConfiguration section, string[] names)
         {
-            var value = GetNonEmpty(_providerSection[name])
-                ?? GetNonEmpty(_providerSection[$"ConnectionProperties:{name}"])
-                ?? GetNonEmpty(_providerSection[$"Resource:{name}"])
-                ?? GetNonEmpty(_providerSection[$"AWS:{name}"]);
-            if (value is not null)
+            foreach (var name in names)
             {
-                return value;
-            }
-
-            if (_referenceName is not null)
-            {
-                value = GetNonEmpty(_configuration[$"{AwsResourcesConfigurationSection}:{_referenceName}:{name}"])
-                    ?? GetNonEmpty(_configuration[$"{EncodeEnvironmentVariableName(_referenceName)}_{name.ToUpperInvariant()}"]);
+                var value = GetNonEmpty(section[name]);
                 if (value is not null)
                 {
                     return value;
                 }
             }
 
-            return _connectionValues.TryGetValue(name, out value) ? GetNonEmpty(value) : null;
+            return null;
         }
 
         private static IReadOnlyDictionary<string, string> ParseConnectionString(string? connectionString)

@@ -97,6 +97,69 @@ public sealed class DynamoDBProviderConfigurationTests
     public void Create_ConnectionPropertiesShape_BindsValues()
         => AssertProviderLocalShape("ConnectionProperties");
 
+    [Theory]
+    [InlineData("Provider:", "Provider:ConnectionProperties:")]
+    [InlineData("Provider:ConnectionProperties:", "Provider:Resource:")]
+    [InlineData("Provider:Resource:", "Provider:AWS:")]
+    [InlineData("Provider:AWS:", "AWS:Resources:orders-table:")]
+    [InlineData("AWS:Resources:orders-table:", "ORDERS_TABLE_")]
+    [InlineData("ORDERS_TABLE_", null)]
+    public void Create_AliasesOverrideLowerPrioritySources(string prefix, string? lowerPriorityPrefix)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Provider:ServiceKey"] = "orders-table",
+            ["ConnectionStrings:orders-table"] = "Service=connection-region;Token=connection-token;ProfileName=connection-profile",
+            [$"{prefix}Region"] = "preferred-region",
+            [$"{prefix}SessionToken"] = "preferred-token",
+            [$"{prefix}Profile"] = "preferred-profile",
+        };
+        if (lowerPriorityPrefix is not null)
+        {
+            values[$"{lowerPriorityPrefix}Service"] = "lower-priority-region";
+            values[$"{lowerPriorityPrefix}Token"] = "lower-priority-token";
+            values[$"{lowerPriorityPrefix}ProfileName"] = "lower-priority-profile";
+        }
+
+        var (_, _, options) = Bind(values);
+
+        Assert.Equal("preferred-region", options.Service);
+        Assert.Equal("preferred-token", options.Token);
+        Assert.Equal("preferred-profile", options.ProfileName);
+    }
+
+    [Theory]
+    [InlineData("ServiceURL")]
+    [InlineData("Endpoint")]
+    public void Create_DirectEndpointAliasOverridesConnectionStringRegion(string alias)
+    {
+        var (_, _, options) = Bind(new()
+        {
+            [$"Provider:{alias}"] = "http://localhost:8000",
+            ["Provider:ConnectionString"] = "Region=us-west-2",
+        });
+
+        Assert.Equal("http://localhost:8000", options.Service);
+    }
+
+    [Fact]
+    public void Create_CanonicalNamesOverrideAliasesWithinSameSource()
+    {
+        var (_, _, options) = Bind(new()
+        {
+            ["Provider:Service"] = "canonical-region",
+            ["Provider:Region"] = "alias-region",
+            ["Provider:Token"] = "canonical-token",
+            ["Provider:SessionToken"] = "alias-token",
+            ["Provider:ProfileName"] = "canonical-profile",
+            ["Provider:Profile"] = "alias-profile",
+        });
+
+        Assert.Equal("canonical-region", options.Service);
+        Assert.Equal("canonical-token", options.Token);
+        Assert.Equal("canonical-profile", options.ProfileName);
+    }
+
     [Fact]
     public void Create_ResourceShape_BindsValues()
         => AssertProviderLocalShape("Resource");

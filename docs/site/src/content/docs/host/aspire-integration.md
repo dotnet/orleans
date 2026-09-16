@@ -45,16 +45,16 @@ The named grain storage resources correspond to named Orleans providers such as 
 <a id="orleans-silo-project"></a>
 <a id="service-defaults-pattern"></a>
 
-Register the keyed Aspire client for every backing resource consumed by Orleans, then call parameterless <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
+Register the keyed Aspire clients required by the selected providers, then call parameterless <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
 :::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="silo_basic_config":::
 
-The AppHost injects the `Orleans` configuration hierarchy. Orleans binds cluster identity, endpoints, clustering, reminders, streaming, grain storage, and grain directory configuration from it.
+The AppHost injects the `Orleans` configuration hierarchy. Orleans binds cluster identity, endpoints, clustering, reminders, streaming, grain storage, grain directory, and grain journaling configuration from it.
 
 > [!IMPORTANT]
-> Resource references inject configuration, but the application project must register the matching keyed service client. For example, use `AddKeyedRedisClient`, `AddKeyedAzureTableServiceClient`, or the matching Aspire integration method for the resource type and name.
+> For providers configured with a keyed service client, register that client in the application project using the resource name. For example, use `AddKeyedRedisClient` or `AddKeyedAzureTableServiceClient`. ADO.NET providers resolve injected connection strings directly, and AWS provider mappings supply endpoints and structured resource outputs as described in the [provider wiring reference](#provider-wiring-reference).
 
-Use the <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> delegate only for configuration that the AppHost doesn't model, such as application-specific options or custom services.
+Use the <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*> delegate for application-specific options and custom services.
 
 ## Configure the Orleans client project
 
@@ -70,7 +70,7 @@ In the client project, register the keyed resource client and call parameterless
 
 :::code language="csharp" source="snippets/aspire/Client/ClientProgram.cs" id="client_basic_config":::
 
-The client receives the same cluster identity and clustering provider settings as the silos, but doesn't receive silo hosting capabilities.
+The client receives the cluster identity, clustering provider settings, and streaming configuration it uses to communicate with silos and stream backends.
 
 ## Azure Storage with Aspire
 
@@ -193,7 +193,7 @@ Set stable service and cluster identifiers for environments that must interopera
 
 :::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="explicit_cluster_ids":::
 
-- Treat the AppHost as a resource model, not as a substitute for durable services.
+- Model durable backing services and their startup dependencies in the AppHost.
 - Use managed identities or workload identities instead of embedding secrets.
 - Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId> stable and isolate environments with <xref:Orleans.Configuration.ClusterOptions.ClusterId>.
 - Run multiple silo replicas across failure domains.
