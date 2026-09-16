@@ -11,6 +11,15 @@ The pre-release [`Microsoft.Orleans.Journaling.AzureStorage`](https://www.nuget.
 
 Use Microsoft Entra workload identity in hosted environments and grant the silo identity only the data-plane permissions required for the selected container or table.
 
+## Named storage namespaces
+
+Both Azure registration methods accept a name followed by the options delegate.
+Register independent Blob clients/containers or Table clients/tables under
+different names to configure multiple providers of the same backend. Named
+options, storage, catalog, and state-manager factory share the same binding.
+The unnamed overload configures default grain journaling; named registrations
+leave that default independent.
+
 ## Azure Blob Storage
 
 Configure <xref:Orleans.Journaling.AzureBlobStorageHostingExtensions.AddAzureBlobJournalStorage*> with an authenticated <xref:Azure.Storage.Blobs.BlobServiceClient>:

@@ -50,6 +50,13 @@ namespace Orleans.Journaling
     public static partial class HostingExtensions
     {
         public static Hosting.ISiloBuilder AddJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
+
+        public static Hosting.ISiloBuilder AddJournalStorage<TProvider>(this Hosting.ISiloBuilder builder, string name, System.Func<System.IServiceProvider, TProvider> factory)
+            where TProvider : class, IJournalStorageProvider { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name) { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>

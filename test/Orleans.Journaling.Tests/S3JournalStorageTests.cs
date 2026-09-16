@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Xunit;
@@ -156,13 +157,21 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
             Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(S3JournalStorageProvider));
             Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(S3JournalStorageInstruments));
-            Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(IJournalStorageProvider));
-            Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(IJournalStorageCatalog));
+            foreach (var serviceType in new[] { typeof(IJournalStorageProvider), typeof(IJournalStorageCatalog), typeof(IJournaledStateManagerFactory) })
+            {
+                Assert.Single(builder.Services, descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == serviceType);
+                Assert.Single(builder.Services, descriptor => descriptor.IsKeyedService
+                    && Equals(descriptor.ServiceKey, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+                    && descriptor.ServiceType == serviceType);
+            }
+
             Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
             using var services = builder.Services.BuildServiceProvider();
             var provider = services.GetRequiredService<S3JournalStorageProvider>();
             Assert.Same(provider, services.GetRequiredService<IJournalStorageProvider>());
             Assert.Same(provider, services.GetRequiredService<IJournalStorageCatalog>());
+            Assert.Same(provider, services.GetRequiredKeyedService<IJournalStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+            Assert.Same(provider, services.GetRequiredKeyedService<IJournalStorageCatalog>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             Assert.Same(provider, services.GetRequiredService<ILifecycleParticipant<ISiloLifecycle>>());
             Assert.Equal("second", services.GetRequiredService<IOptions<S3JournalStorageOptions>>().Value.BucketName);
         }

@@ -19,6 +19,14 @@ Configure the provider with <xref:Orleans.Journaling.RedisJournalStorageHostingE
 
 The [runnable Redis Journaling sample](samples.md#run-the-redis-sample) uses the same provider with a <xref:Orleans.Journaling.DurableGrain>, acknowledges a durable value update, deactivates the grain, and verifies recovery on a new activation.
 
+The named overload accepts a provider name followed by the options delegate.
+Use distinct names with independent connections or key prefixes for separate
+journal namespaces. A named provider's options, catalog, storage, and
+state-manager factory resolve together; the unnamed overload continues to
+configure default grain journaling. A `ServiceKey` in configuration chooses the
+client connection, while the `GrainJournaling` provider name chooses the storage
+binding.
+
 ## Storage behavior
 
 The provider stores journal data in Redis strings and journal metadata in Redis hashes. Per-journal reads and mutations use atomic Lua scripts. Catalog operations discover journals by scanning metadata keys on each connected primary Redis server.
