@@ -116,8 +116,10 @@ equivalence includes routing, timestamps, body and context bytes, and declared t
 Recovery restores the journaled ownership pair and repairs pending work with an
 absent owner. Failed ownership writes restore committed state before retry backoff,
 including when recovery resolves an ambiguous commit response. Callbacks validate
-generation and physical job identity, coalesce by logical ownership, and commit
-terminal ownership cleanup. Loopback delivery executes through the local inbox;
+generation and physical job identity across awaited operations, coalesce by logical
+ownership, and commit terminal ownership cleanup. Recovery hands subsequent delivery
+results and terminal cleanup to callbacks for the recovered state and job handle.
+Loopback delivery executes through the local inbox;
 remote batches yield between timer turns and retain the durable attempt's
 cancellation token. Delivery outcomes commit message removal or bounded retry and
 dead-letter state. Diagnostics expose retained outbox dead letters and stage their
