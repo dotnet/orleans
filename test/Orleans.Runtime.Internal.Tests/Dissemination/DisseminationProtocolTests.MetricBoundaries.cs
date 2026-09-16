@@ -75,16 +75,16 @@ public partial class DisseminationProtocolTests
             switch (operation)
             {
                 case "broadcast-receive":
-                {
-                    var response = await protocol.ReceiveBroadcast(new()
                     {
-                        Sender = peer,
-                        Values = CreateValueGroups(ns.Name, ns.CreateItem(peer, "value", 2)),
-                    }, cancellationToken);
-                    Assert.Equal(2, ns.GetVersion("value"));
-                    Assert.Equal(2, Assert.Single(response.Acknowledgments[ns.Name]).Version);
-                    break;
-                }
+                        var response = await protocol.ReceiveBroadcast(new()
+                        {
+                            Sender = peer,
+                            Values = CreateValueGroups(ns.Name, ns.CreateItem(peer, "value", 2)),
+                        }, cancellationToken);
+                        Assert.Equal(2, ns.GetVersion("value"));
+                        Assert.Equal(2, Assert.Single(response.Acknowledgments[ns.Name]).Version);
+                        break;
+                    }
                 case "broadcast-send":
                 case "publication":
                     ns.SetValue("value", 1);
@@ -95,17 +95,17 @@ public partial class DisseminationProtocolTests
                     Assert.Single(transport.BroadcastBatches);
                     break;
                 case "repair-receive":
-                {
-                    ns.SetValue("value", 2);
-                    var response = await protocol.ReceiveAntiEntropy(new()
                     {
-                        Sender = peer,
-                        SupportedNamespaces = [ns.Name],
-                        Digests = new() { [ns.Name] = [new("value", 1)] },
-                    }, cancellationToken);
-                    Assert.Equal(2, Assert.Single(GetAntiEntropyResponseValues(response)).Value.ToVersion);
-                    break;
-                }
+                        ns.SetValue("value", 2);
+                        var response = await protocol.ReceiveAntiEntropy(new()
+                        {
+                            Sender = peer,
+                            SupportedNamespaces = [ns.Name],
+                            Digests = new() { [ns.Name] = [new("value", 1)] },
+                        }, cancellationToken);
+                        Assert.Equal(2, Assert.Single(GetAntiEntropyResponseValues(response)).Value.ToVersion);
+                        break;
+                    }
                 case "repair-send":
                 case "repair-failure":
                     ns.SetValue("value", 1);
