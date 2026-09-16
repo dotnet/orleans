@@ -40,6 +40,16 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MaxFanOutFactor)} must be greater than or equal to {nameof(DisseminationOverlayOptions.MinFanOutFactor)}.");
         }
 
+        if (overlay.AggregationFanOutFactor <= 0)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AggregationFanOutFactor)} must be greater than 0.");
+        }
+
+        if (overlay.AggregationBroadcastsPerSecond is < 1 or > 1000)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AggregationBroadcastsPerSecond)} must be between 1 and 1000.");
+        }
+
         if (overlay.AntiEntropyInterval < TimeSpan.FromMilliseconds(1)
             || overlay.AntiEntropyInterval > MaxPeriodicTimerPeriod)
         {
@@ -50,6 +60,16 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
         if (overlay.AntiEntropyPeerCount <= 0)
         {
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AntiEntropyPeerCount)} must be greater than 0.");
+        }
+
+        if (overlay.MaxAntiEntropyBatchItems <= 0)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MaxAntiEntropyBatchItems)} must be greater than 0.");
+        }
+
+        if (overlay.MaxAntiEntropyBatchBytes <= 0)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MaxAntiEntropyBatchBytes)} must be greater than 0.");
         }
 
         return ValidateOptionsResult.Success;

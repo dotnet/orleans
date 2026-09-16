@@ -12,6 +12,7 @@ internal sealed partial class DisseminationProtocol
 {
     private const int MaxRetainedNonMemberResponseCursors = 64;
     private static readonly TimeSpan MaxAntiEntropyRoundLifetime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+    private static readonly TimeSpan InventoryMaintenanceInterval = TimeSpan.FromSeconds(1);
     private readonly SiloAddress _localSilo;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly DisseminationMembership _membership;
@@ -19,6 +20,11 @@ internal sealed partial class DisseminationProtocol
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
     private readonly DisseminationBroadcastQueue _broadcastQueue;
+    private readonly object _rootBatcherLock = new();
+    private readonly Dictionary<DisseminationNamespace, DisseminationRootBatcher> _rootBatchers = [];
+    private bool _rootBatchersStopped;
+    private readonly object _maintenanceLock = new();
+    private MaintenanceStamp? _lastMaintenance;
     private readonly AdmissionGate _admission = new();
     private readonly DisseminationSendGate _antiEntropySendGate;
     private readonly CancellationTokenSource _antiEntropyShutdown = new();
@@ -32,6 +38,7 @@ internal sealed partial class DisseminationProtocol
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
     private readonly object _peerSupportLock = new();
     private readonly Dictionary<SiloAddress, HashSet<DisseminationNamespace>> _confirmedPeerNamespaces = [];
+    private DisseminationMembershipSnapshot? _confirmedMembership;
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
 
     public DisseminationProtocol(
@@ -128,11 +135,18 @@ internal sealed partial class DisseminationProtocol
         // Notifications carry identity only; each peer pump asks the namespace for the latest repair at send time.
         RecordValueUpdate(disseminationNamespace.Name, key, publishedVersion);
         var accepted = true;
-        foreach (var peer in membership.GetOriginatorTargets(disseminationNamespace.RoutingMode))
+        if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree && membership.IsAggregationRoot)
         {
-            accepted &= _broadcastQueue.Notify(
-                peer, disseminationNamespace, key,
-                immediate: disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree && !membership.IsAggregationRoot);
+            accepted = NotifyRoot(disseminationNamespace, [new(key, publishedVersion, true)]);
+        }
+        else
+        {
+            foreach (var peer in membership.GetOriginatorTargets(disseminationNamespace.RoutingMode))
+            {
+                accepted &= _broadcastQueue.Notify(
+                    peer, disseminationNamespace, key,
+                    immediate: disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree);
+            }
         }
 
         EmitPublication(
@@ -219,9 +233,8 @@ internal sealed partial class DisseminationProtocol
         }
 
         // Membership may be part of this batch, so apply everything before deriving the forwarding tree.
+        await MaintainInventories(cancellationToken);
         var membershipSnapshots = _membership.CurrentSnapshots;
-        PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
-        await _broadcastQueue.Prune(membershipSnapshots, cancellationToken);
         // Changed state always wakes children, including same-version liveness updates. Duplicate deliveries
         // wake only children which still need this version and have no equivalent queued work.
         foreach (var (disseminationNamespace, keys) in receivedKeys)
@@ -240,12 +253,17 @@ internal sealed partial class DisseminationProtocol
                     }
                 }
 
-                foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode, batch.Sender))
+                if (membership.IsAggregationRoot)
                 {
-                    // A producer which is also a child needs its update returned in the distribution batch
-                    // so that it forwards the update to its own descendants.
-                    _broadcastQueue.NotifyBatch(
-                        peer, disseminationNamespace, notifications.AsSpan(0, notificationCount), immediate: !membership.IsAggregationRoot);
+                    NotifyRoot(disseminationNamespace, notifications.AsSpan(0, notificationCount));
+                }
+                else
+                {
+                    foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode, batch.Sender))
+                    {
+                        _broadcastQueue.NotifyBatch(
+                            peer, disseminationNamespace, notifications.AsSpan(0, notificationCount), immediate: true);
+                    }
                 }
 
                 continue;
@@ -330,9 +348,8 @@ internal sealed partial class DisseminationProtocol
             return;
         }
 
+        await MaintainInventories(cancellationToken);
         var membershipSnapshots = _membership.CurrentSnapshots;
-        PrunePeerNamespaceConfirmations(membershipSnapshots.AllMembers);
-        await _broadcastQueue.Prune(membershipSnapshots, cancellationToken);
 
         // A round never queues behind prior rounds: busy destinations and slots wait for a future rotation.
         var leases = AcquireAntiEntropyPeers(membershipSnapshots, options.Overlay.AntiEntropyPeerCount);
@@ -480,8 +497,8 @@ internal sealed partial class DisseminationProtocol
                     Sender = _localSilo,
                     Digests = peerDigests,
                     SupportedNamespaces = supportedNamespaces,
-                    MaxResponseItems = options.MaxBatchItems,
-                    MaxResponseBytes = options.MaxBatchBytes,
+                    MaxResponseItems = Math.Min(options.MaxBatchItems, options.Overlay.MaxAntiEntropyBatchItems),
+                    MaxResponseBytes = Math.Min(options.MaxBatchBytes, options.Overlay.MaxAntiEntropyBatchBytes),
                 });
             }
         }
@@ -705,6 +722,8 @@ internal sealed partial class DisseminationProtocol
         out bool isUnfiltered)
     {
         isUnfiltered = false;
+        var maxItems = antiEntropy ? Math.Min(options.MaxBatchItems, options.Overlay.MaxAntiEntropyBatchItems) : options.MaxBatchItems;
+        var maxBytes = antiEntropy ? Math.Min(options.MaxBatchBytes, options.Overlay.MaxAntiEntropyBatchBytes) : options.MaxBatchBytes;
         long totalCount = 0;
         foreach (var entries in values.Values)
         {
@@ -720,7 +739,7 @@ internal sealed partial class DisseminationProtocol
                 : 0;
         }
 
-        if (position == 0 && FitsReceiveBudget(values, totalCount, options))
+        if (position == 0 && FitsReceiveBudget(values, totalCount, maxItems, maxBytes))
         {
             var fastPathMembers = _membership.CurrentSnapshots.AllMembers;
             lock (_receivedBatchCursorLock)
@@ -755,14 +774,14 @@ internal sealed partial class DisseminationProtocol
 
             for (var index = (int)skip; index < entries.Count; index++)
             {
-                if (examined >= options.MaxBatchItems || byteCount >= options.MaxBatchBytes)
+                if (examined >= maxItems || byteCount >= maxBytes)
                 {
                     goto Complete;
                 }
 
                 var item = entries[index];
                 var payloadBytes = item.Value.Payload.Length;
-                if (!ValidatePayloadSize(disseminationNamespace, item.Value, options))
+                if (!ValidatePayloadSize(disseminationNamespace, item.Value, maxBytes))
                 {
                     // Oversized entries consume inspection capacity, but must not pin the receive cursor.
                     examined++;
@@ -770,7 +789,7 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                if (payloadBytes > options.MaxBatchBytes - byteCount)
+                if (payloadBytes > maxBytes - byteCount)
                 {
                     // Preserve this candidate for a fresh budget instead of discarding a repair-chain suffix.
                     goto Complete;
@@ -815,14 +834,15 @@ Complete:
     private bool FitsReceiveBudget(
         Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> values,
         long itemCount,
-        DisseminationOptions options)
+        int maxItems,
+        int maxBytes)
     {
-        if (itemCount > options.MaxBatchItems)
+        if (itemCount > maxItems)
         {
             return false;
         }
 
-        var remainingBytes = options.MaxBatchBytes;
+        var remainingBytes = maxBytes;
         foreach (var (namespaceName, entries) in values)
         {
             if (entries.Count == 0 || !TryGetEnabledNamespace(namespaceName, out var disseminationNamespace))
@@ -935,8 +955,10 @@ Complete:
 
         // Honor the recipient's budget at the responder's existing fair cursor. Independently truncating
         // rotating responses at the receiver can repeatedly omit the same keys when the limits differ.
-        var maxResponseItems = Math.Min(options.MaxBatchItems, request.MaxResponseItems ?? int.MaxValue);
-        var maxResponseBytes = Math.Min(options.MaxBatchBytes, request.MaxResponseBytes ?? int.MaxValue);
+        var maxResponseItems = Math.Min(Math.Min(options.MaxBatchItems, options.Overlay.MaxAntiEntropyBatchItems),
+            request.MaxResponseItems ?? int.MaxValue);
+        var maxResponseBytes = Math.Min(Math.Min(options.MaxBatchBytes, options.Overlay.MaxAntiEntropyBatchBytes),
+            request.MaxResponseBytes ?? int.MaxValue);
         var valueCount = 0;
         var byteCount = 0;
         var truncated = false;
@@ -1202,7 +1224,7 @@ Complete:
     {
         cancellationToken.ThrowIfCancellationRequested();
         var namespaceName = disseminationNamespace.Name;
-        if (!ValidatePayloadSize(disseminationNamespace, item.Value, options))
+        if (!ValidatePayloadSize(disseminationNamespace, item.Value, options.MaxBatchBytes))
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -1266,8 +1288,17 @@ Complete:
         return result;
     }
 
-    internal Task FlushPendingBroadcast(CancellationToken cancellationToken) =>
-        _broadcastQueue.FlushPendingBroadcast(cancellationToken);
+    internal async Task FlushPendingBroadcast(CancellationToken cancellationToken)
+    {
+        DisseminationRootBatcher[] roots;
+        lock (_rootBatcherLock)
+        {
+            roots = [.. _rootBatchers.Values];
+        }
+
+        await Task.WhenAll(roots.Select(root => root.FlushAsync(cancellationToken)));
+        await _broadcastQueue.FlushPendingBroadcast(cancellationToken);
+    }
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
@@ -1281,7 +1312,22 @@ Complete:
         }
         finally
         {
-            await _broadcastQueue.StopAsync(cancellationToken);
+            DisseminationRootBatcher[] roots;
+            lock (_rootBatcherLock)
+            {
+                _rootBatchersStopped = true;
+                roots = [.. _rootBatchers.Values];
+                _rootBatchers.Clear();
+            }
+
+            try
+            {
+                await Task.WhenAll(roots.Select(root => root.StopAsync(cancellationToken)));
+            }
+            finally
+            {
+                await _broadcastQueue.StopAsync(cancellationToken);
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -1384,6 +1430,12 @@ Complete:
     {
         lock (_peerSupportLock)
         {
+            if (ReferenceEquals(_confirmedMembership, membership))
+            {
+                return;
+            }
+
+            membership = _membership.CurrentSnapshots.AllMembers;
             foreach (var peer in _confirmedPeerNamespaces.Keys)
             {
                 if (!membership.ContainsMember(peer))
@@ -1391,6 +1443,8 @@ Complete:
                     _confirmedPeerNamespaces.Remove(peer);
                 }
             }
+
+            _confirmedMembership = membership;
         }
     }
 
@@ -1414,10 +1468,122 @@ Complete:
         CancellationToken cancellationToken)
     {
         // Prune peer ledgers against the same membership view used to choose tree targets.
-        var memberships = await _membership.GetSnapshotsContainingMember(member, scope, cancellationToken);
-        await _broadcastQueue.Prune(memberships ?? _membership.CurrentSnapshots, cancellationToken);
-        return memberships?.GetSnapshot(scope);
+        await _membership.GetSnapshotsContainingMember(member, scope, cancellationToken);
+        await MaintainInventories(cancellationToken);
+        var snapshot = _membership.GetSnapshot(scope);
+        return snapshot.ContainsMember(member) ? snapshot : null;
     }
+
+    private bool NotifyRoot(
+        IDisseminationNamespace disseminationNamespace,
+        ReadOnlySpan<DisseminationBroadcastQueue.KeyNotification> notifications)
+    {
+        DisseminationRootBatcher root;
+        lock (_rootBatcherLock)
+        {
+            if (_rootBatchersStopped)
+            {
+                return false;
+            }
+
+            if (notifications.IsEmpty)
+            {
+                return true;
+            }
+
+            if (!_rootBatchers.TryGetValue(disseminationNamespace.Name, out root!))
+            {
+                root = new(
+                    _timeProvider, disseminationNamespace, _options,
+                    values => DispatchRootBatch(disseminationNamespace, values), _logger);
+                _rootBatchers.Add(disseminationNamespace.Name, root);
+            }
+        }
+
+        return root.Notify(notifications);
+    }
+
+    private bool DispatchRootBatch(
+        IDisseminationNamespace disseminationNamespace,
+        ReadOnlySpan<DisseminationBroadcastQueue.KeyNotification> notifications)
+    {
+        var membership = _membership.GetSnapshot(disseminationNamespace.MembershipScope);
+        if (!membership.IsAggregationRoot)
+        {
+            // A departing root hands accepted state to the new root, even after leaving Active membership.
+            return membership.Members.IsEmpty
+                || _broadcastQueue.NotifyBatch(membership.Members[0], disseminationNamespace, notifications, immediate: true);
+        }
+
+        var accepted = true;
+        foreach (var child in membership.AggregationChildren)
+        {
+            // Include a child producer's own value so it reaches that child's descendants.
+            accepted &= _broadcastQueue.NotifyBatch(child, disseminationNamespace, notifications, immediate: true);
+        }
+
+        return accepted;
+    }
+
+    private async ValueTask MaintainInventories(CancellationToken cancellationToken)
+    {
+        MaintenanceStamp reservation;
+        bool membershipChanged;
+        lock (_maintenanceLock)
+        {
+            var membership = _membership.CurrentSnapshots;
+            var now = _timeProvider.GetTimestamp();
+            membershipChanged = !ReferenceEquals(_lastMaintenance?.Membership, membership);
+            if (!membershipChanged
+                && _lastMaintenance is { } previous
+                && _timeProvider.GetElapsedTime(previous.Timestamp, now) < InventoryMaintenanceInterval)
+            {
+                return;
+            }
+
+            // Reserve the pass before enumerating namespace state, keeping callbacks outside this lock.
+            reservation = new(membership, now);
+            _lastMaintenance = reservation;
+        }
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PrunePeerNamespaceConfirmations(reservation.Membership.AllMembers);
+            await _broadcastQueue.Prune(reservation.Membership, cancellationToken);
+            KeyValuePair<DisseminationNamespace, DisseminationRootBatcher>[] roots;
+            lock (_rootBatcherLock)
+            {
+                roots = [.. _rootBatchers];
+            }
+
+            foreach (var (name, root) in roots)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var ns = _namespaces[name];
+                var activeKeys = ns.Options.Enabled ? ns.Keys.ToHashSet() : new HashSet<DisseminationKey>();
+                root.Prune(activeKeys);
+                if (membershipChanged && !reservation.Membership.GetSnapshot(ns.MembershipScope).IsAggregationRoot)
+                {
+                    root.WakeForMembershipChange();
+                }
+            }
+        }
+        catch
+        {
+            lock (_maintenanceLock)
+            {
+                if (ReferenceEquals(_lastMaintenance, reservation))
+                {
+                    _lastMaintenance = null;
+                }
+            }
+
+            throw;
+        }
+    }
+
+    private sealed record MaintenanceStamp(DisseminationMembershipSnapshots Membership, long Timestamp);
 
     private bool TryGetEnabledNamespace(DisseminationNamespace namespaceName, [NotNullWhen(true)] out IDisseminationNamespace? disseminationNamespace)
     {
@@ -1434,10 +1600,10 @@ Complete:
     private bool ValidatePayloadSize(
         IDisseminationNamespace disseminationNamespace,
         DisseminationValue value,
-        DisseminationOptions options)
+        int maxBatchBytes)
     {
         if (value.Payload.Length <= disseminationNamespace.Options.MaxPayloadBytes
-            && value.Payload.Length <= options.MaxBatchBytes)
+            && value.Payload.Length <= maxBatchBytes)
         {
             return true;
         }
@@ -1541,7 +1707,7 @@ Complete:
             if (value.Key != request.Key
                 || !IsValidVersionRange(value)
                 || value.ToVersion > repair.Version
-                || !ValidatePayloadSize(disseminationNamespace, value, options))
+                || !ValidatePayloadSize(disseminationNamespace, value, options.MaxBatchBytes))
             {
                 return false;
             }

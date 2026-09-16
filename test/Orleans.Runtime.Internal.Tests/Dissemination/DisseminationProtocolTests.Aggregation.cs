@@ -24,9 +24,10 @@ public partial class DisseminationProtocolTests
     public void AggregationTopologyHasOneRootAndLinearDistributionEdges(int count, int fanout)
     {
         var members = CreateSilos(count).ToImmutableArray();
+        var overlay = new DisseminationOverlayOptions { AggregationFanOutFactor = fanout };
         var snapshots = members.ToDictionary(
             silo => silo,
-            silo => new DisseminationMembershipSnapshot(new MembershipVersion(1), silo, members, CreateOverlayOptions(fanout)));
+            silo => new DisseminationMembershipSnapshot(new MembershipVersion(1), silo, members, overlay));
         Assert.Equal(count - 1, snapshots.Values.Sum(snapshot => snapshot.AggregationChildren.Length));
         Assert.Equal(members.Skip(1), snapshots.Values.SelectMany(snapshot => snapshot.AggregationChildren).Order());
         foreach (var (silo, snapshot) in snapshots)
@@ -85,7 +86,7 @@ public partial class DisseminationProtocolTests
             var transport = new FakeTransport(member, members.Where(peer => !peer.Equals(member)).ToArray());
             var protocol = CreateProtocol(transport, ns, options =>
             {
-                options.Overlay.FanOutFactor = _ => fanout;
+                options.Overlay.AggregationFanOutFactor = fanout;
                 options.MaxConcurrentSends = 1;
             }, clock);
             nodes.Add(member, (ns, transport, protocol));
@@ -171,7 +172,7 @@ public partial class DisseminationProtocolTests
             var transport = new FakeTransport(member, members.Where(peer => !peer.Equals(member)).ToArray());
             var protocol = CreateProtocol(transport, ns, options =>
             {
-                options.Overlay.FanOutFactor = static _ => 2;
+                options.Overlay.AggregationFanOutFactor = 2;
                 options.MaxConcurrentSends = 1;
             }, clock);
             nodes.Add(member, (ns, transport, protocol));
@@ -280,7 +281,7 @@ public partial class DisseminationProtocolTests
             forwarded.TrySetResult();
             return Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
         };
-        var protocol = CreateProtocol(transport, ns, options => options.Overlay.FanOutFactor = static _ => 2, clock);
+        var protocol = CreateProtocol(transport, ns, options => options.Overlay.AggregationFanOutFactor = 2, clock);
         var start = clock.GetTimestamp();
         try
         {
@@ -333,7 +334,7 @@ public partial class DisseminationProtocolTests
             }
             return Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
         };
-        var protocol = CreateProtocol(transport, ns, options => options.Overlay.FanOutFactor = static _ => 2, clock);
+        var protocol = CreateProtocol(transport, ns, options => options.Overlay.AggregationFanOutFactor = 2, clock);
         var values = Enumerable.Range(0, 64).Select(index => ns.CreateItem(members[0], $"key-{index}", 1)).ToArray();
         var start = clock.GetTimestamp();
         try
@@ -373,7 +374,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task AggregationWindowBatchesStaggeredKeysAndPreservesNextWindow()
+    public async Task QueueCoalescingWindowBatchesStaggeredKeysAndPreservesNextWindow()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(40801);
@@ -384,7 +385,7 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay;
+        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
         var transport = new FakeTransport(local, peer);
         var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

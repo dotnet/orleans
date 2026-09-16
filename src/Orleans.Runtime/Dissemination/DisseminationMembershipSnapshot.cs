@@ -27,6 +27,7 @@ internal sealed class DisseminationMembershipSnapshot
         // frequent updates cannot keep repair rounds confined to the first few members.
         _antiEntropySelection = previous?._antiEntropySelection ?? new();
         var fanout = Members.Length <= 1 ? 1 : overlayOptions.GetFanOutFactor(Members.Length);
+        var aggregationFanout = Math.Clamp(overlayOptions.AggregationFanOutFactor, 1, Math.Max(1, Members.Length));
         var memberSet = new HashSet<SiloAddress>(Members.Length);
         var localIndex = -1;
         for (var i = 0; i < Members.Length; i++)
@@ -45,7 +46,7 @@ internal sealed class DisseminationMembershipSnapshot
 
         _set = memberSet.ToFrozenSet();
         ForwardingTreeTargets = localIndex < 0 ? [] : ComputeChildren((long)fanout * (localIndex + 1), fanout);
-        AggregationChildren = localIndex < 0 ? [] : ComputeChildren((long)fanout * localIndex + 1, fanout);
+        AggregationChildren = localIndex < 0 ? [] : ComputeChildren((long)aggregationFanout * localIndex + 1, aggregationFanout);
 
         if (localIndex < 0)
         {

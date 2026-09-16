@@ -31,7 +31,7 @@ flowchart LR
     Repair --> Authority
 ```
 
-`DisseminationProtocol` coordinates routing, peer capability evidence, anti-entropy, and application isolation. `DisseminationBroadcastQueue` owns per-peer scheduling, coalescing, retry, drain, and acknowledged-version ledgers. `DisseminationMembership` projects one membership snapshot into topology-specific member sets. Each `IDisseminationNamespace` owns serialization, current versions, retained history, payload limits, repair construction, and application semantics.
+`DisseminationProtocol` coordinates routing, peer capability evidence, anti-entropy, and application isolation. `DisseminationRootBatcher` owns the aggregation root's bounded, latest-key pending set and broadcast cadence. `DisseminationBroadcastQueue` owns per-peer scheduling, retry, drain, and acknowledged-version ledgers. `DisseminationMembership` projects one membership snapshot into topology-specific member sets. Each `IDisseminationNamespace` owns serialization, current versions, retained history, payload limits, repair construction, and application semantics.
 
 Queue entries contain `(namespace, key)` identities. A pump acquires both destination ownership and a global broadcast slot before materializing a repair. Coalesced notifications therefore use the latest namespace state and acknowledged baseline after admission, without retaining serialized payloads for waiting peers.
 
@@ -71,11 +71,13 @@ Every silo derives routing from the same ordered membership projection. Members 
 
 Membership uses the broadcast forest: for fanout `f` and zero-based member index `i`, a forwarding node selects children starting at `f * (i + 1)` and continuing for at most `f` members. An originator sends to the first `f` members, excluding itself, plus its normal forwarding children.
 
-Deployment load uses root aggregation followed by tree distribution. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. Each non-root producer sends its own update directly to the root immediately. The root merges updates and batches them for 500 ms. Relays atomically enqueue every key from a received batch before waking their send loops, then forward to their children immediately. The batching delay is paid at the root once, rather than at every hop. Queues retain the latest version of a repeatedly published key, and acknowledgments suppress reflected duplicates.
+Deployment load uses root aggregation followed by tree distribution. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. Its fanout defaults to eight, independently of the membership forest. Each non-root producer sends its own update directly to the root immediately. The root retains one latest notification per key and collects for 25 ms. It starts at most five normal broadcast waves per second, so the next deadline is the later of the first pending notification plus the collection window and the previous wave start plus 200 ms. New arrivals keep that deadline. An idle root sends after the collection window, while sustained traffic combines updates between paced waves.
+
+Admitted waves enter every child queue atomically. Relays forward immediately. The root's pending set stays outside the per-peer queues, so urgent membership traffic can proceed without prematurely flushing unadmitted load values. Explicit flush and shutdown drain can bypass normal pacing within their caller's cancellation budget. A former root hands pending state to the current root, including when it has left Active membership.
 
 Aggregation ledgers advance on broadcast acknowledgments, after the receiver processes the batch and attempts downstream queue admission. An ingress producer which is also a child receives its own update in the root's distribution batch and forwards it to its descendants. Passive evidence of a peer's local value serves repair; broadcast acknowledgments establish distribution progress. Anti-entropy repairs gaps left by bounded queue admission or changed topology.
 
-At one publication per silo per second, root ingress contributes `N - 1` requests per second. Up to two 500 ms root batches traverse `N - 1` distribution edges, targeting roughly `3 * (N - 1)` requests per second under stable, healthy, fitting-batch conditions. One fully collected publication round requires `2 * (N - 1)` requests. Acknowledgment responses add the corresponding return messages. Batch splitting, repair, topology transitions, and other runtime traffic are accounted separately. Payload delivery still includes each recipient's copy of the statistics; the savings come from aggregating those copies into fewer messages.
+At one publication per silo per second, root ingress contributes `N - 1` requests per second. With `R` root waves per second, healthy fitting batches add at most roughly `R * (N - 1)` distribution requests. At the default five waves per second, the model is `6 * (N - 1)`, or 11,994 requests per second for 2,000 silos. An eight-child relay sends up to approximately 40 distribution requests per second. These are protocol projections, not measured multi-host capacity. Acknowledgment replies, retries, repair, topology transitions, forced drains, and wire-message splitting add separate work. Payload delivery still includes each recipient's copy of the statistics.
 
 Active members are ordered by silo address. Ingress moves toward a smaller root; distribution moves toward larger children. A non-root node receiving an ingress from a higher-address sender redirects it to its current root immediately, accommodating a changed root without adding another batching window. Membership repair reconciles differing views.
 
@@ -86,7 +88,7 @@ Namespaces select a membership scope before topology construction:
 | Deployment load | Active members, root aggregation | Producers send to one root; already-aggregated batches traverse the distribution tree immediately. |
 | Membership | All dissemination members | Joining and graceful-shutdown transitions can propagate. |
 
-Fanout is derived from the target hop count and bounded by the configured minimum and maximum, or selected by the code-configured callback. A membership or fanout change creates a new topology from the next snapshot; acknowledged ledgers and anti-entropy repair convergence across the transition.
+Membership fanout is derived from the target hop count and configured bounds, or selected by the code-configured callback. Aggregation uses its independent fanout setting. At 2,000 silos, fanout eight gives at most four distribution hops. A membership change creates a new topology from the next snapshot; acknowledged ledgers and anti-entropy repair convergence across the transition.
 
 The projection cache tracks its authoritative source snapshot. On a cache miss it re-reads the owner under the cache lock, so a delayed reader follows the current view, including an owner-authorized version replacement. Eligible membership and status changes refresh routing and peer selection. Heartbeat-only updates and cleanup of non-participants reuse the existing topology, while rebuilt projections retain rotation progress.
 
@@ -101,9 +103,12 @@ Dissemination is opt-in. Enable <xref:Orleans.Configuration.DisseminationOptions
 | <xref:Orleans.Configuration.DisseminationOptions.MaxBatchBytes> | 1 MiB | Serialized payload bytes in an outgoing batch or admitted from an incoming batch or repair response. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.TargetHopCount> | 2 | Target depth used to derive fanout. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.MinFanOutFactor> / <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxFanOutFactor> | 4 / 32 | Bounds for derived fanout. |
+| <xref:Orleans.Configuration.DisseminationOverlayOptions.AggregationFanOutFactor> | 8 | Maximum children per load-distribution relay. |
+| <xref:Orleans.Configuration.DisseminationOverlayOptions.AggregationBroadcastsPerSecond> | 5 | Normal root broadcast-wave frequency. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyInterval> | 5 seconds | Repair-round cadence and retry-delay ceiling. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyPeerCount> | 3 | Maximum peers selected in one repair round and independent per-silo active local repair attempt limit. |
-| <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPendingItemCount> | 1,024 | Distinct retained keys per namespace and peer. |
+| <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxAntiEntropyBatchItems> / <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxAntiEntropyBatchBytes> | 8,192 / 1 MiB | Independent repair limits, capped by the global batch limits and negotiated with the peer. |
+| <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPendingItemCount> | 1,024; load uses 8,192 | Distinct retained keys per namespace and peer, and in a root's pending set. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxCoalescingDelay> | 100 ms | Normal-priority batching window. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.StaleItemTtl> | 30 seconds | Independent local transport and application budgets for each hop. |
 | <xref:Orleans.Configuration.DisseminationNamespaceOptions.ExpectedUpdateCadence> | 10 seconds | Quiet period before a digest is offered for repair. |
@@ -111,7 +116,9 @@ Dissemination is opt-in. Enable <xref:Orleans.Configuration.DisseminationOptions
 
 Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceOptions>. Operators can enable and tune membership and deployment-load dissemination independently while retaining the local concurrency and per-message bounds.
 
-Deployment load uses a 500 ms root batching window and a 5-second expected update cadence. Producer ingress and relay forwarding bypass that window; relays preserve whole batches atomically. Membership retains high priority and bypasses coalescing.
+Deployment load samples remain on the one-second publication cadence. Root collection defaults to 25 ms with a five-wave-per-second admission limit, and the expected repair-update cadence remains five seconds. Producer ingress and relay forwarding bypass collection delays. Membership retains high priority and bypasses coalescing. Configure the load pending-key bound to cover the intended active inventory and stalls; each newer notification replaces the retained value for that key rather than adding another sample.
+
+Inventory and peer-ledger maintenance runs on membership changes and bounded one-second maintenance opportunities instead of every received update. Failed passes remain eligible for retry. This keeps full inventory scans out of the normal per-message root path while promptly retiring peers when the routing view changes.
 
 The anti-entropy loop waits without periodic timer wakeups while the subsystem is disabled. An options-change notification wakes the loop when enablement changes; disabling it returns the loop to the dormant wait. Shutdown removes the options subscription and observes the loop's completion.
 

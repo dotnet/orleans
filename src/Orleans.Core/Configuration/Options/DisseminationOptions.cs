@@ -49,14 +49,15 @@ public sealed class DisseminationOptions
 public sealed class DisseminationOverlayOptions
 {
     /// <summary>
-    /// Gets or sets the code-configured fanout selector.
+    /// Gets or sets the code-configured fanout selector for the membership broadcast forest.
     /// </summary>
     /// <remarks>
-    /// The argument is the current member count for the selected dissemination topology.
+    /// The argument is the current member count for the membership broadcast forest.
     /// The selector must return the same fanout on every silo for a given member count so that forwarding
     /// routes agree across the cluster.
     /// When this value is <see langword="null"/>, <see cref="TargetHopCount"/>, <see cref="MinFanOutFactor"/>,
     /// and <see cref="MaxFanOutFactor"/> are used to derive a fanout factor.
+    /// Aggregation trees use <see cref="AggregationFanOutFactor"/> instead.
     /// </remarks>
     public Func<int, int>? FanOutFactor { get; set; }
 
@@ -76,6 +77,28 @@ public sealed class DisseminationOverlayOptions
     public int MaxFanOutFactor { get; set; } = 32;
 
     /// <summary>
+    /// Gets or sets the maximum number of children per node in the aggregation distribution tree.
+    /// </summary>
+    /// <remarks>
+    /// This value is independent of the membership broadcast forest's <see cref="FanOutFactor"/> selector
+    /// and is clamped to the member count. Configure the same value on every silo so that distribution
+    /// routes agree across the cluster. Producers continue to send updates directly to the aggregation root.
+    /// </remarks>
+    /// <value>The default is 8 and the value must be greater than zero.</value>
+    public int AggregationFanOutFactor { get; set; } = 8;
+
+    /// <summary>
+    /// Gets or sets the maximum number of logical aggregation distribution waves admitted by the root per second.
+    /// </summary>
+    /// <remarks>
+    /// Rate admission can add a wait beyond the namespace's collection window. Relays forward admitted waves
+    /// immediately without another collection window or rate admission wait. The batch item and byte limits
+    /// can split one logical wave into multiple wire messages, which do not each consume a separate wave allowance.
+    /// </remarks>
+    /// <value>The default is 5 and the value must be between 1 and 1000, inclusive.</value>
+    public int AggregationBroadcastsPerSecond { get; set; } = 5;
+
+    /// <summary>
     /// Gets or sets the interval between anti-entropy repair rounds.
     /// </summary>
     /// <value>The interval is 5 seconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
@@ -89,6 +112,28 @@ public sealed class DisseminationOverlayOptions
     /// capacity when its local wait completes, including timeout or cancellation.
     /// </remarks>
     public int AntiEntropyPeerCount { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the maximum number of items in one anti-entropy repair batch.
+    /// </summary>
+    /// <remarks>
+    /// The effective limit is the minimum of this value, <see cref="DisseminationOptions.MaxBatchItems"/>,
+    /// and the peer's advertised receive budget. This allows repair batches to be tuned independently
+    /// of broadcast batches.
+    /// </remarks>
+    /// <value>The default is 8192 and the value must be greater than zero.</value>
+    public int MaxAntiEntropyBatchItems { get; set; } = 8 * 1024;
+
+    /// <summary>
+    /// Gets or sets the maximum total payload bytes in one anti-entropy repair batch.
+    /// </summary>
+    /// <remarks>
+    /// The effective limit is the minimum of this value, <see cref="DisseminationOptions.MaxBatchBytes"/>,
+    /// and the peer's advertised receive budget. This allows repair batches to be tuned independently
+    /// of broadcast batches.
+    /// </remarks>
+    /// <value>The default is 1048576 and the value must be greater than zero.</value>
+    public int MaxAntiEntropyBatchBytes { get; set; } = 1024 * 1024;
 
     internal int GetFanOutFactor(int memberCount)
     {
@@ -153,6 +198,9 @@ public sealed class DisseminationNamespaceOptions
     /// Per-peer batches can contain values from multiple namespaces and use the shortest configured delay among
     /// enabled namespaces. High-priority namespaces (see <see cref="Priority"/>) do not coalesce and are excluded
     /// from this calculation.
+    /// For aggregation trees, this is the root's collection window. Admission under
+    /// <see cref="DisseminationOverlayOptions.AggregationBroadcastsPerSecond"/> can add a separate wait;
+    /// relays forward admitted waves immediately. Batch limits can split a logical wave into multiple wire messages.
     /// </remarks>
     /// <value>The delay is 100 milliseconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
