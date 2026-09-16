@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "purpose": "Manually selected, real-process measurements of original legacy and candidate dissemination off/on costs.",
+  "entrypoint": ".github/scripts/dissemination-performance.ps1",
+  "workflow": ".github/workflows/dissemination-performance.yml",
+  "trigger": "workflow_dispatch",
+  "extractedFrom": "3fc0a4610cd2eb5feef27e958fcca59658aaae47",
+  "baseline": {
+    "repository": "dotnet/orleans",
+    "commit": "6739589254b746a8790cf53524e6abe372bb53d4"
+  },
+  "selection": {
+    "candidate": "Explicit repository/ref inputs resolve to a commit in a separate checkout. Both worker checkouts receive only this tooling revision's Silo and Shared files.",
+    "build": "Each worker resolves runtime project references, SDK selection and package settings from its own checkout. The controller builds from the tooling checkout with shared protocol/instrumentation and MTP/xUnit.",
+    "identity": "selection.json preserves tooling/candidate/original commits and build dotnet --info. Each OS process checks its PID, source revision, assembly version, informational commit, dissemination presence, loaded Orleans DLL hashes and binary-directory paths against its published manifest.",
+    "comparison": "Candidate off/on pairs use one published binary directory and identical process counts, workload and environment. Original-to-candidate deltas include every intervening runtime change."
+  },
+  "controls": {
+    "defaults": { "sizes": [4, 8], "iterations": 3, "repetitions": 2, "runtimePaths": "All", "scenarios": ["stable", "churn", "partition"] },
+    "sizes": "One to six distinct counts, each 3..128",
+    "iterations": "3..200",
+    "repetitions": "1..5; even repetitions run original/off/on, odd repetitions run on/off/original; Current selects off/on",
+    "scenarios": "Distinct stable, churn and partition selections",
+    "siloProcessorCount": "0..64; 0 inherits the runner processor count",
+    "gcConserveMemory": "0..9; equal process environment for every path",
+    "memory": "Linux/Windows available-memory planning guard: 128 MiB per requested silo plus 1 GiB controller headroom; host-resources.json records the calculation. Job/process deadlines bound the run independently.",
+    "largeCurve": "For an explicitly requested large stable curve, use 8,16,32,64,100 with Current, two repetitions, one processor per silo and GCConserveMemory=9 on a sufficiently provisioned host."
+  },
+  "measurement": {
+    "test": "Scaling_SelectedRuntimePathsConverge",
+    "paths": ["OriginalLegacy", "CurrentDisabled", "CurrentEnabledSupported"],
+    "enablement": "Candidate off/on explicitly sets the subsystem and both namespace flags. Overlay, repair, coalescing and namespace cadence use the selected runtime's settings.",
+    "warmup": "Two production publication rounds and complete enabled-peer support confirmation precede the cost window. Preparation time, CPU and allocation totals are reported separately.",
+    "publication": "Dispose the automatic DeploymentLoadPublisher timer on its scheduler while retaining the field reference for original-runtime lifecycle shutdown. Invoke the production PublishStatistics method once per active node, then require exact load dictionary inventory and values using IncludeFields=true.",
+    "stable": "Repeat equal closed-loop publication/convergence rounds.",
+    "churn": "Gracefully stop and restart one process at its original endpoint every other round. Confirm membership and supported enabled peers before the next offered round. Replacement startup, shutdown, discovery and fallback costs remain in the measured window.",
+    "partition": "Abort real inbound/outbound silo connections and reject new admissions at one endpoint. Publish once on each remaining node. Recovery drains middleware and close tasks at both endpoints, including unidentified handshakes, then confirms bidirectional acknowledged control RPCs before a single publication per active node. Teardown/readiness/retries remain inside recovery time and total cost, preserving the #11243 barrier.",
+    "window": "Identical two-second socket-sampling margins; costs include background runtime, control RPCs and instrumentation. The post-window full-GC retained-memory probe is separate from CPU/allocation costs.",
+    "membership": "Exclusive-file-lease JSON provider with atomic replacement, ETags and incarnation-aware rows. Liveness detection is disabled so the transport partition retains stable membership.",
+    "metrics": [
+      "Request plus one-way Orleans RPC counts; all messages including responses reported separately",
+      "Load broadcast requests and logical value transmissions reported separately, with requests per round and per second",
+      "Complete serialized Orleans message bytes, including headers and bodies",
+      "Process-wide System.Net.Sockets sent/received counters and separate transport-pipe submitted/read bytes",
+      "Process CPU, allocated bytes, retained managed bytes, working set and private bytes",
+      "Publication latency, residual convergence wait, end-to-end convergence and partition recovery time",
+      "Per-process topology, originator/forwarding targets, tree rank, upper-tree role and namespace/anti-entropy counters"
+    ],
+    "reports": "cost-results.json keeps raw samples. comparisons.json and the job summary pair candidate off/on by size/scenario/repetition, checking equal live process count, binary/revision, environment, iterations and offered publications. Costs normalize per offered publication; median/P95 convergence and incomplete pairs remain explicit."
+  },
+  "interpretation": {
+    "environment": "Loopback TCP processes share one runner's CPU, memory and local storage. Results describe a closed-loop control-plane workload with a convergence barrier after each round.",
+    "timing": "100 ms state polling and one-second socket sampling introduce boundary uncertainty; raw UTC snapshots and separate publication/wait durations preserve that context.",
+    "socketBytes": "Socket counters measure application bytes; transport counters include submitted buffered bytes, including bytes abandoned during connection abort.",
+    "memory": "Retained memory is a post-GC live-size sample for surviving processes. Artifacts also retain retired-process snapshots and per-process RSS/private-memory samples.",
+    "costScope": "The window covers silo processes. Controller CPU/allocation, storage disk bytes, TCP/IP headers, retransmission, NIC overhead, cross-machine latency and application-grain work require separate experiments.",
+    "attribution": "The candidate off/on pair isolates enablement on the same binaries. Original-to-candidate comparisons reflect all source changes between the selected revisions."
+  },
+  "bounds": {
+    "startupSeconds": 90,
+    "controllerStartupSeconds": 100,
+    "siloCommandSeconds": 60,
+    "controllerCommandSeconds": 70,
+    "convergenceSeconds": 60,
+    "partitionRecoverySeconds": 60,
+    "capabilityDiscovery": "max(90 seconds, two complete peer rotations at actual repair cadence plus 60 seconds)",
+    "membershipLockSeconds": 10,
+    "shutdownSeconds": 35,
+    "processLifetimeMinutes": 45,
+    "workflowMinutes": 90,
+    "failure": "Preserve partial samples, logs, snapshots, binlogs and TRX. Cleanup kills only owned child processes which exceeded their shutdown deadline and reports that as a failure."
+  },
+  "artifacts": {
+    "root": "Artifacts/DisseminationPerformance",
+    "results": "results/<UTC>-<unique-id>: selection, invocation, methodology, host resources, TRX, comparisons, raw costs and per-cluster process snapshots/stdout/stderr",
+    "binaries": "bin/{Old,New,Runner} and bin/selection.json for explicit -SkipBuild replay",
+    "paths": "Artifact roots are single named directories under Artifacts; existing links/reparse points are rejected. Every invocation writes a fresh results directory.",
+    "retentionDays": { "results": 30, "binaries": 7 }
+  }
+}
