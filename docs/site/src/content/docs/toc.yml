@@ -112,6 +112,8 @@ items:
             href: grains/journaling/operations.md
           - name: Samples
             href: grains/journaling/samples.md
+      - name: Durable messaging
+        href: grains/durable-messaging.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation

@@ -200,6 +200,8 @@ namespace Orleans.DurableJobs
         private readonly int _dummyPrimitive;
         public required System.DateTimeOffset DueTime { get { throw null; } init { } }
 
+        public string? JobId { get { throw null; } init { } }
+
         public required string JobName { get { throw null; } init { } }
 
         public System.Collections.Generic.IReadOnlyDictionary<string, string>? Metadata { get { throw null; } init { } }

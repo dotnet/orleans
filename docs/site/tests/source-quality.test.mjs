@@ -72,6 +72,33 @@ describe('documentation source quality', () => {
     );
   });
 
+  test('includes packages which opt into package inventory validation', async () => {
+    const repositoryRoot = await mkdtemp(path.join(os.tmpdir(), 'orleans-package-policy-'));
+    temporaryDirectories.push(repositoryRoot);
+    const projectRoot = path.join(repositoryRoot, 'src', 'Conditional');
+    await mkdir(projectRoot, { recursive: true });
+    const project = path.join(projectRoot, 'Conditional.csproj');
+    await writeFile(project, '<Project Sdk="Microsoft.NET.Sdk" />');
+
+    const packages = await collectPackageProjects(repositoryRoot, {
+      evaluate: async () => ({
+        IsPackable: 'false',
+        PackageInventoryPackable: 'true',
+        PackageId: 'Microsoft.Orleans.Conditional',
+        VersionSuffix: 'alpha.1',
+      }),
+    });
+
+    expect(packages).toEqual(
+      new Map([
+        [
+          'Microsoft.Orleans.Conditional',
+          { file: project, alpha: true },
+        ],
+      ]),
+    );
+  });
+
   test('allows explicit releases only in migration or upgrade paths and links', () => {
     expect(
       findReleaseVersionIssues({
