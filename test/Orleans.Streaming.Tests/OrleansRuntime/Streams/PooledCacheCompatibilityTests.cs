@@ -16,9 +16,11 @@ namespace UnitTests.OrleansRuntime.Streams;
 public class PooledCacheCompatibilityTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NativeWrapperDelegatesSafePrefixFailureRewindAndDeliveredBoundary(bool useMemoryCache)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void NativeWrapperPreservesReceiptSkipAndCertifiedReplay(bool useMemoryCache, bool certifiedReplay)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var pool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024));
@@ -66,12 +68,21 @@ public class PooledCacheCompatibilityTests
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
-        cursor.RecordDeliveryFailure();
+        if (!certifiedReplay)
+        {
+            cursor.RecordDeliveryFailure();
+            Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+            Assert.Equal(4, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+            return;
+        }
+
+        progress.RecordDeliveryFailure();
         Assert.Null(cursor.GetCurrent(out _));
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
-        cursor.RecordDeliveryFailure();
+        progress.RecordDeliveryFailure();
         progress.SetDeliveredThrough(new EventSequenceTokenV2(2));
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(4, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);

@@ -427,6 +427,7 @@ public class EventHubCheckpointRecoveryTests
         }
         public void Refresh(StreamSequenceToken token) => inner.Refresh(token);
         public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
+        void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
         public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
         public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
         public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)inner).RecordDeliverySuccess();

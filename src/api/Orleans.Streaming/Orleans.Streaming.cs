@@ -965,6 +965,8 @@ namespace Orleans.Providers.Streams.Common
 
         public virtual Orleans.Streams.QueueCacheCursorMoveResult MoveNextWithResult() { throw null; }
 
+        void Orleans.Streams.IQueueCacheCursorProgress.RecordDeliveryFailure() { }
+
         void Orleans.Streams.IQueueCacheCursorProgress.RecordDeliverySuccess() { }
 
         void Orleans.Streams.IQueueCacheCursorProgress.SetDeliveredThrough(Orleans.Streams.StreamSequenceToken token) { }
