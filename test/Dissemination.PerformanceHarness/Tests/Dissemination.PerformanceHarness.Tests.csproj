@@ -4,8 +4,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The controller shares only protocol and instrumentation code with the isolated workers. -->
+    <!-- Shared helpers compile independently of the selected Orleans runtime. -->
     <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <Compile Include="..\Shared\PublisherApi.cs" Link="PublisherApi.cs" />
     <Compile Include="..\Silo\Observation.cs" Link="Observation.cs" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

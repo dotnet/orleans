@@ -40,15 +40,25 @@ if (@($Scenarios.Split(',') | Select-Object -Unique).Count -ne $Scenarios.Split(
 }
 
 function Assert-NoLinks([string] $Path) {
-    $current = $Path
-    while ($current -and $current -ne $root) {
+    $current = [System.IO.Path]::GetFullPath($Path)
+    $relative = [System.IO.Path]::GetRelativePath($root, $current)
+    if ([System.IO.Path]::IsPathRooted($relative) -or $relative -eq '..' -or
+        $relative.StartsWith("..$([System.IO.Path]::DirectorySeparatorChar)", [StringComparison]::Ordinal)) {
+        throw "Path is outside the repository boundary: $Path"
+    }
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    while (![string]::Equals($current, $root, $comparison)) {
         if (Test-Path -LiteralPath $current) {
             $item = Get-Item -LiteralPath $current -Force
             if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
                 throw "Artifact and runtime paths must use ordinary directories: $current"
             }
         }
-        $current = Split-Path -Parent $current
+        $parent = Split-Path -Parent $current
+        if (!$parent -or [string]::Equals($parent, $current, $comparison)) {
+            throw "Path is outside the repository boundary: $Path"
+        }
+        $current = $parent
     }
 }
 
@@ -271,7 +281,7 @@ Push-Location $root
 try {
     Invoke-DotNet @(
         $runner, '--filter-class', 'Orleans.Dissemination.PerformanceHarness.MeasurementTests',
-        '--minimum-expected-tests', '15', '--report-trx',
+        '--minimum-expected-tests', '21', '--report-trx',
         '--results-directory', (Join-Path $results 'instrument-checks')
     )
     Invoke-DotNet @(

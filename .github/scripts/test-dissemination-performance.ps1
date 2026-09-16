@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $script = Join-Path $PSScriptRoot 'dissemination-performance.ps1'
 $errors = $null
-$null = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$null, [ref]$errors)
+$scriptAst = [System.Management.Automation.Language.Parser]::ParseFile($script, [ref]$null, [ref]$errors)
 if ($errors) {
     throw ($errors | Out-String)
 }
@@ -70,6 +70,92 @@ function dotnet {
 }
 
 try {
+    & {
+        foreach ($name in @('Assert-NoLinks', 'Copy-Worker')) {
+            $definition = $scriptAst.Find({
+                param($node)
+                $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $false)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+
+        Assert-NoLinks $root
+        Assert-NoLinks (Join-Path $testArtifacts 'not-created')
+        foreach ($outside in @((Split-Path -Parent $root), [System.IO.Path]::GetPathRoot($root), "$root-sibling")) {
+            $rejected = $false
+            try {
+                Assert-NoLinks $outside
+            }
+            catch {
+                if ($_.Exception.Message -notlike 'Path is outside the repository boundary:*') {
+                    throw
+                }
+                $rejected = $true
+            }
+            if (!$rejected) {
+                throw "Expected repository-boundary rejection for $outside."
+            }
+        }
+        Write-Output 'Passed 5 repository-boundary checks.'
+
+        $harnessSource = Join-Path $root 'test' 'Dissemination.PerformanceHarness'
+        $checkout = Join-Path $testArtifacts 'runtime-checkout'
+        $existingHarness = Join-Path $checkout 'test' 'Dissemination.IntegrationHarness'
+        New-Item -ItemType Directory -Path $existingHarness -Force | Out-Null
+        $sentinel = Join-Path $existingHarness 'preserved.txt'
+        Set-Content -LiteralPath $sentinel -Value 'Existing candidate harness remains intact.'
+        Copy-Worker $checkout
+        $copied = Join-Path $checkout 'test' 'Dissemination.PerformanceHarness'
+        if (@(Get-ChildItem -LiteralPath $copied -Directory).Count -ne 2) {
+            throw 'Copy-Worker must copy exactly the Silo and Shared directories.'
+        }
+        foreach ($part in @('Silo', 'Shared')) {
+            $expected = @(Get-ChildItem -LiteralPath (Join-Path $harnessSource $part) -File |
+                Where-Object { $_.Extension -in '.cs', '.csproj' })
+            $actual = @(Get-ChildItem -LiteralPath (Join-Path $copied $part) -File)
+            if ($expected.Count -ne $actual.Count) {
+                throw "Copied $part inventory differs from the tooling source."
+            }
+            foreach ($file in $expected) {
+                $copy = Join-Path $copied $part $file.Name
+                if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath $copy).Hash) {
+                    throw "Copied file differs: $copy"
+                }
+            }
+        }
+        $rejected = $false
+        try {
+            Copy-Worker $checkout
+        }
+        catch {
+            if ($_.Exception.Message -notlike 'Refusing to overwrite an existing runtime harness:*') {
+                throw
+            }
+            $rejected = $true
+        }
+        if (!$rejected -or (Get-Content -LiteralPath $sentinel) -ne 'Existing candidate harness remains intact.') {
+            throw 'Copy-Worker must preserve both existing harness directories.'
+        }
+        Write-Output 'Passed worker-copy inventory, coexistence and overwrite checks.'
+    }
+
+    $methodologyPath = Join-Path $root 'test' 'Dissemination.PerformanceHarness' 'methodology.json'
+    $methodology = Get-Content -LiteralPath $methodologyPath -Raw | ConvertFrom-Json
+    $scriptText = Get-Content -LiteralPath $script -Raw
+    $baselineMatch = [regex]::Match($scriptText, '(?m)^\$baselineSha = ''([0-9a-f]{40})''\r?$')
+    if (!$baselineMatch.Success -or $baselineMatch.Groups[1].Value -ne $methodology.baseline.commit) {
+        throw 'Script and methodology baseline pins differ.'
+    }
+    $baselineSha = $baselineMatch.Groups[1].Value
+    $controller = Get-Content -LiteralPath (Join-Path $root 'test' 'Dissemination.PerformanceHarness' 'Tests' 'ProcessCluster.cs') -Raw
+    $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..' 'workflows' 'dissemination-performance.yml') -Raw
+    $readme = Get-Content -LiteralPath (Join-Path $root 'test' 'Dissemination.PerformanceHarness' 'README.md') -Raw
+    if (!$controller.Contains("public const string Baseline = `"$baselineSha`";") -or
+        $workflow -notmatch "repository: dotnet/orleans\s+ref: $baselineSha\b" -or !$readme.Contains($baselineSha)) {
+        throw 'Controller, workflow and documentation must retain the same pinned original runtime.'
+    }
+    Write-Output 'Passed baseline-pin consistency checks.'
+
     $selection = @{
         CandidateRepository = 'ReubenBond/orleans'
         CandidateRef = '3fc0a4610cd2eb5feef27e958fcca59658aaae47'

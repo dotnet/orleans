@@ -19,8 +19,8 @@ namespace Orleans.Dissemination.PerformanceHarness;
 
 internal static class Program
 {
-    private static readonly MethodInfo PublishMethod = typeof(DeploymentLoadPublisher).GetMethod(
-        "PublishStatistics", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly MethodInfo PublishMethod = PublisherApi.GetPublishMethod(typeof(DeploymentLoadPublisher));
+    private static readonly FieldInfo PublishTimerField = PublisherApi.GetTimerField(typeof(DeploymentLoadPublisher));
 
     public static async Task<int> Main(string[] args)
     {
@@ -100,8 +100,7 @@ internal static class Program
             // Commands own publication cadence; lifecycle shutdown retains its disposable timer reference.
             await publisher.RunOrQueueTask(() =>
             {
-                var field = typeof(DeploymentLoadPublisher).GetField("_publishTimer", BindingFlags.Instance | BindingFlags.NonPublic)!;
-                ((IDisposable)field.GetValue(publisher)!).Dispose();
+                ((IDisposable)PublishTimerField.GetValue(publisher)!).Dispose();
                 return Task.CompletedTask;
             });
             await Write(new Response(0, Snapshot(host.Services), null));

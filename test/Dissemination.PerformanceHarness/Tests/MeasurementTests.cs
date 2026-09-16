@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Orleans.Dissemination.PerformanceHarness;
 
-public sealed class MeasurementTests
+public sealed partial class MeasurementTests
 {
     [Theory]
     [InlineData(2)]

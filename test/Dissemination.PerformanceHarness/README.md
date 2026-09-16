@@ -27,14 +27,21 @@ The workflow runs only through `workflow_dispatch`. GitHub requires a workflow
 to be registered on the repository's default branch before it can be dispatched.
 Select trusted public runtime revisions: their build code executes on the runner
 with read-only repository permissions and checkout credentials disabled.
+The operator who can dispatch this workflow authorizes the exact repository/ref to
+execute. Inspect that revision's build inputs and dependencies before dispatch;
+selected code has the hosted runner's network access. Results record both the
+requested ref and resolved commit for audit.
 
 CI creates separate original and candidate checkouts, verifies their origins and
 clean state, and copies only `Silo` and `Shared` support sources into each checkout.
 Each worker builds against that checkout's runtime projects and package settings.
-The controller builds against the tooling checkout's shared protocol and instrumentation.
+The controller builds against the tooling checkout's shared protocol, instrumentation
+and reflection-boundary helpers.
 The tooling branch can therefore be based on main while the selected candidate
 provides the dissemination APIs. `NewRuntime.cs` describes the expected internal API
 shape; update this adapter deliberately when testing a candidate with changed APIs.
+The shared publisher adapter validates the publication method's signature and the
+disposable timer field, reporting the incompatible member and selected assembly.
 
 Published manifests record DLL hashes, versions and source commits. Every worker
 checks the loaded Orleans assemblies and exact process identity. Candidate off/on
@@ -117,10 +124,11 @@ Run only the lightweight controller measurement cases locally:
 ```powershell
 .\.github\scripts\test-dissemination-performance.ps1
 dotnet test --project test\Dissemination.PerformanceHarness\Tests\Dissemination.PerformanceHarness.Tests.csproj `
-  --framework net10.0 --filter-class '*MeasurementTests' --minimum-expected-tests 15
+  --framework net10.0 --filter-class '*MeasurementTests' --minimum-expected-tests 21
 ```
 
-Ordinary Linux/Windows CI runs the script checks with worker execution stubbed.
+Ordinary Linux/Windows CI runs script checks for repository containment, worker-copy
+coexistence, baseline-pin consistency and replay paths with worker execution stubbed.
 `ProviderTests\FileMembershipTableTests.cs` is linked into `Orleans.Runtime.Tests`
 alongside the file-backed provider and its protocol. These BVT cases exercise
 persisted membership cleanup: all expired non-active statuses are removed, while

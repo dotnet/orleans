@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <Compile Include="..\Shared\PublisherApi.cs" Link="PublisherApi.cs" />
     <AssemblyMetadata Include="HarnessRuntime" Value="$(HarnessRuntime)" />
     <AssemblyMetadata Include="HarnessSourceRevision" Value="$(SourceRevisionId)" />
   </ItemGroup>
