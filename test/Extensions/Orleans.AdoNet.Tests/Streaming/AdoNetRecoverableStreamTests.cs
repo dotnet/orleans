@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -602,6 +603,122 @@ public class AdoNetRecoverableStreamTests
         Assert.Contains("first available message is 3", exception.Message);
     }
 
+    [Theory]
+    [InlineData(true, null, typeof(TransientStreamReplayException))]
+    [InlineData(false, null, typeof(TransientStreamReplayException))]
+    [InlineData(true, AdoNetStreamReplayStatus.OwnershipLost, typeof(InvalidOperationException))]
+    [InlineData(false, AdoNetStreamReplayStatus.OwnershipLost, typeof(InvalidOperationException))]
+    [InlineData(true, AdoNetStreamReplayStatus.Expired, typeof(DataNotAvailableException))]
+    [InlineData(false, AdoNetStreamReplayStatus.Expired, typeof(DataNotAvailableException))]
+    public async Task ReplaySource_InFlightReadSurfacesHeartbeatFailure(
+        bool readObservesCancellation,
+        string? heartbeatStatus,
+        Type exceptionType)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var readStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var readCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var databaseFailure = new ReplayDatabaseException();
+        var storage = new CapturingRelationalStorage
+        {
+            ReplayUpdateStatus = heartbeatStatus ?? AdoNetStreamReplayStatus.Active,
+            BeforeRead = async (query, token) =>
+            {
+                if (query == nameof(DbStoredQueries.UpdateStreamReplayLeaseKey) && heartbeatStatus is null)
+                {
+                    throw databaseFailure;
+                }
+
+                if (query == nameof(DbStoredQueries.ReadStreamReplayMessagesKey))
+                {
+                    using var registration = token.Register(() => readCanceled.TrySetResult());
+                    readStarted.SetResult();
+                    await readCanceled.Task.WaitAsync(cancellationToken);
+                    if (readObservesCancellation)
+                    {
+                        token.ThrowIfCancellationRequested();
+                    }
+                }
+            },
+        };
+        var timeProvider = new FakeTimeProvider();
+        var source = new AdoNetRecoverableStream(
+            "service", "provider", "queue",
+            new AdoNetStreamOptions
+            {
+                ReplayLeaseDuration = TimeSpan.FromSeconds(3),
+                ReplayLeaseRenewalInterval = TimeSpan.FromSeconds(1),
+            },
+            CreateQueries(storage), NullLogger.Instance, timeProvider);
+        _ = await source.Load(cancellationToken);
+        var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+            cancellationToken);
+
+        var read = replay.Read(10, cancellationToken).AsTask();
+        await readStarted.Task.WaitAsync(cancellationToken);
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+
+        var failure = await Assert.ThrowsAsync(exceptionType, () => read.WaitAsync(cancellationToken));
+        if (heartbeatStatus is null)
+        {
+            Assert.Same(databaseFailure, failure.InnerException);
+        }
+
+        Assert.False(cancellationToken.IsCancellationRequested);
+        Assert.Same(failure, await Assert.ThrowsAsync(exceptionType, () => replay.Read(10, cancellationToken).AsTask()));
+        Assert.Same(failure, await Assert.ThrowsAsync(exceptionType, () => replay.DisposeAsync().AsTask()));
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReadStreamReplayMessagesKey)]);
+        Assert.Equal(1, storage.CallCounts[nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplaySource_InFlightCancellationPreservesCallerOrShutdownCancellation(bool shutdown)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var readStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var storage = new CapturingRelationalStorage
+        {
+            BeforeRead = async (query, token) =>
+            {
+                if (query == nameof(DbStoredQueries.ReadStreamReplayMessagesKey))
+                {
+                    readStarted.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                }
+            },
+        };
+        var source = new AdoNetRecoverableStream(
+            "service", "provider", "queue", new AdoNetStreamOptions(),
+            CreateQueries(storage), NullLogger.Instance, new FakeTimeProvider());
+        _ = await source.Load(cancellationToken);
+        var replay = await ((IRecoverableStreamReplaySourceFactory<AdoNetStreamMessage>)source).Create(
+            StreamId.Create("namespace", Guid.NewGuid()),
+            new AdoNetStreamSequenceToken("service", "provider", "queue", 1),
+            cancellationToken);
+        using var callerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        var read = replay.Read(10, callerCancellation.Token).AsTask();
+        await readStarted.Task.WaitAsync(cancellationToken);
+        if (shutdown)
+        {
+            await replay.ShutdownAsync(cancellationToken);
+        }
+        else
+        {
+            callerCancellation.Cancel();
+        }
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read.WaitAsync(cancellationToken));
+        await replay.DisposeAsync();
+        Assert.Equal(!shutdown, callerCancellation.IsCancellationRequested);
+        Assert.Equal(shutdown ? 0 : 1, storage.CallCounts.GetValueOrDefault(nameof(DbStoredQueries.ReleaseStreamReplayLeaseKey)));
+        Assert.False(storage.CallCounts.ContainsKey(nameof(DbStoredQueries.UpdateStreamReplayLeaseKey)));
+    }
+
     [Fact]
     public async Task ReplaySource_ReceiverShutdownPreservesLeaseForOwnershipTransfer()
     {
@@ -1035,6 +1152,7 @@ public class AdoNetRecoverableStreamTests
     private sealed class CapturingRelationalStorage : IRelationalStorage
     {
         public CancellationToken CapturedCancellationToken { get; private set; }
+        public Func<string, CancellationToken, Task>? BeforeRead { get; init; }
 
         public Dictionary<string, Dictionary<string, object?>> Parameters { get; } = [];
         public Dictionary<string, int> CallCounts { get; } = [];
@@ -1072,6 +1190,11 @@ public class AdoNetRecoverableStreamTests
                 .ToDictionary(parameter => parameter.ParameterName, parameter =>
                     parameter.Value is DBNull ? null : parameter.Value);
             CallCounts[query] = CallCounts.GetValueOrDefault(query) + 1;
+            if (BeforeRead is { } beforeRead)
+            {
+                await beforeRead(query, cancellationToken);
+            }
+
             var records = query switch
             {
                 nameof(DbStoredQueries.AcquireStreamPartitionKey) => [PartitionRecord()],
@@ -1247,6 +1370,8 @@ public class AdoNetRecoverableStreamTests
             return Record([.. values]);
         }
     }
+
+    private sealed class ReplayDatabaseException : DbException;
 
     private sealed class ReservedReceiver : IQueueAdapterReceiver, IQueueCache
     {

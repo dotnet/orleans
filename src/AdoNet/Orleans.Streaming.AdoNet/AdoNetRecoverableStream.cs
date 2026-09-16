@@ -450,12 +450,18 @@ internal sealed partial class AdoNetRecoverableStream(
                     _leaseDurationSeconds,
                     linkedCancellation.Token);
             }
+            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+            {
+                ThrowIfFailed();
+                throw;
+            }
             catch (DbException exception)
             {
                 throw new TransientStreamReplayException(
                     $"ADO.NET replay reader '{_readerId}' temporarily failed.",
                     exception);
             }
+            ThrowIfFailed();
             ThrowForReplayStatus(page.Lease, _readerId, _readOffset);
             if (page.Messages.Count > 0
                 && page.Messages[0].MessageId > _readOffset + 1)
