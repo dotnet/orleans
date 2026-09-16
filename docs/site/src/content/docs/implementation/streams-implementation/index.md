@@ -77,7 +77,7 @@ The default maximum adapter batch-container batch size is 1 and the empty-poll p
 
 ### Shutdown and admitted work
 
-Each pulling-agent run owns admission for queue reads, producer registrations, subscription handshakes, and consumer delivery. Shutdown closes processing admission, stops polling, cancels processing waits, and drains admitted work and actual receiver initialization. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Repeated shutdown calls share the same completion. Initialization waits for the prior run's full cleanup before opening fresh admission and cancellation scopes.
+Each pulling-agent run owns admission for queue reads, producer registrations, subscription handshakes, and consumer delivery. Shutdown closes processing admission, stops polling, and drains admitted work and actual receiver initialization. Accepted calls retain their messaging timeouts and retry limits while completing token bookkeeping and releasing registration pins and batch protection with the cache and receiver still available. Repeated shutdown calls share the same completion. Initialization waits for the prior run's full cleanup before opening fresh admission and cancellation scopes.
 
 Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
 
@@ -89,7 +89,7 @@ Subscription removal revokes in-flight handshake and delivery ownership. A termi
 
 An unavailable client is detached locally immediately. Durable subscription retirement has its own admission and cancellation lifetime, allowing a finishing delivery to start cleanup after processing admission closes. Once processing drains, shutdown closes retirement admission and waits for persistence and notification retries to finish. Producer-initiated retirement persists the removal and notifies the other producers; the requesting producer has already detached that subscription. Ordinary consumer unregistration notifies every registered producer.
 
-The final delivery-progress scan preserves the checkpoint barrier for registrations and handshakes which were pending when shutdown began. Cancellation and failed registration retain the prior safe position. The agent disposes subscription cursors before receiver shutdown flushes the safe checkpoint and releases its resources. Producer unregistration follows receiver cleanup. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
+The final delivery-progress scan preserves the checkpoint barrier for producer registrations which were pending when shutdown began. Accepted handshakes establish their final position during the drain; unresolved handshakes keep the existing checkpoint. The agent disposes subscription cursors before receiver shutdown flushes the safe checkpoint and releases its resources. Producer unregistration follows receiver cleanup. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
