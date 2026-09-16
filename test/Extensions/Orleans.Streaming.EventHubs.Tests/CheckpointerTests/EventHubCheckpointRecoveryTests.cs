@@ -122,6 +122,78 @@ public class EventHubCheckpointRecoveryTests
             .BuildServiceProvider();
 
     [Fact]
+    public async Task NativeCacheWithReleasedTransportKeepsLegacyPurgeCheckpointing()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("legacy", "transport");
+        var store = new CheckpointStore();
+        await using var lifetime = await CreateAgent(
+            services, adapter, [CreateEvent(adapter, stream, 1), CreateEvent(adapter, stream, 2)],
+            store, purgeImmediately: true, legacyTransport: true);
+        Assert.False(lifetime.UsesCertifiedDeliveryProgress);
+        Assert.True(await lifetime.Read(2));
+        var streams = await lifetime.Accessor.GetPubSubCache();
+        await Task.WhenAll(streams.Values.Select(value => value.RegistrationTask ?? Task.CompletedTask));
+        Assert.False(await lifetime.Read(0));
+        await lifetime.Accessor.Shutdown();
+        Assert.Equal("2", store.State.Checkpoint);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ExistingDerivedCachesAndEvictionPoliciesKeepTheirReleasedDefaults(bool derivedCache, bool customEviction)
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("legacy", "cache");
+        var pool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024));
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        IEvictionStrategy eviction = customEviction
+            ? new LegacyEvictionStrategy()
+            : new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null);
+        using EventHubQueueCache cache = derivedCache
+            ? new LegacyDerivedCache(pool, adapter, eviction, checkpointer)
+            : new EventHubQueueCache("0", 1000, pool, adapter, eviction, checkpointer, NullLogger.Instance, null!, null, null);
+        var certified = cache.TryEnableCertifiedDeliveryProgress();
+        Assert.Equal(!derivedCache && !customEviction, certified);
+        cache.Add([CreateEvent(adapter, stream, 1), CreateEvent(adapter, stream, 2)], Now.UtcDateTime);
+        cache.SignalPurge();
+        var updates = checkpointer.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IStreamQueueCheckpointer<string>.Update)).ToArray();
+        if (certified)
+        {
+            Assert.Empty(updates);
+        }
+        else
+        {
+            Assert.Equal("2", Assert.Single(updates).GetArguments()[0]);
+        }
+    }
+
+    private sealed class LegacyEvictionStrategy()
+        : ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null);
+
+    [Fact]
+    public void ExistingCustomDataAdaptersKeepReleasedDefaults()
+    {
+        using var services = CreateServices();
+        var adapter = new ThrowingDataAdapter(services.GetRequiredService<Serializer>());
+        using var cache = new EventHubQueueCache("0", 1000,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)), adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null),
+            Substitute.For<IStreamQueueCheckpointer<string>>(), NullLogger.Instance, null!, null, null);
+        Assert.False(cache.TryEnableCertifiedDeliveryProgress());
+    }
+
+    private sealed class LegacyDerivedCache(
+        IObjectPool<FixedSizeBuffer> pool, IEventHubDataAdapter adapter,
+        IEvictionStrategy eviction, IStreamQueueCheckpointer<string> checkpointer)
+        : EventHubQueueCache("0", 1000, pool, adapter, eviction, checkpointer, NullLogger.Instance, null!, null, null);
+
+    [Fact]
     public async Task ReadRecovery_RetriesPackingWithoutFetchingOrAdmittingTwice()
     {
         using var services = CreateServices();
@@ -136,6 +208,7 @@ public class EventHubCheckpointRecoveryTests
         var busy = new RecordingConsumer();
 
         await using var lifetime = await CreateAgent(services, adapter, events, store);
+        Assert.True(lifetime.UsesCertifiedDeliveryProgress);
         var idleSubscription = await lifetime.AddConsumer(idleId, idle);
         var busySubscription = await lifetime.AddConsumer(busyId, busy);
         Assert.True(await lifetime.Read(2));
@@ -144,12 +217,14 @@ public class EventHubCheckpointRecoveryTests
 
         adapter.FailAtSequence = 4;
         await Assert.ThrowsAsync<InvalidOperationException>(() => lifetime.Read(3));
+        Assert.True(lifetime.UsesCertifiedDeliveryProgress);
         await lifetime.Accessor.ReportDeliveryProgress();
         Assert.Empty(store.Writes);
         Assert.Equal([2], busy.Events);
         Assert.Equal([1L, 2L, 3L, 4L, 5L], lifetime.Transport.ReceivedSequences);
 
         Assert.True(await lifetime.Read(3));
+        Assert.True(lifetime.UsesCertifiedDeliveryProgress);
         Assert.Equal([1L, 2L, 3L, 4L, 5L], lifetime.Transport.ReceivedSequences);
         Assert.Equal([2, 3, 4, 5], busy.Events);
         Assert.Equal([1], idle.Events);
@@ -286,9 +361,10 @@ public class EventHubCheckpointRecoveryTests
             return buffer;
         });
         var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
-        using var cache = new EventHubQueueCache("0", 1000, pool, adapter,
+        using var cache = new CertifiedTestCache(pool, adapter,
             new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null!, null),
-            checkpointer, NullLogger.Instance, null!, null, null);
+            checkpointer);
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
         cache.Add([CreateEvent(adapter, streamId, 1), CreateEvent(adapter, streamId, 2)], Now.UtcDateTime);
 
         cache.SignalPurge();
@@ -313,10 +389,10 @@ public class EventHubCheckpointRecoveryTests
         using var services = CreateServices();
         var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
         var streamId = StreamId.Create("eviction", "failure");
-        using var cache = new EventHubQueueCache("0", 1000,
+        using var cache = new CertifiedTestCache(
             new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)), adapter,
-            new ThrowingEvictionStrategy(), Substitute.For<IStreamQueueCheckpointer<string>>(),
-            NullLogger.Instance, null!, null, null);
+            new ThrowingEvictionStrategy(), Substitute.For<IStreamQueueCheckpointer<string>>());
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
         cache.Add([CreateEvent(adapter, streamId, 1)], Now.UtcDateTime);
         Assert.Throws<InvalidOperationException>(() => cache.UpdateDeliveryProgress(Token(1), Now.UtcDateTime.AddMinutes(1)));
 
@@ -346,9 +422,10 @@ public class EventHubCheckpointRecoveryTests
             buffers.Add(buffer);
             return buffer;
         });
-        using var cache = new EventHubQueueCache("0", 1000, pool, adapter,
+        using var cache = new CertifiedTestCache(pool, adapter,
             new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), monitor, null),
-            Substitute.For<IStreamQueueCheckpointer<string>>(), NullLogger.Instance, null!, null, null);
+            Substitute.For<IStreamQueueCheckpointer<string>>());
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
         var messages = new List<EventData> { CreateEvent(adapter, streamId, 1), CreateEvent(adapter, streamId, 2) };
         Assert.Throws<InvalidOperationException>(() => cache.Add(messages, Now.UtcDateTime));
 
@@ -391,6 +468,20 @@ public class EventHubCheckpointRecoveryTests
     private sealed class ImmediatePurgePredicate() : TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero)
     {
         public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) => true;
+    }
+
+    private sealed class CertifiedTestCache(
+        IObjectPool<FixedSizeBuffer> pool,
+        IEventHubDataAdapter adapter,
+        IEvictionStrategy eviction,
+        IStreamQueueCheckpointer<string> checkpointer)
+        : EventHubQueueCache("0", 1000, pool, adapter, eviction, checkpointer, NullLogger.Instance, null!, null, null)
+    {
+        public override bool TryEnableCertifiedDeliveryProgress()
+        {
+            EnableCertifiedDeliveryProgress();
+            return true;
+        }
     }
 
     private sealed class ThrowingDataAdapter(Serializer serializer) : EventHubDataAdapter(serializer)
@@ -453,7 +544,8 @@ public class EventHubCheckpointRecoveryTests
         EventHubDataAdapter adapter,
         EventData[] events,
         CheckpointStore store,
-        bool purgeImmediately = false)
+        bool purgeImmediately = false,
+        bool legacyTransport = false)
     {
         PartitionTransport? transport = null;
         var settings = new EventHubPartitionSettings
@@ -464,9 +556,7 @@ public class EventHubCheckpointRecoveryTests
         };
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (partition, checkpointer, _) => new EventHubQueueCache(
-                partition,
-                EventHubAdapterReceiver.MaxMessagesPerRead,
+            cacheFactory: (partition, checkpointer, _) => new CertifiedTestCache(
                 new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)),
                 adapter,
                 new ChronologicalEvictionStrategy(
@@ -474,11 +564,7 @@ public class EventHubCheckpointRecoveryTests
                     purgeImmediately ? new ImmediatePurgePredicate() : new TimePurgePredicate(TimeSpan.FromHours(1), TimeSpan.FromHours(1)),
                     null!,
                     null),
-                checkpointer,
-                NullLogger.Instance,
-                null!,
-                null,
-                null),
+                checkpointer),
             checkpointerFactory: (_, _) => Task.FromResult<IStreamQueueCheckpointer<string>>(
                 new StreamQueueCheckpointer(store, new StreamQueueCheckpointerOptions
                 {
@@ -491,7 +577,11 @@ public class EventHubCheckpointRecoveryTests
                 services.GetRequiredService<OrleansInstruments>()),
             loadSheddingOptions: new LoadSheddingOptions(),
             environmentStatisticsProvider: new EnvironmentStatisticsProvider(),
-            eventHubReceiverFactory: (_, offset, _) => transport = new PartitionTransport(events, offset));
+            eventHubReceiverFactory: (_, offset, _) =>
+            {
+                transport = new PartitionTransport(events, offset);
+                return legacyTransport ? new LegacyPartitionTransport(transport) : transport;
+            });
 
         var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
         var localSilo = Substitute.For<ILocalSiloDetails>();
@@ -549,6 +639,7 @@ public class EventHubCheckpointRecoveryTests
     {
         public PersistentStreamPullingAgent.ITestAccessor Accessor { get; } = agent;
         public PartitionTransport Transport { get; } = transport;
+        public bool UsesCertifiedDeliveryProgress => receiver.UsesCertifiedDeliveryProgress;
 
         public Task<bool> Read(int count) => Accessor.ReadFromQueue(Queue, receiver, count);
 
@@ -564,7 +655,13 @@ public class EventHubCheckpointRecoveryTests
         public ValueTask DisposeAsync() => new(Accessor.Shutdown());
     }
 
-    private sealed class PartitionTransport(EventData[] events, string offset) : IEventHubReceiver
+    private sealed class LegacyPartitionTransport(PartitionTransport transport) : IEventHubReceiver
+    {
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime) => transport.ReceiveAsync(maxCount, waitTime);
+        public Task CloseAsync() => transport.CloseAsync();
+    }
+
+    private sealed class PartitionTransport(EventData[] events, string offset) : IEventHubReceiver, IQueueAdapterReceiverReadRecovery
     {
         // Match EventHubReceiverProxy's inclusive EventPosition.FromOffset(offset, true).
         private readonly Queue<EventData> _remaining = new(events.Where(message =>
@@ -574,6 +671,12 @@ public class EventHubCheckpointRecoveryTests
         public string RequestedOffset { get; } = offset;
         public List<long> ReceivedSequences { get; } = [];
         public bool Closed { get; private set; }
+
+        public Task RecoverReadAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
 
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
         {

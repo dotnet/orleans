@@ -488,6 +488,8 @@ namespace Orleans.Streaming.EventHubs
 
         public void Dispose() { }
 
+        protected void EnableCertifiedDeliveryProgress() { }
+
         [System.Obsolete("Use TryGetCursor instead.")]
         public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
@@ -496,6 +498,8 @@ namespace Orleans.Streaming.EventHubs
         public void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken) { }
 
         public void SignalPurge() { }
+
+        public virtual bool TryEnableCertifiedDeliveryProgress() { throw null; }
 
         public Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
@@ -597,6 +601,7 @@ namespace Orleans.Streaming.EventHubs
         object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
         void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken);
         void SignalPurge();
+        bool TryEnableCertifiedDeliveryProgress();
         Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
         Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition);
         [System.Obsolete("Use TryGetNextMessageWithResult instead.")]

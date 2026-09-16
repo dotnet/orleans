@@ -68,8 +68,14 @@ public class EventHubCheckpointerTests
     {
         public int DisposeCount { get; private set; }
         public int AddCount { get; private set; }
-        public object Cursor { get; } = new TestCursorProgress();
+        public virtual object Cursor { get; } = new();
         public string? AppliedOffset { get; private set; }
+        public int CapabilityRequests { get; private set; }
+        public virtual bool TryEnableCertifiedDeliveryProgress()
+        {
+            CapabilityRequests++;
+            return false;
+        }
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
         public Exception? CursorException { get; set; }
@@ -129,7 +135,17 @@ public class EventHubCheckpointerTests
         public void RecordDeliveryFailure() { }
     }
 
-    private sealed class TestEventHubReceiver : IEventHubReceiver
+    private sealed class CertifiedEventHubTestCache : TestEventHubQueueCache
+    {
+        public override object Cursor { get; } = new TestCursorProgress();
+        public override bool TryEnableCertifiedDeliveryProgress()
+        {
+            base.TryEnableCertifiedDeliveryProgress();
+            return true;
+        }
+    }
+
+    private class TestEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
 
@@ -143,6 +159,42 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RecoverableEventHubTestReceiver : TestEventHubReceiver, IQueueAdapterReceiverReadRecovery
+    {
+        public Task RecoverReadAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CertifiedProgressRequiresBothCacheAndTransportOptIn(bool certifiedCache, bool recoverableTransport)
+    {
+        TestEventHubQueueCache cache = certifiedCache ? new CertifiedEventHubTestCache() : new TestEventHubQueueCache();
+        IEventHubReceiver transport = recoverableTransport ? new RecoverableEventHubTestReceiver() : new TestEventHubReceiver();
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer, cache, transport);
+        Assert.Equal(certifiedCache && recoverableTransport, receiver.UsesCertifiedDeliveryProgress);
+        Assert.Equal(recoverableTransport ? 1 : 0, cache.CapabilityRequests);
+        var cursor = ((IQueueCache)receiver).TryGetCacheCursor(StreamId.Create("compatibility", "stream"), null).Cursor!;
+        Assert.Equal(certifiedCache && recoverableTransport, cursor is IQueueCacheCursorProgress);
+
+        UpdateDeliveryProgress(receiver, MakeToken(50));
+        Assert.Equal("50", checkpointer.LastOffset);
+        Assert.Equal(certifiedCache && recoverableTransport ? "50" : null, cache.AppliedOffset);
+        if (!receiver.UsesCertifiedDeliveryProgress)
+        {
+            receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
+            Assert.Equal("50", checkpointer.LastOffset);
+        }
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
     [Fact, TestCategory("BVT")]
@@ -761,12 +813,12 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task NullProgress_IsNotANoSubscriptionsCertificate()
+    public async Task LegacyNullProgressPreservesReleasedBehavior()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        Assert.Throws<ArgumentNullException>(() => receiver.UpdateDeliveryProgress(null!, DateTime.UtcNow));
+        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
 
         Assert.Null(checkpointer.LastOffset);
     }
@@ -784,7 +836,7 @@ public class EventHubCheckpointerTests
         Assert.Null(checkpointer.LastOffset);
         UpdateDeliveryProgress(receiver, MakeToken(100));
         Assert.Equal("100", checkpointer.LastOffset);
-        Assert.Equal("100", cache.AppliedOffset);
+        Assert.Null(cache.AppliedOffset);
     }
 
     [TestSuite("BVT")]

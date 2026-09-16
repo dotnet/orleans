@@ -28,8 +28,8 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="newBlock">The new block.</param>
         /// <remarks>
-        /// Repeated notifications for the same currently owned buffer are idempotent, allowing
-        /// a receiver to reconcile a failed admission notification without duplicating ownership.
+        /// Strategies opting into certified admission make repeated notifications for the same
+        /// owned buffer idempotent, so failed admission notifications can be reconciled safely.
         /// </remarks>
         void OnBlockAllocated(FixedSizeBuffer newBlock);
     }
