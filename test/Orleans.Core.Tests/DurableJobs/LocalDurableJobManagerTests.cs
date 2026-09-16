@@ -2005,7 +2005,7 @@ public class LocalDurableJobManagerTests
         membership.SetSiloStatus(owner, SiloStatus.Active);
         membership.SetSiloStatus(caller, SiloStatus.Active);
         var options = CreateOptions();
-        options.WriteProviderName = "B";
+        options.ActiveProviderName = "B";
         options.DrainingProviderNames.Add("A");
         var managerOptions = servicesB.GetRequiredService<IOptions<JournaledStateManagerOptions>>();
         var original = new JournaledJobShardManager(new TestLocalSiloDetails(owner),

@@ -255,6 +255,8 @@ namespace Orleans.Hosting
 
     public sealed partial class DurableJobsOptions
     {
+        public string ActiveProviderName { get { throw null; } set { } }
+
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
 
         public System.Collections.Generic.List<string> DrainingProviderNames { get { throw null; } }
@@ -290,8 +292,6 @@ namespace Orleans.Hosting
         public int SlowStartInitialConcurrency { get { throw null; } set { } }
 
         public System.TimeSpan SlowStartInterval { get { throw null; } set { } }
-
-        public string WriteProviderName { get { throw null; } set { } }
     }
 
     public sealed partial class DurableJobsOptionsValidator : IConfigurationValidator

@@ -22,7 +22,7 @@ internal sealed class StorageInventoryReporter(
         using var registration = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
         await started.Task.WaitAsync(stoppingToken);
 
-        var providers = options.Value.DrainingProviderNames.Prepend(options.Value.WriteProviderName).Distinct().ToArray();
+        var providers = options.Value.DrainingProviderNames.Prepend(options.Value.ActiveProviderName).Distinct().ToArray();
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         do
         {

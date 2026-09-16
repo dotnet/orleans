@@ -66,10 +66,10 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder
         .UseJournaledDurableJobs(options =>
         {
-            options.WriteProviderName = builder.Configuration.GetValue("Playground:Migration:WriteProviderName", "jobs-a")!;
+            options.ActiveProviderName = builder.Configuration.GetValue("Playground:Migration:ActiveProviderName", "jobs-a")!;
             if (builder.Configuration.GetValue("Playground:Migration:DrainOtherProvider", true))
             {
-                options.DrainingProviderNames.Add(options.WriteProviderName == "jobs-a" ? "jobs-b" : "jobs-a");
+                options.DrainingProviderNames.Add(options.ActiveProviderName == "jobs-a" ? "jobs-b" : "jobs-a");
             }
         })
         .AddDashboard()

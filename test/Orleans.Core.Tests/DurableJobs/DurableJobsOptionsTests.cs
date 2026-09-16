@@ -27,7 +27,7 @@ public class DurableJobsOptionsTests
     {
         var options = new DurableJobsOptions();
 
-        Assert.Equal(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, options.WriteProviderName);
+        Assert.Equal(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, options.ActiveProviderName);
         Assert.Empty(options.DrainingProviderNames);
         Assert.Equal(new[] { ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME }, DurableJobsJournalProviders.GetProviderNames(options));
     }
@@ -38,9 +38,9 @@ public class DurableJobsOptionsTests
     [InlineData(" ")]
     public void JournalProviderSelection_RejectsBlankWriteOrDrainNames(string? name)
     {
-        var write = new DurableJobsOptions { WriteProviderName = name! };
+        var write = new DurableJobsOptions { ActiveProviderName = name! };
         var writeFailure = Assert.Throws<OrleansConfigurationException>(() => DurableJobsJournalProviders.GetProviderNames(write));
-        Assert.Contains(nameof(DurableJobsOptions.WriteProviderName), writeFailure.Message);
+        Assert.Contains(nameof(DurableJobsOptions.ActiveProviderName), writeFailure.Message);
         var drain = new DurableJobsOptions();
         drain.DrainingProviderNames.Add(name!);
 
@@ -54,7 +54,7 @@ public class DurableJobsOptionsTests
     [InlineData(false)]
     public void JournalProviderSelection_RejectsWriteDrainOverlapAndDuplicateDrains(bool duplicatesWrite)
     {
-        var options = new DurableJobsOptions { WriteProviderName = "current" };
+        var options = new DurableJobsOptions { ActiveProviderName = "current" };
         options.DrainingProviderNames.Add("old");
         options.DrainingProviderNames.Add(duplicatesWrite ? "current" : "old");
 
@@ -73,7 +73,7 @@ public class DurableJobsOptionsTests
             .AddVolatileJournalStorage("old")
             .UseJournaledDurableJobs(options =>
             {
-                options.WriteProviderName = "current";
+                options.ActiveProviderName = "current";
                 options.DrainingProviderNames.Add("old");
             });
         using var services = builder.Services.BuildServiceProvider();
@@ -91,7 +91,7 @@ public class DurableJobsOptionsTests
         Assert.IsType<DurableJobsStorageInspector>(services.GetRequiredService<IDurableJobsStorageInspector>());
 
         var options = services.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
-        options.WriteProviderName = "old";
+        options.ActiveProviderName = "old";
         options.DrainingProviderNames.Clear();
         Assert.Equal("current", manager.WriteProvider.Name);
         Assert.Equal(new[] { "current", "old" }, providers.Providers.Select(provider => provider.Name));
@@ -107,7 +107,7 @@ public class DurableJobsOptionsTests
         builder.AddVolatileJournalStorage("current").AddVolatileJournalStorage("old")
             .UseJournaledDurableJobs(options =>
             {
-                options.WriteProviderName = "current";
+                options.ActiveProviderName = "current";
                 options.DrainingProviderNames.Add("old");
             });
         var missingType = missing switch

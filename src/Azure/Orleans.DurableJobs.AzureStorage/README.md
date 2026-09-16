@@ -23,9 +23,9 @@ a `TableServiceClient` and `TableName`; Blob configuration accepts a
 service, including a separate standard account when journal storage uses a
 premium BlockBlobStorage account.
 
-The [Durable Jobs journaling playground](../../../../playground/DurableJobsJournaling/README.md)
+The [Durable Jobs journaling playground](../../../playground/DurableJobsJournaling/README.md)
 provides runnable Blob/Table backend selection. The
-[Azure provider benchmarks](../../../../test/Benchmarks/Journaling/Azure/README.md)
+[Azure provider benchmarks](../../../test/Benchmarks/Journaling/Azure/README.md)
 measure append, checkpoint, recovery, and catalog workloads with bounded work
 and explicit resource ownership.
 
@@ -34,7 +34,7 @@ and explicit resource ownership.
 For explicit storage selection, register
 `AddAzureBlobJournalStorage("jobs-a", configure)` or
 `AddAzureTableJournalStorage("jobs-a", configure)` and call
-`UseJournaledDurableJobs(options => options.WriteProviderName = "jobs-a")`.
+`UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs-a")`.
 Both builder and service-collection APIs are supported. Each name has its own
 backend options, storage provider, catalog, and state-manager factory. Named
 registrations leave default grain journaling independent.
@@ -56,7 +56,7 @@ siloBuilder
     })
     .UseJournaledDurableJobs(options =>
     {
-        options.WriteProviderName = "jobs-b";
+        options.ActiveProviderName = "jobs-b";
         options.DrainingProviderNames.Add("jobs-a");
     });
 ```
@@ -93,7 +93,7 @@ including unrecognized entries, before removing A. Retirement combines these
 live observations with independent evidence of completed cluster-wide writer
 cutover.
 
-The [migration sample](../../../../samples/DurableJobsMigration/README.md)
+The [migration sample](../../../samples/DurableJobsMigration/README.md)
 uses disk-backed Azurite, two Blob namespaces, separate prepare/drain processes,
 and local inventory reporting. See the
 [core migration guidance](../../Orleans.DurableJobs/README.md#cut-over-and-retire-a-provider)

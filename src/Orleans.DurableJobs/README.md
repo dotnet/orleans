@@ -110,7 +110,7 @@ builder.UseOrleans(siloBuilder =>
 `UseJournaledDurableJobs` on `ISiloBuilder` or `IServiceCollection` installs the
 journaled shard manager and Durable Jobs JSON metadata independently of the
 storage backend. Register a catalog-capable journal provider, then select it
-with `DurableJobsOptions.WriteProviderName`. The default name is `"Default"`.
+with `DurableJobsOptions.ActiveProviderName`. The default name is `"Default"`.
 `DrainingProviderNames` is initially empty.
 
 ```csharp
@@ -127,7 +127,7 @@ siloBuilder
     })
     .UseJournaledDurableJobs(options =>
     {
-        options.WriteProviderName = "jobs-b";
+        options.ActiveProviderName = "jobs-b";
         options.DrainingProviderNames.Add("jobs-a");
     });
 ```

@@ -159,7 +159,7 @@ Add a provider-independent `UseJournaledDurableJobs` entry point which installs 
 journaled manager, Durable Jobs JSON metadata, and selection validation.
 Configure:
 
-- `WriteProviderName`: the binding used for all new shard creation.
+- `ActiveProviderName`: the binding used for all new shard creation.
 - `DrainingProviderNames`: additional bindings whose existing shards are discovered and processed.
 
 The discovery set is the write provider plus the draining providers.
@@ -178,7 +178,7 @@ siloBuilder
     .AddAzureBlobJournalStorage("jobs-current", ConfigureCurrentAccount)
     .UseJournaledDurableJobs(options =>
     {
-        options.WriteProviderName = "jobs-current";
+        options.ActiveProviderName = "jobs-current";
         options.DrainingProviderNames.Add("jobs-original");
     });
 ```
@@ -227,7 +227,7 @@ Scheduling and execution use provider bindings they already know.
 ### Creation, discovery, and execution
 
 Bind every created/opened shard to its provider for its entire lifetime.
-Create shards only through `WriteProviderName`; expose only that provider's newly created
+Create shards only through `ActiveProviderName`; expose only that provider's newly created
 shards to normal scheduling. Draining shards remain closed to new schedules while existing
 jobs continue to mutate their original journals.
 

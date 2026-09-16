@@ -16,10 +16,10 @@ namespace Orleans.Hosting;
 public sealed class DurableJobsOptions
 {
     /// <summary>
-    /// Gets or sets the named journal provider used to create new job shards.
+    /// Gets or sets the active journal provider used to create new job shards.
     /// Defaults to <see cref="ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME"/>.
     /// </summary>
-    public string WriteProviderName { get; set; } = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+    public string ActiveProviderName { get; set; } = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
 
     /// <summary>
     /// Gets the additional named journal providers whose existing shards are discovered and drained.

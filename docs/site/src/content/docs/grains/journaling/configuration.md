@@ -52,7 +52,7 @@ dependency injection.
 
 For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
 selects the journaled implementation.
-<xref:Orleans.Hosting.DurableJobsOptions.WriteProviderName> selects the provider
+<xref:Orleans.Hosting.DurableJobsOptions.ActiveProviderName> selects the provider
 for new shards and defaults to `Default`.
 <xref:Orleans.Hosting.DurableJobsOptions.DrainingProviderNames> selects additional
 providers containing existing shards and is empty by default. All selected

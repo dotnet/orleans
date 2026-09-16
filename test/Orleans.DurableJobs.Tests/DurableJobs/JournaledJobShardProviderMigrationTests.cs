@@ -208,7 +208,9 @@ public partial class JournaledJobShardManagerTests
         Assert.Equal("A", recovered.Metadata!["provider"]);
         Assert.Null(await recovered.TryScheduleJobAsync(new()
         {
-            Target = job.TargetGrainId, JobName = "must-not-enter-drain", DueTime = fixture.Now
+            Target = job.TargetGrainId,
+            JobName = "must-not-enter-drain",
+            DueTime = fixture.Now
         }, token));
         var newShard = await fixture.CreateShardAsync(afterCutover, fixture.Now);
         Assert.Same(fixture.BindingB, ((JournaledJobShard)newShard).Provider);
@@ -274,7 +276,8 @@ public partial class JournaledJobShardManagerTests
         var job = await shard.TryScheduleJobAsync(new()
         {
             Target = GrainId.Create("type", "cancel-after-cutover"),
-            JobName = "cancel-future", DueTime = fixture.Now.AddMinutes(30)
+            JobName = "cancel-future",
+            DueTime = fixture.Now.AddMinutes(30)
         }, token);
         Assert.NotNull(job);
         await shard.DisposeAsync(); // Crash: do not gracefully release its metadata.
@@ -306,7 +309,8 @@ public partial class JournaledJobShardManagerTests
         var job = await original.TryScheduleJobAsync(new()
         {
             Target = GrainId.Create("type", "same-owner"),
-            JobName = "existing", DueTime = fixture.Now
+            JobName = "existing",
+            DueTime = fixture.Now
         }, token);
         Assert.NotNull(job);
         await original.DisposeAsync(); // Same silo identity restarts without graceful release.
@@ -325,7 +329,9 @@ public partial class JournaledJobShardManagerTests
         Assert.Equal(fixture.Silo.ToParsableString(), metadata.Properties["DurableJobsOwner"]);
         Assert.Null(await recovered.TryScheduleJobAsync(new()
         {
-            Target = job.TargetGrainId, JobName = "rejected-after-cutover", DueTime = fixture.Now
+            Target = job.TargetGrainId,
+            JobName = "rejected-after-cutover",
+            DueTime = fixture.Now
         }, token));
         Assert.Empty(fixture.B.JournalAppends);
         Assert.Empty(fixture.B.MetadataUpdates);
@@ -584,7 +590,7 @@ public partial class JournaledJobShardManagerTests
 
         public JournaledJobShardManager CreateManager(string write, string? drain = null, SiloAddress? silo = null)
         {
-            var options = new DurableJobsOptions { WriteProviderName = write };
+            var options = new DurableJobsOptions { ActiveProviderName = write };
             if (drain is not null) options.DrainingProviderNames.Add(drain);
             var resolved = new DurableJobsJournalProviders(_registry, Options.Create(options));
             // Reuse fixture bindings so tests can assert identity, not just provider names.

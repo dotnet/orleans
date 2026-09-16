@@ -40,13 +40,13 @@ internal sealed class DurableJobsJournalProviders
 
     internal static List<string> GetProviderNames(DurableJobsOptions options)
     {
-        if (string.IsNullOrWhiteSpace(options.WriteProviderName))
+        if (string.IsNullOrWhiteSpace(options.ActiveProviderName))
         {
-            throw new OrleansConfigurationException("DurableJobsOptions.WriteProviderName must be non-empty.");
+            throw new OrleansConfigurationException("DurableJobsOptions.ActiveProviderName must be non-empty.");
         }
 
-        var result = new List<string> { options.WriteProviderName };
-        var names = new HashSet<string>(StringComparer.Ordinal) { options.WriteProviderName };
+        var result = new List<string> { options.ActiveProviderName };
+        var names = new HashSet<string>(StringComparer.Ordinal) { options.ActiveProviderName };
         foreach (var name in options.DrainingProviderNames)
         {
             if (string.IsNullOrWhiteSpace(name))

@@ -63,7 +63,7 @@ reuse both namespaces across AppHost restarts:
 ```powershell
 $env:Playground__Storage__RunId = 'migration01'
 $env:Playground__Migration__ReportInventory = 'true'
-$env:Playground__Migration__WriteProviderName = 'jobs-a'
+$env:Playground__Migration__ActiveProviderName = 'jobs-a'
 dotnet run --project playground\DurableJobsJournaling\DurableJobsJournaling.AppHost
 ```
 
@@ -72,7 +72,7 @@ the AppHost gracefully. Keep its Azurite volume and stable run identifier.
 Restart with B creating new shards and A still selected for draining:
 
 ```powershell
-$env:Playground__Migration__WriteProviderName = 'jobs-b'
+$env:Playground__Migration__ActiveProviderName = 'jobs-b'
 dotnet run --project playground\DurableJobsJournaling\DurableJobsJournaling.AppHost
 ```
 

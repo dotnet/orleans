@@ -52,7 +52,7 @@ builder.UseOrleans(silo =>
     });
     silo.UseJournaledDurableJobs(options =>
     {
-        options.WriteProviderName = phase == "prepare" ? "jobs-a" : "jobs-b";
+        options.ActiveProviderName = phase == "prepare" ? "jobs-a" : "jobs-b";
         options.DrainingProviderNames.Add(phase == "prepare" ? "jobs-b" : "jobs-a");
         options.ShardDuration = TimeSpan.FromSeconds(5);
         options.ShardCheckInterval = TimeSpan.FromSeconds(1);

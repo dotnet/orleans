@@ -26,7 +26,7 @@ Keep one authoritative location for each shard throughout its lifetime.
    codecs. Its credentials must permit reads, listing, conditional metadata
    updates, journal writes, compaction, and deletion throughout the drain.
 1. Register <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
-   and configure <xref:Orleans.Hosting.DurableJobsOptions.WriteProviderName>
+   and configure <xref:Orleans.Hosting.DurableJobsOptions.ActiveProviderName>
    and <xref:Orleans.Hosting.DurableJobsOptions.DrainingProviderNames>.
    The default write name is `Default`; the draining list is initially empty.
 1. Validate both namespaces and permissions in an isolated environment. Startup

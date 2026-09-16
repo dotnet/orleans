@@ -392,7 +392,7 @@ describe('rendered internal link audit', () => {
     );
   });
 
-  test('validates generated repository source links locally', async () => {
+  test('validates source and generated repository links locally', async () => {
     const repositoryRoot = await temporaryDirectory();
     const distRoot = path.join(repositoryRoot, 'dist');
     await mkdir(path.join(repositoryRoot, 'src'));
@@ -413,7 +413,16 @@ describe('rendered internal link audit', () => {
         '<a href="https://github.com/dotnet/orleans/pulls">non-source repository URL</a>',
       ].join(''),
     );
-    const externalTargets = new Map();
+    const externalTargets = new Map([
+      [
+        `https://github.com/dotnet/orleans/blob/${commit}/src/Widget.cs`,
+        [{ relativeFile: 'guide.md', line: 1 }],
+      ],
+      [
+        'https://github.com/dotnet/orleans/tree/main/samples/Example',
+        [{ relativeFile: 'guide.md', line: 2 }],
+      ],
+    ]);
 
     const issues = await auditRenderedInternalLinks({
       distRoot,
