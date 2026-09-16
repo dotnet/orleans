@@ -212,6 +212,45 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task PruningScratchReuseBoundsSteadyStateAllocations()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(40751);
+        var ns = new CompactReviewInventoryNamespace(local);
+        var keys = Enumerable.Range(0, 1024).Select(index => new DisseminationKey($"key-{index}")).ToArray();
+        ns.ReadKeys = () => keys;
+        var transport = new FakeTransport(local);
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+        var membership = new DisseminationMembership(
+            transport.MembershipManager, new FakeLocalSiloDetails(local),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        var snapshots = membership.CurrentSnapshots;
+        try
+        {
+            await queue.Prune(snapshots, cancellationToken);
+            await queue.Prune(snapshots, cancellationToken);
+            const int iterations = 128;
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var iteration = 0; iteration < iterations; iteration++)
+            {
+                var operation = queue.Prune(snapshots, cancellationToken);
+                if (!operation.IsCompletedSuccessfully)
+                {
+                    throw new InvalidOperationException("An empty peer set must prune synchronously.");
+                }
+            }
+
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.True(allocated < iterations * 512,
+                $"Pruning a stable 1024-key inventory allocated {allocated} bytes over {iterations} operations.");
+        }
+        finally
+        {
+            await queue.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task PruningScratchInventoryIsClearedAfterEnumerationFailure()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
