@@ -2,10 +2,13 @@ using System.Data;
 using System.Data.Common;
 using System.Reflection;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
 using Orleans.Streams;
@@ -19,6 +22,142 @@ namespace Tester.AdoNet.Streaming;
 [TestArea("Streaming")]
 public class AdoNetRecoverableStreamTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Receiver_CanceledShutdownPreservesRegistrationUntilAcceptedCleanup(bool initializeFirst)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var storage = new CapturingRelationalStorage
+        {
+            PartitionRecord = PartitionRecord(0, 2, 1, 1),
+            ReadRecords = [MessageRecord(1)],
+        };
+        var notifications = 0;
+        var capacityAtRemoval = -1;
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+        var registry = CreateReceiverRegistry(storage, services.GetRequiredService<Serializer<AdoNetBatchContainer>>(),
+            queueId, receiver =>
+            {
+                notifications++;
+                capacityAtRemoval = receiver.GetMaxAddCount();
+            });
+        var receiver = registry.GetOrCreate(queueId);
+        AdoNetQueueAdapterReceiver? replacement = null;
+        try
+        {
+            if (initializeFirst)
+            {
+                Assert.Single(await receiver.GetQueueMessagesAsync(1, TestContext.Current.CancellationToken));
+            }
+
+            var reads = storage.ReadCallCount;
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => ((IQueueAdapterReceiver)receiver).Shutdown(TimeSpan.FromSeconds(5), cancellation.Token));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Equal(0, notifications);
+            Assert.Same(receiver, registry.GetOrCreate(queueId));
+            Assert.Equal(reads, storage.ReadCallCount);
+            if (!initializeFirst)
+            {
+                Assert.Single(await receiver.GetQueueMessagesAsync(1, TestContext.Current.CancellationToken));
+            }
+
+            Assert.True(receiver.IsUnderPressure());
+            Assert.Equal(0, receiver.GetMaxAddCount());
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(1, notifications);
+            Assert.Equal(8, capacityAtRemoval);
+            Assert.False(receiver.IsUnderPressure());
+            replacement = registry.GetOrCreate(queueId);
+            Assert.NotSame(receiver, replacement);
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, notifications);
+            Assert.Same(replacement, registry.GetOrCreate(queueId));
+        }
+        finally
+        {
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            if (replacement is not null)
+            {
+                await replacement.Shutdown(TimeSpan.FromSeconds(5));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Receiver_ConcurrentShutdownWaitsForAdmittedCheckpointFlush(bool cancelCaller)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var writes = 0;
+        var storage = new CapturingRelationalStorage
+        {
+            PartitionRecord = PartitionRecord(0, 2, 1, 1),
+            ReadRecords = [MessageRecord(1)],
+            OnCheckpointWrite = _ =>
+            {
+                writes++;
+                started.TrySetResult();
+                return release.Task;
+            },
+        };
+        var notifications = 0;
+        var queueId = QueueId.GetQueueId("queue", 0, 0);
+        var registry = CreateReceiverRegistry(storage, services.GetRequiredService<Serializer<AdoNetBatchContainer>>(),
+            queueId, _ => notifications++);
+        var receiver = registry.GetOrCreate(queueId);
+        AdoNetQueueAdapterReceiver? replacement = null;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        Task? first = null;
+        try
+        {
+            Assert.Single(await receiver.GetQueueMessagesAsync(1, TestContext.Current.CancellationToken));
+            receiver.UpdateDeliveryProgress(new EventSequenceTokenV2(1), DateTime.UtcNow);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            first = ((IQueueAdapterReceiver)receiver).Shutdown(Timeout.InfiniteTimeSpan, cancellation.Token);
+            if (cancelCaller)
+            {
+                cancellation.Cancel();
+            }
+
+            var second = receiver.Shutdown(Timeout.InfiniteTimeSpan);
+            Assert.Same(first, second);
+            Assert.False(first.IsCompleted);
+            Assert.Equal(0, notifications);
+            Assert.Same(receiver, registry.GetOrCreate(queueId));
+            Assert.Equal(1, writes);
+            release.SetResult();
+            await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, notifications);
+            Assert.Equal(1, writes);
+            Assert.False(receiver.IsUnderPressure());
+            replacement = registry.GetOrCreate(queueId);
+            Assert.NotSame(receiver, replacement);
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, notifications);
+            Assert.Same(replacement, registry.GetOrCreate(queueId));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await (first ?? receiver.Shutdown(TimeSpan.FromSeconds(5)))
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            if (replacement is not null)
+            {
+                await replacement.Shutdown(TimeSpan.FromSeconds(5));
+            }
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -663,6 +802,31 @@ public class AdoNetRecoverableStreamTests
         return new RelationalOrleansQueries(storage, new DbStoredQueries(queryValues));
     }
 
+    private static QueueAdapterReceiverRegistry<AdoNetQueueAdapterReceiver> CreateReceiverRegistry(
+        IRelationalStorage storage,
+        Serializer<AdoNetBatchContainer> serializer,
+        QueueId queueId,
+        Action<AdoNetQueueAdapterReceiver> onShutdown)
+    {
+        QueueAdapterReceiverRegistry<AdoNetQueueAdapterReceiver> registry = null!;
+        registry = new(_ =>
+        {
+            var receiver = new AdoNetQueueAdapterReceiver(
+                "provider", "queue",
+                new AdoNetStreamOptions { StartFromNow = false, MaxMessagesPerRead = 8, MaxCacheSizeBytes = 1 },
+                new ClusterOptions { ServiceId = "service" },
+                new SimpleQueueCacheOptions { CacheSize = 8 },
+                CreateQueries(storage), serializer, NullLogger<AdoNetQueueAdapterReceiver>.Instance);
+            receiver.OnShutdown = current =>
+            {
+                onShutdown(current);
+                registry.Remove(queueId, current);
+            };
+            return receiver;
+        });
+        return registry;
+    }
+
     private static IDataRecord Record(params (string Name, object? Value)[] values)
         => new DictionaryDataRecord(values.ToDictionary(value => value.Name, value => value.Value));
 
@@ -849,6 +1013,8 @@ public class AdoNetRecoverableStreamTests
 
         public Action? OnCleanup { get; set; }
 
+        public Func<CancellationToken, Task>? OnCheckpointWrite { get; set; }
+
         public IReadOnlyList<IDataRecord>? CleanupRecords { get; set; }
 
         public int ReadCallCount { get; private set; }
@@ -874,6 +1040,10 @@ public class AdoNetRecoverableStreamTests
             if (query == nameof(DbStoredQueries.CleanupStreamMessagesKey))
             {
                 OnCleanup?.Invoke();
+            }
+            else if (query == nameof(DbStoredQueries.AdvanceStreamCheckpointKey) && OnCheckpointWrite is { } onWrite)
+            {
+                await onWrite(cancellationToken);
             }
 
             var records = query switch

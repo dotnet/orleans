@@ -136,7 +136,7 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 
 During shutdown or queue reassignment, the pulling agent closes processing admission and drains admitted queue reads, registrations, delivery, and durable subscription retirement. It preserves pending-registration and handshake checkpoint barriers before the receiver flushes durable progress and releases its pooled cache resources.
 
-The receiver bounds its asynchronous shutdown work using the supplied timeout. Receiver replacement waits for outstanding partition acquisition to settle. The next receiver acquires a fresh ownership epoch and resumes after the durable checkpoint, with retained history governed by the configured retention policy.
+Cancellation before shutdown admission preserves the receiver and its registration. An admitted shutdown uses the first caller's timeout and completes cleanup independently of later caller cancellation; concurrent shutdown calls share that operation. Receiver replacement waits for cleanup and outstanding partition acquisition to settle. The next receiver acquires a fresh ownership epoch and resumes after the durable checkpoint, with retained history governed by the configured retention policy.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
