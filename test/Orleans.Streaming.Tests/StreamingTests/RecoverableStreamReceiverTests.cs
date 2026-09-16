@@ -1534,9 +1534,9 @@ public sealed class RecoverableStreamReceiverTests
         return new(source, adapter, cache, checkpointer, startFromNow: false);
     }
 
-    private sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
+    internal sealed record TestQueueMessage(StreamId StreamId, long SequenceNumber, string Payload);
 
-    private sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
+    internal sealed class TestDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
     {
         public int CompareCallCount { get; private set; }
         public int PositionCallCount { get; private set; }
@@ -1649,7 +1649,7 @@ public sealed class RecoverableStreamReceiverTests
         }
     }
 
-    private sealed class TestBatchContainer(
+    internal sealed class TestBatchContainer(
         StreamId streamId,
         StreamSequenceToken sequenceToken,
         string payload) : IBatchContainer
@@ -1893,7 +1893,7 @@ public sealed class RecoverableStreamReceiverTests
         }
     }
 
-    private sealed class NoOpEvictionStrategy : IEvictionStrategy
+    internal sealed class NoOpEvictionStrategy : IEvictionStrategy
     {
         public int PerformPurgeCount { get; private set; }
 
