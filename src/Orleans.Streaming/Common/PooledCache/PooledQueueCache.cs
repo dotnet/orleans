@@ -282,8 +282,8 @@ namespace Orleans.Providers.Streams.Common
 
             LinkedListNode<CachedMessageBlock> newestBlock = messageBlocks.First!; // messageBlocks.Count != 0 (checked above).
 
-            // A cursor which waited on an empty cache starts at the oldest message;
-            // otherwise, a null token starts at the newest message.
+            // A cursor which waited on an empty cache includes the first admitted message.
+            // A new Latest cursor excludes the entire existing partition prefix.
             if (sequenceToken == null)
             {
                 if (cursor.State == CursorStates.Idle)
@@ -300,6 +300,7 @@ namespace Orleans.Providers.Streams.Common
                     cursor.CurrentBlock = newestBlock;
                     cursor.Index = newestBlock.Value.NewestMessageIndex;
                     cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                    cursor.RecordScanned(cursor.SequenceToken);
                 }
 
                 return null;

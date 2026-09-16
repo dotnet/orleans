@@ -99,6 +99,8 @@ An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delive
 
 The cache tracks the earliest contiguous partition position which is safe across active subscriptions. A matching record becomes safe after delivery or intentional filtering. A cursor also advances safely across records for other streams when no earlier matching delivery is pending, so a quiet stream does not pin an otherwise busy partition. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
 
+A `Latest` subscription attached to a populated recoverable cache starts after its current partition tail. That excluded prefix contributes safe scan progress immediately, allowing a byte-bounded cache to reclaim it once the other subscriptions have also advanced. The first included record remains pending until delivery succeeds or filtering accepts it. A `Latest` cursor created while the cache is empty starts with the first subsequently admitted record.
+
 ```mermaid
 flowchart TB
     New[New queue batches] --> Cache[Queue cache]
