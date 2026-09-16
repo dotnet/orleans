@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="..\Dissemination.PerformanceHarness\Silo\FileMembershipTable.cs" Link="DisseminationPerformance\FileMembershipTable.cs" />
     <Compile Include="..\Dissemination.PerformanceHarness\Shared\Protocol.cs" Link="DisseminationPerformance\Protocol.cs" />
+    <Compile Include="..\Dissemination.PerformanceHarness\Shared\OpenLoopProducer.cs" Link="DisseminationPerformance\OpenLoopProducer.cs" />
     <Compile Include="..\Dissemination.PerformanceHarness\ProviderTests\FileMembershipTableTests.cs" Link="DisseminationPerformance\FileMembershipTableTests.cs" />
   </ItemGroup>
 

@@ -12,7 +12,7 @@ internal sealed record NodeConfiguration(
     int SiloProcessorCount = 0,
     int GCConserveMemory = 0);
 
-internal sealed record Command(int Id, string Operation, string? Peer = null);
+internal sealed record Command(int Id, string Operation, string? Peer = null, OpenLoopPlan? OpenLoop = null);
 
 internal sealed record Response(int Id, NodeSnapshot? Snapshot, string? Error);
 
@@ -64,6 +64,7 @@ internal sealed record NodeSnapshot
     public required string[] ForwardingTargets { get; init; }
     public string[] TopologyMembers { get; init; } = [];
     public int Fanout { get; init; }
+    public string? FanoutSource { get; init; }
     public bool AggregationTree { get; init; }
     public int AntiEntropyPeerCount { get; init; }
     public double AntiEntropyIntervalMilliseconds { get; init; }
@@ -83,4 +84,6 @@ internal sealed record NodeSnapshot
     public bool Partitioned { get; init; }
     public int? RemoteProcessId { get; init; }
     public string? ProbeError { get; init; }
+    public OpenLoopProgress? OpenLoopProgress { get; init; }
+    public OpenLoopReport? OpenLoopReport { get; init; }
 }

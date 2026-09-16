@@ -7,6 +7,9 @@
     <!-- Shared helpers compile independently of the selected Orleans runtime. -->
     <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
     <Compile Include="..\Shared\PublisherApi.cs" Link="PublisherApi.cs" />
+    <Compile Include="..\Shared\AggregationFanout.cs" Link="AggregationFanout.cs" />
+    <Compile Include="..\Shared\OpenLoopProducer.cs" Link="OpenLoopProducer.cs" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <Compile Include="..\Silo\Observation.cs" Link="Observation.cs" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

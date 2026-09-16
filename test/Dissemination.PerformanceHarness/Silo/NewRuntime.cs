@@ -28,6 +28,9 @@ internal static class NewRuntime
 
         var ns = services.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
         var topology = services.GetRequiredService<DisseminationMembership>().CurrentSnapshots.ActiveMembers;
+        var aggregationTree = ns.RoutingMode == DisseminationRoutingMode.AggregationTree;
+        var fanout = AggregationFanout.Read(
+            options.Overlay, aggregationTree, topology.Members.Length, () => options.Overlay.GetFanOutFactor(topology.Members.Length));
         return snapshot with
         {
             Enabled = options.Enabled,
@@ -37,8 +40,9 @@ internal static class NewRuntime
             OriginatorTargets = topology.GetOriginatorTargets(ns.RoutingMode).Select(address => address.ToParsableString()).ToArray(),
             ForwardingTargets = topology.GetForwardingTargets(ns.RoutingMode).Select(address => address.ToParsableString()).ToArray(),
             TopologyMembers = topology.Members.Select(address => address.ToParsableString()).ToArray(),
-            Fanout = options.Overlay.GetFanOutFactor(topology.Members.Length),
-            AggregationTree = ns.RoutingMode == DisseminationRoutingMode.AggregationTree,
+            Fanout = fanout.Value,
+            FanoutSource = fanout.Source,
+            AggregationTree = aggregationTree,
             AntiEntropyPeerCount = options.Overlay.AntiEntropyPeerCount,
             AntiEntropyIntervalMilliseconds = options.Overlay.AntiEntropyInterval.TotalMilliseconds,
         };

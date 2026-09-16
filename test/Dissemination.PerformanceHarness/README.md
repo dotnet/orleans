@@ -20,6 +20,7 @@ gh workflow run dissemination-performance.yml --repo ReubenBond/orleans `
   -f candidate_ref=3fc0a4610cd2eb5feef27e958fcca59658aaae47 `
   -f sizes=4,8 -f iterations=3 -f repetitions=2 `
   -f runtime_paths=All -f scenarios=stable,churn,partition `
+  -f workload=ClosedLoop `
   -f silo_processor_count=0 -f gc_conserve_memory=0
 ```
 
@@ -44,6 +45,11 @@ provides the dissemination APIs. `NewRuntime.cs` describes the expected internal
 shape; update this adapter deliberately when testing a candidate with changed APIs.
 The shared publisher adapter validates the publication method's signature and the
 disposable timer field, reporting the incompatible member and selected assembly.
+Aggregation-tree reports use the optional public `Overlay.AggregationFanOutFactor`
+property when present, clamped to the candidate's effective range
+`1..max(1, memberCount)`. Older candidates such as `3fc0a461` use their membership
+fanout formula. `FanoutSource` names the detected capability; an incompatible
+property shape raises an adapter diagnostic. Membership routing retains its selector.
 
 Published manifests record DLL hashes, versions and source commits. Every worker
 checks the loaded Orleans assemblies and exact process identity. Candidate off/on
@@ -56,6 +62,39 @@ Defaults are 4 and 8 processes, three rounds, two paired repetitions, and all th
 paths across `stable`, `churn` and `partition`. Sizes accept one to six distinct
 counts from 3 through 128; rounds accept 3 through 200; repetitions accept 1 through
 5. Successive repetitions reverse the complete execution order, including off/on.
+
+`workload=ClosedLoop` preserves the publication/convergence barrier after each round.
+For fixed-rate stable measurement, choose `OpenLoopSynchronized` or
+`OpenLoopStaggered`, `scenarios=stable`, 3 through 32 processes, and `iterations`
+from 3 through 30 (duration in seconds at one publication per producer per second).
+Synchronized producers share each one-second boundary; staggered producers use
+evenly spaced phases within that second. Each worker arms a local monotonic schedule
+at a common future UTC epoch, then calls the production publisher on its scheduler.
+Controller polling observes state independently of these publication deadlines.
+
+```powershell
+gh workflow run dissemination-performance.yml --repo ReubenBond/orleans `
+  --ref <tooling-branch> -f candidate_repository=ReubenBond/orleans `
+  -f candidate_ref=<candidate-commit> -f sizes=4,8,32 -f iterations=10 `
+  -f repetitions=2 -f runtime_paths=Current -f scenarios=stable `
+  -f workload=OpenLoopStaggered -f silo_processor_count=0 -f gc_conserve_memory=0
+```
+
+Arming must finish within the five-second lead. A producer fails on a missed period
+or a publication extending past its one-second slot, preserving partial timestamps,
+missed-period and overrun counts. Each accepted run offers exactly
+`processes * durationSeconds` publications. Producers retain the configured rate
+without catch-up bursts. The controller has a separate ten-second completion and
+latest-state drain after the scheduled end. It verifies active process identities,
+exact latest dictionary inventory and values, and that observed versions and values
+were actually published.
+
+Open-loop artifacts preserve planned/actual start and completion timestamps,
+actual inter-publication periods, first-observed peer ages, and each producer's
+final value reaching every process. Ages and final-latest latency are **polling
+upper bounds**, using same-host UTC timestamps and 100 ms controller polling.
+Intermediate values may coalesce; observed and unobserved publication/observer pairs
+are reported separately. Exact latest-state convergence remains required.
 
 Every round invokes the actual load publisher once per active node and checks exact
 state inventory and field values at every node. Churn restarts a process at the same
@@ -91,9 +130,14 @@ bytes, CPU, allocations, retained memory, publication/convergence/recovery laten
 and per-node topology. Load broadcast requests and logical value transmissions are
 separate counters. Reports compare equal binary, environment, process count and
 offered work, with costs per publication and median/P95 convergence.
+Open-loop comparisons use median/P95 final-latest polling upper bounds instead of
+per-round closed-loop latency. Raw `open-loop-{plans,producers,observations,summary}.json`
+files preserve cadence and observation evidence. Total costs include arming, the
+fixed-rate window, final-state drain, and the common socket-sampling margin.
 
 These are shared-runner, single-host loopback measurements. The workload is
-closed-loop, with a convergence barrier after each round. Silo costs include control
+closed-loop by default, with a convergence barrier after each round. The optional
+open-loop mode fixes the offered producer rate at 1 Hz. Silo costs include control
 and instrumentation work; controller costs, storage disk bytes, cross-machine latency,
 TCP/IP wire overhead and application-grain workloads need separate experiments.
 The 100 ms polling cadence and one-second socket sampling introduce boundary
@@ -126,7 +170,7 @@ Run only the lightweight controller measurement cases locally:
 ```powershell
 .\.github\scripts\test-dissemination-performance.ps1
 dotnet test --project test\Dissemination.PerformanceHarness\Tests\Dissemination.PerformanceHarness.Tests.csproj `
-  --framework net10.0 --filter-class '*MeasurementTests' --minimum-expected-tests 21
+  --framework net10.0 --filter-class '*MeasurementTests' --minimum-expected-tests 50
 ```
 
 Ordinary Linux/Windows CI runs script checks for repository containment, worker-copy

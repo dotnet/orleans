@@ -18,7 +18,7 @@ on:
         type: string
         default: '4,8'
       iterations:
-        description: 'Publication rounds per scenario (3..200)'
+        description: 'Closed-loop rounds (3..200), or open-loop 1 Hz duration in seconds (3..30)'
         type: number
         default: 3
       repetitions:
@@ -34,6 +34,11 @@ on:
         description: 'Distinct comma-separated scenarios: stable,churn,partition'
         type: string
         default: 'stable,churn,partition'
+      workload:
+        description: 'Open-loop requires stable only and at most 32 processes'
+        type: choice
+        options: [ClosedLoop, OpenLoopSynchronized, OpenLoopStaggered]
+        default: ClosedLoop
       silo_processor_count:
         description: 'Logical processors per silo (0 = inherit runner, maximum 64)'
         type: number
@@ -94,6 +99,7 @@ jobs:
           PERFORMANCE_REPETITIONS: ${{ inputs.repetitions }}
           PERFORMANCE_PATHS: ${{ inputs.runtime_paths }}
           PERFORMANCE_SCENARIOS: ${{ inputs.scenarios }}
+          PERFORMANCE_WORKLOAD: ${{ inputs.workload }}
           PERFORMANCE_PROCESSORS: ${{ inputs.silo_processor_count }}
           PERFORMANCE_GC: ${{ inputs.gc_conserve_memory }}
         run: |
@@ -101,7 +107,8 @@ jobs:
             -CandidateRepository $env:CANDIDATE_REPOSITORY -CandidateRef $env:CANDIDATE_REF `
             -Sizes $env:PERFORMANCE_SIZES -Iterations ([int]$env:PERFORMANCE_ITERATIONS) `
             -Repetitions ([int]$env:PERFORMANCE_REPETITIONS) -RuntimePaths $env:PERFORMANCE_PATHS `
-            -Scenarios $env:PERFORMANCE_SCENARIOS -SiloProcessorCount ([int]$env:PERFORMANCE_PROCESSORS) `
+            -Scenarios $env:PERFORMANCE_SCENARIOS -Workload $env:PERFORMANCE_WORKLOAD `
+            -SiloProcessorCount ([int]$env:PERFORMANCE_PROCESSORS) `
             -GCConserveMemory ([int]$env:PERFORMANCE_GC)
       - name: Preserve raw measurements and build diagnostics
         if: always()

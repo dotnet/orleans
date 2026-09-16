@@ -16,7 +16,7 @@ internal sealed record BuildManifest(
     string Sha256,
     Dictionary<string, AssemblyManifest> Assemblies);
 
-internal sealed class ProcessCluster : IAsyncDisposable
+internal sealed partial class ProcessCluster : IAsyncDisposable
 {
     public const string Baseline = "6739589254b746a8790cf53524e6abe372bb53d4";
     private readonly List<SiloProcess> _all = [];
@@ -336,12 +336,13 @@ internal sealed class SiloProcess : IAsyncDisposable
     public Task<NodeSnapshot> Send(string operation, string? peer = null) =>
         Send(TestContext.Current.CancellationToken, operation, peer);
 
-    public async Task<NodeSnapshot> Send(CancellationToken cancellationToken, string operation, string? peer = null)
+    public async Task<NodeSnapshot> Send(
+        CancellationToken cancellationToken, string operation, string? peer = null, OpenLoopPlan? openLoop = null)
     {
         await _commandLock.WaitAsync(cancellationToken);
         try
         {
-            var command = new Command(Interlocked.Increment(ref _commandId), operation, peer);
+            var command = new Command(Interlocked.Increment(ref _commandId), operation, peer, openLoop);
             var completed = new TaskCompletionSource<Response>(TaskCreationOptions.RunContinuationsAsynchronously);
             _pending[command.Id] = completed;
             await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(command).AsMemory(), cancellationToken);

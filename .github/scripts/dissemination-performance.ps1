@@ -18,6 +18,8 @@ param(
     [string] $RuntimePaths = 'All',
     [ValidatePattern('^(stable|churn|partition)(,(stable|churn|partition)){0,2}$')]
     [string] $Scenarios = 'stable,churn,partition',
+    [ValidateSet('ClosedLoop', 'OpenLoopSynchronized', 'OpenLoopStaggered')]
+    [string] $Workload = 'ClosedLoop',
     [ValidateRange(0, 64)]
     [int] $SiloProcessorCount = 0,
     [ValidateRange(0, 9)]
@@ -37,6 +39,10 @@ if (@($sizesArray | Select-Object -Unique).Count -ne $sizesArray.Count -or
 }
 if (@($Scenarios.Split(',') | Select-Object -Unique).Count -ne $Scenarios.Split(',').Count) {
     throw 'Select each scenario at most once.'
+}
+if ($Workload -ne 'ClosedLoop' -and ($Scenarios -ne 'stable' -or $Iterations -gt 30 -or
+    @($sizesArray | Where-Object { $_ -gt 32 }).Count -gt 0)) {
+    throw 'Open-loop workloads require stable only, 3..32 silo processes and 3..30 seconds (Iterations).'
 }
 
 function Assert-NoLinks([string] $Path) {
@@ -262,6 +268,7 @@ $env:ORLEANS_DISSEMINATION_ITERATIONS = $Iterations.ToString([System.Globalizati
 $env:ORLEANS_DISSEMINATION_REPETITIONS = $Repetitions.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:ORLEANS_DISSEMINATION_RUNTIME_PATHS = $RuntimePaths
 $env:ORLEANS_DISSEMINATION_SCENARIOS = $Scenarios
+$env:ORLEANS_DISSEMINATION_WORKLOAD = $Workload
 $env:ORLEANS_DISSEMINATION_SILO_PROCESSOR_COUNT = $SiloProcessorCount.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $env:ORLEANS_DISSEMINATION_GC_CONSERVE_MEMORY = $GCConserveMemory.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 @{
@@ -272,6 +279,7 @@ $env:ORLEANS_DISSEMINATION_GC_CONSERVE_MEMORY = $GCConserveMemory.ToString([Syst
     Repetitions = $Repetitions
     RuntimePaths = $RuntimePaths
     Scenarios = $Scenarios
+    Workload = $Workload
     SiloProcessorCount = $SiloProcessorCount
     GCConserveMemory = $GCConserveMemory
     StartUtc = [DateTimeOffset]::UtcNow
@@ -282,7 +290,7 @@ Push-Location $root
 try {
     Invoke-DotNet @(
         $runner, '--filter-class', 'Orleans.Dissemination.PerformanceHarness.MeasurementTests',
-        '--minimum-expected-tests', '21', '--report-trx',
+        '--minimum-expected-tests', '50', '--report-trx',
         '--results-directory', (Join-Path $results 'instrument-checks')
     )
     Invoke-DotNet @(

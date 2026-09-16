@@ -25,6 +25,14 @@ public sealed class ScalingTests
         Assert.All(scenarios, scenario => Assert.Contains(scenario, new[] { "stable", "churn", "partition" }));
         var paths = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_RUNTIME_PATHS") ?? "All";
         Assert.Contains(paths, new[] { "All", "Current" });
+        var workload = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_WORKLOAD") ?? "ClosedLoop";
+        Assert.Contains(workload, new[] { "ClosedLoop", "OpenLoopSynchronized", "OpenLoopStaggered" });
+        if (workload != "ClosedLoop")
+        {
+            Assert.Equal(new[] { "stable" }, scenarios);
+            Assert.InRange(iterations, 3, 30);
+            Assert.All(sizes, size => Assert.InRange(size, 3, 32));
+        }
 
         var records = new List<object>();
         var output = Environment.GetEnvironmentVariable("ORLEANS_DISSEMINATION_RESULTS")!;
@@ -49,7 +57,7 @@ public sealed class ScalingTests
                     for (var order = 0; order < variants.Length; order++)
                     {
                         var variant = variants[ExecutionIndex(repetition, order, variants.Length)];
-                        var record = await Measure(size, scenario, variant, iterations, repetition, order);
+                        var record = await Measure(size, scenario, variant, iterations, repetition, order, workload);
                         records.Add(record);
                         var json = JsonSerializer.Serialize(records, new JsonSerializerOptions { WriteIndented = true });
                         await File.WriteAllTextAsync(Path.Combine(output, "cost-results.json"), json, TestContext.Current.CancellationToken);
@@ -70,14 +78,15 @@ public sealed class ScalingTests
         }
     }
 
-    private static async Task<object> Measure(int size, string scenario, RuntimeVariant variant, int iterations, int repetition, int order)
+    private static async Task<object> Measure(
+        int size, string scenario, RuntimeVariant variant, int iterations, int repetition, int order, string workload)
     {
         var enabled = variant.Enabled;
         var siloProcessorCount = Setting("SILO_PROCESSOR_COUNT", 0, 0, 64);
         var gcConserveMemory = Setting("GC_CONSERVE_MEMORY", 0, 0, 9);
         var bootstrap = Stopwatch.StartNew();
         await using var cluster = new ProcessCluster(
-            $"scale-{size}-{scenario}-{variant.Name}-{repetition}", siloProcessorCount, gcConserveMemory);
+            $"scale-{size}-{scenario}-{workload}-{variant.Name}-{repetition}", siloProcessorCount, gcConserveMemory);
         for (var index = 0; index < size; index++)
         {
             await cluster.Start(variant.Runtime, enabled);
@@ -109,7 +118,13 @@ public sealed class ScalingTests
         var offeredPublications = 0;
         var restarts = 0;
         var partitions = 0;
-        for (var iteration = 0; iteration < iterations; iteration++)
+        OpenLoopSummary? openLoop = null;
+        if (workload != "ClosedLoop")
+        {
+            openLoop = await cluster.MeasureOpenLoop(workload, iterations);
+            offeredPublications = size * iterations;
+        }
+        for (var iteration = 0; workload == "ClosedLoop" && iteration < iterations; iteration++)
         {
             if (scenario == "churn" && iteration > 0 && iteration % 2 == 0)
             {
@@ -189,6 +204,8 @@ public sealed class ScalingTests
                 index >= 0 && (topology.AggregationTree ? index <= topology.Fanout : index < topology.Fanout),
                 topology.OriginatorTargets,
                 topology.ForwardingTargets,
+                topology.Fanout,
+                topology.FanoutSource,
                 requestMessages.Count + oneWayMessages.Count,
                 allMessages.Count,
                 allMessages.Sum,
@@ -232,12 +249,14 @@ public sealed class ScalingTests
 
         var record = new
         {
-            Schema = 1,
+            Schema = 2,
             RuntimePath = variant.Name,
             Runtime = finish[0].Identity,
             Size = size,
             LiveSilos = start.Count,
             Scenario = scenario,
+            Workload = workload,
+            OpenLoop = openLoop,
             Enabled = enabled,
             Iterations = iterations,
             Repetition = repetition,
@@ -256,7 +275,7 @@ public sealed class ScalingTests
             TotalMessages = nodes.Sum(node => node.SentMessages),
             LoadBroadcastRequests = nodes.Sum(node => node.LoadBroadcastRequests),
             LoadValueTransmissions = nodes.Sum(node => node.LoadValueTransmissions),
-            LoadBroadcastRequestsPerRound = nodes.Sum(node => node.LoadBroadcastRequests) / iterations,
+            LoadBroadcastRequestsPerRound = openLoop is null ? nodes.Sum(node => node.LoadBroadcastRequests) / iterations : (double?)null,
             LoadBroadcastRequestsPerSecond = nodes.Sum(node => node.LoadBroadcastRequests) / (elapsed / 1000),
             SerializedBytesSent = nodes.Sum(node => node.SerializedBytesSent),
             SocketBytesSent = nodes.Sum(node => node.SocketBytesSent),
@@ -283,6 +302,9 @@ public sealed class ScalingTests
                 WarmupRounds = 2,
                 SettlingMarginSeconds = 2,
                 AutomaticLoadPublisherPaused = true,
+                ProducerCadence = workload == "ClosedLoop" ? "controller publication/convergence rounds" : "worker-local 1 Hz monotonic schedule",
+                OpenLoopTiming = "5-second common-start arming budget; 3..30-second stable publication window; 10-second completion/latest-state drain; missed periods and overruns fail without catch-up",
+                Latency = workload == "ClosedLoop" ? "per-round end-to-end exact convergence" : "first-observed ages and per-producer final-latest convergence are polling upper bounds using same-host UTC timestamps",
                 ProductionDisseminationCadence = variant.Runtime == "New" && enabled,
                 ExplicitDisseminationOptOut = variant.Runtime == "New" && !enabled,
                 LoadNamespaceSupportConfirmedBeforeOfferedRounds = enabled,
@@ -369,6 +391,8 @@ public sealed class ScalingTests
         bool UpperTree,
         string[] OriginatorTargets,
         string[] ForwardingTargets,
+        int Fanout,
+        string? FanoutSource,
         long Rpcs,
         long SentMessages,
         double SerializedBytesSent,

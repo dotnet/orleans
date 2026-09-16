@@ -39,6 +39,7 @@ internal static class Program
 #endif
         using var lifetime = new CancellationTokenSource(TimeSpan.FromMinutes(45));
         using var observation = new Observation();
+        var openLoop = new OpenLoopProducer(TimeProvider.System);
         var membership = new FileMembershipTable(configuration);
         using var host = TestClusterHostFactory.CreateSiloHost(
             configuration.Name,
@@ -47,6 +48,7 @@ internal static class Program
             {
                 services.AddSingleton(configuration);
                 services.AddSingleton(observation);
+                services.AddSingleton(openLoop);
                 services.AddSingleton(membership);
                 services.AddSingleton<IMembershipTable>(membership);
                 services.AddSingleton<ControlTarget>();
@@ -112,7 +114,7 @@ internal static class Program
                 operation.CancelAfter(TimeSpan.FromSeconds(60));
                 try
                 {
-                    var result = await Execute(host.Services, command, operation.Token);
+                    var result = await Execute(host.Services, command, operation.Token, lifetime.Token);
                     await Write(new Response(command.Id, result, null));
                     if (command.Operation == "stop")
                     {
@@ -126,6 +128,7 @@ internal static class Program
             }
 
             using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            await openLoop.DisposeAsync();
             await host.StopAsync(shutdown.Token).WaitAsync(shutdown.Token);
             // Drain the last one-second OS socket-counter bucket before recording shutdown cost.
             await Task.Delay(TimeSpan.FromMilliseconds(1100));
@@ -135,11 +138,13 @@ internal static class Program
         finally
         {
             await lifetime.CancelAsync();
+            await openLoop.DisposeAsync();
             await monitor;
         }
     }
 
-    private static async Task<NodeSnapshot> Execute(IServiceProvider services, Command command, CancellationToken cancellationToken)
+    private static async Task<NodeSnapshot> Execute(
+        IServiceProvider services, Command command, CancellationToken cancellationToken, CancellationToken lifetimeToken)
     {
         var manager = services.GetRequiredService<IMembershipManager>();
         var publisher = services.GetRequiredService<DeploymentLoadPublisher>();
@@ -158,6 +163,22 @@ internal static class Program
                     .WaitAsync(cancellationToken);
 
                 break;
+            case "open-loop-arm":
+                services.GetRequiredService<OpenLoopProducer>().Start(
+                    command.OpenLoop ?? throw new InvalidOperationException("Missing open-loop plan."),
+                    token => publisher.RunOrQueueTaskResult(async () =>
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var startedAt = DateTimeOffset.UtcNow;
+                        await (Task)PublishMethod.Invoke(publisher, [token])!;
+                        var local = services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
+                        var value = publisher.PeriodicStatistics[local];
+                        return new ProducedValue(startedAt, DateTimeOffset.UtcNow, value.DateTime.Ticks, StateComparison.Serialize(value));
+                    }).Unwrap(), lifetimeToken);
+                break;
+            case "open-loop-finish":
+                var report = await services.GetRequiredService<OpenLoopProducer>().Completion.WaitAsync(cancellationToken);
+                return Snapshot(services) with { OpenLoopReport = report };
             case "partition":
                 services.GetRequiredService<Observation>().Partition();
                 break;
@@ -233,6 +254,9 @@ internal static class Program
         var membership = manager.CurrentSnapshot;
         using var process = Process.GetCurrentProcess();
         var socket = observation.SocketSnapshot;
+        var load = publisher.PeriodicStatistics.ToArray();
+        var openLoop = services.GetRequiredService<OpenLoopProducer>();
+        var progress = openLoop.Progress;
         var result = new NodeSnapshot
         {
             CapturedAtUtc = DateTimeOffset.UtcNow,
@@ -244,9 +268,9 @@ internal static class Program
                 pair => JsonSerializer.Serialize(FileMembershipTable.EntryData.From(pair.Value))), StringComparer.Ordinal),
             ActiveMembers = membership.Entries.Values.Where(entry => entry.Status == SiloStatus.Active)
                 .Select(entry => entry.SiloAddress.ToParsableString()).Order(StringComparer.Ordinal).ToArray(),
-            Load = new(publisher.PeriodicStatistics.ToDictionary(
+            Load = new(load.ToDictionary(
                 pair => pair.Key.ToParsableString(), pair => StateComparison.Serialize(pair.Value)), StringComparer.Ordinal),
-            LoadVersions = new(publisher.PeriodicStatistics.ToDictionary(
+            LoadVersions = new(load.ToDictionary(
                 pair => pair.Key.ToParsableString(), pair => pair.Value.DateTime.Ticks), StringComparer.Ordinal),
             UnconfirmedPeers = [],
             OriginatorTargets = [],
@@ -265,6 +289,8 @@ internal static class Program
             ProcessorCount = Environment.ProcessorCount,
             ServerGC = System.Runtime.GCSettings.IsServerGC,
             Partitioned = observation.Partitioned,
+            OpenLoopProgress = progress,
+            OpenLoopReport = progress?.Error is not null ? openLoop.Report : null,
         };
 #if NEW_RUNTIME
         result = NewRuntime.Decorate(services, result);

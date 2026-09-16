@@ -25,6 +25,10 @@ $cases = @(
     @{ Name = 'ref option'; Parameter = 'CandidateRef'; Value = '--upload-pack=command'; Error = '*cannot validate argument*' }
     @{ Name = 'processor bound'; Parameter = 'SiloProcessorCount'; Value = 65; Error = '*cannot validate argument*' }
     @{ Name = 'GC bound'; Parameter = 'GCConserveMemory'; Value = 10; Error = '*cannot validate argument*' }
+    @{ Name = 'unknown workload'; Parameter = 'Workload'; Value = 'unknown'; Error = '*cannot validate argument*' }
+    @{ Name = 'open-loop stable only'; Parameter = 'Workload'; Value = 'OpenLoopSynchronized'; Error = 'Open-loop workloads require*' }
+    @{ Name = 'open-loop duration bound'; Parameter = 'Iterations'; Value = 31; Additional = @{ Workload = 'OpenLoopStaggered'; Scenarios = 'stable' }; Error = 'Open-loop workloads require*' }
+    @{ Name = 'open-loop process bound'; Parameter = 'Sizes'; Value = '4,33'; Additional = @{ Workload = 'OpenLoopSynchronized'; Scenarios = 'stable' }; Error = 'Open-loop workloads require*' }
 )
 foreach ($case in $cases) {
     $arguments = @{
@@ -33,6 +37,11 @@ foreach ($case in $cases) {
         SkipBuild = $true
     }
     $arguments[$case.Parameter] = $case.Value
+    if ($case.ContainsKey('Additional')) {
+        foreach ($entry in $case.Additional.GetEnumerator()) {
+            $arguments[$entry.Key] = $entry.Value
+        }
+    }
     $rejected = $false
     try {
         & $script @arguments
@@ -231,8 +240,16 @@ try {
         & $script -CandidateRepository $selection.CandidateRepository -CandidateRef $selection.CandidateRef `
             -ArtifactsDirectory "Artifacts$separator$artifactName" -Sizes '3' -Iterations 3 -Repetitions 1 -SkipBuild
     }
-    if ($calls.Count -ne 4) {
-        throw "Expected measurement and scaling invocations for both path spellings; got $($calls.Count)."
+    foreach ($workload in @('OpenLoopSynchronized', 'OpenLoopStaggered')) {
+        & $script -CandidateRepository $selection.CandidateRepository -CandidateRef $selection.CandidateRef `
+            -ArtifactsDirectory (Join-Path 'Artifacts' $artifactName) -Sizes '3' -Iterations 30 -Repetitions 1 `
+            -Scenarios stable -Workload $workload -SkipBuild
+        if ($env:ORLEANS_DISSEMINATION_WORKLOAD -ne $workload -or $env:ORLEANS_DISSEMINATION_ITERATIONS -ne '30') {
+            throw "Open-loop invocation lost its workload selection: $workload"
+        }
+    }
+    if ($calls.Count -ne 8) {
+        throw "Expected measurement and scaling invocations for two path spellings and two open-loop patterns; got $($calls.Count)."
     }
     for ($index = 0; $index -lt $calls.Count; $index++) {
         $expectedClass = if ($index % 2 -eq 0) { 'MeasurementTests' } else { 'ScalingTests' }
@@ -241,8 +258,8 @@ try {
         }
     }
     $runs = @(Get-ChildItem -LiteralPath (Join-Path $testArtifacts 'results') -Directory)
-    if ($runs.Count -ne 2) {
-        throw "Expected two results directories under the same artifact root; got $($runs.Count)."
+    if ($runs.Count -ne 4) {
+        throw "Expected four results directories under the same artifact root; got $($runs.Count)."
     }
     foreach ($run in $runs) {
         foreach ($filename in @('invocation.json', 'selection.json', 'methodology.json', 'host-resources.json')) {
@@ -253,7 +270,7 @@ try {
             throw 'The recorded results path differs from the created directory.'
         }
     }
-    Write-Output 'Passed 2 SkipBuild path checks with worker execution stubbed.'
+    Write-Output 'Passed 4 SkipBuild path/workload checks with worker execution stubbed.'
 }
 finally {
     foreach ($entry in Get-ChildItem Env:ORLEANS_DISSEMINATION_*) {
