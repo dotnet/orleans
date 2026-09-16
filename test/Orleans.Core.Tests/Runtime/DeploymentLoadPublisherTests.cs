@@ -25,10 +25,12 @@ namespace NonSilo.Tests.Runtime;
 [TestArea("Runtime")]
 public class DeploymentLoadPublisherTests
 {
-    [Fact]
-    public async Task PublishStatistics_ExplicitlyDisabled_PreservesDirectPublication()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task PublishStatistics_DisabledByDefaultOrExplicitly_PreservesDirectPublication(bool? configured)
     {
-        using var rig = CreateTestRig(TimeSpan.FromSeconds(5));
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: configured);
 
         await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
@@ -41,9 +43,9 @@ public class DeploymentLoadPublisherTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PublishStatistics_DefaultEnabled_ConfirmedPeersUseDissemination(bool confirmed)
+    public async Task PublishStatistics_ExplicitlyEnabled_ConfirmedPeersUseDissemination(bool confirmed)
     {
-        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: null);
+        using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
         var remoteSilo = SiloAddress.FromParsableString("127.0.0.1:200@100");
         rig.Dissemination.GetUnconfirmedPeers(Arg.Any<IDisseminationNamespace>())
             .Returns(confirmed ? [] : new[] { remoteSilo });

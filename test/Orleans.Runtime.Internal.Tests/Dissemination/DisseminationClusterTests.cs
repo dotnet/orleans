@@ -84,7 +84,10 @@ public sealed class DisseminationClusterTests
         await cluster.DeployAsync(cancellationToken);
         var primary = Assert.IsType<InProcessSiloHandle>(cluster.Primary);
         Assert.IsType<SystemTargetBasedMembershipTable>(primary.SiloHost.Services.GetRequiredService<IMembershipTable>());
-        var retained = primary.SiloHost.Services.GetRequiredService<IMembershipManager>().CurrentSnapshot;
+        var primaryManager = primary.SiloHost.Services.GetRequiredService<IMembershipManager>();
+        await primaryManager.Refresh(null, cancellationToken, requireFresh: true);
+        var retained = primaryManager.CurrentSnapshot;
+        Assert.Equal(3, retained.ActiveNodeCount);
         var originalSilos = cluster.GetActiveSilos().ToArray();
 
         var restarted = Assert.IsType<InProcessSiloHandle>(

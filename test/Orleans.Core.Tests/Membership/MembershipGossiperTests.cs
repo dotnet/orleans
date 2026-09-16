@@ -55,7 +55,8 @@ public class MembershipGossiperTests
 
         try
         {
-            await Task.WhenAll(directStarted.Task, disseminationStarted.Task).WaitAsync(TestContext.Current.CancellationToken);
+            await Task.WhenAll(directStarted.Task, disseminationStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.False(gossipTask.IsCompleted);
             Assert.False(directCompleted.Task.IsCompleted);
             Assert.Equal(1, rig.DisseminationServiceResolutionCount);
@@ -127,7 +128,8 @@ public class MembershipGossiperTests
 
         try
         {
-            await Task.WhenAll(directStarted.Task, disseminationStarted.Task).WaitAsync(TestContext.Current.CancellationToken);
+            await Task.WhenAll(directStarted.Task, disseminationStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             await rig.RemoteMembershipService.Received(1).MembershipChangeNotification(snapshot, cancellation.Token);
         }
         finally
@@ -186,7 +188,8 @@ public class MembershipGossiperTests
 
         try
         {
-            await Task.WhenAll(directStarted.Task, disseminationStarted.Task).WaitAsync(TestContext.Current.CancellationToken);
+            await Task.WhenAll(directStarted.Task, disseminationStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.Equal(["MembershipSystemTargetResolved", "DisseminationServiceResolved"], resolutionOrder);
         }
         finally
@@ -418,6 +421,7 @@ public class MembershipGossiperTests
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory.GetSystemTarget<IMembershipService>(Constants.MembershipServiceType, Arg.Any<SiloAddress>()).Returns(remote);
         var membershipManager = Substitute.For<IMembershipManager>();
+        membershipManager.CurrentSnapshot.Returns(CreateSnapshot(localSilo, remoteSilo, SiloStatus.Active));
         var options = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
         options.CurrentValue.Returns(new ClusterMembershipOptions
         {
