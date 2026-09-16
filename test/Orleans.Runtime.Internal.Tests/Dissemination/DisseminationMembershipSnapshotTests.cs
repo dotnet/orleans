@@ -639,7 +639,7 @@ public class DisseminationMembershipSnapshotTests
             SiloAddress? indirectProbingSilo,
             CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh = false) => Task.CompletedTask;
 
         public Task ProcessGossipSnapshot(
             MembershipTableSnapshot value,
@@ -723,7 +723,7 @@ public class DisseminationMembershipSnapshotTests
             SiloAddress? indirectProbingSilo,
             CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh = false) => Task.CompletedTask;
 
         public Task ProcessGossipSnapshot(
             MembershipTableSnapshot value,

@@ -3280,6 +3280,7 @@ public partial class DisseminationProtocolTests
 
         Assert.Equal(1, membershipManager.RefreshCallCount);
         Assert.Null(Assert.Single(membershipManager.RefreshTargetVersions));
+        Assert.False(Assert.Single(membershipManager.RefreshFreshnessRequirements));
     }
 
     [Fact]
@@ -4521,6 +4522,8 @@ public partial class DisseminationProtocolTests
 
         public List<MembershipVersion?> RefreshTargetVersions { get; } = new();
 
+        public List<bool> RefreshFreshnessRequirements { get; } = new();
+
         public Func<MembershipTableSnapshot, CancellationToken, Task>? ProcessGossipSnapshotHandler { get; set; }
 
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => EmptyUpdates(TestContext.Current.CancellationToken);
@@ -4533,10 +4536,11 @@ public partial class DisseminationProtocolTests
 
         public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
 
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
+        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh = false)
         {
             RefreshCallCount++;
             RefreshTargetVersions.Add(targetVersion);
+            RefreshFreshnessRequirements.Add(requireFresh);
             return _refresh?.Invoke(cancellationToken) ?? Task.CompletedTask;
         }
 
