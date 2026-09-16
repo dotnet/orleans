@@ -466,12 +466,16 @@ recovery reads, checkpoint publication and cleanup, ownership metadata updates,
 and catalog listing pages. Standard and premium Blob use the same provider
 operations with different account pricing and service characteristics.
 
-Use `orleans-journaling-provider-operations` and
-`orleans-journaling-provider-api-calls` to compare logical workload and SDK
-invocation/page amplification. Reconcile transaction cost with Azure metrics:
-automatic SDK retries and upload chunking can add transport requests within a
-single SDK invocation. The provider benchmarks export these measurements alongside
-the selected account tier, workload sizes, and operation outcomes.
+Use `orleans-journaling-provider-catalog-pages`, `catalog-items`, and
+`catalog-entries` (with the same prefix) to compare catalog traversal and
+delivered results. `orleans-journaling-provider-retries` counts explicit
+provider retries. The benchmarks pair these counters with independently
+measured operation counts, outcomes, payload bytes, and latency.
+
+Configure request counts, timing, and outcomes through host-owned Azure SDK
+diagnostics, Aspire integrations, or other application instrumentation.
+Reconcile transaction cost with Azure service metrics and the SDK's retry and
+upload behavior.
 
 ## Monitoring and Troubleshooting
 

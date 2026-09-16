@@ -166,7 +166,8 @@ catalog counts to zero for an empty selected namespace.
 
 ## Reports and units
 
-Schema version 1 JSON contains:
+Schema version 2 JSON contains runner-owned operation measurements and
+catalog/retry counters:
 
 | Field | Meaning |
 | --- | --- |
@@ -180,7 +181,7 @@ Schema version 1 JSON contains:
 | `CompletedPayloadBytes`, `PayloadBytesPerSecond` | Successfully committed or replayed caller bytes and bytes/window-second; catalog contributes zero |
 | `CompletedItems`, `ItemUnit` | Append records, replacements, checkpoint + replayed records, or catalog entries |
 | `Failures`, `Phase`, `Success` | Partial-result failure diagnostics and whole-run outcome, including verification/cleanup |
-| `ProviderMetrics` | Bounded-tag counters and duration summaries from the provider's exact DI `Microsoft.Orleans` meter |
+| `ProviderMetrics` | Catalog pages, candidate items, delivered entries, and explicit retries from the provider's exact DI `Microsoft.Orleans` meter |
 
 An append with eight records is **one** timed operation. Its p99 is the p99 of
 eight-record batch commits. Recovery and catalog latency include their complete
@@ -196,14 +197,32 @@ The JSON includes runtime/OS and explicit source/unit descriptions. Existing
 output files are preserved by create-new writes; export failure produces a
 nonzero exit and console diagnostics.
 
-Provider counters cover logical outcomes, SDK calls/pages, payload bytes, items,
-and explicit provider retries. Histogram summaries use fixed-memory logarithmic
-buckets with 10% widths starting at 0.001 ms; `P50UpperBound`, `P95UpperBound`,
-and `P99UpperBound` are bucket upper bounds. `Sum` is the counter total or
-duration sum, and `Observations` is the number of measurements received.
-Correlate SDK invocations/pages with Azure transaction metrics for cost
-accounting: SDK-internal retries and upload chunking can produce multiple
-transport requests per invocation.
+The four `orleans-journaling-provider-` counters describe provider semantics:
+
+| Suffix | Count |
+| --- | --- |
+| `catalog-pages` | Successful pages received during catalog listing, including empty pages |
+| `catalog-items` | Candidate items in those whole pages, before local filtering |
+| `catalog-entries` | Entries actually yielded to the catalog consumer |
+| `retries` | Explicit provider retries, grouped by reason |
+
+Every metric row contains `Instrument`, `Unit` (`count`), `Provider`, `Reason`,
+`Observations`, and `Sum`. `Sum` is an integer counter total; `Observations` is
+the number of measurements received. `Provider` preserves the provider-supplied
+label, and `Reason` is populated for retry counters. A completed catalog scan
+can receive more candidates than it yields. Append, replacement, and recovery
+runs can have an empty `ProviderMetrics` array when they perform no explicit
+provider retry. Their operation counts, outcomes, payload bytes, and latency
+percentiles come from the runner's own samples.
+
+Use host-owned Azure SDK diagnostics, Aspire integrations, or other application
+instrumentation for request counts, duration, outcomes, and transport attempts.
+Reconcile cost accounting with Azure service metrics and the configured SDK's
+retry and upload behavior. Catalog page/item counters measure traversal work.
+
+Schema version 2 identifies the catalog-only metric row shape and semantics.
+Historical schema version 1 reports retain the instruments and measured build
+from their original run; compare reports using their recorded schema and units.
 
 ## Bounded BenchmarkDotNet adapter
 

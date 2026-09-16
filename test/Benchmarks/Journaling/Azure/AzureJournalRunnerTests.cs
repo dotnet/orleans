@@ -1,9 +1,19 @@
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Azure;
+using Azure.Core;
+using Azure.Data.Tables;
+using Azure.Data.Tables.Models;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using DurableJobsJournaling;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Journaling;
+using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
 using TestExtensions;
 using Xunit;
@@ -97,26 +107,139 @@ public class AzureJournalRunnerTests
     [Fact]
     public void MetricsUseExactMeterAndMeasurementWindow()
     {
-        using var meter = new Meter("Microsoft.Orleans");
+        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var instruments = new OrleansInstruments(services.GetRequiredService<IMeterFactory>());
         using var foreign = new Meter("Microsoft.Orleans");
-        var count = meter.CreateCounter<long>("orleans-journaling-provider-operations");
-        var duration = meter.CreateHistogram<double>("orleans-journaling-provider-operation-duration", "ms");
-        var foreignCount = foreign.CreateCounter<long>(count.Name);
-        using var collector = new ProviderMetrics(meter);
-        count.Add(100);
+        var foreignCount = foreign.CreateCounter<long>("orleans-journaling-provider-catalog-pages");
+        using var collector = new ProviderMetrics(instruments.Meter);
+        var telemetry = new JournalStorageTelemetry(instruments);
+        telemetry.OnCatalogPage("orders-primary", 100);
         collector.Start();
         foreignCount.Add(1000);
-        count.Add(2, new KeyValuePair<string, object?>("operation", "append"));
-        duration.Record(5);
+        telemetry.OnCatalogPage("orders-primary", 0);
+        telemetry.OnCatalogPage("orders-primary", 3);
+        telemetry.OnCatalogEntry("orders-primary");
+        telemetry.OnCatalogEntry("orders-primary");
+        telemetry.OnRetry("orders-primary", "metadata_conflict");
+        telemetry.OnRetry("orders-primary", "metadata_conflict");
+        telemetry.OnRetry("orders-secondary", "metadata_conflict");
         var metrics = collector.Stop();
-        count.Add(100);
-        Assert.Equal(2, metrics.Count);
-        Assert.Equal(2, Assert.Single(metrics, metric => metric.Instrument == count.Name).Sum);
-        var histogram = Assert.Single(metrics, metric => metric.Instrument == duration.Name);
-        Assert.Equal(5, histogram.Mean);
-        Assert.InRange(histogram.P99UpperBound!.Value, 5, 5.5);
+        telemetry.OnCatalogPage("orders-primary", 100);
+        Assert.Equal(new ProviderMetric[]
+        {
+            new("orleans-journaling-provider-catalog-entries", "count", "orders-primary", "", 2, 2),
+            new("orleans-journaling-provider-catalog-items", "count", "orders-primary", "", 1, 3),
+            new("orleans-journaling-provider-catalog-pages", "count", "orders-primary", "", 2, 2),
+            new("orleans-journaling-provider-retries", "count", "orders-primary", "metadata_conflict", 2, 2),
+            new("orleans-journaling-provider-retries", "count", "orders-secondary", "metadata_conflict", 1, 1)
+        }, metrics);
         collector.Start();
         Assert.Empty(collector.Stop());
+    }
+
+    [Fact]
+    public void MetricsCollectOnlyCatalogCountersAndPreserveIntegerPrecision()
+    {
+        using var meter = new Meter("Microsoft.Orleans");
+        using var collector = new ProviderMetrics(meter);
+        var items = meter.CreateCounter<long>("orleans-journaling-provider-catalog-items");
+        var oldCalls = meter.CreateCounter<long>("orleans-journaling-provider-api-calls");
+        var oldOperations = meter.CreateCounter<long>("orleans-journaling-provider-operations");
+        var duration = meter.CreateHistogram<double>("orleans-journaling-provider-operation-duration", "ms");
+        var wrongType = meter.CreateHistogram<long>("orleans-journaling-provider-catalog-pages");
+        var futureMetric = meter.CreateCounter<long>("orleans-journaling-provider-unrelated");
+        collector.Start();
+        const long Count = 9_007_199_254_740_993;
+        items.Add(Count, new KeyValuePair<string, object?>("provider", "orders"));
+        items.Add(2, new KeyValuePair<string, object?>("provider", "orders"));
+        oldCalls.Add(100);
+        oldOperations.Add(100);
+        duration.Record(5);
+        wrongType.Record(10);
+        futureMetric.Add(100);
+        Assert.Equal(new ProviderMetric("orleans-journaling-provider-catalog-items", "count", "orders", "", 2, Count + 2),
+            Assert.Single(collector.Stop()));
+    }
+
+    [Fact]
+    public async Task MetricsCaptureActualVolatileCatalogEntries()
+    {
+        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var instruments = new OrleansInstruments(services.GetRequiredService<IMeterFactory>());
+        using var collector = new ProviderMetrics(instruments.Meter);
+        var provider = new VolatileJournalStorageProvider(Options.Create(new JournaledStateManagerOptions()), instruments);
+        var token = TestContext.Current.CancellationToken;
+        Assert.True(await provider.CreateStorage(new("due/a")).CreateIfNotExistsAsync(cancellationToken: token));
+        Assert.True(await provider.CreateStorage(new("due/b")).CreateIfNotExistsAsync(cancellationToken: token));
+        Assert.True(await provider.CreateStorage(new("future/c")).CreateIfNotExistsAsync(cancellationToken: token));
+        collector.Start();
+        var ids = new List<JournalId>();
+        await foreach (var entry in provider.ListAsync(new() { Prefix = new("due/") }, token))
+        {
+            ids.Add(entry.Id);
+        }
+
+        Assert.Equal(new JournalId[] { new("due/a"), new("due/b") }, ids);
+        Assert.Equal(new ProviderMetric("orleans-journaling-provider-catalog-entries", "count", "volatile", "", 2, 2),
+            Assert.Single(collector.Stop()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MetricsCaptureActualAzureCatalogPagesCandidatesAndEntries(bool table)
+    {
+        var builder = new MetricsSiloBuilder();
+        builder.Services.AddLogging().AddMetrics().AddSingleton<OrleansInstruments>();
+        if (table)
+        {
+            builder.AddAzureTableJournalStorage(options => options.TableServiceClient = new CatalogTableService());
+        }
+        else
+        {
+            builder.AddAzureBlobJournalStorage(options => options.BlobServiceClient = new CatalogBlobService());
+        }
+
+        await using var services = builder.Services.BuildServiceProvider();
+        using var collector = new ProviderMetrics(services.GetRequiredService<OrleansInstruments>().Meter);
+        var catalog = services.GetRequiredService<IJournalStorageCatalog>();
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        foreach (var participant in services.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
+        {
+            participant.Participate(lifecycle);
+        }
+
+        var token = TestContext.Current.CancellationToken;
+        await lifecycle.OnStart(token);
+        try
+        {
+            var options = new ListOptions { Prefix = new("catalog/"), MaxId = new("catalog/b") };
+            Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
+            collector.Start();
+            Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
+            var provider = table ? "azure_table" : "azure_blob";
+            Assert.Equal(new ProviderMetric[]
+            {
+                new("orleans-journaling-provider-catalog-entries", "count", provider, "", 2, 2),
+                new("orleans-journaling-provider-catalog-items", "count", provider, "", 1, 3),
+                new("orleans-journaling-provider-catalog-pages", "count", provider, "", 2, 2)
+            }, collector.Stop());
+
+            async Task<List<JournalId>> ReadIdsAsync()
+            {
+                var ids = new List<JournalId>();
+                await foreach (var entry in catalog.ListAsync(options, token))
+                {
+                    ids.Add(entry.Id);
+                }
+
+                return ids;
+            }
+        }
+        finally
+        {
+            await lifecycle.OnStop(token);
+        }
     }
 
     [Fact]
@@ -284,17 +407,33 @@ public class AzureJournalRunnerTests
         var prefix = Path.Combine(Path.GetTempPath(), "journal-report-" + Guid.NewGuid().ToString("N"));
         try
         {
-            var report = new AzureJournalReport(new() { Output = "secret-path", Operations = 1, Concurrency = 1 });
+            const long Items = 9_007_199_254_740_993;
+            var report = new AzureJournalReport(new() { Output = "secret-path", Operations = 1, Concurrency = 1 })
+            {
+                ProviderMetrics =
+                [
+                    new("orleans-journaling-provider-catalog-items", "count", "orders", "", 1, Items),
+                    new("orleans-journaling-provider-retries", "count", "orders", "metadata_conflict", 1, 1)
+                ]
+            };
             report.Failures.Add(BenchmarkFailure.From("setup", new RequestFailedException(403, "sig=secret")));
             await report.ExportAsync(prefix);
             var json = await File.ReadAllTextAsync(prefix + ".json", TestContext.Current.CancellationToken);
             var csv = await File.ReadAllTextAsync(prefix + ".csv", TestContext.Current.CancellationToken);
             using var document = JsonDocument.Parse(json);
-            Assert.Equal(1, document.RootElement.GetProperty("SchemaVersion").GetInt32());
+            Assert.Equal(2, document.RootElement.GetProperty("SchemaVersion").GetInt32());
+            Assert.Equal("counts of catalog pages, candidate items, delivered entries, and explicit provider retries",
+                document.RootElement.GetProperty("TelemetryUnit").GetString());
+            var metric = document.RootElement.GetProperty("ProviderMetrics")[0];
+            Assert.Equal(new[] { "Instrument", "Unit", "Provider", "Reason", "Observations", "Sum" },
+                metric.EnumerateObject().Select(property => property.Name));
+            Assert.Equal(Items, metric.GetProperty("Sum").GetInt64());
+            Assert.Equal("metadata_conflict", document.RootElement.GetProperty("ProviderMetrics")[1].GetProperty("Reason").GetString());
             Assert.Equal("AzuriteBlob", document.RootElement.GetProperty("Configuration").GetProperty("Backend").GetString());
             Assert.Equal(403, document.RootElement.GetProperty("Failures")[0].GetProperty("HttpStatus").GetInt32());
             Assert.Contains("provider_metrics_json", csv);
             Assert.Contains("payload_bytes_per_second", csv);
+            Assert.Contains(JsonSerializer.Serialize(report.ProviderMetrics, AzureJournalReport.JsonOptions).Replace("\"", "\"\"", StringComparison.Ordinal), csv);
             Assert.Equal("IJournalStorage / IJournalStorageCatalog", document.RootElement.GetProperty("Source").GetString());
             Assert.DoesNotContain("secret", json);
             Assert.DoesNotContain("secret", csv);
@@ -405,6 +544,81 @@ public class AzureJournalRunnerTests
         Assert.Equal(expected, backend.ToString());
         Assert.Equal(emulator, backend.IsEmulator());
         Assert.Equal(table, backend.UsesTableJournal());
+    }
+
+    private sealed class MetricsSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
+    }
+
+    private sealed class CatalogBlobService : BlobServiceClient
+    {
+        private readonly CatalogContainer _container = new();
+        public override BlobContainerClient GetBlobContainerClient(string blobContainerName) => _container;
+    }
+
+    private sealed class CatalogContainer : BlobContainerClient
+    {
+        public override Task<Response<BlobContainerInfo>> CreateIfNotExistsAsync(
+            PublicAccessType publicAccessType = PublicAccessType.None,
+            IDictionary<string, string>? metadata = null,
+            BlobContainerEncryptionScopeOptions? encryptionScopeOptions = null,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(Response.FromValue(
+                BlobsModelFactory.BlobContainerInfo(new ETag("created"), DateTimeOffset.UnixEpoch), new CatalogResponse()));
+
+        public override AsyncPageable<BlobItem> GetBlobsAsync(GetBlobsOptions options, CancellationToken cancellationToken = default)
+        {
+            Assert.Equal("wal/catalog/", options.Prefix);
+            var items = new[] { "catalog/a", "catalog/b", "catalog/c" }.Select(id => BlobsModelFactory.BlobItem(
+                name: $"wal/{id}", deleted: false,
+                properties: BlobsModelFactory.BlobItemProperties(accessTierInferred: false, blobType: BlobType.Append))).ToArray();
+            return AsyncPageable<BlobItem>.FromPages(
+            [
+                Page<BlobItem>.FromValues([], "next", new CatalogResponse()),
+                Page<BlobItem>.FromValues(items, null, new CatalogResponse())
+            ]);
+        }
+    }
+
+    private sealed class CatalogTableService : TableServiceClient
+    {
+        private readonly CatalogTable _table = new();
+        public override TableClient GetTableClient(string tableName) => _table;
+    }
+
+    private sealed class CatalogTable : TableClient
+    {
+        public override Task<Response<TableItem>> CreateIfNotExistsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(Response.FromValue(new TableItem("journal"), new CatalogResponse()));
+
+        public override AsyncPageable<T> QueryAsync<T>(
+            string? filter = null, int? maxPerPage = null, IEnumerable<string>? select = null, CancellationToken cancellationToken = default)
+        {
+            Assert.Contains("PartitionKey le", filter);
+            Assert.Equal(1000, maxPerPage);
+            var items = new[] { "catalog/a", "catalog/b", "catalog/c" }
+                .Select(id => (T)(ITableEntity)new TableEntity { ["JournalId"] = id }).ToArray();
+            return AsyncPageable<T>.FromPages(
+            [
+                Page<T>.FromValues([], "next", new CatalogResponse()),
+                Page<T>.FromValues(items, null, new CatalogResponse())
+            ]);
+        }
+    }
+
+    private sealed class CatalogResponse : Response
+    {
+        public override int Status => 200;
+        public override string ReasonPhrase => "OK";
+        public override Stream? ContentStream { get; set; }
+        public override string ClientRequestId { get; set; } = "";
+        public override void Dispose() { }
+        protected override bool ContainsHeader(string name) => false;
+        protected override IEnumerable<HttpHeader> EnumerateHeaders() => [];
+        protected override bool TryGetHeader(string name, out string value) { value = ""; return false; }
+        protected override bool TryGetHeaderValues(string name, out IEnumerable<string> values) { values = []; return false; }
     }
 
     private sealed class FakeScenario(AzureJournalReport report) : IAzureJournalScenario

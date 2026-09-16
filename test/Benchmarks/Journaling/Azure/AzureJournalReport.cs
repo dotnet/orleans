@@ -50,7 +50,7 @@ internal sealed record OperationResult(int Index, string Outcome, double Latency
 
 internal sealed class AzureJournalReport(AzureJournalOptions configuration)
 {
-    public int SchemaVersion => 1;
+    public int SchemaVersion => 2;
     public string Source => "IJournalStorage / IJournalStorageCatalog";
     public string LoadModel => "closed-loop fixed work; one independent journal per mutation";
     public string LatencyUnit => "ms; Stopwatch around each awaited operation, including recovery/catalog validation";
@@ -62,7 +62,7 @@ internal sealed class AzureJournalReport(AzureJournalOptions configuration)
         AzureJournalWorkload.RecoveryReplay => "checkpoint plus payload records",
         _ => "catalog entries"
     };
-    public string TelemetryUnit => "provider logical operations and SDK invocations/pages; Azure metrics establish billable transport requests";
+    public string TelemetryUnit => "counts of catalog pages, candidate items, delivered entries, and explicit provider retries";
     public AzureJournalOptions Configuration { get; } = configuration;
     public string Runtime { get; } = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
     public string OperatingSystem { get; } = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
