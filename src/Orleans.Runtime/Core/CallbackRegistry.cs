@@ -60,6 +60,15 @@ internal sealed class CallbackRegistry
         }
     }
 
+    internal bool ContainsKey(CorrelationId id)
+    {
+        var stripe = GetStripe(id);
+        lock (stripe.Lock)
+        {
+            return stripe.Callbacks.ContainsKey(id);
+        }
+    }
+
     public bool TryRemove(CallbackData callback)
     {
         var id = callback.Message.Id;
