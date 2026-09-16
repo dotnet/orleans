@@ -172,6 +172,7 @@ catalog/retry counters:
 | Field | Meaning |
 | --- | --- |
 | `Configuration` | Backend, workload, seed, sizes, work caps, requested concurrency/count, deadlines, and opt-in |
+| `Build` | Loaded benchmark, Journaling, and Azure Storage assembly names, source revisions, and module version IDs |
 | `Resource`, `Ownership`, `Cleanup` | Generated resource identity and lifecycle outcome |
 | `AccountVerification`, `AccountKind`, `AccountSku` | Emulator, data-plane-verified Blob tier, or requested-unverified Table |
 | `Completed`, `Failed`, `Cancelled`, `NotStarted` | Mutually exclusive outcomes summing to the requested operation count |
@@ -193,7 +194,15 @@ operations for tail-latency analysis.
 CSV has one summary row, invariant-culture numeric values, quoted fields, and
 the same configuration, raw operations, failures, and provider metrics in JSON
 columns. Use `Import-Csv` to read it and `ConvertFrom-Json` for nested columns.
-The JSON includes runtime/OS and explicit source/unit descriptions. Existing
+The JSON includes runtime/OS and explicit source/unit descriptions. `Build`
+(also exported as CSV `build_json`) identifies each of the three loaded
+assemblies using its compiler-generated `ModuleVersionId` and the hexadecimal
+source revision appended by the .NET SDK to its informational version. A
+`SourceRevision` of `null` explicitly records missing or unrecognized revision
+metadata. Module IDs distinguish compiled code, including local changes built
+on the same revision; retain the binaries with reports for exact reproduction.
+This provenance comes from the loaded assemblies, so running an older build
+after changing the checkout still reports that build's identity. Existing
 output files are preserved by create-new writes; export failure produces a
 nonzero exit and console diagnostics.
 
@@ -235,6 +244,10 @@ The `Dry` smoke preset also retains the three-iteration cap. BDN's reported
 operation is one provider call or complete traversal.
 Its mean describes iteration samples; use the fixed-work runner's independently
 timed operation distribution for request-tail analysis.
+Each benchmark process emits the same build information in an `Azure benchmark
+build:` JSON line during global setup. Retain the BDN log under the configured
+`--artifacts` directory alongside its summary reports, especially for
+multi-runtime or isolated-process comparisons.
 
 ```powershell
 # Correctness-only smoke uses the already built assembly in process.

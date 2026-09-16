@@ -64,6 +64,7 @@ internal sealed class AzureJournalReport(AzureJournalOptions configuration)
     };
     public string TelemetryUnit => "counts of catalog pages, candidate items, delivered entries, and explicit provider retries";
     public AzureJournalOptions Configuration { get; } = configuration;
+    public BenchmarkBuildInfo Build { get; } = BenchmarkBuildInfo.Current;
     public string Runtime { get; } = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
     public string OperatingSystem { get; } = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
     public string? Resource { get; set; }
@@ -105,7 +106,7 @@ internal sealed class AzureJournalReport(AzureJournalOptions configuration)
             "schema_version", "backend", "workload", "phase", "success", "resource", "ownership", "cleanup",
             "account_verification", "account_kind", "account_sku", "completed", "failed", "cancelled", "not_started",
             "elapsed_seconds", "operations_per_second", "payload_bytes_per_second", "completed_payload_bytes", "completed_items",
-            "p50_ms", "p95_ms", "p99_ms", "item_unit", "configuration_json", "operations_json", "failures_json", "provider_metrics_json"
+            "p50_ms", "p95_ms", "p99_ms", "item_unit", "configuration_json", "operations_json", "failures_json", "provider_metrics_json", "build_json"
         ];
         object?[] values =
         [
@@ -114,7 +115,8 @@ internal sealed class AzureJournalReport(AzureJournalOptions configuration)
             ElapsedSeconds, CompletedOperationsPerSecond, PayloadBytesPerSecond, CompletedPayloadBytes, CompletedItems,
             SuccessfulLatency.P50Ms, SuccessfulLatency.P95Ms, SuccessfulLatency.P99Ms, ItemUnit,
             JsonSerializer.Serialize(Configuration, JsonOptions), JsonSerializer.Serialize(Operations, JsonOptions),
-            JsonSerializer.Serialize(Failures, JsonOptions), JsonSerializer.Serialize(ProviderMetrics, JsonOptions)
+            JsonSerializer.Serialize(Failures, JsonOptions), JsonSerializer.Serialize(ProviderMetrics, JsonOptions),
+            JsonSerializer.Serialize(Build, JsonOptions)
         ];
         var csv = string.Join(',', headers) + "\n" + string.Join(',', values.Select(CsvField)) + "\n";
         await WriteNewAsync(prefix + ".json", json);

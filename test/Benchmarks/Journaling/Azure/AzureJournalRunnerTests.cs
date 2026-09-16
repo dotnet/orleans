@@ -1,4 +1,6 @@
 using System.Diagnostics.Metrics;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Text.Json;
 using Azure;
 using Azure.Core;
@@ -434,6 +436,9 @@ public class AzureJournalRunnerTests
             Assert.Contains("provider_metrics_json", csv);
             Assert.Contains("payload_bytes_per_second", csv);
             Assert.Contains(JsonSerializer.Serialize(report.ProviderMetrics, AzureJournalReport.JsonOptions).Replace("\"", "\"\"", StringComparison.Ordinal), csv);
+            Assert.Contains("build_json", csv);
+            Assert.Equal(report.Build, document.RootElement.GetProperty("Build").Deserialize<BenchmarkBuildInfo>());
+            Assert.Contains(JsonSerializer.Serialize(report.Build, AzureJournalReport.JsonOptions).Replace("\"", "\"\"", StringComparison.Ordinal), csv);
             Assert.Equal("IJournalStorage / IJournalStorageCatalog", document.RootElement.GetProperty("Source").GetString());
             Assert.DoesNotContain("secret", json);
             Assert.DoesNotContain("secret", csv);
@@ -444,6 +449,53 @@ public class AzureJournalRunnerTests
             File.Delete(prefix + ".json");
             File.Delete(prefix + ".csv");
         }
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("10.0.0. Commit Hash: <developer build>", null)]
+    [InlineData("10.0.0+short", null)]
+    [InlineData("10.0.0+https://example.invalid/?sig=sensitive", null)]
+    [InlineData("10.0.0+012345678901234567890123456789012345678G", null)]
+    [InlineData("10.0.0+0123456789012345678901234567890123456789-dirty", null)]
+    [InlineData("10.0.0. Commit Hash: <developer build>+ABCDEF0123456789ABCDEF0123456789ABCDEF01", "abcdef0123456789abcdef0123456789abcdef01")]
+    [InlineData("10.0.0+0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    public void BuildProvenanceExportsOnlySanitizedSourceRevision(string? version, string? expected)
+        => Assert.Equal(expected, BenchmarkAssemblyBuild.ParseSourceRevision(version));
+
+    [Fact]
+    public void BuildProvenanceUsesLoadedAssemblyMetadata()
+    {
+        const string Revision = "0123456789012345678901234567890123456789";
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("BenchmarkProvenanceFixture"), AssemblyBuilderAccess.Run);
+        var module = assembly.DefineDynamicModule("Fixture");
+        assembly.SetCustomAttribute(new CustomAttributeBuilder(
+            typeof(AssemblyInformationalVersionAttribute).GetConstructor([typeof(string)])!, ["10.0.0+" + Revision]));
+        Assert.Equal(new BenchmarkAssemblyBuild("BenchmarkProvenanceFixture", Revision, module.ModuleVersionId),
+            BenchmarkAssemblyBuild.FromAssembly(assembly));
+    }
+
+    [Fact]
+    public void BuildProvenanceIdentifiesBenchmarkAndProviderModulesInBdnLog()
+    {
+        var build = new AzureJournalReport(new()).Build;
+        Assert.Equal("Benchmarks", build.Benchmark.Name);
+        Assert.Equal(typeof(AzureJournalReport).Module.ModuleVersionId, build.Benchmark.ModuleVersionId);
+        Assert.Equal("Orleans.Journaling", build.Journaling.Name);
+        Assert.Equal(typeof(IJournalStorage).Module.ModuleVersionId, build.Journaling.ModuleVersionId);
+        Assert.Equal("Orleans.Journaling.AzureStorage", build.AzureStorage.Name);
+        Assert.Equal(typeof(AzureBlobJournalStorageOptions).Module.ModuleVersionId, build.AzureStorage.ModuleVersionId);
+        Assert.NotEqual(Guid.Empty, build.Benchmark.ModuleVersionId);
+        Assert.NotEqual(Guid.Empty, build.Journaling.ModuleVersionId);
+        Assert.NotEqual(Guid.Empty, build.AzureStorage.ModuleVersionId);
+        using var output = new StringWriter();
+        BenchmarkBuildInfo.WriteTo(output);
+        var line = Assert.Single(output.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        const string Prefix = "Azure benchmark build: ";
+        Assert.StartsWith(Prefix, line);
+        Assert.Equal(build, JsonSerializer.Deserialize<BenchmarkBuildInfo>(line[Prefix.Length..]));
+        Assert.NotNull(typeof(AzureJournalBenchmarks).GetMethod(nameof(AzureJournalBenchmarks.ReportBuild))!
+            .GetCustomAttribute<BenchmarkDotNet.Attributes.GlobalSetupAttribute>());
     }
 
     [Fact]

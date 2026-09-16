@@ -43,6 +43,9 @@ public class AzureJournalBenchmarks
         .Split(',').Select(value => int.Parse(value, System.Globalization.CultureInfo.InvariantCulture)).Distinct().Take(4).ToArray() is { Length: <= 3 } sizes
             ? sizes : throw new ArgumentException("Select at most three payload sizes.");
 
+    [GlobalSetup]
+    public void ReportBuild() => BenchmarkBuildInfo.WriteTo(Console.Out);
+
     [IterationSetup]
     public void Setup()
     {
