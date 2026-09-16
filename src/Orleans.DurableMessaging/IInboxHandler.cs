@@ -53,10 +53,16 @@ public interface IInboxHandler
     /// may call this method multiple times per message when searching for a matching handler.
     /// </para>
     /// <para>
-    /// Selection is read-only. <see cref="IInboxHandlerContext.CreateEnvelope"/>,
-    /// <see cref="IInboxHandlerContext.Send"/>, and <see cref="IInboxHandlerContext.Outbox"/>
-    /// throw when called from this method. After selection, <see cref="PrepareAsync"/> prepares local
-    /// values and returns the action which stages journaled effects and outgoing messages.
+    /// Implement this method as a pure metadata predicate, keeping grain state and injected
+    /// durable state unchanged. Purity is the handler implementation's responsibility. Stage
+    /// journaled effects and outgoing messages in the action returned by <see cref="PrepareAsync"/> after selection completes.
+    /// </para>
+    /// <para>
+    /// The selection context exposes envelope metadata and grain identity. Its
+    /// <see cref="IInboxHandlerContext.CreateEnvelope"/>, <see cref="IInboxHandlerContext.Send"/>,
+    /// and <see cref="IInboxHandlerContext.Outbox"/> members throw during selection.
+    /// The runtime also rejects explicit journal write and delete requests during selection
+    /// and handling, preserving the completion commit after the prepared action completes.
     /// </para>
     /// <para>
     /// <b>Handler Precedence:</b> When multiple handlers return <c>true</c>, the first registered
