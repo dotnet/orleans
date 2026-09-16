@@ -17,7 +17,8 @@ public class AzureJournalBenchmarks
         public Configuration()
         {
             AddJob(Job.Default.WithStrategy(RunStrategy.Monitoring).WithWarmupCount(1).WithIterationCount(3).AsDefault());
-            AddJob(Job.Default.DontEnforcePowerPlan().AsMutator());
+            AddJob(Job.Default.DontEnforcePowerPlan().WithLaunchCount(1).AsMutator());
+            AddValidator(new AzureJournalBenchmarkValidator());
         }
     }
 

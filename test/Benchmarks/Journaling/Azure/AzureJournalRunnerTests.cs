@@ -386,6 +386,58 @@ public class AzureJournalRunnerTests
         Assert.Equal("deleted", result.Cleanup);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PartialProviderInitializationStopsAttemptedStagesBeforeDisposal(bool cancel)
+    {
+        var events = new List<string>();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var builder = new MetricsSiloBuilder();
+        builder.Services.AddLogging().AddMetrics().AddSingleton<OrleansInstruments>();
+        builder.AddAzureBlobJournalStorage(options => options.BlobServiceClient = new CatalogBlobService());
+        var startupFailure = new InvalidOperationException("startup failed");
+        builder.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(_ => new FailingLifecycleParticipant(
+            events, () =>
+            {
+                if (cancel)
+                {
+                    cancellation.Cancel();
+                    cancellation.Token.ThrowIfCancellationRequested();
+                }
+
+                throw startupFailure;
+            }));
+        var options = new AzureJournalOptions();
+        var report = new AzureJournalReport(options);
+        var scenario = new AzureJournalScenario(options, report);
+        try
+        {
+            var error = await Record.ExceptionAsync(() => scenario.InitializeProviderAsync(builder.Services, cancellation.Token));
+            if (cancel)
+            {
+                Assert.IsAssignableFrom<OperationCanceledException>(error);
+            }
+            else
+            {
+                Assert.Same(startupFailure, error);
+            }
+
+            report.Failures.Add(BenchmarkFailure.From(report.Phase, error!));
+            Assert.Equal(new[] { "start:early", "start:failed" }, events);
+            await scenario.CleanupAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(new[] { "start:early", "start:failed", "stop:failed", "stop:early", "dispose" }, events);
+            Assert.Equal("initialize", Assert.Single(report.Failures).Phase);
+            Assert.False(report.Success);
+            await scenario.CleanupAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(5, events.Count);
+        }
+        finally
+        {
+            await scenario.CleanupAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
     [Fact]
     public async Task VerificationFailureRetainsCompletedOperationsAndFailsTheRun()
     {
@@ -665,6 +717,24 @@ public class AzureJournalRunnerTests
     {
         public IServiceCollection Services { get; } = new ServiceCollection();
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
+    }
+
+    private sealed class FailingLifecycleParticipant(List<string> events, Action fail) : ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    {
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe("early", ServiceLifecycleStage.RuntimeInitialize + 1,
+                onStart: _ => { events.Add("start:early"); return Task.CompletedTask; },
+                onStop: token => { token.ThrowIfCancellationRequested(); events.Add("stop:early"); return Task.CompletedTask; });
+            lifecycle.Subscribe("failed", ServiceLifecycleStage.RuntimeInitialize + 2,
+                onStart: _ => { events.Add("start:failed"); fail(); return Task.CompletedTask; },
+                onStop: token => { token.ThrowIfCancellationRequested(); events.Add("stop:failed"); return Task.CompletedTask; });
+            lifecycle.Subscribe("unreached", ServiceLifecycleStage.RuntimeInitialize + 3,
+                onStart: _ => { events.Add("start:unreached"); return Task.CompletedTask; },
+                onStop: _ => { events.Add("stop:unreached"); return Task.CompletedTask; });
+        }
+
+        public void Dispose() => events.Add("dispose");
     }
 
     private sealed class CatalogBlobService : BlobServiceClient

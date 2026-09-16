@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
@@ -60,13 +61,17 @@ if (backend == StorageBackend.PremiumBlob)
     });
 }
 
-if (!backend.IsEmulator() && builder.ExecutionContext.IsPublishMode)
-{
-    storage.ClearDefaultRoleAssignments();
-    tableStorage.ClearDefaultRoleAssignments();
-}
-
 var tables = tableStorage.AddTables("tables");
+
+SetStorageRoles(storage, backend.UsesTableJournal()
+    ? [StorageBuiltInRole.StorageTableDataContributor]
+    : backend == StorageBackend.PremiumBlob
+        ? [StorageBuiltInRole.StorageBlobDataContributor]
+        : [StorageBuiltInRole.StorageBlobDataContributor, StorageBuiltInRole.StorageTableDataContributor]);
+if (backend == StorageBackend.PremiumBlob)
+{
+    SetStorageRoles(tableStorage, [StorageBuiltInRole.StorageTableDataContributor]);
+}
 
 var orleans = builder.AddOrleans("cluster")
     .WithClustering(tables);
@@ -105,6 +110,14 @@ builder.AddProject<Projects.DurableJobsJournaling_Web>("web")
     .WithReplicas(1);
 
 builder.Build().Run();
+
+static void SetStorageRoles(IResourceBuilder<AzureStorageResource> storage, StorageBuiltInRole[] roles)
+{
+    storage.ClearDefaultRoleAssignments()
+        .WithAnnotation(new DefaultRoleAssignmentsAnnotation(roles
+            .Select(role => new RoleDefinition(role.ToString(), StorageBuiltInRole.GetBuiltInRoleName(role)))
+            .ToHashSet()));
+}
 
 static void RemoveUnsupportedPremiumBlobStorageOutputs(AzureResourceInfrastructure infrastructure)
 {

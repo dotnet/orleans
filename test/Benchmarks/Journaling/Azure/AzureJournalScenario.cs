@@ -39,7 +39,6 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
     private TableServiceClient? _tableService;
     private readonly List<IJournalStorage> _journals = [];
     private OwnedBenchmarkResource? _resource;
-    private bool _started;
     private byte[] _expectedHash = null!;
     private HashSet<JournalId> _expectedCatalog = [];
 
@@ -119,19 +118,7 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
 
         builder.Services.AddKeyedSingleton<IJournalFormat>(FormatKey, new BenchmarkByteFormat());
         builder.Services.Configure<JournaledStateManagerOptions>(value => value.JournalFormatKey = FormatKey);
-        _services = builder.Services.BuildServiceProvider();
-        _metrics = new ProviderMetrics(_services.GetRequiredService<OrleansInstruments>().Meter);
-        _provider = _services.GetRequiredService<IJournalStorageProvider>();
-        _catalog = _services.GetRequiredService<IJournalStorageCatalog>();
-        _lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
-        foreach (var participant in _services.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
-        {
-            participant.Participate(_lifecycle);
-        }
-
-        report.Phase = "initialize";
-        await _lifecycle.OnStart(cancellationToken);
-        _started = true;
+        await InitializeProviderAsync(builder.Services, cancellationToken);
         report.Phase = "seed";
         if (options.IsCatalog)
         {
@@ -157,6 +144,22 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
         report.Phase = "warmup";
         await ExecuteAsync(options.Operations, cancellationToken);
         await VerifyAsync([options.Operations], cancellationToken);
+    }
+
+    internal async Task InitializeProviderAsync(IServiceCollection services, CancellationToken cancellationToken)
+    {
+        _services = services.BuildServiceProvider();
+        _metrics = new ProviderMetrics(_services.GetRequiredService<OrleansInstruments>().Meter);
+        _provider = _services.GetRequiredService<IJournalStorageProvider>();
+        _catalog = _services.GetRequiredService<IJournalStorageCatalog>();
+        _lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        foreach (var participant in _services.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
+        {
+            participant.Participate(_lifecycle);
+        }
+
+        report.Phase = "initialize";
+        await _lifecycle.OnStart(cancellationToken);
     }
 
     public async Task ExecuteAsync(int index, CancellationToken cancellationToken)
@@ -302,18 +305,17 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
     {
         try
         {
-            if (_started)
+            if (_lifecycle is { } lifecycle)
             {
+                _lifecycle = null;
                 try
                 {
-                    await _lifecycle!.OnStop(cancellationToken);
+                    await lifecycle.OnStop(cancellationToken);
                 }
                 catch (Exception exception)
                 {
                     report.Failures.Add(BenchmarkFailure.From("cleanup-lifecycle", exception));
                 }
-
-                _started = false;
             }
 
             if (_resource is not null)

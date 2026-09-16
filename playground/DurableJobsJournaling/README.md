@@ -47,6 +47,14 @@ provision chargeable resources. Use an explicitly approved Azure development
 environment and its standard Aspire authentication/deployment procedure.
 `PremiumBlob` configures `BlockBlobStorage` with `Premium_LRS`; standard accounts
 use `Standard_LRS`.
+Storage role defaults match the selected services: Blob and Table Data
+Contributor for a shared standard Blob/clustering account, Table Data Contributor
+for Table journals, and separate Blob-only journal and Table-only clustering
+assignments for premium Blob. Generic manifest publishing retains role modules
+with `principalId` and `principalType` inputs for the deployment's intended
+identity. An identity-aware Aspire deployment environment can apply these defaults
+to its application identities. Configure that environment and identity before
+deployment; local Azurite uses its emulator credentials.
 Compare backends using the same compute, region, account redundancy, job
 distribution, and `Playground:DurableJobs` settings.
 

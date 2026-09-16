@@ -246,6 +246,11 @@ bridges. Job mutators enforce one warmup and three measured iterations,
 including when CLI toolchain/job selection replaces the default monitoring job.
 The `Dry` smoke preset also retains the three-iteration cap. BDN's reported
 operation is one provider call or complete traversal.
+Before execution, a benchmark validator checks the final resolved job: 1-3
+measured iterations, 0-1 warmup iterations, one invocation, unroll factor 1,
+and one process launch. It rejects configurations outside those limits before
+resource setup, including adaptive iteration counts. Use the fixed-work runner
+for larger explicitly sized comparisons.
 Its mean describes iteration samples; use the fixed-work runner's independently
 timed operation distribution for request-tail analysis.
 The BDN path leaves provider metric collection inactive, so its timings include
@@ -295,6 +300,9 @@ creation was acknowledged to this run, after all workers join. Ctrl+C cancels
 setup/measurement/verification while cleanup retains its own finite deadline.
 An operation failure stops further scheduling, joins active workers, and exports
 partial results with a nonzero exit.
+Cleanup stops every attempted lifecycle stage in reverse order, including a
+stage whose startup failed or was cancelled, before deleting the owned resource
+and disposing the service provider.
 
 If creation's response is lost, `creation-unconfirmed` and
 `manual-check-required` identify the resource to inspect. A final HTTP 409 also
