@@ -54,7 +54,7 @@ public class TransactionQueueStorageWorkTests
         var lifecycle = new TestLifecycle();
         var context = new TestGrainContext(services, lifecycle);
         var state = new TransactionalState<TestState>(
-            new TransactionalStateConfiguration { StateName = "state", StorageName = "storage" },
+            new TransactionalStateConfiguration(new TransactionalStateAttribute("state", "storage")),
             new TestGrainContextAccessor(context), null!, null!, NullLogger<TransactionalState<TestState>>.Instance);
         var wrapper = new FaultInjectionTransactionalState<TestState>(
             state, null!, null!, NullLogger<FaultInjectionTransactionalState<TestState>>.Instance);
@@ -69,7 +69,9 @@ public class TransactionQueueStorageWorkTests
         var worker = Assert.IsType<BatchWorkerFromDelegate>(typeof(TransactionQueue<TestState>)
             .GetField("storageWorker", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(queue));
         await worker.WaitForCurrentWorkToBeServiced().WaitAsync(TestContext.Current.CancellationToken);
-        var batch = CreateDirtyBatch();
+        var batch = Assert.IsType<StorageBatch<TestState>>(typeof(TransactionQueue<TestState>)
+            .GetField("storageBatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(queue));
+        batch.Read(DateTime.UtcNow);
         bool? outcome = null;
         Task? stop = null;
         batch.FollowUpAction(success =>
@@ -78,8 +80,6 @@ public class TransactionQueueStorageWorkTests
             Assert.False(stop.IsCompleted);
             outcome = success;
         });
-        typeof(TransactionQueue<TestState>).GetField("storageBatch", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(queue, batch);
-
         var work = worker.NotifyAndWaitForWorkToBeServiced();
         await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
         stop = lifecycle.Observers[stopStage].OnStop(TestContext.Current.CancellationToken);
@@ -843,7 +843,12 @@ public class TransactionQueueStorageWorkTests
         public GrainId GrainId { get; } = GrainId.Create("test", "fault-injection");
         public ActivationId ActivationId { get; } = ActivationId.NewId();
         public GrainReference GrainReference => new TestGrainReference(GrainId, null!);
-        public GrainAddress Address => GrainAddress.GetAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1), GrainId, ActivationId);
+        public GrainAddress Address => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1),
+            GrainId = GrainId,
+            ActivationId = ActivationId,
+        };
         public IServiceProvider ActivationServices => activationServices;
         public IGrainLifecycle ObservableLifecycle => lifecycle;
         public object? GrainInstance => null;
