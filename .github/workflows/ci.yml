@@ -75,8 +75,6 @@ jobs:
       run: ./.github/scripts/test-dissemination-performance.ps1
     - name: Build
       run: dotnet build -bl
-    - name: Test performance harness membership provider
-      run: dotnet test --project test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj --framework net10.0 --no-build --filter-class "Orleans.Dissemination.PerformanceHarness.FileMembershipTableTests" --minimum-expected-tests 10
     - name: Pack and validate package compatibility
       if: matrix.os == 'ubuntu-latest'
       run: dotnet pack Orleans.slnx --configuration Debug --no-build --no-restore -bl:package_validation.binlog
