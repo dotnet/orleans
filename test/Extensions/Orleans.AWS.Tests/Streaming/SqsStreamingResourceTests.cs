@@ -468,7 +468,9 @@ public sealed class SqsStreamingResourceTests
                 aws,
                 new SqsStreamingOptions
                 {
-                    ServiceId = conflictingServiceId, PartitionCount = 2, FifoQueue = fifoQueue,
+                    ServiceId = conflictingServiceId,
+                    PartitionCount = 2,
+                    FifoQueue = fifoQueue,
                 }));
 
         var queueName = Assert.IsType<string>(Assert.Single(GetQueues(existing)).QueueName);
