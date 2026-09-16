@@ -46,6 +46,8 @@ namespace Orleans.Streams
 
         private Task? receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
+        private AdmissionGate _workAdmission = new();
+        private Task? _shutdownTask;
         private StreamSequenceToken? _lastReadToken;
         private bool _useLegacyDeliveryProgress;
         private bool IsShutdown => timer is null;
@@ -156,9 +158,17 @@ namespace Orleans.Streams
         ///     Same applies to shutdown.
         /// </summary>
         /// <returns></returns>
-        public Task Initialize(CancellationToken cancellationToken)
+        public async Task Initialize(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_shutdownTask is { } shutdownTask)
+            {
+                await shutdownTask.WaitAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                _shutdownTask = null;
+                _workAdmission = new();
+            }
+
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
             _activePumpTask = Task.CompletedTask;
@@ -215,7 +225,6 @@ namespace Orleans.Streams
             _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object?>("name", StatisticUniquePostfix)));
 
             LogInfoTakingQueue(new(QueueId));
-            return Task.CompletedTask;
 
             async Task InitializeReceiver()
             {
@@ -232,12 +241,18 @@ namespace Orleans.Streams
             }
         }
 
-        public async Task Shutdown(CancellationToken cancellationToken)
+        public Task Shutdown(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            return _shutdownTask ??= ShutdownCore(cancellationToken);
+        }
+
+        private async Task ShutdownCore(CancellationToken cancellationToken)
+        {
             // Stop pulling from queues that are not in my range anymore.
             LogInfoShutdown(GetType().Name, new(QueueId));
 
+            var drainTask = _workAdmission.CloseAsync();
             var asyncTimer = timer;
             timer = null;
             if (asyncTimer is not null)
@@ -245,6 +260,9 @@ namespace Orleans.Streams
                 asyncTimer.Dispose();
                 StreamingEvents.EmitPullingAgentStopped(streamProviderName, Silo, QueueId);
             }
+
+            // Pending registrations leave subscriber progress uncertain, even if they exit during the drain.
+            var hasPendingRegistrations = pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false });
 
             Task? localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
@@ -254,10 +272,18 @@ namespace Orleans.Streams
             }
 
             await _activePumpTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await drainTask;
 
-            // Final delivery progress scan so the receiver has the latest watermark
-            // before FlushAsync persists the checkpoint.
-            NotifyDeliveryProgress();
+            // All accepted work has finished progress bookkeeping and released its batch/registration pins.
+            if (!hasPendingRegistrations)
+            {
+                NotifyDeliveryProgress();
+            }
+
+            foreach (var streamData in pubSubCache.Values)
+            {
+                streamData.DisposeAll(logger);
+            }
 
             this.queueCache = null;
 
@@ -279,23 +305,9 @@ namespace Orleans.Streams
                 // We already logged individual exceptions for individual calls to Shutdown. No need to log again.
             }
 
-            // Drain any in-progress background registration tasks before proceeding.
-            // Setting timer = null above makes IsShutdown = true, which causes registrations
-            // to stop retrying, so these tasks will complete quickly.
-            var inFlightRegistrations = pubSubCache.Values
-                .Select(v => v.RegistrationTask)
-                .OfType<Task>()
-                .ToList();
-            if (inFlightRegistrations.Count > 0)
-            {
-                await Task.WhenAll(inFlightRegistrations)
-                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-
             var unregisterTasks = new List<Task>();
             foreach (var tuple in pubSubCache)
             {
-                tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 LogInfoUnregisterProducer(streamId);
                 unregisterTasks.Add(pubSub.UnregisterProducer(streamId, GrainId, cancellationToken));
@@ -337,7 +349,8 @@ namespace Orleans.Streams
             string? filterData,
             StreamSequenceToken? cacheToken)
         {
-            if (IsShutdown) return;
+            using var admission = _workAdmission.TryEnter();
+            if (!admission.Entered || IsShutdown) return;
 
             if (!pubSubCache.TryGetValue(streamId, out var streamDataCollection))
             {
@@ -1222,22 +1235,38 @@ namespace Orleans.Streams
                 return;
             }
 
+            var workAdmission = _workAdmission;
+            if (!workAdmission.TryEnterUnscoped())
+            {
+                return;
+            }
+
             var streamData = new StreamConsumerCollection(now);
 
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
-            var pinCursor = queueCache is null ? null : GetCacheCursorOrThrow(streamId, firstToken);
+            IQueueCacheCursor? pinCursor;
+            try
+            {
+                pinCursor = queueCache is null ? null : GetCacheCursorOrThrow(streamId, firstToken);
+            }
+            catch
+            {
+                workAdmission.Exit();
+                throw;
+            }
+
             streamData.RegistrationTask = RegisterStreamAsync();
             pubSubCache.Add(streamId, streamData);
 
             async Task RegisterStreamAsync()
             {
-                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-
                 try
                 {
+                    await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
                     if (IsShutdown || cancellationToken.IsCancellationRequested)
                     {
                         return;
@@ -1281,8 +1310,15 @@ namespace Orleans.Streams
                 }
                 finally
                 {
-                    streamData.RegistrationTask = null;
-                    pinCursor?.Dispose();
+                    try
+                    {
+                        streamData.RegistrationTask = null;
+                        pinCursor?.Dispose();
+                    }
+                    finally
+                    {
+                        workAdmission.Exit();
+                    }
                 }
             }
 
@@ -1365,6 +1401,9 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData, CancellationToken cancellationToken = default)
         {
+            using var admission = _workAdmission.TryEnter();
+            if (!admission.Entered || IsShutdown) return;
+
             TagList? tags = null;
             try
             {
