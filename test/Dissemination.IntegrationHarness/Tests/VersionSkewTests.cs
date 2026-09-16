@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Xunit;
+using Xunit.Sdk;
+using Xunit.v3;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Parallelization(Mode = ParallelMode.None)]
 
 namespace Orleans.Dissemination.IntegrationHarness;
 
