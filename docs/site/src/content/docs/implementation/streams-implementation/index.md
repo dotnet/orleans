@@ -132,7 +132,7 @@ Source: [`PersistentStreamPullingManager`](https://github.com/dotnet/orleans/blo
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
-Each initialization creates a fresh `AdmissionGate`. Scoped admissions cover queue pumping, stream registration, subscriber handshakes and attachment, and cursor delivery. System-target shutdown closes admission and drains actual accepted operations before updating final delivery progress and releasing queue resources. Grain hosting creates an additional cancellation scope for interruptible subscription and delivery waits; its publisher registry separately drains actual registration completions. Reinitialization awaits the full previous shutdown before opening the next run's admission.
+Each initialization creates a fresh `AdmissionGate`. Scoped admissions cover queue pumping, stream registration, subscriber handshakes and attachment, and cursor delivery. System-target shutdown closes admission and drains actual accepted operations before updating final delivery progress and releasing queue resources. Grain hosting creates an additional cancellation scope for interruptible subscription and delivery waits; its publisher registry separately drains actual registration completions. Cancellation preserves acknowledged delivery and drained-subscription progress, while unresolved handshakes withhold checkpoint advancement. Reinitialization awaits the full previous shutdown before opening the next run's admission.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 

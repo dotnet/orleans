@@ -154,7 +154,7 @@ namespace Orleans.Streams
             => GrainContext.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken, ++consumerData.HandshakeRequestId)).Unwrap();
 
         Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
-            => GrainContext.RunOrQueueTask(() => RunConsumerCursor(consumerData));
+            => GrainContext.RunOrQueueTask(() => RunConsumerCursor(consumerData, ShutdownToken));
 
         Task ITestAccessor.RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken)
             => GrainContext.RunOrQueueTask(() => RunQueuePump(myQueueId, cancellationToken));
@@ -1654,8 +1654,13 @@ namespace Orleans.Streams
                     }
                     catch (Exception exc)
                     {
-                        _useLegacyDeliveryProgress = true;
-                        LogErrorDeliveringMessages(consumerData.StreamId, exc);
+                        var canceled = exc is OperationCanceledException && cancellationToken.IsCancellationRequested;
+                        if (!canceled)
+                        {
+                            _useLegacyDeliveryProgress = true;
+                            LogErrorDeliveringMessages(consumerData.StreamId, exc);
+                        }
+
                         if (handshakeGeneration != consumerData.HandshakeGeneration)
                         {
                             continue;
@@ -1670,12 +1675,10 @@ namespace Orleans.Streams
                             consumerData.Cursor?.RecordDeliveryFailure();
                         }
 
-                        if (exc is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                        if (canceled)
                         {
                             throw;
                         }
-
-                        LogErrorDeliveringMessages(consumerData.StreamId, exc);
 
                         exceptionOccured = exc is ClientNotAvailableException || forceFaultSubscription
                             ? exc
@@ -1701,7 +1704,11 @@ namespace Orleans.Streams
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _useLegacyDeliveryProgress = true;
+                if (!IsShutdown)
+                {
+                    _useLegacyDeliveryProgress = true;
+                }
+
                 consumerData.State = StreamConsumerDataState.Inactive;
             }
             catch (Exception exc)

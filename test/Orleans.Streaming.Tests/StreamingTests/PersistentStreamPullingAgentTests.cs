@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -461,7 +462,8 @@ namespace UnitTests.StreamingTests
             TimeProvider? timeProvider = null,
             StreamPullingAgentOptions? options = null,
             IStreamFilter? filter = null,
-            IStreamFailureHandler? failureHandler = null)
+            IStreamFailureHandler? failureHandler = null,
+            bool grainHosted = false)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -493,6 +495,30 @@ namespace UnitTests.StreamingTests
             var queueAdapter = Substitute.For<IQueueAdapter>();
             queueAdapter.Name.Returns("provider");
             queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(receiver);
+
+            if (grainHosted)
+            {
+                var context = Substitute.For<IGrainContext>();
+                var grainId = PullingAgentId.Create("provider", queueId);
+                context.GrainId.Returns(grainId);
+                context.Address.Returns(new GrainAddress
+                {
+                    SiloAddress = siloAddress,
+                    GrainId = grainId,
+                    ActivationId = ActivationId.NewId(),
+                });
+                var services = Substitute.For<IServiceProvider>();
+                services.GetService(typeof(ILogger<WorkItemGroup>)).Returns(NullLogger<WorkItemGroup>.Instance);
+                context.ActivationServices.Returns(services);
+                var scheduler = new WorkItemGroup(context, Options.Create(new SchedulingOptions()), CreateSchedulerInstruments());
+                context.Scheduler.Returns(scheduler);
+                return new PersistentStreamPullingAgent(
+                    context, "provider", pubSub!, filter ?? new NoOpStreamFilter(), queueId,
+                    options ?? new StreamPullingAgentOptions(), queueAdapter, queueAdapterCache!,
+                    failureHandler ?? new NoOpStreamDeliveryFailureHandler(),
+                    new FixedBackoff(TimeSpan.FromMilliseconds(1)), new FixedBackoff(TimeSpan.FromMilliseconds(1)),
+                    timeProvider ?? TimeProvider.System, NullLoggerFactory.Instance, timerRegistry, grainFactory: null!);
+            }
 
             return new PullingAgentTarget(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
@@ -2803,13 +2829,17 @@ namespace UnitTests.StreamingTests
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
-        [InlineData(false, false)]
-        [InlineData(false, true)]
-        [InlineData(true, false)]
-        [InlineData(true, true)]
-        public async Task Checkpoint_RegisteredConsumerHandshakeBlocksOnlyUntilCompletion(bool legacyMode, bool completeHandshake)
+        [InlineData(false, false, false)]
+        [InlineData(false, true, false)]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, false)]
+        [InlineData(false, false, true)]
+        [InlineData(false, true, true)]
+        [InlineData(true, false, true)]
+        [InlineData(true, true, true)]
+        public async Task Checkpoint_RegisteredConsumerHandshakeBlocksOnlyUntilCompletion(bool legacyMode, bool completeHandshake, bool grainHosted)
         {
-            await using var scenario = await CreateCheckpointScenario();
+            await using var scenario = await CreateCheckpointScenario(grainHosted: grainHosted);
             await scenario.Read((scenario.Idle, 1), (scenario.Busy, 50), (scenario.Busy, 200));
             await scenario.Remove(scenario.Idle);
             if (legacyMode)
@@ -2856,12 +2886,24 @@ namespace UnitTests.StreamingTests
                 scenario.Checkpoints.Clear();
                 var shutdown = scenario.Accessor.Shutdown();
                 await scenario.Accessor.GetPubSubCache();
-                Assert.False(shutdown.IsCompleted);
-                Assert.Empty(scenario.Checkpoints);
-                releaseHandshake.TrySetResult(replayToken);
-                consumer.ReleaseDelivery();
+                if (!grainHosted)
+                {
+                    Assert.False(shutdown.IsCompleted);
+                    Assert.Empty(scenario.Checkpoints);
+                    releaseHandshake.TrySetResult(replayToken);
+                    consumer.ReleaseDelivery();
+                }
+
                 await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                Assert.Equal(completeHandshake ? 200 : 50, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                if (grainHosted && !completeHandshake)
+                {
+                    Assert.False(releaseHandshake.Task.IsCompleted);
+                    Assert.Empty(scenario.Checkpoints);
+                }
+                else
+                {
+                    Assert.Equal(grainHosted || !completeHandshake ? 50 : 200, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                }
             }
             finally
             {
@@ -2874,13 +2916,16 @@ namespace UnitTests.StreamingTests
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
-        [InlineData("none", 100)]
-        [InlineData("completed", 100)]
-        [InlineData("overlapping", 1)]
+        [InlineData("none", 100, false)]
+        [InlineData("completed", 100, false)]
+        [InlineData("overlapping", 1, false)]
+        [InlineData("none", 50, true)]
+        [InlineData("completed", 50, true)]
+        [InlineData("overlapping", 1, true)]
         public async Task Checkpoint_HandshakeAccountsForDeliveryStartedWhileAwaitingResponse(
-            string deliveryTiming, long expectedCheckpoint)
+            string deliveryTiming, long expectedCheckpoint, bool grainHosted)
         {
-            await using var scenario = await CreateCheckpointScenario();
+            await using var scenario = await CreateCheckpointScenario(grainHosted: grainHosted);
             await scenario.Read((scenario.Idle, 1), (scenario.Busy, 50), (scenario.Busy, 100));
             using var replayPin = scenario.Cache.GetCacheCursor(scenario.Busy.StreamId, new EventSequenceTokenV2(50));
             var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2951,10 +2996,15 @@ namespace UnitTests.StreamingTests
                 scenario.Checkpoints.Clear();
                 var shutdown = scenario.Accessor.Shutdown();
                 await scenario.Accessor.GetPubSubCache();
-                Assert.False(shutdown.IsCompleted);
-                Assert.Empty(scenario.Checkpoints);
-                releaseReplay.TrySetResult(null);
+                if (!grainHosted)
+                {
+                    Assert.False(shutdown.IsCompleted);
+                    Assert.Empty(scenario.Checkpoints);
+                    releaseReplay.TrySetResult(null);
+                }
+
                 await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(!grainHosted, releaseReplay.Task.IsCompleted);
                 Assert.Equal(expectedCheckpoint, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
             }
             finally
@@ -3704,11 +3754,13 @@ namespace UnitTests.StreamingTests
         }
 
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task Checkpoint_InFlightDeliveryConstrainsProgressUntilAcknowledged(bool acknowledge)
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public async Task Checkpoint_InFlightDeliveryConstrainsProgressUntilAcknowledged(bool acknowledge, bool grainHosted)
         {
-            await using var scenario = await CreateCheckpointScenario();
+            await using var scenario = await CreateCheckpointScenario(grainHosted: grainHosted);
             await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
             var consumer = new RecordingConsumer();
             scenario.Busy.StreamConsumer = consumer;
@@ -3728,14 +3780,19 @@ namespace UnitTests.StreamingTests
 
                 var shutdown = scenario.Accessor.Shutdown();
                 await scenario.Accessor.GetPubSubCache();
-                if (!acknowledge)
+                if (!acknowledge && !grainHosted)
                 {
                     Assert.False(shutdown.IsCompleted);
                     Assert.Empty(scenario.Checkpoints);
                 }
-                consumer.ReleaseDelivery();
+                if (!grainHosted)
+                {
+                    consumer.ReleaseDelivery();
+                }
+
                 await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                Assert.Equal(200, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                Assert.Equal(acknowledge || !grainHosted, consumer.IsDeliveryReleased);
+                Assert.Equal(grainHosted && !acknowledge ? 2 : 200, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
             }
             finally
             {
@@ -3880,7 +3937,7 @@ namespace UnitTests.StreamingTests
 
         private static async Task<CheckpointScenario> CreateCheckpointScenario(
             bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null, bool grainHosted = false)
         {
             IQueueCache cache;
             List<StreamSequenceToken?> checkpoints;
@@ -3907,7 +3964,7 @@ namespace UnitTests.StreamingTests
             var (accessor, _, idleStream) = await CreateInitializedAgentWithStream(
                 idleId, new EventSequenceTokenV2(1), cache,
                 new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize },
-                filtered ? Substitute.For<IStreamFilter>() : null, timeProvider);
+                filtered ? Substitute.For<IStreamFilter>() : null, timeProvider, grainHosted: grainHosted);
             await accessor.RegisterStream(busyId, new EventSequenceTokenV2(2), DateTime.UtcNow);
             var busyStream = (await accessor.GetPubSubCache())[busyId];
 
@@ -3975,7 +4032,8 @@ namespace UnitTests.StreamingTests
                 IStreamFilter? filter = null,
                 TimeProvider? timeProvider = null,
                 IQueueAdapterReceiver? receiver = null,
-                IStreamFailureHandler? failureHandler = null)
+                IStreamFailureHandler? failureHandler = null,
+                bool grainHosted = false)
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -3992,11 +4050,13 @@ namespace UnitTests.StreamingTests
                 timeProvider: timeProvider,
                 options: options,
                 filter: filter,
-                failureHandler: failureHandler);
+                failureHandler: failureHandler,
+                grainHosted: grainHosted);
             var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
-            await InitializeAgent(agent);
-            await accessor.RegisterStream(streamId, registrationToken, DateTime.UtcNow);
-            var streamData = (await accessor.GetPubSubCache()).Single().Value;
+            await InitializeAgent(agent).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await accessor.RegisterStream(streamId, registrationToken, DateTime.UtcNow)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var streamData = (await accessor.GetPubSubCache().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Single().Value;
             return (accessor, pubSub, streamData);
         }
 
