@@ -61,6 +61,8 @@ public sealed class MeasurementTests
         Assert.Equal(40, pair.Disabled.P95ConvergenceMilliseconds);
         Assert.Equal(30, pair.Enabled.P95ConvergenceMilliseconds);
         Assert.Contains("99.00 -> 10.00", result.ToMarkdown(), StringComparison.Ordinal);
+        Assert.Contains("Enabled mode explicitly opts into the subsystem and both namespaces", result.ToMarkdown(), StringComparison.Ordinal);
+        Assert.Contains("production dissemination tuning defaults", result.ToMarkdown(), StringComparison.Ordinal);
     }
 
     [Theory]

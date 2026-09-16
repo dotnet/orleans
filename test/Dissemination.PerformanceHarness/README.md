@@ -57,8 +57,10 @@ Readiness time and RPC costs stay inside recovery and total cost windows.
 
 Automatic load publication is paused by disposing its timer on the publisher
 scheduler. The timer field retains its disposed reference for original-runtime
-shutdown. Enabled runs use the candidate's production cadence after peer support
-confirmation; replacement startup and support confirmation remain inside churn costs.
+shutdown. Enabled runs explicitly opt into the subsystem and both namespaces while
+retaining the candidate's production dissemination tuning defaults. Offered rounds
+begin after peer support confirmation; replacement startup and support confirmation
+remain inside churn costs.
 
 The Linux/Windows memory guard plans 128 MiB per silo plus 1 GiB controller headroom.
 Commands, startup, shutdown and processes have deadlines; the workflow has a

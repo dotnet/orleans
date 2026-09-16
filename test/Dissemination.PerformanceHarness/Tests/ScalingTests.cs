@@ -301,7 +301,7 @@ public sealed class ScalingTests
                 Excludes = "controller process CPU/allocation, storage disk byte accounting, cross-machine latency, NIC/TCP wire overhead, production storage/placement/grain work",
                 PartitionComparison = "retire partitioned connections at both endpoints, then confirm healed connections with bidirectional acknowledged control RPCs before the same single publication round on all paths; teardown and readiness remain inside partition recovery time and total cost",
                 OriginalBaselineAttribution = "original-to-current disabled deltas include all intervening source changes, including lifecycle prerequisites and load notification/tombstone/dedup changes; only current off/on isolates enabling the subsystem on the same binary",
-                Interpretation = "separate original-legacy, current-explicitly-disabled and current-explicitly-enabled-supported measurements",
+                Interpretation = "separate original-legacy, current-explicitly-disabled and current-explicitly-enabled-supported measurements; enabled mode explicitly opts into the subsystem and both namespaces, retaining candidate production dissemination tuning defaults",
             },
         };
         await cluster.Save("window-start.json", start);

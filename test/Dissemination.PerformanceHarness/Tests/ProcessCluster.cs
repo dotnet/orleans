@@ -61,7 +61,7 @@ internal sealed class ProcessCluster : IAsyncDisposable
             Assert.NotEqual(Baseline, manifest.SourceRevision);
         }
 
-        var name = $"{runtime}-{_sequence++}-{(enabled ? "enabled" : "default")}";
+        var name = $"{runtime}-{_sequence++}-{(enabled ? "enabled" : "disabled")}";
         var node = new SiloProcess(
             binaryDirectory,
             new(name, Path.GetFileName(Directory), _membershipDirectory, port ?? AvailablePort(), Environment.ProcessId,

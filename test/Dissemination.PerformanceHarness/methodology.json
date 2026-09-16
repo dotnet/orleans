@@ -29,7 +29,7 @@
   "measurement": {
     "test": "Scaling_SelectedRuntimePathsConverge",
     "paths": ["OriginalLegacy", "CurrentDisabled", "CurrentEnabledSupported"],
-    "enablement": "Candidate off/on explicitly sets the subsystem and both namespace flags. Overlay, repair, coalescing and namespace cadence use the selected runtime's settings.",
+    "enablement": "Enabled mode explicitly opts into the subsystem and both namespaces; disabled mode explicitly opts out. Both retain the candidate's production dissemination tuning defaults for overlay, repair, coalescing and namespace cadence.",
     "warmup": "Two production publication rounds and complete enabled-peer support confirmation precede the cost window. Preparation time, CPU and allocation totals are reported separately.",
     "publication": "Dispose the automatic DeploymentLoadPublisher timer on its scheduler while retaining the field reference for original-runtime lifecycle shutdown. Invoke the production PublishStatistics method once per active node, then require exact load dictionary inventory and values using IncludeFields=true.",
     "stable": "Repeat equal closed-loop publication/convergence rounds.",

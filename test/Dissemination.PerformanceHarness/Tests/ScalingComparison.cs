@@ -61,6 +61,7 @@ internal sealed record ScalingComparison(ScalingPair[] Pairs, int IncompletePair
     {
         var result = new StringBuilder();
         result.AppendLine("### Dissemination disabled vs enabled");
+        result.AppendLine("Enabled mode explicitly opts into the subsystem and both namespaces, retaining the candidate's production dissemination tuning defaults.");
         result.AppendLine("Each cell is disabled -> enabled. Costs per offered publication include background and control traffic. Single-host, resource-shared measurements; raw totals, environment and per-node data are in the artifacts.");
         result.AppendLine();
         result.AppendLine("| Silos / scenario / repetition | RPCs / publication | KiB / publication | Allocated KiB / publication | CPU ms / publication | Median ms | P95 ms |");
