@@ -10,6 +10,8 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
     private const int BufferSize = 1024 * 1024;
     private readonly RecoverableStreamReceiver<AdoNetStreamMessage> _inner;
     private readonly AdoNetRecoverableStream _source;
+    private readonly object _shutdownLock = new();
+    private Task? _shutdownTask;
     private int _shutdownNotified;
 
     internal Action<AdoNetQueueAdapterReceiver>? OnShutdown { get; set; }
@@ -71,11 +73,20 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
     Task IQueueAdapterReceiver.Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
         => ShutdownWithCancellation(timeout, cancellationToken);
 
-    private async Task ShutdownWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
+    private Task ShutdownWithCancellation(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_shutdownLock)
+        {
+            return _shutdownTask ??= ShutdownCore(timeout);
+        }
+    }
+
+    private async Task ShutdownCore(TimeSpan timeout)
     {
         try
         {
-            await ((IQueueAdapterReceiver)_inner).Shutdown(timeout, cancellationToken);
+            await ((IQueueAdapterReceiver)_inner).Shutdown(timeout, CancellationToken.None);
         }
         finally
         {
