@@ -2926,7 +2926,7 @@ namespace UnitTests.StreamingTests
             var releaseDelivery = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakeStarted.TrySetResult();
                     return releaseHandshake.Task;
@@ -3014,7 +3014,7 @@ namespace UnitTests.StreamingTests
             var handshakes = 0;
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     if (++handshakes == 1)
                     {
@@ -3120,7 +3120,7 @@ namespace UnitTests.StreamingTests
             var calls = 0;
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     if (++calls == 1)
                     {
@@ -3304,7 +3304,8 @@ namespace UnitTests.StreamingTests
                 streamId, new EventSequenceTokenV2(50), cache, new StreamPullingAgentOptions(), failureHandler: failureHandler);
             var terminalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var terminalResult = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            pubSub.UnregisterConsumer(Arg.Any<GuidId>(), Arg.Any<QualifiedStreamId>(), Arg.Any<CancellationToken>())
+            var agent = (PersistentStreamPullingAgent)accessor;
+            pubSub.UnregisterConsumerFromProducer(Arg.Any<GuidId>(), Arg.Any<QualifiedStreamId>(), agent.GrainId, Arg.Any<CancellationToken>())
                 .Returns(_ =>
                 {
                     terminalStarted.TrySetResult();
@@ -3322,10 +3323,10 @@ namespace UnitTests.StreamingTests
             {
                 OnDelivery = _ => operation == "unregister"
                     ? Task.FromException<StreamHandshakeToken?>(
-                        (ClientNotAvailableException)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ClientNotAvailableException)))
+                        Tester.ClientConnectionTests.ClientObserverRoutingTests.CreateUnavailableClientException())
                     : Task.FromResult<StreamHandshakeToken?>(
                         StreamHandshakeToken.CreateStartToken(new EventSequenceTokenV2(0))),
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakeStarted.TrySetResult();
                     return handshakeResult.Task;
@@ -3337,24 +3338,24 @@ namespace UnitTests.StreamingTests
             data.IsRegistered = true;
             data.LastProcessedToken = new EventSequenceTokenV2(50);
             data.Cursor = cache.GetCacheCursor(streamId.StreamId, new EventSequenceTokenV2(100));
-            var delivery = accessor.RunConsumerCursor(data);
+            var replacementConsumer = new ImmediateRecordingConsumer();
+            var replacement = stream.AddConsumer(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                streamId, replacementConsumer, null, DateTime.UtcNow);
+            replacement.IsRegistered = true;
+            var replacementCursor = cache.GetCacheCursor(streamId.StreamId, new EventSequenceTokenV2(50));
+            replacement.Cursor = replacementCursor;
+            Task delivery = Task.CompletedTask;
             Task attachment = Task.CompletedTask;
 
             try
             {
-                await terminalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                var replacementConsumer = new ImmediateRecordingConsumer();
-                var replacement = stream.AddConsumer(
-                    GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
-                    streamId, replacementConsumer, null, DateTime.UtcNow);
-                replacement.IsRegistered = true;
-                var replacementCursor = cache.GetCacheCursor(streamId.StreamId, new EventSequenceTokenV2(50));
-                replacement.Cursor = replacementCursor;
                 attachment = accessor.AddSubscriber(data);
                 await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                delivery = accessor.RunConsumerCursor(data);
+                await terminalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 if (notifyBeforeHandshakeCompletes)
                 {
-                    var agent = (PersistentStreamPullingAgent)accessor;
                     await agent.RunOrQueueTask(() => agent.RemoveSubscriber(
                         data.SubscriptionId, streamId, TestContext.Current.CancellationToken));
                     Assert.Null(data.Cursor);
@@ -3386,12 +3387,12 @@ namespace UnitTests.StreamingTests
                 Assert.Equal(new long[] { 50, 100 }, replacementConsumer.DeliveredTokens.Select(token => token.SequenceNumber));
                 await pubSub.Received(operation == "fault" ? 1 : 0).FaultSubscription(
                     streamId, data.SubscriptionId, Arg.Any<CancellationToken>());
-                await pubSub.Received(operation == "unregister" ? 1 : 0).UnregisterConsumer(
-                    data.SubscriptionId, streamId, Arg.Any<CancellationToken>());
+                await pubSub.Received(operation == "unregister" ? 1 : 0).UnregisterConsumerFromProducer(
+                    data.SubscriptionId, streamId, agent.GrainId, Arg.Any<CancellationToken>());
                 await pubSub.DidNotReceive().FaultSubscription(
                     streamId, replacement.SubscriptionId, Arg.Any<CancellationToken>());
-                await pubSub.DidNotReceive().UnregisterConsumer(
-                    replacement.SubscriptionId, streamId, Arg.Any<CancellationToken>());
+                await pubSub.DidNotReceive().UnregisterConsumerFromProducer(
+                    replacement.SubscriptionId, streamId, agent.GrainId, Arg.Any<CancellationToken>());
             }
             finally
             {
@@ -3757,7 +3758,7 @@ namespace UnitTests.StreamingTests
             var handshakes = 0;
             var consumer = new RecordingConsumer
             {
-                OnHandshake = () =>
+                OnHandshake = _ =>
                 {
                     handshakes++;
                     started.TrySetResult();
@@ -3838,7 +3839,7 @@ namespace UnitTests.StreamingTests
             cache.AddToCache([new TestBatchContainer(streamId.StreamId, token)]);
             var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(Arg.Any<QualifiedStreamId>(), Arg.Any<GrainId>(), Arg.Any<CancellationToken>())
                 .Returns(call =>
                 {
@@ -3988,7 +3989,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var token = new EventSequenceTokenV2(1);
-            var pubSub = Substitute.For<IStreamPubSub>();
+            var pubSub = Substitute.For<IStreamPubSubRuntime>();
             pubSub.RegisterProducer(Arg.Any<QualifiedStreamId>(), Arg.Any<GrainId>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
             var cleanupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -4016,7 +4017,7 @@ namespace UnitTests.StreamingTests
                 var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var consumer = new RecordingConsumer
                 {
-                    OnHandshake = () =>
+                    OnHandshake = _ =>
                     {
                         started.TrySetResult();
                         return release.Task;
@@ -4309,13 +4310,12 @@ namespace UnitTests.StreamingTests
             var shutdownTask = testAccessor.Shutdown();
             try
             {
-                await shutdownTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await testAccessor.GetPubSubCache().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.False(shutdownTask.IsCompleted);
                 Assert.False(registration.Task.IsCompleted);
-                Assert.True(receiverShutdownStarted.Task.IsCompletedSuccessfully);
+                Assert.False(receiverShutdownStarted.Task.IsCompleted);
                 Assert.Empty(queueCache.DeliveryProgressTokens);
                 Assert.Equal(0, queueCache.DeliveryProgressCallCount);
-                await pubSub.Received(1).UnregisterProducer(
-                    new QualifiedStreamId("provider", streamId), agent.GrainId, Arg.Any<CancellationToken>());
 
                 if (registrationFails)
                 {
@@ -4346,6 +4346,8 @@ namespace UnitTests.StreamingTests
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);
             await receiver.Received(1).Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+            await pubSub.Received(1).UnregisterProducer(
+                new QualifiedStreamId("provider", streamId), agent.GrainId, Arg.Any<CancellationToken>());
         }
 
         [TestSuite("BVT")]

@@ -120,7 +120,7 @@ public partial class PersistentStreamPullingAgentTests
     [TestProvider("None")]
     [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public async Task Shutdown_CancelsPendingSubscriberHandshake()
+    public async Task Shutdown_DrainsPendingSubscriberHandshake()
     {
         var pubSub = Substitute.For<IStreamPubSubRuntime>();
         pubSub.RegisterProducer(default, default, Arg.Any<CancellationToken>())
@@ -152,11 +152,18 @@ public partial class PersistentStreamPullingAgentTests
             var token = await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.True(token.CanBeCanceled);
             Assert.False(token.IsCancellationRequested);
-            await accessor.Shutdown().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var shutdown = accessor.Shutdown();
+            await accessor.GetPubSubCache();
+            Assert.False(shutdown.IsCompleted);
+            Assert.False(token.IsCancellationRequested);
+            Assert.False(handshake.Task.IsCompleted);
+            await receiver.DidNotReceive().Shutdown(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>());
+            handshake.SetResult(null);
+            await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.True(token.IsCancellationRequested);
-            Assert.False(handshake.Task.IsCompleted);
-            Assert.False(data.IsRegistered);
+            Assert.True(data.IsRegistered);
+            Assert.Equal(0, data.PendingHandshakes);
             Assert.Empty(consumer.DeliveredTokens);
             Assert.Equal(0, cache.DeliveryProgressCallCount);
             Assert.Empty(await accessor.GetPubSubCache());

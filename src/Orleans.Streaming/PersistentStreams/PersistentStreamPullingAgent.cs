@@ -289,11 +289,9 @@ namespace Orleans.Streams
                 StreamingEvents.EmitPullingAgentStopped(streamProviderName, Silo, QueueId);
             }
 
-            // Canceled registrations can remove themselves from the cache before producer cleanup.
+            // Registrations can remove themselves from the cache before producer cleanup.
             var streams = pubSubCache.ToArray();
-            var hasPendingSubscriptions = streams.Any(static entry => entry.Value.RegistrationTask is not null
-                || entry.Value.AllConsumers().Any(static consumer => consumer.PendingHandshakes != 0));
-            _shutdownCancellation?.Cancel();
+            var hasPendingRegistrations = streams.Any(static entry => entry.Value.RegistrationTask is not null);
 
             Task? localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
@@ -303,6 +301,7 @@ namespace Orleans.Streams
             }
 
             await workDrained;
+            _shutdownCancellation?.Cancel();
 
             try
             {
@@ -314,8 +313,8 @@ namespace Orleans.Streams
                 _retirementCancellation.Dispose();
             }
 
-            // Canceled registrations and handshakes retain their pre-shutdown checkpoint barrier.
-            if (!hasPendingSubscriptions)
+            // Registrations which exit during shutdown retain their checkpoint barrier.
+            if (!hasPendingRegistrations)
             {
                 NotifyDeliveryProgress();
             }
