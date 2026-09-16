@@ -28,6 +28,23 @@ public interface IJournaledStateManager : IAsyncDisposable
     void RegisterState(string name, IJournaledState state);
 
     /// <summary>
+    /// Registers an observer for state operations, initialization replay, and terminal failure notifications.
+    /// </summary>
+    /// <param name="observer">The observer.</param>
+    /// <remarks>
+    /// Observers must be registered before <see cref="InitializeAsync"/> begins.
+    /// Each operation uses a stable snapshot of registered observers. The default implementation
+    /// throws <see cref="NotSupportedException"/>; implementations supporting observers override this method.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="observer"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The observer is already registered.</exception>
+    /// <exception cref="NotSupportedException">
+    /// Initialization has started, or the manager uses the default implementation.
+    /// </exception>
+    void RegisterObserver(IJournaledStateObserver observer) =>
+        throw new NotSupportedException("This journaled state manager does not support observers.");
+
+    /// <summary>
     /// Attempts to get a state registered with the manager.
     /// </summary>
     /// <param name="name">The state's stable identifier.</param>

@@ -18,6 +18,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 #endif
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IJournaledState> _statesMap = [];
+    private readonly HashSet<IJournaledStateObserver> _observers = [];
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
@@ -141,6 +142,25 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
 
         _workSignal.Signal();
+    }
+
+    public void RegisterObserver(IJournaledStateObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        lock (_lock)
+        {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_workLoop is not null)
+            {
+                throw new NotSupportedException(
+                    "Registering a journaled state observer after initialization has started is not supported.");
+            }
+
+            if (!_observers.Add(observer))
+            {
+                throw new InvalidOperationException("The journaled state observer is already registered.");
+            }
+        }
     }
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
@@ -268,6 +288,34 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
+
+                                    IJournaledStateObserver[] observers;
+                                    lock (_lock)
+                                    {
+                                        observers = [.. _observers];
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        await observer.OnWritePreparingAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        await observer.OnWriteFinalizingAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        try
+                                        {
+                                            observer.OnWriteStarted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnWriteStarted));
+                                        }
+                                    }
 
                                     lock (_lock)
                                     {
@@ -432,11 +480,34 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         }
                                     }
 
+                                    foreach (var observer in observers)
+                                    {
+                                        try
+                                        {
+                                            observer.OnWriteCompleted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnWriteCompleted));
+                                        }
+                                    }
+
                                     break;
                                 }
 
                             case DeleteStateWorkItem:
                                 {
+                                    IJournaledStateObserver[] observers;
+                                    lock (_lock)
+                                    {
+                                        observers = [.. _observers];
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        await observer.OnDeletePreparingAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    }
+
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -455,6 +526,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                                         _deletionGeneration++;
                                     }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        try
+                                        {
+                                            observer.OnDeleteCompleted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnDeleteCompleted));
+                                        }
+                                    }
+
                                     break;
                                 }
 
@@ -548,14 +632,33 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private void Fence(Exception exception)
     {
+        IJournaledStateObserver[] observers;
         lock (_lock)
         {
+            if (_state is ManagerState.Fenced)
+            {
+                return;
+            }
+
             _state = ManagerState.Fenced;
             _failure = exception;
+            observers = [.. _observers];
         }
 
         try
         {
+            foreach (var observer in observers)
+            {
+                try
+                {
+                    observer.OnFaulted(exception);
+                }
+                catch (Exception notificationException)
+                {
+                    LogObserverError(_shared.Logger, notificationException, nameof(IJournaledStateObserver.OnFaulted));
+                }
+            }
+
             if (!_shutdownCancellation.IsCancellationRequested)
             {
                 LogErrorProcessingWorkItems(_shared.Logger, exception);
@@ -645,6 +748,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        IJournaledStateObserver[] observers;
+        lock (_lock)
+        {
+            ThrowIfStateOperationsUnavailable();
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            observer.OnDeleteRequested();
+        }
+
         Task task;
         bool didEnqueue;
         lock (_lock)
@@ -674,6 +789,24 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        IJournaledStateObserver[] observers;
+        lock (_lock)
+        {
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            try
+            {
+                observer.OnRecoveryStarted();
+            }
+            catch (Exception exception)
+            {
+                LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnRecoveryStarted));
+            }
+        }
+
         lock (_lock)
         {
             ResetForRecovery();
@@ -718,6 +851,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         LogRetiredStateDetected(_shared.Logger, name);
                     }
                 }
+            }
+        }
+
+        foreach (var observer in observers)
+        {
+            try
+            {
+                observer.OnRecoveryCompleted();
+            }
+            catch (Exception exception)
+            {
+                LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnRecoveryCompleted));
             }
         }
     }
@@ -832,6 +977,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        IJournaledStateObserver[] observers;
+        lock (_lock)
+        {
+            ThrowIfStateOperationsUnavailable();
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            observer.OnWriteRequested();
+        }
 
         Task pendingWrite;
         bool didEnqueue;
@@ -1294,6 +1450,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journaled state observer callback {Callback} failed.")]
+    private static partial void LogObserverError(ILogger logger, Exception exception, string callback);
 
     [LoggerMessage(
         Level = LogLevel.Information,
