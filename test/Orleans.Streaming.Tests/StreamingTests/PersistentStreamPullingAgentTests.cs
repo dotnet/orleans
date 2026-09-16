@@ -3397,6 +3397,13 @@ namespace UnitTests.StreamingTests
             try
             {
                 await terminalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                var replacementConsumer = new ImmediateRecordingConsumer();
+                var replacement = stream.AddConsumer(
+                    GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                    streamId, replacementConsumer, null, DateTime.UtcNow);
+                replacement.IsRegistered = true;
+                var replacementCursor = cache.GetCacheCursor(streamId.StreamId, new EventSequenceTokenV2(50));
+                replacement.Cursor = replacementCursor;
                 attachment = accessor.AddSubscriber(data);
                 await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 if (notifyBeforeHandshakeCompletes)
@@ -3412,7 +3419,7 @@ namespace UnitTests.StreamingTests
                 if (notifyBeforeHandshakeCompletes)
                 {
                     Assert.Null(data.Cursor);
-                    Assert.Empty(await accessor.GetPubSubCache());
+                    Assert.Same(replacement, Assert.Single(stream.AllConsumers()));
                 }
                 else
                 {
@@ -3424,13 +3431,21 @@ namespace UnitTests.StreamingTests
                 terminalResult.SetResult(true);
                 await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.Null(data.Cursor);
-                Assert.Empty(await accessor.GetPubSubCache());
+                Assert.Same(stream, Assert.Single(await accessor.GetPubSubCache()).Value);
+                Assert.Same(replacement, Assert.Single(stream.AllConsumers()));
+                Assert.Same(replacementCursor, replacement.Cursor);
                 Assert.Single(consumer.DeliveredTokens);
                 Assert.Equal(0, data.PendingHandshakes);
+                await accessor.RunConsumerCursor(replacement);
+                Assert.Equal(new long[] { 50, 100 }, replacementConsumer.DeliveredTokens.Select(token => token.SequenceNumber));
                 await pubSub.Received(operation == "fault" ? 1 : 0).FaultSubscription(
-                    Arg.Any<QualifiedStreamId>(), Arg.Any<GuidId>(), Arg.Any<CancellationToken>());
+                    streamId, data.SubscriptionId, Arg.Any<CancellationToken>());
                 await pubSub.Received(operation == "unregister" ? 1 : 0).UnregisterConsumer(
-                    Arg.Any<GuidId>(), Arg.Any<QualifiedStreamId>(), Arg.Any<CancellationToken>());
+                    data.SubscriptionId, streamId, Arg.Any<CancellationToken>());
+                await pubSub.DidNotReceive().FaultSubscription(
+                    streamId, replacement.SubscriptionId, Arg.Any<CancellationToken>());
+                await pubSub.DidNotReceive().UnregisterConsumer(
+                    replacement.SubscriptionId, streamId, Arg.Any<CancellationToken>());
             }
             finally
             {
