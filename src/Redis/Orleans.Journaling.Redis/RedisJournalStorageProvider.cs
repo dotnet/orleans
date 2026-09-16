@@ -107,12 +107,12 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
-                    _telemetry.OnCatalogItems(JournalStorageTelemetry.Redis, 1);
+                    _telemetry.OnCatalogItems(nameof(RedisJournalStorageProvider), 1);
                     cancellationToken.ThrowIfCancellationRequested();
                     var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
-                        _telemetry.OnCatalogEntry(JournalStorageTelemetry.Redis);
+                        _telemetry.OnCatalogEntry(nameof(RedisJournalStorageProvider));
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }
@@ -131,7 +131,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
-                    _telemetry.OnCatalogItems(JournalStorageTelemetry.Redis, 1);
+                    _telemetry.OnCatalogItems(nameof(RedisJournalStorageProvider), 1);
                     batch[count++] = metadataKeys.Current;
                 }
 
@@ -188,7 +188,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        _telemetry.OnCatalogEntry(JournalStorageTelemetry.Redis);
+                        _telemetry.OnCatalogEntry(nameof(RedisJournalStorageProvider));
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }

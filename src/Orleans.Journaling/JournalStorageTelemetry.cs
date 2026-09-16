@@ -4,12 +4,6 @@ namespace Orleans.Journaling;
 
 internal sealed class JournalStorageTelemetry
 {
-    internal const string S3 = "s3";
-    internal const string AzureBlob = "azure_blob";
-    internal const string AzureTable = "azure_table";
-    internal const string Redis = "redis";
-    internal const string Volatile = "volatile";
-
     private static readonly Lazy<JournalStorageTelemetry> Direct = new(
         static () => new(new Meter("Microsoft.Orleans")));
     private readonly Counter<long> _catalogPages;

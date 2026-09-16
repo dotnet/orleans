@@ -24,11 +24,11 @@ internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments
 
     private readonly JournalStorageTelemetry _telemetry = new(instruments);
 
-    internal void OnCatalogPage(long items) => _telemetry.OnCatalogPage(JournalStorageTelemetry.S3, items);
+    internal void OnCatalogPage(long items) => _telemetry.OnCatalogPage(nameof(S3JournalStorageProvider), items);
 
-    internal void OnCatalogEntry() => _telemetry.OnCatalogEntry(JournalStorageTelemetry.S3);
+    internal void OnCatalogEntry() => _telemetry.OnCatalogEntry(nameof(S3JournalStorageProvider));
 
-    internal void OnRetry(string reason) => _telemetry.OnRetry(JournalStorageTelemetry.S3, reason);
+    internal void OnRetry(string reason) => _telemetry.OnRetry(nameof(S3JournalStorageProvider), reason);
 
     internal static S3JournalStorageInstruments CreateForDirectConstruction() => DirectConstruction.Value;
 

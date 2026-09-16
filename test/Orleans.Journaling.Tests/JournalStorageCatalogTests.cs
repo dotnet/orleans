@@ -38,8 +38,8 @@ public sealed class JournalStorageCatalogTests
     });
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob")]
-    [InlineData("AzureTable", "azure_table")]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider))]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider))]
     public async Task AzureListAsync_TelemetryCountsReturnedPagesAndNativeItemsBeforeFiltering(
         string kind, string provider)
     {
@@ -91,10 +91,10 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", false)]
-    [InlineData("AzureBlob", "azure_blob", true)]
-    [InlineData("AzureTable", "azure_table", false)]
-    [InlineData("AzureTable", "azure_table", true)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), false)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), true)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), false)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), true)]
     public async Task AzureListAsync_TelemetryPreservesReturnedPageCountsAfterFailureOrDisposal(
         string kind, string provider, bool fail)
     {
@@ -139,10 +139,10 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", 503)]
-    [InlineData("AzureBlob", "azure_blob", 0)]
-    [InlineData("AzureTable", "azure_table", 503)]
-    [InlineData("AzureTable", "azure_table", 0)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), 503)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), 0)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), 503)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), 0)]
     public async Task AzureListAsync_TelemetryDoesNotCountFailedFirstPage(
         string kind, string provider, int status)
     {
@@ -166,10 +166,10 @@ public sealed class JournalStorageCatalogTests
     }
 
     [Theory]
-    [InlineData("AzureBlob", "azure_blob", false)]
-    [InlineData("AzureBlob", "azure_blob", true)]
-    [InlineData("AzureTable", "azure_table", false)]
-    [InlineData("AzureTable", "azure_table", true)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), false)]
+    [InlineData("AzureBlob", nameof(AzureBlobJournalStorageProvider), true)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), false)]
+    [InlineData("AzureTable", nameof(AzureTableJournalStorageProvider), true)]
     public async Task AzureListAsync_NativeDisposalFailurePropagatesWithoutChangingCatalogCounts(
         string kind, string provider, bool stopEarly)
     {
@@ -498,8 +498,8 @@ public sealed class JournalStorageCatalogTests
     [InlineData("S3")]
     public async Task ListAsync_EmptyRangeDoesNotRequestStorage(string kind)
     {
-        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
-            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(nameof(AzureBlobJournalStorageProvider))
+            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider)) : null;
         await using var context = await CreateAsync(kind, ["tenant/a"], metrics: metrics);
         Assert.Empty(await DrainAsync(context.Catalog.ListAsync(
             new() { MinId = new("z"), MaxId = new("a") }, TestContext.Current.CancellationToken)));
@@ -618,8 +618,8 @@ public sealed class JournalStorageCatalogTests
     [InlineData("S3")]
     public async Task ListAsync_CancellationBeforeAndBetweenResultsPropagates(string kind)
     {
-        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
-            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+        using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(nameof(AzureBlobJournalStorageProvider))
+            : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider)) : null;
         await using var context = await CreateAsync(kind, ["z", "a", "b"], metrics: metrics);
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
@@ -661,8 +661,8 @@ public sealed class JournalStorageCatalogTests
     {
         foreach (var empty in new[] { false, true })
         {
-            using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob)
-                : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable) : null;
+            using var metrics = kind == "AzureBlob" ? new AzureJournalStorageMetricsFixture(nameof(AzureBlobJournalStorageProvider))
+                : kind == "AzureTable" ? new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider)) : null;
             await using var context = await CreateAsync(kind, empty ? [] : ["z", "a"], metrics: metrics);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             context.Native.BeforeResponse = cancellation.Cancel;

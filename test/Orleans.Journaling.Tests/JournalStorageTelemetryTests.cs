@@ -12,10 +12,10 @@ public sealed class JournalStorageTelemetryTests
     public void Instruments_RecordTypesUnitsValuesAndBoundedTags()
     {
         using var fixture = new Fixture();
-        fixture.Telemetry.OnCatalogPage("s3", 3);
-        fixture.Telemetry.OnCatalogItems("redis", 2);
-        fixture.Telemetry.OnCatalogEntry("s3");
-        fixture.Telemetry.OnRetry("s3", "metadata_conflict");
+        fixture.Telemetry.OnCatalogPage("orders", 3);
+        fixture.Telemetry.OnCatalogItems("archive", 2);
+        fixture.Telemetry.OnCatalogEntry("orders");
+        fixture.Telemetry.OnRetry("orders", "metadata_conflict");
 
         Assert.Equal(new[]
         {
@@ -34,20 +34,20 @@ public sealed class JournalStorageTelemetryTests
         var page = Assert.Single(fixture.CatalogPages.GetMeasurementSnapshot());
         Assert.Equal(1, page.Value);
         Assert.Single(page.Tags);
-        Assert.True(page.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "s3") }));
+        Assert.True(page.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "orders") }));
         var items = fixture.CatalogItems.GetMeasurementSnapshot();
         Assert.Equal(new long[] { 3, 2 }, items.Select(item => item.Value));
         Assert.All(items, item => Assert.Single(item.Tags));
-        Assert.True(items[0].MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "s3") }));
-        Assert.True(items[1].MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "redis") }));
+        Assert.True(items[0].MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "orders") }));
+        Assert.True(items[1].MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "archive") }));
         var entry = Assert.Single(fixture.CatalogEntries.GetMeasurementSnapshot());
         Assert.Equal(1, entry.Value);
         Assert.Single(entry.Tags);
-        Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "s3") }));
+        Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "orders") }));
         var retry = Assert.Single(fixture.Retries.GetMeasurementSnapshot());
         Assert.Equal(1, retry.Value);
         Assert.Equal(2, retry.Tags.Count);
-        Assert.True(retry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "s3"), new("reason", "metadata_conflict") }));
+        Assert.True(retry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "orders"), new("reason", "metadata_conflict") }));
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public sealed class JournalStorageTelemetryTests
     public void CatalogPages_CountEmptyResponsesAndNativeItems()
     {
         using var fixture = new Fixture();
-        fixture.Telemetry.OnCatalogPage("azure_blob", 0);
-        fixture.Telemetry.OnCatalogPage("azure_blob", 2);
+        fixture.Telemetry.OnCatalogPage("orders", 0);
+        fixture.Telemetry.OnCatalogPage("orders", 2);
         Assert.Equal(new long[] { 1, 1 }, fixture.CatalogPages.GetMeasurementSnapshot().Select(item => item.Value));
         Assert.Equal(2, fixture.CatalogItems.GetMeasurementSnapshot().Sum(item => item.Value));
     }
@@ -70,8 +70,8 @@ public sealed class JournalStorageTelemetryTests
     public void CatalogItems_RecordConsumedItemsWithoutInventingPages()
     {
         using var fixture = new Fixture();
-        fixture.Telemetry.OnCatalogItems("redis", 1);
-        fixture.Telemetry.OnCatalogItems("redis", 1);
+        fixture.Telemetry.OnCatalogItems("archive", 1);
+        fixture.Telemetry.OnCatalogItems("archive", 1);
         Assert.Equal(new long[] { 1, 1 }, fixture.CatalogItems.GetMeasurementSnapshot().Select(item => item.Value));
         Assert.Empty(fixture.CatalogPages.GetMeasurementSnapshot());
     }
@@ -103,7 +103,7 @@ public sealed class JournalStorageTelemetryTests
         Assert.All(fixture.CatalogEntries.GetMeasurementSnapshot(), entry =>
         {
             Assert.Single(entry.Tags);
-            Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "volatile") }));
+            Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", nameof(VolatileJournalStorageProvider)) }));
         });
         Assert.Empty(fixture.CatalogPages.GetMeasurementSnapshot());
         Assert.Empty(fixture.CatalogItems.GetMeasurementSnapshot());
@@ -166,19 +166,16 @@ public sealed class JournalStorageTelemetryTests
     }
 
     [Theory]
-    [InlineData(JournalStorageTelemetry.S3, "s3")]
-    [InlineData(JournalStorageTelemetry.AzureBlob, "azure_blob")]
-    [InlineData(JournalStorageTelemetry.AzureTable, "azure_table")]
-    [InlineData(JournalStorageTelemetry.Redis, "redis")]
-    [InlineData(JournalStorageTelemetry.Volatile, "volatile")]
-    public void ProviderConstants_UseBoundedNames(string provider, string expected)
+    [InlineData("orders-primary")]
+    [InlineData("orders-secondary")]
+    [InlineData("Tenant/Archive")]
+    public void CatalogCounters_PreserveCallerSuppliedProviderName(string provider)
     {
-        Assert.Equal(expected, provider);
         using var fixture = new Fixture();
         fixture.Telemetry.OnCatalogEntry(provider);
         var entry = Assert.Single(fixture.CatalogEntries.GetMeasurementSnapshot());
         Assert.Equal(1, entry.Value);
-        Assert.Equal(expected, Assert.Single(entry.Tags).Value);
+        Assert.Equal(new KeyValuePair<string, object?>("provider", provider), Assert.Single(entry.Tags));
     }
 
     private sealed class Fixture : IDisposable

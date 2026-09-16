@@ -179,7 +179,9 @@ The `Microsoft.Orleans` meter records catalog traversal and explicit provider re
   Table, Redis, and Volatile providers.
 - `orleans-journaling-provider-retries` counts explicit provider-loop retries.
 
-Pages, items, and entries use the bounded `provider` tag; retries use `provider` and `reason`.
+Pages, items, and entries use a `provider` tag supplied by the provider; retries also use `reason`.
+The built-in journaling registrations are unnamed singletons and identify themselves by provider
+type name, such as `VolatileJournalStorageProvider`.
 Compare candidates with delivered entries to assess filtering and duplicate suppression.
 
 Existing state-manager and provider-specific metrics retain storage latency, outcomes, and byte

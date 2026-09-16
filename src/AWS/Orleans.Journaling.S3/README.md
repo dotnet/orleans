@@ -54,7 +54,7 @@ Dispose the enumerator when stopping early and use a cancellation token covering
 
 ## Metrics
 
-The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. The shared counters use `provider=s3`:
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. The provider supplies its type name as the `provider` tag, `S3JournalStorageProvider`:
 
 | Metric | Measurement | Other tags |
 | --- | --- | --- |

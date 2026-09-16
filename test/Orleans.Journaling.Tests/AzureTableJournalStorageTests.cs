@@ -22,7 +22,7 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
     {
-        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable);
+        using var metrics = new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider));
         var store = new FakeTableStore();
         var storage = CreateStorage(store, instruments: metrics.Table);
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -40,7 +40,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.All(retries, retry =>
         {
             Assert.Equal(2, retry.Tags.Count);
-            Assert.Equal("azure_table", retry.Tags["provider"]);
+            Assert.Equal(nameof(AzureTableJournalStorageProvider), retry.Tags["provider"]);
             Assert.Equal("metadata_conflict", retry.Tags["reason"]);
         });
         Assert.Equal(3, store.UpdateCalls.Count);
@@ -165,7 +165,7 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public async Task AppendAsync_WhenHeaderETagChangesOnlyForMetadata_ReloadsHeaderAndAppends()
     {
-        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable);
+        using var metrics = new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider));
         var store = new FakeTableStore();
         var storage = CreateStorage(store, instruments: metrics.Table);
         var catalogStorage = CreateStorage(store);
@@ -182,7 +182,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
         var retry = Assert.Single(metrics.Retries.GetMeasurementSnapshot());
         Assert.Equal(2, retry.Tags.Count);
-        Assert.Equal("azure_table", retry.Tags["provider"]);
+        Assert.Equal(nameof(AzureTableJournalStorageProvider), retry.Tags["provider"]);
         Assert.Equal("metadata_only_conflict", retry.Tags["reason"]);
         Assert.Equal(1, retry.Value);
         Assert.Equal(3, store.TransactionCalls.Count);
@@ -603,7 +603,7 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public async Task ReplaceAsync_WhenRowWriteFails_DoesNotFlipHeader()
     {
-        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureTable);
+        using var metrics = new AzureJournalStorageMetricsFixture(nameof(AzureTableJournalStorageProvider));
         var store = new FakeTableStore();
         var storage = CreateStorage(store, instruments: metrics.Table);
 

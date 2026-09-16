@@ -23,7 +23,7 @@ public sealed class AzureBlobJournalStorageTests
     [Fact]
     public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
     {
-        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        using var metrics = new AzureJournalStorageMetricsFixture(nameof(AzureBlobJournalStorageProvider));
         var appendBlobs = new FakeAppendBlobStore();
         var storage = CreateStorage(appendBlobs, instruments: metrics.Blob);
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
@@ -41,7 +41,7 @@ public sealed class AzureBlobJournalStorageTests
         Assert.All(retries, retry =>
         {
             Assert.Equal(2, retry.Tags.Count);
-            Assert.Equal("azure_blob", retry.Tags["provider"]);
+            Assert.Equal(nameof(AzureBlobJournalStorageProvider), retry.Tags["provider"]);
             Assert.Equal("metadata_conflict", retry.Tags["reason"]);
         });
         Assert.Equal(3, appendBlobs.SetMetadataCalls.Count);
@@ -93,7 +93,7 @@ public sealed class AzureBlobJournalStorageTests
     [Fact]
     public async Task AppendAsync_WhenWalETagChangesOnlyForMetadata_ReloadsWalAndAppends()
     {
-        using var metrics = new AzureJournalStorageMetricsFixture(JournalStorageTelemetry.AzureBlob);
+        using var metrics = new AzureJournalStorageMetricsFixture(nameof(AzureBlobJournalStorageProvider));
         var appendBlobs = new FakeAppendBlobStore();
         var storage = CreateStorage(appendBlobs, instruments: metrics.Blob);
         var catalogStorage = CreateStorage(appendBlobs);
@@ -108,7 +108,7 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
         var retry = Assert.Single(metrics.Retries.GetMeasurementSnapshot());
         Assert.Equal(2, retry.Tags.Count);
-        Assert.Equal("azure_blob", retry.Tags["provider"]);
+        Assert.Equal(nameof(AzureBlobJournalStorageProvider), retry.Tags["provider"]);
         Assert.Equal("metadata_only_conflict", retry.Tags["reason"]);
         Assert.Equal(1, retry.Value);
         Assert.Equal(3, appendBlobs.AppendCalls.Count);

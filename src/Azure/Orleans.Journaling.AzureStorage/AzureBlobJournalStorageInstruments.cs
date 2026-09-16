@@ -9,13 +9,13 @@ internal sealed class AzureBlobJournalStorageInstruments(OrleansInstruments inst
     private readonly JournalStorageTelemetry _telemetry = new(instruments);
 
     internal void OnCatalogPage(long items)
-        => _telemetry.OnCatalogPage(JournalStorageTelemetry.AzureBlob, items);
+        => _telemetry.OnCatalogPage(nameof(AzureBlobJournalStorageProvider), items);
 
     internal void OnCatalogEntry()
-        => _telemetry.OnCatalogEntry(JournalStorageTelemetry.AzureBlob);
+        => _telemetry.OnCatalogEntry(nameof(AzureBlobJournalStorageProvider));
 
     internal void OnRetry(string reason)
-        => _telemetry.OnRetry(JournalStorageTelemetry.AzureBlob, reason);
+        => _telemetry.OnRetry(nameof(AzureBlobJournalStorageProvider), reason);
 
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";

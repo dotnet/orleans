@@ -128,7 +128,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            _telemetry.OnCatalogEntry(JournalStorageTelemetry.Volatile);
+            _telemetry.OnCatalogEntry(nameof(VolatileJournalStorageProvider));
             yield return new JournalCatalogEntry(new JournalId(key), metadata);
         }
 
