@@ -78,7 +78,8 @@ public interface IDurableOutbox
     /// <para>
     /// Repeatedly sending an equivalent envelope with the same message ID is an idempotent no-op.
     /// Sending a different envelope with an ID which is already present throws <see cref="InvalidOperationException"/>.
-    /// Envelope equivalence includes routing and correlation fields, creation time, body bytes, and request-context bytes.
+    /// Envelope equivalence includes routing and correlation fields, creation time, and the declared types
+    /// and bytes of the body and request-context values.
     /// </para>
     /// <para>
     /// To create an envelope, use <c>context.CreateEnvelope()</c> in a handler, or create a
