@@ -66,8 +66,8 @@ Storage errors and cancellation propagate without provider-level retries, restar
 
 The `Microsoft.Orleans` meter records `orleans-journaling-provider-catalog-items` for scan keys
 consumed by catalog traversal and `orleans-journaling-provider-catalog-entries` for identities yielded
-after filtering and duplicate suppression. Both use the provider's type name, `RedisJournalStorageProvider`,
-in the `provider` tag. Empty logical ranges produce
+after filtering and duplicate suppression. Both use `provider=redis`, the short name defined by
+this library. Empty logical ranges produce
 zero measurements; early disposal and cancellation retain the consumed-key and delivered-entry
 counts.
 

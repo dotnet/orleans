@@ -283,11 +283,9 @@ Core journaling instruments use `operation` and `status` where applicable. Opera
 ### Provider workload counters
 
 Provider counters record catalog traversal and explicit provider retries at existing execution
-points. Each provider supplies its own identity for the `provider` tag. The built-in, unnamed
-journaling registrations use their provider type names: `S3JournalStorageProvider`,
-`AzureBlobJournalStorageProvider`, `AzureTableJournalStorageProvider`, `RedisJournalStorageProvider`,
-and `VolatileJournalStorageProvider`. Existing state-manager and provider-specific instruments
-supply storage operation latency, outcomes, and bytes.
+points. Each provider library defines its own short name for the `provider` tag: `s3`,
+`azure_blob`, `azure_table`, `redis`, or `volatile`. Existing state-manager and provider-specific
+instruments supply storage operation latency, outcomes, and bytes.
 
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|

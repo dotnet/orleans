@@ -36,13 +36,13 @@ public sealed class RedisJournalStorageTelemetryTests
         {
             Assert.Equal(1, entry.Value);
             Assert.Single(entry.Tags);
-            Assert.Equal(nameof(RedisJournalStorageProvider), entry.Tags["provider"]);
+            Assert.Equal("redis", entry.Tags["provider"]);
         });
         Assert.Equal(new long[] { 1, 1 }, fixture.Items.GetMeasurementSnapshot().Select(item => item.Value));
         Assert.All(fixture.Items.GetMeasurementSnapshot(), item =>
         {
             Assert.Single(item.Tags);
-            Assert.True(item.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", nameof(RedisJournalStorageProvider)) }));
+            Assert.True(item.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "redis") }));
         });
         Assert.Empty(fixture.Pages.GetMeasurementSnapshot());
     }
@@ -113,7 +113,7 @@ public sealed class RedisJournalStorageTelemetryTests
         {
             Assert.Equal(1, item.Value);
             Assert.Single(item.Tags);
-            Assert.Equal(nameof(RedisJournalStorageProvider), item.Tags["provider"]);
+            Assert.Equal("redis", item.Tags["provider"]);
         });
         Assert.Equal(2, fixture.Items.GetMeasurementSnapshot().Sum(item => item.Value));
         Assert.Equal(2, fixture.Entries.GetMeasurementSnapshot().Sum(item => item.Value));

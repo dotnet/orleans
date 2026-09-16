@@ -103,7 +103,7 @@ public sealed class JournalStorageTelemetryTests
         Assert.All(fixture.CatalogEntries.GetMeasurementSnapshot(), entry =>
         {
             Assert.Single(entry.Tags);
-            Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", nameof(VolatileJournalStorageProvider)) }));
+            Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "volatile") }));
         });
         Assert.Empty(fixture.CatalogPages.GetMeasurementSnapshot());
         Assert.Empty(fixture.CatalogItems.GetMeasurementSnapshot());

@@ -12,6 +12,7 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
 {
+    private const string ProviderName = "volatile";
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
     private readonly SortedSet<string> _storageKeys = new(StringComparer.Ordinal);
@@ -128,7 +129,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            _telemetry.OnCatalogEntry(nameof(VolatileJournalStorageProvider));
+            _telemetry.OnCatalogEntry(ProviderName);
             yield return new JournalCatalogEntry(new JournalId(key), metadata);
         }
 

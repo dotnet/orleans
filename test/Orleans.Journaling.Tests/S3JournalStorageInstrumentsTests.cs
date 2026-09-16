@@ -255,7 +255,7 @@ public sealed class S3JournalStorageInstrumentsTests
         Assert.Equal(1, retry.Value);
         Assert.Equal(2, retry.Tags.Count);
         Assert.True(retry.MatchesTags(
-            new KeyValuePair<string, object?>[] { new("provider", nameof(S3JournalStorageProvider)), new("reason", "checkpoint_collision") }));
+            new KeyValuePair<string, object?>[] { new("provider", "s3"), new("reason", "checkpoint_collision") }));
     }
 
     [Theory]
@@ -296,7 +296,7 @@ public sealed class S3JournalStorageInstrumentsTests
             Assert.Equal(1, retry.Value);
             Assert.Equal(2, retry.Tags.Count);
             Assert.True(retry.MatchesTags(
-                new KeyValuePair<string, object?>[] { new("provider", nameof(S3JournalStorageProvider)), new("reason", "metadata_conflict") }));
+                new KeyValuePair<string, object?>[] { new("provider", "s3"), new("reason", "metadata_conflict") }));
         });
     }
 
@@ -329,7 +329,7 @@ public sealed class S3JournalStorageInstrumentsTests
         Assert.Equal(1, retry.Value);
         Assert.Equal(2, retry.Tags.Count);
         Assert.True(retry.MatchesTags(
-            new KeyValuePair<string, object?>[] { new("provider", nameof(S3JournalStorageProvider)), new("reason", "metadata_conflict") }));
+            new KeyValuePair<string, object?>[] { new("provider", "s3"), new("reason", "metadata_conflict") }));
     }
 
     [Theory]
@@ -378,7 +378,7 @@ public sealed class S3JournalStorageInstrumentsTests
         => new("Private service diagnostic which must not become a metric tag.") { StatusCode = statusCode };
 
     private static KeyValuePair<string, object?>[] CatalogTags()
-        => [new("provider", nameof(S3JournalStorageProvider))];
+        => [new("provider", "s3")];
 
     private sealed class MetricsContext : IDisposable
     {
@@ -447,7 +447,7 @@ public sealed class S3JournalStorageInstrumentsTests
             {
                 Assert.Equal(1, entry.Value);
                 Assert.Single(entry.Tags);
-                Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", nameof(S3JournalStorageProvider)) }));
+                Assert.True(entry.MatchesTags(new KeyValuePair<string, object?>[] { new("provider", "s3") }));
             });
         }
 

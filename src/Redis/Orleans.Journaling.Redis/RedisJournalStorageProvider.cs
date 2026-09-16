@@ -8,6 +8,7 @@ namespace Orleans.Journaling;
 
 internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
 {
+    private const string ProviderName = "redis";
     private const int JournalIdReadBatchSize = 128;
     private const int ScanPageSize = 250;
     private const string ReadJournalIdScript =
@@ -107,12 +108,12 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
-                    _telemetry.OnCatalogItems(nameof(RedisJournalStorageProvider), 1);
+                    _telemetry.OnCatalogItems(ProviderName, 1);
                     cancellationToken.ThrowIfCancellationRequested();
                     var journalId = RedisJournalStorage.GetJournalIdFromMetadataKey(_keyPrefix, metadataKeys.Current);
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
-                        _telemetry.OnCatalogEntry(nameof(RedisJournalStorageProvider));
+                        _telemetry.OnCatalogEntry(ProviderName);
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }
@@ -131,7 +132,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                         break;
                     }
 
-                    _telemetry.OnCatalogItems(nameof(RedisJournalStorageProvider), 1);
+                    _telemetry.OnCatalogItems(ProviderName, 1);
                     batch[count++] = metadataKeys.Current;
                 }
 
@@ -188,7 +189,7 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
                     if (range.Contains(journalId.Value) && journalIds.Add(journalId))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        _telemetry.OnCatalogEntry(nameof(RedisJournalStorageProvider));
+                        _telemetry.OnCatalogEntry(ProviderName);
                         yield return new JournalCatalogEntry(journalId);
                     }
                 }

@@ -54,7 +54,7 @@ Dispose the enumerator when stopping early and use a cancellation token covering
 
 ## Metrics
 
-The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. The provider supplies its type name as the `provider` tag, `S3JournalStorageProvider`:
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. This library defines `s3` as its short name for the `provider` tag:
 
 | Metric | Measurement | Other tags |
 | --- | --- | --- |

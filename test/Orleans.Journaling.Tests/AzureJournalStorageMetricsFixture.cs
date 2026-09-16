@@ -12,7 +12,7 @@ internal sealed class AzureJournalStorageMetricsFixture : IDisposable
     {
         _services = new ServiceCollection().AddMetrics().BuildServiceProvider();
         var instruments = new OrleansInstruments(_services.GetRequiredService<IMeterFactory>());
-        if (provider == nameof(AzureBlobJournalStorageProvider))
+        if (provider == "azure_blob")
         {
             Blob = new(instruments);
         }
