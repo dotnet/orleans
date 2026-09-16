@@ -47,7 +47,7 @@ flowchart LR
 
 System-target hosting also resolves an <xref:Orleans.Streams.IStreamQueueBalancer>. Grain hosting uses a coordinator grain to manage placement.
 
-During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. System-target hosting drains agents during provider shutdown. Grain hosting closes local admission and coordinator liveness checks at provider shutdown, then lets grain deactivation perform final receiver cleanup and migration.
+During lifecycle initialization the provider resolves its named adapter factory and creates the adapter. At the active stage it initializes the pulling manager and starts agents. System-target hosting drains agents during provider shutdown. Grain hosting closes local admission and coordinator liveness checks, joins previously admitted manager commands, then lets grain deactivation perform final receiver cleanup and migration. In-flight start commands observe shutdown after coordinator calls, and queued starts are rejected before opening admission.
 
 By default, pulling agents start automatically. Explicit grain-based and implicit subscriptions are both enabled.
 

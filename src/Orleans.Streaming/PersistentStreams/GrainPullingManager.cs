@@ -52,15 +52,14 @@ internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPulli
     public Task StartAgents(CancellationToken cancellationToken) => _executor.AddNext(async () =>
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_shuttingDown)
-        {
-            throw new InvalidOperationException($"Stream provider '{_providerName}' is shutting down.");
-        }
+        ThrowIfShuttingDown();
 
         _provider.State = RunState.AgentsStarted;
         _heartbeat ??= RegisterGrainTimer(KeepCoordinatorAlive, _provider.Options.GrainHostingProbePeriod, _provider.Options.GrainHostingProbePeriod);
         await PullingAgentPlacement.WithHint(Silo, () => _coordinator.EnsureRunning(cancellationToken));
+        ThrowIfShuttingDown();
         await _coordinator.NotifyHostChanged(cancellationToken);
+        ThrowIfShuttingDown();
         EmitState();
     });
 
@@ -78,7 +77,15 @@ internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPulli
         _shuttingDown = true;
         CloseLocalAdmission();
         // Grain deactivation owns the final flush and producer-preserving migration during silo shutdown.
-        return Task.CompletedTask;
+        return _executor.AddNext(static () => Task.CompletedTask);
+    }
+
+    private void ThrowIfShuttingDown()
+    {
+        if (_shuttingDown)
+        {
+            throw new InvalidOperationException($"Stream provider '{_providerName}' is shutting down.");
+        }
     }
 
     private void CloseLocalAdmission()

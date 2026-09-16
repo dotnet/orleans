@@ -186,6 +186,100 @@ public sealed class PullingAgentControlTests
         Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
     }
 
+    [Theory]
+    [InlineData(nameof(IPullingCoordinatorGrain.EnsureRunning))]
+    [InlineData(nameof(IPullingCoordinatorGrain.NotifyHostChanged))]
+    public async Task LifecycleStop_JoinsInFlightStartAndRejectsQueuedStarts(string pausedMethod)
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var notifications = setup.CoordinatorNotifications;
+        setup.PausedCoordinatorMethod = pausedMethod;
+        setup.CoordinatorCallBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var manager = setup.GetManager(silo);
+        var starting = manager.StartAgents(TestContext.Current.CancellationToken);
+        Task? queuedStart = null;
+        Task? stopping = null;
+        Exception? startFailure = null;
+        Exception? queuedStartFailure = null;
+
+        try
+        {
+            await setup.CoordinatorCallStarted.Task.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            queuedStart = manager.StartAgents(TestContext.Current.CancellationToken);
+            stopping = manager.Stop(TestContext.Current.CancellationToken);
+            Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped,
+                await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
+            Assert.False(starting.IsCompleted);
+            Assert.False(queuedStart.IsCompleted);
+            Assert.False(stopping.IsCompleted);
+            Assert.Equal(1, setup.Initializations);
+            Assert.Equal(0, setup.Shutdowns);
+        }
+        finally
+        {
+            setup.CoordinatorCallBarrier.TrySetResult();
+            startFailure = await Record.ExceptionAsync(() => starting.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken));
+            if (queuedStart is not null)
+            {
+                queuedStartFailure = await Record.ExceptionAsync(() => queuedStart.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken));
+            }
+
+            await (stopping ?? manager.Stop(TestContext.Current.CancellationToken))
+                .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+        }
+
+        Assert.IsType<InvalidOperationException>(startFailure);
+        Assert.IsType<InvalidOperationException>(queuedStartFailure);
+        Assert.Equal(notifications + (pausedMethod == nameof(IPullingCoordinatorGrain.NotifyHostChanged) ? 1 : 0),
+            setup.CoordinatorNotifications);
+        Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped,
+            await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
+        Assert.Equal(1, setup.Initializations);
+        Assert.Equal(0, setup.Shutdowns);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.StartAgents(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task LifecycleStop_JoinsAdmittedAdministrativeDrain()
+    {
+        await using var setup = new Setup(1);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        await setup.NextInitialization();
+        var notifications = setup.CoordinatorNotifications;
+        setup.ShutdownBarrier = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var manager = setup.GetManager(silo);
+        var draining = manager.StopAgents(TestContext.Current.CancellationToken);
+        Task? stopping = null;
+
+        try
+        {
+            await setup.ShutdownEntered.Task.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            stopping = manager.Stop(TestContext.Current.CancellationToken);
+            Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped,
+                await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
+            Assert.False(draining.IsCompleted);
+            Assert.False(stopping.IsCompleted);
+            Assert.Equal(1, setup.Shutdowns);
+        }
+        finally
+        {
+            setup.ShutdownBarrier.TrySetResult();
+            await draining.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            await (stopping ?? manager.Stop(TestContext.Current.CancellationToken))
+                .WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(notifications, setup.CoordinatorNotifications);
+        Assert.Equal(1, setup.Shutdowns);
+        Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+    }
+
     [Fact]
     public async Task FailedStop_RemainsObservableToDeactivationUntilSuccessfulRestart()
     {
@@ -434,6 +528,9 @@ public sealed class PullingAgentControlTests
             PullingCoordinatorGrain.GetGrainId(ProviderName));
         internal FakeTimeProvider Clock { get; } = new();
         internal TaskCompletionSource ShutdownEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource CoordinatorCallStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource? CoordinatorCallBarrier { get; set; }
+        internal string? PausedCoordinatorMethod { get; set; }
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
         internal TaskCompletionSource? InitializationBarrier { get; set; }
         internal Exception? ShutdownFailure { get; set; }
@@ -616,7 +713,7 @@ public sealed class PullingAgentControlTests
 
         private sealed class NotificationRecorder(Setup setup) : IOutgoingGrainCallFilter
         {
-            public Task Invoke(IOutgoingGrainCallContext context)
+            public async Task Invoke(IOutgoingGrainCallContext context)
             {
                 if (context.TargetId.Equals(PullingCoordinatorGrain.GetGrainId(ProviderName))
                     && context.MethodName == nameof(IPullingCoordinatorGrain.NotifyHostChanged))
@@ -624,7 +721,14 @@ public sealed class PullingAgentControlTests
                     Interlocked.Increment(ref setup._coordinatorNotifications);
                 }
 
-                return context.Invoke();
+                await context.Invoke();
+                if (context.TargetId.Equals(PullingCoordinatorGrain.GetGrainId(ProviderName))
+                    && context.MethodName == setup.PausedCoordinatorMethod
+                    && setup.CoordinatorCallBarrier is { } barrier)
+                {
+                    setup.CoordinatorCallStarted.TrySetResult();
+                    await barrier.Task;
+                }
             }
         }
     }
