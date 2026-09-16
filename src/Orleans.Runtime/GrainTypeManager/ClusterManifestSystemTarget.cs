@@ -59,13 +59,14 @@ namespace Orleans.Runtime
         public ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(ManifestHashCalculator.ComputeHash(_siloManifest));
+            return new(ManifestHashCalculator.ComputeHash(_clusterManifestProvider.LocalGrainManifest));
         }
 
         public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(hash == ManifestHashCalculator.ComputeHash(_siloManifest) ? _siloManifest : null);
+            var localManifest = _clusterManifestProvider.LocalGrainManifest;
+            return new(hash == ManifestHashCalculator.ComputeHash(localManifest) ? localManifest : null);
         }
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
