@@ -1,6 +1,6 @@
 # Microsoft Orleans Durable Messaging
 
-This project supplies the durable messaging protocol and handler-routing contracts:
+This project supplies the durable messaging protocol, handler routing, and journaled inbox runtime:
 
 - `DurableEnvelope` identifies a message by sender and message ID and carries its
   destination, route, correlation key, reply destination, and creation timestamp.
@@ -20,12 +20,20 @@ This project supplies the durable messaging protocol and handler-routing contrac
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
-Handlers perform validation, asynchronous I/O, and envelope serialization using local
-values during preparation. They return a non-null synchronous action which applies
-already-prepared business mutations and stages prepared messages using the existing
-`Send` method. Messaging invokes that action once for the prepared attempt. An attempt
-with no effects returns an empty synchronous action. Each applied effect is already
-safe to commit with the shared pending journal changes.
+The inbox accepts a message after DurableJobs confirms scheduling and the journal
+commits the envelope together with its ownership generation and exact returned job
+handle. Recovery restores that pair and repairs an absent owner for pending work.
+Callbacks validate generation and physical job identity before processing.
 
-This intermediate project is non-packable while the runtime and hosting layers are
-assembled into `Microsoft.Orleans.DurableMessaging`.
+Handlers execute sequentially. Their journaled effects, staged output, inbox
+completion, and `(SenderId, MessageId)` deduplication record commit together after
+the handler returns. A failed handler restores committed state and applies bounded
+retry and dead-letter policy. Retained duplicates return `Duplicate`; expiry permits
+acceptance again. Capacity limits return `Backpressured` before persistence.
+Exact route registration retains the original handler instance and takes precedence
+over generic handler selection. Operational diagnostics expose retained dead letters
+and stage their removal for the next journal write.
+
+This intermediate project remains non-packable. Receiver tests compose the runtime
+with existing Journaling and DurableJobs services using test-only registration;
+outbound dispatch and public hosting composition are assembled in later layers.
