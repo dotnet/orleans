@@ -374,9 +374,11 @@ namespace Orleans.Streams
             }
 
             data.PendingHandshakes++;
+            var handshakeSucceeded = false;
             try
             {
-                if (await DoHandshakeWithConsumer(data, cacheToken))
+                handshakeSucceeded = await DoHandshakeWithConsumer(data, cacheToken);
+                if (handshakeSucceeded)
                 {
                     // Delivery can start while the handshake is awaiting a response.
                     if (data.State == StreamConsumerDataState.Active)
@@ -394,6 +396,7 @@ namespace Orleans.Streams
             }
             finally
             {
+                data.HasUnresolvedHandshake = !handshakeSucceeded;
                 data.PendingHandshakes--;
             }
         }
@@ -1124,7 +1127,7 @@ namespace Orleans.Streams
 
                 foreach (var consumer in streamConsumers.AllConsumers())
                 {
-                    if (!consumer.IsRegistered || consumer.PendingHandshakes != 0)
+                    if (!consumer.IsRegistered || consumer.PendingHandshakes != 0 || consumer.HasUnresolvedHandshake)
                     {
                         return false;
                     }
@@ -1199,6 +1202,7 @@ namespace Orleans.Streams
             => consumer.IsCaughtUp
                 && consumer.State == StreamConsumerDataState.Inactive
                 && consumer.PendingHandshakes == 0
+                && !consumer.HasUnresolvedHandshake
                 && consumer.PendingBatch is null
                 && consumer.Cursor is not null
                 && consumer.LastProcessedToken is { } progress

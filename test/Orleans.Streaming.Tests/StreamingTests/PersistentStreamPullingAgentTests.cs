@@ -3038,6 +3038,115 @@ namespace UnitTests.StreamingTests
             }
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+        [InlineData("faulted", false)]
+        [InlineData("faulted", true)]
+        [InlineData("canceled", false)]
+        [InlineData("canceled", true)]
+        [InlineData("recovered", false)]
+        [InlineData("recovered", true)]
+        public async Task Shutdown_WithholdsProgressUntilRegisteredHandshakeUncertaintyIsResolved(
+            string outcome, bool deliveryInFlight)
+        {
+            await using var scenario = await CreateCheckpointScenario();
+            await scenario.Read((scenario.Idle, 1), (scenario.Busy, 50), (scenario.Busy, 100));
+            await scenario.Remove(scenario.Idle);
+            using var replayPin = scenario.Cache.GetCacheCursor(scenario.Busy.StreamId, new EventSequenceTokenV2(50));
+            var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var recoveryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var failedHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var successfulHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseDelivery = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var handshakes = 0;
+            var consumer = new RecordingConsumer
+            {
+                OnHandshake = () =>
+                {
+                    if (++handshakes == 1)
+                    {
+                        handshakeStarted.TrySetResult();
+                        return failedHandshake.Task;
+                    }
+
+                    recoveryStarted.TrySetResult();
+                    return successfulHandshake.Task;
+                },
+                OnDelivery = _ => releaseDelivery.Task,
+            };
+            scenario.Busy.StreamConsumer = consumer;
+            var replayToken = StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(50));
+            Task attachment = Task.CompletedTask;
+            Task recovery = Task.CompletedTask;
+
+            try
+            {
+                if (deliveryInFlight)
+                {
+                    await scenario.Read((scenario.Busy, 200));
+                    await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                }
+
+                attachment = scenario.Accessor.AddSubscriber(scenario.Busy);
+                await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                if (outcome == "recovered")
+                {
+                    recovery = scenario.Accessor.AddSubscriber(scenario.Busy);
+                    await recoveryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                }
+
+                var shutdown = scenario.Accessor.Shutdown();
+                await scenario.Accessor.GetPubSubCache();
+                Assert.False(shutdown.IsCompleted);
+                Assert.True(scenario.Busy.IsRegistered);
+                Assert.Equal(100, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                Assert.Empty(scenario.Checkpoints);
+
+                if (outcome == "canceled")
+                {
+                    failedHandshake.SetCanceled(TestContext.Current.CancellationToken);
+                }
+                else
+                {
+                    failedHandshake.SetException(new InvalidOperationException("Re-handshake failed"));
+                }
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.True(scenario.Busy.HasUnresolvedHandshake);
+                if (outcome == "recovered")
+                {
+                    successfulHandshake.SetResult(replayToken);
+                    await recovery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                    Assert.False(scenario.Busy.HasUnresolvedHandshake);
+                }
+                releaseDelivery.SetResult(null);
+
+                await shutdown.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                Assert.Equal(0, scenario.Busy.PendingHandshakes);
+                Assert.Empty(consumer.Errors);
+                if (outcome == "recovered")
+                {
+                    Assert.Equal(50, Assert.Single(scenario.Checkpoints)?.SequenceNumber);
+                    Assert.Same(replayToken, scenario.Busy.LastToken);
+                    Assert.Equal(50, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                }
+                else
+                {
+                    Assert.Empty(scenario.Checkpoints);
+                    Assert.Equal(deliveryInFlight ? 200 : 100, scenario.Busy.LastProcessedToken?.SequenceNumber);
+                }
+            }
+            finally
+            {
+                failedHandshake.TrySetResult(null);
+                successfulHandshake.TrySetResult(replayToken);
+                releaseDelivery.TrySetResult(null);
+                await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await recovery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+        }
+
         [Theory, TestCategory("BVT"), TestCategory("Streaming")]
         [InlineData(false, "pending")]
         [InlineData(false, "replaying")]

@@ -85,6 +85,8 @@ Explicit subscription notifications receive an immediate acknowledgement while t
 
 A completed handshake establishes the subscription's current cursor and replay position. Delivery completions from an older handshake generation release their work while preserving that replacement position, so final checkpoint progress reflects the accepted rewind.
 
+A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the existing checkpoint until a successful handshake reconciles that position.
+
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
 <a name="backpressure"></a>
