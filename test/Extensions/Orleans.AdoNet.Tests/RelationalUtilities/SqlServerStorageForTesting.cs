@@ -91,7 +91,11 @@ namespace UnitTests.General
                 await OpenConnectionAsync(connection, cancellationToken);
                 foreach (var script in scriptBatches)
                 {
-                    await ExecuteCommandAsync(connection, script, cancellationToken);
+                    await ExecuteCommandAsync(
+                        connection,
+                        script,
+                        cancellationToken,
+                        SetupCommandTimeoutSeconds);
                 }
             }
             finally
