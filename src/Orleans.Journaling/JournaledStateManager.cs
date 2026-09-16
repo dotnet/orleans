@@ -29,6 +29,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly RetiredStateTracker _retirementTracker;
     private Task? _workLoop;
     private ManagerState _state;
+    private long _recoveryGeneration;
     private bool _migrationSnapshotRequired;
     private int _disposed;
 
@@ -138,6 +139,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
+            ThrowIfInitializationFenced();
             if (_workLoop is null)
             {
                 _workLoop = Start();
@@ -196,6 +198,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 {
                                     _state = ManagerState.Ready;
                                 }
+
+                                _recoveryGeneration++;
                             }
 
                             needsRecovery = false;
@@ -207,7 +211,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             {
                                 if (fenceOnFailure)
                                 {
-                                    _state = ManagerState.Ready;
+                                    _state = ManagerState.Fenced;
                                 }
                             }
 
@@ -248,6 +252,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                     try
                     {
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem
+                            && workItem.RecoveryGeneration != Volatile.Read(ref _recoveryGeneration))
+                        {
+                            throw new InvalidOperationException(
+                                "The journaled state operation was queued before recovery discarded its mutations. Retry the operation.");
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -464,6 +475,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                             var id = _journalStreamDirectory.GetNextJournalStreamId();
                                             _journalStreamDirectory.Set(name, id);
                                         }
+
+                                        _recoveryGeneration++;
                                     }
                                     break;
                                 }
@@ -474,6 +487,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     lock (_lock)
                                     {
                                         _state = ManagerState.Ready;
+                                        _recoveryGeneration++;
                                     }
 
                                     break;
@@ -483,6 +497,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 {
                                     lock (_lock)
                                     {
+                                        ThrowIfInitializationFenced();
                                         _state = ManagerState.Ready;
                                     }
                                     break;
@@ -541,7 +556,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        if (IsRecoverySignal(exception))
+                        if (workItem is not RevertPendingChangesWorkItem && IsRecoverySignal(exception))
                         {
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
@@ -573,7 +588,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
             catch (Exception exception)
             {
-                needsRecovery = true;
+                lock (_lock)
+                {
+                    needsRecovery = _state is not ManagerState.Fenced;
+                }
                 if (_shutdownCancellation.Token.IsCancellationRequested)
                 {
                     CompleteRecoveryTrigger();
@@ -742,6 +760,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         lock (_lock)
         {
+            foreach (var (name, state) in _states)
+            {
+                if (state is not RetiredState && !_journalStreamDirectory.ContainsKey(name))
+                {
+                    _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
+                }
+            }
+
             foreach ((var name, var state) in _states)
             {
                 state.OnRecoveryCompleted();
@@ -943,6 +969,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
+    private void ThrowIfInitializationFenced()
+    {
+        if (_state is ManagerState.Fenced)
+        {
+            throw new InvalidOperationException(
+                "The journaled state manager is fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+        }
+    }
+
     private async ValueTask ReadStorageAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
@@ -1021,6 +1056,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         var newWorkItem = new TWorkItem();
         newWorkItem.EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp();
+        newWorkItem.RecoveryGeneration = _recoveryGeneration;
         newWorkItem.RecordTraceContext();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
@@ -1113,6 +1149,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         private List<ActivityLink>? _links;
 
         public long EnqueuedTimestamp { get; set; }
+
+        public long RecoveryGeneration { get; set; }
 
         public ActivityContext TraceParent { get; private set; }
 
