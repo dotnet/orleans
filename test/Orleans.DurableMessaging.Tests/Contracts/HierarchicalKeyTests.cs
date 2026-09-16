@@ -129,6 +129,28 @@ public class HierarchicalKeyTests
         Assert.Equal("foo/bar/baz", child.ToString());
     }
 
+    [Fact]
+    public void CreateChildKey_PreservesRootFirstHierarchy()
+    {
+        var root = HierarchicalKey.Create("root");
+        var branch = root.CreateChildKey("branch");
+        var leaf = branch.CreateChildKey("leaf");
+        var segments = new List<string>();
+        foreach (var segment in leaf)
+        {
+            segments.Add(segment.ToString());
+        }
+
+        Assert.Equal(["root", "branch", "leaf"], segments);
+        Assert.Equal("root/branch/leaf", leaf.ToString());
+        Assert.Equal(HierarchicalKey.Create("root/branch/leaf"), leaf);
+        Assert.True(root.IsParentOf(branch));
+        Assert.True(branch.IsParentOf(leaf));
+        Assert.True(leaf.IsChildOf(branch));
+        Assert.True(root.IsAncestorOf(leaf));
+        Assert.False(root.IsParentOf(leaf));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("bar//baz")]
@@ -142,11 +164,29 @@ public class HierarchicalKeyTests
     }
 
     [Fact]
+    public void CreateEscapedChildKey_WithNullString_ThrowsArgumentException()
+    {
+        var parent = HierarchicalKey.Create("foo");
+
+        var exception = Assert.Throws<ArgumentException>(() => parent.CreateEscapedChildKey(null!));
+
+        Assert.Equal("value", exception.ParamName);
+    }
+
+    [Fact]
     public void CreateEscapedChildKey_EscapesSegmentSeparators()
     {
         var parent = HierarchicalKey.Create("foo");
         var child = parent.CreateEscapedChildKey("bar/baz");
         Assert.Equal("foo/bar\\/baz", child.ToString());
+    }
+
+    [Fact]
+    public void CreateEscaped_WithNullString_ThrowsArgumentException()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => HierarchicalKey.CreateEscaped(null!));
+
+        Assert.Equal("value", exception.ParamName);
     }
 
     [Fact]
