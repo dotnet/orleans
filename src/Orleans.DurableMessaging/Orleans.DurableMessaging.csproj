@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.DurableMessaging</PackageId>
     <Title>Microsoft Orleans Durable Messaging</Title>
-    <Description>Durable messaging protocol and journaled inbox processing for Microsoft Orleans.</Description>
+    <Description>Durable messaging protocol and journaled inbox and outbox processing for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Messaging Inbox Outbox Durable</PackageTags>
     <IsPackable>false</IsPackable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>

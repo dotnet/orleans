@@ -1,6 +1,6 @@
 # Microsoft Orleans Durable Messaging
 
-This project supplies the durable messaging protocol, handler routing, and journaled inbox runtime:
+This project supplies the durable messaging protocol, handler routing, and journaled inbox and outbox runtime:
 
 - `DurableEnvelope` identifies a message by sender and message ID and carries its
   destination, route, correlation key, reply destination, and creation timestamp.
@@ -126,6 +126,26 @@ Exact route registration retains the original handler instance and takes precede
 over generic handler selection. Operational diagnostics expose retained dead letters
 and stage their removal for the next journal write.
 
-This intermediate project remains non-packable. Receiver tests compose the runtime
-with existing Journaling and DurableJobs services using test-only registration;
-outbound dispatch and public hosting composition are assembled in later layers.
+The outbox stages envelopes with the owning grain as sender. The journal write
+schedules delivery before committing each new batch with its ownership generation
+and exact returned DurableJob handle. Commit notifications release the captured
+messages for delivery. Equivalent repeated enqueues preserve the original message
+and its commit status; conflicting envelopes with the same message ID fail. Envelope
+equivalence includes routing, timestamps, body and context bytes, and declared types.
+
+Recovery restores the journaled ownership pair and repairs pending work with an
+absent owner. Failed ownership writes restore committed state before retry backoff,
+including when recovery resolves an ambiguous commit response. Callbacks validate
+generation and physical job identity, coalesce by logical ownership, and commit
+terminal ownership cleanup. Loopback delivery executes through the local inbox;
+remote batches yield between timer turns and retain the durable attempt's
+cancellation token. Delivery outcomes commit message removal or bounded retry and
+dead-letter state. Diagnostics expose retained outbox dead letters and stage their
+removal for the next journal write.
+
+This intermediate project remains non-packable. Receiver tests compose the inbox
+with existing Journaling and DurableJobs services and a journaled test outbox for
+isolation. Outbox component tests construct the actual runtime through test-only
+reflection and public interfaces. Public `AddDurableMessaging` hosting composition,
+full-cluster sender/receiver integration, package publishing, and documentation-site
+wiring are assembled in the final consumer layer.
