@@ -21,6 +21,25 @@ public sealed class GrainDirectoryProcessCompatibilityTests(ITestOutputHelper ou
     internal static readonly TimeSpan PhaseTimeout = TimeSpan.FromSeconds(75);
 
     [Theory]
+    [InlineData(HostVersion.Released)]
+    [InlineData(HostVersion.Current)]
+    public async Task DuplicateCommandIdDoesNotExecuteStop(HostVersion version)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var cluster = new CompatibilityProcessCluster(output);
+        var host = await cluster.StartAsync(version, "duplicate-command", isPrimary: true, cancellationToken);
+        await cluster.WaitForMembershipAsync("initial membership", [host], [], cancellationToken);
+
+        var response = await host.SendDuplicateStopAsync(cancellationToken);
+
+        Assert.False(response.Success);
+        Assert.Equal($"A command with id {response.Id} is already running.", response.Error);
+        Assert.Empty(await host.PingAsync([], cancellationToken));
+        await host.StopAsync(cancellationToken);
+        Assert.Equal(0, host.ExitCode);
+    }
+
+    [Theory]
     [InlineData(HostVersion.Released, HostVersion.Current)]
     [InlineData(HostVersion.Current, HostVersion.Released)]
     public async Task DirectedRollingReplacement_PreservesRegistrationAndTraffic(
@@ -1130,6 +1149,45 @@ internal sealed class CompatibilityHostProcess : IAsyncDisposable
         }
 
         return errors;
+    }
+
+    public async Task<(int Id, bool Success, string? Error)> SendDuplicateStopAsync(CancellationToken cancellationToken)
+    {
+        EnsureRunning();
+        var id = Interlocked.Increment(ref _nextCommandId);
+        var completion = new TaskCompletionSource<HostResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(GrainDirectoryProcessCompatibilityTests.PhaseTimeout);
+        var deadlineUtc = DateTimeOffset.UtcNow + GrainDirectoryProcessCompatibilityTests.PhaseTimeout;
+        if (!_responses.TryAdd(id, completion))
+        {
+            throw new InvalidOperationException($"Duplicate command id {id}.");
+        }
+
+        try
+        {
+            await _commandWriteLock.WaitAsync(deadline.Token);
+            try
+            {
+                // A running silo cannot reach empty membership, keeping this command active until shutdown.
+                var original = new HostCommand(id, "membership", null, [], [], deadlineUtc.ToUnixTimeMilliseconds());
+                var duplicate = new HostCommand(id, "stop", null, null, null, deadlineUtc.ToUnixTimeMilliseconds());
+                await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(original).AsMemory(), deadline.Token);
+                await _process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(duplicate).AsMemory(), deadline.Token);
+                await _process.StandardInput.FlushAsync(deadline.Token);
+            }
+            finally
+            {
+                _commandWriteLock.Release();
+            }
+
+            var response = await completion.Task.WaitAsync(deadline.Token);
+            return (id, response.Success, response.Error);
+        }
+        finally
+        {
+            _responses.TryRemove(id, out _);
+        }
     }
 
     private async Task<JsonElement> SendAsync(HostCommand command, CancellationToken cancellationToken)

@@ -31,6 +31,8 @@ The scenarios keep application activations on a surviving silo while their direc
 
 The process fixture owns the handles/PIDs it starts, resumes suspended children during cleanup, and reaps them before releasing resources. Suspension is implemented for Windows, Linux, and macOS. Cleanup errors are reported as failures.
 
+The command-loop regression holds a membership request open and submits a `stop` command with the same ID. Both hosts reject the duplicate before execution, continue serving commands, and drain the original request during normal shutdown.
+
 Full child output is retained under the test assembly output directory in `compatibility-process-logs\<cluster-id>`. Failure messages include bounded output tails and the full log paths.
 
 To exercise .NET 8, use `--framework net8.0`. When the required runtime is installed outside the normal `dotnet` location, set `ORLEANS_COMPAT_DOTNET_HOST` to that installation's `dotnet` executable for child processes. The runner and children must use the same runtime/architecture.

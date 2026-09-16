@@ -156,7 +156,7 @@ Each transition records its range, previous view, target view, direction, stage,
 
 Overlapping active transitions with the same target view are rejected. Different target views can overlap; their predecessor waits establish the ordering.
 
-`Fail` records the exception, cancels the completion task to wake waiters, and retains the gate in `Failed`. `Complete` accepts only the required stages. In the directory integration, an exception takes precedence over a completion-eligible stage, and the transition task is observed by the silo's fatal-error handler.
+`Fail` records the exception, faults the completion task so waiters observe the original failure, and retains the gate in `Failed`. `Complete` accepts only the required stages. In the directory integration, an exception takes precedence over a completion-eligible stage, and the transition task is observed by the silo's fatal-error handler.
 
 `Abort` removes the gate and cancels its completion. The directory uses this during shutdown, after its stopped token has closed request admission. A new integration must establish the corresponding admission boundary before abandoning a transition.
 

@@ -159,8 +159,7 @@ public static class Program
                 continue;
             }
 
-            var task = HandleCommandAsync(services, command, shutdown);
-            if (!commands.TryAdd(command.Id, task))
+            if (commands.ContainsKey(command.Id))
             {
                 WriteResponse(new HostResponse(
                     command.Id,
@@ -170,6 +169,9 @@ public static class Program
                 continue;
             }
 
+            // This loop is the only writer adding commands; completions only remove them.
+            var task = HandleCommandAsync(services, command, shutdown);
+            commands[command.Id] = task;
             _ = task.ContinueWith(
                 (completedTask, state) =>
                 {
