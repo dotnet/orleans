@@ -44,6 +44,10 @@ builder.AddProject<Projects.Client>("client")
 
 The options define both the AWS CDK queue resources and the Orleans configuration emitted to every referenced silo and client. The integration applies the stable service ID, attaches the AWS SDK profile and region, and makes each referenced resource wait for the CDK stack automatically.
 
+Provider names are unique ignoring case within an Orleans service, including providers registered through other streaming extensions. Each physical queue has one owning SQS stack per AppHost and region. Registration validates both identities before adding resources or changing Orleans configuration, and reports the conflicting provider or queue. Use distinct service IDs or provider names for separate topologies in the same region, including when AWS profiles select different accounts.
+
+Physical queue names preserve the service ID and lowercase the provider name: `orders-service-orders_primary-0`. Hyphens and underscores remain distinct in physical names; the CDK resource identifiers distinguish names such as `orders-primary` and `orders_primary`.
+
 ## Documentation
 
 See [Stream with Amazon SQS](https://dotnet.github.io/orleans/docs/streaming/sqs-streaming/) for runtime behavior, permissions, delivery semantics, and operations.

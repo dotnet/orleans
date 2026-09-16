@@ -25,6 +25,11 @@ public static partial class OrleansSqsStreamingExtensions
     /// <param name="awsSdkConfig">The AWS SDK profile and region configuration.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The Orleans service.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
+    /// same AppHost and region, a generated resource name is already registered, or the service
+    /// identifier conflicts with the Orleans service.
+    /// </exception>
     public static OrleansService WithSqsStreaming(
         this OrleansService orleansService,
         string name,
@@ -43,6 +48,11 @@ public static partial class OrleansSqsStreamingExtensions
     /// <param name="awsSdkConfig">The AWS SDK profile and region configuration.</param>
     /// <param name="options">The SQS topology and runtime options.</param>
     /// <returns>The SQS stream provider resource.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// A stream provider name conflicts case-insensitively, a physical queue is already owned in the
+    /// same AppHost and region, a generated resource name is already registered, or the service
+    /// identifier conflicts with the Orleans service.
+    /// </exception>
     public static SqsStreamingResource AddSqsStreaming(
         this OrleansService orleansService,
         string name,
@@ -61,11 +71,19 @@ public static partial class OrleansSqsStreamingExtensions
         }
 
         var validatedOptions = ValidateAndCopy(name, awsSdkConfig, options);
+        var queueNames = GetPhysicalQueueNames(name, validatedOptions);
+        var region = awsSdkConfig.Region!.SystemName;
+        ValidateIdentities(orleansService, name, region, queueNames);
         ValidateServiceId(orleansService, validatedOptions.ServiceId, allowUnset: true);
 
         var resourceName = CreateResourceName($"{orleansService.Name}-{name}-sqs");
+        var queueResourceNames = Enumerable.Range(0, validatedOptions.PartitionCount)
+            .Select(partition => $"{resourceName}-{partition}")
+            .ToArray();
+        ValidateResourceNames(orleansService.Builder, resourceName, queueResourceNames);
         var stack = orleansService.Builder.AddAWSCDKStack(resourceName).WithReference(awsSdkConfig);
-        var queues = CreateQueues(stack, name, validatedOptions);
+        var queues = CreateQueues(stack, validatedOptions, queueNames, queueResourceNames);
+        stack.WithAnnotation(new SqsTopologyAnnotation(name, region, queueNames));
         var resource = new SqsStreamingResource(
             orleansService,
             name,
@@ -78,6 +96,68 @@ public static partial class OrleansSqsStreamingExtensions
             .WithServiceId(validatedOptions.ServiceId)
             .WithStreaming(name, resource);
         return resource;
+    }
+
+    private static void ValidateIdentities(
+        OrleansService orleansService,
+        string name,
+        string region,
+        IReadOnlyList<string> queueNames)
+    {
+        foreach (var existingName in orleansService.Streaming.Keys)
+        {
+            if (string.Equals(existingName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"SQS stream provider '{name}' conflicts with existing stream provider '{existingName}'. "
+                    + "Stream provider names must be unique ignoring case within an Orleans service.");
+            }
+        }
+
+        var physicalNames = new HashSet<string>(queueNames, StringComparer.Ordinal);
+        foreach (var resource in orleansService.Builder.Resources)
+        {
+            foreach (var topology in resource.Annotations.OfType<SqsTopologyAnnotation>())
+            {
+                if (!string.Equals(topology.Region, region, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                foreach (var queueName in topology.QueueNames)
+                {
+                    if (physicalNames.Contains(queueName))
+                    {
+                        throw new InvalidOperationException(
+                            $"SQS stream provider '{name}' generates physical queue '{queueName}' in region '{region}', "
+                            + $"which is already owned by stream provider '{topology.ProviderName}' in stack '{resource.Name}'. "
+                            + "Use distinct service identifiers or provider names for separate queue topologies.");
+                    }
+                }
+            }
+        }
+    }
+
+    private sealed record SqsTopologyAnnotation(
+        string ProviderName,
+        string Region,
+        IReadOnlyList<string> QueueNames) : IResourceAnnotation;
+
+    private static void ValidateResourceNames(
+        IDistributedApplicationBuilder builder,
+        string stackName,
+        IReadOnlyList<string> queueResourceNames)
+    {
+        var names = new HashSet<string>(queueResourceNames, StringComparer.OrdinalIgnoreCase) { stackName };
+        foreach (var resource in builder.Resources)
+        {
+            if (names.Contains(resource.Name))
+            {
+                throw new InvalidOperationException(
+                    $"SQS streaming resource name '{resource.Name}' is already registered in the AppHost. "
+                    + "Use distinct Orleans service names and provider names for separate stacks.");
+            }
+        }
     }
 
     private static SqsStreamingOptions ValidateAndCopy(
@@ -138,17 +218,17 @@ public static partial class OrleansSqsStreamingExtensions
 
     private static IReadOnlyList<IResourceBuilder<IConstructResource<Queue>>> CreateQueues(
         IResourceBuilder<IStackResource> stack,
-        string providerName,
-        SqsStreamingOptions options)
+        SqsStreamingOptions options,
+        IReadOnlyList<string> queueNames,
+        IReadOnlyList<string> queueResourceNames)
     {
-        var queueNames = GetPhysicalQueueNames(providerName, options);
         var result = new List<IResourceBuilder<IConstructResource<Queue>>>(queueNames.Count);
         for (var index = 0; index < queueNames.Count; index++)
         {
             var queueName = queueNames[index];
             result.Add(
                 stack.AddSQSQueue(
-                    $"{CreateResourceName(providerName)}-{index}",
+                    queueResourceNames[index],
                     new QueueProps
                     {
                         QueueName = queueName,
