@@ -4,7 +4,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.DurableJobs.AzureStorage</PackageId>
     <Title>Microsoft Orleans Azure Storage Durable Jobs Provider</Title>
-    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob Storage</Description>
+    <Description>Microsoft Orleans durable jobs provider backed by Azure Blob or Azure Table journal storage</Description>
     <PackageTags>$(PackageTags) Azure Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.DurableJobs.AzureStorage</AssemblyName>

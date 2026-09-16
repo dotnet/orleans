@@ -190,6 +190,10 @@ stream consumption and correctness checks. Setup, warmup, post-write
 verification, cleanup, and export are outside latency, throughput, and provider
 metric windows. Small sample counts produce coarse percentiles; increase
 operations for tail-latency analysis.
+The fixed-work runner activates its provider metric listener at the start of
+measurement and detaches it when the workers finish, before verification and
+cleanup. Metric callbacks and aggregation are part of the measured fixed-work
+configuration.
 
 CSV has one summary row, invariant-culture numeric values, quoted fields, and
 the same configuration, raw operations, failures, and provider metrics in JSON
@@ -244,6 +248,9 @@ The `Dry` smoke preset also retains the three-iteration cap. BDN's reported
 operation is one provider call or complete traversal.
 Its mean describes iteration samples; use the fixed-work runner's independently
 timed operation distribution for request-tail analysis.
+The BDN path leaves provider metric collection inactive, so its timings include
+the workload and correctness checks without the fixed-work runner's metric
+listener callbacks or aggregation.
 Each benchmark process emits the same build information in an `Azure benchmark
 build:` JSON line during global setup. Retain the BDN log under the configured
 `--artifacts` directory alongside its summary reports, especially for

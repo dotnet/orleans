@@ -140,6 +140,48 @@ public class AzureJournalRunnerTests
     }
 
     [Fact]
+    public void MetricsEnableCountersOnlyDuringExplicitCollectionWindows()
+    {
+        using var meter = new Meter("Microsoft.Orleans");
+        var pages = meter.CreateCounter<long>("orleans-journaling-provider-catalog-pages");
+        using var collector = new ProviderMetrics(meter);
+        var entries = meter.CreateCounter<long>("orleans-journaling-provider-catalog-entries");
+        Assert.False(pages.Enabled);
+        Assert.False(entries.Enabled);
+        pages.Add(100);
+        collector.Start();
+        Assert.True(pages.Enabled);
+        Assert.True(entries.Enabled);
+        Assert.Throws<InvalidOperationException>(collector.Start);
+        var retries = meter.CreateCounter<long>("orleans-journaling-provider-retries");
+        Assert.True(retries.Enabled);
+        pages.Add(1, new KeyValuePair<string, object?>("provider", "orders"));
+        entries.Add(2, new KeyValuePair<string, object?>("provider", "orders"));
+        Assert.Equal(new ProviderMetric[]
+        {
+            new("orleans-journaling-provider-catalog-entries", "count", "orders", "", 1, 2),
+            new("orleans-journaling-provider-catalog-pages", "count", "orders", "", 1, 1)
+        }, collector.Stop());
+        Assert.False(pages.Enabled);
+        Assert.False(entries.Enabled);
+        Assert.False(retries.Enabled);
+        entries.Add(100);
+        collector.Start();
+        Assert.True(pages.Enabled);
+        Assert.True(entries.Enabled);
+        Assert.True(retries.Enabled);
+        entries.Add(3, new KeyValuePair<string, object?>("provider", "orders"));
+        Assert.Equal(new ProviderMetric("orleans-journaling-provider-catalog-entries", "count", "orders", "", 1, 3),
+            Assert.Single(collector.Stop()));
+        collector.Start();
+        Assert.True(pages.Enabled);
+        collector.Dispose();
+        Assert.False(pages.Enabled);
+        Assert.False(entries.Enabled);
+        Assert.False(retries.Enabled);
+    }
+
+    [Fact]
     public void MetricsCollectOnlyCatalogCountersAndPreserveIntegerPrecision()
     {
         using var meter = new Meter("Microsoft.Orleans");
@@ -203,8 +245,24 @@ public class AzureJournalRunnerTests
         }
 
         await using var services = builder.Services.BuildServiceProvider();
-        using var collector = new ProviderMetrics(services.GetRequiredService<OrleansInstruments>().Meter);
+        var meter = services.GetRequiredService<OrleansInstruments>().Meter;
+        var counters = new List<Instrument>();
+        using var observer = new MeterListener
+        {
+            InstrumentPublished = (instrument, _) =>
+            {
+                if (ReferenceEquals(instrument.Meter, meter)
+                    && instrument.Name.StartsWith("orleans-journaling-provider-", StringComparison.Ordinal))
+                {
+                    counters.Add(instrument);
+                }
+            }
+        };
+        observer.Start();
+        using var collector = new ProviderMetrics(meter);
         var catalog = services.GetRequiredService<IJournalStorageCatalog>();
+        Assert.Equal(4, counters.Count);
+        Assert.All(counters, counter => Assert.False(counter.Enabled));
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         foreach (var participant in services.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
         {
@@ -217,7 +275,9 @@ public class AzureJournalRunnerTests
         {
             var options = new ListOptions { Prefix = new("catalog/"), MaxId = new("catalog/b") };
             Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
+            Assert.All(counters, counter => Assert.False(counter.Enabled));
             collector.Start();
+            Assert.All(counters, counter => Assert.True(counter.Enabled));
             Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
             var provider = table ? "azure_table" : "azure_blob";
             Assert.Equal(new ProviderMetric[]
@@ -226,6 +286,9 @@ public class AzureJournalRunnerTests
                 new("orleans-journaling-provider-catalog-items", "count", provider, "", 1, 3),
                 new("orleans-journaling-provider-catalog-pages", "count", provider, "", 2, 2)
             }, collector.Stop());
+            Assert.All(counters, counter => Assert.False(counter.Enabled));
+            Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
+            Assert.All(counters, counter => Assert.False(counter.Enabled));
 
             async Task<List<JournalId>> ReadIdsAsync()
             {

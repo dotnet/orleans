@@ -10,16 +10,28 @@ internal sealed record ProviderMetric(
     long Observations,
     long Sum);
 
-internal sealed class ProviderMetrics : IDisposable
+internal sealed class ProviderMetrics(Meter meter) : IDisposable
 {
-    private readonly MeterListener _listener = new();
+    private MeterListener? _listener;
     private readonly Dictionary<MetricKey, Aggregate> _values = [];
     private readonly object _lock = new();
     private bool _recording;
 
-    public ProviderMetrics(Meter meter)
+    public void Start()
     {
-        _listener.InstrumentPublished = (instrument, listener) =>
+        lock (_lock)
+        {
+            if (_listener is not null)
+            {
+                throw new InvalidOperationException("Provider metric collection is already active.");
+            }
+
+            _values.Clear();
+            _recording = true;
+        }
+
+        var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, subscriber) =>
         {
             if (ReferenceEquals(instrument.Meter, meter)
                 && instrument is Counter<long>
@@ -28,27 +40,19 @@ internal sealed class ProviderMetrics : IDisposable
                     or "orleans-journaling-provider-catalog-entries"
                     or "orleans-journaling-provider-retries")
             {
-                listener.EnableMeasurementEvents(instrument);
+                subscriber.EnableMeasurementEvents(instrument);
             }
         };
-        _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => Record(instrument, value, tags));
-        _listener.Start();
-    }
-
-    public void Start()
-    {
-        lock (_lock)
-        {
-            _values.Clear();
-            _recording = true;
-        }
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => Record(instrument, value, tags));
+        _listener = listener;
+        listener.Start();
     }
 
     public IReadOnlyList<ProviderMetric> Stop()
     {
+        Dispose();
         lock (_lock)
         {
-            _recording = false;
             return _values.OrderBy(pair => pair.Key.Instrument, StringComparer.Ordinal)
                 .ThenBy(pair => pair.Key.Provider, StringComparer.Ordinal)
                 .ThenBy(pair => pair.Key.Reason, StringComparer.Ordinal)
@@ -86,7 +90,18 @@ internal sealed class ProviderMetrics : IDisposable
         }
     }
 
-    public void Dispose() => _listener.Dispose();
+    public void Dispose()
+    {
+        MeterListener? listener;
+        lock (_lock)
+        {
+            _recording = false;
+            listener = _listener;
+            _listener = null;
+        }
+
+        listener?.Dispose();
+    }
 
     private sealed record MetricKey(string Instrument, string Unit, string Provider, string Reason);
 
