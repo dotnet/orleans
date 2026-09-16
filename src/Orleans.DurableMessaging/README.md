@@ -1,6 +1,6 @@
 # Microsoft Orleans Durable Messaging
 
-This project supplies the durable messaging protocol and handler-routing contracts:
+This project supplies the durable messaging protocol, handler routing, and journaled inbox runtime:
 
 - `DurableEnvelope` identifies a message by sender and message ID and carries its
   destination, route, correlation key, reply destination, and creation timestamp.
@@ -54,5 +54,20 @@ disposed, or foreign handles are rejected before mutation.
 Envelope identity/equivalence checks retain the existing routing, payload and declared-type
 metadata semantics.
 
-This intermediate project is non-packable while the runtime and hosting layers are
-assembled into `Microsoft.Orleans.DurableMessaging`.
+The inbox accepts a message after DurableJobs confirms scheduling and the journal
+commits the envelope together with its ownership generation and exact returned job
+handle. Recovery restores that pair and repairs an absent owner for pending work.
+Callbacks validate generation and physical job identity before processing.
+
+Handlers execute sequentially. Their journaled effects, staged output, inbox
+completion, and `(SenderId, MessageId)` deduplication record commit together after
+the handler returns. A failed handler restores committed state and applies bounded
+retry and dead-letter policy. Retained duplicates return `Duplicate`; expiry permits
+acceptance again. Capacity limits return `Backpressured` before persistence.
+Exact route registration retains the original handler instance and takes precedence
+over generic handler selection. Operational diagnostics expose retained dead letters
+and stage their removal for the next journal write.
+
+This intermediate project remains non-packable. Receiver tests compose the runtime
+with existing Journaling and DurableJobs services using test-only registration;
+outbound dispatch and public hosting composition are assembled in later layers.

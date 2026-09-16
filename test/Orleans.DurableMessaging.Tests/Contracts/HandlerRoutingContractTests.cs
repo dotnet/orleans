@@ -1,4 +1,7 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -20,6 +23,54 @@ public sealed class HandlerRoutingContractTests : IDisposable
         services.AddSerializer();
         _services = services.BuildServiceProvider();
         _sessions = _services.GetRequiredService<SerializerSessionPool>();
+    }
+
+    [Fact]
+    public void ExactRouteRegistration_PreservesHandlerIdentityAndRejectsReplacement()
+    {
+        var inbox = CreateInbox();
+        var handler = Substitute.For<IInboxHandler>();
+        inbox.RegisterHandler("orders/submit", handler);
+
+        Assert.True(inbox.HasHandler("orders/submit"));
+        Assert.True(inbox.TryGetHandler("orders/submit", out var registered));
+        Assert.Same(handler, registered);
+
+        Assert.Throws<InvalidOperationException>(
+            () => inbox.RegisterHandler("orders/submit", Substitute.For<IInboxHandler>()));
+        Assert.True(inbox.TryGetHandler("orders/submit", out registered));
+        Assert.Same(handler, registered);
+        Assert.False(inbox.TryGetHandler("orders/Submit", out var missing));
+        Assert.Null(missing);
+    }
+
+    [Fact]
+    public async Task ExactRouteSelection_PreservesPrecedenceAndOrdinalMatching()
+    {
+        var inbox = CreateInbox();
+        var handler = Substitute.For<IInboxHandler>();
+        var fallback = Substitute.For<IInboxHandler>();
+        fallback.CanHandle(Arg.Any<IInboxHandlerContext>()).Returns(true);
+        inbox.RegisterHandler(fallback);
+        inbox.RegisterHandler("orders/submit", handler);
+        using var exactContext = CreateContext("orders/submit");
+        using var differentCaseContext = CreateContext("orders/Submit");
+        var cancellationToken = Xunit.TestContext.Current.CancellationToken;
+        var select = inbox.GetType().GetMethod("TryFindHandler", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        object?[] arguments = [exactContext, null];
+
+        Assert.True((bool)select.Invoke(inbox, arguments)!);
+        Assert.Same(handler, arguments[1]);
+        await ((IInboxHandler)arguments[1]!).HandleAsync(exactContext, cancellationToken);
+
+        handler.DidNotReceive().CanHandle(Arg.Any<IInboxHandlerContext>());
+        fallback.DidNotReceive().CanHandle(Arg.Any<IInboxHandlerContext>());
+        await handler.Received(1).HandleAsync(exactContext, cancellationToken);
+
+        arguments = [differentCaseContext, null];
+        Assert.True((bool)select.Invoke(inbox, arguments)!);
+        Assert.Same(fallback, arguments[1]);
+        fallback.Received(1).CanHandle(differentCaseContext);
     }
 
     [Theory]
@@ -440,6 +491,13 @@ public sealed class HandlerRoutingContractTests : IDisposable
     {
         var type = typeof(IInboxHandlerContext).Assembly.GetType($"Orleans.DurableMessaging.{typeName}", throwOnError: true)!;
         return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, arguments));
+    }
+
+    private static IDurableInbox CreateInbox()
+    {
+        var inboxType = typeof(IDurableInbox).Assembly.GetType("Orleans.DurableMessaging.DurableInbox", throwOnError: true)!;
+        var messages = Substitute.For<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>();
+        return (IDurableInbox)Activator.CreateInstance(inboxType, messages, 1000)!;
     }
 
     private TestContext CreateContext(string route, HierarchicalKey? correlation = null, object? body = null)
