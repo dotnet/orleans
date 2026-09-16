@@ -326,6 +326,8 @@ namespace Orleans.Streaming.EventHubs
         protected virtual void InitEventHubClient() { }
 
         public virtual System.Threading.Tasks.Task QueueMessageBatchAsync<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
+
+        public virtual System.Threading.Tasks.Task ShutdownAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     [GenerateSerializer]

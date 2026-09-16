@@ -341,11 +341,18 @@ namespace Orleans.Streaming.EventHubs
             return await producer.GetPartitionIdsAsync();
         }
 
-        internal Task CloseAsync(CancellationToken cancellationToken)
+        /// <summary>
+        /// Drains accepted publications and closes the producer and its owned connection.
+        /// </summary>
+        /// <param name="cancellationToken">Bounds the wait for shutdown while accepted publications continue draining.</param>
+        /// <returns>A task representing the wait for shutdown.</returns>
+        public virtual Task ShutdownAsync(CancellationToken cancellationToken)
         {
             lock (closeLock)
             {
-                return closeTask ??= producer.CloseAsync(cancellationToken);
+                // Derived factories can supply their own transport by overriding InitEventHubClient.
+                closeTask ??= producer?.CloseAsync(CancellationToken.None) ?? Task.CompletedTask;
+                return closeTask.WaitAsync(cancellationToken);
             }
         }
 
