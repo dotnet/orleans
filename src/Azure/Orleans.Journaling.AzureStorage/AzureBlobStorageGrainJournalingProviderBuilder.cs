@@ -12,7 +12,7 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         name ??= ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
-        builder.AddAzureBlobJournalStorage(name);
+        builder.AddAzureBlobJournalStorage(name, configure: null);
         var optionsBuilder = builder.Services.AddJournalStorageOptions<AzureBlobJournalStorageOptions>(name);
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {

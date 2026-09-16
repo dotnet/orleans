@@ -62,6 +62,8 @@ public static class HostingExtensions
     /// <see cref="ILifecycleParticipant{TLifecycleObservable}"/>, those services are registered for the same provider.
     /// All providers use the shared journal format configuration. The
     /// <see cref="ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME"/> binding also supplies the unkeyed services.
+    /// The default binding honors unkeyed singleton <see cref="IJournalStorageProvider"/> customizations. A replacement
+    /// provider must implement the catalog and lifecycle contracts declared by <typeparamref name="TProvider"/>.
     /// Repeating a registration with the same name and implementation type retains the original factory.
     /// </remarks>
     /// <exception cref="ArgumentNullException">The builder or factory is null.</exception>
@@ -106,7 +108,19 @@ public static class HostingExtensions
 
         builder.AddJournalStorage();
         services.AddSingleton(new JournalStorageRegistration(name, typeof(TProvider)));
-        services.AddKeyedSingleton<IJournalStorageProvider>(name, (serviceProvider, _) => factory(serviceProvider));
+        var isDefault = string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal);
+        if (isDefault)
+        {
+            services.TryAddSingleton(factory);
+            services.TryAddSingleton<IJournalStorageProvider>(static serviceProvider => serviceProvider.GetRequiredService<TProvider>());
+            services.AddKeyedSingleton<IJournalStorageProvider>(name, static (serviceProvider, _) =>
+                serviceProvider.GetRequiredService<IJournalStorageProvider>());
+        }
+        else
+        {
+            services.AddKeyedSingleton<IJournalStorageProvider>(name, (serviceProvider, _) => factory(serviceProvider));
+        }
+
         services.AddKeyedSingleton<IJournaledStateManagerFactory>(name, (serviceProvider, _) =>
             new JournaledStateManagerFactory(
                 serviceProvider.GetRequiredService<JournaledStateManagerShared>(),
@@ -125,17 +139,10 @@ public static class HostingExtensions
                 (ILifecycleParticipant<ISiloLifecycle>)serviceProvider.GetRequiredKeyedService<IJournalStorageProvider>(name));
         }
 
-        if (string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal))
+        if (isDefault && supportsCatalog)
         {
-            services.TryAddSingleton<IJournalStorageProvider>(serviceProvider =>
-                serviceProvider.GetRequiredKeyedService<IJournalStorageProvider>(name));
-            services.TryAddSingleton<TProvider>(serviceProvider =>
-                (TProvider)serviceProvider.GetRequiredKeyedService<IJournalStorageProvider>(name));
-            if (supportsCatalog)
-            {
-                services.TryAddSingleton<IJournalStorageCatalog>(serviceProvider =>
-                    serviceProvider.GetRequiredKeyedService<IJournalStorageCatalog>(name));
-            }
+            services.TryAddSingleton<IJournalStorageCatalog>(serviceProvider =>
+                serviceProvider.GetRequiredKeyedService<IJournalStorageCatalog>(name));
         }
 
         return builder;

@@ -29,6 +29,82 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task DefaultProviderOverride_GrainAndFactoryManagersShareStorageAndLifecycle(bool registerOverrideFirst)
+    {
+        var builder = CreateNamedProviderBuilder();
+        var original = new LifecycleJournalStorageProvider();
+        var replacement = new LifecycleJournalStorageProvider();
+        var grainId = GrainId.Create("test-grain", "default-override");
+        var journalId = JournalId.FromGrainId(grainId);
+        builder.Services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(grainId));
+        if (registerOverrideFirst)
+        {
+            builder.Services.AddSingleton<IJournalStorageProvider>(replacement);
+        }
+
+        builder.AddJournalStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, _ => original);
+        builder.AddVolatileJournalStorage("other");
+        if (!registerOverrideFirst)
+        {
+            builder.Services.AddSingleton<IJournalStorageProvider>(replacement);
+        }
+
+        await using var services = builder.Services.BuildServiceProvider();
+        var token = TestContext.Current.CancellationToken;
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
+            await manager.InitializeAsync(token);
+            value.Value = 42;
+            await manager.WriteStateAsync(token);
+        }
+
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var keyedFactory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
+        Assert.Same(factory, keyedFactory);
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonJournalExtensions.JournalFormatKey);
+        await using (var manager = keyedFactory.Create(journalId))
+        {
+            var value = new DurableValue<int>("value", manager, codec);
+            await manager.InitializeAsync(token);
+            Assert.Equal(42, value.Value);
+            value.Value = 43;
+            await manager.WriteStateAsync(token);
+        }
+
+        await using (var scope = services.CreateAsyncScope())
+        {
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
+            await manager.InitializeAsync(token);
+            Assert.Equal(43, value.Value);
+        }
+
+        Assert.Same(replacement, services.GetRequiredService<IJournalStorageProvider>());
+        Assert.Same(replacement, services.GetRequiredKeyedService<IJournalStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        Assert.Same(replacement, services.GetRequiredService<IJournalStorageCatalog>());
+        Assert.Same(replacement, services.GetRequiredKeyedService<IJournalStorageCatalog>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+        var catalog = new List<JournalId>();
+        await foreach (var entry in services.GetRequiredService<IJournalStorageCatalog>().ListAsync(cancellationToken: token))
+        {
+            catalog.Add(entry.Id);
+        }
+
+        Assert.Equal([journalId], catalog);
+        Assert.Null(await original.CreateStorage(journalId).GetMetadataAsync(token));
+        Assert.Null(await services.GetRequiredKeyedService<IJournalStorageProvider>("other").CreateStorage(journalId).GetMetadataAsync(token));
+        var participant = Assert.Single(services.GetServices<ILifecycleParticipant<ISiloLifecycle>>());
+        Assert.Same(replacement, participant);
+        var lifecycle = new SiloLifecycleSubject(services.GetRequiredService<ILogger<SiloLifecycleSubject>>());
+        participant.Participate(lifecycle);
+        Assert.Equal(1, replacement.ParticipationCount);
+        Assert.Equal(0, original.ParticipationCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task NamedVolatileProviders_KeepDefaultStableAndFactoriesReplayOnlyTheirOwnNamespace(bool registerDefaultFirst)
     {
         var builder = CreateNamedProviderBuilder();
@@ -137,7 +213,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
                 return factoryB;
             };
         });
-        builder.AddAzureBlobJournalStorage("jobs-A"); // Repetition must not duplicate lifecycle participation.
+        builder.AddAzureBlobJournalStorage("jobs-A", configure: null); // Repetition must not duplicate lifecycle participation.
         await using var services = builder.Services.BuildServiceProvider();
         var a = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-A");
         var b = services.GetRequiredKeyedService<IJournalStorageProvider>("jobs-B");
@@ -192,7 +268,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var builder = CreateNamedProviderBuilder();
         builder.AddVolatileJournalStorage("jobs");
 
-        var exception = Assert.Throws<InvalidOperationException>(() => builder.AddAzureBlobJournalStorage("jobs"));
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.AddAzureBlobJournalStorage("jobs", configure: null));
 
         Assert.Contains("jobs", exception.Message);
         using var services = builder.Services.BuildServiceProvider();
@@ -329,6 +405,20 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private sealed class TestJournalStorageProvider(IJournalStorage storage) : IJournalStorageProvider
     {
         public IJournalStorage CreateStorage(JournalId journalId) => storage;
+    }
+
+    private sealed class LifecycleJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
+    {
+        private readonly VolatileJournalStorageProvider _storage = new();
+
+        public int ParticipationCount { get; private set; }
+
+        public IJournalStorage CreateStorage(JournalId journalId) => _storage.CreateStorage(journalId);
+
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+            => _storage.ListAsync(options, cancellationToken);
+
+        public void Participate(ISiloLifecycle lifecycle) => ParticipationCount++;
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

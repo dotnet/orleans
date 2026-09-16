@@ -28,12 +28,20 @@ Each named registration binds its options, storage, catalog, and state-manager
 factory to one physical journal namespace. The unnamed overloads configure the
 `Default` binding. Registrations under other names leave that default unchanged.
 
+For a named backend registration, supply both the provider name and the options
+delegate. Pass `configure: null` when options are configured separately.
+
 The `Default` storage binding retains the unnamed backend-options configuration
 pipeline, including option delegates registered before or after convenience
 methods and each `ConfigureAll` delegate applied once. Non-default storage names
 use their corresponding named backend options.
 The storage binding name and the backend options name are therefore distinct
 for the default binding.
+
+An unkeyed singleton <xref:Orleans.Journaling.IJournalStorageProvider> customization supplies
+storage for both grain activations and the `Default` keyed factory. The default
+catalog and lifecycle bindings use that provider too, so replacement providers
+implement the catalog and lifecycle contracts declared by the registered provider type.
 
 A provider name identifies storage, rather than a journal format or an individual
 durable state. Register each selected physical namespace once and keep its

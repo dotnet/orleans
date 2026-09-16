@@ -12,7 +12,7 @@ namespace Orleans.Journaling
     {
         public static Hosting.ISiloBuilder AddRedisJournalStorage(this Hosting.ISiloBuilder builder, System.Action<RedisJournalStorageOptions>? configure) { throw null; }
 
-        public static Hosting.ISiloBuilder AddRedisJournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<RedisJournalStorageOptions>? configure = null) { throw null; }
+        public static Hosting.ISiloBuilder AddRedisJournalStorage(this Hosting.ISiloBuilder builder, string name, System.Action<RedisJournalStorageOptions>? configure) { throw null; }
 
         public static Hosting.ISiloBuilder AddRedisJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Providers;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;
@@ -21,6 +22,18 @@ public sealed class RedisGrainJournalingProviderBuilderTests
 {
     private const string ConfigurationSectionName = "Orleans:GrainJournaling:Redis";
     private const string ProviderName = "redis";
+
+    [Fact]
+    public void AddRedisJournalStorage_NullConfigure_UsesDefaultProvider()
+    {
+        var builder = new TestSiloBuilder(new ConfigurationBuilder().Build());
+
+        Assert.Same(builder, builder.AddRedisJournalStorage(null));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var provider = Assert.IsType<RedisJournalStorageProvider>(services.GetRequiredService<IJournalStorageProvider>());
+        Assert.Same(provider, services.GetRequiredKeyedService<IJournalStorageProvider>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
+    }
 
     [Fact]
     public void Configure_FullConfiguration_BindsSettingsAndJournalFormat()

@@ -33,7 +33,7 @@ public static class S3JournalStorageHostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The provider name.</param>
-    /// <param name="configure">The delegate used to configure this provider.</param>
+    /// <param name="configure">The delegate used to configure this provider, or <see langword="null"/> to use separately configured options.</param>
     /// <returns>The silo builder.</returns>
     /// <remarks>
     /// Named providers share journal format configuration but have independent storage options and client lifetimes.
@@ -44,7 +44,7 @@ public static class S3JournalStorageHostingExtensions
     public static ISiloBuilder AddS3JournalStorage(
         this ISiloBuilder builder,
         string name,
-        Action<S3JournalStorageOptions>? configure = null)
+        Action<S3JournalStorageOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

@@ -32,7 +32,7 @@ public static class AzureBlobStorageHostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="name">The provider name.</param>
-    /// <param name="configure">The delegate used to configure this provider.</param>
+    /// <param name="configure">The delegate used to configure this provider, or <see langword="null"/> to use separately configured options.</param>
     /// <returns>The silo builder.</returns>
     /// <remarks>
     /// Named providers share journal format configuration but have independent storage options and lifecycle initialization.
@@ -43,7 +43,7 @@ public static class AzureBlobStorageHostingExtensions
     public static ISiloBuilder AddAzureBlobJournalStorage(
         this ISiloBuilder builder,
         string name,
-        Action<AzureBlobJournalStorageOptions>? configure = null)
+        Action<AzureBlobJournalStorageOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
