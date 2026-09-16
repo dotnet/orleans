@@ -467,6 +467,138 @@ public sealed class KinesisPooledRuntimeTests
         await fixture.DiscoveryClient.Received(3).ListShardsAsync(Arg.Any<ListShardsRequest>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData("created")]
+    [InlineData("initializing")]
+    [InlineData("initialized")]
+    [InlineData("flushing")]
+    public async Task PooledReceiver_ShutdownCancellationReleasesResourcesBeforeRemoval(string state)
+    {
+        await using var fixture = new Fixture();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
+        var client = Substitute.For<IAmazonKinesis>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initialization = new TaskCompletionSource<GetShardIteratorResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.GetShardIteratorAsync(Arg.Any<GetShardIteratorRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                started.TrySetResult();
+                return state == "initializing"
+                    ? initialization.Task
+                    : Task.FromResult(new GetShardIteratorResponse { ShardIterator = "iterator" });
+            });
+        client.GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Response("tail", fixture.Record("10", "retained")));
+        if (state == "flushing")
+        {
+            var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+            checkpointer.Load(Arg.Any<CancellationToken>()).Returns(string.Empty);
+            checkpointer.FlushAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                Assert.False(cancellation.IsCancellationRequested);
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            });
+            fixture.CheckpointerFactory.Configure().Create("shard-1", Arg.Any<CancellationToken>())
+                .Returns(checkpointer);
+        }
+
+        var disposed = false;
+        client.When(value => value.Dispose()).Do(_ => disposed = true);
+        var removalCount = 0;
+        var disposedAtRemoval = false;
+        var capacityAtRemoval = -1;
+        var receiver = new KinesisPooledAdapterReceiver(
+            client, "stream", "shard-1", fixture.CheckpointerFactory,
+            new SimpleQueueCacheOptions { CacheSize = 8 }, fixture.Serializer, NullLoggerFactory.Instance,
+            new KinesisShardTopologyMonitor(
+                fixture.DiscoveryClient, "stream", ["shard-1"], TimeSpan.FromMinutes(1),
+                fixture.Time, NullLogger<KinesisShardTopologyMonitor>.Instance),
+            TimeSpan.Zero, fixture.Time,
+            onShutdown: current =>
+            {
+                removalCount++;
+                disposedAtRemoval = disposed;
+                capacityAtRemoval = current.GetMaxAddCount();
+            },
+            maxCacheSizeBytes: 1);
+        Task initialize = Task.CompletedTask;
+        try
+        {
+            if (state == "initializing")
+            {
+                initialize = ((IQueueAdapterReceiver)receiver).Initialize(Timeout.InfiniteTimeSpan, TestCancellation);
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestCancellation);
+            }
+            else if (state is "initialized" or "flushing")
+            {
+                Assert.Single(await receiver.GetQueueMessagesAsync(1, TestCancellation));
+                Assert.True(receiver.IsUnderPressure());
+                Assert.Equal(0, receiver.GetMaxAddCount());
+            }
+
+            // Cancel the caller after shutdown admission, while the receiver closes its lifecycle.
+            using var cancelOnShutdown = state == "flushing"
+                ? default
+                : receiver.LifecycleCancellationToken.Register(cancellation.Cancel);
+            var error = await Xunit.Record.ExceptionAsync(() => ((IQueueAdapterReceiver)receiver)
+                .Shutdown(TimeSpan.FromSeconds(5), cancellation.Token)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestCancellation));
+
+            Assert.NotNull(error);
+            var errors = error is AggregateException aggregate
+                ? aggregate.Flatten().InnerExceptions.ToArray()
+                : [error];
+            Assert.All(errors, exception => Assert.IsAssignableFrom<OperationCanceledException>(exception));
+            Assert.True(cancellation.IsCancellationRequested);
+            Assert.All(errors, exception => Assert.True(((OperationCanceledException)exception).CancellationToken.IsCancellationRequested));
+            Assert.True(disposedAtRemoval);
+            Assert.Equal(8, capacityAtRemoval);
+            Assert.Equal(1, removalCount);
+            Assert.False(receiver.IsUnderPressure());
+            client.Received(1).Dispose();
+            Assert.Empty(await receiver.GetQueueMessagesAsync(1, TestCancellation));
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, removalCount);
+            client.Received(1).Dispose();
+        }
+        finally
+        {
+            initialization.TrySetResult(new GetShardIteratorResponse { ShardIterator = "late" });
+            await initialize.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            if (!disposed)
+            {
+                client.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PooledFactory_CancellationBeforeShutdownAdmissionPreservesReceiver()
+    {
+        await using var fixture = new Fixture(maxCacheSizeBytes: 1);
+        await fixture.Factory.CreateAdapter(TestCancellation);
+        var receiver = fixture.GetReceiver();
+        var client = Assert.Single(fixture.ReceiverClients);
+        fixture.SetReads(client, () => Response("tail", fixture.Record("10", "retained")));
+        Assert.Single(await receiver.GetQueueMessagesAsync(1, TestCancellation));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => ((IQueueAdapterReceiver)receiver).Shutdown(TimeSpan.FromSeconds(5), cancellation.Token));
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Same(receiver, fixture.GetReceiver());
+        Assert.True(receiver.IsUnderPressure());
+        client.DidNotReceive().Dispose();
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        Assert.False(receiver.IsUnderPressure());
+        client.Received(1).Dispose();
+        Assert.NotSame(receiver, fixture.GetReceiver());
+    }
+
     [Fact]
     public async Task PooledReceiver_MixedTypeNonzeroIndicesPersistSafeWatermarkAndRestartAtNextRecord()
     {
