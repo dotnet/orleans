@@ -19,6 +19,7 @@ internal sealed class MembershipDisseminationNamespace(
     private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
     private readonly Dictionary<long, ReadOnlyMemory<byte>> _snapshotPayloads = [];
     private readonly Dictionary<(long FromVersion, long ToVersion), ReadOnlyMemory<byte>> _diffPayloads = [];
+    private MembershipTableSnapshot? _currentSnapshot;
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
@@ -34,8 +35,8 @@ internal sealed class MembershipDisseminationNamespace(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Remember the exact snapshot before waking peer pumps so it is immediately repairable.
-        RememberSnapshot(snapshot);
+        // Capture authoritative state: a delayed publication can outlive the snapshot which caused it.
+        RememberCurrentSnapshot();
         return await disseminationService.Publish(
             this,
             DisseminationKey.Default,
@@ -47,8 +48,7 @@ internal sealed class MembershipDisseminationNamespace(
     {
         get
         {
-            var snapshot = membershipManager.CurrentSnapshot;
-            RememberSnapshot(snapshot);
+            var snapshot = RememberCurrentSnapshot();
             // Version alone misses same-version liveness advances, so the digest fingerprints heartbeat state too.
             yield return new DigestEntry(
                 DisseminationKey.Default,
@@ -72,8 +72,7 @@ internal sealed class MembershipDisseminationNamespace(
         // Select history and cached bytes atomically because membership can change without advancing its version.
         lock (_historyLock)
         {
-            var currentSnapshot = membershipManager.CurrentSnapshot;
-            RememberSnapshotUnsafe(currentSnapshot);
+            var currentSnapshot = RememberCurrentSnapshotUnsafe();
             var targetVersion = request.ToVersion ?? currentSnapshot.Version.Value;
             if (targetVersion > currentSnapshot.Version.Value
                 || !_snapshotHistory.TryGetValue(targetVersion, out var targetSnapshot))
@@ -81,7 +80,8 @@ internal sealed class MembershipDisseminationNamespace(
                 return DisseminationRepairResult.Unavailable(currentSnapshot.Version.Value);
             }
 
-            // Prefer a retained peer baseline when available; otherwise the full snapshot remains the fallback.
+            // A numerically greater peer version can belong to an older table incarnation.
+            // Only a retained lower baseline is useful for a diff; all other peers receive a full snapshot.
             MembershipTableSnapshot? baseSnapshot = null;
             if (request.FromVersion is { } fromVersion
                 && fromVersion > 0
@@ -91,11 +91,6 @@ internal sealed class MembershipDisseminationNamespace(
             }
 
             var resolvedVersion = targetSnapshot.Version.Value;
-            if (request.FromVersion is { } peerVersion && peerVersion > resolvedVersion)
-            {
-                return DisseminationRepairResult.Current(resolvedVersion);
-            }
-
             if (request.MaxItemCount <= 0)
             {
                 return DisseminationRepairResult.InsufficientCapacity(resolvedVersion);
@@ -244,23 +239,31 @@ internal sealed class MembershipDisseminationNamespace(
         CancellationToken cancellationToken)
     {
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        var current = membershipManager.CurrentSnapshot;
-        RememberSnapshot(current);
+        var current = RememberCurrentSnapshot();
         return MembershipSnapshotsEqual(previous, current)
             ? DisseminationApplyResult.Duplicate
             : DisseminationApplyResult.Applied;
     }
 
-    private void RememberSnapshot(MembershipTableSnapshot snapshot)
+    private MembershipTableSnapshot RememberCurrentSnapshot()
     {
         lock (_historyLock)
         {
-            RememberSnapshotUnsafe(snapshot);
+            return RememberCurrentSnapshotUnsafe();
         }
     }
 
-    private void RememberSnapshotUnsafe(MembershipTableSnapshot snapshot)
+    private MembershipTableSnapshot RememberCurrentSnapshotUnsafe()
     {
+        var snapshot = membershipManager.CurrentSnapshot;
+        if (_currentSnapshot is { } previousCurrent && snapshot.Version < previousCurrent.Version)
+        {
+            _snapshotHistory.Clear();
+            _snapshotPayloads.Clear();
+            _diffPayloads.Clear();
+        }
+
+        _currentSnapshot = snapshot;
         if (_snapshotHistory.TryGetValue(snapshot.Version.Value, out var previous)
             && !MembershipSnapshotsEqual(previous, snapshot))
         {
@@ -279,6 +282,8 @@ internal sealed class MembershipDisseminationNamespace(
                 InvalidatePayloads(removedVersion);
             }
         }
+
+        return snapshot;
     }
 
     private void InvalidatePayloads(long version)
@@ -395,16 +400,7 @@ internal sealed class MembershipDisseminationNamespace(
     };
 
     private static bool MembershipEntriesEqual(MembershipEntry left, MembershipEntry right) =>
-        left.SiloAddress.Equals(right.SiloAddress)
-        && left.Status == right.Status
-        && EqualSuspectTimes(left.SuspectTimes, right.SuspectTimes)
-        && left.ProxyPort == right.ProxyPort
-        && string.Equals(left.HostName, right.HostName, StringComparison.Ordinal)
-        && string.Equals(left.SiloName, right.SiloName, StringComparison.Ordinal)
-        && string.Equals(left.RoleName, right.RoleName, StringComparison.Ordinal)
-        && left.UpdateZone == right.UpdateZone
-        && left.FaultZone == right.FaultZone
-        && left.StartTime == right.StartTime
+        MembershipTableSnapshot.AreVersionedFieldsEqual(left, right)
         && left.IAmAliveTime == right.IAmAliveTime;
 
     private static bool MembershipSnapshotsEqual(
@@ -433,28 +429,6 @@ internal sealed class MembershipDisseminationNamespace(
         return true;
     }
 
-    private static bool EqualSuspectTimes(List<Tuple<SiloAddress, DateTime>>? left, List<Tuple<SiloAddress, DateTime>>? right)
-    {
-        if (left is null || right is null)
-        {
-            return left is null && right is null;
-        }
-
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
-
-        for (var i = 0; i < left.Count; i++)
-        {
-            if (!Equals(left[i].Item1, right[i].Item1) || left[i].Item2 != right[i].Item2)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 }
 
 [GenerateSerializer, Immutable]

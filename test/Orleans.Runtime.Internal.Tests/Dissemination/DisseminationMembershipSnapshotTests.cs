@@ -381,7 +381,7 @@ public class DisseminationMembershipSnapshotTests
         var latest = await secondRefresh;
         Assert.Equal(new MembershipVersion(42), latest.MembershipVersion);
         Assert.Equal(new[] { local, firstPeer, secondPeer }, latest.ActiveMembers.Members);
-        Assert.Equal(3, manager.SnapshotReadCount);
+        Assert.Equal(5, manager.SnapshotReadCount);
     }
 
     [Fact]
@@ -413,7 +413,41 @@ public class DisseminationMembershipSnapshotTests
         Assert.Equal(new MembershipVersion(42), newer.MembershipVersion);
         Assert.Equal(new MembershipVersion(42), stale.MembershipVersion);
         Assert.Equal(new[] { local, firstPeer, secondPeer }, membership.CurrentSnapshots.ActiveMembers.Members);
-        Assert.Equal(4, manager.SnapshotReadCount);
+        Assert.Equal(6, manager.SnapshotReadCount);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(40)]
+    public async Task AuthoritativeTopologyReplacementWinsOverStaleConcurrentRead(long replacementVersion)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var members = CreateSilos(3);
+        var manager = new MutableMembershipManager(CreateSourceSnapshot(40, members[0], members[1]), cancellationToken)
+        {
+            BlockSecondSnapshotRead = true,
+        };
+        var membership = new DisseminationMembership(manager, new ScopeLocalSiloDetails(members[0]),
+            Microsoft.Extensions.Options.Options.Create(new DisseminationOptions()));
+        Assert.Contains(members[1], membership.CurrentSnapshot.Members);
+        var stale = Task.Run(() => membership.CurrentSnapshots, cancellationToken);
+        DisseminationMembershipSnapshots replacement;
+        try
+        {
+            await manager.SecondReadCaptured.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            manager.SetSnapshot(CreateSourceSnapshot(replacementVersion, members[0], members[2]));
+            replacement = membership.CurrentSnapshots;
+            Assert.Equal(new MembershipVersion(replacementVersion), replacement.MembershipVersion);
+            Assert.Equal(new[] { members[0], members[2] }, replacement.ActiveMembers.Members);
+        }
+        finally
+        {
+            manager.ReleaseSecondRead();
+        }
+
+        Assert.Same(replacement, await stale.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        Assert.Same(replacement, membership.CurrentSnapshots);
+        Assert.DoesNotContain(members[1], replacement.AllMembers.Members);
     }
 
     [Theory]

@@ -489,7 +489,15 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             if (scheduled is { } info)
             {
-                DisseminationInstruments.OnBroadcastScheduled(info.Reason);
+                try
+                {
+                    DisseminationInstruments.OnBroadcastScheduled(info.Reason);
+                }
+                catch (Exception exception)
+                {
+                    LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
+                }
+
                 try
                 {
                     DisseminationEvents.EmitBroadcastScheduled(_owner._localSilo, Peer, info.Reason, info.DueTime, info.Attempt, info.Epoch);
@@ -786,10 +794,11 @@ internal sealed partial class DisseminationBroadcastQueue
             }
             catch (Exception exception)
             {
-                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Recovered);
-                LogDebugBroadcastFlushFailed(_owner._logger, exception);
+                // Restore accepted identities before invoking diagnostics, whose callbacks can throw or reenter.
                 Requeue(work);
                 result = new(RequiresBackoff: true, MadeProgress: false);
+                LogDebugBroadcastFlushFailed(_owner._logger, exception);
+                EmitPumpFailure(DisseminationPumpFailureStatus.Recovered);
             }
             finally
             {
@@ -852,8 +861,8 @@ internal sealed partial class DisseminationBroadcastQueue
                     }
                 }
 
-                EmitScheduled(scheduled);
                 flushCompletion.TrySetResult();
+                EmitScheduled(scheduled);
             }
         }
 
@@ -878,10 +887,11 @@ internal sealed partial class DisseminationBroadcastQueue
                     _activeFlushCompletion = null;
                 }
 
-                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Recovered);
-                LogWarningBroadcastPumpIterationFailed(_owner._logger, exception, Peer, scheduled?.DueTime);
-                EmitScheduled(scheduled);
                 activeFlushCompletion?.TrySetResult();
+                // Diagnostics follow state recovery, but a failing logger must still fault the pump explicitly.
+                LogWarningBroadcastPumpIterationFailed(_owner._logger, exception, Peer, scheduled?.DueTime);
+                EmitPumpFailure(DisseminationPumpFailureStatus.Recovered);
+                EmitScheduled(scheduled);
                 return true;
             }
             catch (Exception recoveryException)
@@ -891,9 +901,21 @@ internal sealed partial class DisseminationBroadcastQueue
                     exception,
                     recoveryException);
                 FailPump(failure);
-                DisseminationInstruments.OnPumpFailure(DisseminationPumpFailureStatus.Permanent);
                 LogErrorBroadcastPumpFailed(_owner._logger, failure, Peer);
+                EmitPumpFailure(DisseminationPumpFailureStatus.Permanent);
                 return false;
+            }
+        }
+
+        private void EmitPumpFailure(DisseminationPumpFailureStatus status)
+        {
+            try
+            {
+                DisseminationInstruments.OnPumpFailure(status);
+            }
+            catch (Exception exception)
+            {
+                LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
             }
         }
 
@@ -1747,7 +1769,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Dissemination broadcast scheduling diagnostic for {Peer} failed.")]
+        Message = "Dissemination broadcast diagnostic for {Peer} failed.")]
     private static partial void LogDebugBroadcastDiagnosticFailed(
         ILogger logger,
         Exception exception,

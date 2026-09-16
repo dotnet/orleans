@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.MembershipService;
@@ -33,13 +35,14 @@ public sealed class DisseminationDiagnosticCollection
 public sealed class DisseminationClusterTests
 {
     [Fact]
-    public async Task MembershipUpdatesAreDisseminatedAcrossRealClusterWithDefaults()
+    public async Task MembershipUpdatesAreDisseminatedAcrossRealClusterWithExplicitOptIn()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(120));
         var cancellationToken = cancellation.Token;
 
         var builder = new InProcessTestClusterBuilder(3);
+        builder.ConfigureSilo((_, silo) => new EnabledDisseminationConfigurator().Configure(silo));
         await using var cluster = builder.Build();
         await cluster.DeployAsync(cancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
@@ -66,6 +69,57 @@ public sealed class DisseminationClusterTests
             observer.AppliedSilos.Count >= 2,
             "Expected membership updates to be applied on at least 2 distinct silos, but saw: "
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
+    }
+
+    [Fact]
+    public async Task DevelopmentPrimaryRestartRejectsRetainedPreResetMembership()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromMinutes(3));
+        var cancellationToken = cancellation.Token;
+        var builder = new TestClusterBuilder(3);
+        builder.Options.InitializeClientOnDeploy = false;
+        builder.AddSiloBuilderConfigurator<EnabledDisseminationConfigurator>();
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(cancellationToken);
+        var primary = Assert.IsType<InProcessSiloHandle>(cluster.Primary);
+        Assert.IsType<SystemTargetBasedMembershipTable>(primary.SiloHost.Services.GetRequiredService<IMembershipTable>());
+        var retained = primary.SiloHost.Services.GetRequiredService<IMembershipManager>().CurrentSnapshot;
+        var originalSilos = cluster.GetActiveSilos().ToArray();
+
+        var restarted = Assert.IsType<InProcessSiloHandle>(
+            await cluster.RestartSiloAsync(primary).WaitAsync(cancellationToken));
+        Assert.NotEqual(primary.SiloAddress, restarted.SiloAddress);
+        var manager = restarted.SiloHost.Services.GetRequiredService<IMembershipManager>();
+        Assert.True(manager.CurrentSnapshot.Version < retained.Version);
+        await manager.ProcessGossipSnapshot(retained, cancellationToken);
+        Assert.Equal(SiloStatus.Active, manager.LocalSiloStatus);
+        Assert.Contains(restarted.SiloAddress, manager.CurrentSnapshot.Entries.Keys);
+        Assert.DoesNotContain(primary.SiloAddress, manager.CurrentSnapshot.Entries.Keys);
+
+        foreach (var silo in originalSilos.Where(silo => !ReferenceEquals(silo, primary)))
+        {
+            await cluster.RestartSiloAsync(silo).WaitAsync(cancellationToken);
+        }
+
+        foreach (var silo in cluster.GetActiveSilos().Cast<InProcessSiloHandle>())
+        {
+            var current = silo.SiloHost.Services.GetRequiredService<IMembershipManager>();
+            await current.Refresh(null, cancellationToken, requireFresh: true);
+            Assert.Equal(SiloStatus.Active, current.LocalSiloStatus);
+            Assert.Contains(restarted.SiloAddress, current.CurrentSnapshot.Entries.Keys);
+            Assert.DoesNotContain(primary.SiloAddress, current.CurrentSnapshot.Entries.Keys);
+        }
+    }
+
+    public sealed class EnabledDisseminationConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder builder) => builder.ConfigureServices(services =>
+        {
+            services.Configure<DisseminationOptions>(options => options.Enabled = true);
+            services.Configure<ClusterMembershipOptions>(options => options.Dissemination.Enabled = true);
+            services.Configure<DeploymentLoadPublisherOptions>(options => options.Dissemination.Enabled = true);
+        });
     }
 
     private sealed class ValueApplyObserver(

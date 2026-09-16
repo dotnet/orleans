@@ -13,12 +13,11 @@ internal static class NewRuntime
 {
     public static void Configure(IServiceCollection services, NodeConfiguration configuration)
     {
-        // Preserve the opt-out control while the candidate defaults are enabled for pre-merge testing.
+        services.Configure<DisseminationOptions>(options => options.Enabled = configuration.Enabled);
+        services.Configure<ClusterMembershipOptions>(options => options.Dissemination.Enabled = configuration.Enabled);
+        services.Configure<DeploymentLoadPublisherOptions>(options => options.Dissemination.Enabled = configuration.Enabled);
         if (!configuration.Enabled)
         {
-            services.Configure<DisseminationOptions>(options => options.Enabled = false);
-            services.Configure<ClusterMembershipOptions>(options => options.Dissemination.Enabled = false);
-            services.Configure<DeploymentLoadPublisherOptions>(options => options.Dissemination.Enabled = false);
             return;
         }
 

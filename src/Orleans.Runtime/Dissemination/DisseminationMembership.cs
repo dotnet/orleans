@@ -27,9 +27,14 @@ internal sealed class DisseminationMembership(
             lock (_membershipLock)
             {
                 current = Volatile.Read(ref _current);
-                if (current is not null && !membershipSnapshot.IsSuccessorTo(current.Source))
+                if (current is not null)
                 {
-                    return current.Snapshots;
+                    // Re-read the owner after acquiring the lock instead of imposing a second version policy.
+                    membershipSnapshot = membershipManager.CurrentSnapshot;
+                    if (ReferenceEquals(current.Source, membershipSnapshot))
+                    {
+                        return current.Snapshots;
+                    }
                 }
 
                 // Same-version heartbeats and removal of non-participants retain the existing topology.
@@ -73,14 +78,18 @@ internal sealed class DisseminationMembership(
             return false;
         }
 
-        if (current.Source.Entries.Count == source.Entries.Count)
-        {
-            return true;
-        }
-
         foreach (var member in current.Snapshots.AllMembers.Members)
         {
-            if (!source.Entries.ContainsKey(member))
+            if (!source.Entries.TryGetValue(member, out var entry)
+                || entry.Status != current.Source.Entries[member].Status)
+            {
+                return false;
+            }
+        }
+
+        foreach (var (member, entry) in source.Entries)
+        {
+            if (IsDisseminationMember(entry.Status) && !current.Snapshots.AllMembers.ContainsMember(member))
             {
                 return false;
             }

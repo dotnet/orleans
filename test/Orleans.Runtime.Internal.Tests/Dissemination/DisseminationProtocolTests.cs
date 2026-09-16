@@ -3207,10 +3207,10 @@ public partial class DisseminationProtocolTests
     {
         var options = new DisseminationOptions();
 
-        Assert.True(options.Enabled);
-        Assert.True(new DisseminationNamespaceOptions().Enabled);
-        Assert.True(new DeploymentLoadPublisherOptions().Dissemination.Enabled);
-        Assert.True(new ClusterMembershipOptions().Dissemination.Enabled);
+        Assert.False(options.Enabled);
+        Assert.False(new DisseminationNamespaceOptions().Enabled);
+        Assert.False(new DeploymentLoadPublisherOptions().Dissemination.Enabled);
+        Assert.False(new ClusterMembershipOptions().Dissemination.Enabled);
         Assert.Equal(1024 * 1024, options.MaxBatchBytes);
         Assert.Equal(8 * 1024, options.MaxBatchItems);
         Assert.Equal(options.MaxBatchBytes, new DisseminationNamespaceOptions().MaxPayloadBytes);
