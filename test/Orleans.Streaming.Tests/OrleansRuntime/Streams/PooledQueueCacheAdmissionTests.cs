@@ -207,7 +207,8 @@ public class PooledQueueCacheAdmissionTests
         }
 
         public void TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure,
-            double? cachePressureContributionCount, double? currentPressure, double? flowControlThreshold) { }
+            double? cachePressureContributionCount, double? currentPressure, double? flowControlThreshold)
+        { }
         public void TrackMessagesPurged(long messagesPurged) { }
         public void TrackMemoryAllocated(int memoryInBytes) { }
         public void TrackMemoryReleased(int memoryInBytes) { }
