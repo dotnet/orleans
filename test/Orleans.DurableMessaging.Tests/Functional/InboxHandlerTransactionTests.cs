@@ -118,6 +118,32 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
+    public async Task SelectionMiss_PreservesUnrelatedStagedEffectsForNextWrite()
+    {
+        var receiver = NewGrain();
+        var original = await receiver.GetSnapshotAsync();
+        var journalId = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
+        var staged = new DurableEffect(Guid.NewGuid(), 1, 82, "application-staging");
+        await receiver.StageEffectAsync(staged);
+        using var envelope = CreateEnvelope(receiver, NewMessage(83, "route-miss"), "unknown/selection");
+
+        var result = await DeliverAsync(receiver, envelope.Value);
+        var selected = await receiver.GetSnapshotAsync();
+
+        Assert.Equal(DeliveryStatus.RouteNotFound, result.Status);
+        Assert.Equal(staged, Assert.Single(selected.Effects));
+        Assert.Equal(0, selected.InboxCount);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
+        await receiver.RetryWriteStateAsync();
+        await receiver.RequestDeactivationAsync();
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(original.ActivationId, recovered.ActivationId);
+        Assert.Equal(staged, Assert.Single(recovered.Effects));
+        Assert.Equal(0, recovered.InboxCount);
+    }
+
+    [Fact]
     public async Task HandlerSelectionWriteAttemptRevertsBeforeRejectingDelivery()
     {
         var receiver = NewGrain();
