@@ -12,6 +12,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
+    Task StageOutputAsync(DurableEnvelope envelope);
     Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
     Task RevertStateAsync();
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
@@ -160,6 +161,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return result;
     }
 
+    public Task StageOutputAsync(DurableEnvelope envelope)
+    {
+        _outbox.Send(envelope);
+        return Task.CompletedTask;
+    }
+
     public Task StageEffectAsync(DurableEffect effect)
     {
         _effects[effect.LogicalId] = effect;
@@ -289,6 +296,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                     .WithBody(message with { ForwardTo = null, ThrowAfterStaging = false })
                     .Build();
                 context.Send(outgoing);
+                if (context.Envelope.RouteKey == "messages/duplicate-output")
+                {
+                    context.Send(outgoing);
+                }
             }
 
             if (message.ThrowAfterStaging
@@ -414,6 +425,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                     .WithBody(new DurableTestMessage(Guid.NewGuid(), 81, "selection-side-effect"))
                     .Build();
                 context.Send(outgoing);
+                if (context.Envelope.RouteKey == "messages/duplicate-output")
+                {
+                    context.Send(outgoing);
+                }
             }
 
             return true;
