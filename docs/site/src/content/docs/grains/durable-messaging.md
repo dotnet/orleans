@@ -36,10 +36,11 @@ for a follow-up message.
 Durable Messaging has the following boundaries:
 
 - Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> stages an envelope in the
-  grain journal. Before journal capture, Durable Messaging allocates a stable job ID and
-  durably schedules the outbox job. The envelope, job ownership, and other journaled
-  grain effects then become durable in one commit. The job polls safely while the
-  envelope is provisional, and dispatch starts only after that commit succeeds.
+  grain journal. Before journal capture, Durable Messaging allocates a logical ownership
+  token and durably schedules an outbox wake-up carrying that token. The envelope,
+  ownership token, returned job handle, and other journaled grain effects then become
+  durable in one commit. The job polls safely while the envelope is provisional, and
+  dispatch starts only after that commit succeeds.
 - Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
   whether the original is provisional or durable. Reusing that ID with different routing,
   correlation, body, or request-context content throws without changing the outbox.
@@ -51,9 +52,9 @@ Durable Messaging has the following boundaries:
   handlers cannot create an earlier journal commit or delete boundary.
 - Deleting the grain journal discards staged inbox and outbox work and clears the
   corresponding volatile pump bookkeeping before a later write begins.
-- A receiver allocates a stable ownership token and places it in a scheduled inbox job
-  before committing both the envelope and ownership, and returns `Accepted` only after
-  both are durable.
+- A receiver allocates an ownership token and places it in a scheduled inbox job
+  before committing the envelope, token, and returned job handle together. It returns
+  `Accepted` after that commit succeeds.
 - Transport is **at-least-once**. A crash after receiver acceptance but before durable
   outbox removal can send the same envelope again.
 - The receiver deduplicates by `(SenderId, MessageId)`. Duplicate deliveries converge
@@ -65,22 +66,28 @@ Durable Messaging has the following boundaries:
   reorder envelopes. Applications which require ordering must carry sequence numbers
   and make their handlers converge on application-defined order.
 
-The inbox and outbox use independent Durable Jobs. A blocked inbox handler on one grain
-doesn't stop another grain's outbox. Monotonic ownership generations fence job
-callbacks. Scheduling uses an internal stable physical job ID for each grain, pump, and
-ownership generation, so retrying an ambiguous response while the original schedule is
-active returns that job instead of creating another one. Completed-generation
-tombstones let delayed duplicates terminate. A job which wakes before its ownership
-commit or activation recovery is visible polls the same attempt instead of completing.
+The inbox and outbox use independent Durable Jobs, allowing other grains' pumps to
+progress while a handler is blocked. Durable Jobs assigns each scheduled wake-up its
+own physical job ID and manages its storage, sharding, and silo failover. Durable
+Messaging stores each logical ownership generation and its returned job handle together
+in the grain journal, and carries the generation in job metadata. Retrying an ambiguous
+scheduling response can create several physical jobs for one logical generation,
+including jobs in different shards. The committed handle identifies the drain owner.
+Callbacks for that job coalesce into one active logical pump; other physical jobs for
+the generation complete once the committed owner is established.
+
+Completed-generation tombstones let delayed duplicates terminate. A job which wakes
+before its ownership commit or activation recovery is visible polls the same attempt.
 After recovery, a scheduled generation with no committed owner and no work is a
-confirmed orphan and completes, so Durable Jobs removes it. If recovered work has no
-matching owner, recovery schedules and commits a new generation before the old
-generation terminates. Callbacks for the recovered and replacement generations both poll
-until replacement ownership commits, preserving the existing durable wake-up if
-scheduling or persistence must retry. Ownership-clear write failures restore the
-preceding generation, so the current job remains responsible. Pump callbacks execute as
-non-interleaving grain timer turns so that infrastructure writes can't commit
-provisional state from a concurrently running handler.
+confirmed orphan and completes, so Durable Jobs removes it. If recovered work has an
+incomplete ownership pair, recovery schedules a replacement and commits its generation
+and returned handle before the orphan terminates. Callbacks poll until replacement
+ownership commits, preserving the existing durable wake-up if scheduling or persistence
+must retry. Ownership-clear write failures restore the preceding ownership pair, so its
+job retains responsibility. Recovery retains a healthy committed owner; Durable Jobs
+handles that job's shard and silo failover. Pump callbacks execute as non-interleaving
+grain timer turns, keeping infrastructure writes and handler effects within their
+owning journal boundaries.
 
 ## Backpressure, retries, and dead letters
 

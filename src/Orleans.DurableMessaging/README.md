@@ -14,13 +14,17 @@ Inject `IDurableInbox` to register handlers and `IDurableOutbox` to enqueue enve
 Inject `IDurableMessagingDiagnostics` to inspect dead letters and remove records after
 they have been handled operationally. Removal is staged and becomes durable with the
 grain's next journal write.
-An outbox enqueue allocates stable job ownership and durably schedules that job before
-the grain journal captures the envelope and ownership in one commit. The job safely
-polls while the envelope is provisional, and dispatch starts only after the commit. If
-the journal write fails, the scheduled job observes no committed envelope and completes
-without sending it after activation recovery; before recovery completes, it polls the
-same attempt. If recovered work exists without matching ownership, recovery establishes
-a new generation before the stale job terminates.
+An outbox enqueue allocates a logical ownership token and durably schedules a wake-up
+carrying that token before the grain journal captures the envelope, ownership token,
+and returned job handle in one commit. Durable Jobs assigns each scheduled wake-up its
+own physical job ID. Retrying an ambiguous scheduling response can create multiple jobs
+for the same logical owner;
+the committed handle identifies the drain owner. Repeated callbacks for that job
+coalesce, and the other physical jobs complete after the owner is committed.
+Each job polls while the envelope is provisional, and dispatch starts after the
+commit. After activation recovery, jobs with neither committed ownership nor pending
+work complete as orphans. If recovered work exists without matching ownership, recovery
+establishes a new generation before the stale job terminates.
 The receiver uses the same schedule-before-commit ordering and returns `Accepted` only
 after the inbox envelope and its durable drain-job ownership are stable.
 

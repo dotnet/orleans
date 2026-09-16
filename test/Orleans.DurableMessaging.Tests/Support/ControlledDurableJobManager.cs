@@ -11,6 +11,8 @@ public sealed class DurableJobManagerProbe
     private readonly ConcurrentDictionary<(string JobName, GrainId Target), int> _successes = [];
     private readonly ConcurrentDictionary<string, int> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, int> _postScheduleFailures = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _duplicates = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string JobName, GrainId Target), ConcurrentQueue<DurableJob>> _scheduledJobs = [];
     private readonly ConcurrentDictionary<string, ScheduleBarrier> _scheduleBarriers = new(StringComparer.Ordinal);
 
     public void FailNext(string jobName) =>
@@ -19,11 +21,17 @@ public sealed class DurableJobManagerProbe
     public void FailAfterNext(string jobName) =>
         _postScheduleFailures.AddOrUpdate(jobName, 1, static (_, count) => count + 1);
 
+    public void DuplicateNext(string jobName) =>
+        _duplicates.AddOrUpdate(jobName, 1, static (_, count) => count + 1);
+
     public int GetAttemptCount(string jobName, GrainId target) =>
         _attempts.TryGetValue((jobName, target), out var count) ? count : 0;
 
     public int GetSuccessCount(string jobName, GrainId target) =>
         _successes.TryGetValue((jobName, target), out var count) ? count : 0;
+
+    public IReadOnlyList<DurableJob> GetScheduledJobs(string jobName, GrainId target) =>
+        _scheduledJobs.TryGetValue((jobName, target), out var jobs) ? jobs.ToArray() : [];
 
     public ScheduleBarrier BlockNext(string jobName)
     {
@@ -42,11 +50,17 @@ public sealed class DurableJobManagerProbe
     internal void OnSuccess(ScheduleJobRequest request) =>
         _successes.AddOrUpdate((request.JobName, request.Target), 1, static (_, count) => count + 1);
 
+    internal void OnScheduled(ScheduleJobRequest request, DurableJob job) =>
+        _scheduledJobs.GetOrAdd((request.JobName, request.Target), static _ => new()).Enqueue(job);
+
     internal bool ShouldFail(string jobName)
         => TryConsumeFailure(_failures, jobName);
 
     internal bool ShouldFailAfterSchedule(string jobName)
         => TryConsumeFailure(_postScheduleFailures, jobName);
+
+    internal bool ShouldDuplicate(string jobName)
+        => TryConsumeFailure(_duplicates, jobName);
 
     internal async Task WaitIfBlockedAsync(string jobName, CancellationToken cancellationToken)
     {
@@ -103,6 +117,13 @@ internal sealed class ControlledDurableJobManager(
 
         await probe.WaitIfBlockedAsync(request.JobName, cancellationToken);
         var result = await inner.ScheduleJobAsync(request, cancellationToken);
+        probe.OnScheduled(request, result);
+        if (probe.ShouldDuplicate(request.JobName))
+        {
+            var duplicate = await inner.ScheduleJobAsync(request, cancellationToken);
+            probe.OnScheduled(request, duplicate);
+        }
+
         probe.OnSuccess(request);
         if (probe.ShouldFailAfterSchedule(request.JobName))
         {

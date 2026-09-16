@@ -22,15 +22,262 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DurableOutboxDeliveryBatchTests
 {
     [Fact]
-    public async Task RecoveryAndLifecycleStart_CoalesceReplacementScheduling()
+    public async Task RecoveryAndLifecycleStart_CoalesceMissingOwnerRepair()
     {
         var timerRegistry = Substitute.For<ITimerRegistry>();
-        var fixture = new OutboxFixture(hasDurableMessage: true, timerRegistry: timerRegistry);
+        var jobManager = new RecordingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            jobManager: jobManager);
 
         fixture.Manager.NotifyRecoveryCompleted();
         await fixture.StartAsync();
+        await fixture.RunRegisteredTimerAsync();
 
+        Assert.NotNull(fixture.JobId.Value);
+        Assert.Equal(1, jobManager.AttemptCount);
+        Assert.Equal(1, fixture.Manager.WriteCount);
         Assert.Single(
+            timerRegistry.ReceivedCalls(),
+            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+    }
+
+    [Fact]
+    public async Task HealthyRecoveredOwnership_IsRetainedWithoutSchedulingReplacement()
+    {
+        const string ownershipId = "recovered:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var jobManager = new RecordingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            jobManager: jobManager,
+            durableJobId: ownershipId);
+
+        var handle = fixture.Job.Value;
+        fixture.Manager.NotifyRecoveryCompleted();
+        await fixture.StartAsync();
+
+        Assert.Same(handle, fixture.Job.Value);
+        Assert.Equal(ownershipId, fixture.JobId.Value);
+        Assert.Equal(0, jobManager.AttemptCount);
+        Assert.DoesNotContain(
+            timerRegistry.ReceivedCalls(),
+            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+    }
+
+
+    [Fact]
+    public async Task RecoveredLogicalOwnerWithoutHandle_IsReplacedAfterNewHandleIsDurable()
+    {
+        const string incompleteOwnershipId = "incomplete:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var jobManager = new RecordingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            jobManager: jobManager,
+            durableJobId: incompleteOwnershipId,
+            hasDurableJobHandle: false);
+
+        fixture.Manager.NotifyRecoveryCompleted();
+        Assert.True((await fixture.ExecuteJobAsync(
+            incompleteOwnershipId,
+            "orphaned-physical-job",
+            "run-before-repair",
+            TestContext.Current.CancellationToken)).IsInProgress);
+        await fixture.StartAsync();
+        await fixture.RunRegisteredTimerAsync();
+
+        Assert.NotEqual(incompleteOwnershipId, fixture.JobId.Value);
+        Assert.NotNull(fixture.Job.Value);
+        Assert.Equal(jobManager.LastJob?.Id, fixture.Job.Value?.Id);
+        Assert.Equal(jobManager.LastJob?.ShardId, fixture.Job.Value?.ShardId);
+        Assert.Equal(
+            fixture.JobId.Value,
+            fixture.Job.Value?.Metadata!["orleans.messaging.ownership-id"]);
+        Assert.Equal(1, jobManager.AttemptCount);
+        Assert.Equal(1, fixture.Manager.WriteCount);
+        Assert.Equal(
+            DurableJobRunStatus.Completed,
+            (await fixture.ExecuteJobAsync(
+                incompleteOwnershipId,
+                "orphaned-physical-job",
+                "run-after-repair",
+                TestContext.Current.CancellationToken)).Status);
+    }
+
+    [Fact]
+    public async Task DuplicatePhysicalCallbacks_CoalesceByLogicalOwnership()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+
+        var first = await fixture.ExecuteJobAsync(ownershipId, $"job-{ownershipId}", "run-1", TestContext.Current.CancellationToken);
+        var second = await fixture.ExecuteJobAsync(ownershipId, $"job-{ownershipId}", "run-2", TestContext.Current.CancellationToken);
+
+        Assert.True(first.IsInProgress);
+        Assert.True(second.IsInProgress);
+        Assert.Single(
+            timerRegistry.ReceivedCalls(),
+            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+    }
+
+    [Fact]
+    public async Task RecoveryInvalidatesQueuedPumpAndAllowsDuplicateCallbackToTakeOwnership()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+
+        Assert.True((await fixture.ExecuteJobAsync(ownershipId, $"job-{ownershipId}", "run-1", TestContext.Current.CancellationToken)).IsInProgress);
+        fixture.Manager.NotifyRecoveryStarted();
+        fixture.Manager.NotifyRecoveryCompleted();
+        Assert.True((await fixture.ExecuteJobAsync(ownershipId, $"job-{ownershipId}", "run-2", TestContext.Current.CancellationToken)).IsInProgress);
+
+        await fixture.RunRegisteredTimersAsync();
+
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Empty(fixture.Messages);
+    }
+
+
+    [Fact]
+    public async Task NonAuthoritativePhysicalCallbackForCurrentGeneration_CompletesWithoutPumping()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+
+        var result = await fixture.ExecuteJobAsync(
+            ownershipId,
+            "duplicate-physical-job",
+            "duplicate-run",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableJobRunStatus.Completed, result.Status);
+        Assert.Equal(ownershipId, fixture.JobId.Value);
+        Assert.DoesNotContain(
+            timerRegistry.ReceivedCalls(),
+            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+    }
+
+    [Fact]
+    public async Task CanceledQueuedPump_AllowsDuplicateCallbackToTakeOwnership()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.True((await fixture.ExecuteJobAsync(
+            ownershipId,
+            $"job-{ownershipId}",
+            "run-1",
+            cancellation.Token)).IsInProgress);
+        cancellation.Cancel();
+        Assert.True((await fixture.ExecuteJobAsync(
+            ownershipId,
+            $"job-{ownershipId}",
+            "run-2",
+            TestContext.Current.CancellationToken)).IsInProgress);
+
+        Assert.Equal(
+            2,
+            timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
+    }
+
+    [Fact]
+    public async Task CanceledRunningPump_ReleasesLogicalOwnershipForDuplicateCallback()
+    {
+        const string ownershipId = "owner:1";
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            async cancellationToken =>
+            {
+                entered.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return DeliveryResult.Accepted();
+            },
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+        using var cancellation = new CancellationTokenSource();
+
+        Assert.True((await fixture.ExecuteJobAsync(
+            ownershipId,
+            $"job-{ownershipId}",
+            "run-1",
+            cancellation.Token)).IsInProgress);
+        var running = fixture.RunRegisteredTimerAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        await running;
+
+        Assert.True((await fixture.ExecuteJobAsync(
+            ownershipId,
+            $"job-{ownershipId}",
+            "run-2",
+            TestContext.Current.CancellationToken)).IsInProgress);
+        Assert.Equal(
+            2,
+            timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
+    }
+
+
+    [Fact]
+    public async Task DeletionInvalidatesQueuedPumpBeforeItCanDeliver()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+
+        Assert.True((await fixture.ExecuteJobAsync(
+            ownershipId,
+            $"job-{ownershipId}",
+            "run-1",
+            TestContext.Current.CancellationToken)).IsInProgress);
+        fixture.Manager.NotifyDeleteCompleted();
+        await fixture.RunRegisteredTimerAsync();
+
+        Assert.Equal(0, fixture.DeliveryCount);
+    }
+
+    [Fact]
+    public async Task CallbackWithoutOwnershipMetadata_CannotClaimJournaledOwnership()
+    {
+        const string ownershipId = "owner:1";
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            durableJobId: ownershipId);
+
+        var result = await fixture.ExecuteJobWithoutOwnershipMetadataAsync(
+            ownershipId,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableJobRunStatus.Completed, result.Status);
+        Assert.Equal(ownershipId, fixture.JobId.Value);
+        Assert.DoesNotContain(
             timerRegistry.ReceivedCalls(),
             static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
     }
@@ -58,7 +305,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task EnsureJobTimerCompletion_ReleasesCoalescingSlot()
+    public async Task EnsureJobTimerCompletion_RetainsHealthyOwnershipWithoutQueueingReplacement()
     {
         var timerRegistry = Substitute.For<ITimerRegistry>();
         var fixture = new OutboxFixture(
@@ -71,7 +318,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         fixture.Manager.NotifyRecoveryCompleted();
 
         Assert.Equal(
-            2,
+            1,
             timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
     }
 
@@ -89,6 +336,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, jobManager.AttemptCount);
+        Assert.Equal(jobManager.LastJob?.Id, fixture.Job.Value?.Id);
+        Assert.Equal(jobManager.LastJob?.ShardId, fixture.Job.Value?.ShardId);
         Assert.Equal(2, fixture.Manager.WriteCount);
     }
 
@@ -166,7 +415,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             durableJobId: recoveredOwnershipId);
         fixture.Manager.InterleaveNextWrite(() => fixture.JobId.Value = replacementOwnershipId);
 
-        var result = await fixture.ExecuteJobCoreAsync(recoveredOwnershipId, hasStableOwnership: true);
+        var result = await fixture.ExecuteJobCoreAsync(recoveredOwnershipId);
 
         Assert.True(result.IsInProgress);
         Assert.Equal(recoveredOwnershipId, fixture.GetDurableOwnershipId());
@@ -552,7 +801,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             ITimerRegistry? timerRegistry = null,
             TimeProvider? jobTimeProvider = null,
             TimeSpan? backpressureRetryDelay = null,
-            string? durableJobId = null)
+            string? durableJobId = null,
+            bool hasDurableJobHandle = true)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -562,6 +812,12 @@ public sealed class DurableOutboxDeliveryBatchTests
             MessageStates = CreateInternalDictionary("Orleans.DurableMessaging.OutboxMessageState");
             DeadLetters = CreateInternalDictionary("Orleans.DurableMessaging.OutboxDeadLetter");
             JobId = new TestDurableValue<string> { Value = durableJobId };
+            Job = new TestDurableValue<DurableJob>();
+            if (durableJobId is not null && hasDurableJobHandle)
+            {
+                Job.Value = CreateJob($"job-{durableJobId}", durableJobId);
+            }
+
             CompletedJobId = new TestDurableValue<string>();
             JobSequence = new TestDurableValue<long>();
             if (hasDurableMessage)
@@ -573,7 +829,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             }
 
             Manager = new TestStateManager(
-                [Messages, MessageStates, DeadLetters, JobId, CompletedJobId, JobSequence],
+                [Messages, MessageStates, DeadLetters, JobId, Job, CompletedJobId, JobSequence],
                 writeException,
                 revertException,
                 supportsObservers);
@@ -626,6 +882,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                     MessageStates.Instance,
                     DeadLetters.Instance,
                     JobId,
+                    Job,
                     CompletedJobId,
                     JobSequence,
                     JobManager,
@@ -646,6 +903,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             {
                 outboxType.GetField("_durableOwnershipId", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .SetValue(_outbox, durableJobId);
+                outboxType.GetField("_durableJob", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(_outbox, Job.Value);
                 outboxType.GetField("_recoveryCompleted", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .SetValue(_outbox, true);
             }
@@ -666,6 +925,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public ILocalDurableJobManager JobManager { get; }
         public ITimerRegistry TimerRegistry { get; }
         public TestDurableValue<string> JobId { get; }
+        public TestDurableValue<DurableJob> Job { get; }
         public TestDurableValue<string> CompletedJobId { get; }
         public TestDurableValue<long> JobSequence { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
@@ -681,34 +941,63 @@ public sealed class DurableOutboxDeliveryBatchTests
                 .GetMethod("EnsureJobScheduledAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(_outbox, [replaceExisting, cancellationToken])!;
 
-        public ValueTask<DurableJobRunResult> ExecuteJobAsync(string ownershipId)
+        public ValueTask<DurableJobRunResult> ExecuteJobAsync(string ownershipId) =>
+            ExecuteJobAsync(ownershipId, $"job-{ownershipId}", $"run-{ownershipId}", TestContext.Current.CancellationToken);
+
+        public ValueTask<DurableJobRunResult> ExecuteJobAsync(
+            string ownershipId,
+            string physicalJobId,
+            string runId,
+            CancellationToken cancellationToken)
         {
             var context = Substitute.For<IJobRunContext>();
-            context.Job.Returns(new DurableJob
+            context.Job.Returns(CreateJob(physicalJobId, ownershipId));
+            context.RunId.Returns(runId);
+            context.DequeueCount.Returns(1);
+            return (ValueTask<DurableJobRunResult>)_outbox.GetType()
+                .GetMethod("ExecuteJobAsync", BindingFlags.Instance | BindingFlags.Public)!
+                .Invoke(_outbox, [context, cancellationToken])!;
+        }
+
+
+        private DurableJob CreateJob(string physicalJobId, string ownershipId) =>
+            new()
             {
-                Id = $"job-{ownershipId}",
+                Id = physicalJobId,
                 Name = "orleans.messaging.outbox-flush",
                 DueTime = DateTimeOffset.UnixEpoch,
                 TargetGrainId = SenderId,
-                ShardId = "test",
+                ShardId = $"shard-{physicalJobId}",
                 Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["orleans.messaging.ownership-id"] = ownershipId
                 }
+            };
+
+        public ValueTask<DurableJobRunResult> ExecuteJobWithoutOwnershipMetadataAsync(
+            string physicalJobId,
+            CancellationToken cancellationToken)
+        {
+            var context = Substitute.For<IJobRunContext>();
+            context.Job.Returns(new DurableJob
+            {
+                Id = physicalJobId,
+                Name = "orleans.messaging.outbox-flush",
+                DueTime = DateTimeOffset.UnixEpoch,
+                TargetGrainId = SenderId,
+                ShardId = "test"
             });
-            context.RunId.Returns($"run-{ownershipId}");
+            context.RunId.Returns($"run-{physicalJobId}");
             context.DequeueCount.Returns(1);
             return (ValueTask<DurableJobRunResult>)_outbox.GetType()
                 .GetMethod("ExecuteJobAsync", BindingFlags.Instance | BindingFlags.Public)!
-                .Invoke(_outbox, [context, TestContext.Current.CancellationToken])!;
+                .Invoke(_outbox, [context, cancellationToken])!;
         }
 
-        public ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(
-            string ownershipId,
-            bool hasStableOwnership) =>
+        public ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(string ownershipId) =>
             (ValueTask<DurableJobRunResult>)_outbox.GetType()
                 .GetMethod("ExecuteJobCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(_outbox, [ownershipId, hasStableOwnership, TestContext.Current.CancellationToken])!;
+                .Invoke(_outbox, [ownershipId, TestContext.Current.CancellationToken])!;
 
         public string? GetDurableOwnershipId() =>
             (string?)_outbox.GetType()
@@ -739,6 +1028,21 @@ public sealed class DurableOutboxDeliveryBatchTests
             var call = Assert.Single(
                 TimerRegistry.ReceivedCalls(),
                 static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+            await RunTimerAsync(call);
+        }
+
+        public async Task RunRegisteredTimersAsync()
+        {
+            foreach (var call in TimerRegistry.ReceivedCalls()
+                .Where(static call => call.GetMethodInfo().Name == "RegisterGrainTimer")
+                .ToArray())
+            {
+                await RunTimerAsync(call);
+            }
+        }
+
+        private static async Task RunTimerAsync(NSubstitute.Core.ICall call)
+        {
             var arguments = call.GetArguments();
             var callback = (Delegate)arguments[1]!;
             await (Task)callback.DynamicInvoke(arguments[2], TestContext.Current.CancellationToken)!;
@@ -987,6 +1291,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         private int _attemptCount;
 
         public int AttemptCount => Volatile.Read(ref _attemptCount);
+        public DurableJob? LastJob { get; private set; }
 
         public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
@@ -997,7 +1302,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 return Task.FromException<DurableJob>(new IOException($"Injected scheduling failure {count}."));
             }
 
-            return Task.FromResult(new DurableJob
+            LastJob = new DurableJob
             {
                 Id = $"job-{count}",
                 Name = request.JobName,
@@ -1005,7 +1310,8 @@ public sealed class DurableOutboxDeliveryBatchTests
                 TargetGrainId = request.Target,
                 ShardId = "test",
                 Metadata = request.Metadata
-            });
+            };
+            return Task.FromResult(LastJob);
         }
 
         public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>

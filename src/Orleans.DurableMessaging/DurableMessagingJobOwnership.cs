@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -18,25 +17,55 @@ internal static class DurableMessagingJobOwnership
             [MetadataKey] = ownershipId
         };
 
-    public static string CreateJobId(string jobName, GrainId target, string ownershipId) =>
-        $"{Encode(Encoding.UTF8.GetBytes(jobName))}."
-        + $"{Encode(target.Type.Value.Value.Span)}."
-        + $"{Encode(target.Key.Value.Span)}."
-        + $"{Encode(Encoding.UTF8.GetBytes(ownershipId))}";
-
     public static bool TryGetOwnershipId(DurableJob job, out string ownershipId)
     {
         if (job.Metadata is not null
             && job.Metadata.TryGetValue(MetadataKey, out var value)
-            && !string.IsNullOrEmpty(value))
+            && !string.IsNullOrWhiteSpace(value))
         {
             ownershipId = value;
             return true;
         }
 
-        ownershipId = job.Id;
+        ownershipId = string.Empty;
         return false;
     }
+
+
+    public static bool IsViable(
+        DurableJob? job,
+        string? ownershipId,
+        string jobName,
+        GrainId target) =>
+        job is not null
+        && !string.IsNullOrEmpty(job.Id)
+        && !string.IsNullOrEmpty(job.ShardId)
+        && job.TargetGrainId == target
+        && string.Equals(job.Name, jobName, StringComparison.Ordinal)
+        && TryGetOwnershipId(job, out var jobOwnershipId)
+        && string.Equals(jobOwnershipId, ownershipId, StringComparison.Ordinal);
+
+
+    public static DurableJob RequireViable(
+        DurableJob? job,
+        string ownershipId,
+        string jobName,
+        GrainId target)
+    {
+        if (!IsViable(job, ownershipId, jobName, target))
+        {
+            throw new InvalidOperationException(
+                $"Durable Jobs returned an invalid handle for logical ownership '{ownershipId}'.");
+        }
+
+        return job!;
+    }
+
+    public static bool IsSamePhysicalJob(DurableJob? expected, DurableJob? actual) =>
+        expected is not null
+        && actual is not null
+        && string.Equals(expected.Id, actual.Id, StringComparison.Ordinal)
+        && string.Equals(expected.ShardId, actual.ShardId, StringComparison.Ordinal);
 
     public static string NextId(string epoch, IDurableValue<long> sequence)
     {
@@ -57,8 +86,6 @@ internal static class DurableMessagingJobOwnership
             && string.Equals(completedEpoch, currentEpoch, StringComparison.Ordinal)
             && current <= completed;
     }
-
-    private static string Encode(ReadOnlySpan<byte> value) => Convert.ToHexString(value);
 
     private static bool TryParse(string? value, out string epoch, out long sequence)
     {

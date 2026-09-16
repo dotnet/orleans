@@ -16,19 +16,30 @@ public sealed class MultiSiloDurableMessagingCollection : ICollectionFixture<Mul
 public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessagingClusterFixture fixture)
 {
     [Fact]
-    public async Task ReceiverOwnerStops_DuringBlockedHandler_NewOwnerRecoversStableJobAndProcessesOnce()
+    public async Task ReceiverOwnerStops_DuringBlockedHandler_NewOwnerRecoversJournaledOwnershipAndProcessesOnce()
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         using var barrier = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failover");
         var sender = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         var logicalId = Guid.NewGuid();
+        const string jobName = "orleans.messaging.inbox-drain";
+        fixture.JobManagerProbe.DuplicateNext(jobName);
 
         await sender.SendAsync(
             receiver.GetGrainId(),
             "messages/failover",
             new DurableTestMessage(logicalId, 81, "failover"));
         await barrier.WaitUntilEnteredAsync();
+        var jobs = fixture.JobManagerProbe.GetScheduledJobs(jobName, receiver.GetGrainId());
+        Assert.Equal(2, jobs.Count);
+        Assert.Equal(2, jobs.Select(static job => job.Id).Distinct(StringComparer.Ordinal).Count());
+        Assert.Single(
+            jobs.Select(static job => job.Metadata!["orleans.messaging.ownership-id"])
+                .Distinct(StringComparer.Ordinal));
         var before = fixture.GetSnapshot(receiver);
+        Assert.Contains(
+            jobs,
+            job => job.Id == before.InboxJob?.Id && job.ShardId == before.InboxJob?.ShardId);
         var owner = fixture.Cluster.Silos.Single(
             silo => silo.SiloAddress.ToParsableString() == before.SiloAddress);
 
@@ -36,6 +47,10 @@ public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessa
         await fixture.Cluster.WaitForLivenessToStabilizeAsync();
         var reactivated = await receiver.GetSnapshotAsync();
         Assert.NotEqual(before.ActivationId, reactivated.ActivationId);
+        Assert.Equal(before.InboxJobId, reactivated.InboxJobId);
+        Assert.Equal(before.InboxJob?.Id, reactivated.InboxJob?.Id);
+        Assert.Equal(before.InboxJob?.ShardId, reactivated.InboxJob?.ShardId);
+        Assert.Equal(1, fixture.JobManagerProbe.GetSuccessCount(jobName, receiver.GetGrainId()));
         barrier.Release();
         DurableEndpointSnapshot recovered;
         try

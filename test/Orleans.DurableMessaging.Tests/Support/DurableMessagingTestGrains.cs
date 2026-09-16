@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.DurableMessaging;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -72,7 +73,9 @@ public sealed record DurableEndpointSnapshot(
     [property: Id(12)] string? OutboxJobId,
     [property: Id(13)] int NullReferenceMessageCalls,
     [property: Id(14)] int NullNullableValueMessageCalls,
-    [property: Id(15)] int GenericExactRouteHandlerCalls);
+    [property: Id(15)] int GenericExactRouteHandlerCalls,
+    [property: Id(16)] DurableJob? InboxJob,
+    [property: Id(17)] DurableJob? OutboxJob);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableDeadLetterSnapshot(
@@ -92,7 +95,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processedMessages;
     private readonly SerializerSessionPool _sessions;
     private readonly IDurableValue<string> _inboxJobId;
+    private readonly IDurableValue<DurableJob> _inboxJob;
     private readonly IDurableValue<string> _outboxJobId;
+    private readonly IDurableValue<DurableJob> _outboxJob;
     private readonly ILocalSiloDetails _siloDetails;
     private readonly HandlerProbe _handlerProbe;
     private readonly SnapshotProbe _snapshotProbe;
@@ -117,7 +122,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         [FromKeyedServices("inbox")] IDurableValue<string> applicationInboxState,
         [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
         [FromKeyedServices("__orleans.durable-messaging.inbox-job-id")] IDurableValue<string> inboxJobId,
+        [FromKeyedServices("__orleans.durable-messaging.inbox-job-handle")] IDurableValue<DurableJob> inboxJob,
         [FromKeyedServices("__orleans.durable-messaging.outbox-job-id")] IDurableValue<string> outboxJobId,
+        [FromKeyedServices("__orleans.durable-messaging.outbox-job-handle")] IDurableValue<DurableJob> outboxJob,
         SerializerSessionPool sessions,
         ILocalSiloDetails siloDetails,
         HandlerProbe handlerProbe,
@@ -130,7 +137,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         ArgumentNullException.ThrowIfNull(applicationInboxState);
         _processedMessages = processedMessages;
         _inboxJobId = inboxJobId;
+        _inboxJob = inboxJob;
         _outboxJobId = outboxJobId;
+        _outboxJob = outboxJob;
         _sessions = sessions;
         _siloDetails = siloDetails;
         _handlerProbe = handlerProbe;
@@ -373,7 +382,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             _outboxJobId.Value,
             _nullReferenceMessageCalls,
             _nullNullableValueMessageCalls,
-            _genericExactRouteHandlerCalls);
+            _genericExactRouteHandlerCalls,
+            _inboxJob.Value,
+            _outboxJob.Value);
 
     private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
         new(

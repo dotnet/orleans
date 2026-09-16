@@ -94,6 +94,7 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState),
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters),
                 sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId),
+                sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle),
                 sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId),
                 sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence),
                 sp.GetRequiredService<IDurableOutbox>(),
@@ -114,6 +115,7 @@ public static class DurableMessagingExtensions
             _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState);
             _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters);
             _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId);
+            _ = sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle);
             _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId);
             _ = sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence);
             _ = sp.GetRequiredService<IDurableOutbox>();

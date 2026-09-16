@@ -3,7 +3,7 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
 
-internal readonly record struct DurableMessagingPumpExecutionKey(string JobName, string JobId, string RunId);
+internal readonly record struct DurableMessagingPumpExecutionKey(string JobName, string JobId, string RunId, long StateGeneration);
 
 internal readonly record struct DurableMessagingPumpExecution(DurableMessagingPumpExecutionKey Key, long Generation);
 

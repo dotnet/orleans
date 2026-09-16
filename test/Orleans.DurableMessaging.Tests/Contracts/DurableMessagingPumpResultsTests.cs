@@ -120,6 +120,22 @@ public sealed class DurableMessagingPumpResultsTests
         Assert.True(results.TryBegin(secondExecution));
     }
 
+    [Fact]
+    public void DifferentStateGeneration_DoesNotObservePreRecoveryResult()
+    {
+        var results = new PumpResults();
+        var beforeRecovery = results.CreateKey("job", "id", "run", stateGeneration: 1);
+        var afterRecovery = results.CreateKey("job", "id", "run", stateGeneration: 2);
+        Assert.True(results.TryStart(beforeRecovery, out var execution));
+        Assert.True(results.TryBegin(execution));
+        results.Complete(execution);
+
+        Assert.False(results.TryTake(afterRecovery, out _, out _));
+        Assert.True(results.TryStart(afterRecovery, out _));
+        Assert.True(results.TryTake(beforeRecovery, out var result, out _));
+        Assert.Same(DurableJobRunResult.Completed, result);
+    }
+
     private sealed class PumpResults
     {
         private static readonly Assembly Assembly = typeof(IDurableOutbox).Assembly;
@@ -146,8 +162,8 @@ public sealed class DurableMessagingPumpResultsTests
             .GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(_instance)!).Count;
 
-        public object CreateKey(string jobName, string jobId, string runId) =>
-            Activator.CreateInstance(KeyType, [jobName, jobId, runId])!;
+        public object CreateKey(string jobName, string jobId, string runId, long stateGeneration = 0) =>
+            Activator.CreateInstance(KeyType, [jobName, jobId, runId, stateGeneration])!;
 
         public bool TryStart(object key, out object execution) =>
             TryStartWithCancellation(key, out execution, TestContext.Current.CancellationToken);

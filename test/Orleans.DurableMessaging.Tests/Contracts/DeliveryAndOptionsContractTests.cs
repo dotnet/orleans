@@ -222,24 +222,4 @@ public sealed class DeliveryAndOptionsContractTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
     }
-
-    [Fact]
-    public void PhysicalJobId_EncodesGrainTypeAndKeyBoundaries()
-    {
-        var ownershipType = typeof(IDurableInbox).Assembly.GetType(
-            "Orleans.DurableMessaging.DurableMessagingJobOwnership",
-            throwOnError: true)!;
-        var createJobId = ownershipType.GetMethod(
-            "CreateJobId",
-            BindingFlags.Static | BindingFlags.Public)!;
-
-        var first = (string)createJobId.Invoke(
-            null,
-            ["job", GrainId.Create("a/b", "c"), "epoch:1"])!;
-        var second = (string)createJobId.Invoke(
-            null,
-            ["job", GrainId.Create("a", "b/c"), "epoch:1"])!;
-
-        Assert.NotEqual(first, second);
-    }
 }
