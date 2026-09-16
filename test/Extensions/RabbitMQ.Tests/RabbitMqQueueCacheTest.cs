@@ -19,19 +19,19 @@ public class RabbitMqQueueCacheTest
         cache.AddToCache([CreateBatch(streamId, 0), CreateBatch(streamId, 1)]);
         using var fast = cache.GetCacheCursor(streamId, null);
         using var slow = cache.GetCacheCursor(streamId, null);
-        Assert.True(fast.MoveNext());
-        Assert.True(slow.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, fast.MoveNextWithResult().Kind);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, slow.MoveNextWithResult().Kind);
 
-        Assert.True(fast.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, fast.MoveNextWithResult().Kind);
         Assert.False(cache.TryPurgeFromCache(out _));
 
-        Assert.True(slow.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, slow.MoveNextWithResult().Kind);
         Assert.True(cache.TryPurgeFromCache(out var firstPurge));
         Assert.Equal(0, Assert.Single(firstPurge).SequenceToken.SequenceNumber);
-        Assert.False(fast.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, fast.MoveNextWithResult().Kind);
         Assert.False(cache.TryPurgeFromCache(out _));
 
-        Assert.False(slow.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, slow.MoveNextWithResult().Kind);
         Assert.True(cache.TryPurgeFromCache(out var secondPurge));
         Assert.Equal(1, Assert.Single(secondPurge).SequenceToken.SequenceNumber);
     }
@@ -52,8 +52,8 @@ public class RabbitMqQueueCacheTest
 
         Assert.True(cache.TryPurgeFromCache(out var initialPurge));
         Assert.Equal(0, Assert.Single(initialPurge).SequenceToken.SequenceNumber);
-        Assert.True(cursor.MoveNext());
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.True(cache.TryPurgeFromCache(out var finalPurge));
         Assert.Equal([1L, 2L], finalPurge.Select(item => item.SequenceToken.SequenceNumber));
     }
@@ -79,14 +79,14 @@ public class RabbitMqQueueCacheTest
         var cache = new RabbitMqQueueCache(new RabbitMQQueueCacheOptions { CacheSize = 1 });
         cache.AddToCache([CreateBatch(streamId, 0)]);
         using var cursor = cache.GetCacheCursor(streamId, null);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
 
         cursor.RecordDeliveryFailure();
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.False(cache.TryPurgeFromCache(out _));
         Assert.True(cache.IsUnderPressure());
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         Assert.True(cache.TryPurgeFromCache(out var purgedItems));
         Assert.Single(purgedItems);
         Assert.False(cache.IsUnderPressure());
@@ -100,13 +100,13 @@ public class RabbitMqQueueCacheTest
         cache.AddToCache([CreateBatch(streamId, 0), CreateBatch(streamId, 1)]);
         using var failedCursor = cache.GetCacheCursor(streamId, null);
         using var successfulCursor = cache.GetCacheCursor(streamId, null);
-        Assert.True(failedCursor.MoveNext());
-        Assert.True(successfulCursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, failedCursor.MoveNextWithResult().Kind);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, successfulCursor.MoveNextWithResult().Kind);
         failedCursor.RecordDeliveryFailure();
 
-        Assert.True(successfulCursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, successfulCursor.MoveNextWithResult().Kind);
         Assert.Equal(1, successfulCursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
-        Assert.True(failedCursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, failedCursor.MoveNextWithResult().Kind);
         Assert.Equal(0, failedCursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         Assert.False(cache.TryPurgeFromCache(out _));
     }
@@ -136,8 +136,8 @@ public class RabbitMqQueueCacheTest
         cache.AddToCache([CreateBatch(streamId, 0), CreateBatch(streamId, 0)]);
         using var cursor = cache.GetCacheCursor(streamId, null);
 
-        Assert.True(cursor.MoveNext());
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
 
         Assert.True(cache.TryPurgeFromCache(out var purged));
         Assert.Equal(2, purged.Count);

@@ -20,7 +20,7 @@ public class RabbitMqQueueCacheCursorTest
 
         using var cursor = cache.GetCacheCursor(streamId, null);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var current = cursor.GetCurrent(out _);
         Assert.NotNull(current);
         Assert.Equal(4, current.SequenceToken.SequenceNumber);
@@ -50,10 +50,10 @@ public class RabbitMqQueueCacheCursorTest
         cache.AddToCache([CreateBatch(streamId, 4)]);
         using var cursor = cache.GetCacheCursor(streamId, new EventSequenceTokenV2(6));
 
-        Assert.False(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
         cache.AddToCache([CreateBatch(streamId, 5), CreateBatch(streamId, 6)]);
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var current = cursor.GetCurrent(out _);
         Assert.NotNull(current);
         Assert.Equal(6, current.SequenceToken.SequenceNumber);
@@ -66,14 +66,14 @@ public class RabbitMqQueueCacheCursorTest
         var cache = CreateCache();
         cache.AddToCache([CreateBatch(streamId, 0), CreateBatch(streamId, 1)]);
         using var cursor = cache.GetCacheCursor(streamId, null);
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var failed = cursor.GetCurrent(out _);
 
         cursor.RecordDeliveryFailure();
 
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Same(failed, cursor.GetCurrent(out _));
-        Assert.True(cursor.MoveNext());
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         var current = cursor.GetCurrent(out _);
         Assert.NotNull(current);
         Assert.Equal(1, current.SequenceToken.SequenceNumber);
