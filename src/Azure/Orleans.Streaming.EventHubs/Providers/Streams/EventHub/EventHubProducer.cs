@@ -5,10 +5,7 @@ using Azure.Messaging.EventHubs.Producer;
 
 namespace Orleans.Streaming.EventHubs;
 
-internal sealed class EventHubProducer(
-    EventHubConnection connection,
-    EventHubProducerClient client,
-    bool ownsConnection) : IEventHubProducer
+internal sealed class EventHubProducer(EventHubProducerClient client) : IEventHubProducer
 {
     private int _closed;
 
@@ -24,16 +21,6 @@ internal sealed class EventHubProducer(
             return;
         }
 
-        try
-        {
-            await client.CloseAsync(cancellationToken);
-        }
-        finally
-        {
-            if (ownsConnection)
-            {
-                await connection.CloseAsync(cancellationToken);
-            }
-        }
+        await client.CloseAsync(cancellationToken);
     }
 }

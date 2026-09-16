@@ -188,19 +188,17 @@ public sealed class EventHubShutdownTests
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DirectProducerShutdown_ClosesProducerAndRespectsConnectionOwnership(bool ownsConnection)
+    [Fact]
+    public async Task DirectProducerShutdown_ClosesProducerButNotBorrowedConnection()
     {
         await using var connection = new EventHubConnection(ConnectionString, "events");
         await using var client = new EventHubProducerClient(connection);
-        var producer = new EventHubProducer(connection, client, ownsConnection);
+        var producer = new EventHubProducer(client);
 
         await producer.CloseAsync(CancellationToken.None);
 
         Assert.True(client.IsClosed);
-        Assert.Equal(ownsConnection, connection.IsClosed);
+        Assert.False(connection.IsClosed);
     }
 
     [Theory]
@@ -356,17 +354,7 @@ public sealed class EventHubShutdownTests
         services.AddKeyedSingleton<IQueueAdapterFactory>(name, (provider, key) =>
         {
             var factory = Assert.IsType<EventHubAdapterFactory>(registration.KeyedImplementationFactory!(provider, key));
-            var producerField = typeof(EventHubAdapterFactory).GetField("producer", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            var originalProducer = Assert.IsAssignableFrom<IEventHubProducer>(producerField.GetValue(factory));
-            var client = new BufferedClient(originalProducer) { InitializationFailure = initializationFailure };
-            if (releaseClose)
-            {
-                client.CloseRelease.SetResult();
-            }
-            producerField.SetValue(factory, new AcknowledgedEventHubProducer(client));
-            typeof(EventHubAdapterFactory).GetProperty(nameof(EventHubAdapterFactory.Direction))!
-                .SetValue(factory, StreamProviderDirection.WriteOnly);
-            var tracked = new TrackingFactory(name, factory, client, connection, name == "owned");
+            var tracked = new TrackingFactory(name, factory, connection, name == "owned", initializationFailure, releaseClose);
             Assert.True(factories.TryAdd(name, tracked));
             return tracked;
         });
@@ -375,13 +363,14 @@ public sealed class EventHubShutdownTests
     private sealed class TrackingFactory(
         string name,
         EventHubAdapterFactory inner,
-        BufferedClient client,
         EventHubConnection connection,
-        bool ownsConnection) : IQueueAdapterFactory
+        bool ownsConnection,
+        Exception? initializationFailure,
+        bool releaseClose) : IQueueAdapterFactory
     {
         public string Name => name;
         public EventHubAdapterFactory Inner => inner;
-        public BufferedClient Client => client;
+        public BufferedClient Client { get; private set; } = null!;
         public EventHubConnection Connection => connection;
         public bool OwnsConnection => ownsConnection;
         public int CreateCount { get; private set; }
@@ -393,6 +382,20 @@ public sealed class EventHubShutdownTests
         public Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
         {
             CreateCount++;
+            if (Client is null)
+            {
+                inner.Init();
+                var producerField = typeof(EventHubAdapterFactory).GetField("producer", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                var originalProducer = Assert.IsAssignableFrom<IEventHubProducer>(producerField.GetValue(inner));
+                Client = new BufferedClient(originalProducer) { InitializationFailure = initializationFailure };
+                if (releaseClose)
+                {
+                    Client.CloseRelease.SetResult();
+                }
+                producerField.SetValue(inner, new AcknowledgedEventHubProducer(Client));
+                typeof(EventHubAdapterFactory).GetProperty(nameof(EventHubAdapterFactory.Direction))!
+                    .SetValue(inner, StreamProviderDirection.WriteOnly);
+            }
             return inner.CreateAdapter();
         }
 
