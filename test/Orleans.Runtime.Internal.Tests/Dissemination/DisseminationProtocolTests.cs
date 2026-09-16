@@ -6052,7 +6052,7 @@ public partial class DisseminationProtocolTests
         var method = typeof(IDisseminationSystemTarget).GetMethod(nameof(IDisseminationSystemTarget.PushBroadcast));
         Assert.Equal(typeof(Task<DisseminationBroadcastResponse>), method!.ReturnType);
         Assert.Equal(
-            [("Acknowledgments", 0), ("UnsupportedNamespaces", 1)],
+            [("Acknowledgments", 0), ("UnsupportedNamespaces", 1), ("AllVersionsAcknowledged", 2)],
             typeof(DisseminationBroadcastResponse)
                 .GetProperties()
                 .Select(property => (
@@ -6061,6 +6061,8 @@ public partial class DisseminationProtocolTests
                         .Single(attribute => attribute.AttributeType == typeof(IdAttribute))
                         .ConstructorArguments.Single().Value)))
                 .OrderBy(static property => property.Item2));
+        Assert.False(batch.SupportsCompactAcknowledgments);
+        Assert.False(response.AllVersionsAcknowledged);
         var acknowledgment = Assert.Single(response.Acknowledgments);
         Assert.Equal(ns.Name, acknowledgment.Key);
         var digest = Assert.Single(acknowledgment.Value);
