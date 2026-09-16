@@ -69,6 +69,105 @@ public sealed class ResourceOwnershipConsumerTests
     }
 
     [Fact(Timeout = 30_000)]
+    public async Task FailedAcquisitionReleasePreservesTheOriginalFailure()
+    {
+        await using var provider = Create(new(), new());
+        var failure = new IOException("Recovery failed.");
+        var protocol = new Protocol { Recover = (_, _, _) => ValueTask.FromException<ReadOnlyMemory<byte>>(failure) };
+        await using var consumer = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        var first = await Publish(provider, TestServiceMembership.A);
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(first)));
+
+        var second = await Publish(provider, TestServiceMembership.B);
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(second)));
+        var third = await Publish(provider, TestServiceMembership.A);
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => consumer.InstallViewAsync(third)));
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => Read(consumer, third.Id).AsTask()));
+
+        Assert.Equal(1, protocol.Recoveries);
+        Assert.Equal(0, protocol.Fences);
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(0, protocol.Handoffs);
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData("recovery")]
+    [InlineData("fence")]
+    public async Task SupersededUnreadyAcquisitionReleasesWithoutCheckpointAndSuccessorsRecover(string delayedStage)
+    {
+        await using var provider = Create(new(), new());
+        var first = await Publish(provider, TestServiceMembership.A);
+        var started = Signal();
+        var resume = Signal();
+        var protocol = new Protocol
+        {
+            Durable = new byte[] { 73 },
+            Recover = async (_, target, token) =>
+            {
+                if (target == first.Id)
+                {
+                    if (delayedStage == "recovery")
+                    {
+                        started.SetResult();
+                        await resume.Task.WaitAsync(token);
+                    }
+
+                    return new byte[] { 255 };
+                }
+
+                return new byte[] { 73 };
+            },
+            Fence = async (_, target, token) =>
+            {
+                if (target == first.Id && delayedStage == "fence")
+                {
+                    started.SetResult();
+                    await resume.Task.WaitAsync(token);
+                }
+
+                return new(ClusterServiceFencingMode.External, target.Revision + 100);
+            }
+        };
+        await using var source = new ResourceOwnershipConsumer(TestServiceMembership.A, provider, protocol);
+        await using var destination = new ResourceOwnershipConsumer(TestServiceMembership.B, provider, protocol);
+        protocol.Consumers[TestServiceMembership.A] = source;
+        protocol.Consumers[TestServiceMembership.B] = destination;
+        var pending = source.InstallViewAsync(first);
+        await destination.InstallViewAsync(first).WaitAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        var second = await Publish(provider, TestServiceMembership.B);
+        var release = source.InstallViewAsync(second);
+        Assert.False(release.IsCompleted);
+        resume.SetResult();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        await release.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, protocol.Checkpoints);
+        Assert.Equal(new byte[] { 73 }, protocol.Durable.ToArray());
+        await Assert.ThrowsAsync<ClusterServiceViewUnavailableException>(() => source.CreateHandoffAsync(
+            new(TestServiceMembership.Resource, TestServiceMembership.B, first.Id, second.Id, Guid.NewGuid()),
+            TestContext.Current.CancellationToken).AsTask());
+        await destination.InstallViewAsync(second).WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new byte[] { 73 }, (await Read(destination, second.Id)).ToArray());
+        Assert.Equal(2, protocol.Recoveries);
+        Assert.Equal(1, protocol.Handoffs);
+
+        await destination.ExecuteAsync(TestServiceMembership.Resource, second.Id,
+            static (_, _) => ValueTask.FromResult<ReadOnlyMemory<byte>>(new byte[] { 99 }), TestContext.Current.CancellationToken);
+        var third = await Publish(provider, TestServiceMembership.A);
+        await destination.InstallViewAsync(third).WaitAsync(TestContext.Current.CancellationToken);
+        await source.InstallViewAsync(third).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new byte[] { 99 }, (await Read(source, third.Id)).ToArray());
+        Assert.Equal(new byte[] { 99 }, protocol.Durable.ToArray());
+        Assert.Equal(1, protocol.Checkpoints);
+        Assert.Equal(2, protocol.Recoveries);
+        Assert.Equal(2, protocol.Handoffs);
+        Assert.Equal(delayedStage == "fence" ? 3 : 2, protocol.Fences);
+    }
+
+    [Fact(Timeout = 30_000)]
     public async Task SkippedAToBToASelectsRecoveryEvenWhenTheLocalOwnedSetIsIdentical()
     {
         await using var provider = Create(new(), new());

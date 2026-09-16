@@ -345,6 +345,7 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             || !_view.ResourceOwners.TryGetValue(request.Resource, out var destination) || !destination.Equals(request.Destination)
             || !_provider.IsOwnerLive(destination, _view.MembershipWatermark)
             || !_retained.TryGetValue(request.Resource, out var retained)
+            || !retained.Receiver.Ready
             || retained.Gate.PreviousView != request.PreviousView || retained.Gate.TargetView != request.TargetView)
         {
             throw new ClusterServiceViewUnavailableException($"Stale or unproven handoff for '{request.Resource}' at '{request.TargetView}'.");
@@ -456,15 +457,14 @@ internal sealed class ResourceOwnershipConsumer : IAsyncDisposable
             await DrainAsync(retained.Receiver);
             // An active release finishes its recipient-fenced checkpoint across later placement views.
             ValidateProviderAuthority(gate.TargetView);
-            if (!retained.Receiver.Ready)
+            gate.MarkDrained();
+            if (retained.Receiver.Ready)
             {
-                throw new ClusterServiceViewUnavailableException($"No installed predecessor state exists for '{resource}' in '{gate.PreviousView}'.");
+                await _protocol.CheckpointAsync(resource, retained.Receiver.State, gate.PreviousView, _shutdown.Token);
+                ValidateProviderAuthority(gate.TargetView);
+                gate.MarkStateRetained();
             }
 
-            gate.MarkDrained();
-            await _protocol.CheckpointAsync(resource, retained.Receiver.State, gate.PreviousView, _shutdown.Token);
-            ValidateProviderAuthority(gate.TargetView);
-            gate.MarkStateRetained();
             gate.Complete();
             _gates.Prune(resource);
         }
