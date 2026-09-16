@@ -1097,7 +1097,7 @@ namespace Orleans.Streams
                 var partitionStartToken = availableMessages[0].SequenceToken;
                 foreach (var streamData in pubSubCache.Values)
                 {
-                    StartInactiveCursors(streamData, partitionStartToken, CancellationToken.None);
+                    StartInactiveCursors(streamData, partitionStartToken, CancellationToken.None, partitionProgressOnly: true);
                 }
 
                 foreach (var group in availableMessages.GroupBy(container => container.StreamId))
@@ -1107,6 +1107,7 @@ namespace Orleans.Streams
                     if (pubSubCache.TryGetValue(streamId, out var streamData))
                     {
                         streamData.RefreshActivity(now);
+                        StartInactiveCursors(streamData, startToken, CancellationToken.None);
                     }
                     else
                     {
@@ -1592,13 +1593,22 @@ namespace Orleans.Streams
             }
         }
 
-        private void StartInactiveCursors(StreamConsumerCollection streamData, StreamSequenceToken startToken, CancellationToken cancellationToken)
+        private void StartInactiveCursors(
+            StreamConsumerCollection streamData,
+            StreamSequenceToken startToken,
+            CancellationToken cancellationToken,
+            bool partitionProgressOnly = false)
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
                 if (IsShutdown)
                 {
                     return;
+                }
+
+                if (partitionProgressOnly && consumerData.Cursor is not IQueueCacheCursorProgress)
+                {
+                    continue;
                 }
 
                 // Some consumer might not be fully registered yet
@@ -1641,6 +1651,7 @@ namespace Orleans.Streams
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
                     var handshakeGeneration = consumerData.HandshakeGeneration;
+                    var handshakeRequestId = consumerData.HandshakeRequestId;
                     var activeCursor = consumerData.Cursor;
                     var progressCursor = activeCursor as IQueueCacheCursorProgress;
                     var batchCursor = options.BatchContainerBatchSize > 1
@@ -1770,6 +1781,7 @@ namespace Orleans.Streams
                             false,
                             null,
                             consumerData.CursorStartToken,
+                            handshakeRequestId,
                             cancellationToken: cancellationToken);
                         if (faultedSubscription || consumerData.Cursor is null)
                         {

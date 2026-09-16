@@ -146,9 +146,9 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 
 ## Receiver shutdown
 
-During shutdown or queue reassignment, each receiver closes admission and waits for accepted dequeue and confirmation operations to finish, including batch conversion and receipt bookkeeping. It then releases its pending messages using their current receipts so another receiver can dequeue them promptly.
+During shutdown or queue reassignment, the pulling agent closes admission and drains accepted reads, deliveries, registrations, and handshakes before reporting its final safe progress. The recoverable receiver stops historical readers, flushes the ownership-fenced checkpoint, and releases its cache buffers. A replacement receiver resumes after the persisted checkpoint.
 
-The shutdown timeout bounds the drain wait and the subsequent release query separately. If the drain times out, the receiver logs a warning and pending messages become eligible for redelivery through their database visibility timeout.
+Historical replay leases remain active until their TTL expires, protecting retained records while the replacement owner reconstructs its readers. The receiver shutdown timeout bounds replay cleanup and checkpoint flushing; failures surface to the pulling agent for logging. An outstanding partition-acquisition command retains its local queue reservation until it settles.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
