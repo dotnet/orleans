@@ -151,42 +151,59 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
                 initializationTask = _initializationTask;
             }
 
-            if (initializationTask is not null)
+            try
             {
-                try
+                if (initializationTask is not null)
                 {
                     await initializationTask.WaitAsync(cancellationToken);
                 }
-                catch (OperationCanceledException)
-                    when (_lifecycleCancellation.IsCancellationRequested
-                        && !cancellationToken.IsCancellationRequested)
-                {
-                }
-                catch (Exception exception)
-                {
-                    (exceptions ??= []).Add(exception);
-                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException)
+                when (_lifecycleCancellation.IsCancellationRequested
+                    && !cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
             }
 
             try
             {
                 if (_inner is null)
                 {
-                    await _source.Shutdown(cancellationToken);
+                    try
+                    {
+                        await _source.Shutdown(cancellationToken);
+                    }
+                    finally
+                    {
+                        _cache.Dispose();
+                    }
                 }
                 else
                 {
-                    var remaining = timeout == Timeout.InfiniteTimeSpan
-                        ? Timeout.InfiniteTimeSpan
-                        : timeout > shutdownWatch.Elapsed
-                            ? timeout - shutdownWatch.Elapsed
-                            : TimeSpan.Zero;
-                    await ((IQueueAdapterReceiver)_inner).Shutdown(remaining, cancellationToken);
+                    var remaining = cancellationToken.IsCancellationRequested
+                        ? TimeSpan.Zero
+                        : timeout == Timeout.InfiniteTimeSpan
+                            ? Timeout.InfiniteTimeSpan
+                            : timeout > shutdownWatch.Elapsed
+                                ? timeout - shutdownWatch.Elapsed
+                                : TimeSpan.Zero;
+                    // Enter cleanup even when the wait budget has expired; the inner receiver releases resources after timeout.
+                    await ((IQueueAdapterReceiver)_inner).Shutdown(remaining, CancellationToken.None);
                 }
             }
             catch (Exception exception)
             {
                 (exceptions ??= []).Add(exception);
+            }
+
+            if (exceptions is null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             if (exceptions is [var singleException])
