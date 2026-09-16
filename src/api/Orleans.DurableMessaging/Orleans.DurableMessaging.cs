@@ -53,6 +53,17 @@ namespace Orleans.DurableMessaging
         DeadLettered = 6
     }
 
+    public sealed partial class DurableDeadLetter
+    {
+        public int AttemptCount { get { throw null; } init { } }
+
+        public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
+
+        public required DurableEnvelope Message { get { throw null; } init { } }
+
+        public required string Reason { get { throw null; } init { } }
+    }
+
     [GenerateSerializer]
     [Alias("Orleans.DurableMessaging.DurableEnvelope")]
     public readonly partial struct DurableEnvelope
@@ -213,6 +224,16 @@ namespace Orleans.DurableMessaging
     {
         [Alias("DeliverAsync")]
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IDurableMessagingDiagnostics
+    {
+        System.Collections.Generic.IReadOnlyList<DurableDeadLetter> InboxDeadLetters { get; }
+
+        System.Collections.Generic.IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
+
+        bool RemoveInboxDeadLetter(Runtime.GrainId senderId, System.Guid messageId);
+        bool RemoveOutboxDeadLetter(System.Guid messageId);
     }
 
     public partial interface IDurableOutbox
