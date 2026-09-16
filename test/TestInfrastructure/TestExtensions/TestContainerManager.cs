@@ -17,6 +17,7 @@ internal sealed class TestContainerManager<TContainer>
     private readonly Func<Task<string?>> _getDockerSkipReasonAsync;
     private readonly Action<TContainer>? _onStarted;
     private readonly bool _isContinuousIntegration;
+    private readonly TimeProvider _timeProvider;
     private readonly Lazy<Task<string?>> _startSkipReason;
 
     public TestContainerManager(
@@ -25,13 +26,15 @@ internal sealed class TestContainerManager<TContainer>
         Func<TContainer, CancellationToken, Task> startAsync,
         Action<TContainer>? onStarted = null,
         Func<Task<string?>>? getDockerSkipReasonAsync = null,
-        bool? isContinuousIntegration = null)
+        bool? isContinuousIntegration = null,
+        TimeProvider? timeProvider = null)
     {
         _serviceName = serviceName;
         _container = new(containerFactory);
         _startAsync = startAsync;
         _getDockerSkipReasonAsync = getDockerSkipReasonAsync ?? (() => DockerSkipReason.Value);
         _onStarted = onStarted;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _isContinuousIntegration = isContinuousIntegration
             ?? (string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(Environment.GetEnvironmentVariable("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase)
@@ -73,7 +76,8 @@ internal sealed class TestContainerManager<TContainer>
         }
 
         var container = _container.Value;
-        await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
+        using var startupTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(5), _timeProvider);
+        await _startAsync(container, startupTimeout.Token).ConfigureAwait(false);
 
         _onStarted?.Invoke(container);
         return null;
