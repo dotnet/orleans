@@ -450,6 +450,23 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void OldAttemptFailureDoesNotRejectSameDestinationRetry()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(original));
+        var retry = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryClaimForRejection(original, Silo1, out _));
+
+        Assert.Equal(1, tracker.Count);
+        Assert.True(tracker.TryClaimForRejection(retry, Silo1, out var removed));
+        Assert.Equal(retry.GatewayRequestAttempt, removed.GatewayRequestAttempt);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ForwardedAttemptClaimsStaleDestination()
     {
         var tracker = CreateTracker();
@@ -733,7 +750,8 @@ public class GatewayInFlightRequestTrackerTests
         request.ForwardCount = 1;
         var update = CreateResponse(request, Message.ResponseTypes.Status);
         update.SendingSilo = request.TargetSilo;
-        update.BodyObject = Silo1;
+        update.BodyObject = new StatusResponse(isExecuting: false, isWaiting: false, diagnostics: []);
+        update.GatewayForwardingSource = Silo1;
         update.ForwardCount = request.ForwardCount;
 
         Assert.True(MessageCenter.IsForwardedClientRequest(request, Silo1));
