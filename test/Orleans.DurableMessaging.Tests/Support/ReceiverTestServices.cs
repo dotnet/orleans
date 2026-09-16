@@ -75,11 +75,9 @@ internal static class ReceiverTestServices
             _ = GetValue<string>(sp, "inbox-completed-job-id");
             _ = GetValue<long>(sp, "inbox-job-sequence");
             _ = sp.GetRequiredService<IDurableOutbox>();
-            return CreateInstance(
-                inboxType,
+            return CreateInstance(inboxType,
                 GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
-                sp.GetServices<IInboxHandler>(),
-                options.MaxCapacity);
+                sp.GetServices<IInboxHandler>(), options.MaxCapacity);
         });
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
@@ -93,8 +91,7 @@ internal static class ReceiverTestServices
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;
-            return CreateInstance(
-                pumpResultsType,
+            return CreateInstance(pumpResultsType,
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
                 completedRetentionPeriod,
                 TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
@@ -108,18 +105,13 @@ internal static class ReceiverTestServices
         services.GetRequiredKeyedService<IDurableDictionary<TKey, TValue>>($"__orleans.durable-messaging.{stateName}");
 
     private static object GetInternalDictionary<TKey>(IServiceProvider services, string valueType, string stateName) =>
-        services.GetRequiredKeyedService(
-            typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), GetImplementationType(valueType)),
+        services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), GetImplementationType(valueType)),
             $"__orleans.durable-messaging.{stateName}");
 
     private static IDurableValue<T> GetValue<T>(IServiceProvider services, string stateName) =>
         services.GetRequiredKeyedService<IDurableValue<T>>($"__orleans.durable-messaging.{stateName}");
 
     private static object CreateInstance(Type type, params object?[] arguments) =>
-        Activator.CreateInstance(
-            type,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
-            binder: null,
-            arguments,
-            culture: null)!;
+        Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
+            binder: null, arguments, culture: null)!;
 }

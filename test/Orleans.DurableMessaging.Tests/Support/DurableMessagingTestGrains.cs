@@ -6,11 +6,17 @@ using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Serialization;
+using Orleans.Serialization.Session;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
 public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
+    Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
+    Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
+    Task DeleteThenWriteStateAsync();
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
     Task StageOutputAsync(DurableEnvelope envelope);
@@ -20,6 +26,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
+    Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync(DurableEnvelope envelope);
@@ -96,6 +103,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly IDurableMessagingDiagnostics _diagnostics;
     private readonly IDurableDictionary<Guid, DurableEffect> _effects;
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processedMessages;
+    private readonly SerializerSessionPool _sessions;
     private readonly IDurableValue<string> _inboxJobId;
     private readonly IDurableValue<DurableJob> _inboxJob;
     private readonly IDurableValue<string> _outboxJobId;
@@ -128,6 +136,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         [FromKeyedServices("__orleans.durable-messaging.inbox-job-handle")] IDurableValue<DurableJob> inboxJob,
         [FromKeyedServices("__orleans.durable-messaging.outbox-job-id")] IDurableValue<string> outboxJobId,
         [FromKeyedServices("__orleans.durable-messaging.outbox-job-handle")] IDurableValue<DurableJob> outboxJob,
+        SerializerSessionPool sessions,
         ILocalSiloDetails siloDetails,
         HandlerProbe handlerProbe,
         SnapshotProbe snapshotProbe)
@@ -144,6 +153,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _inboxJob = inboxJob;
         _outboxJobId = outboxJobId;
         _outboxJob = outboxJob;
+        _sessions = sessions;
         _siloDetails = siloDetails;
         _handlerProbe = handlerProbe;
         _snapshotProbe = snapshotProbe;
@@ -159,6 +169,43 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _inbox.RegisterHandler(new TypedMessageHandler(this));
         await base.OnActivateAsync(cancellationToken);
         _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
+    }
+
+    public async Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        await WriteStateAsync();
+        return envelope.MessageId;
+    }
+
+    public async Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        _outbox.Send(envelope);
+        await WriteStateAsync();
+        return envelope.MessageId;
+    }
+
+    public async Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var messageId = await SendAsync(target, route, message);
+        DeactivateOnIdle();
+        return messageId;
+    }
+
+    public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
+    {
+        var envelope = CreateEnvelope(target, route, message);
+        _outbox.Send(envelope);
+        return Task.FromResult(envelope.MessageId);
+    }
+
+    public async Task DeleteThenWriteStateAsync()
+    {
+        await StateManager.DeleteStateAsync(CancellationToken.None);
+        await WriteStateAsync();
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
@@ -224,6 +271,17 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public async Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId)
     {
         if (!_diagnostics.RemoveInboxDeadLetter(senderId, messageId))
+        {
+            return false;
+        }
+
+        await WriteStateAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId)
+    {
+        if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
         {
             return false;
         }
@@ -340,6 +398,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     internal void PublishStoredSnapshot(DurableEndpointSnapshot snapshot) => _snapshotProbe.Publish(this.GetGrainId(), snapshot);
     internal void CaptureStorageRead() => ReplayedSnapshot = CreateSnapshot();
     internal DurableEndpointSnapshot? ReplayedSnapshot { get; private set; }
+
+    private DurableEnvelope CreateEnvelope(GrainId target, string route, DurableTestMessage message) =>
+        new DurableEnvelopeBuilder(_sessions, this.GetGrainId())
+            .To(target, route)
+            .WithBody(message)
+            .Build();
 
     private async ValueTask<Action> PrepareAsync(
         DurableTestMessage message,

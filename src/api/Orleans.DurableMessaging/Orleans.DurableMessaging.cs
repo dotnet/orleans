@@ -337,6 +337,16 @@ namespace Orleans.DurableMessaging.Configuration
     }
 }
 
+namespace Orleans.Hosting
+{
+    public static partial class DurableMessagingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableMessaging(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<DurableMessaging.Configuration.DurableInboxOptions>? configureOptions = null) { throw null; }
+
+        public static ISiloBuilder AddDurableMessaging(this ISiloBuilder builder, System.Action<DurableMessaging.Configuration.DurableInboxOptions>? configureOptions = null) { throw null; }
+    }
+}
+
 namespace OrleansCodeGen.Orleans.DurableMessaging
 {
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

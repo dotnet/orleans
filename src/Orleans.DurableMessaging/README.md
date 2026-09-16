@@ -1,6 +1,20 @@
 # Microsoft Orleans Durable Messaging
 
-This project supplies the durable messaging protocol, handler routing, and journaled inbox and outbox runtime:
+`Microsoft.Orleans.DurableMessaging` provides grain-scoped durable inboxes and
+outboxes built on Orleans Journaling and Durable Jobs. Configure their storage for
+the deployment, then call `AddDurableMessaging` on the silo builder. The
+`IServiceCollection` overload registers the same messaging services. Grains derive
+from `DurableGrain`, inject `IDurableInbox` to register handlers, and inject
+`IDurableOutbox` to enqueue envelopes.
+
+`AddDurableMessaging` selects the built-in `orleans-binary` journal format from the
+default JSON format and preserves an explicit binary configuration. Another
+`JournaledStateManagerOptions.JournalFormatKey` produces an
+`InvalidOperationException` when options are evaluated, identifying the configured
+and required formats. Its optional `DurableInboxOptions` callback configures
+capacity, batches, retries, deduplication, and dead-letter retention.
+
+The protocol and runtime provide:
 
 - `DurableEnvelope` identifies a message by sender and message ID and carries its
   destination, route, correlation key, reply destination, and creation timestamp.
@@ -281,18 +295,26 @@ complete safe-to-commit business changes and prepared sends in one synchronous t
 Already-captured cohorts acknowledge only their own snapshot; mutations staged during
 the storage await remain pending for their own acknowledgement.
 
-This intermediate project remains non-packable. Receiver tests compose the inbox
-with existing Journaling and DurableJobs services and a journaled test outbox for
-isolation. Bootstrap tests compose the real outbox and verify marker-selected and
-legacy grains through atomic capture, fresh replay, remote delivery, and deduplication.
-Outbox component tests construct the actual runtime through test-only reflection and
-public interfaces. Public `AddDurableMessaging` hosting composition,
-full-cluster sender/receiver integration, package publishing, and documentation-site
-wiring are assembled in the final consumer layer.
-
 Message outcome counters group by grain type and delivery or processing status.
 Each successful duplicate delivery records one received duplicate outcome, whether
 the message is pending in the inbox or retained as processed.
 The sent-message counter and latency histograms group by grain type. Orphaned-job
 metrics retain the job name, and depth gauges report aggregate pending work. Route
 keys continue to select handlers and remain available in message diagnostics.
+
+Transport is at-least-once and unordered. Retained deduplication records provide
+effectively-once handler effects. Applications which require ordering carry
+sequence numbers and converge on application-defined order. A single
+non-interleaving activation owns each grain journal and its pumps. The journaled
+state manager validates pending state before capture and fences terminal failures.
+
+Use shared, production-grade Journaling and Durable Jobs storage for multi-silo
+deployments. In-memory storage supports development and tests. Inbox and outbox
+dead letters are retained for 30 days by default, with up to 1,000 records in each
+collection. Configure `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters` for
+the application's operational retention policy. Expired and excess records are
+compacted when dead letters are added and when an activation starts.
+
+See the [durable messaging guide](https://dotnet.github.io/orleans/docs/grains/durable-messaging/)
+and [hosting API](https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.durablemessaging/orleans.hosting.durablemessagingextensions/)
+for configuration and operating guarantees.
