@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +17,10 @@ using Orleans.Timers.Internal;
 
 namespace Orleans.Transactions.State
 {
+    [SuppressMessage(
+        "Design",
+        "CA1001:Types that own disposable fields should be disposable",
+        Justification = "The cancellation source remains valid for all shutdown observers and is reclaimed with the grain activation.")]
     internal partial class TransactionQueue<TState>
         where TState : class, new()
     {
@@ -24,7 +30,7 @@ namespace Orleans.Transactions.State
         private readonly ITransactionalStateStorage<TState> storage;
         private readonly BatchWorker storageWorker;
         protected readonly ILogger logger;
-        private readonly IActivationLifetime activationLifetime;
+        private readonly CancellationTokenSource onDeactivating = new();
         private readonly ConfirmationWorker<TState> confirmationWorker;
         private readonly TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity;
         private CommitQueue<TState> commitQueue;
@@ -52,6 +58,7 @@ namespace Orleans.Transactions.State
         public CausalClock Clock { get; }
         internal ParticipantId Resource => resource;
         internal TimeSpan PrepareTimeout => options.PrepareTimeout;
+        internal CancellationToken OnDeactivating => onDeactivating.Token;
         internal TransactionDiagnosticEvents.TransactionDiagnosticIdentity DiagnosticIdentity => diagnosticIdentity;
 
         public TransactionQueue(
@@ -62,7 +69,6 @@ namespace Orleans.Transactions.State
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime,
             TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity)
         {
             this.options = options.Value;
@@ -71,14 +77,23 @@ namespace Orleans.Transactions.State
             this.storage = storage;
             this.Clock = new CausalClock(clock);
             this.logger = logger;
-            this.activationLifetime = activationLifetime;
             this.diagnosticIdentity = diagnosticIdentity;
-            this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
-            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
-            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
+            this.storageWorker = new BatchWorkerFromDelegate(StorageWork, OnDeactivating);
+            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, OnDeactivating);
+            this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, OnDeactivating);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
             this.commitQueue = new CommitQueue<TState>();
             this.readyTask = Task.CompletedTask;
+        }
+
+        internal Task StopAsync(CancellationToken cancellationToken)
+        {
+            onDeactivating.Cancel(throwOnFirstException: false);
+
+            // Storage cycles and shutdown run on the activation scheduler. Canceled cycles return before accessing storage.
+            return cancellationToken.IsCancellationRequested
+                ? Task.CompletedTask
+                : storageWorker.WaitForCurrentWorkToBeServiced().WaitAsync(cancellationToken);
         }
 
         public async Task EnqueueCommit(TransactionRecord<TState> record)
@@ -325,7 +340,7 @@ namespace Orleans.Transactions.State
                 case CommitRole.LocalCommit:
                     {
                         LogTraceAborting(status, entry);
-                        var deactivationToken = this.activationLifetime.OnDeactivating;
+                        var deactivationToken = OnDeactivating;
                         var fanOutDiagnosticsEnabled = AreCancelFanOutEventsEnabled();
                         var targetCount = 0;
                         var selfTargetCount = 0;
@@ -827,10 +842,8 @@ namespace Orleans.Transactions.State
             var batchCompletedSuccessfully = false;
             var recoveryInitiated = false;
 
-            using (var admission = this.activationLifetime.TryBlockDeactivation())
+            if (!this.onDeactivating.IsCancellationRequested)
             {
-                if (!admission.Entered) return;
-
                 var writeAttempted = false;
 
                 try

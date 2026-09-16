@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,7 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker lockWorker;
         private readonly BatchWorker storageWorker;
         private readonly ILogger logger;
-        private readonly IActivationLifetime activationLifetime;
+        private readonly CancellationToken onDeactivating;
 
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
@@ -52,14 +53,14 @@ namespace Orleans.Transactions.State
             TransactionQueue<TState> queue,
             BatchWorker storageWorker,
             ILogger logger,
-            IActivationLifetime activationLifetime)
+            CancellationToken onDeactivating)
         {
             this.options = options.Value;
             this.queue = queue;
             this.storageWorker = storageWorker;
             this.logger = logger;
-            this.activationLifetime = activationLifetime;
-            this.lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
+            this.onDeactivating = onDeactivating;
+            this.lockWorker = new BatchWorkerFromDelegate(LockWork, onDeactivating);
         }
 
         public async Task<TResult> EnterLock<TResult>(
@@ -334,10 +335,8 @@ namespace Orleans.Transactions.State
 
         private async Task LockWork()
         {
-            using (var admission = this.activationLifetime.TryBlockDeactivation())
+            if (!this.onDeactivating.IsCancellationRequested)
             {
-                if (!admission.Entered) return;
-
                 var now = DateTime.UtcNow;
 
                 if (currentGroup != null)

@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
@@ -35,12 +34,10 @@ public class TransactionRecoveryLatencyTests
     public async Task ParticipantLockUsesTransactionTimeoutWhenItExceedsConfiguredLockTimeout()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
-        var activationLifetime = new TestActivationLifetime();
         var configuredLockTimeout = TimeSpan.FromSeconds(8);
         var transactionTimeout = TimeSpan.FromSeconds(30);
         var queue = new GatedCancelTransactionQueue(
             resource,
-            activationLifetime,
             options: new TransactionalStateOptions { LockTimeout = configuredLockTimeout });
         var transactionId = Guid.NewGuid();
         var before = DateTime.UtcNow + transactionTimeout;
@@ -65,7 +62,7 @@ public class TransactionRecoveryLatencyTests
             ReadWriteLock<TestState>.GetEffectiveLockTimeout(TimeSpan.Zero, configuredLockTimeout));
 
         queue.RWLock.Rollback(transactionId);
-        activationLifetime.Cancel();
+        await queue.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -116,7 +113,7 @@ public class TransactionRecoveryLatencyTests
     public async Task CancelBeforePrepareBreaksPrePrepareLockAndRetainsTransactionId()
     {
         var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
-        var queue = new GatedCancelTransactionQueue(resource, new TestActivationLifetime());
+        var queue = new GatedCancelTransactionQueue(resource);
         var transactionId = Guid.NewGuid();
         var timeStamp = new DateTime(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
         var accessCount = new AccessCounter { Writes = 1 };
@@ -186,8 +183,7 @@ public class TransactionRecoveryLatencyTests
     public async Task AbortingQueuedTransactionRemovesAllPendingOperations()
     {
         var queue = new GatedCancelTransactionQueue(
-            CreateParticipant("resource", ParticipantId.Role.Resource),
-            new TestActivationLifetime());
+            CreateParticipant("resource", ParticipantId.Role.Resource));
         var currentTransactionId = Guid.NewGuid();
         var abortedTransactionId = Guid.NewGuid();
         var nextTransactionId = Guid.NewGuid();
@@ -253,8 +249,7 @@ public class TransactionRecoveryLatencyTests
     public async Task QueuedWriteUpgradeAbortsConflictingTransactionOperations()
     {
         var queue = new GatedCancelTransactionQueue(
-            CreateParticipant("resource", ParticipantId.Role.Resource),
-            new TestActivationLifetime());
+            CreateParticipant("resource", ParticipantId.Role.Resource));
         var currentTransactionId = Guid.NewGuid();
         var upgradingTransactionId = Guid.NewGuid();
         var conflictingTransactionId = Guid.NewGuid();
@@ -313,8 +308,7 @@ public class TransactionRecoveryLatencyTests
     public async Task UnresolvableQueuedWriteUpgradeAbortsItsPendingOperations()
     {
         var queue = new GatedCancelTransactionQueue(
-            CreateParticipant("resource", ParticipantId.Role.Resource),
-            new TestActivationLifetime());
+            CreateParticipant("resource", ParticipantId.Role.Resource));
         var currentTransactionId = Guid.NewGuid();
         var upgradingTransactionId = Guid.NewGuid();
         var conflictingTransactionId = Guid.NewGuid();
@@ -386,7 +380,6 @@ public class TransactionRecoveryLatencyTests
         var identity = new TransactionDiagnosticEvents.TransactionDiagnosticIdentity(null, activationId);
         var queue = new GatedCancelTransactionQueue(
             manager,
-            new TestActivationLifetime(),
             new Dictionary<string, Task>
             {
                 [remoteOne.Name] = remoteOneGate.Task,
@@ -468,16 +461,14 @@ public class TransactionRecoveryLatencyTests
         var selfResource = CreateParticipant("self-resource", reference, ParticipantId.Role.Resource);
         var remoteGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var selfGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var lifetime = new TestActivationLifetime();
-        lifetime.Cancel();
         var queue = new GatedCancelTransactionQueue(
             manager,
-            lifetime,
             new Dictionary<string, Task>
             {
                 [remote.Name] = remoteGate.Task,
                 [selfResource.Name] = selfGate.Task,
             });
+        await queue.StopAsync(TestContext.Current.CancellationToken);
         var protocol = new ManagerAbortProtocol(queue);
         var agent = CreateTransactionAgent(protocol);
         var timeStamp = new DateTime(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
@@ -529,10 +520,8 @@ public class TransactionRecoveryLatencyTests
         var manager = CreateParticipant("manager", ParticipantId.Role.Manager);
         var remote = CreateParticipant("remote", ParticipantId.Role.Resource);
         var remoteGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var lifetime = new TestActivationLifetime();
         var queue = new GatedCancelTransactionQueue(
             manager,
-            lifetime,
             new Dictionary<string, Task> { [remote.Name] = remoteGate.Task });
         var record = CreateLocalCommitRecord(manager, remote);
         var observer = new RecordingObserver(record.TransactionId);
@@ -545,7 +534,7 @@ public class TransactionRecoveryLatencyTests
         Assert.Equal(TransactionalStatus.PrepareTimeout, await record.PromiseForTA.Task);
         Assert.False(notification.IsCompleted);
 
-        lifetime.Cancel();
+        await queue.StopAsync(TestContext.Current.CancellationToken);
         await notification.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.False(send.SendTask.IsCompleted);
@@ -577,7 +566,6 @@ public class TransactionRecoveryLatencyTests
         var cleanupTimeout = TimeSpan.FromMilliseconds(250);
         var queue = new GatedCancelTransactionQueue(
             manager,
-            new TestActivationLifetime(),
             new Dictionary<string, Task> { [remote.Name] = cancelGate.Task },
             options: new TransactionalStateOptions { LockTimeout = cleanupTimeout });
         var protocol = new ManagerAbortProtocol(queue);
@@ -636,10 +624,8 @@ public class TransactionRecoveryLatencyTests
         var manager = CreateParticipant("manager", reference, ParticipantId.Role.Manager);
         var selfResource = CreateParticipant("resource-alias", reference, ParticipantId.Role.Resource);
         var selfGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var lifetime = new TestActivationLifetime();
         var queue = new GatedCancelTransactionQueue(
             manager,
-            lifetime,
             new Dictionary<string, Task> { [selfResource.Name] = selfGate.Task });
         var record = CreateLocalCommitRecord(manager, selfResource);
         var observer = new RecordingObserver(record.TransactionId);
@@ -654,7 +640,7 @@ public class TransactionRecoveryLatencyTests
         Assert.Equal(TransactionalStatus.PrepareTimeout, await record.PromiseForTA.Task);
         Assert.False(notification.IsCompleted);
 
-        lifetime.Cancel();
+        await queue.StopAsync(TestContext.Current.CancellationToken);
         await notification;
 
         Assert.Equal(1, queue.CancelSendCount);
@@ -688,7 +674,6 @@ public class TransactionRecoveryLatencyTests
         var cancelGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var queue = new GatedCancelTransactionQueue(
             manager,
-            new TestActivationLifetime(),
             new Dictionary<string, Task> { [remote.Name] = cancelGate.Task });
         var protocol = new ManagerAbortProtocol(queue);
         var agent = CreateTransactionAgent(protocol);
@@ -729,7 +714,7 @@ public class TransactionRecoveryLatencyTests
     {
         var manager = CreateParticipant("manager", ParticipantId.Role.Manager);
         var remote = CreateParticipant("remote", ParticipantId.Role.Resource);
-        var queue = new GatedCancelTransactionQueue(manager, new TestActivationLifetime());
+        var queue = new GatedCancelTransactionQueue(manager);
         var transactionId = Guid.NewGuid();
         var timeStamp = new DateTime(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
         var observer = new RecordingObserver(transactionId);
@@ -800,7 +785,6 @@ public class TransactionRecoveryLatencyTests
 
         public GatedCancelTransactionQueue(
             ParticipantId resource,
-            IActivationLifetime activationLifetime,
             IReadOnlyDictionary<string, Task>? cancelGates = null,
             IReadOnlyDictionary<string, Task>? dispatchGates = null,
             TransactionDiagnosticEvents.TransactionDiagnosticIdentity identity = default,
@@ -813,7 +797,6 @@ public class TransactionRecoveryLatencyTests
                 new TestClock(),
                 NullLogger.Instance,
                 null!,
-                activationLifetime,
                 identity)
         {
             this.cancelGates = cancelGates ?? new Dictionary<string, Task>();
@@ -949,22 +932,6 @@ public class TransactionRecoveryLatencyTests
     private sealed class TestClock : IClock
     {
         public DateTime UtcNow() => new(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
-    }
-
-    private sealed class TestActivationLifetime : IActivationLifetime
-    {
-        private readonly CancellationTokenSource cancellation = new();
-        private readonly AdmissionGate gate = new();
-
-        public CancellationToken OnDeactivating => cancellation.Token;
-
-        public AdmissionGate.Admission TryBlockDeactivation() => gate.TryEnter();
-
-        public void Cancel()
-        {
-            _ = gate.CloseAsync();
-            cancellation.Cancel();
-        }
     }
 
     private sealed class TestGrainReference(GrainId grainId)
