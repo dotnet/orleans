@@ -58,8 +58,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
 
     // For synchronization with remote silos.
+    private readonly AdmissionGate _publicationGate = new();
     private Task? _nextPublishTask;
-    private Task? _inflightPublishTask;
     private long _publishRequestVersion;
     private SiloAddress? _requestedSuccessor;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? _requestedTable;
@@ -563,34 +563,32 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             LogDebugPublishingRoutes(successor);
 
             var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, successor);
-            if (_stoppingCts.IsCancellationRequested)
+            if (!_publicationGate.TryEnterUnscoped())
             {
                 return false;
             }
 
-            var publicationCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            publicationCompletion.Task.Ignore();
-            Volatile.Write(ref _inflightPublishTask, publicationCompletion.Task);
-            await _onPublishRegistered();
-
-            if (_stoppingCts.IsCancellationRequested)
-            {
-                publicationCompletion.TrySetResult(false);
-                return false;
-            }
-
-            Task publishTask;
+            Task? publishTask = null;
             try
             {
+                await _onPublishRegistered();
+                if (_stoppingCts.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 publishTask = remote.OnUpdateClientRoutes(update, _stoppingCts.Token);
             }
-            catch (Exception exception)
+            finally
             {
-                publicationCompletion.TrySetException(exception);
-                throw;
+                if (publishTask is null)
+                {
+                    _publicationGate.Exit();
+                }
             }
 
-            ObservePublication(publishTask, publicationCompletion).Ignore();
+            // The returned RPC task owns admission through completion, including after the cancellable wait ends.
+            ObservePublication(publishTask, _publicationGate).Ignore();
             await publishTask.WaitAsync(_stoppingCts.Token);
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
@@ -619,20 +617,15 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             return false;
         }
 
-        static async Task ObservePublication(Task publishTask, TaskCompletionSource<bool> publicationCompletion)
+        static async Task ObservePublication(Task publishTask, AdmissionGate publicationGate)
         {
             try
             {
                 await publishTask;
-                publicationCompletion.TrySetResult(true);
             }
-            catch (OperationCanceledException exception)
+            finally
             {
-                publicationCompletion.TrySetCanceled(exception.CancellationToken);
-            }
-            catch (Exception exception)
-            {
-                publicationCompletion.TrySetException(exception);
+                publicationGate.Exit();
             }
         }
     }
@@ -641,6 +634,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         Task? runTask;
         Task? publishTask;
+        var publicationsDrained = _publicationGate.CloseAsync();
         if (!_stoppingCts.IsCancellationRequested)
         {
             _stoppingCts.Cancel();
@@ -663,11 +657,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             await publishTask.WaitAsync(cancellationToken).SuppressThrowing();
         }
 
-        var inflightPublishTask = Volatile.Read(ref _inflightPublishTask);
-        if (inflightPublishTask is not null)
-        {
-            await inflightPublishTask.WaitAsync(cancellationToken).SuppressThrowing();
-        }
+        await publicationsDrained.WaitAsync(cancellationToken).SuppressThrowing();
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -713,9 +703,10 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             {
                 lock (instance._lockObj)
                 {
-                    return instance._runTask is not { IsCompleted: false }
+                    return instance._stoppingCts.IsCancellationRequested
+                        && instance._runTask is not { IsCompleted: false }
                         && instance._nextPublishTask is not { IsCompleted: false }
-                        && Volatile.Read(ref instance._inflightPublishTask) is not { IsCompleted: false };
+                        && instance._publicationGate.CloseAsync().IsCompleted;
                 }
             }
         }
