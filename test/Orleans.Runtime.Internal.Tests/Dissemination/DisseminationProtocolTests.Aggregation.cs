@@ -77,7 +77,14 @@ public partial class DisseminationProtocolTests
                 options.MaxConcurrentSends = 1;
             }, clock);
             nodes.Add(member, (ns, transport, protocol));
-            transport.SendBroadcastResponseHandler = (peer, batch, token) => nodes[peer].Protocol.ReceiveBroadcast(batch, token);
+            transport.SendBroadcastResponseHandler = (peer, batch, token) =>
+            {
+                lock (transport.BroadcastBatches)
+                {
+                    transport.BroadcastBatches.Add((peer, batch));
+                }
+                return nodes[peer].Protocol.ReceiveBroadcast(batch, token);
+            };
         }
 
         try
@@ -144,6 +151,10 @@ public partial class DisseminationProtocolTests
         var timestamps = new List<long>();
         transport.SendBroadcastResponseHandler = async (_, batch, _) =>
         {
+            lock (transport.BroadcastBatches)
+            {
+                transport.BroadcastBatches.Add((peer, batch));
+            }
             timestamps.Add(clock.GetTimestamp());
             if (timestamps.Count == 1)
             {
