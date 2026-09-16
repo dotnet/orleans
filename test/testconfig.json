@@ -7,7 +7,7 @@
     "diagnosticMessages": true,
     "longRunningTestSeconds": 120,
     "methodDisplay": "classAndMethod",
-    "parallelizeTestCollections": false,
+    "parallelMode": "none",
     "preEnumerateTheories": true
   }
 }
