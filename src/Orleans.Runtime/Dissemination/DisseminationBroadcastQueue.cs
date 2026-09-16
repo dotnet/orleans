@@ -54,7 +54,8 @@ internal sealed partial class DisseminationBroadcastQueue
         SiloAddress peer,
         IDisseminationNamespace disseminationNamespace,
         DisseminationKey key,
-        bool force = true)
+        bool force = true,
+        bool immediate = false)
     {
         PeerQueuePump pump;
         lock (_lock)
@@ -69,8 +70,35 @@ internal sealed partial class DisseminationBroadcastQueue
 
         // Notification diagnostics run outside the queue lock and can reenter the queue.
         var version = disseminationNamespace.GetVersion(key);
-        return pump.Notify(disseminationNamespace, key, version, force);
+        return pump.Notify(disseminationNamespace, key, version, force, immediate);
     }
+
+    public bool NotifyBatch(
+        SiloAddress peer,
+        IDisseminationNamespace disseminationNamespace,
+        IReadOnlyList<KeyNotification> notifications,
+        bool immediate)
+    {
+        PeerQueuePump pump;
+        lock (_lock)
+        {
+            if (_stopped)
+            {
+                return false;
+            }
+
+            if (notifications.Count == 0)
+            {
+                return true;
+            }
+
+            pump = GetOrCreatePeerUnsafe(peer);
+        }
+
+        return pump.NotifyBatch(disseminationNamespace, notifications, immediate);
+    }
+
+    internal readonly record struct KeyNotification(DisseminationKey Key, long Version, bool Force);
 
     public void ObservePeerVersion(
         SiloAddress peer,
@@ -81,6 +109,13 @@ internal sealed partial class DisseminationBroadcastQueue
         if (version < 0
             || !_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
             || !disseminationNamespace.Options.Enabled)
+        {
+            return;
+        }
+
+        // Aggregation acknowledgments also confirm distribution processing. A peer's possession alone
+        // cannot suppress distribution: its descendants may still need the value.
+        if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree)
         {
             return;
         }
@@ -317,87 +352,157 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private int DirtyCount { get; set; }
 
-        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, bool force)
+        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, bool force, bool immediate)
         {
             ScheduledFlush? scheduled = null;
-            var admissionRejected = false;
+            bool admissionRejected;
+            bool accepted;
             lock (_lock)
             {
-                if (_stopping)
+                var wasEmpty = DirtyCount == 0;
+                var wasRetrying = _retryAttempt > 0;
+                accepted = NotifyKeyUnsafe(disseminationNamespace, key, version, force, out var changed, out admissionRejected);
+                if (changed)
                 {
-                    return false;
-                }
-
-                if (_pumpFailure is { } pumpFailure)
-                {
-                    throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
-                }
-
-                var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
-                namespaceState.TryGetKey(key, out var keyState);
-                if (!force)
-                {
-                    // Duplicate deliveries can repair a new child, but cannot perpetuate a cycle between
-                    // skewed trees. Applied same-version state (membership liveness) forces a notification.
-                    if (keyState is { Dirty: true } or { InFlight: true } && keyState.NotificationVersion >= version)
-                    {
-                        return true;
-                    }
-
-                    var knownVersion = keyState?.KnownVersion;
-                    if (knownVersion is null && namespaceState.KnownVersions.TryGetValue(key, out var recordedVersion))
-                    {
-                        knownVersion = recordedVersion;
-                    }
-
-                    if (knownVersion >= version)
-                    {
-                        return true;
-                    }
-                }
-
-                if (keyState is null && namespaceState.Keys.Count >= disseminationNamespace.Options.MaxPendingItemCount)
-                {
-                    admissionRejected = true;
-                }
-                else
-                {
-                    keyState ??= namespaceState.AddKey(key);
-                    // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
-                    keyState.NotificationVersion = version;
-                    keyState.NotificationGeneration = ++_notificationEpoch;
-                    var wasRetrying = _retryAttempt > 0;
-                    _retryAttempt = 0;
-                    var wasEmpty = DirtyCount == 0;
-                    MarkDirtyUnsafe(namespaceState, keyState);
-
-                    // Filled queues flush immediately; otherwise one timer coalesces all pending namespaces.
-                    var currentOptions = _owner._options.CurrentValue;
-                    if (disseminationNamespace.Options.Priority == DisseminationPriority.High)
-                    {
-                        // High-priority updates skip the coalescing window and pull any pending flush forward.
-                        _flushTimer.Change(TimeSpan.Zero);
-                        _wakeScheduled = true;
-                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
-                    }
-                    else if (DirtyCount >= currentOptions.MaxBatchItems
-                        || namespaceState.DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
-                    {
-                        _flushTimer.Change(TimeSpan.Zero);
-                        _wakeScheduled = true;
-                        scheduled = new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
-                    }
-                    else if (wasEmpty || wasRetrying || !_wakeScheduled)
-                    {
-                        var delay = _owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay);
-                        _flushTimer.Change(delay);
-                        _wakeScheduled = true;
-                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
-                    }
+                    scheduled = ScheduleNotificationUnsafe(disseminationNamespace, immediate, wasEmpty, wasRetrying);
                 }
             }
 
-            if (admissionRejected)
+            EmitNotification(disseminationNamespace, admissionRejected ? 1 : 0, scheduled);
+            return accepted;
+        }
+
+        public bool NotifyBatch(
+            IDisseminationNamespace disseminationNamespace,
+            IReadOnlyList<KeyNotification> notifications,
+            bool immediate)
+        {
+            ScheduledFlush? scheduled = null;
+            var rejections = 0;
+            var accepted = true;
+            lock (_lock)
+            {
+                var wasEmpty = DirtyCount == 0;
+                var wasRetrying = _retryAttempt > 0;
+                var anyChanged = false;
+                for (var index = 0; index < notifications.Count; index++)
+                {
+                    var notification = notifications[index];
+                    accepted &= NotifyKeyUnsafe(
+                        disseminationNamespace, notification.Key, notification.Version, notification.Force,
+                        out var changed, out var rejected);
+                    anyChanged |= changed;
+                    rejections += rejected ? 1 : 0;
+                }
+
+                if (anyChanged)
+                {
+                    // Publish the complete key set before waking a relay's send loop.
+                    scheduled = ScheduleNotificationUnsafe(disseminationNamespace, immediate, wasEmpty, wasRetrying);
+                }
+            }
+
+            EmitNotification(disseminationNamespace, rejections, scheduled);
+            return accepted;
+        }
+
+        private bool NotifyKeyUnsafe(
+            IDisseminationNamespace disseminationNamespace,
+            DisseminationKey key,
+            long version,
+            bool force,
+            out bool changed,
+            out bool admissionRejected)
+        {
+            changed = false;
+            admissionRejected = false;
+            if (_stopping)
+            {
+                return false;
+            }
+
+            if (_pumpFailure is { } pumpFailure)
+            {
+                throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
+            }
+
+            var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
+            namespaceState.TryGetKey(key, out var keyState);
+            if (!force)
+            {
+                // Duplicate deliveries seed unknown peers without perpetuating cycles between skewed views.
+                if (keyState is { Dirty: true } or { InFlight: true } && keyState.NotificationVersion >= version)
+                {
+                    return true;
+                }
+
+                var knownVersion = keyState?.KnownVersion;
+                if (knownVersion is null && namespaceState.KnownVersions.TryGetValue(key, out var recordedVersion))
+                {
+                    knownVersion = recordedVersion;
+                }
+
+                if (knownVersion >= version)
+                {
+                    return true;
+                }
+            }
+
+            if (keyState is null && namespaceState.Keys.Count >= disseminationNamespace.Options.MaxPendingItemCount)
+            {
+                admissionRejected = true;
+                return false;
+            }
+
+            keyState ??= namespaceState.AddKey(key);
+            keyState.NotificationVersion = version;
+            keyState.NotificationGeneration = ++_notificationEpoch;
+            _retryAttempt = 0;
+            MarkDirtyUnsafe(namespaceState, keyState);
+            changed = true;
+            return true;
+        }
+
+        private ScheduledFlush? ScheduleNotificationUnsafe(
+            IDisseminationNamespace disseminationNamespace, bool immediate, bool wasEmpty, bool wasRetrying)
+        {
+            var currentOptions = _owner._options.CurrentValue;
+            if (immediate)
+            {
+                _flushTimer.Wake();
+                _wakeScheduled = true;
+                return new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+            }
+
+            if (disseminationNamespace.Options.Priority == DisseminationPriority.High)
+            {
+                _flushTimer.Change(TimeSpan.Zero);
+                _wakeScheduled = true;
+                return new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+            }
+
+            if (DirtyCount >= currentOptions.MaxBatchItems
+                || _statesByNamespace[disseminationNamespace.Name].DirtyCount >= disseminationNamespace.Options.MaxPendingItemCount)
+            {
+                _flushTimer.Change(TimeSpan.Zero);
+                _wakeScheduled = true;
+                return new(DisseminationBroadcastScheduleReason.Immediate, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+            }
+
+            if (wasEmpty || wasRetrying || !_wakeScheduled)
+            {
+                var delay = _owner.GetCoalescingDelay(disseminationNamespace.Options.MaxCoalescingDelay);
+                _flushTimer.Change(delay);
+                _wakeScheduled = true;
+                return new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+            }
+
+            return null;
+        }
+
+        private void EmitNotification(IDisseminationNamespace disseminationNamespace, int rejections, ScheduledFlush? scheduled)
+        {
+            for (var index = 0; index < rejections; index++)
             {
                 DisseminationInstruments.OnQueueAdmissionRejected(disseminationNamespace.Name);
                 try
@@ -415,7 +520,6 @@ internal sealed partial class DisseminationBroadcastQueue
             }
 
             EmitScheduled(scheduled);
-            return !admissionRejected;
         }
 
         private void EmitScheduled(ScheduledFlush? scheduled)

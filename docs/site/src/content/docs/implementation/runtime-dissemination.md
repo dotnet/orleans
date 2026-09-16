@@ -63,15 +63,19 @@ Every silo derives routing from the same ordered membership projection. Members 
 
 Membership uses the broadcast forest: for fanout `f` and zero-based member index `i`, a forwarding node selects children starting at `f * (i + 1)` and continuing for at most `f` members. An originator sends to the first `f` members, excluding itself, plus its normal forwarding children.
 
-Deployment load uses a rooted aggregation tree. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. A publication enters only the local parent/child queues. Receivers merge updates into authoritative state and notify their other tree neighbors, so updates gather toward common ancestors and distribute into other subtrees. Queues combine distinct keys and retain the latest version of a repeatedly published key. Acknowledged peer versions suppress reflected duplicates.
+Deployment load uses root aggregation followed by tree distribution. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. Each non-root producer sends its own update directly to the root immediately. The root merges updates and batches them for 500 ms. Relays atomically enqueue every key from a received batch before waking their send loops, then forward to their children immediately. The batching delay is paid at the root once, rather than at every hop. Queues retain the latest version of a repeatedly published key, and acknowledgments suppress reflected duplicates.
 
-The aggregation tree has `N - 1` undirected edges and `2 * (N - 1)` directed queues. With the default 250 ms load batching window, stable membership, normal priority, fitting batches, and no retries or explicit forced flushes, load traffic targets roughly `8 * (N - 1)` requests per second instead of per-update all-to-all fanout. Acknowledgment responses add the corresponding return messages. Batch splitting, repair, and other runtime traffic are accounted separately. Payload delivery still includes each recipient's copy of the statistics; the savings come from aggregating those copies into fewer messages. A longer batching window trades propagation delay for fewer envelopes, while a shorter window favors freshness.
+Aggregation ledgers advance on broadcast acknowledgments, after the receiver processes the batch and attempts downstream queue admission. An ingress producer which is also a child receives its own update in the root's distribution batch and forwards it to its descendants. Passive evidence of a peer's local value serves repair; broadcast acknowledgments establish distribution progress. Anti-entropy repairs gaps left by bounded queue admission or changed topology.
+
+At one publication per silo per second, root ingress contributes `N - 1` requests per second. Up to two 500 ms root batches traverse `N - 1` distribution edges, targeting roughly `3 * (N - 1)` requests per second under stable, healthy, fitting-batch conditions. One fully collected publication round requires `2 * (N - 1)` requests. Acknowledgment responses add the corresponding return messages. Batch splitting, repair, topology transitions, and other runtime traffic are accounted separately. Payload delivery still includes each recipient's copy of the statistics; the savings come from aggregating those copies into fewer messages.
+
+Active members are ordered by silo address. Ingress moves toward a smaller root; distribution moves toward larger children. A non-root node receiving an ingress from a higher-address sender redirects it to its current root immediately, accommodating a changed root without adding another batching window. Membership repair reconciles differing views.
 
 Namespaces select a membership scope before topology construction:
 
 | Namespace | Scope | Operational effect |
 |---|---|---|
-| Deployment load | Active members, aggregation tree | Parent/child batches distribute placement statistics with a linear number of directed queues. |
+| Deployment load | Active members, root aggregation | Producers send to one root; already-aggregated batches traverse the distribution tree immediately. |
 | Membership | All dissemination members | Joining and graceful-shutdown transitions can propagate. |
 
 Fanout is derived from the target hop count and bounded by the configured minimum and maximum, or selected by the code-configured callback. A membership or fanout change creates a new topology from the next snapshot; acknowledged ledgers and anti-entropy repair convergence across the transition.
@@ -99,7 +103,7 @@ The subsystem and both built-in namespaces are temporarily enabled by default fo
 
 Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceOptions>. Operators can enable and tune membership and deployment-load dissemination independently while retaining the local concurrency and per-message bounds.
 
-Deployment load uses a 250 ms coalescing window and a 5-second expected update cadence. The window aggregates updates across producers at each tree edge. Propagation delay includes a batching window at each traversed hop. Membership retains high priority and bypasses coalescing.
+Deployment load uses a 500 ms root batching window and a 5-second expected update cadence. Producer ingress and relay forwarding bypass that window; relays preserve whole batches atomically. Membership retains high priority and bypasses coalescing.
 
 The anti-entropy loop waits without periodic timer wakeups while the subsystem is disabled. An options-change notification wakes the loop when enablement changes; disabling it returns the loop to the dormant wait. Shutdown removes the options subscription and observes the loop's completion.
 

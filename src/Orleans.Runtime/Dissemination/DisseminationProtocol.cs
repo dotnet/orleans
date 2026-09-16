@@ -51,6 +51,15 @@ internal sealed partial class DisseminationProtocol
         _timeProvider = timeProvider;
         _logger = logger;
         _namespaces = disseminationNamespaces.ToFrozenDictionary(static ns => ns.Name);
+        foreach (var ns in _namespaces.Values)
+        {
+            if (ns.RoutingMode == DisseminationRoutingMode.AggregationTree
+                && ns.MembershipScope != DisseminationMembershipScope.ActiveMembers)
+            {
+                throw new ArgumentException("Root aggregation requires an ActiveMembers membership scope.", nameof(disseminationNamespaces));
+            }
+        }
+
         _antiEntropySendGate = new(Math.Max(1, options.CurrentValue.Overlay.AntiEntropyPeerCount));
 
         _broadcastQueue = new DisseminationBroadcastQueue(
@@ -121,7 +130,9 @@ internal sealed partial class DisseminationProtocol
         var accepted = true;
         foreach (var peer in membership.GetOriginatorTargets(disseminationNamespace.RoutingMode))
         {
-            accepted &= _broadcastQueue.Notify(peer, disseminationNamespace, key);
+            accepted &= _broadcastQueue.Notify(
+                peer, disseminationNamespace, key,
+                immediate: disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree && !membership.IsAggregationRoot);
         }
 
         DisseminationInstruments.OnPublication(
@@ -208,6 +219,28 @@ internal sealed partial class DisseminationProtocol
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
+            if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree)
+            {
+                var notifications = new List<DisseminationBroadcastQueue.KeyNotification>(keys.Count);
+                foreach (var (key, state) in keys)
+                {
+                    var version = disseminationNamespace.GetVersion(key);
+                    if (version > 0)
+                    {
+                        notifications.Add(new(key, version, state.Applied));
+                    }
+                }
+
+                foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode, batch.Sender))
+                {
+                    // A producer which is also a child needs its update returned in the distribution batch
+                    // so that it forwards the update to its own descendants.
+                    _broadcastQueue.NotifyBatch(peer, disseminationNamespace, notifications, immediate: !membership.IsAggregationRoot);
+                }
+
+                continue;
+            }
+
             foreach (var (key, state) in keys)
             {
                 if (disseminationNamespace.GetVersion(key) <= 0)

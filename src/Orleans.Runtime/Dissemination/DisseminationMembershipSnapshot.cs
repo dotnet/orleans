@@ -10,6 +10,8 @@ internal sealed class DisseminationMembershipSnapshot
     private readonly FrozenSet<SiloAddress> _set;
     private readonly SiloAddress[] _antiEntropyPeers;
     private readonly AntiEntropyPeerSelection _antiEntropySelection;
+    private readonly SiloAddress _localSilo;
+    private readonly ImmutableArray<SiloAddress> _aggregationOriginatorTargets;
 
     public DisseminationMembershipSnapshot(
         MembershipVersion membershipVersion,
@@ -19,6 +21,7 @@ internal sealed class DisseminationMembershipSnapshot
         DisseminationMembershipSnapshot? previous = null)
     {
         MembershipVersion = membershipVersion;
+        _localSilo = localSilo;
         Members = members.IsDefault ? [] : members;
         // Membership versions also advance without changing the eligible peers. Preserve progress so that
         // frequent updates cannot keep repair rounds confined to the first few members.
@@ -62,6 +65,9 @@ internal sealed class DisseminationMembershipSnapshot
 
         OriginatorTreeTargets = ComputeOriginatorTreeTargets(localSilo, localIndex, fanout);
         AggregationTreeTargets = ComputeAggregationTreeTargets(localIndex, fanout);
+        IsAggregationRoot = localIndex == 0;
+        AggregationChildren = localIndex > 0 ? AggregationTreeTargets.RemoveAt(0) : AggregationTreeTargets;
+        _aggregationOriginatorTargets = localIndex < 0 ? [] : IsAggregationRoot ? AggregationChildren : [Members[0]];
     }
 
     public MembershipVersion MembershipVersion { get; }
@@ -74,11 +80,21 @@ internal sealed class DisseminationMembershipSnapshot
 
     public ImmutableArray<SiloAddress> AggregationTreeTargets { get; }
 
+    public ImmutableArray<SiloAddress> AggregationChildren { get; }
+
+    public bool IsAggregationRoot { get; }
+
     public ImmutableArray<SiloAddress> GetOriginatorTargets(DisseminationRoutingMode mode) =>
-        mode == DisseminationRoutingMode.AggregationTree ? AggregationTreeTargets : OriginatorTreeTargets;
+        mode == DisseminationRoutingMode.AggregationTree ? _aggregationOriginatorTargets : OriginatorTreeTargets;
 
     public ImmutableArray<SiloAddress> GetForwardingTargets(DisseminationRoutingMode mode) =>
-        mode == DisseminationRoutingMode.AggregationTree ? AggregationTreeTargets : ForwardingTreeTargets;
+        mode == DisseminationRoutingMode.AggregationTree ? AggregationChildren : ForwardingTreeTargets;
+
+    // Active members are address-ordered: ingest moves toward a smaller root, distribution toward larger children.
+    public ImmutableArray<SiloAddress> GetForwardingTargets(DisseminationRoutingMode mode, SiloAddress sender) =>
+        mode == DisseminationRoutingMode.AggregationTree && !IsAggregationRoot && sender.CompareTo(_localSilo) > 0
+            ? _aggregationOriginatorTargets
+            : GetForwardingTargets(mode);
 
     public bool ContainsMember(SiloAddress silo) => _set.Contains(silo);
 

@@ -21,8 +21,9 @@ namespace Orleans.Configuration
         /// Gets or sets dissemination options for deployment load statistics.
         /// </summary>
         /// <remarks>
-        /// When all active peers confirm support, dissemination aggregates updates along a parent/child tree
-        /// using a 250 millisecond batching window by default. Confirmation remains valid for that silo generation
+        /// When all active peers confirm support, producers send updates directly to the aggregation root.
+        /// The root batches for 500 milliseconds by default, then relays forward whole batches immediately
+        /// through the parent/child tree. Confirmation remains valid for that silo generation
         /// until the peer explicitly rejects the namespace or leaves the eligible membership set. During bootstrap
         /// or mixed-version operation, direct publication covers all active peers so that an unsupported intermediate
         /// node cannot interrupt delivery. Direct publication also covers all active peers when dissemination is
@@ -31,7 +32,7 @@ namespace Orleans.Configuration
         public DisseminationNamespaceOptions Dissemination { get; set; } = new()
         {
             ExpectedUpdateCadence = TimeSpan.FromSeconds(5),
-            MaxCoalescingDelay = TimeSpan.FromMilliseconds(250),
+            MaxCoalescingDelay = TimeSpan.FromMilliseconds(500),
         };
     }
 }

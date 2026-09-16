@@ -130,7 +130,7 @@
       "Process CPU time, GC total allocated bytes, post-full-GC retained managed bytes, working set and private bytes",
       "Per-round exact state-convergence latency and partition recovery latency",
       "Separate per-round publication duration and residual convergence wait, retaining the original end-to-end latency and 100 ms polling cadence",
-      "Per-node counters, actual originator/forwarding targets, tree rank and upper-tree role; load uses rooted parent/child aggregation with 250 ms default batching; raw snapshots preserve topology changes",
+      "Per-node counters, actual originator/forwarding targets, tree rank and upper-tree role; load sends directly to one root, batches there for 500 ms, and atomically forwards whole batches down the tree immediately; raw snapshots preserve topology changes",
       "Raw protocol payload, namespace-batch and anti-entropy counters, never substituted for total RPC or byte counts"
     ],
     "limitations": [

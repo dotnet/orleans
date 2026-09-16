@@ -3198,7 +3198,7 @@ public partial class DisseminationProtocolTests
     public void NamespaceOptionsUseExpectedUpdateCadenceDefaults()
     {
         Assert.Equal(TimeSpan.FromSeconds(5), new DeploymentLoadPublisherOptions().Dissemination.ExpectedUpdateCadence);
-        Assert.Equal(TimeSpan.FromMilliseconds(250), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), new ClusterMembershipOptions().Dissemination.ExpectedUpdateCadence);
     }
 
@@ -3952,6 +3952,8 @@ public partial class DisseminationProtocolTests
         public DisseminationNamespace Name => _name;
 
         public DisseminationRoutingMode RoutingMode { get; set; }
+
+        public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.AllMembers;
 
         public DisseminationNamespaceOptions Options { get; } = new() { Enabled = true };
 
@@ -7744,8 +7746,10 @@ public partial class DisseminationProtocolTests
         Assert.Empty(transport.BroadcastBatches);
     }
 
-    [Fact]
-    public async Task BroadcastNotificationDiagnosticsRunOutsideQueueLock()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BroadcastNotificationDiagnosticsRunOutsideQueueLock(bool batch)
     {
         var local = CreateSilo(39009);
         var peer = CreateSilo(39010);
@@ -7762,7 +7766,11 @@ public partial class DisseminationProtocolTests
                 releaseCallback.Task.GetAwaiter().GetResult();
             }),
             static name => name == DisseminationEvents.BroadcastScheduledEventName);
-        var notification = Task.Run(() => queue.Notify(peer, ns, "value"), TestContext.Current.CancellationToken);
+        var notification = Task.Run(
+            () => batch
+                ? queue.NotifyBatch(peer, ns, [new("value", 1, true)], immediate: true)
+                : queue.Notify(peer, ns, "value"),
+            TestContext.Current.CancellationToken);
 
         try
         {
