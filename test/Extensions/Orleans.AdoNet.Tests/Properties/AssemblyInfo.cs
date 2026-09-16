@@ -1,4 +1,5 @@
-using Xunit;
+using Xunit.Sdk;
+using Xunit.v3;
 
-// ADO.NET tests recreate shared provider databases and cannot safely run in parallel.
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+// Run tests sequentially while they recreate shared provider databases.
+[assembly: Parallelization(Mode = ParallelMode.None)]
