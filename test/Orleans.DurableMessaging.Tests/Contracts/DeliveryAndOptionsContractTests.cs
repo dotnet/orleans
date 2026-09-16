@@ -1,4 +1,8 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using NSubstitute;
 using Orleans.DurableMessaging.Configuration;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -8,6 +12,87 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 [TestArea("DurableMessaging")]
 public sealed class DeliveryAndOptionsContractTests
 {
+    [Fact]
+    public void RetentionTimeArithmetic_HandlesMaximumDurationsWithoutOverflow()
+    {
+        var timeType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingTime",
+            throwOnError: true)!;
+        var isExpired = timeType.GetMethod(
+            "IsExpired",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var addClamped = timeType.GetMethod(
+            "AddClamped",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var timestamp = DateTimeOffset.MaxValue - TimeSpan.FromTicks(1);
+
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, timestamp, TimeSpan.MaxValue])!);
+        var fullDateTimeRange = TimeSpan.FromTicks(
+            DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        Assert.True((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, DateTimeOffset.MinValue, fullDateTimeRange])!);
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, DateTimeOffset.MinValue, TimeSpan.MaxValue])!);
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MinValue, DateTimeOffset.MaxValue, TimeSpan.FromTicks(1)])!);
+        Assert.Equal(
+            DateTimeOffset.MaxValue,
+            (DateTimeOffset)addClamped.Invoke(null, [timestamp, TimeSpan.MaxValue])!);
+    }
+
+    [Fact]
+    public void DeadLetterCompaction_SaturatesMaximumRetentionWithoutOverflow()
+    {
+        var retentionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableDeadLetterRetention",
+            throwOnError: true)!;
+        var compact = retentionType.GetMethod(
+            "Compact",
+            BindingFlags.Static | BindingFlags.Public)!
+            .MakeGenericMethod(typeof(string), typeof(DateTimeOffset));
+        var entries = new Dictionary<string, DateTimeOffset>
+        {
+            ["oldest"] = DateTimeOffset.MinValue,
+            ["newest"] = DateTimeOffset.MaxValue
+        };
+
+        var removed = (bool)compact.Invoke(
+            null,
+            [
+                entries,
+                DateTimeOffset.MaxValue,
+                TimeSpan.MaxValue,
+                int.MaxValue,
+                (Func<DateTimeOffset, DateTimeOffset>)(static timestamp => timestamp),
+                0
+            ])!;
+
+        Assert.False(removed);
+        Assert.Equal(2, entries.Count);
+
+        var fullDateTimeRange = TimeSpan.FromTicks(
+            DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        removed = (bool)compact.Invoke(
+            null,
+            [
+                entries,
+                DateTimeOffset.MaxValue,
+                fullDateTimeRange,
+                int.MaxValue,
+                (Func<DateTimeOffset, DateTimeOffset>)(static timestamp => timestamp),
+                0
+            ])!;
+
+        Assert.True(removed);
+        Assert.DoesNotContain("oldest", entries);
+        Assert.Contains("newest", entries);
+    }
+
     [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
@@ -100,4 +185,70 @@ public sealed class DeliveryAndOptionsContractTests
         }
     }
 
+    [Fact]
+    public void InboxDispose_CancelsWorkOnceAndSupportsRepeatedDisposal()
+    {
+        var assembly = typeof(IDurableInbox).Assembly;
+        var extensionType = assembly.GetType("Orleans.DurableMessaging.DurableInboxExtension", throwOnError: true)!;
+        var coordinatorType = assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpCoordinator", throwOnError: true)!;
+        var extension = (IDisposable)RuntimeHelpers.GetUninitializedObject(extensionType);
+        var coordinator = Activator.CreateInstance(coordinatorType)!;
+        using var shutdown = new CancellationTokenSource();
+        var token = shutdown.Token;
+        var cancellationCount = 0;
+        using var registration = token.Register(() => cancellationCount++);
+        extensionType.GetField("_shutdownCts", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, shutdown);
+        extensionType.GetField("_pumpCoordinator", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, coordinator);
+        object?[] acquireArguments = ["owner", token, null];
+        Assert.True((bool)coordinatorType.GetMethod("TryAcquire")!.Invoke(coordinator, acquireArguments)!);
+
+        extension.Dispose();
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.Equal(1, cancellationCount);
+        Assert.False((bool)coordinatorType.GetMethod("IsCurrent")!.Invoke(coordinator, [acquireArguments[2]])!);
+        Assert.Throws<ObjectDisposedException>(() => shutdown.Token);
+
+        extension.Dispose();
+
+        Assert.Equal(1, cancellationCount);
+    }
+
+    [Fact]
+    public async Task InboxLifecycleStart_ObservesPreCanceledLifecycleToken()
+    {
+        var extensionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableInboxExtension",
+            throwOnError: true)!;
+        var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.OnStart(cancellation.Token));
+    }
+
+    [Fact]
+    public async Task InboxLifecycleStart_CancellationInterruptsBlockedResume()
+    {
+        var extensionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableInboxExtension",
+            throwOnError: true)!;
+        var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainInstance.Returns(new object());
+        extensionType.GetField("_grainContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, grainContext);
+        extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, new SemaphoreSlim(0, 1));
+        extensionType.GetField("_metricsActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, 1);
+        using var cancellation = new CancellationTokenSource();
+
+        var start = extension.OnStart(cancellation.Token);
+        Assert.False(start.IsCompleted);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
+    }
 }
