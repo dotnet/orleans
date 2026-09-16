@@ -280,7 +280,37 @@ Core journaling instruments use `operation` and `status` where applicable. Opera
 | `orleans-journaling-storage-operations` | C | Operations, implicit | `operation`, `status` | Journal storage operations by operation and outcome. |
 | `orleans-journaling-write-coalesced-callers` | H | Callers, implicit | `operation` | Number of callers combined into each coalesced journal write. |
 
-Azure journaling storage instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
+### Provider workload counters
+
+Provider counters record catalog traversal and explicit provider retries at existing execution
+points. Each provider library defines its own short name for the `provider` tag: `s3`,
+`azure_blob`, `azure_table`, `redis`, or `volatile`. Existing state-manager and provider-specific
+instruments supply storage operation latency, outcomes, and bytes.
+
+| Instrument | Type | Unit | Attributes | Description |
+|---|---|---|---|---|
+| `orleans-journaling-provider-catalog-entries` | C | Entries, implicit | `provider` | Catalog entries delivered to the consumer. |
+| `orleans-journaling-provider-catalog-pages` | C | Pages, implicit | `provider` | Pages received during S3 and Azure catalog traversal, including empty pages. |
+| `orleans-journaling-provider-catalog-items` | C | Items, implicit | `provider` | Native catalog page candidates before filtering, or Redis scan keys consumed by catalog traversal. |
+| `orleans-journaling-provider-retries` | C | Retries, implicit | `provider`, `reason` | Explicit provider-loop retries, using bounded reason labels. |
+
+S3 and Azure count each page received by the catalog traversal and all candidates on that page,
+before local filtering. Redis counts keys consumed by traversal before filtering and duplicate
+suppression. Volatile storage records delivered entries. Comparing candidates with delivered
+entries shows how much data the provider filters.
+
+Empty logical ranges produce zero pages, items, and entries. Early disposal and cancellation
+retain counts already recorded. A terminal enumeration advance or a failed page retrieval adds
+zero pages. Provider retry counts describe explicit storage recovery loops.
+
+Use the existing duration histograms for storage latency and
+[host-provided dependency telemetry](../../grains/journaling/operations.md#use-host-provided-dependency-telemetry)
+for SDK request timing, outcomes, and transport attempts. Catalog page and item counts describe
+provider traversal; service-side transaction metrics provide the basis for billing reconciliation.
+
+The existing state-manager and provider-specific instruments below retain their original meanings.
+
+Azure and S3 storage-method instruments use operations `create`, `get_metadata`, `update_metadata`, `append`, `delete`, `read`, and `replace`.
 
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
@@ -290,6 +320,9 @@ Azure journaling storage instruments use operations `create`, `get_metadata`, `u
 | `orleans-journaling-azure-table-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by Azure Table journal storage operations. |
 | `orleans-journaling-azure-table-operation-duration` | H | `ms` | `operation`, `status` | Azure Table journal storage operation duration by operation and outcome. |
 | `orleans-journaling-azure-table-operations` | C | Operations, implicit | `operation`, `status` | Azure Table journal storage operations by operation and `ok` or `error` status. |
+| `orleans-journaling-s3-operation-bytes` | C | `bytes` | `operation` | Cumulative bytes successfully processed by S3 journal storage methods. |
+| `orleans-journaling-s3-operation-duration` | H | `ms` | `operation`, `status` | S3 journal storage method duration by operation and outcome. |
+| `orleans-journaling-s3-operations` | C | Operations, implicit | `operation`, `status` | S3 journal storage methods by operation and `ok` or `error` status. |
 
 ## Use the catalog
 

@@ -167,6 +167,28 @@ server-side filtering can reduce transferred data while the service still examin
 
 Enumeration observes live storage. Concurrent changes follow each provider's listing semantics; callers should tolerate repeated identities during changes and use subsequent enumerations to discover later updates. Journal existence can change between discovery and a storage operation. Cancellation and storage errors propagate through enumeration. Dispose a failed enumerator and begin a new enumeration when retrying a listing operation.
 
+## Provider metrics
+
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries:
+
+- `orleans-journaling-provider-catalog-pages` counts pages received during S3 and Azure catalog
+  traversal, including empty pages.
+- `orleans-journaling-provider-catalog-items` counts native page candidates and consumed Redis
+  scan keys before local filtering.
+- `orleans-journaling-provider-catalog-entries` counts entries delivered by S3, Azure Blob, Azure
+  Table, Redis, and Volatile providers.
+- `orleans-journaling-provider-retries` counts explicit provider-loop retries.
+
+Pages, items, and entries use a `provider` tag supplied by the provider; retries also use `reason`.
+Each provider library owns its short name, such as `volatile` for the in-memory provider.
+Compare candidates with delivered entries to assess filtering and duplicate suppression.
+
+Existing state-manager and provider-specific metrics retain storage latency, outcomes, and byte
+measurements. The application supplies [client SDK telemetry](../../docs/site/src/content/docs/grains/journaling/operations.md#use-host-provided-dependency-telemetry)
+through hosting integrations such as Aspire, instrumentation libraries, or SDK diagnostic
+configuration. Use those signals for dependency timing and outcomes, and service-side transaction
+metrics for billing reconciliation.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

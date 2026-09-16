@@ -94,6 +94,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     }
 
                     await DelayForRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
+                    _shared.Instruments.OnRetry("metadata_conflict");
                 }
             }
         }
@@ -226,6 +227,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                         succeeded = true;
                         return null;
                     }
+
+                    if (attempt < 2)
+                    {
+                        _shared.Instruments.OnRetry("metadata_conflict");
+                    }
                 }
             }
 
@@ -289,6 +295,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                         : null;
                     if (refreshed is not null)
                     {
+                        _shared.Instruments.OnRetry("metadata_conflict");
                         continue;
                     }
 
@@ -386,6 +393,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     {
                         expectedETag = refreshed.Value.ETag;
                         expectedProviderState = refreshed.Value.ProviderState;
+                        _shared.Instruments.OnRetry("metadata_conflict");
                         continue;
                     }
 
@@ -592,6 +600,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 var checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));
                 if (!await TryCreateCheckpointAsync(checkpointName, checkpointStream, cancellationToken).ConfigureAwait(false))
                 {
+                    _shared.Instruments.OnRetry("checkpoint_collision");
                     continue;
                 }
 
@@ -621,6 +630,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                             {
                                 walState = refreshedState;
                                 previousCheckpointName = _shared.Options.DeleteOldCheckpoints ? refreshedState.Manifest.Checkpoint?.Name : null;
+                                _shared.Instruments.OnRetry("metadata_conflict");
                                 continue;
                             }
 
@@ -791,6 +801,11 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
                 await DelayForRetryAsync(conflictAttempt - 1, cancellationToken).ConfigureAwait(false);
             }
+
+            if (!WalExists)
+            {
+                _shared.Instruments.OnRetry("metadata_conflict");
+            }
         }
     }
 
@@ -955,6 +970,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 }
 
                 await DelayForRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
+                _shared.Instruments.OnRetry("checkpoint_collision");
             }
         }
     }

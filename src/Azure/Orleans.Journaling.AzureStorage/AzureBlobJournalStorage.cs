@@ -131,6 +131,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             for (var attempt = 0; attempt < 3; attempt++)
             {
+                if (attempt > 0)
+                {
+                    _shared.Instruments.OnRetry("metadata_conflict");
+                }
+
                 BlobProperties? properties;
                 try
                 {
@@ -258,6 +263,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                         : null;
                     if (refreshed is not null)
                     {
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -344,6 +350,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     {
                         walState = refreshedState;
                         checkpointName = refreshedState.Manifest.Checkpoint?.Name;
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -522,6 +529,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
                 {
                     // Snapshot ids are random, so this should be vanishingly rare. Retry with a new id.
+                    _shared.Instruments.OnRetry("checkpoint_collision");
                     continue;
                 }
 
@@ -547,6 +555,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                         if (refreshed is { } refreshedState)
                         {
                             walState = refreshedState;
+                            _shared.Instruments.OnRetry("metadata_only_conflict");
                             continue;
                         }
 
@@ -625,6 +634,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             {
                 // Another instance created the WAL first; load only the properties needed before appending.
                 await TryLoadWalStateAsync(conditions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!WalExists)
+            {
+                _shared.Instruments.OnRetry("create_race");
             }
         }
     }

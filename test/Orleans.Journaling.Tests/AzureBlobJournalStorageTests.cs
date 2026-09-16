@@ -21,6 +21,33 @@ public sealed class AzureBlobJournalStorageTests
     private static readonly JournalId TestJournalId = JournalId.FromGrainId(GrainId.Create("test-grain", "0"));
 
     [Fact]
+    public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture("azure_blob");
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs, instruments: metrics.Blob);
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        appendBlobs.BeforeSetMetadata = (_, _, _) =>
+        {
+            Assert.Equal(appendBlobs.SetMetadataCalls.Count - 1, metrics.Retries.GetMeasurementSnapshot().Count);
+            throw new RequestFailedException(412, "concurrent update");
+        };
+
+        Assert.Null(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+
+        var retries = metrics.Retries.GetMeasurementSnapshot();
+        Assert.Equal([1L, 1L], retries.Select(retry => retry.Value));
+        Assert.All(retries, retry =>
+        {
+            Assert.Equal(2, retry.Tags.Count);
+            Assert.Equal("azure_blob", retry.Tags["provider"]);
+            Assert.Equal("metadata_conflict", retry.Tags["reason"]);
+        });
+        Assert.Equal(3, appendBlobs.SetMetadataCalls.Count);
+    }
+
+    [Fact]
     public async Task DeleteAsync_AllowsNextAppendToRecreateWal()
     {
         var appendBlobs = new FakeAppendBlobStore();
@@ -66,8 +93,9 @@ public sealed class AzureBlobJournalStorageTests
     [Fact]
     public async Task AppendAsync_WhenWalETagChangesOnlyForMetadata_ReloadsWalAndAppends()
     {
+        using var metrics = new AzureJournalStorageMetricsFixture("azure_blob");
         var appendBlobs = new FakeAppendBlobStore();
-        var storage = CreateStorage(appendBlobs);
+        var storage = CreateStorage(appendBlobs, instruments: metrics.Blob);
         var catalogStorage = CreateStorage(appendBlobs);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
@@ -78,6 +106,12 @@ public sealed class AzureBlobJournalStorageTests
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
+        var retry = Assert.Single(metrics.Retries.GetMeasurementSnapshot());
+        Assert.Equal(2, retry.Tags.Count);
+        Assert.Equal("azure_blob", retry.Tags["provider"]);
+        Assert.Equal("metadata_only_conflict", retry.Tags["reason"]);
+        Assert.Equal(1, retry.Value);
+        Assert.Equal(3, appendBlobs.AppendCalls.Count);
     }
 
     [Fact]
@@ -729,7 +763,8 @@ public sealed class AzureBlobJournalStorageTests
         string? journalFormatKey = null,
         bool deleteOldCheckpoints = true,
         string? walBlobName = null,
-        Func<string, string>? getCheckpointName = null)
+        Func<string, string>? getCheckpointName = null,
+        AzureBlobJournalStorageInstruments? instruments = null)
     {
         checkpoints ??= new FakeBlockBlobStore();
         walBlobName ??= "blob/wal";
@@ -739,7 +774,7 @@ public sealed class AzureBlobJournalStorageTests
                 NullLogger<AzureBlobJournalStorage>.Instance,
                 Options.Create(new AzureBlobJournalStorageOptions { DeleteOldCheckpoints = deleteOldCheckpoints }),
                 new FakeBlobClientProvider(appendBlobs, checkpoints, walBlobName, getCheckpointName),
-                CreateAzureBlobJournalStorageInstruments(),
+                instruments ?? CreateAzureBlobJournalStorageInstruments(),
                 mimeType,
                 journalFormatKey),
             TestJournalId);

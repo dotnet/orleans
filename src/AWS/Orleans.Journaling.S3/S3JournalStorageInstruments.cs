@@ -6,6 +6,7 @@ namespace Orleans.Journaling;
 
 internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments)
 {
+    private const string ProviderName = "s3";
     private static readonly Lazy<S3JournalStorageInstruments> DirectConstruction = new(CreateDirectConstruction);
     private const string MillisecondsUnit = "ms";
     private const string BytesUnit = "bytes";
@@ -21,6 +22,14 @@ internal sealed class S3JournalStorageInstruments(OrleansInstruments instruments
     internal const string OperationDelete = "delete";
     internal const string OperationRead = "read";
     internal const string OperationReplace = "replace";
+
+    private readonly JournalStorageTelemetry _telemetry = new(instruments);
+
+    internal void OnCatalogPage(long items) => _telemetry.OnCatalogPage(ProviderName, items);
+
+    internal void OnCatalogEntry() => _telemetry.OnCatalogEntry(ProviderName);
+
+    internal void OnRetry(string reason) => _telemetry.OnRetry(ProviderName, reason);
 
     internal static S3JournalStorageInstruments CreateForDirectConstruction() => DirectConstruction.Value;
 

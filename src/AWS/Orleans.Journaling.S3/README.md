@@ -21,8 +21,6 @@ For example, journal `jobs/00001234` uses `wal/jobs/00001234` and checkpoint obj
 
 S3 Express directory buckets benefit from slash-delimited prefixes. Unordered listings scan the selected WAL directory and retain every matching overdue journal, however old. Applications can supply hierarchical base keys, provided their prefix and reverse mappings satisfy the catalog contract.
 
-**Alpha layout upgrade:** When upgrading from the previous `<base-key>/wal` layout, drain durable jobs before deploying the new version, then recreate journals using the new layout.
-
 ## Catalog enumeration
 
 `IJournalStorageCatalog.ListAsync` returns `JournalCatalogEntry` values incrementally in S3 traversal order. Each entry's `Id` is the journal identity. S3 entries always have null `Metadata`, including when `ListOptions.IncludeMetadata = true`: `ListObjectsV2` cannot project the complete journal format, ETag, and caller-owned properties together. Enumeration never adds separate per-journal metadata requests. Call `GetMetadataAsync` explicitly when metadata is needed.
@@ -53,3 +51,22 @@ options.TryParseJournalId = key => key.StartsWith("journals/", StringComparison.
 Client traversal memory is proportional to the current native page. An enumerator advance can cross multiple filtered or empty pages, and the storage service determines scan work, latency, and retries. Enumeration observes the live bucket; concurrent changes follow S3 listing semantics. Use subsequent enumerations to discover later changes and tolerate repeated identities during changes.
 
 Dispose the enumerator when stopping early and use a cancellation token covering its lifetime. Cancellation and service failures propagate through enumeration.
+
+## Metrics
+
+The `Microsoft.Orleans` meter records catalog traversal and explicit provider retries. This library defines `s3` as its short name for the `provider` tag:
+
+| Metric | Measurement | Other tags |
+| --- | --- | --- |
+| `orleans-journaling-provider-catalog-entries` | Catalog entries delivered to consumers | None |
+| `orleans-journaling-provider-catalog-pages` | Pages received by catalog traversal, including empty pages | None |
+| `orleans-journaling-provider-catalog-items` | Native catalog candidates before local filtering | None |
+| `orleans-journaling-provider-retries` | Provider-loop retries | `reason` |
+
+Each received catalog page increments the page counter even when its object collection is empty. Failed page retrieval and terminal enumeration advances add zero pages. Compare native candidates with delivered entries to assess filtering work.
+
+Retry reasons are `metadata_conflict` and `checkpoint_collision`, recorded when the provider performs another attempt. Catalog entries count only yielded identities; native item counts include candidates filtered from the current page. Early disposal and cancellation retain the work already recorded.
+
+The application supplies request telemetry through its hosting integrations, instrumentation libraries, or [AWS SDK diagnostic configuration](https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/Util/TLoggingConfig.html). Reuse client instrumentation already configured by the host. The application owns diagnostic collection and sensitive-response handling; service-side transaction metrics support billing reconciliation. Resource identities belong in protected logs and traces; metric tags remain bounded.
+
+The existing `orleans-journaling-s3-operations`, `orleans-journaling-s3-operation-duration`, and `orleans-journaling-s3-operation-bytes` metrics retain their names, tags, and behavior, including for directly constructed storage instances.

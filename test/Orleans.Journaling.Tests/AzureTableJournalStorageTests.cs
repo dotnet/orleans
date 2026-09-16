@@ -20,6 +20,33 @@ public sealed class AzureTableJournalStorageTests
     private static readonly string TestPartitionKey = AzureTableJournalStorageOptions.GetDefaultPartitionKey(TestJournalId);
 
     [Fact]
+    public async Task Telemetry_MetadataConflictRecordsOnlyActualProviderRetries()
+    {
+        using var metrics = new AzureJournalStorageMetricsFixture("azure_table");
+        var store = new FakeTableStore();
+        var storage = CreateStorage(store, instruments: metrics.Table);
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
+        store.BeforeUpdate = (_, _) =>
+        {
+            Assert.Equal(store.UpdateCalls.Count - 1, metrics.Retries.GetMeasurementSnapshot().Count);
+            throw new RequestFailedException(412, "concurrent update");
+        };
+
+        Assert.Null(await storage.UpdateMetadataAsync(
+            set: new Dictionary<string, string> { ["owner"] = "alice" }, cancellationToken: TestContext.Current.CancellationToken));
+
+        var retries = metrics.Retries.GetMeasurementSnapshot();
+        Assert.Equal([1L, 1L], retries.Select(retry => retry.Value));
+        Assert.All(retries, retry =>
+        {
+            Assert.Equal(2, retry.Tags.Count);
+            Assert.Equal("azure_table", retry.Tags["provider"]);
+            Assert.Equal("metadata_conflict", retry.Tags["reason"]);
+        });
+        Assert.Equal(3, store.UpdateCalls.Count);
+    }
+
+    [Fact]
     public async Task AppendAsync_RoundTripsThroughRead()
     {
         var store = new FakeTableStore();
@@ -138,8 +165,9 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public async Task AppendAsync_WhenHeaderETagChangesOnlyForMetadata_ReloadsHeaderAndAppends()
     {
+        using var metrics = new AzureJournalStorageMetricsFixture("azure_table");
         var store = new FakeTableStore();
-        var storage = CreateStorage(store);
+        var storage = CreateStorage(store, instruments: metrics.Table);
         var catalogStorage = CreateStorage(store);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
@@ -150,8 +178,17 @@ public sealed class AzureTableJournalStorageTests
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         var consumer = new CapturingJournalStorageConsumer();
-        await CreateStorage(store).ReadAsync(consumer, CancellationToken.None);
+        await CreateStorage(store, instruments: metrics.Table).ReadAsync(consumer, CancellationToken.None);
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        var retry = Assert.Single(metrics.Retries.GetMeasurementSnapshot());
+        Assert.Equal(2, retry.Tags.Count);
+        Assert.Equal("azure_table", retry.Tags["provider"]);
+        Assert.Equal("metadata_only_conflict", retry.Tags["reason"]);
+        Assert.Equal(1, retry.Value);
+        Assert.Equal(3, store.TransactionCalls.Count);
+        Assert.Empty(metrics.Pages.GetMeasurementSnapshot());
+        Assert.Empty(metrics.Items.GetMeasurementSnapshot());
+        Assert.Empty(metrics.Entries.GetMeasurementSnapshot());
     }
 
     [Fact]
@@ -566,14 +603,17 @@ public sealed class AzureTableJournalStorageTests
     [Fact]
     public async Task ReplaceAsync_WhenRowWriteFails_DoesNotFlipHeader()
     {
+        using var metrics = new AzureJournalStorageMetricsFixture("azure_table");
         var store = new FakeTableStore();
-        var storage = CreateStorage(store);
+        var storage = CreateStorage(store, instruments: metrics.Table);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         store.FailNextTransaction = true;
         await Assert.ThrowsAsync<RequestFailedException>(
             () => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
 
+        Assert.Equal(2, store.TransactionCalls.Count);
+        Assert.Empty(metrics.Retries.GetMeasurementSnapshot());
         await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
         var consumer = new CapturingJournalStorageConsumer();
         await CreateStorage(store).ReadAsync(consumer, CancellationToken.None);
@@ -805,7 +845,8 @@ public sealed class AzureTableJournalStorageTests
         long compactionRowCountThreshold = AzureTableJournalStorageOptions.DEFAULT_COMPACTION_ROW_COUNT_THRESHOLD,
         long compactionSizeThreshold = AzureTableJournalStorageOptions.DEFAULT_COMPACTION_SIZE_THRESHOLD,
         Action<AzureTableJournalStorageOptions>? configure = null,
-        JournalId journalId = default)
+        JournalId journalId = default,
+        AzureTableJournalStorageInstruments? instruments = null)
     {
         var options = new AzureTableJournalStorageOptions
         {
@@ -819,7 +860,7 @@ public sealed class AzureTableJournalStorageTests
                 NullLogger<AzureTableJournalStorage>.Instance,
                 Options.Create(options),
                 new FakeTableClientProvider(store),
-                CreateAzureTableJournalStorageInstruments(),
+                instruments ?? CreateAzureTableJournalStorageInstruments(),
                 journalFormatKey),
             journalId.IsDefault ? TestJournalId : journalId);
     }

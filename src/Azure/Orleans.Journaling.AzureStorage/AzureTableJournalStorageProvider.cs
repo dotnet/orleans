@@ -89,6 +89,7 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             select: range.IncludeMetadata ? JournalMetadataSelect : JournalIdSelect,
             cancellationToken: cancellationToken).AsPages(pageSizeHint: 1000))
         {
+            _shared.Instruments.OnCatalogPage(page.Values.Count);
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var entity in page.Values)
             {
@@ -96,11 +97,13 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
                 if (TryGetJournalId(entity, out var journalId)
                     && range.Contains(journalId.Value))
                 {
-                    yield return new(
+                    var entry = new JournalCatalogEntry(
                         journalId,
                         range.IncludeMetadata
                             ? AzureTableJournalStorage.CreateJournalMetadataSnapshot(entity.ETag, entity)
                             : null);
+                    _shared.Instruments.OnCatalogEntry();
+                    yield return entry;
                 }
             }
         }

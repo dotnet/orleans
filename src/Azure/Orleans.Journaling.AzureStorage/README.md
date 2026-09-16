@@ -47,6 +47,12 @@ Table enumeration requests up to 1000 header rows per service page and reads ide
 
 Use `await foreach` or dispose a retained enumerator when stopping early. Pass a cancellation token covering the traversal lifetime; cancellation and service errors propagate to the caller.
 
+## Runtime metrics
+
+The `Microsoft.Orleans` meter records catalog traversal with `provider=azure_blob` or `provider=azure_table`, short names defined by this library. `orleans-journaling-provider-catalog-pages` counts received catalog pages, including empty pages. `orleans-journaling-provider-catalog-items` counts their native candidates before local filtering, and `orleans-journaling-provider-catalog-entries` counts entries yielded to the caller. Failed page retrieval and terminal enumeration advances add zero pages. `orleans-journaling-provider-retries` counts explicit provider retries using bounded `reason` tags.
+
+Existing `orleans-journaling-azure-blob-*` and `orleans-journaling-azure-table-*` metrics retain storage latency, outcome, and byte measurements. The application supplies client SDK telemetry through its Aspire integration, instrumentation libraries, or [Azure SDK diagnostic configuration](https://learn.microsoft.com/dotnet/azure/sdk/logging). Reuse diagnostics already configured for the registered clients. Request/response events include HTTP status and I/O duration; configure collection and sensitive-content handling at the application boundary. Application-supplied container factories retain control over their initialization and client calls. Service-side transaction metrics support billing reconciliation.
+
 ## Getting Started
 To use this package, install it via NuGet:
 

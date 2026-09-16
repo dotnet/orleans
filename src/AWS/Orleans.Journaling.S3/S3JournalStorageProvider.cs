@@ -105,6 +105,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                     ContinuationToken = continuationToken,
                 },
                 cancellationToken).ConfigureAwait(false);
+            _shared.Instruments.OnCatalogPage(response.S3Objects?.Count ?? 0);
 
             cancellationToken.ThrowIfCancellationRequested();
             // AWS SDK v4 represents an empty listing page with a null collection.
@@ -119,6 +120,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
                 if (TryGetJournalId(item.Key, range, out var id))
                 {
                     // ListObjectsV2 cannot project the complete journal metadata without a separate request.
+                    _shared.Instruments.OnCatalogEntry();
                     yield return new JournalCatalogEntry(id);
                 }
             }

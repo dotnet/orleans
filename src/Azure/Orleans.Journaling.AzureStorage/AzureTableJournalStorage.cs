@@ -165,6 +165,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         {
             for (var attempt = 0; attempt < 3; attempt++)
             {
+                if (attempt > 0)
+                {
+                    _shared.Instruments.OnRetry("metadata_conflict");
+                }
+
                 var entity = await GetHeaderEntityAsync(cancellationToken).ConfigureAwait(false);
                 if (entity is null)
                 {
@@ -291,6 +296,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                         : null;
                     if (refreshed is not null)
                     {
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -359,6 +365,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                     if (refreshed is { } refreshedState)
                     {
                         headerState = refreshedState;
+                        _shared.Instruments.OnRetry("metadata_only_conflict");
                         continue;
                     }
 
@@ -519,6 +526,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
                         if (refreshed is { } refreshedState)
                         {
                             headerState = refreshedState;
+                            _shared.Instruments.OnRetry("metadata_only_conflict");
                             continue;
                         }
 
@@ -592,6 +600,11 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
             {
                 // Another instance created the header first; load only the manifest needed before writing.
                 await TryLoadHeaderStateAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!HeaderExists)
+            {
+                _shared.Instruments.OnRetry("create_race");
             }
         }
     }

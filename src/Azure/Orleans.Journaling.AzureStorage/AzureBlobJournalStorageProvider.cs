@@ -1,8 +1,6 @@
 using System.Runtime.CompilerServices;
-using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -80,6 +78,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
             },
             cancellationToken).AsPages(pageSizeHint: 5000))
         {
+            _shared.Instruments.OnCatalogPage(page.Values.Count);
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var item in page.Values)
             {
@@ -98,11 +97,13 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
                 if (AzureBlobJournalStorageLayout.TryGetJournalId(item.Name, out var journalId)
                     && range.Contains(journalId.Value))
                 {
-                    yield return new(
+                    var entry = new JournalCatalogEntry(
                         journalId,
                         range.IncludeMetadata
                             ? AzureBlobJournalStorage.CreateJournalMetadata(item.Properties.ETag!.Value, item.Metadata)
                             : null);
+                    _shared.Instruments.OnCatalogEntry();
+                    yield return entry;
                 }
             }
         }
