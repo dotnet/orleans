@@ -327,7 +327,7 @@ namespace Orleans.Streaming.EventHubs
     }
 
     [GenerateSerializer]
-    public partial class EventHubBatchContainer : Streams.IBatchContainer
+    public partial class EventHubBatchContainer : Streams.IBatchContainer, Streams.IQueueCacheBatchContainerFilter
     {
         public EventHubBatchContainer(EventHubMessage eventHubMessage, Serialization.Serializer serializer) { }
 
@@ -338,6 +338,10 @@ namespace Orleans.Streaming.EventHubs
         public System.Collections.Generic.IEnumerable<System.Tuple<T, Streams.StreamSequenceToken>> GetEvents<T>() { throw null; }
 
         public bool ImportRequestContext() { throw null; }
+
+        Streams.IBatchContainer? Streams.IQueueCacheBatchContainerFilter.FilterAfter(Streams.StreamSequenceToken exclusiveStartToken) { throw null; }
+
+        Streams.IBatchContainer? Streams.IQueueCacheBatchContainerFilter.FilterFrom(Streams.StreamSequenceToken inclusiveStartToken) { throw null; }
 
         public static Azure.Messaging.EventHubs.EventData ToEventData<T>(Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
 
@@ -413,6 +417,8 @@ namespace Orleans.Streaming.EventHubs
         public virtual Runtime.StreamId GetStreamIdentity(Azure.Messaging.EventHubs.EventData queueMessage) { throw null; }
 
         public virtual Streams.StreamPosition GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage) { throw null; }
+
+        int Providers.Streams.Common.ICacheDataAdapter.Compare(ref Providers.Streams.Common.CachedMessage cachedMessage, Streams.StreamSequenceToken token) { throw null; }
 
         public virtual Azure.Messaging.EventHubs.EventData ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
@@ -499,6 +505,8 @@ namespace Orleans.Streaming.EventHubs
         public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
 
         public Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
+
+        public void UpdateDeliveryProgress(Streams.StreamSequenceToken safeToken, System.DateTime utcNow) { }
     }
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
@@ -594,6 +602,7 @@ namespace Orleans.Streaming.EventHubs
         [System.Obsolete("Use TryGetNextMessageWithResult instead.")]
         bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message);
         Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message);
+        void UpdateDeliveryProgress(Streams.StreamSequenceToken safeToken, System.DateTime utcNow);
     }
 
     public partial interface IEventHubQueueCacheFactory

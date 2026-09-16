@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net;
 using Azure.Messaging.EventHubs;
+using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Primitives;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -36,16 +38,7 @@ public class EventHubCheckpointRecoveryTests
     [InlineData(true)]
     public async Task Shutdown_IdleStreamDoesNotPinCheckpoint_ResumesWithoutOldBacklog(bool recoverCursor)
     {
-        using var services = new ServiceCollection()
-            .AddMetrics()
-            .AddSerializer()
-            .AddSingleton<OrleansInstruments>()
-            .AddSingleton<SchedulerInstruments>()
-            .AddSingleton<CatalogInstruments>()
-            .AddSingleton<GrainInstruments>()
-            .AddSingleton<MessagingInstruments>()
-            .AddSingleton<MessagingProcessingInstruments>()
-            .BuildServiceProvider();
+        using var services = CreateServices();
         var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
         var idleId = StreamId.Create("idle", "idle");
         var busyId = StreamId.Create("busy", "busy");
@@ -71,6 +64,11 @@ public class EventHubCheckpointRecoveryTests
             }
 
             Assert.True(await first.Read(198));
+            if (recoverCursor)
+            {
+                Assert.Equal([2], busy.Events);
+                await first.Accessor.RunConsumerCursor(busySubscription);
+            }
 
             Assert.Equal([1], idle.Events);
             Assert.Equal(Enumerable.Range(2, 199), busy.Events);
@@ -111,14 +109,327 @@ public class EventHubCheckpointRecoveryTests
         Assert.Empty(resumedConsumer.Errors);
     }
 
-    private sealed class ThrowingQueueCursor(IQueueCacheCursor inner) : IQueueCacheCursor
+    private static ServiceProvider CreateServices()
+        => new ServiceCollection()
+            .AddMetrics()
+            .AddSerializer()
+            .AddSingleton<OrleansInstruments>()
+            .AddSingleton<SchedulerInstruments>()
+            .AddSingleton<CatalogInstruments>()
+            .AddSingleton<GrainInstruments>()
+            .AddSingleton<MessagingInstruments>()
+            .AddSingleton<MessagingProcessingInstruments>()
+            .BuildServiceProvider();
+
+    [Fact]
+    public async Task ReadRecovery_RetriesPackingWithoutFetchingOrAdmittingTwice()
     {
+        using var services = CreateServices();
+        var adapter = new ThrowingDataAdapter(services.GetRequiredService<Serializer>());
+        var idleId = StreamId.Create("idle", "idle");
+        var busyId = StreamId.Create("busy", "busy");
+        var events = Enumerable.Range(1, 5)
+            .Select(sequence => CreateEvent(adapter, sequence == 1 ? idleId : busyId, sequence))
+            .ToArray();
+        var store = new CheckpointStore();
+        var idle = new RecordingConsumer();
+        var busy = new RecordingConsumer();
+
+        await using var lifetime = await CreateAgent(services, adapter, events, store);
+        var idleSubscription = await lifetime.AddConsumer(idleId, idle);
+        var busySubscription = await lifetime.AddConsumer(busyId, busy);
+        Assert.True(await lifetime.Read(2));
+        await lifetime.Accessor.AddSubscriber(idleSubscription);
+        await lifetime.Accessor.AddSubscriber(busySubscription);
+
+        adapter.FailAtSequence = 4;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifetime.Read(3));
+        await lifetime.Accessor.ReportDeliveryProgress();
+        Assert.Empty(store.Writes);
+        Assert.Equal([2], busy.Events);
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], lifetime.Transport.ReceivedSequences);
+
+        Assert.True(await lifetime.Read(3));
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], lifetime.Transport.ReceivedSequences);
+        Assert.Equal([2, 3, 4, 5], busy.Events);
+        Assert.Equal([1], idle.Events);
+        await lifetime.Accessor.Shutdown();
+        Assert.Equal(["5"], store.Writes);
+    }
+
+    [Fact]
+    public async Task Checkpoint_PartialEventResumeWaitsForTheRemainingRecord()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer>();
+        var adapter = new EventHubDataAdapter(serializer);
+        var streamId = StreamId.Create("partial", "record");
+        var payload = adapter.ToQueueMessage<int>(streamId, [10, 11, 12], null, null);
+        var first = EventHubsModelFactory.EventData(
+            eventBody: payload.EventBody, properties: payload.Properties, partitionKey: adapter.GetPartitionKey(streamId),
+            sequenceNumber: 1, offsetString: "1", enqueuedTime: Now);
+        var store = new CheckpointStore();
+        var selected = new TaskCompletionSource<EventHubBatchContainer>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acknowledged = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deliveredSecond = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumer = new RecordingConsumer(StreamHandshakeToken.CreateDeliveyToken(new EventHubSequenceTokenV2("1", 1, 0)))
+        {
+            OnDelivery = batch =>
+            {
+                if (batch.SequenceToken.SequenceNumber == 1)
+                {
+                    selected.TrySetResult(Assert.IsType<EventHubBatchContainer>(batch));
+                    return acknowledged.Task;
+                }
+
+                deliveredSecond.TrySetResult();
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+        };
+        await using var lifetime = await CreateAgent(
+            services, adapter, [first, CreateEvent(adapter, streamId, 2)], store, purgeImmediately: true);
+        var subscription = await lifetime.AddConsumer(streamId, consumer);
+        Assert.True(await lifetime.Read(2));
+        await lifetime.Accessor.AddSubscriber(subscription);
+        try
+        {
+            var pending = await selected.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal([11, 12], consumer.Events);
+            Assert.Equal([1, 2], pending.GetEvents<int>().Select(item => item.Item2.EventIndex));
+            var copy = serializer.Deserialize<EventHubBatchContainer>(serializer.SerializeToArray(pending));
+            Assert.NotNull(copy);
+            Assert.Equal([11, 12], copy.GetEvents<int>().Select(item => item.Item1));
+            Assert.Equal([1, 2], copy.GetEvents<int>().Select(item => item.Item2.EventIndex));
+
+            Assert.False(await lifetime.Read(0));
+            await lifetime.Accessor.ReportDeliveryProgress();
+            Assert.Empty(store.Writes);
+            Assert.Equal([11, 12], pending.GetEvents<int>().Select(item => item.Item1));
+
+            acknowledged.SetResult(null);
+            await deliveredSecond.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await lifetime.Accessor.Shutdown();
+            Assert.Equal([11, 12, 2], consumer.Events);
+            Assert.Equal(["2"], store.Writes);
+        }
+        finally
+        {
+            acknowledged.TrySetResult(null);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadRecovery_PreservesCapturedLatestPosition(bool emptyPartition)
+    {
+        var positions = new List<EventPosition>();
+        var readers = new List<PartitionReceiver>();
+        var failure = new InvalidOperationException("Transient source read failure");
+        var proxy = new EventHubReceiverProxy(position =>
+        {
+            positions.Add(position);
+            var reader = Substitute.For<PartitionReceiver>();
+            reader.GetPartitionPropertiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(
+                EventHubsModelFactory.PartitionProperties("hub", "0", emptyPartition, 0, emptyPartition ? -1 : 50, "50", Now)));
+            reader.ReceiveBatchAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromException<IEnumerable<EventData>>(failure));
+            readers.Add(reader);
+            return reader;
+        }, EventPosition.Latest, captureLatestPosition: true);
+        await proxy.InitializeAsync(TestContext.Current.CancellationToken);
+        var captured = emptyPartition ? EventPosition.Earliest : EventPosition.FromOffset("50", false);
+        Assert.Equal(new[] { EventPosition.Latest, captured }, positions);
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+            () => proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken)));
+        await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new[] { EventPosition.Latest, captured, captured }, positions);
+        await readers[0].Received(1).GetPartitionPropertiesAsync(Arg.Any<CancellationToken>());
+        await readers[1].DidNotReceive().GetPartitionPropertiesAsync(Arg.Any<CancellationToken>());
+        await proxy.CloseAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ReadRecovery_ResumesAfterLastSuccessfulRawBatch()
+    {
+        var positions = new List<EventPosition>();
+        var reader = Substitute.For<PartitionReceiver>();
+        var body = new BinaryData(Array.Empty<byte>());
+        var batch = new[] { EventHubsModelFactory.EventData(body, sequenceNumber: 51, offsetString: "51"), EventHubsModelFactory.EventData(body, sequenceNumber: 52, offsetString: "52") };
+        reader.ReceiveBatchAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<EventData>>(batch), Task.FromException<IEnumerable<EventData>>(new InvalidOperationException("Read failed")));
+        var proxy = new EventHubReceiverProxy(position =>
+        {
+            positions.Add(position);
+            return reader;
+        }, EventPosition.FromOffset("50", true), captureLatestPosition: false);
+
+        Assert.Equal(batch, await proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken));
+        await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new[] { EventPosition.FromOffset("50", true), EventPosition.FromOffset("52", false) }, positions);
+        await proxy.CloseAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public void Eviction_UsesOnlyTheCurrentCertificateAndPreservesSharedBuffers()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var streamId = StreamId.Create("eviction", "stream");
+        var buffers = new List<FixedSizeBuffer>();
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            var buffer = new FixedSizeBuffer(1024 * 1024);
+            buffers.Add(buffer);
+            return buffer;
+        });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        using var cache = new EventHubQueueCache("0", 1000, pool, adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null!, null),
+            checkpointer, NullLogger.Instance, null!, null, null);
+        cache.Add([CreateEvent(adapter, streamId, 1), CreateEvent(adapter, streamId, 2)], Now.UtcDateTime);
+
+        cache.SignalPurge();
+        var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var first).Kind);
+        Assert.Equal(1, Assert.Single(first!.GetEvents<int>()).Item1);
+        ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        cache.UpdateDeliveryProgress(Token(1), Now.UtcDateTime.AddMinutes(1));
+
+        var probe = pool.Allocate();
+        Assert.NotSame(buffers[0], probe);
+        probe.Dispose();
+        cache.SignalPurge();
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var second).Kind);
+        Assert.Equal(2, Assert.Single(second!.GetEvents<int>()).Item1);
+        Assert.DoesNotContain(checkpointer.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(IStreamQueueCheckpointer<string>.Update));
+    }
+
+    [Fact]
+    public void Eviction_FailedCallbackClearsItsBorrowedCertificate()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var streamId = StreamId.Create("eviction", "failure");
+        using var cache = new EventHubQueueCache("0", 1000,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)), adapter,
+            new ThrowingEvictionStrategy(), Substitute.For<IStreamQueueCheckpointer<string>>(),
+            NullLogger.Instance, null!, null, null);
+        cache.Add([CreateEvent(adapter, streamId, 1)], Now.UtcDateTime);
+        Assert.Throws<InvalidOperationException>(() => cache.UpdateDeliveryProgress(Token(1), Now.UtcDateTime.AddMinutes(1)));
+
+        cache.SignalPurge();
+        var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);
+        Assert.Equal(1, Assert.Single(batch!.GetEvents<int>()).Item1);
+    }
+
+    [Fact]
+    public void Admission_RetriesBufferNotificationWithoutDuplicatingOwnership()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var streamId = StreamId.Create("admission", "notification");
+        var notificationCount = 0;
+        var monitor = Substitute.For<ICacheMonitor>();
+        monitor.WhenForAnyArgs(value => value.TrackMemoryAllocated(default)).Do(_ =>
+        {
+            notificationCount++;
+            throw new InvalidOperationException("Allocation observer failed after ownership transfer");
+        });
+        var buffers = new List<FixedSizeBuffer>();
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            var buffer = new FixedSizeBuffer(1024 * 1024);
+            buffers.Add(buffer);
+            return buffer;
+        });
+        using var cache = new EventHubQueueCache("0", 1000, pool, adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), monitor, null),
+            Substitute.For<IStreamQueueCheckpointer<string>>(), NullLogger.Instance, null!, null, null);
+        var messages = new List<EventData> { CreateEvent(adapter, streamId, 1), CreateEvent(adapter, streamId, 2) };
+        Assert.Throws<InvalidOperationException>(() => cache.Add(messages, Now.UtcDateTime));
+
+        Assert.Equal(2, cache.Add(messages, Now.UtcDateTime).Count);
+        Assert.Equal(1, notificationCount);
+        var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        foreach (var expected in new[] { 1, 2 })
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);
+            Assert.Equal(expected, Assert.Single(batch!.GetEvents<int>()).Item1);
+            ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        }
+        Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cache.TryGetNextMessageWithResult(cursor, out _).Kind);
+        cache.UpdateDeliveryProgress(Token(2), Now.UtcDateTime.AddMinutes(1));
+
+        var firstLease = pool.Allocate();
+        var secondLease = pool.Allocate();
+        Assert.Same(buffers[0], firstLease);
+        Assert.NotSame(firstLease, secondLease);
+        firstLease.Dispose();
+        secondLease.Dispose();
+    }
+
+    private sealed class ThrowingEvictionStrategy()
+        : ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null!, null)
+    {
+        private bool throwNext = true;
+
+        protected override bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, DateTime nowUtc)
+        {
+            if (throwNext)
+            {
+                throwNext = false;
+                throw new InvalidOperationException("Purge policy failed");
+            }
+            return base.ShouldPurge(ref cachedMessage, ref newestCachedMessage, nowUtc);
+        }
+    }
+
+    private sealed class ImmediatePurgePredicate() : TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero)
+    {
+        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) => true;
+    }
+
+    private sealed class ThrowingDataAdapter(Serializer serializer) : EventHubDataAdapter(serializer)
+    {
+        public long? FailAtSequence { get; set; }
+
+        public override CachedMessage FromQueueMessage(
+            StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
+        {
+            var result = base.FromQueueMessage(streamPosition, queueMessage, dequeueTime, getSegment);
+            if (FailAtSequence == queueMessage.SequenceNumber)
+            {
+                FailAtSequence = null;
+                throw new InvalidOperationException("Transient packing failure");
+            }
+            return result;
+        }
+    }
+
+    private sealed class ThrowingQueueCursor(IQueueCacheCursor inner) : IQueueCacheCursor, IQueueCacheCursorProgress
+    {
+        private bool failed;
         public void Dispose() => inner.Dispose();
         public IBatchContainer? GetCurrent(out Exception? exception) => inner.GetCurrent(out exception);
-        public bool MoveNext() => throw new InvalidOperationException("Injected cursor read failure");
-        public QueueCacheCursorMoveResult MoveNextWithResult() => throw new InvalidOperationException("Injected cursor read failure");
+        public bool MoveNext() => MoveNextWithResult().Kind == QueueCacheCursorMoveResultKind.Success;
+        public QueueCacheCursorMoveResult MoveNextWithResult()
+        {
+            if (!failed)
+            {
+                failed = true;
+                throw new InvalidOperationException("Injected cursor read failure");
+            }
+            return inner.MoveNextWithResult();
+        }
         public void Refresh(StreamSequenceToken token) => inner.Refresh(token);
         public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
+        public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+        public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
+        public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)inner).RecordDeliverySuccess();
     }
 
     private static EventData CreateEvent(EventHubDataAdapter adapter, StreamId streamId, int sequence)
@@ -140,7 +451,8 @@ public class EventHubCheckpointRecoveryTests
         ServiceProvider services,
         EventHubDataAdapter adapter,
         EventData[] events,
-        CheckpointStore store)
+        CheckpointStore store,
+        bool purgeImmediately = false)
     {
         PartitionTransport? transport = null;
         var settings = new EventHubPartitionSettings
@@ -158,7 +470,7 @@ public class EventHubCheckpointRecoveryTests
                 adapter,
                 new ChronologicalEvictionStrategy(
                     NullLogger.Instance,
-                    new TimePurgePredicate(TimeSpan.FromHours(1), TimeSpan.FromHours(1)),
+                    purgeImmediately ? new ImmediatePurgePredicate() : new TimePurgePredicate(TimeSpan.FromHours(1), TimeSpan.FromHours(1)),
                     null!,
                     null),
                 checkpointer,
@@ -303,13 +615,14 @@ public class EventHubCheckpointRecoveryTests
     {
         public List<int> Events { get; } = [];
         public List<Exception> Errors { get; } = [];
+        public Func<IBatchContainer, Task<StreamHandshakeToken?>>? OnDelivery { get; set; }
 
         public Task<StreamHandshakeToken?> DeliverBatch(
             GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,
             StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
         {
             Events.AddRange(item.GetEvents<int>().Select(message => message.Item1));
-            return Task.FromResult<StreamHandshakeToken?>(null);
+            return OnDelivery?.Invoke(item) ?? Task.FromResult<StreamHandshakeToken?>(null);
         }
 
         public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId, CancellationToken cancellationToken)

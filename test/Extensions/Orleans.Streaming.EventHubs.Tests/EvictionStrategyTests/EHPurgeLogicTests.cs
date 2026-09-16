@@ -70,7 +70,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WontPurge_WhenUnderPressure()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache, make sure will allocate multiple buffers from the pool
             int itemAddToCache = 100;
@@ -93,7 +93,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WontPurge_WhenTimePurgePredicateSaysDontPurge()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -107,8 +107,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = false;
 
             //perform purge
-            this.receiver1.TryPurgeFromCache(out _);
-            this.receiver2.TryPurgeFromCache(out _);
+            foreach (var cache in cacheList)
+                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
 
             //Assert
             int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
@@ -118,7 +118,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_WillPurge_WhenTimePurgePredicateSaysPurge_And_NotUnderPressure()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -132,8 +132,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = true;
 
             //perform purge
-            this.receiver1.TryPurgeFromCache(out _);
-            this.receiver2.TryPurgeFromCache(out _);
+            foreach (var cache in cacheList)
+                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
 
             //Assert
             int expectedItemCountInCaches = 0;
@@ -144,7 +144,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
         [Fact, TestCategory("BVT")]
         public async Task EventHubQueueCache_EvictionStrategy_Behavior()
         {
-            InitForTesting();
+            await InitForTesting();
             var tasks = new List<Task>();
             //add items into cache
             int itemAddToCache = 100;
@@ -170,9 +170,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
-            IList<IBatchContainer>? ignore;
-            this.receiver1.TryPurgeFromCache(out ignore);
-            this.receiver2.TryPurgeFromCache(out ignore);
+            foreach (var cache in cacheList)
+                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
 
             //Each cache should have all buffers purged
             this.evictionStrategyList.ForEach(strategy => Assert.Empty(strategy.InUseBuffers));
@@ -200,7 +199,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             expectedPurgedBuffers.ForEach(buffer => Assert.Contains(buffer, newBufferAllocated));
         }
 
-        private void InitForTesting()
+        private async Task InitForTesting()
         {
             this.cacheList = new ConcurrentBag<EventHubQueueCacheForTesting>();
             this.evictionStrategyList = new List<EHEvictionStrategyForTesting>();
@@ -211,11 +210,13 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             };
 
             this.receiver1 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
+                (_, _, _) => new EmptyEventHubReceiver());
             this.receiver2 = new EventHubAdapterReceiver(this.ehSettings, this.CacheFactory, this.CheckPointerFactory, NullLoggerFactory.Instance,
-                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider);
-            this.receiver1.Initialize(this.timeOut);
-            this.receiver2.Initialize(this.timeOut);
+                new DefaultEventHubReceiverMonitor(monitorDimensions, this.instruments), new LoadSheddingOptions(), environmentStatisticsProvider,
+                (_, _, _) => new EmptyEventHubReceiver());
+            await this.receiver1.Initialize(this.timeOut);
+            await this.receiver2.Initialize(this.timeOut);
         }
 
         private int GetItemCountInAllCache(ConcurrentBag<EventHubQueueCacheForTesting> caches)
@@ -228,16 +229,24 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return itemCount;
         }
 
-        private static async Task AddDataIntoCache(
+        private static Task AddDataIntoCache(
             EventHubQueueCacheForTesting cache,
             int count,
             CancellationToken cancellationToken)
         {
-            await Task.Delay(10, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             List<EventData> messages = Enumerable.Range(0, count)
-                .Select(i => MakeEventData(i))
+                .Select(_ => MakeEventData(cache.NextSequenceNumber++))
                 .ToList();
             cache.Add(messages, DateTime.UtcNow);
+            return Task.CompletedTask;
+        }
+
+        private sealed class EmptyEventHubReceiver : IEventHubReceiver
+        {
+            public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+                => Task.FromResult<IEnumerable<EventData>>([]);
+            public Task CloseAsync() => Task.CompletedTask;
         }
 
         private static EventData MakeEventData(long sequenceNumber)

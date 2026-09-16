@@ -786,6 +786,7 @@ namespace Orleans.Providers.Streams.Common
         CachedMessage? Oldest { get; }
 
         void RemoveOldestMessage();
+        bool TryRemoveOldestMessage();
     }
 
     public partial interface IQueueAdapterReceiverMonitor
@@ -947,9 +948,11 @@ namespace Orleans.Providers.Streams.Common
         public virtual bool TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) { throw null; }
     }
 
-    public partial class SimpleQueueCacheCursor : Orleans.Streams.IQueueCacheCursor, System.IDisposable
+    public partial class SimpleQueueCacheCursor : Orleans.Streams.IQueueCacheCursor, System.IDisposable, Orleans.Streams.IQueueCacheCursorProgress
     {
         public SimpleQueueCacheCursor(SimpleQueueCache cache, Runtime.StreamId streamId, Microsoft.Extensions.Logging.ILogger logger) { }
+
+        Orleans.Streams.StreamSequenceToken? Orleans.Streams.IQueueCacheCursorProgress.SafeSequenceToken { get { throw null; } }
 
         public void Dispose() { }
 
@@ -961,6 +964,10 @@ namespace Orleans.Providers.Streams.Common
         public virtual bool MoveNext() { throw null; }
 
         public virtual Orleans.Streams.QueueCacheCursorMoveResult MoveNextWithResult() { throw null; }
+
+        void Orleans.Streams.IQueueCacheCursorProgress.RecordDeliverySuccess() { }
+
+        void Orleans.Streams.IQueueCacheCursorProgress.SetDeliveredThrough(Orleans.Streams.StreamSequenceToken token) { }
 
         public void RecordDeliveryFailure() { }
 
@@ -1657,6 +1664,11 @@ namespace Orleans.Streams
         System.Collections.Generic.List<IBatchContainer> BatchContainers { get; }
     }
 
+    public partial interface ICheckpointingQueueCache : IQueueCache, IQueueFlowController
+    {
+        void UpdateDeliveryProgress(StreamSequenceToken safeToken, System.DateTime utcNow);
+    }
+
     public partial interface IConsistentRingStreamQueueMapper : IStreamQueueMapper
     {
         System.Collections.Generic.IEnumerable<QueueId> GetQueuesForRange(Runtime.IRingRange range);
@@ -1713,6 +1725,11 @@ namespace Orleans.Streams
         System.Threading.Tasks.Task Shutdown(System.TimeSpan timeout);
     }
 
+    public partial interface IQueueAdapterReceiverReadRecovery
+    {
+        System.Threading.Tasks.Task RecoverReadAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface IQueueCache : IQueueFlowController
     {
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
@@ -1722,7 +1739,12 @@ namespace Orleans.Streams
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
         QueueCacheCursorResult<IQueueCacheCursor> TryGetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
-        void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
+    }
+
+    public partial interface IQueueCacheBatchContainerFilter
+    {
+        IBatchContainer? FilterAfter(StreamSequenceToken exclusiveStartToken);
+        IBatchContainer? FilterFrom(StreamSequenceToken inclusiveStartToken);
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable
@@ -1733,6 +1755,15 @@ namespace Orleans.Streams
         QueueCacheCursorMoveResult MoveNextWithResult();
         void RecordDeliveryFailure();
         void Refresh(StreamSequenceToken token);
+    }
+
+    public partial interface IQueueCacheCursorProgress
+    {
+        StreamSequenceToken? SafeSequenceToken { get; }
+
+        void RecordDeliveryFailure();
+        void RecordDeliverySuccess();
+        void SetDeliveredThrough(StreamSequenceToken token);
     }
 
     public partial interface IQueueDataAdapter<TQueueMessage>
