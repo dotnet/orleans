@@ -60,6 +60,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
+            if (inUseBuffers.Contains(newBlock)) return;
             this.inUseBuffers.Enqueue(newBlock);
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
@@ -104,9 +105,12 @@ namespace Orleans.Providers.Streams.Common
                 {
                     break;
                 }
+                if (!this.PurgeObservable.TryRemoveOldestMessage())
+                {
+                    break;
+                }
                 lastMessagePurged = oldestMessageInCache;
                 itemsPurged++;
-                this.PurgeObservable.RemoveOldestMessage();
             }
             //if nothing got purged, return
             if (itemsPurged == 0)

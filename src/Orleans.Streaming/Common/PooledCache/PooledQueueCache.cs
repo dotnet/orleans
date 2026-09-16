@@ -32,7 +32,8 @@ namespace Orleans.Providers.Streams.Common
         private readonly ILogger logger;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly TimeSpan purgeMetadataInterval;
-        private readonly PeriodicAction? periodicMonitoring;
+        private readonly TimeSpan? monitorWriteInterval;
+        private DateTime nextMonitorWriteTime;
         private readonly PeriodicAction? periodicMetadaPurging;
 
         private readonly Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)> lastPurgedToken = new Dictionary<StreamId, (DateTime TimeStamp, StreamSequenceToken Token)>();
@@ -91,7 +92,8 @@ namespace Orleans.Providers.Streams.Common
             this.cacheMonitor = cacheMonitor;
             if (this.cacheMonitor != null && cacheMonitorWriteInterval.HasValue)
             {
-                this.periodicMonitoring = new PeriodicAction(cacheMonitorWriteInterval.Value, this.ReportCacheMessageStatistics);
+                this.monitorWriteInterval = cacheMonitorWriteInterval;
+                this.nextMonitorWriteTime = DateTime.UtcNow + cacheMonitorWriteInterval.Value;
             }
 
             if (purgeMetadataInterval.HasValue)
@@ -144,7 +146,10 @@ namespace Orleans.Providers.Streams.Common
                 return QueueCacheCursorResult<object>.FromCacheMiss(cacheMiss);
             }
 
-            var cursor = new Cursor(streamId);
+            var cursor = new Cursor(this, streamId)
+            {
+                InclusiveStartToken = sequenceToken,
+            };
             if (SetCursor(cursor, sequenceToken) is { } racedCacheMiss)
             {
                 return QueueCacheCursorResult<object>.FromCacheMiss(racedCacheMiss);
@@ -174,7 +179,7 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
             }
 
-            var result = new Cursor(streamId);
+            var result = new Cursor(this, streamId);
             SetCursorAtEarliestAvailable(result);
             return QueueCacheCursorResult<object>.FromCursor(result);
         }
@@ -193,7 +198,12 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
             }
 
-            if (cursor.IsEarliestAvailable)
+            if (cursor.CacheMiss is { } observedMiss)
+            {
+                throw observedMiss.ToException();
+            }
+
+            if (cursor.IsEarliestAvailable || cursor.RetryPendingDelivery)
             {
                 return;
             }
@@ -215,27 +225,31 @@ namespace Orleans.Providers.Streams.Common
             }
 
             cursor.State = CursorStates.Unset;
+            cursor.InclusiveStartToken = sequenceToken;
             if (SetCursor(cursor, sequenceToken) is { } cacheMiss)
             {
+                cursor.CacheMiss = cacheMiss;
                 throw cacheMiss.ToException();
             }
         }
 
-        private void ReportCacheMessageStatistics()
+        private void ReportCacheMessageStatistics(List<CachedMessage> messages, int projectedItemCount)
         {
-            if (this.IsEmpty)
+            var oldestMessage = Oldest;
+            var newestMessage = Newest;
+            if (messages.Count > 0)
             {
-                this.cacheMonitor!.ReportMessageStatistics(null, null, null, this.ItemCount); // Only invoked via periodicMonitoring, which is only created when cacheMonitor is non-null.
+                oldestMessage ??= messages[0];
+                newestMessage = messages[^1];
             }
-            else
-            {
-                var newestMessage = this.Newest!.Value; // Not empty (checked above), so Newest is non-null.
-                var oldestMessage = this.Oldest!.Value; // Not empty (checked above), so Oldest is non-null.
-                var newestMessageEnqueueTime = newestMessage.EnqueueTimeUtc;
-                var oldestMessageEnqueueTime = oldestMessage.EnqueueTimeUtc;
-                var oldestMessageDequeueTime = oldestMessage.DequeueTimeUtc;
-                this.cacheMonitor!.ReportMessageStatistics(oldestMessageEnqueueTime, oldestMessageDequeueTime, newestMessageEnqueueTime, this.ItemCount); // Only invoked via periodicMonitoring, which is only created when cacheMonitor is non-null.
-            }
+
+            // Preserve post-admission metric values without exposing a committed prefix to
+            // a potentially throwing observer. This method is only called with a monitor.
+            cacheMonitor!.ReportMessageStatistics(
+                oldestMessage?.EnqueueTimeUtc,
+                oldestMessage?.DequeueTimeUtc,
+                newestMessage?.EnqueueTimeUtc,
+                projectedItemCount);
         }
 
         private void PurgeMetadata()
@@ -271,27 +285,43 @@ namespace Orleans.Providers.Streams.Common
             // If nothing in cache, unset token and wait for more data.
             if (IsEmpty)
             {
-                cursor.State = CursorStates.Unset;
+                cursor.State = sequenceToken is null ? CursorStates.Idle : CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
                 return null;
             }
 
             LinkedListNode<CachedMessageBlock> newestBlock = messageBlocks.First!; // messageBlocks.Count != 0 (checked above).
 
-            // if sequenceToken is null, iterate from newest message in cache
+            // A cursor which waited on an empty cache includes the first admitted message.
+            // A new Latest cursor excludes the entire existing partition prefix.
             if (sequenceToken == null)
             {
-                cursor.State = CursorStates.Idle;
-                cursor.CurrentBlock = newestBlock;
-                cursor.Index = newestBlock.Value.NewestMessageIndex;
-                cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                if (cursor.State == CursorStates.Idle)
+                {
+                    var waitingOldestBlock = messageBlocks.Last!;
+                    cursor.State = CursorStates.Set;
+                    cursor.CurrentBlock = waitingOldestBlock;
+                    cursor.Index = waitingOldestBlock.Value.OldestMessageIndex;
+                    cursor.SequenceToken = waitingOldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
+                }
+                else
+                {
+                    cursor.State = CursorStates.Idle;
+                    cursor.CurrentBlock = newestBlock;
+                    cursor.Index = newestBlock.Value.NewestMessageIndex;
+                    cursor.SequenceToken = newestBlock.Value.GetNewestSequenceToken(cacheDataAdapter);
+                    cursor.RecordScanned(cursor.SequenceToken);
+                }
+
                 return null;
             }
 
-            // If sequenceToken is too new to be in cache, unset token, and wait for more data.
+            // The retained partition prefix precedes the requested start, so it is safe to scan
+            // while keeping the inclusive target pending for a later read.
             CachedMessage newestMessage = newestBlock.Value.NewestMessage;
             if (cacheDataAdapter.Compare(ref newestMessage, sequenceToken) < 0)
             {
+                cursor.RecordScanned(cacheDataAdapter.GetSequenceToken(ref newestMessage));
                 cursor.State = CursorStates.Unset;
                 cursor.SequenceToken = sequenceToken;
                 return null;
@@ -371,14 +401,14 @@ namespace Orleans.Providers.Streams.Common
 
             var newestBlock = messageBlocks.First!;
             var newestMessage = newestBlock.Value.NewestMessage;
-            if (newestMessage.Compare(sequenceToken) < 0)
+            if (cacheDataAdapter.Compare(ref newestMessage, sequenceToken) < 0)
             {
                 cacheMiss = default;
                 return false;
             }
 
             var oldestMessage = messageBlocks.Last!.Value.OldestMessage;
-            if (oldestMessage.Compare(sequenceToken) <= 0
+            if (cacheDataAdapter.Compare(ref oldestMessage, sequenceToken) <= 0
                 || lastPurgedToken.TryGetValue(streamId, out var entry)
                     && EventSequenceTokenCompatibility.Compare(sequenceToken, entry.Token) >= 0)
             {
@@ -392,20 +422,18 @@ namespace Orleans.Providers.Streams.Common
 
         private void SetCursorAtEarliestAvailable(Cursor cursor)
         {
-            for (var node = messageBlocks.Last; node is not null; node = node.Previous)
+            if (IsEmpty)
             {
-                if (node.Value.TryFindFirstMessage(cursor.StreamId, cacheDataAdapter, out var index))
-                {
-                    cursor.State = CursorStates.EarliestAvailableSet;
-                    cursor.CurrentBlock = node;
-                    cursor.Index = index;
-                    cursor.SequenceToken = node.Value.GetSequenceToken(index, cacheDataAdapter);
-                    cursor.BlockGeneration = node.Value.Generation;
-                    return;
-                }
+                SetWaitingAtCurrentEnd(cursor);
+                return;
             }
 
-            SetWaitingAtCurrentEnd(cursor);
+            var oldestBlock = messageBlocks.Last!;
+            cursor.State = CursorStates.EarliestAvailableSet;
+            cursor.CurrentBlock = oldestBlock;
+            cursor.Index = oldestBlock.Value.OldestMessageIndex;
+            cursor.SequenceToken = oldestBlock.Value.GetOldestSequenceToken(cacheDataAdapter);
+            cursor.BlockGeneration = oldestBlock.Value.Generation;
         }
 
         private void SetWaitingAtCurrentEnd(Cursor cursor)
@@ -426,7 +454,7 @@ namespace Orleans.Providers.Streams.Common
             cursor.Index = index + 1;
         }
 
-        private bool TrySetCursorAtFirstMatchingMessageAfterAnchor(Cursor cursor)
+        private bool TrySetCursorAfterAnchor(Cursor cursor)
         {
             LinkedListNode<CachedMessageBlock>? node;
             int startIndex;
@@ -446,13 +474,12 @@ namespace Orleans.Providers.Streams.Common
             while (node is not null)
             {
                 if (!node.Value.IsEmpty
-                    && startIndex < node.Value.WriteIndex
-                    && node.Value.TryFindNextMessage(startIndex, cursor.StreamId, cacheDataAdapter, out var index))
+                    && startIndex < node.Value.WriteIndex)
                 {
                     cursor.State = CursorStates.EarliestAvailableSet;
                     cursor.CurrentBlock = node;
-                    cursor.Index = index;
-                    cursor.SequenceToken = node.Value.GetSequenceToken(index, cacheDataAdapter);
+                    cursor.Index = startIndex;
+                    cursor.SequenceToken = node.Value.GetSequenceToken(startIndex, cacheDataAdapter);
                     cursor.BlockGeneration = node.Value.Generation;
                     return true;
                 }
@@ -514,10 +541,42 @@ namespace Orleans.Providers.Streams.Common
                 throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
             }
 
+            if (cursor.CacheMiss is { } observedMiss)
+            {
+                return QueueCacheCursorMoveResult.FromCacheMiss(observedMiss);
+            }
+
+            if (cursor.RetryPendingDelivery)
+            {
+                if (RewindPendingDelivery(cursor) is { } retryCacheMiss)
+                {
+                    return RecordCacheMiss(cursor, retryCacheMiss);
+                }
+            }
+
+            if (IsEmpty)
+            {
+                if (cursor.State is CursorStates.Set or CursorStates.EarliestAvailableSet)
+                {
+                    // A previously positioned unread record was purged. Empty bounds are
+                    // unknown, not evidence that the cursor caught up without loss.
+                    return RecordCacheMiss(cursor, CreateCacheMissInfo(cursor.SequenceToken!));
+                }
+
+                return QueueCacheCursorMoveResult.NoData;
+            }
+
             if (cursor.State == CursorStates.EarliestAvailableSet
                 && (cursor.CurrentBlock?.List != messageBlocks
                     || !cursor.CurrentBlock.Value.Contains(cursor.Index, cursor.BlockGeneration)))
             {
+                if (cursor.SafeSequenceToken is not null || cursor.PendingStartToken is not null)
+                {
+                    // EarliestAvailable only tolerates eviction before its initial scan.
+                    // Once scanning begins, losing the unread position is an explicit gap.
+                    return RecordCacheMiss(cursor, CreateCacheMissInfo(cursor.SequenceToken!));
+                }
+
                 if (cursor.CurrentBlock is { } currentBlock
                     && currentBlock.List == messageBlocks
                     && currentBlock.Value.Generation == cursor.BlockGeneration)
@@ -534,7 +593,7 @@ namespace Orleans.Providers.Streams.Common
             }
 
             if (cursor.State == CursorStates.EarliestAvailableWaiting
-                && !TrySetCursorAtFirstMatchingMessageAfterAnchor(cursor))
+                && !TrySetCursorAfterAnchor(cursor))
             {
                 return QueueCacheCursorMoveResult.NoData;
             }
@@ -543,7 +602,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 if (SetCursor(cursor, cursor.SequenceToken) is { } cacheMiss)
                 {
-                    return QueueCacheCursorMoveResult.FromCacheMiss(cacheMiss);
+                    return RecordCacheMiss(cursor, cacheMiss);
                 }
 
                 if (cursor.State != CursorStates.Set)
@@ -557,69 +616,200 @@ namespace Orleans.Providers.Streams.Common
             if (cursor.State == CursorStates.Set
                 && cacheDataAdapter.Compare(ref oldestMessage, cursor.SequenceToken!) > 0) // Cursor is Set, so SequenceToken is guaranteed non-null.
             {
-                return QueueCacheCursorMoveResult.FromCacheMiss(CreateCacheMissInfo(cursor.SequenceToken!));
+                return RecordCacheMiss(cursor, CreateCacheMissInfo(cursor.SequenceToken!));
             }
 
-            // Iterate forward (in time) in the cache until we find a message on the stream or run out of cached messages.
-            // Note that we get the message from the current cursor location, then move it forward.  This means that if we return true, the cursor
-            //   will point to the next message after the one we're returning.
+            // Iterate forward in partition order. Records for other streams are safe as soon as they
+            // are scanned. A matching record and everything after it remain pending until its delivery
+            // is confirmed by the owner.
             while (cursor.State is CursorStates.Set or CursorStates.EarliestAvailableSet)
             {
                 CachedMessage currentMessage = cursor.Message;
-
-                // Have we caught up to the newest event, if so set cursor to idle.
-                if (cursor.CurrentBlock == messageBlocks.First && cursor.IsNewestInBlock)
-                {
-                    if (cursor.State == CursorStates.EarliestAvailableSet)
-                    {
-                        SetWaitingAfter(cursor, cursor.CurrentBlock!, cursor.Index);
-                    }
-                    else
-                    {
-                        cursor.State = CursorStates.Idle;
-                        cursor.SequenceToken = messageBlocks.First!.Value.GetNewestSequenceToken(cacheDataAdapter); // Just compared equal to cursor.CurrentBlock, which is non-null while cursor.State is Set.
-                    }
-                }
-                else // move to next
-                {
-                    int index;
-                    if (cursor.IsNewestInBlock)
-                    {
-                        // cursor.CurrentBlock is non-null while cursor.State is Set. It is not messageBlocks.First here (checked above),
-                        // so it is not the newest block in the cache, and therefore has a non-null Previous.
-                        cursor.CurrentBlock = cursor.CurrentBlock!.Previous;
-                        cursor.CurrentBlock!.Value.TryFindFirstMessage(cursor.StreamId, this.cacheDataAdapter, out index);
-                    }
-                    else
-                    {
-                        cursor.CurrentBlock!.Value.TryFindNextMessage(cursor.Index + 1, cursor.StreamId, this.cacheDataAdapter, out index); // Non-null while cursor.State is Set.
-                    }
-                    cursor.Index = index;
-                    if (cursor.State == CursorStates.EarliestAvailableSet)
-                    {
-                        cursor.BlockGeneration = cursor.CurrentBlock!.Value.Generation;
-                    }
-                }
+                var currentToken = cacheDataAdapter.GetSequenceToken(ref currentMessage);
 
                 // check if this message is in the cursor's stream
                 if (currentMessage.CompareStreamId(cursor.StreamId))
                 {
-                    message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
-                    cursor.SequenceToken = cursor.IsEarliestAvailable
-                        ? cacheDataAdapter.GetSequenceToken(ref currentMessage)
-                        : cursor.CurrentBlock!.Value.GetSequenceToken(cursor.Index, cacheDataAdapter); // Non-null while cursor.State is Set.
+                    if (cursor.DeliveredThroughToken is { } deliveredThrough
+                        && cacheDataAdapter.Compare(ref currentMessage, deliveredThrough) < 0)
+                    {
+                        MoveCursorForward(cursor, currentToken);
+                        cursor.RecordScanned(currentToken);
+                        continue;
+                    }
+
+                    try
+                    {
+                        message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
+                        if (cursor.DeliveredThroughToken is { } exclusiveStartToken
+                            && cacheDataAdapter.Compare(ref currentMessage, exclusiveStartToken) == 0)
+                        {
+                            if (message is not IQueueCacheBatchContainerFilter exclusiveFilter
+                                || exclusiveFilter.FilterAfter(exclusiveStartToken) is not { } filtered)
+                            {
+                                MoveCursorForward(cursor, currentToken);
+                                cursor.RecordScanned(exclusiveStartToken);
+                                message = null;
+                                continue;
+                            }
+
+                            message = filtered;
+                        }
+
+                        if (cursor.InclusiveStartToken is { } inclusiveStartToken)
+                        {
+                            if (message is IQueueCacheBatchContainerFilter filter)
+                            {
+                                message = filter.FilterFrom(inclusiveStartToken);
+                                if (message is null)
+                                {
+                                    MoveCursorForward(cursor, currentToken);
+                                    cursor.RecordScanned(currentToken);
+                                    continue;
+                                }
+                            }
+                        }
+
+                        cursor.RecordPending(message.SequenceToken, currentToken);
+                    }
+                    catch
+                    {
+                        // Materialization and provider slicing must leave the first selected
+                        // record recoverable, even before a batch is returned to the owner.
+                        cursor.RecordPending(currentToken);
+                        throw;
+                    }
+
+                    MoveCursorForward(cursor, currentToken);
                     return QueueCacheCursorMoveResult.Success;
                 }
+
+                MoveCursorForward(cursor, currentToken);
+                cursor.RecordScanned(currentToken);
             }
 
             return QueueCacheCursorMoveResult.NoData;
         }
 
+        private static QueueCacheCursorMoveResult RecordCacheMiss(Cursor cursor, QueueCacheMissInfo cacheMiss)
+        {
+            cursor.CacheMiss ??= cacheMiss;
+            return QueueCacheCursorMoveResult.FromCacheMiss(cursor.CacheMiss.Value);
+        }
+
         private QueueCacheMissInfo CreateCacheMissInfo(StreamSequenceToken requestedToken)
-            => new(
-                requestedToken,
-                messageBlocks.Last!.Value.GetOldestSequenceToken(cacheDataAdapter),
-                messageBlocks.First!.Value.GetNewestSequenceToken(cacheDataAdapter));
+            => IsEmpty
+                ? new(requestedToken.ToString(), low: null, high: null)
+                : new(
+                    requestedToken,
+                    messageBlocks.Last!.Value.GetOldestSequenceToken(cacheDataAdapter),
+                    messageBlocks.First!.Value.GetNewestSequenceToken(cacheDataAdapter));
+
+        internal StreamSequenceToken? GetSafeSequenceToken(object cursorObj)
+            => GetCursor(cursorObj).SafeSequenceToken;
+
+        internal void SetCursorDeliveredThrough(object cursorObj, StreamSequenceToken token)
+        {
+            var cursor = GetCursor(cursorObj);
+            cursor.DeliveredThroughToken = token;
+            cursor.InclusiveStartToken = null;
+        }
+
+        internal void RecordDeliverySuccess(object cursorObj)
+            => GetCursor(cursorObj).RecordDeliverySuccess();
+
+        internal void RecordDeliveryFailure(object cursorObj)
+        {
+            var cursor = GetCursor(cursorObj);
+            if (cursor.CacheMiss is { } observedMiss)
+            {
+                throw observedMiss.ToException();
+            }
+
+            if (cursor.PendingStartToken is null)
+            {
+                return;
+            }
+
+            cursor.RetryPendingDelivery = true;
+            if (RewindPendingDelivery(cursor) is { } cacheMiss)
+            {
+                cursor.CacheMiss = cacheMiss;
+                throw cacheMiss.ToException();
+            }
+        }
+
+        private QueueCacheMissInfo? RewindPendingDelivery(Cursor cursor)
+        {
+            var retryToken = cursor.PendingStartToken!;
+            if (IsEmpty)
+            {
+                return CreateCacheMissInfo(retryToken);
+            }
+
+            // A retry must not skip its purged matching record, even if it equals
+            // this stream's last-purged token. That is an unresolved gap, not progress.
+            var oldestMessage = messageBlocks.Last!.Value.OldestMessage;
+            if (cacheDataAdapter.Compare(ref oldestMessage, retryToken) > 0)
+            {
+                return CreateCacheMissInfo(retryToken);
+            }
+
+            cursor.State = CursorStates.Unset;
+            cursor.CurrentBlock = null;
+            cursor.SequenceToken = retryToken;
+            if (SetCursor(cursor, retryToken) is { } cacheMiss)
+            {
+                return cacheMiss;
+            }
+
+            if (cursor.State != CursorStates.Set)
+            {
+                return CreateCacheMissInfo(retryToken);
+            }
+
+            // Preserve the original inclusive/exclusive slicing boundary across retries.
+            cursor.TakePendingStartToken();
+            cursor.RetryPendingDelivery = false;
+            return null;
+        }
+
+        private Cursor GetCursor(object cursorObj)
+            => cursorObj as Cursor
+                ?? throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
+
+        private void MoveCursorForward(Cursor cursor, StreamSequenceToken currentToken)
+        {
+            if (cursor.CurrentBlock == messageBlocks.First && cursor.IsNewestInBlock)
+            {
+                if (cursor.State == CursorStates.EarliestAvailableSet)
+                {
+                    SetWaitingAfter(cursor, cursor.CurrentBlock!, cursor.Index);
+                }
+                else
+                {
+                    cursor.State = CursorStates.Idle;
+                    cursor.SequenceToken = currentToken;
+                }
+
+                return;
+            }
+
+            // Resolve the provider token before mutating the position: an adapter failure
+            // must not leave the cursor past an unread record with a stale token.
+            var nextBlock = cursor.IsNewestInBlock ? cursor.CurrentBlock!.Previous! : cursor.CurrentBlock!;
+            var nextIndex = cursor.IsNewestInBlock ? nextBlock.Value.OldestMessageIndex : cursor.Index + 1;
+            var nextToken = nextBlock.Value.GetSequenceToken(nextIndex, cacheDataAdapter);
+            cursor.CurrentBlock = nextBlock;
+            cursor.Index = nextIndex;
+
+            if (cursor.State == CursorStates.EarliestAvailableSet)
+            {
+                cursor.BlockGeneration = cursor.CurrentBlock!.Value.Generation;
+            }
+
+            cursor.SequenceToken = nextToken;
+        }
 
         /// <summary>
         /// Add a list of queue message to the cache 
@@ -629,12 +819,33 @@ namespace Orleans.Providers.Streams.Common
         /// <returns></returns>
         public void Add(List<CachedMessage> messages, DateTime dequeueTime)
         {
+            ArgumentNullException.ThrowIfNull(messages);
+            var projectedItemCount = checked(ItemCount + messages.Count);
+            // Validate deadline arithmetic before any observer or metadata mutation.
+            var nextReportTime = monitorWriteInterval is { } interval && dequeueTime >= nextMonitorWriteTime
+                ? dequeueTime + interval
+                : (DateTime?)null;
+
+            // Once insertion starts, only the internal metadata pool is involved: no
+            // provider/adapter or observer callbacks may throw after a partial commit.
+            // Allocation failures are outside this recoverable admission contract.
+            cacheMonitor?.TrackMessagesAdded(messages.Count);
+            if (nextReportTime.HasValue)
+            {
+                ReportCacheMessageStatistics(messages, projectedItemCount);
+            }
+
             foreach (var message in messages)
             {
                 this.Add(message);
             }
-            this.cacheMonitor?.TrackMessagesAdded(messages.Count);
-            periodicMonitoring?.TryAction(dequeueTime);
+
+            if (nextReportTime is { } next)
+            {
+                // A failed observer must not suppress reporting when admission is retried
+                // at the same timestamp. Advance the schedule only after the commit.
+                nextMonitorWriteTime = next;
+            }
         }
 
         private void Add(CachedMessage message)
@@ -675,21 +886,41 @@ namespace Orleans.Providers.Streams.Common
             EarliestAvailableWaiting, // Waits after a physical cache position for the next matching stream message.
         }
 
-        private class Cursor
+        private class Cursor : IQueueCacheCursorProgress
         {
+            private readonly PooledQueueCache owner;
             public readonly StreamId StreamId;
 
-            public Cursor(StreamId streamId)
+            public Cursor(PooledQueueCache owner, StreamId streamId)
             {
+                this.owner = owner;
                 StreamId = streamId;
                 State = CursorStates.Unset;
             }
 
             public CursorStates State;
 
-            // current sequence token; null while Unset (no sequence token has been established yet)
+            StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken => SafeSequenceToken;
+
+            void IQueueCacheCursorProgress.SetDeliveredThrough(StreamSequenceToken token)
+                => owner.SetCursorDeliveredThrough(this, token);
+
+            void IQueueCacheCursorProgress.RecordDeliveryFailure()
+                => owner.RecordDeliveryFailure(this);
+
+            // current sequence token; null while waiting for the first message to arrive
             public StreamSequenceToken? SequenceToken;
+            public StreamSequenceToken? InclusiveStartToken;
             public long BlockGeneration;
+            public StreamSequenceToken? SafeSequenceToken;
+            public StreamSequenceToken? DeliveredThroughToken;
+            private StreamSequenceToken? pendingSequenceToken;
+            private StreamSequenceToken? pendingStartToken;
+            private bool hasPendingDelivery;
+            public bool RetryPendingDelivery;
+            // Observed loss is sticky until the owner deliberately acquires a new cursor.
+            public QueueCacheMissInfo? CacheMiss;
+            public StreamSequenceToken? PendingStartToken => pendingStartToken;
 
             // reference into cache; non-null while State is Set
             public LinkedListNode<CachedMessageBlock>? CurrentBlock;
@@ -699,6 +930,59 @@ namespace Orleans.Providers.Streams.Common
             public bool IsEarliestAvailable => State is CursorStates.EarliestAvailableSet or CursorStates.EarliestAvailableWaiting;
             public bool IsNewestInBlock => Index == CurrentBlock!.Value.NewestMessageIndex; // Only accessed while State is Set, at which point CurrentBlock is non-null.
             public CachedMessage Message => CurrentBlock!.Value[Index]; // Only accessed while State is Set, at which point CurrentBlock is non-null.
+
+            public void RecordScanned(StreamSequenceToken token)
+            {
+                if (hasPendingDelivery)
+                {
+                    pendingSequenceToken = token;
+                }
+                else
+                {
+                    SafeSequenceToken = token;
+                }
+            }
+
+            public void RecordPending(StreamSequenceToken token, StreamSequenceToken? retryToken = null)
+            {
+                if (!hasPendingDelivery)
+                {
+                    pendingStartToken = retryToken ?? token;
+                }
+
+                hasPendingDelivery = true;
+                pendingSequenceToken = token;
+            }
+
+            public void RecordDeliverySuccess()
+            {
+                if (!hasPendingDelivery || RetryPendingDelivery || CacheMiss.HasValue)
+                {
+                    return;
+                }
+
+                SafeSequenceToken = pendingSequenceToken;
+                pendingSequenceToken = null;
+                pendingStartToken = null;
+                hasPendingDelivery = false;
+                InclusiveStartToken = null;
+                DeliveredThroughToken = null;
+            }
+
+            public StreamSequenceToken? TakePendingStartToken()
+            {
+                if (!hasPendingDelivery)
+                {
+                    return null;
+                }
+
+                var result = pendingStartToken;
+                pendingSequenceToken = null;
+                pendingStartToken = null;
+                hasPendingDelivery = false;
+                return result;
+            }
+
         }
     }
 }

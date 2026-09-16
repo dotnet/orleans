@@ -16,6 +16,71 @@ namespace UnitTests.OrleansRuntime.Streams;
 public class PooledCacheCompatibilityTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeWrapperDelegatesSafePrefixFailureRewindAndDeliveredBoundary(bool useMemoryCache)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var pool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024));
+        var stream = StreamId.Create("progress", "target");
+        var other = StreamId.Create("progress", "other");
+        IQueueCache cache;
+        if (useMemoryCache)
+        {
+            var serializer = new DefaultMemoryMessageBodySerializer(services.GetRequiredService<Serializer<MemoryMessageBody>>());
+            cache = new MemoryPooledCache<DefaultMemoryMessageBodySerializer>(
+                pool,
+                new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)),
+                NullLogger.Instance,
+                serializer,
+                cacheMonitor: null,
+                monitorWriteInterval: null,
+                purgeMetadataInterval: null);
+            cache.AddToCache(Enumerable.Range(1, 4).Select(sequence => (IBatchContainer)
+                new MemoryBatchContainer<DefaultMemoryMessageBodySerializer>(
+                    new MemoryMessageData
+                    {
+                        StreamId = sequence % 2 == 0 ? stream : other,
+                        SequenceNumber = sequence,
+                        EnqueueTimeUtc = DateTime.UnixEpoch,
+                        Payload = serializer.Serialize(new MemoryMessageBody([sequence], requestContext: null)),
+                    },
+                    serializer)).ToArray());
+        }
+        else
+        {
+            cache = new GeneratorPooledCache(
+                pool,
+                NullLogger.Instance,
+                services.GetRequiredService<Serializer>(),
+                cacheMonitor: null,
+                monitorWriteInterval: null);
+            cache.AddToCache(Enumerable.Range(1, 4).Select(sequence => (IBatchContainer)
+                new GeneratedBatchContainer(sequence % 2 == 0 ? stream : other, sequence, new EventSequenceTokenV2(sequence))).ToArray());
+        }
+
+        var result = cache.TryGetCacheCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+        Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
+        using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(result.Cursor);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
+        cursor.RecordDeliveryFailure();
+        Assert.Null(cursor.GetCurrent(out _));
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
+        cursor.RecordDeliveryFailure();
+        progress.SetDeliveredThrough(new EventSequenceTokenV2(2));
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
+        Assert.Equal(4, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+        progress.RecordDeliverySuccess();
+        Assert.Equal(4, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Theory]
     [InlineData(false, StreamSubscriptionStartPosition.Latest)]
     [InlineData(false, StreamSubscriptionStartPosition.EarliestAvailable)]
     [InlineData(true, StreamSubscriptionStartPosition.Latest)]

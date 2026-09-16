@@ -148,5 +148,13 @@ namespace Orleans.Streaming.EventHubs
         /// Send purge signal to the cache, the cache will perform a time based purge on its cached messages
         /// </summary>
         void SignalPurge();
+
+        /// <summary>
+        /// Applies a certified partition prefix to cache eviction.
+        /// </summary>
+        /// <param name="safeToken">The last fully accounted partition record, valid for this call.</param>
+        /// <param name="utcNow">The current UTC time.</param>
+        void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
+            => throw new NotSupportedException("The Event Hubs cache must enforce the certified delivery prefix when evicting records.");
     }
 }
