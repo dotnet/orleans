@@ -2999,7 +2999,10 @@ namespace UnitTests.StreamingTests
                 await attachment.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.Same(replayToken, scenario.Busy.LastToken);
                 Assert.Equal(50, scenario.Busy.LastProcessedToken?.SequenceNumber);
-                Assert.Equal(100, scenario.Busy.PendingBatch?.SequenceToken.SequenceNumber);
+                Assert.Null(scenario.Busy.PendingBatch);
+                Assert.NotNull(scenario.Busy.Cursor);
+                Assert.Equal(50, scenario.Busy.Cursor.GetCurrent(out var cursorException)?.SequenceToken.SequenceNumber);
+                Assert.Null(cursorException);
                 Assert.Equal(StreamConsumerDataState.Active, scenario.Busy.State);
 
                 var shutdown = scenario.Accessor.Shutdown();
