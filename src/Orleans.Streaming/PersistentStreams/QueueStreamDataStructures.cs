@@ -54,6 +54,8 @@ namespace Orleans.Streams
         public long HandshakeGeneration;
         [NonSerialized]
         public bool HasUnresolvedHandshake;
+        [NonSerialized]
+        public long HandshakeRequestId;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {

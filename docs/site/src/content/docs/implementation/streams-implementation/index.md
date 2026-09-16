@@ -83,9 +83,9 @@ The agent then reports final delivery progress to the cache, disposes subscripti
 
 Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
 
-A completed handshake establishes the subscription's current cursor and replay position. Delivery completions from an older handshake generation release their work while preserving that replacement position, so final checkpoint progress reflects the accepted rewind.
+A completed handshake establishes the subscription's current cursor and replay position. The latest requested handshake owns reconciliation; responses from superseded requests preserve that ownership. Delivery completions and error handling from an older handshake generation release their work while preserving the replacement position, so final checkpoint progress reflects the accepted rewind.
 
-A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the existing checkpoint until a successful handshake reconciles that position.
+A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
