@@ -22,6 +22,93 @@ namespace UnitTests.Dissemination;
 public partial class DisseminationProtocolTests
 {
     [Fact]
+    public async Task SingleKeyNotificationAvoidsTemporaryAllocations()
+    {
+        var local = CreateSilo(40901);
+        var peer = CreateSilo(40902);
+        var ns = new FakeNamespace(local);
+        ns.SetValue("value", 1);
+        var transport = new FakeTransport(local, peer);
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+        try
+        {
+            Assert.True(queue.Notify(peer, ns, "value"));
+            for (var iteration = 0; iteration < 128; iteration++)
+            {
+                Assert.True(queue.Notify(peer, ns, "value", force: false));
+            }
+
+            const int iterations = 1024;
+            var accepted = true;
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var iteration = 0; iteration < iterations; iteration++)
+            {
+                accepted &= queue.Notify(peer, ns, "value", force: false);
+            }
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.True(accepted);
+            Assert.True(allocated < 512, $"Repeated single-key notifications allocated {allocated} bytes.");
+            await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+            Assert.Equal(1, Assert.Single(GetBroadcastValues(Assert.Single(transport.BroadcastBatches).Batch)).Value.ToVersion);
+        }
+        finally
+        {
+            ns.Options.Enabled = false;
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task BatchNotificationPreservesLaterUpdatesWhenAdmissionRejectsAKey()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(40903);
+        var peer = CreateSilo(40904);
+        var ns = new FakeNamespace(local);
+        ns.Options.MaxPendingItemCount = 1;
+        ns.SetValue("value", 1);
+        ns.SetValue("rejected", 1);
+        var transport = new FakeTransport(local, peer);
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastResponseHandler = async (_, batch, _) =>
+        {
+            transport.BroadcastBatches.Add((peer, batch));
+            if (transport.BroadcastBatches.Count == 1)
+            {
+                firstStarted.TrySetResult();
+                await releaseFirst.Task;
+            }
+            return FakeTransport.CreateAcknowledgment(batch);
+        };
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+        try
+        {
+            Assert.True(queue.Notify(peer, ns, "value"));
+            var firstFlush = queue.FlushPendingBroadcast(cancellationToken);
+            await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            ns.SetValue("value", 2);
+            Assert.False(queue.NotifyBatch(peer, ns,
+                [new("rejected", 1, true), new("value", 2, true)], immediate: true));
+            releaseFirst.TrySetResult();
+            await firstFlush.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await queue.FlushPendingBroadcast(cancellationToken);
+
+            Assert.Equal(new long[] { 1, 2 }, transport.BroadcastBatches.Select(
+                entry => Assert.Single(GetBroadcastValues(entry.Batch)).Value.ToVersion));
+            Assert.All(transport.BroadcastBatches, entry =>
+                Assert.Equal(new DisseminationKey("value"), Assert.Single(GetBroadcastValues(entry.Batch)).Value.Key));
+        }
+        finally
+        {
+            releaseFirst.TrySetResult();
+            ns.Options.Enabled = false;
+            await queue.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
     public void DisseminationKeysSortAcrossSupportedKinds()
     {
         var firstSilo = CreateSilo(40101);

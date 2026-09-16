@@ -21,23 +21,21 @@ public partial class DisseminationProtocolTests
     [InlineData(32, 6)]
     [InlineData(100, 10)]
     [InlineData(256, 4)]
-    public void AggregationTopologyHasLinearSymmetricEdges(int count, int fanout)
+    public void AggregationTopologyHasOneRootAndLinearDistributionEdges(int count, int fanout)
     {
         var members = CreateSilos(count).ToImmutableArray();
         var snapshots = members.ToDictionary(
             silo => silo,
             silo => new DisseminationMembershipSnapshot(new MembershipVersion(1), silo, members, CreateOverlayOptions(fanout)));
-        Assert.Equal(2 * (count - 1), snapshots.Values.Sum(snapshot => snapshot.AggregationTreeTargets.Length));
         Assert.Equal(count - 1, snapshots.Values.Sum(snapshot => snapshot.AggregationChildren.Length));
+        Assert.Equal(members.Skip(1), snapshots.Values.SelectMany(snapshot => snapshot.AggregationChildren).Order());
         foreach (var (silo, snapshot) in snapshots)
         {
-            Assert.DoesNotContain(silo, snapshot.AggregationTreeTargets);
-            Assert.Equal(snapshot.AggregationTreeTargets.Length, snapshot.AggregationTreeTargets.Distinct().Count());
-            Assert.InRange(snapshot.AggregationTreeTargets.Length, 0, fanout + 1);
-            foreach (var peer in snapshot.AggregationTreeTargets)
-            {
-                Assert.Contains(silo, snapshots[peer].AggregationTreeTargets);
-            }
+            Assert.DoesNotContain(silo, snapshot.AggregationChildren);
+            Assert.Equal(snapshot.AggregationChildren.Length, snapshot.AggregationChildren.Distinct().Count());
+            Assert.InRange(snapshot.AggregationChildren.Length, 0, fanout);
+            Assert.All(snapshot.AggregationChildren, child => Assert.True(child.CompareTo(silo) > 0));
+            Assert.Equal(snapshot.AggregationChildren, snapshot.GetForwardingTargets(DisseminationRoutingMode.AggregationTree));
             if (snapshot.IsAggregationRoot)
             {
                 Assert.Equal(members[0], silo);
@@ -53,7 +51,7 @@ public partial class DisseminationProtocolTests
         var pending = new Queue<SiloAddress>(reached);
         while (pending.TryDequeue(out var silo))
         {
-            foreach (var peer in snapshots[silo].AggregationTreeTargets)
+            foreach (var peer in snapshots[silo].AggregationChildren)
             {
                 if (reached.Add(peer))
                 {

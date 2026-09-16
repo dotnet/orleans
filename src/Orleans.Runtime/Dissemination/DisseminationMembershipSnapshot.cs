@@ -44,7 +44,8 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         _set = memberSet.ToFrozenSet();
-        ForwardingTreeTargets = localIndex < 0 ? [] : ComputeForwardingTreeTargets(localIndex, fanout);
+        ForwardingTreeTargets = localIndex < 0 ? [] : ComputeChildren((long)fanout * (localIndex + 1), fanout);
+        AggregationChildren = localIndex < 0 ? [] : ComputeChildren((long)fanout * localIndex + 1, fanout);
 
         if (localIndex < 0)
         {
@@ -64,10 +65,15 @@ internal sealed class DisseminationMembershipSnapshot
         }
 
         OriginatorTreeTargets = ComputeOriginatorTreeTargets(localSilo, localIndex, fanout);
-        AggregationTreeTargets = ComputeAggregationTreeTargets(localIndex, fanout);
         IsAggregationRoot = localIndex == 0;
-        AggregationChildren = localIndex > 0 ? AggregationTreeTargets.RemoveAt(0) : AggregationTreeTargets;
-        _aggregationOriginatorTargets = localIndex < 0 ? [] : IsAggregationRoot ? AggregationChildren : [Members[0]];
+        if (localIndex < 0)
+        {
+            _aggregationOriginatorTargets = [];
+        }
+        else
+        {
+            _aggregationOriginatorTargets = IsAggregationRoot ? AggregationChildren : [Members[0]];
+        }
     }
 
     public MembershipVersion MembershipVersion { get; }
@@ -77,8 +83,6 @@ internal sealed class DisseminationMembershipSnapshot
     public ImmutableArray<SiloAddress> OriginatorTreeTargets { get; }
 
     public ImmutableArray<SiloAddress> ForwardingTreeTargets { get; }
-
-    public ImmutableArray<SiloAddress> AggregationTreeTargets { get; }
 
     public ImmutableArray<SiloAddress> AggregationChildren { get; }
 
@@ -144,44 +148,21 @@ internal sealed class DisseminationMembershipSnapshot
         return result.ToImmutable();
     }
 
-    private ImmutableArray<SiloAddress> ComputeForwardingTreeTargets(int index, int fanout)
+    private ImmutableArray<SiloAddress> ComputeChildren(long firstChild, int fanout)
     {
-        var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(fanout, Members.Length));
-        var firstChild = (long)fanout * (index + 1);
-        for (var i = 0; i < fanout; i++)
-        {
-            var childIndex = firstChild + i;
-            if (childIndex >= Members.Length)
-            {
-                break;
-            }
-
-            result.Add(Members[(int)childIndex]);
-        }
-
-        return result.ToImmutable();
-    }
-
-    private ImmutableArray<SiloAddress> ComputeAggregationTreeTargets(int index, int fanout)
-    {
-        if (index < 0)
+        if (firstChild >= Members.Length)
         {
             return [];
         }
 
-        var result = ImmutableArray.CreateBuilder<SiloAddress>(Math.Min(fanout + 1, Members.Length - 1));
-        if (index > 0)
-        {
-            result.Add(Members[(index - 1) / fanout]);
-        }
-
-        var firstChild = (long)fanout * index + 1;
-        for (var child = firstChild; child < Members.Length && child < firstChild + fanout; child++)
+        var count = (int)Math.Min(fanout, Members.Length - firstChild);
+        var result = ImmutableArray.CreateBuilder<SiloAddress>(count);
+        for (var child = firstChild; child < firstChild + count; child++)
         {
             result.Add(Members[(int)child]);
         }
 
-        return result.ToImmutable();
+        return result.MoveToImmutable();
     }
 
     private sealed class AntiEntropyPeerSelection

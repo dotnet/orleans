@@ -31,7 +31,7 @@ internal sealed partial class DisseminationProtocol
     private readonly object _valueUpdateLock = new();
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
     private readonly object _peerSupportLock = new();
-    private readonly Dictionary<SiloAddress, Dictionary<DisseminationNamespace, long>> _confirmedPeerNamespaces = [];
+    private readonly Dictionary<SiloAddress, HashSet<DisseminationNamespace>> _confirmedPeerNamespaces = [];
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
 
     public DisseminationProtocol(
@@ -170,7 +170,7 @@ internal sealed partial class DisseminationProtocol
             }
         }
 
-        var selectedValues = SelectReceivedValues(batch.Sender, batch.Values, options, antiEntropy: false);
+        var selectedValues = SelectReceivedValues(batch.Sender, batch.Values, options, antiEntropy: false, out var isUnfiltered);
         foreach (var (namespaceName, values) in selectedValues)
         {
             var disseminationNamespace = _namespaces[namespaceName];
@@ -221,13 +221,14 @@ internal sealed partial class DisseminationProtocol
             var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
             if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree)
             {
-                var notifications = new List<DisseminationBroadcastQueue.KeyNotification>(keys.Count);
+                var notifications = new DisseminationBroadcastQueue.KeyNotification[keys.Count];
+                var notificationCount = 0;
                 foreach (var (key, state) in keys)
                 {
                     var version = disseminationNamespace.GetVersion(key);
                     if (version > 0)
                     {
-                        notifications.Add(new(key, version, state.Applied));
+                        notifications[notificationCount++] = new(key, version, state.Applied);
                     }
                 }
 
@@ -235,7 +236,8 @@ internal sealed partial class DisseminationProtocol
                 {
                     // A producer which is also a child needs its update returned in the distribution batch
                     // so that it forwards the update to its own descendants.
-                    _broadcastQueue.NotifyBatch(peer, disseminationNamespace, notifications, immediate: !membership.IsAggregationRoot);
+                    _broadcastQueue.NotifyBatch(
+                        peer, disseminationNamespace, notifications.AsSpan(0, notificationCount), immediate: !membership.IsAggregationRoot);
                 }
 
                 continue;
@@ -260,7 +262,7 @@ internal sealed partial class DisseminationProtocol
 
         // Once downstream work is queued, report the versions this receiver actually holds.
         var compact = batch.SupportsCompactAcknowledgments
-            && ReferenceEquals(selectedValues, batch.Values)
+            && isUnfiltered
             && CanAcknowledgeTransmittedVersions(receivedKeys);
         var acknowledgments = new Dictionary<DisseminationNamespace, List<DigestEntry>>(receivedKeys.Count);
         foreach (var (disseminationNamespace, keys) in receivedKeys)
@@ -540,18 +542,9 @@ internal sealed partial class DisseminationProtocol
 
         lock (_valueUpdateLock)
         {
-            List<DigestKey>? removedKeys = null;
             foreach (var key in _lastValueUpdates.Keys)
             {
                 if (!currentValueStreams.Contains(key))
-                {
-                    (removedKeys ??= []).Add(key);
-                }
-            }
-
-            if (removedKeys is not null)
-            {
-                foreach (var key in removedKeys)
                 {
                     _lastValueUpdates.Remove(key);
                 }
@@ -642,7 +635,7 @@ internal sealed partial class DisseminationProtocol
             // A response only includes namespaces which produced repairs. Absence is not evidence that an
             // up-to-date or unrelated namespace is unsupported, so confirmations are additive here.
             ConfirmPeerNamespaces(response.Sender, response.Values.Keys);
-            foreach (var (namespaceName, values) in SelectReceivedValues(response.Sender, response.Values, options, antiEntropy: true))
+            foreach (var (namespaceName, values) in SelectReceivedValues(response.Sender, response.Values, options, antiEntropy: true, out _))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var disseminationNamespace = _namespaces[namespaceName];
@@ -699,8 +692,10 @@ internal sealed partial class DisseminationProtocol
         SiloAddress peer,
         Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> values,
         DisseminationOptions options,
-        bool antiEntropy)
+        bool antiEntropy,
+        out bool isUnfiltered)
     {
+        isUnfiltered = false;
         long totalCount = 0;
         foreach (var entries in values.Values)
         {
@@ -725,6 +720,8 @@ internal sealed partial class DisseminationProtocol
                 PruneReceivedBatchCursors(fastPathMembers);
             }
 
+            // Compact acknowledgments require this whole-batch validation, independently of collection reuse.
+            isUnfiltered = true;
             return values;
         }
 
@@ -1298,7 +1295,7 @@ Complete:
                 }
 
                 if (!_confirmedPeerNamespaces.TryGetValue(peer, out var namespaces)
-                    || !namespaces.ContainsKey(disseminationNamespace.Name))
+                    || !namespaces.Contains(disseminationNamespace.Name))
                 {
                     (result ??= []).Add(peer);
                 }
@@ -1326,10 +1323,9 @@ Complete:
             return;
         }
 
-        var now = _timeProvider.GetTimestamp();
         lock (_peerSupportLock)
         {
-            Dictionary<DisseminationNamespace, long>? confirmedNamespaces = null;
+            HashSet<DisseminationNamespace>? confirmedNamespaces = null;
             foreach (var namespaceName in namespaceNames)
             {
                 if (!_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
@@ -1338,14 +1334,16 @@ Complete:
                     continue;
                 }
 
-                if (confirmedNamespaces is null
-                    && !_confirmedPeerNamespaces.TryGetValue(peer, out confirmedNamespaces))
+                if (confirmedNamespaces is null)
                 {
-                    confirmedNamespaces = [];
-                    _confirmedPeerNamespaces.Add(peer, confirmedNamespaces);
+                    if (!_confirmedPeerNamespaces.TryGetValue(peer, out confirmedNamespaces))
+                    {
+                        confirmedNamespaces = [];
+                        _confirmedPeerNamespaces.Add(peer, confirmedNamespaces);
+                    }
                 }
 
-                confirmedNamespaces![namespaceName] = now;
+                confirmedNamespaces.Add(namespaceName);
             }
         }
     }

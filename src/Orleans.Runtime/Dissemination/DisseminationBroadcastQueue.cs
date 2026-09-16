@@ -70,13 +70,13 @@ internal sealed partial class DisseminationBroadcastQueue
 
         // Notification diagnostics run outside the queue lock and can reenter the queue.
         var version = disseminationNamespace.GetVersion(key);
-        return pump.Notify(disseminationNamespace, key, version, force, immediate);
+        return pump.Notify(disseminationNamespace, [new(key, version, force)], immediate);
     }
 
     public bool NotifyBatch(
         SiloAddress peer,
         IDisseminationNamespace disseminationNamespace,
-        IReadOnlyList<KeyNotification> notifications,
+        ReadOnlySpan<KeyNotification> notifications,
         bool immediate)
     {
         PeerQueuePump pump;
@@ -87,7 +87,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 return false;
             }
 
-            if (notifications.Count == 0)
+            if (notifications.IsEmpty)
             {
                 return true;
             }
@@ -95,7 +95,7 @@ internal sealed partial class DisseminationBroadcastQueue
             pump = GetOrCreatePeerUnsafe(peer);
         }
 
-        return pump.NotifyBatch(disseminationNamespace, notifications, immediate);
+        return pump.Notify(disseminationNamespace, notifications, immediate);
     }
 
     internal readonly record struct KeyNotification(DisseminationKey Key, long Version, bool Force);
@@ -285,23 +285,7 @@ internal sealed partial class DisseminationBroadcastQueue
     {
         // Retries begin at the normal coalescing cadence and back off no further than anti-entropy.
         // High-priority namespaces do not coalesce, so they do not define the retry floor.
-        var floor = TimeSpan.MaxValue;
-        foreach (var disseminationNamespace in _disseminationNamespaces)
-        {
-            var namespaceOptions = disseminationNamespace.Options;
-            if (namespaceOptions.Enabled
-                && namespaceOptions.Priority != DisseminationPriority.High
-                && namespaceOptions.MaxCoalescingDelay < floor)
-            {
-                floor = namespaceOptions.MaxCoalescingDelay;
-            }
-        }
-
-        if (floor == TimeSpan.MaxValue)
-        {
-            floor = GetBoundedFallbackDelay();
-        }
-
+        var floor = GetCoalescingDelay(TimeSpan.MaxValue);
         var cap = _options.CurrentValue.Overlay.AntiEntropyInterval;
         if (floor > cap)
         {
@@ -326,7 +310,7 @@ internal sealed partial class DisseminationBroadcastQueue
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly WakeTimer _flushTimer;
         private readonly Task _flushTask;
-        private Dictionary<DisseminationNamespace, PeerNamespaceState> _statesByNamespace = [];
+        private readonly Dictionary<DisseminationNamespace, PeerNamespaceState> _statesByNamespace = [];
         private TaskCompletionSource _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource? _activeFlushCompletion;
         private Exception? _pumpFailure;
@@ -352,29 +336,9 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private int DirtyCount { get; set; }
 
-        public bool Notify(IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, bool force, bool immediate)
-        {
-            ScheduledFlush? scheduled = null;
-            bool admissionRejected;
-            bool accepted;
-            lock (_lock)
-            {
-                var wasEmpty = DirtyCount == 0;
-                var wasRetrying = _retryAttempt > 0;
-                accepted = NotifyKeyUnsafe(disseminationNamespace, key, version, force, out var changed, out admissionRejected);
-                if (changed)
-                {
-                    scheduled = ScheduleNotificationUnsafe(disseminationNamespace, immediate, wasEmpty, wasRetrying);
-                }
-            }
-
-            EmitNotification(disseminationNamespace, admissionRejected ? 1 : 0, scheduled);
-            return accepted;
-        }
-
-        public bool NotifyBatch(
+        public bool Notify(
             IDisseminationNamespace disseminationNamespace,
-            IReadOnlyList<KeyNotification> notifications,
+            ReadOnlySpan<KeyNotification> notifications,
             bool immediate)
         {
             ScheduledFlush? scheduled = null;
@@ -385,9 +349,8 @@ internal sealed partial class DisseminationBroadcastQueue
                 var wasEmpty = DirtyCount == 0;
                 var wasRetrying = _retryAttempt > 0;
                 var anyChanged = false;
-                for (var index = 0; index < notifications.Count; index++)
+                foreach (var notification in notifications)
                 {
-                    var notification = notifications[index];
                     accepted &= NotifyKeyUnsafe(
                         disseminationNamespace, notification.Key, notification.Version, notification.Force,
                         out var changed, out var rejected);
@@ -1622,9 +1585,8 @@ internal sealed partial class DisseminationBroadcastQueue
 
             var byteCount = 0;
             var expectedFromVersion = request.FromVersion;
-            for (var i = 0; i < repair.Values.Length; i++)
+            foreach (var value in repair.Values)
             {
-                var value = repair.Values[i];
                 if (value.Key != request.Key
                     || value.FromVersion < 0
                     || value.ToVersion <= value.FromVersion
@@ -1634,17 +1596,10 @@ internal sealed partial class DisseminationBroadcastQueue
                     return false;
                 }
 
-                if (i == 0)
-                {
-                    if (expectedFromVersion is null && value.FromVersion != 0
-                        || expectedFromVersion is { } fromVersion
-                        && value.FromVersion != 0
-                        && value.FromVersion != fromVersion)
-                    {
-                        return false;
-                    }
-                }
-                else if (value.FromVersion != 0 && value.FromVersion != expectedFromVersion)
+                if (expectedFromVersion is null && value.FromVersion != 0
+                    || expectedFromVersion is { } fromVersion
+                    && value.FromVersion != 0
+                    && value.FromVersion != fromVersion)
                 {
                     return false;
                 }
