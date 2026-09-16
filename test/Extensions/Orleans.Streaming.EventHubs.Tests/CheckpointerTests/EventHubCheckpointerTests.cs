@@ -120,6 +120,8 @@ public class EventHubCheckpointerTests
 
     private sealed class BlockingResetCheckpointer : TestCheckpointer
     {
+        public CancellationToken ResetCancellationToken { get; private set; }
+
         public TaskCompletionSource ResetStarted { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -128,6 +130,7 @@ public class EventHubCheckpointerTests
 
         public override async Task Reset(CancellationToken cancellationToken)
         {
+            ResetCancellationToken = cancellationToken;
             await base.Reset(cancellationToken);
             ResetStarted.TrySetResult();
             await ReleaseReset.Task.WaitAsync(cancellationToken);
@@ -471,9 +474,10 @@ public class EventHubCheckpointerTests
     private sealed class InvalidArgumentEventHubReceiver : IEventHubReceiver
     {
         public int CloseCount { get; private set; }
+        public Exception Failure { get; init; } = new ArgumentException("The receiver rejected an unrelated argument.");
 
         public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
-            => throw new ArgumentException("The receiver rejected an unrelated argument.");
+            => throw Failure;
 
         public Task CloseAsync()
         {
@@ -1105,6 +1109,37 @@ public class EventHubCheckpointerTests
     }
 
     [TestSuite("BVT")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(true, true, "The supplied offset '13953' is invalid. The last offset in the system is '13952' TrackingId:example\nFor troubleshooting information, see https://aka.ms/azsdk/net/eventhubs/exceptions/troubleshoot", true)]
+    [InlineData(false, true, "The supplied offset '13953' is invalid.", false)]
+    [InlineData(true, false, "The supplied offset '13953' is invalid.", false)]
+    [InlineData(true, true, "The supplied offset must be numeric.", false)]
+    [InlineData(true, true, "The consumer group is invalid.", false)]
+    public async Task GetQueueMessagesAsync_ClassifiesKnownServiceOffsetError(
+        bool checkpointExists, bool argumentException, string message, bool recover)
+    {
+        var checkpointer = new TestCheckpointer { CheckpointExists = checkpointExists, LoadedOffset = "13953" };
+        var cache = new TestEventHubQueueCache();
+        var failure = argumentException ? (Exception)new ArgumentException(message) : new InvalidOperationException(message);
+        var failedReceiver = new InvalidArgumentEventHubReceiver { Failure = failure };
+        var offsets = new List<string>();
+        var receiver = await CreateReceiver(
+            checkpointer,
+            cacheFactory: () => offsets.Count == 0 ? cache : new TestEventHubQueueCache(),
+            onReceiverCreated: offsets.Add,
+            receiverFactory: _ => offsets.Count == 1 ? failedReceiver : new TestEventHubReceiver());
+
+        Assert.Same(failure, await Assert.ThrowsAnyAsync<Exception>(
+            () => receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken)));
+        Assert.Equal(recover ? 1 : 0, checkpointer.ResetCount);
+        Assert.Equal(recover ? 1 : 0, failedReceiver.CloseCount);
+        Assert.Equal(recover ? 1 : 0, cache.DisposeCount);
+        Assert.Equal(
+            recover ? ["13953", EventHubConstants.StartOfStream] : new[] { checkpointExists ? "13953" : EventHubConstants.StartOfStream },
+            offsets);
+    }
+
+    [TestSuite("BVT")]
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -1322,8 +1357,11 @@ public class EventHubCheckpointerTests
     }
 
     [TestSuite("BVT")]
-    [Fact, TestCategory("BVT")]
-    public async Task ResetReceiver_WhenShutdownWins_DoesNotInstallReplacementResources()
+    [Theory, TestCategory("BVT")]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ResetReceiver_WhenShutdownWins_DrainsRecoveryBeforeNextLifetime(bool cancelRead, bool timeoutShutdown)
     {
         var checkpointer = new BlockingResetCheckpointer
         {
@@ -1339,18 +1377,53 @@ public class EventHubCheckpointerTests
             receiverFactory: offset => offset == "123" ? invalidReceiver : replacementReceiver,
             cacheFactory: caches.Dequeue);
 
-        var recovery = receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var recovery = receiver.GetQueueMessagesAsync(10, cancellation.Token);
         await checkpointer.ResetStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        if (cancelRead)
+        {
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => recovery);
+        }
+
+        if (timeoutShutdown)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => receiver.Shutdown(TimeSpan.FromMilliseconds(50)));
+        }
+
+        var shutdown = receiver.Shutdown(TimeSpan.FromSeconds(5));
+        Assert.False(shutdown.IsCompleted);
+        Assert.Equal(CancellationToken.None, checkpointer.ResetCancellationToken);
+        Assert.Equal(0, checkpointer.FlushCount);
+        Assert.Equal(0, initialCache.DisposeCount);
+        Assert.Equal(0, invalidReceiver.CloseCount);
 
         checkpointer.ReleaseReset.TrySetResult();
-        await Assert.ThrowsAsync<ArgumentException>(() => recovery);
+        await shutdown;
+        if (!cancelRead)
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() => recovery);
+        }
 
+        Assert.Equal(1, checkpointer.FlushCount);
         Assert.Equal(1, initialCache.DisposeCount);
         Assert.Equal(0, replacementCache.DisposeCount);
         Assert.Equal(1, invalidReceiver.CloseCount);
         Assert.Equal(0, replacementReceiver.CloseCount);
         Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+
+        await receiver.Initialize(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        UpdateDeliveryProgress(receiver, MakeToken(42));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal("42", checkpointer.FlushedOffset);
+        Assert.Equal(2, checkpointer.FlushCount);
+        Assert.Equal(1, initialCache.DisposeCount);
+        Assert.Equal(1, replacementCache.DisposeCount);
+        Assert.Equal(1, invalidReceiver.CloseCount);
+        Assert.Equal(1, replacementReceiver.CloseCount);
+        Assert.Equal(1, checkpointer.ResetCount);
     }
 
     [TestSuite("BVT")]
@@ -1554,6 +1627,209 @@ public class EventHubCheckpointerTests
 #pragma warning restore CS0618
         Assert.Same(movementException, actualMovementException);
         Assert.Same(movementInnerException, actualMovementException.InnerException);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_AfterReinitialization_CleansUpEachLifetimeOnce()
+    {
+        var checkpointers = new[] { new TestCheckpointer(), new TestCheckpointer() };
+        var caches = new[] { new TestEventHubQueueCache(), new TestEventHubQueueCache() };
+        var eventHubReceivers = new[] { new TestEventHubReceiver(), new TestEventHubReceiver() };
+        var lifetime = 0;
+        var receiver = await CreateReceiver(
+            checkpointers[0],
+            cacheFactory: () => caches[lifetime],
+            receiverFactory: _ => eventHubReceivers[lifetime],
+            checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointers[lifetime]),
+            initialize: false);
+
+        for (; lifetime < 2; lifetime++)
+        {
+            await receiver.Initialize(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            UpdateDeliveryProgress(receiver, MakeToken(100 + lifetime));
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+            Assert.Equal((100 + lifetime).ToString(CultureInfo.InvariantCulture), checkpointers[lifetime].FlushedOffset);
+            Assert.Equal(1, checkpointers[lifetime].FlushCount);
+            Assert.Equal(1, caches[lifetime].DisposeCount);
+            Assert.Equal(1, eventHubReceivers[lifetime].CloseCount);
+        }
+
+        Assert.All(checkpointers, checkpointer => Assert.Equal(1, checkpointer.FlushCount));
+        Assert.All(caches, cache => Assert.Equal(1, cache.DisposeCount));
+        Assert.All(eventHubReceivers, eventHubReceiver => Assert.Equal(1, eventHubReceiver.CloseCount));
+    }
+
+    [TestSuite("BVT")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Initialize_AfterShutdownAndFailedReinitialization_RetriesAndCleansUp(bool cancelInitialization)
+    {
+        var checkpointers = new[] { new TestCheckpointer(), new TestCheckpointer(), new TestCheckpointer() };
+        var caches = new[] { new TestEventHubQueueCache(), new TestEventHubQueueCache(), new TestEventHubQueueCache() };
+        var eventHubReceivers = new[] { new CleanupTrackingEventHubReceiver(), new CleanupTrackingEventHubReceiver(), new CleanupTrackingEventHubReceiver() };
+        var attempt = 0;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var expected = new InvalidOperationException("Receiver creation failed");
+        var receiver = await CreateReceiver(
+            checkpointers[0],
+            cacheFactory: () => caches[attempt],
+            receiverFactory: _ =>
+            {
+                if (attempt == 1)
+                {
+                    if (!cancelInitialization)
+                    {
+                        throw expected;
+                    }
+
+                    cancellation.Cancel();
+                }
+
+                return eventHubReceivers[attempt];
+            },
+            checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointers[attempt]));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        attempt++;
+        var initialization = receiver.Initialize(TimeSpan.FromSeconds(5), cancellation.Token);
+        if (cancelInitialization)
+        {
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization);
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.False(eventHubReceivers[1].CloseCancellationToken.IsCancellationRequested);
+        }
+        else
+        {
+            Assert.Same(expected, await Assert.ThrowsAsync<InvalidOperationException>(() => initialization));
+        }
+
+        attempt++;
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+        UpdateDeliveryProgress(receiver, MakeToken(200));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, checkpointers[0].FlushCount);
+        Assert.Equal(0, checkpointers[1].FlushCount);
+        Assert.Equal(1, checkpointers[2].FlushCount);
+        Assert.Equal("200", checkpointers[2].FlushedOffset);
+        Assert.All(caches, cache => Assert.Equal(1, cache.DisposeCount));
+        Assert.Equal(1, eventHubReceivers[0].CloseCount);
+        Assert.Equal(cancelInitialization ? 1 : 0, eventHubReceivers[1].CloseCount);
+        Assert.Equal(1, eventHubReceivers[2].CloseCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_AfterShutdownWithCanceledToken_PreservesCompletedLifetime()
+    {
+        var checkpointer = new TestCheckpointer();
+        var cache = new TestEventHubQueueCache();
+        var eventHubReceiver = new TestEventHubReceiver();
+        var creations = 0;
+        var receiver = await CreateReceiver(
+            checkpointer, cache, eventHubReceiver, onReceiverCreated: _ => creations++);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.Initialize(TimeSpan.FromSeconds(5), cancellation.Token));
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, creations);
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal(1, cache.DisposeCount);
+        Assert.Equal(1, eventHubReceiver.CloseCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_AfterCanceledReinitialization_RetriesPendingCleanup()
+    {
+        var checkpointer = new TestCheckpointer();
+        var caches = new[] { new TestEventHubQueueCache(), new TestEventHubQueueCache() };
+        var originalReceiver = new TestEventHubReceiver();
+        var failedReceiver = new RetryingCloseEventHubReceiver();
+        using var cancellation = new CancellationTokenSource();
+        var lifetime = 0;
+        var receiver = await CreateReceiver(
+            checkpointer,
+            cacheFactory: () => caches[lifetime],
+            receiverFactory: _ =>
+            {
+                if (lifetime == 0)
+                {
+                    return originalReceiver;
+                }
+
+                cancellation.Cancel();
+                return failedReceiver;
+            });
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        lifetime++;
+        var failure = await Assert.ThrowsAsync<AggregateException>(
+            () => receiver.Initialize(TimeSpan.FromSeconds(5), cancellation.Token));
+        Assert.IsAssignableFrom<OperationCanceledException>(failure.InnerExceptions[0]);
+        Assert.Equal("Close failed", failure.InnerExceptions[1].Message);
+        Assert.Equal(1, failedReceiver.CloseCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal(1, originalReceiver.CloseCount);
+        Assert.Equal(2, failedReceiver.CloseCount);
+        Assert.All(caches, cache => Assert.Equal(1, cache.DisposeCount));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Shutdown_DrainsInitializationBeforeNextLifetime()
+    {
+        var checkpointer = new TestCheckpointer();
+        var caches = new[] { new TestEventHubQueueCache(), new TestEventHubQueueCache() };
+        var eventHubReceivers = new[] { new TestEventHubReceiver(), new TestEventHubReceiver() };
+        var factoryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFactory = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lifetime = 0;
+        var receiver = await CreateReceiver(
+            checkpointer,
+            cacheFactory: () => caches[lifetime],
+            receiverFactory: _ => eventHubReceivers[lifetime],
+            checkpointerFactory: async cancellationToken =>
+            {
+                factoryStarted.TrySetResult();
+                await releaseFactory.Task.WaitAsync(cancellationToken);
+                return checkpointer;
+            },
+            initialize: false);
+
+        var initialization = receiver.Initialize(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await factoryStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var shutdown = receiver.Shutdown(TimeSpan.FromSeconds(5));
+        Assert.False(shutdown.IsCompleted);
+        releaseFactory.TrySetResult();
+        await Task.WhenAll(initialization, shutdown);
+        Assert.Equal(0, checkpointer.FlushCount);
+        Assert.Equal(1, caches[0].DisposeCount);
+        Assert.Equal(1, eventHubReceivers[0].CloseCount);
+
+        lifetime++;
+        await receiver.Initialize(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        UpdateDeliveryProgress(receiver, MakeToken(300));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, checkpointer.FlushCount);
+        Assert.Equal("300", checkpointer.FlushedOffset);
+        Assert.All(caches, cache => Assert.Equal(1, cache.DisposeCount));
+        Assert.All(eventHubReceivers, eventHubReceiver => Assert.Equal(1, eventHubReceiver.CloseCount));
     }
 
     [TestSuite("BVT")]
