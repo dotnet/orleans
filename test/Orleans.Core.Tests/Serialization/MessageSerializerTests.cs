@@ -252,12 +252,15 @@ namespace UnitTests.Serialization
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
             message.RequestContextData = new() { ["application"] = 42 };
             message.GatewayRequestAttempt = 123;
+            message.GatewayForwardingSource = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
 
             var deserializedMessage = RoundTripMessage(message);
 
             Assert.Equal(123, deserializedMessage.GatewayRequestAttempt);
+            Assert.Equal(message.GatewayForwardingSource, deserializedMessage.GatewayForwardingSource);
             Assert.Equal(42, deserializedMessage.RequestContextData!["application"]);
             Assert.DoesNotContain(Message.GatewayRequestAttemptKey, deserializedMessage.RequestContextData);
+            Assert.DoesNotContain(Message.GatewayForwardingSourceKey, deserializedMessage.RequestContextData);
         }
 
         [TestSuite("BVT")]

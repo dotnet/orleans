@@ -437,7 +437,8 @@ namespace UnitTests.MembershipTests
                 TargetGrain = original.SendingGrain,
                 SendingSilo = forwarded.TargetSilo,
                 SendingGrain = forwarded.TargetGrain,
-                BodyObject = original.TargetSilo,
+                BodyObject = new StatusResponse(isExecuting: false, isWaiting: false, diagnostics: []),
+                GatewayForwardingSource = original.TargetSilo,
                 ForwardCount = forwarded.ForwardCount,
             };
             Assert.True(gateway.TryGetClientState(original, out var client));

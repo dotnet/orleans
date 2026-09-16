@@ -593,7 +593,8 @@ namespace Orleans.Runtime.Messaging
         internal static bool IsForwardedClientRequestUpdate(Message message) =>
             message.Direction == Message.Directions.Response
             && message.Result == Message.ResponseTypes.Status
-            && message.BodyObject is SiloAddress
+            && message.BodyObject is StatusResponse
+            && message.GatewayForwardingSource is not null
             && message.ForwardCount > 0;
 
         private void SendForwardedClientRequest(Message message, Connection? destination, Exception? exception)
@@ -618,7 +619,8 @@ namespace Orleans.Runtime.Messaging
 
             var update = messageFactory.CreateResponseMessage(message);
             update.Result = Message.ResponseTypes.Status;
-            update.BodyObject = _siloAddress;
+            update.BodyObject = new StatusResponse(isExecuting: false, isWaiting: false, diagnostics: []);
+            update.GatewayForwardingSource = _siloAddress;
             update.ForwardCount = message.ForwardCount;
             update.CacheInvalidationHeader = null;
             update.RequestContextData = null;

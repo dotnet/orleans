@@ -534,6 +534,7 @@ namespace Orleans.Runtime.Messaging
             public void Send(Message msg)
             {
                 msg.GatewayRequestAttempt = 0;
+                msg.GatewayForwardingSource = null;
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
@@ -542,7 +543,7 @@ namespace Orleans.Runtime.Messaging
             public void SendResponse(Message message)
             {
                 if (MessageCenter.IsForwardedClientRequestUpdate(message)
-                    && message.BodyObject is SiloAddress forwardingSource
+                    && message.GatewayForwardingSource is { } forwardingSource
                     && message.SendingSilo is { } forwardingTarget)
                 {
                     UpdateForwardedRequest(message, forwardingSource, forwardingTarget);
