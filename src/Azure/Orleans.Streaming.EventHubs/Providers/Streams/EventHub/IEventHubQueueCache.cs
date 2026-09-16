@@ -155,6 +155,13 @@ namespace Orleans.Streaming.EventHubs
         /// <param name="safeToken">The last fully accounted partition record, valid for this call.</param>
         /// <param name="utcNow">The current UTC time.</param>
         void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
-            => throw new NotSupportedException("The Event Hubs cache must enforce the certified delivery prefix when evicting records.");
+        {
+        }
+
+        /// <summary>
+        /// Selects certified cursor and eviction semantics for this cache lifetime.
+        /// </summary>
+        /// <returns><see langword="true"/> when the cache implements the certified contract; otherwise <see langword="false"/>.</returns>
+        bool TryEnableCertifiedDeliveryProgress() => false;
     }
 }

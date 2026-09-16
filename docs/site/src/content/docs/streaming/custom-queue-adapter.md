@@ -59,11 +59,13 @@ For a durable custom checkpoint backend, implement <xref:Orleans.Streams.IStream
 
 <xref:Orleans.Streams.StreamQueueCheckpointer> limits writes to the configured persistence interval, coalesces pending updates to the latest checkpoint, and flushes the latest position on demand. Set <xref:Orleans.Streams.StreamQueueCheckpointerOptions.CheckpointComparer> when checkpoint values have an ordering contract; the checkpointer then keeps progress monotonic across local updates and concurrent store writers.
 
-## Migrate a custom checkpointing provider
+## Opt into certified checkpoint progress
 
-Checkpointing providers use one certified partition prefix. The former `IQueueCache.UpdateDeliveryProgress` callback moves to <xref:Orleans.Streams.ICheckpointingQueueCache.UpdateDeliveryProgress*>. The callback receives a non-null whole-record certificate. Pending or unknown progress withholds the callback; when there are no subscriptions, the certificate is the last fully accounted read boundary.
+The released <xref:Orleans.Streams.IQueueCache.UpdateDeliveryProgress*> callback remains supported, including its nullable no-subscriptions value and existing implicit or explicit implementations. Existing providers retain their subscription-progress and failure policies.
 
-Update the provider at these boundaries:
+Providers can opt into <xref:Orleans.Streams.ICheckpointingQueueCache> to use one certified partition prefix. Its callback receives a non-null whole-record certificate. Pending or unknown progress withholds the callback; when there are no subscriptions, the certificate is the last fully accounted read boundary. Capability selection is stable for the initialized provider: a transient failure retains the certified recovery obligations.
+
+An opted-in provider supplies these guarantees:
 
 | Component | Required implementation |
 | --- | --- |
@@ -74,13 +76,15 @@ Update the provider at these boundaries:
 | Checkpoint store | Persist only the certified whole-record position. Preserve the provider's epoch or version fencing and serialized checkpoint writes. A delivery token inside a record becomes a checkpoint only after the rest of that record is accounted for. |
 | Event Hubs cache and eviction | Implement <xref:Orleans.Streaming.EventHubs.IEventHubQueueCache.UpdateDeliveryProgress*> and expose progress from the returned raw cursors. Scope eviction permission to the supplied certificate. Purge policies use <xref:Orleans.Providers.Streams.Common.IPurgeObservable.TryRemoveOldestMessage*> and count removal only after it returns true. Repeated <xref:Orleans.Providers.Streams.Common.IEvictionStrategy.OnBlockAllocated*> notifications for the same owned buffer are idempotent. Metadata removal and shared-buffer reclamation stay in the existing eviction lifecycle. |
 
-The runtime validates checkpoint receiver capabilities before initialization or source reads, and cursor capabilities when a cursor is acquired. An unmarked cache with the exact former public delivery-progress callback, including an inherited callback, fails configuration with migration guidance. Explicit implementations of the removed interface member require recompilation; old binaries can fail interface loading. Ordinary receipt-based caches continue through their established receive and acknowledgement path.
+The runtime validates the stronger receiver and cursor capabilities only for opted-in providers. Legacy caches continue to receive their released callback and require no new interfaces. Ordinary receipt-based caches continue through their established receive and acknowledgement path.
+
+Event Hubs selects certified processing only when both its transport supports read recovery and its cache accepts <xref:Orleans.Streaming.EventHubs.IEventHubQueueCache.TryEnableCertifiedDeliveryProgress*>. The built-in cache with the built-in data adapter and chronological eviction strategy accepts this contract. Existing custom caches, derived caches, data adapters, transports, and eviction strategies retain their legacy behavior by default. A derived cache can explicitly opt in by overriding the negotiation method and invoking its protected enable method after establishing the required guarantees. Legacy cache wrappers can opt in by forwarding negotiation, cursor progress, and certified updates together.
 
 The pulling agent owns a successfully returned batch until admission and registration accounting finish. It serializes reads with read recovery, retains failed-registration pins for retry, and drains accepted work before releasing a receiver. A completed recovery repairs only its own read obligation. Subscription replay and handshake generations retain independent ownership.
 
 Checkpointing owners report exhausted deliveries through <xref:Orleans.Streams.IQueueCacheCursorProgress.RecordDeliveryFailure*> so the pending range is replayed. The legacy <xref:Orleans.Streams.IQueueCacheCursor.RecordDeliveryFailure*> callback retains the non-checkpointing provider's failure notification and skip policy. Receipt-based providers continue past an exhausted delivery after their error protocol; their failed receipts retain the provider's acknowledgement or redelivery treatment.
 
-Validate the migration with a held delivery while other streams advance, a failed selected batch followed by retry, a throwing materializer, a failed read followed by an empty certified recovery, partial admission attempts, registration retries, and shutdown during recovery. Verify that a later acknowledgment cannot cross an unresolved gap, that idle subscriptions advance through unrelated records, and that a bare purge call cannot reuse an earlier certificate after a subscription repositions.
+Validate the opt-in with a held delivery while other streams advance, a failed selected batch followed by retry, a throwing materializer, a failed read followed by an empty certified recovery, partial admission attempts, registration retries, and shutdown during recovery. Verify that a later acknowledgment cannot cross an unresolved gap, that idle subscriptions advance through unrelated records, and that a bare purge call cannot reuse an earlier certificate after a subscription repositions.
 
 ## Register the provider
 

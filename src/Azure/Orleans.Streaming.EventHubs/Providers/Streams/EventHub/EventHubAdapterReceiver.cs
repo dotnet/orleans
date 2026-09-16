@@ -63,6 +63,7 @@ namespace Orleans.Streaming.EventHubs
         private List<EventData>? _pendingMessages;
         private List<StreamPosition>? _pendingPositions;
         private List<IBatchContainer>? _pendingNotifications;
+        public bool UsesCertifiedDeliveryProgress { get; private set; }
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -139,6 +140,7 @@ namespace Orleans.Streaming.EventHubs
             var watch = Stopwatch.StartNew();
             try
             {
+                UsesCertifiedDeliveryProgress = false;
                 this.checkpointer = await this.checkpointerFactory(
                     this.settings.Partition,
                     cancellationToken);
@@ -156,7 +158,9 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
-                if (this.receiver is EventHubReceiverProxy proxy)
+                UsesCertifiedDeliveryProgress = this.receiver is IQueueAdapterReceiverReadRecovery
+                    && this.cache.TryEnableCertifiedDeliveryProgress();
+                if (UsesCertifiedDeliveryProgress && this.receiver is EventHubReceiverProxy proxy)
                 {
                     await proxy.InitializeAsync(cancellationToken);
                 }
@@ -202,10 +206,14 @@ namespace Orleans.Streaming.EventHubs
             {
 
                 // Receivers built against older Orleans versions can still return null.
-                messages = _pendingMessages ??= (await this.receiver.ReceiveAsync(
-                    maxCount,
-                    ReceiveTimeout,
-                    cancellationToken))?.ToList();
+                if (UsesCertifiedDeliveryProgress)
+                {
+                    messages = _pendingMessages ??= (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout, cancellationToken))?.ToList();
+                }
+                else
+                {
+                    messages = (await this.receiver.ReceiveAsync(maxCount, ReceiveTimeout, cancellationToken))?.ToList();
+                }
                 watch.Stop();
 
                 this.monitor?.TrackRead(true, watch.Elapsed, null);
@@ -234,8 +242,12 @@ namespace Orleans.Streaming.EventHubs
 
             this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-            var positions = _pendingPositions ??= this.cache!.Add(messages, dequeueTimeUtc);
-            batches = _pendingNotifications ??= new List<IBatchContainer>(positions.Count);
+            var positions = UsesCertifiedDeliveryProgress
+                ? _pendingPositions ??= this.cache!.Add(messages, dequeueTimeUtc)
+                : this.cache!.Add(messages, dequeueTimeUtc);
+            batches = UsesCertifiedDeliveryProgress
+                ? _pendingNotifications ??= new List<IBatchContainer>(positions.Count)
+                : new List<IBatchContainer>(positions.Count);
             for (var i = batches.Count; i < positions.Count; i++)
             {
                 batches.Add(new StreamActivityNotificationBatch(positions[i]));
@@ -289,7 +301,8 @@ namespace Orleans.Streaming.EventHubs
         [Obsolete("Use IQueueCache.TryGetCacheCursor instead.")]
         public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
         {
-            return new Cursor(this.cache!, streamId, token);
+            var cursor = this.cache!.GetCursor(streamId, token);
+            return CreateCursor(cursor);
         }
 
         QueueCacheCursorResult<IQueueCacheCursor> IQueueCache.TryGetCacheCursor(
@@ -309,7 +322,7 @@ namespace Orleans.Streaming.EventHubs
         private QueueCacheCursorResult<IQueueCacheCursor> WrapCursorResult(QueueCacheCursorResult<object> result)
             => result.Kind switch
             {
-                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(new Cursor(this.cache!, result.Cursor!)),
+                QueueCacheCursorResultKind.Success => QueueCacheCursorResult<IQueueCacheCursor>.FromCursor(CreateCursor(result.Cursor!)),
                 QueueCacheCursorResultKind.CacheMiss => QueueCacheCursorResult<IQueueCacheCursor>.FromCacheMiss(result.CacheMiss!.Value),
                 QueueCacheCursorResultKind.NotSupported => QueueCacheCursorResult<IQueueCacheCursor>.NotSupported,
                 _ => throw new InvalidOperationException("The cursor result is not initialized."),
@@ -325,8 +338,18 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
-        public void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
+        public void UpdateDeliveryProgress(StreamSequenceToken? safeToken, DateTime utcNow)
         {
+            if (!UsesCertifiedDeliveryProgress)
+            {
+                if (safeToken is IEventHubPartitionLocation legacy
+                    && long.TryParse(legacy.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                {
+                    checkpointer?.Update(legacy.EventHubOffset, utcNow, CancellationToken.None);
+                }
+                return;
+            }
+
             ArgumentNullException.ThrowIfNull(safeToken);
             if (safeToken is not IEventHubPartitionLocation location
                 || !long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
@@ -476,11 +499,13 @@ namespace Orleans.Streaming.EventHubs
             public bool ImportRequestContext() { throw new NotSupportedException(); }
         }
 
-        private class Cursor : IQueueCacheCursor, IQueueCacheCursorProgress
+        private IQueueCacheCursor CreateCursor(object cursor)
+            => UsesCertifiedDeliveryProgress ? new ProgressCursor(cache!, cursor) : new Cursor(cache!, cursor);
+
+        private class Cursor : IQueueCacheCursor
         {
             private readonly IEventHubQueueCache cache;
             private readonly object cursor;
-            private readonly IQueueCacheCursorProgress progress;
             private IBatchContainer? current;
 
             public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
@@ -489,20 +514,13 @@ namespace Orleans.Streaming.EventHubs
 #pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
                 this.cursor = cache.GetCursor(streamId, token);
 #pragma warning restore CS0618
-                progress = GetProgress(this.cursor);
             }
 
             public Cursor(IEventHubQueueCache cache, object cursor)
             {
                 this.cache = cache;
                 this.cursor = cursor;
-                progress = GetProgress(cursor);
             }
-
-            private static IQueueCacheCursorProgress GetProgress(object cursor)
-                => cursor as IQueueCacheCursorProgress
-                    ?? throw new OrleansConfigurationException(
-                        $"Event Hubs cursor {cursor.GetType().FullName} must expose {nameof(IQueueCacheCursorProgress)}.");
 
             public void Dispose()
             {
@@ -543,12 +561,19 @@ namespace Orleans.Streaming.EventHubs
 
             public void RecordDeliveryFailure()
             {
-                progress.RecordDeliveryFailure();
             }
+        }
+
+        private sealed class ProgressCursor(IEventHubQueueCache cache, object cursor)
+            : Cursor(cache, cursor), IQueueCacheCursorProgress
+        {
+            private readonly IQueueCacheCursorProgress progress = cursor as IQueueCacheCursorProgress
+                ?? throw new OrleansConfigurationException($"Event Hubs cursor {cursor.GetType().FullName} must expose {nameof(IQueueCacheCursorProgress)}.");
 
             public StreamSequenceToken? SafeSequenceToken => progress.SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => progress.SetDeliveredThrough(token);
             public void RecordDeliverySuccess() => progress.RecordDeliverySuccess();
+            void IQueueCacheCursorProgress.RecordDeliveryFailure() => progress.RecordDeliveryFailure();
         }
 
         [LoggerMessage(
