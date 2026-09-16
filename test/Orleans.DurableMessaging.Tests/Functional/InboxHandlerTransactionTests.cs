@@ -14,6 +14,10 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestBase
 {
+    public InboxHandlerTransactionTests() : base(receiverOnly: true)
+    {
+    }
+
     [Fact]
     public async Task HandlerSuccess_CommitsEffectCompletionDedupeAndStagedOutputAtomically()
     {

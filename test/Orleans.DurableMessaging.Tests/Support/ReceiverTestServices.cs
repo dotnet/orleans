@@ -48,13 +48,7 @@ internal static class ReceiverTestServices
         RegisterDictionary<(GrainId, Guid), DateTimeOffset>(services, "inbox-processed");
         RegisterInternalDictionary<(GrainId, Guid)>(services, "InboxMessageState", "inbox-message-state");
         RegisterInternalDictionary<(GrainId, Guid)>(services, "InboxDeadLetter", "inbox-dead-letters");
-        services.AddKeyedScoped<IDurableDictionary<Guid, DurableEffect>>("test-effects", (sp, key) =>
-            new ObservedJournalDictionary<Guid, DurableEffect>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
-        services.AddKeyedScoped<IDurableValue<int>>("bootstrap-value", (sp, key) =>
-            new ObservedJournalValue<int>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
-        services.AddKeyedScoped<IDurableValue<int>>("activation-validation", (sp, key) =>
-            new ObservedJournalValue<int>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
-
+        AddObservedStateProbes(services);
 
         services.TryAddScoped(extensionType, sp => CreateInstance(
             extensionType,
@@ -95,17 +89,14 @@ internal static class ReceiverTestServices
             _ = GetValue<string>(sp, "inbox-completed-job-id");
             _ = GetValue<long>(sp, "inbox-job-sequence");
             _ = sp.GetRequiredService<IDurableOutbox>();
-            return CreateInstance(
-                inboxType,
+            return CreateInstance(inboxType,
                 GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
-                sp.GetServices<IInboxHandler>(),
-                options.MaxCapacity);
+                sp.GetServices<IInboxHandler>(), options.MaxCapacity);
         });
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
-
         services.AddScoped<IDurableOutbox, JournaledTestOutbox>();
-        services.AddKeyedScoped<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output", (sp, _) =>
-            (JournaledTestOutbox)sp.GetRequiredService<IDurableOutbox>());
+        services.AddKeyedScoped<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output",
+            (sp, _) => (JournaledTestOutbox)sp.GetRequiredService<IDurableOutbox>());
         services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
         services.TryAddScoped(pumpResultsType, sp =>
         {
@@ -114,14 +105,23 @@ internal static class ReceiverTestServices
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;
-            return CreateInstance(
-                pumpResultsType,
+            return CreateInstance(pumpResultsType,
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
                 completedRetentionPeriod,
                 TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
                 65_536);
         });
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IConfigureGrainTypeComponents), configuratorType));
+    }
+
+    public static void AddObservedStateProbes(IServiceCollection services)
+    {
+        services.TryAddKeyedScoped<IDurableDictionary<Guid, DurableEffect>>("test-effects", (sp, key) =>
+            new ObservedJournalDictionary<Guid, DurableEffect>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
+        services.TryAddKeyedScoped<IDurableValue<int>>("bootstrap-value", (sp, key) =>
+            new ObservedJournalValue<int>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
+        services.TryAddKeyedScoped<IDurableValue<int>>("activation-validation", (sp, key) =>
+            new ObservedJournalValue<int>(sp.GetRequiredService<IJournaledStateManager>(), (string)key!));
     }
 
     public static IJournaledState CreateStandardDictionary<TKey, TValue>(IJournaledStateManager manager) where TKey : notnull
@@ -160,23 +160,17 @@ internal static class ReceiverTestServices
             });
     }
 
-    private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName)
-        where TKey : notnull =>
+    private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName) where TKey : notnull =>
         services.GetRequiredKeyedService<IDurableDictionary<TKey, TValue>>($"__orleans.durable-messaging.{stateName}");
 
     private static object GetInternalDictionary<TKey>(IServiceProvider services, string valueType, string stateName) =>
-        services.GetRequiredKeyedService(
-            typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), GetImplementationType(valueType)),
+        services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), GetImplementationType(valueType)),
             $"__orleans.durable-messaging.{stateName}");
 
     private static IDurableValue<T> GetValue<T>(IServiceProvider services, string stateName) =>
         services.GetRequiredKeyedService<IDurableValue<T>>($"__orleans.durable-messaging.{stateName}");
 
     private static object CreateInstance(Type type, params object?[] arguments) =>
-        Activator.CreateInstance(
-            type,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
-            binder: null,
-            arguments,
-            culture: null)!;
+        Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
+            binder: null, arguments, culture: null)!;
 }
