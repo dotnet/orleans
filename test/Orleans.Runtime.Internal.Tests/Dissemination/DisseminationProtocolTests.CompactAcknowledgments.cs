@@ -152,27 +152,32 @@ public partial class DisseminationProtocolTests
             SupportsCompactAcknowledgments = true,
             Values = CreateValueGroups(new FakeNamespace(peer).CreateItem(peer, "value", 1)),
         };
-        var legacyBatch = serializer.Deserialize<CompactReviewLegacyBatch>(serializer.SerializeToArray(current));
+        var legacyBatch = Assert.IsType<CompactReviewLegacyBatch>(
+            serializer.Deserialize<CompactReviewLegacyBatch>(serializer.SerializeToArray(current)));
         Assert.Equal(peer, legacyBatch.Sender);
         Assert.Equal(1, Assert.Single(legacyBatch.Values[FakeNamespace.DefaultName]).Value.ToVersion);
-        var request = serializer.Deserialize<DisseminationBroadcastBatch>(serializer.SerializeToArray(legacyBatch));
+        var request = Assert.IsType<DisseminationBroadcastBatch>(
+            serializer.Deserialize<DisseminationBroadcastBatch>(serializer.SerializeToArray(legacyBatch)));
         Assert.False(request.SupportsCompactAcknowledgments);
 
         var legacyResponse = new CompactReviewLegacyResponse
         {
             Acknowledgments = new() { [FakeNamespace.DefaultName] = [new("value", 3)] },
         };
-        var response = serializer.Deserialize<DisseminationBroadcastResponse>(serializer.SerializeToArray(legacyResponse));
+        var response = Assert.IsType<DisseminationBroadcastResponse>(
+            serializer.Deserialize<DisseminationBroadcastResponse>(serializer.SerializeToArray(legacyResponse)));
         Assert.False(response.AllVersionsAcknowledged);
         Assert.Equal(3, Assert.Single(response.Acknowledgments[FakeNamespace.DefaultName]).Version);
-        var oldReader = serializer.Deserialize<CompactReviewLegacyResponse>(serializer.SerializeToArray(response));
+        var oldReader = Assert.IsType<CompactReviewLegacyResponse>(
+            serializer.Deserialize<CompactReviewLegacyResponse>(serializer.SerializeToArray(response)));
         Assert.Equal(3, Assert.Single(oldReader.Acknowledgments[FakeNamespace.DefaultName]).Version);
         var compact = new DisseminationBroadcastResponse
         {
             AllVersionsAcknowledged = true,
             Acknowledgments = new() { [FakeNamespace.DefaultName] = [] },
         };
-        var ignoresNewField = serializer.Deserialize<CompactReviewLegacyResponse>(serializer.SerializeToArray(compact));
+        var ignoresNewField = Assert.IsType<CompactReviewLegacyResponse>(
+            serializer.Deserialize<CompactReviewLegacyResponse>(serializer.SerializeToArray(compact)));
         Assert.Equal(FakeNamespace.DefaultName, Assert.Single(ignoresNewField.Acknowledgments.Keys));
         Assert.Empty(ignoresNewField.Acknowledgments[FakeNamespace.DefaultName]);
     }
@@ -197,7 +202,8 @@ public partial class DisseminationProtocolTests
 
         var explicitBytes = serializer.SerializeToArray(explicitResponse);
         var compactBytes = serializer.SerializeToArray(compactResponse);
-        var roundTrip = serializer.Deserialize<DisseminationBroadcastResponse>(compactBytes);
+        var roundTrip = Assert.IsType<DisseminationBroadcastResponse>(
+            serializer.Deserialize<DisseminationBroadcastResponse>(compactBytes));
 
         Assert.True(roundTrip.AllVersionsAcknowledged);
         Assert.Empty(roundTrip.Acknowledgments[FakeNamespace.DefaultName]);
