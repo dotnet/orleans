@@ -95,6 +95,7 @@ function Assert-Checkout([string] $Directory, [string] $Repository) {
 
 function Copy-Worker([string] $Checkout) {
     $destination = Join-Path $Checkout 'test' 'Dissemination.PerformanceHarness'
+    Assert-NoLinks $destination
     if (Test-Path -LiteralPath $destination) {
         throw "Refusing to overwrite an existing runtime harness: $destination"
     }

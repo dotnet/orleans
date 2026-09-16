@@ -34,6 +34,8 @@ requested ref and resolved commit for audit.
 
 CI creates separate original and candidate checkouts, verifies their origins and
 clean state, and copies only `Silo` and `Shared` support sources into each checkout.
+Before creating worker files, the copy step validates every existing destination
+parent through the checkout, rejecting symlinks and reparse points within it.
 Each worker builds against that checkout's runtime projects and package settings.
 The controller builds against the tooling checkout's shared protocol, instrumentation
 and reflection-boundary helpers.

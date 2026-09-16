@@ -137,6 +137,59 @@ try {
             throw 'Copy-Worker must preserve both existing harness directories.'
         }
         Write-Output 'Passed worker-copy inventory, coexistence and overwrite checks.'
+
+        foreach ($linkedPart in @('test', 'harness')) {
+            foreach ($dangling in @($false, $true)) {
+                $caseName = "$linkedPart-$dangling"
+                $linkedCheckout = Join-Path $testArtifacts "linked-checkout-$caseName"
+                $target = Join-Path $testArtifacts "outside-checkout-$caseName"
+                New-Item -ItemType Directory -Path $linkedCheckout, $target | Out-Null
+                $link = Join-Path $linkedCheckout 'test'
+                if ($linkedPart -eq 'harness') {
+                    New-Item -ItemType Directory -Path $link | Out-Null
+                    $link = Join-Path $link 'Dissemination.PerformanceHarness'
+                }
+                $linkType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+                New-Item -ItemType $linkType -Path $link -Target $target | Out-Null
+                try {
+                    if ($dangling) {
+                        [System.IO.Directory]::Delete($target)
+                    }
+                    else {
+                        Set-Content -LiteralPath (Join-Path $target 'preserved.txt') -Value 'Untouched link target.'
+                    }
+                    $rejected = $false
+                    try {
+                        Copy-Worker $linkedCheckout
+                    }
+                    catch {
+                        if ($_.Exception.Message -ne "Artifact and runtime paths must use ordinary directories: $link") {
+                            throw
+                        }
+                        $rejected = $true
+                    }
+                    if (!$rejected) {
+                        throw "Copy-Worker accepted a linked destination parent: $caseName"
+                    }
+                    if ($dangling) {
+                        if (Test-Path -LiteralPath $target) {
+                            throw "Copy-Worker created the dangling link target: $caseName"
+                        }
+                    }
+                    else {
+                        $files = @(Get-ChildItem -LiteralPath $target -Force)
+                        if ($files.Count -ne 1 -or $files[0].Name -ne 'preserved.txt' -or
+                            (Get-Content -LiteralPath $files[0].FullName) -ne 'Untouched link target.') {
+                            throw "Copy-Worker modified the link target: $caseName"
+                        }
+                    }
+                }
+                finally {
+                    Remove-Item -LiteralPath $link -Force
+                }
+            }
+        }
+        Write-Output 'Passed 4 worker-copy linked-parent checks with untouched targets.'
     }
 
     $methodologyPath = Join-Path $root 'test' 'Dissemination.PerformanceHarness' 'methodology.json'
