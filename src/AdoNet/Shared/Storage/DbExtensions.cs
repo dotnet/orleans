@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -260,7 +261,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Returns a value with the given <see paramref="fieldName"/> as int.
+        /// Converts the value with the given <see paramref="fieldName"/> to int using invariant culture.
         /// </summary>
         /// <param name="record">The record from which to retrieve the value.</param>
         /// <param name="fieldName">The name of the field.</param>
@@ -271,7 +272,7 @@ namespace Orleans.Tests.SqlUtils
             try
             {
                 var ordinal = record.GetOrdinal(fieldName);
-                return record.GetInt32(ordinal);
+                return Convert.ToInt32(record.GetValue(ordinal), CultureInfo.InvariantCulture);
             }
             catch (IndexOutOfRangeException e)
             {
@@ -301,7 +302,8 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Returns a value with the given <see paramref="fieldName"/> as nullable int.
+        /// Converts the value with the given <see paramref="fieldName"/> to nullable int using invariant culture,
+        /// returning null for <see cref="DBNull.Value"/>.
         /// </summary>
         /// <param name="record">The record from which to retrieve the value.</param>
         /// <param name="fieldName">The name of the field.</param>
@@ -316,7 +318,7 @@ namespace Orleans.Tests.SqlUtils
                 if (value == DBNull.Value)
                     return null;
 
-                return Convert.ToInt32(value);
+                return Convert.ToInt32(value, CultureInfo.InvariantCulture);
             }
             catch (IndexOutOfRangeException e)
             {
