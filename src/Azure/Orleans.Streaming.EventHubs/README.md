@@ -81,6 +81,10 @@ Orleans closes its producer and the connection created from a connection string,
 A connection factory supplies a new provider-owned connection on each invocation. When configured with an existing
 `EventHubConnection` instance, the caller owns that connection and closes it after its providers have stopped.
 
+The default factory defers activation until `CreateAdapter`, after the stream provider
+has acquired the factory, so initialization failures use the same asynchronous cleanup path as shutdown. The factory
+owns connections it creates even if producer construction fails.
+
 The Azure SDK can map the same partition key to a different partition when switching between direct and buffered
 producers. Avoid changing publishing modes while strict ordering must be preserved for active streams.
 

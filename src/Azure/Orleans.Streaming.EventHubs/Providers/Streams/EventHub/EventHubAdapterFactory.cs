@@ -53,6 +53,8 @@ namespace Orleans.Streaming.EventHubs
         private string[] partitionIds = null!;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers = null!;
         private IEventHubProducer producer = null!;
+        private EventHubConnection? ownedConnection;
+        private bool initialized;
         private readonly object closeLock = new();
         private Task? closeTask;
 
@@ -176,6 +178,7 @@ namespace Orleans.Streaming.EventHubs
             }
 
             this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.ehOptions.EventHubName}");
+            this.initialized = true;
         }
 
         //should only need checkpointer on silo side, so move its init logic when it is used
@@ -190,6 +193,13 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The queue adapter.</returns>
         public async Task<IQueueAdapter> CreateAdapter()
         {
+            ObjectDisposedException.ThrowIf(this.closeTask is not null, this);
+            if (!this.initialized)
+            {
+                // The provider owns the factory before activation, so its failure path can shut it down.
+                Init();
+            }
+
             if (this.streamQueueMapper == null)
             {
                 this.partitionIds = await GetPartitionIdsAsync();
@@ -276,18 +286,17 @@ namespace Orleans.Streaming.EventHubs
         {
             var connectionOptions = ehOptions.ConnectionOptions;
             var connection = ehOptions.CreateConnection(connectionOptions);
+            this.ownedConnection = ehOptions.OwnsConnection ? connection : null;
             var bufferedOptions = ehOptions.BufferedProducerOptions;
             if (bufferedOptions is not null)
             {
                 this.producer = new AcknowledgedEventHubProducer(
-                    new BufferedEventHubClient(connection, bufferedOptions, ehOptions.OwnsConnection));
+                    new BufferedEventHubClient(connection, bufferedOptions));
             }
             else
             {
                 this.producer = new EventHubProducer(
-                    connection,
-                    new EventHubProducerClient(connection, new EventHubProducerClientOptions { ConnectionOptions = connectionOptions }),
-                    ehOptions.OwnsConnection);
+                    new EventHubProducerClient(connection, new EventHubProducerClientOptions { ConnectionOptions = connectionOptions }));
             }
         }
 
@@ -350,18 +359,36 @@ namespace Orleans.Streaming.EventHubs
         {
             lock (closeLock)
             {
-                // Derived factories can supply their own transport by overriding InitEventHubClient.
-                closeTask ??= producer?.CloseAsync(CancellationToken.None) ?? Task.CompletedTask;
+                closeTask ??= ShutdownCoreAsync();
                 return closeTask.WaitAsync(cancellationToken);
             }
         }
 
+        private async Task ShutdownCoreAsync()
+        {
+            try
+            {
+                // Derived factories can supply their own transport by overriding InitEventHubClient.
+                if (producer is not null)
+                {
+                    await producer.CloseAsync(CancellationToken.None);
+                }
+            }
+            finally
+            {
+                if (ownedConnection is not null)
+                {
+                    await ownedConnection.CloseAsync(CancellationToken.None);
+                }
+            }
+        }
+
         /// <summary>
-        /// Creates and initializes an Event Hubs adapter factory.
+        /// Creates an Event Hubs adapter factory. Activation is deferred until <see cref="CreateAdapter"/> is called.
         /// </summary>
         /// <param name="services">The service provider.</param>
         /// <param name="name">The stream provider name.</param>
-        /// <returns>The initialized adapter factory.</returns>
+        /// <returns>The adapter factory.</returns>
         public static EventHubAdapterFactory Create(IServiceProvider services, string name)
         {
             var ehOptions = services.GetOptionsByName<EventHubOptions>(name);
@@ -372,9 +399,7 @@ namespace Orleans.Streaming.EventHubs
             IEventHubDataAdapter dataAdapter = services.GetKeyedService<IEventHubDataAdapter>(name)
                 ?? services.GetService<IEventHubDataAdapter>()
                 ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
-            factory.Init();
-            return factory;
+            return ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
         }
     }
 }

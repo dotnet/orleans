@@ -9,18 +9,13 @@ namespace Orleans.Streaming.EventHubs;
 
 internal sealed class BufferedEventHubClient : IBufferedEventHubClient
 {
-    private readonly EventHubConnection _connection;
     private readonly EventHubBufferedProducerClient _client;
-    private readonly bool _ownsConnection;
     private int _closed;
 
     public BufferedEventHubClient(
         EventHubConnection connection,
-        EventHubBufferedProducerClientOptions options,
-        bool ownsConnection)
+        EventHubBufferedProducerClientOptions options)
     {
-        _connection = connection;
-        _ownsConnection = ownsConnection;
         _client = new EventHubBufferedProducerClient(connection, options);
         _client.SendEventBatchSucceededAsync += OnBatchSucceededAsync;
         _client.SendEventBatchFailedAsync += OnBatchFailedAsync;
@@ -45,17 +40,7 @@ internal sealed class BufferedEventHubClient : IBufferedEventHubClient
             return;
         }
 
-        try
-        {
-            await _client.CloseAsync(flush: true, cancellationToken);
-        }
-        finally
-        {
-            if (_ownsConnection)
-            {
-                await _connection.CloseAsync(cancellationToken);
-            }
-        }
+        await _client.CloseAsync(flush: true, cancellationToken);
     }
 
     private Task OnBatchSucceededAsync(SendEventBatchSucceededEventArgs args)
