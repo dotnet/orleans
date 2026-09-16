@@ -760,6 +760,34 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_FailedExplicitRevertFaultsQueuedInitialization()
+    {
+        var expected = new IOException("Expected explicit recovery failure.");
+        var storage = new BlockingRecoveryStorage
+        {
+            RecoveryReadException = expected
+        };
+        var sut = CreateTestSystem(storage: storage);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        var revert = sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.RecoveryReadStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        var initialize = sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
+
+        storage.AllowRecoveryRead.SetResult();
+
+        var revertException = await Assert.ThrowsAsync<IOException>(() => revert);
+        Assert.Same(expected, revertException);
+        var initializeException = await Assert.ThrowsAsync<IOException>(() => initialize);
+        Assert.Same(expected, initializeException);
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task StateManager_RevertAgainstEmptyJournalResetsUncommittedState()
     {
         var storage = new CapturingStorage();
@@ -1060,6 +1088,36 @@ public class StateManagerTests : JournalingTestBase
         Assert.Equal(42, existing.Value);
         var entries = ReadBinaryEntries(storage.Appends[^1]);
         Assert.Contains(entries, entry => entry.StreamId.Value == recoveredStreamId.Value + 1);
+    }
+
+    [Fact]
+    public async Task StateManager_Recovery_RebindsStateAboveUnknownStreamIds()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var unknownStreamId = new JournalStreamId(8);
+        var unknownPayload = new byte[] { 1, 2, 3 };
+        using (var segment = new OrleansBinaryJournalBufferWriter())
+        {
+            using (var entry = segment.CreateJournalStreamWriter(unknownStreamId).BeginEntry())
+            {
+                entry.Writer.Write(unknownPayload);
+                entry.Commit();
+            }
+
+            using var committed = segment.GetBuffer();
+            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = 42;
+
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        var entries = ReadBinaryEntries(Assert.Single(storage.Replaces));
+        Assert.Contains(entries, entry => entry.StreamId == unknownStreamId && entry.Payload.SequenceEqual(unknownPayload));
+        Assert.Contains(entries, entry => entry.StreamId.Value == unknownStreamId.Value + 1);
     }
 
     [Fact]
@@ -2076,10 +2134,16 @@ public class StateManagerTests : JournalingTestBase
             {
                 RecoveryReadStarted.SetResult();
                 await AllowRecoveryRead.Task.WaitAsync(cancellationToken);
+                if (RecoveryReadException is { } exception)
+                {
+                    throw exception;
+                }
             }
 
             consumer.Complete(metadata: null);
         }
+
+        public Exception? RecoveryReadException { get; init; }
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 

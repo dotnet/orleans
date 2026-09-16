@@ -569,16 +569,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                             needsRecovery = true;
                         }
+                        else if (workItem is RevertPendingChangesWorkItem)
+                        {
+                            lock (_lock)
+                            {
+                                _state = ManagerState.Fenced;
+                                FaultQueuedWorkItemsUnderLock(exception);
+                            }
+
+                            workItem.SetException(exception);
+                        }
                         else
                         {
                             workItem.SetException(exception);
-                            if (workItem is RevertPendingChangesWorkItem)
-                            {
-                                lock (_lock)
-                                {
-                                    _state = ManagerState.Fenced;
-                                }
-                            }
                         }
                     }
                     finally
@@ -764,7 +767,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             {
                 if (state is not RetiredState && !_journalStreamDirectory.ContainsKey(name))
                 {
-                    _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
+                    var id = _journalStreamDirectory.GetNextJournalStreamId();
+                    while (_statesMap.ContainsKey(id))
+                    {
+                        id = checked(id + 1);
+                    }
+
+                    _journalStreamDirectory.Set(name, id);
                 }
             }
 
