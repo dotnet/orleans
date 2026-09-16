@@ -27,6 +27,10 @@ namespace Orleans.Providers.Streams.Common
         /// Method which should be called when data adapter allocated a new block
         /// </summary>
         /// <param name="newBlock">The new block.</param>
+        /// <remarks>
+        /// Repeated notifications for the same currently owned buffer are idempotent, allowing
+        /// a receiver to reconcile a failed admission notification without duplicating ownership.
+        /// </remarks>
         void OnBlockAllocated(FixedSizeBuffer newBlock);
     }
 
@@ -39,6 +43,16 @@ namespace Orleans.Providers.Streams.Common
         /// Removes oldest message in the cache.
         /// </summary>
         void RemoveOldestMessage();
+
+        /// <summary>
+        /// Removes the oldest message when its outstanding delivery obligations permit eviction.
+        /// </summary>
+        /// <returns><see langword="true"/> if the message was removed; otherwise <see langword="false"/>.</returns>
+        bool TryRemoveOldestMessage()
+        {
+            RemoveOldestMessage();
+            return true;
+        }
 
         /// <summary>
         /// Gets the newest message in the cache.

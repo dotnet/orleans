@@ -66,17 +66,10 @@ public class EventHubCheckpointerTests
 
     private class TestEventHubQueueCache : IEventHubQueueCache
     {
-        private readonly IStreamQueueCheckpointer<string>? checkpointer;
-
-        public TestEventHubQueueCache(IStreamQueueCheckpointer<string>? checkpointer = null)
-        {
-            this.checkpointer = checkpointer;
-        }
-
         public int DisposeCount { get; private set; }
         public int AddCount { get; private set; }
-        public string? PurgeOffsetToReport { get; set; }
-        public object Cursor { get; } = new();
+        public object Cursor { get; } = new TestCursorProgress();
+        public string? AppliedOffset { get; private set; }
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
         public Exception? CursorException { get; set; }
@@ -117,16 +110,23 @@ public class EventHubCheckpointerTests
 
         public void SignalPurge()
         {
-            if (PurgeOffsetToReport is not null)
-            {
-                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow, TestContext.Current.CancellationToken);
-            }
         }
+
+        public void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
+            => AppliedOffset = ((IEventHubPartitionLocation)safeToken).EventHubOffset;
 
         public void Dispose()
         {
             DisposeCount++;
         }
+    }
+
+    private sealed class TestCursorProgress : IQueueCacheCursorProgress
+    {
+        public StreamSequenceToken? SafeSequenceToken => null;
+        public void SetDeliveredThrough(StreamSequenceToken token) { }
+        public void RecordDeliverySuccess() { }
+        public void RecordDeliveryFailure() { }
     }
 
     private sealed class TestEventHubReceiver : IEventHubReceiver
@@ -345,11 +345,6 @@ public class EventHubCheckpointerTests
         receiver.UpdateDeliveryProgress(token, DateTime.UtcNow);
     }
 
-    private static void UpdateDeliveryProgressWithNoSubscriptions(EventHubAdapterReceiver receiver)
-    {
-        receiver.UpdateDeliveryProgress(null!, DateTime.UtcNow);
-    }
-
     private static async Task<EventHubAdapterReceiver> CreateReceiver(
         TestCheckpointer checkpointer,
         TestEventHubQueueCache? cache = null,
@@ -370,7 +365,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
+            cacheFactory: (_, _, _) => cache ?? new TestEventHubQueueCache(),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -766,28 +761,30 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task NoActiveSubscriptions_NoCheckpoint()
+    public async Task NullProgress_IsNotANoSubscriptionsCertificate()
     {
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer);
 
-        // No subscription progress is available; cache purge checkpointing is handled directly by the cache.
-        UpdateDeliveryProgressWithNoSubscriptions(receiver);
+        Assert.Throws<ArgumentNullException>(() => receiver.UpdateDeliveryProgress(null!, DateTime.UtcNow));
 
         Assert.Null(checkpointer.LastOffset);
     }
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task CachePurge_UpdatesCheckpointDirectly()
+    public async Task CachePurge_PreservesCheckpointUntilCertifiedProgress()
     {
         var checkpointer = new TestCheckpointer();
-        var cache = new TestEventHubQueueCache(checkpointer) { PurgeOffsetToReport = "100" };
+        var cache = new TestEventHubQueueCache();
         var receiver = await CreateReceiver(checkpointer, cache);
 
         receiver.TryPurgeFromCache(out _);
 
+        Assert.Null(checkpointer.LastOffset);
+        UpdateDeliveryProgress(receiver, MakeToken(100));
         Assert.Equal("100", checkpointer.LastOffset);
+        Assert.Equal("100", cache.AppliedOffset);
     }
 
     [TestSuite("BVT")]

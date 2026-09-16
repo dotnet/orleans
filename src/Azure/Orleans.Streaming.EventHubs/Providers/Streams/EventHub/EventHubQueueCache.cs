@@ -31,11 +31,15 @@ namespace Orleans.Streaming.EventHubs
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
         private readonly IEventHubDataAdapter dataAdapter;
         private readonly IEvictionStrategy evictionStrategy;
-        private readonly IStreamQueueCheckpointer<string> checkpointer;
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
         private FixedSizeBuffer? currentBuffer;
+        private readonly List<FixedSizeBuffer> pendingBuffers = [];
+        private int pendingBufferNotification;
+        private List<EventData>? committedMessages;
+        private List<StreamPosition>? committedPositions;
+        private StreamSequenceToken? deliveryBoundary;
 
         /// <summary>
         /// EventHub queue cache.
@@ -66,12 +70,11 @@ namespace Orleans.Streaming.EventHubs
             this.defaultMaxAddCount = defaultMaxAddCount;
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
-            this.checkpointer = checkpointer;
             this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
-            this.evictionStrategy.PurgeObservable = this.cache;
+            this.evictionStrategy.PurgeObservable = new CertifiedPurgeView(this);
             this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
             this.logger = logger;
         }
@@ -83,6 +86,50 @@ namespace Orleans.Streaming.EventHubs
             if (this.cache.IsEmpty)
             {
                 this.currentBuffer = null;
+            }
+        }
+
+        /// <inheritdoc />
+        public void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
+        {
+            ArgumentNullException.ThrowIfNull(safeToken);
+            deliveryBoundary = safeToken;
+            try
+            {
+                evictionStrategy.PerformPurge(utcNow);
+                if (cache.IsEmpty) currentBuffer = null;
+            }
+            finally
+            {
+                deliveryBoundary = null;
+            }
+        }
+
+        private sealed class CertifiedPurgeView(EventHubQueueCache owner) : IPurgeObservable
+        {
+            public CachedMessage? Newest => owner.cache.Newest;
+            public CachedMessage? Oldest => owner.cache.Oldest;
+            public int ItemCount => owner.cache.ItemCount;
+            public bool IsEmpty => owner.cache.IsEmpty;
+
+            public bool TryRemoveOldestMessage()
+            {
+                if (owner.deliveryBoundary is not { } boundary || Oldest is not { } oldest
+                    || owner.dataAdapter.Compare(ref oldest, boundary) > 0)
+                {
+                    return false;
+                }
+
+                owner.cache.RemoveOldestMessage();
+                return true;
+            }
+
+            public void RemoveOldestMessage()
+            {
+                if (!TryRemoveOldestMessage())
+                {
+                    throw new InvalidOperationException("Eviction attempted to pass the certified delivery prefix.");
+                }
             }
         }
 
@@ -122,16 +169,54 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The stream positions of the cached messages.</returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
-            List<StreamPosition> positions = new List<StreamPosition>();
-            List<CachedMessage> cachedMessages = new List<CachedMessage>();
-            foreach (EventData message in messages)
+            if (committedMessages is not null && !ReferenceEquals(committedMessages, messages))
             {
-                StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
-                cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
-                positions.Add(position);
+                throw new InvalidOperationException("The previously admitted Event Hubs batch must finish its handoff before another batch is admitted.");
             }
-            cache.Add(cachedMessages, dequeueTimeUtc);
-            return positions;
+
+            if (committedMessages is null)
+            {
+                var originalBuffer = currentBuffer;
+                var originalPosition = originalBuffer?.Position ?? 0;
+                var positions = new List<StreamPosition>(messages.Count);
+                var cachedMessages = new List<CachedMessage>(messages.Count);
+                try
+                {
+                    foreach (var message in messages)
+                    {
+                        var position = dataAdapter.GetStreamPosition(Partition, message);
+                        cachedMessages.Add(dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, GetSegment));
+                        positions.Add(position);
+                    }
+
+                    cache.Add(cachedMessages, dequeueTimeUtc);
+                }
+                catch
+                {
+                    originalBuffer?.ResetTo(originalPosition);
+                    currentBuffer = originalBuffer;
+                    foreach (var buffer in pendingBuffers) buffer.Dispose();
+                    pendingBuffers.Clear();
+                    throw;
+                }
+
+                committedMessages = messages;
+                committedPositions = positions;
+            }
+
+            // Metadata admission is complete. Retry notification without admitting the records twice.
+            while (pendingBufferNotification < pendingBuffers.Count)
+            {
+                evictionStrategy.OnBlockAllocated(pendingBuffers[pendingBufferNotification]);
+                pendingBufferNotification++;
+            }
+
+            var result = committedPositions!;
+            pendingBuffers.Clear();
+            pendingBufferNotification = 0;
+            committedMessages = null;
+            committedPositions = null;
+            return result;
         }
 
         /// <summary>
@@ -227,13 +312,6 @@ namespace Orleans.Streaming.EventHubs
                     new(lastItemPurged.Value.DequeueTimeUtc),
                     new(newestItem.Value.DequeueTimeUtc));
             }
-            if (lastItemPurged.HasValue)
-            {
-                checkpointer.Update(
-                    this.dataAdapter.GetOffset(lastItemPurged.Value),
-                    DateTime.UtcNow,
-                    CancellationToken.None);
-            }
         }
 
         /// <summary>
@@ -280,8 +358,7 @@ namespace Orleans.Streaming.EventHubs
                     throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
                 }
                 currentBuffer = newBuffer;
-                //call EvictionStrategy's OnBlockAllocated method
-                this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                pendingBuffers.Add(currentBuffer);
             }
             return segment;
         }
