@@ -14,6 +14,63 @@ public sealed class FileMembershipTableTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"orleans-dissemination-cleanup-{Guid.NewGuid():N}");
 
     [Fact]
+    public async Task DeleteInvalidatesThePreviousTableEtag()
+    {
+        var table = CreateTable();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = CreateEntry(SiloStatus.Active, 1);
+        var initial = await table.ReadAllAsync(cancellationToken);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), cancellationToken));
+        var before = await table.ReadAllAsync(cancellationToken);
+        var previousRow = Assert.Single(before.Members);
+
+        await table.DeleteMembershipTableEntriesAsync("cleanup", cancellationToken);
+        var reopened = CreateTable();
+        var deleted = await reopened.ReadAllAsync(cancellationToken);
+        Assert.Empty(deleted.Members);
+        Assert.Equal(before.Version.Version + 1, deleted.Version.Version);
+        Assert.NotEqual(before.Version.VersionEtag, deleted.Version.VersionEtag);
+        Assert.False(await reopened.InsertRowAsync(entry, before.Version.Next(), cancellationToken));
+        Assert.False(await reopened.UpdateRowAsync(entry, previousRow.Item2, before.Version.Next(), cancellationToken));
+        var afterRejectedWrites = await reopened.ReadAllAsync(cancellationToken);
+        Assert.Empty(afterRejectedWrites.Members);
+        Assert.Equal(deleted.Version, afterRejectedWrites.Version);
+
+        Assert.True(await reopened.InsertRowAsync(entry, deleted.Version.Next(), cancellationToken));
+        var inserted = await reopened.ReadAllAsync(cancellationToken);
+        var currentRow = Assert.Single(inserted.Members);
+        Assert.Equal(entry.SiloAddress, currentRow.Item1.SiloAddress);
+        Assert.False(await reopened.UpdateRowAsync(entry, currentRow.Item2, before.Version.Next(), cancellationToken));
+        Assert.Equal(inserted.Version, (await reopened.ReadAllAsync(cancellationToken)).Version);
+    }
+
+    [Fact]
+    public async Task HeartbeatPreservesTableVersionAndOtherColumns()
+    {
+        var table = CreateTable();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = CreateEntry(SiloStatus.Active, 1);
+        var initial = await table.ReadAllAsync(cancellationToken);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), cancellationToken));
+        var before = await table.ReadAllAsync(cancellationToken);
+        var previousRow = Assert.Single(before.Members);
+
+        var update = CreateEntry(SiloStatus.Dead, 1);
+        update.HostName = "ignored";
+        update.IAmAliveTime = Cutoff;
+        await table.UpdateIAmAliveAsync(update, cancellationToken);
+        var reopened = CreateTable();
+        var after = await reopened.ReadAllAsync(cancellationToken);
+        var currentRow = Assert.Single(after.Members);
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(previousRow.Item2, currentRow.Item2);
+        var expected = FileMembershipTable.EntryData.From(previousRow.Item1) with { IAmAliveTime = Cutoff };
+        Assert.Equal(StateComparison.Serialize(expected), StateComparison.Serialize(FileMembershipTable.EntryData.From(currentRow.Item1)));
+    }
+
+    [Fact]
     public async Task CleanupRemovesEveryExpiredNonActiveStatus()
     {
         var table = CreateTable();

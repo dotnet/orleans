@@ -69,6 +69,7 @@ internal sealed class FileMembershipTable(NodeConfiguration configuration) : IMe
 
         state.Rows.Clear();
         state.Version++;
+        state.Etag = Guid.NewGuid().ToString("N");
         return true;
     }, write: true, cancellationToken);
 
