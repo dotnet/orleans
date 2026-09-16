@@ -44,6 +44,8 @@ namespace Orleans.Streams
         {
             if (!queueData.Remove(subscriptionId, out var consumer)) return false;
 
+            consumer.HandshakeRequestId++;
+            consumer.HandshakeGeneration++;
             consumer.SafeDisposeCursor(logger);
             return true;
         }

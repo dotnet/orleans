@@ -1867,7 +1867,7 @@ namespace Orleans.Streams
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
                 await pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, CancellationToken.None);
-                return IsCurrent();
+                return true;
             }
 
             // notify consumer about the error or that the data is not available.
@@ -1892,6 +1892,7 @@ namespace Orleans.Streams
             if ((forceFaultSubscription || streamFailureHandler.ShouldFaultSubsriptionOnError)
                 && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
             {
+                var faultRequested = false;
                 try
                 {
                     // notify consumer of faulted subscription, if we can.
@@ -1903,16 +1904,17 @@ namespace Orleans.Streams
                     if (!IsCurrent()) return false;
 
                     // mark subscription as faulted.
+                    faultRequested = true;
                     await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId, cancellationToken);
                 }
                 finally
                 {
-                    if (IsCurrent())
+                    if (faultRequested)
                     {
                         RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
                     }
                 }
-                return IsCurrent();
+                return true;
             }
             return false;
 

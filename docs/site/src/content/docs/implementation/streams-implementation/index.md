@@ -87,6 +87,8 @@ A completed handshake establishes the subscription's current cursor and replay p
 
 A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
 
+Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
+
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
 <a name="backpressure"></a>
