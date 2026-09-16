@@ -42,6 +42,12 @@ The manager's durable local commit completes the caller's transaction promise. I
 
 The disabled agent explicitly rejects transactional operations. Overload throttling returns transaction-start failures while bounding queued work.
 
+## Activation deactivation
+
+Transaction background workers hold scoped admissions while processing locks, persisting state, and confirming or collecting transaction records. A storage admission covers the persistence outcome, recovery, and batch follow-up callbacks so an accepted write can finish during deactivation.
+
+When deactivation begins, the activation lifetime permanently closes admission and signals its cancellation token to stop retry and collection waits. Each lifecycle stop notification waits up to five seconds for admitted work to drain, bounded by the host cancellation token. Deactivation proceeds when that best-effort budget expires. Subsequent activations recover unresolved transactions from durable state.
+
 ## Trade-offs and boundaries
 
 The protocol favors serializable state transitions and recovery over low latency. Read-only work uses a direct resource path, while write transactions pay for coordination and durable records. Transaction atomicity covers registered transactional resources; applications coordinate or compensate external side effects separately.

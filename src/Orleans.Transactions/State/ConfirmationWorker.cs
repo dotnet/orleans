@@ -82,8 +82,10 @@ namespace Orleans.Transactions.State
             bool hasPendingConfirmations = true;
             while (!ct.IsCancellationRequested && hasPendingConfirmations)
             {
-                using (this.activationLifetime.BlockDeactivation())
+                using (var admission = this.activationLifetime.TryBlockDeactivation())
                 {
+                    if (!admission.Entered) return;
+
                     var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
                     hasPendingConfirmations = false;
                     foreach (var confirmed in confirmationResults)
@@ -105,8 +107,10 @@ namespace Orleans.Transactions.State
             var ct = this.activationLifetime.OnDeactivating;
             while (!ct.IsCancellationRequested)
             {
-                using (this.activationLifetime.BlockDeactivation())
+                using (var admission = this.activationLifetime.TryBlockDeactivation())
                 {
+                    if (!admission.Entered) return;
+
                     if (await TryCollect(transactionId)) break;
                     if (ct.IsCancellationRequested) break;
 

@@ -23,6 +23,144 @@ namespace Orleans.Transactions.Tests;
 public class TransactionQueueStorageWorkTests
 {
     [Fact]
+    public async Task RejectedAdmission_LeavesStorageBatchUntouched()
+    {
+        var lifetime = new ActivationLifetimeTests.ClosedActivationLifetime();
+        var storage = new ScriptedTransactionalStateStorage();
+        var queue = CreateQueue(storage, static () => { },
+            new ParticipantId("resource", null!, ParticipantId.Role.Resource), new NoOpTimerManager(), lifetime);
+        var batch = CreateDirtyBatch();
+        var completed = false;
+        batch.FollowUpAction(_ => completed = true);
+        queue.SetStorageBatch(batch);
+
+        await queue.InvokeStorageWorkAsync();
+
+        Assert.Equal(1, lifetime.AdmissionAttempts);
+        Assert.Equal(0, storage.StoreCallCount);
+        Assert.Equal(0, storage.LoadCallCount);
+        Assert.Same(batch, queue.CurrentStorageBatch);
+        Assert.False(completed);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Deactivation_DrainsStorageOutcomeRecoveryAndFollowUp(bool failStore, bool failRestore)
+    {
+        var lifetime = ActivationLifetimeTests.CreateLifetime();
+        var storage = new CoordinatedTransactionalStateStorage();
+        var storeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishStore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRestore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(async _ =>
+        {
+            storeStarted.SetResult();
+            await finishStore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            if (failStore) throw new InvalidOperationException("store failed");
+            return "committed-etag";
+        });
+        storage.EnqueueLoad(async () =>
+        {
+            restoreStarted.SetResult();
+            await finishRestore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            if (failRestore) throw new InvalidOperationException("restore failed");
+            return CreateLoadResponse(Guid.NewGuid(), DateTime.UtcNow,
+                new ParticipantId("resource", null!, ParticipantId.Role.Resource), "restored-etag", includeCommitRecord: false);
+        });
+
+        var queue = CreateQueue(storage, static () => { },
+            new ParticipantId("resource", null!, ParticipantId.Role.Resource), new NoOpTimerManager(), lifetime);
+        var batch = CreateDirtyBatch();
+        Task? stop = null;
+        var outcomes = new List<bool>();
+        batch.FollowUpAction(success =>
+        {
+            Assert.NotNull(stop);
+            Assert.False(stop.IsCompleted);
+            outcomes.Add(success);
+        });
+        queue.SetStorageBatch(batch);
+
+        var work = queue.InvokeStorageWorkAsync();
+        await storeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        stop = lifetime.OnStop(TestContext.Current.CancellationToken);
+        Assert.False(stop.IsCompleted);
+        finishStore.SetResult();
+
+        if (failStore)
+        {
+            await restoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.False(stop.IsCompleted);
+            Assert.Empty(outcomes);
+            finishRestore.SetResult();
+        }
+
+        if (failRestore)
+        {
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => work);
+            Assert.Equal("restore failed", exception.Message);
+        }
+        else
+        {
+            await work.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(failStore ? "restored-etag" : "committed-etag", queue.CurrentStorageBatch.ETag);
+        }
+
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+        await queue.WaitForBackgroundWorkAsync().WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(!failStore, Assert.Single(outcomes));
+        Assert.Equal(failStore, restoreStarted.Task.IsCompleted);
+        using var late = lifetime.TryBlockDeactivation();
+        Assert.False(late.Entered);
+    }
+
+    [Fact]
+    public async Task FollowUpException_ReleasesAdmissionAfterRecovery()
+    {
+        var lifetime = ActivationLifetimeTests.CreateLifetime();
+        var storage = new CoordinatedTransactionalStateStorage();
+        var restoreStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRestore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        storage.EnqueueStore(_ => Task.FromResult("committed-etag"));
+        storage.EnqueueLoad(async () =>
+        {
+            restoreStarted.SetResult();
+            await finishRestore.Task.WaitAsync(TestContext.Current.CancellationToken);
+            return CreateLoadResponse(Guid.NewGuid(), DateTime.UtcNow,
+                new ParticipantId("resource", null!, ParticipantId.Role.Resource), "restored-etag", includeCommitRecord: false);
+        });
+        var queue = CreateQueue(storage, static () => { },
+            new ParticipantId("resource", null!, ParticipantId.Role.Resource), new NoOpTimerManager(), lifetime);
+        var batch = CreateDirtyBatch();
+        Task? stop = null;
+        var callbackCount = 0;
+        batch.FollowUpAction(success =>
+        {
+            Assert.True(success);
+            callbackCount++;
+            stop = lifetime.OnStop(TestContext.Current.CancellationToken);
+            Assert.False(stop.IsCompleted);
+            throw new InvalidOperationException("follow-up failed");
+        });
+        queue.SetStorageBatch(batch);
+
+        var work = queue.InvokeStorageWorkAsync();
+        await restoreStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(stop);
+        Assert.False(stop.IsCompleted);
+        finishRestore.SetResult();
+
+        await work.WaitAsync(TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TestContext.Current.CancellationToken);
+        await queue.WaitForBackgroundWorkAsync().WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, callbackCount);
+        Assert.Equal("restored-etag", queue.CurrentStorageBatch.ETag);
+    }
+
+    [Fact]
     public async Task StoreFailureAndFailedRestore_CountsOneFailurePerCycle_AndLoadsOncePerCycle()
     {
         var storage = new ScriptedTransactionalStateStorage();
@@ -342,14 +480,14 @@ public class TransactionQueueStorageWorkTests
             deactivate,
             new ParticipantId("resource", null!, ParticipantId.Role.Resource),
             new NoOpTimerManager(),
-            new TestActivationLifetime());
+            ActivationLifetimeTests.CreateLifetime());
 
     private static TestTransactionQueue CreateQueue(
         ITransactionalStateStorage<TestState> storage,
         Action deactivate,
         ParticipantId resource,
         ITimerManager timerManager)
-        => CreateQueue(storage, deactivate, resource, timerManager, new TestActivationLifetime());
+        => CreateQueue(storage, deactivate, resource, timerManager, ActivationLifetimeTests.CreateLifetime());
 
     private static TestTransactionQueue CreateQueue(
         ITransactionalStateStorage<TestState> storage,
@@ -584,22 +722,6 @@ public class TransactionQueueStorageWorkTests
             }
 
             delay.TrySetResult(result);
-        }
-    }
-
-    private sealed class TestActivationLifetime : IActivationLifetime
-    {
-        public CancellationToken OnDeactivating => CancellationToken.None;
-
-        public IDisposable BlockDeactivation() => NoOpDisposable.Instance;
-
-        private sealed class NoOpDisposable : IDisposable
-        {
-            public static NoOpDisposable Instance { get; } = new();
-
-            public void Dispose()
-            {
-            }
         }
     }
 

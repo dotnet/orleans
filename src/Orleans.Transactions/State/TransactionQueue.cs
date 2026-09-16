@@ -823,15 +823,14 @@ namespace Orleans.Transactions.State
 
         private async Task StorageWork()
         {
-            // Stop if this activation is stopping/stopped.
-            if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
-
             StorageBatch<TState>? batchBeingSentToStorage = null;
             var batchCompletedSuccessfully = false;
             var recoveryInitiated = false;
 
-            using (this.activationLifetime.BlockDeactivation())
+            using (var admission = this.activationLifetime.TryBlockDeactivation())
             {
+                if (!admission.Entered) return;
+
                 var writeAttempted = false;
 
                 try

@@ -334,10 +334,10 @@ namespace Orleans.Transactions.State
 
         private async Task LockWork()
         {
-            // Stop pumping lock work if this activation is stopping/stopped.
-            if (this.activationLifetime.OnDeactivating.IsCancellationRequested) return;
-            using (this.activationLifetime.BlockDeactivation())
+            using (var admission = this.activationLifetime.TryBlockDeactivation())
             {
+                if (!admission.Entered) return;
+
                 var now = DateTime.UtcNow;
 
                 if (currentGroup != null)

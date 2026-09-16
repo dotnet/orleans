@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
@@ -953,12 +954,17 @@ public class TransactionRecoveryLatencyTests
     private sealed class TestActivationLifetime : IActivationLifetime
     {
         private readonly CancellationTokenSource cancellation = new();
+        private readonly AdmissionGate gate = new();
 
         public CancellationToken OnDeactivating => cancellation.Token;
 
-        public IDisposable BlockDeactivation() => NullDisposable.Instance;
+        public AdmissionGate.Admission TryBlockDeactivation() => gate.TryEnter();
 
-        public void Cancel() => cancellation.Cancel();
+        public void Cancel()
+        {
+            _ = gate.CloseAsync();
+            cancellation.Cancel();
+        }
     }
 
     private sealed class TestGrainReference(GrainId grainId)
@@ -973,15 +979,6 @@ public class TransactionRecoveryLatencyTests
                 copyContextPool: null!,
                 serviceProvider: null!),
             grainId.Key);
-
-    private sealed class NullDisposable : IDisposable
-    {
-        public static NullDisposable Instance { get; } = new();
-
-        public void Dispose()
-        {
-        }
-    }
 
     private sealed class RecordingObserver(Guid transactionId) : IObserver<TransactionDiagnosticEvents.TransactionDiagnosticEvent>
     {

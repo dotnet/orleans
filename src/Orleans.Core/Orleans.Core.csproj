@@ -85,6 +85,8 @@
     <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="Orleans.TestingHost" />
+    <InternalsVisibleTo Include="Orleans.Transactions" />
+    <InternalsVisibleTo Include="Orleans.Transactions.Tests" />
     <InternalsVisibleTo Include="TestExtensions" />
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
