@@ -207,6 +207,12 @@ namespace Orleans.Runtime.Messaging
                 return true;
             }
 
+            if (request.GatewayRequestAttempt != 0 && request.GatewayRequestAttempt != trackedRequest.Attempt)
+            {
+                requestToReject = null!;
+                return false;
+            }
+
             if (targetSilo.Equals(trackedRequest.TargetSilo))
             {
                 requests.Remove(request.Id);
