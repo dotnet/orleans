@@ -143,7 +143,7 @@ public class ActivationLifetimeTests
         using (var admission = lifetime.TryBlockDeactivation())
         {
             Assert.True(admission.Entered);
-            var exception = Assert.Throws<AggregateException>(() => { lifetime.OnStop(TestContext.Current.CancellationToken); });
+            var exception = await Assert.ThrowsAsync<AggregateException>(() => lifetime.OnStop(TestContext.Current.CancellationToken));
             Assert.Same(failure, Assert.Single(exception.InnerExceptions));
             Assert.True(otherObserverCalled);
             using var late = lifetime.TryBlockDeactivation();
@@ -161,15 +161,17 @@ public class ActivationLifetimeTests
         var lifetime = CreateLifetime();
         var failure = new InvalidOperationException("work failed");
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<InvalidOperationException>(Work);
+
+        Assert.Same(failure, exception);
+        Assert.True(lifetime.OnStop(TestContext.Current.CancellationToken).IsCompletedSuccessfully);
+
+        void Work()
         {
             using var admission = lifetime.TryBlockDeactivation();
             Assert.True(admission.Entered);
             throw failure;
-        });
-
-        Assert.Same(failure, exception);
-        Assert.True(lifetime.OnStop(TestContext.Current.CancellationToken).IsCompletedSuccessfully);
+        }
     }
 
     internal static ActivationLifetime CreateLifetime() => new(new TestLifecycle(), new ControlledTimeProvider());
