@@ -650,17 +650,24 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     private async Task AdvancePendingDeliveriesAsync(
+        DurableJob job,
+        long stateGeneration,
         CancellationToken cancellationToken,
         CancellationToken attemptCancellationToken)
     {
         await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        var stateGeneration = Volatile.Read(ref _stateGeneration);
         _activeDeliveryGeneration = stateGeneration;
         try
         {
+            if (!IsCurrentPump(job, stateGeneration))
+            {
+                return;
+            }
+
             if (_pendingDeliveryBatch is { } pendingBatch)
             {
-                if (pendingBatch.StateGeneration != stateGeneration)
+                if (pendingBatch.StateGeneration != stateGeneration
+                    || !DurableMessagingJobOwnership.IsSamePhysicalJob(pendingBatch.Job, job))
                 {
                     CancelPendingDeliveryBatch();
                     return;
@@ -729,6 +736,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         try
                         {
                             var result = await DeliverToInboxAsync(envelope, cancellationToken).ConfigureAwait(true);
+                            if (!IsCurrentPump(job, stateGeneration))
+                            {
+                                return;
+                            }
+
                             ApplyDeliveryResult(envelope, result, stopwatch, ref summary);
                         }
                         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -737,6 +749,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         }
                         catch (Exception exception)
                         {
+                            if (!IsCurrentPump(job, stateGeneration))
+                            {
+                                return;
+                            }
+
                             ApplyDeliveryFailure(envelope, exception, stopwatch, ref summary);
                         }
                     }
@@ -779,11 +796,18 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 if (attempts is { Count: > 0 })
                 {
                     var newBatch = new PendingDeliveryBatch(
+                        job,
                         stateGeneration,
                         batchCancellation!,
                         attempts,
                         summary);
                     batchCancellation = null;
+                    if (!IsCurrentPump(job, stateGeneration))
+                    {
+                        newBatch.Cancel();
+                        return;
+                    }
+
                     if (attempts.All(static attempt => attempt.Task.IsCompleted))
                     {
                         var completedSummary = await ApplyCompletedDeliveryBatchAsync(
@@ -840,6 +864,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         var summary = pendingBatch.Summary;
         try
         {
+            if (!IsCurrentPump(pendingBatch.Job, pendingBatch.StateGeneration))
+            {
+                return summary;
+            }
+
             foreach (var attempt in pendingBatch.Attempts)
             {
                 if (!_messages.ContainsKey(attempt.Envelope.MessageId))
@@ -1349,6 +1378,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             this,
             execution,
             lease,
+            context.Job,
             cancellationToken);
         try
         {
@@ -1375,6 +1405,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private async Task RunPumpTimerAsync(
         DurableMessagingPumpExecution execution,
         DurableMessagingPumpLease lease,
+        DurableJob job,
         CancellationToken jobCancellation,
         CancellationToken timerCancellation)
     {
@@ -1393,6 +1424,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 _shutdown.Token);
             result = await ExecuteJobCoreAsync(
                 lease.OwnershipId,
+                job,
+                execution.Key.StateGeneration,
                 linkedCancellation.Token,
                 jobCancellation);
         }
@@ -1415,13 +1448,15 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     internal async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(
         string jobId,
+        DurableJob job,
+        long stateGeneration,
         CancellationToken cancellationToken,
         CancellationToken attemptCancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            if (!_recoveryCompleted)
+            if (!IsCurrentPump(job, stateGeneration))
             {
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
@@ -1458,7 +1493,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _gate.Release();
         }
 
-        await AdvancePendingDeliveriesAsync(cancellationToken, attemptCancellationToken).ConfigureAwait(true);
+        await AdvancePendingDeliveriesAsync(job, stateGeneration, cancellationToken, attemptCancellationToken).ConfigureAwait(true);
         if (_pendingDeliveryBatch is not null)
         {
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
@@ -1470,7 +1505,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                if (IsOwnershipTransitionPending(jobId))
+                if (!IsCurrentPump(job, stateGeneration) || IsOwnershipTransitionPending(jobId))
                 {
                     return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
                 }
@@ -1524,6 +1559,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             await Task.Delay(_backpressureRetryDelay, _jobTimeProvider, cancellationToken).ConfigureAwait(true);
         }
     }
+
+    private bool IsCurrentPump(DurableJob job, long stateGeneration) =>
+        _recoveryCompleted
+        && stateGeneration == Volatile.Read(ref _stateGeneration)
+        && DurableMessagingJobOwnership.IsSamePhysicalJob(_job.Value, job);
 
     private bool IsOwnershipTransitionPending(string ownershipId)
     {
@@ -1627,6 +1667,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         DurableOutbox owner,
         DurableMessagingPumpExecution execution,
         DurableMessagingPumpLease lease,
+        DurableJob job,
         CancellationToken jobCancellation)
     {
         public OneShotTimerHandle Handle { get; } = new();
@@ -1638,6 +1679,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 await owner.RunPumpTimerAsync(
                     execution,
                     lease,
+                    job,
                     jobCancellation,
                     timerCancellation);
             }
@@ -1650,11 +1692,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     private sealed class PendingDeliveryBatch(
+        DurableJob job,
         long stateGeneration,
         CancellationTokenSource cancellation,
         List<PendingDeliveryAttempt> attempts,
         DeliverySummary summary) : IDisposable
     {
+        public DurableJob Job { get; } = job;
         public long StateGeneration { get; } = stateGeneration;
         public List<PendingDeliveryAttempt> Attempts { get; } = attempts;
         public DeliverySummary Summary { get; } = summary;
