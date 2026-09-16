@@ -224,7 +224,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(61, "schedule-failure"));
-        Fixture.JobManagerProbe.FailNext(DurableInboxExtension.JobName);
+        Fixture.JobManagerProbe.FailNext(ReceiverTestServices.InboxJobName);
 
         await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
         var reverted = await receiver.GetSnapshotAsync();
@@ -232,13 +232,13 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         Assert.Null(reverted.InboxJobId);
         Assert.Null(reverted.InboxJob);
         Assert.Empty(reverted.Effects);
-        Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
-        Assert.Equal(2, Fixture.JobManagerProbe.GetAttemptCount(DurableInboxExtension.JobName, receiver.GetGrainId()));
-        Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(DurableInboxExtension.JobName, receiver.GetGrainId()));
+        Assert.Equal(2, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+        Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
     }
 
     [Fact]

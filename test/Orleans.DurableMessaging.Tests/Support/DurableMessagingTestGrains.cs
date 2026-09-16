@@ -162,7 +162,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public async Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job)
     {
         var messages = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
-            DurableMessagingStateNames.Inbox);
+            "__orleans.durable-messaging.inbox");
         messages.Add((envelope.SenderId, envelope.MessageId), envelope);
         _inboxJobId.Value = ownershipId;
         _inboxJob.Value = job;
