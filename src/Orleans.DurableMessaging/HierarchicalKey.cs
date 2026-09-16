@@ -288,7 +288,7 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
                 {
                     if (segmentLength <= 1)
                     {
-                        // Empty segments are not allowed (the segment contains only an segment separator)
+                        // Empty segments are not allowed (the segment contains only a segment separator)
                         return false;
                     }
 
