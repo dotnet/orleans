@@ -93,9 +93,9 @@ public partial class DisseminationProtocolTests
                 }
 
                 // Explicit phases isolate aggregation from timer phase/order: gather, then distribute.
-                foreach (var member in members.Reverse())
+                for (var index = members.Length - 1; index >= 0; index--)
                 {
-                    await nodes[member].Protocol.FlushPendingBroadcast(cancellationToken);
+                    await nodes[members[index]].Protocol.FlushPendingBroadcast(cancellationToken);
                 }
                 foreach (var member in members)
                 {
