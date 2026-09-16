@@ -97,6 +97,12 @@ An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delive
 
 The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
 
+At shutdown, the pulling agent reports delivery progress to the queue cache so a checkpointing receiver can persist its handoff position. With ordered, comparable queue tokens, a subscription which has drained its cursor and processed every batch read for its stream can advance to the queue's read boundary. Other subscriptions contribute their last processed token, and the earliest resulting position bounds the checkpoint. Pending registrations, handshakes, and unknown subscription progress defer this report.
+
+After a cursor-read exception, the pulling agent can resume from the subscription's last processed token when the cache still retains that position. It reacquires the cursor and confirms retention by finding the exact acknowledged token. Once replay after that token has been acknowledged or filtered through the stream's read boundary and the cursor drains, that subscription can advance to the queue's read boundary again. Queue reads continue updating the boundaries throughout recovery. An empty recovery cursor or a first token newer than the acknowledged position selects subscription-based progress because the intervening history is unproven.
+
+Queue read failures, partially accounted reads, incompatible or out-of-order tokens, cache misses, invalid cursor results, failed deliveries which exhaust retries, and replay requests select subscription-based progress for the rest of that agent's initialized lifetime. These transitions leave history which a later acknowledgment alone cannot account for. A debug log records the first transition and its reason. Subsequent acknowledgments continue advancing subscription-based progress, and reinitialization starts fresh read-boundary tracking.
+
 ```mermaid
 flowchart TB
     New[New queue batches] --> Cache[Queue cache]
