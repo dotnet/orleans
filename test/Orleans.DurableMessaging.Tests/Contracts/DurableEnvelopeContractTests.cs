@@ -272,6 +272,41 @@ public sealed class DurableEnvelopeContractTests : IDisposable
         Assert.False(copy.Data.TryGetContextValue<uint>("attempt", out _));
     }
 
+    [Fact]
+    public void OutboxEquivalenceIncludesDeclaredTypeMetadata()
+    {
+        var sender = GrainId.Create("sender", "typed-equivalence");
+        var receiver = GrainId.Create("receiver", "typed-equivalence");
+        var first = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "typed/equivalence")
+            .WithBody(0)
+            .Build();
+        var secondTemplate = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "typed/equivalence")
+            .WithBody(0U)
+            .Build();
+        var second = new DurableEnvelope
+        {
+            MessageId = first.MessageId,
+            SenderId = secondTemplate.SenderId,
+            ReceiverId = secondTemplate.ReceiverId,
+            RouteKey = secondTemplate.RouteKey,
+            CorrelationKey = secondTemplate.CorrelationKey,
+            ReplyTo = secondTemplate.ReplyTo,
+            Data = secondTemplate.Data,
+            CreatedAt = first.CreatedAt,
+        };
+
+        var outboxType = typeof(IDurableOutbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableOutbox",
+            throwOnError: true)!;
+        var areEquivalent = outboxType.GetMethod(
+            "AreEquivalent",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+
+        Assert.False((bool)areEquivalent.Invoke(null, [first, second])!);
+    }
+
     public void Dispose() => _services.Dispose();
 
     [GenerateSerializer, Immutable]
