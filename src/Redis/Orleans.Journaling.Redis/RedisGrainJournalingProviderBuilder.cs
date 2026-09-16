@@ -13,8 +13,9 @@ internal sealed class RedisGrainJournalingProviderBuilder : IProviderBuilder<ISi
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddRedisJournalStorage();
-        var optionsBuilder = builder.Services.AddOptions<RedisJournalStorageOptions>();
+        name ??= ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+        builder.AddRedisJournalStorage(name);
+        var optionsBuilder = builder.Services.AddJournalStorageOptions<RedisJournalStorageOptions>(name);
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
             var serviceKey = configurationSection["ServiceKey"];

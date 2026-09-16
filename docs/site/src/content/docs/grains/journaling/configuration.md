@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Configure Orleans Journaling
 
-Configure one journal storage provider on every silo that can activate a <xref:Orleans.Journaling.DurableGrain>. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and legacy Orleans binary reader.
+Configure a default journal storage provider on every silo that can activate a <xref:Orleans.Journaling.DurableGrain>. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
 
@@ -20,6 +20,27 @@ The Journaling packages are pre-release alpha packages and their APIs carry diag
 | [Redis](redis-journal-storage.md) | `Microsoft.Orleans.Journaling.Redis` | String journal plus hash metadata | Journal bytes |
 
 Select a provider based on atomic-write limits, replay latency, durability configuration, backup tooling, maximum hot-grain size, and operational familiarity.
+
+## Select named providers
+
+The Blob, Table, Redis, S3, and volatile registration APIs accept a provider name.
+Each named registration binds its options, storage, catalog, and state-manager
+factory to one physical journal namespace. The unnamed overloads configure the
+`Default` binding. Registrations under other names leave that default unchanged.
+
+The `Default` storage binding retains the unnamed backend-options configuration
+pipeline, including option delegates registered before or after convenience
+methods and each `ConfigureAll` delegate applied once. Non-default storage names
+use their corresponding named backend options.
+The storage binding name and the backend options name are therefore distinct
+for the default binding.
+
+A provider name identifies storage, rather than a journal format or an individual
+durable state. Register each selected physical namespace once and keep its
+account, container, table, bucket, key prefix, and naming functions stable while
+it contains work. A configuration-based `GrainJournaling` provider name selects
+the journal registration; `ServiceKey` selects the Azure or Redis client from
+dependency injection.
 
 ## Configure the JSON format
 
@@ -59,6 +80,6 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can register <xref:Orleans.Journaling.VolatileJournalStorageProvider> directly; its contents live in process memory.
+<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

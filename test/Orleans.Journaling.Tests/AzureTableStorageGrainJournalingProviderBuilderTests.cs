@@ -16,6 +16,7 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
 {
+    private const string ProviderName = "provider-name";
     private static readonly Uri NamedServiceUri = new("https://named.table.example/");
     private static readonly Uri DirectServiceUri = new("https://direct.table.example/");
 
@@ -32,13 +33,13 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var storageOptions = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+        var storageOptions = GetStorageOptions(services);
         var managerOptions = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value;
         Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_TABLE_NAME, storageOptions.TableName);
         Assert.Null(storageOptions.TableServiceClient);
         Assert.Null(storageOptions.CreateClient);
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, managerOptions.JournalFormatKey);
-        Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(AzureTableJournalStorageProvider));
+        AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
     }
 
     [Fact]
@@ -53,6 +54,9 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         Assert.Equal(
             "custom-journal",
+            GetStorageOptions(services).TableName);
+        Assert.Equal(
+            AzureTableJournalStorageOptions.DEFAULT_TABLE_NAME,
             services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableName);
         Assert.Equal(
             "orleans-binary",
@@ -73,7 +77,7 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
         Assert.False(options.DeleteOldGenerations);
         Assert.Equal(123, options.CompactionRowCountThreshold);
         Assert.Equal(456, options.CompactionSizeThreshold);
@@ -99,7 +103,7 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
         Assert.Same(keyedClient, options.TableServiceClient);
         Assert.Same(
             keyedClient,
@@ -116,7 +120,7 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var client = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableServiceClient;
+        var client = GetStorageOptions(services).TableServiceClient;
         Assert.NotNull(client);
         Assert.Equal("named", client.AccountName);
         Assert.Equal(NamedServiceUri, client.Uri);
@@ -133,7 +137,7 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var client = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableServiceClient;
+        var client = GetStorageOptions(services).TableServiceClient;
         Assert.NotNull(client);
         Assert.Equal("direct", client.AccountName);
         Assert.Equal(DirectServiceUri, client.Uri);
@@ -148,7 +152,7 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "Provider");
 
         using var services = builder.Services.BuildServiceProvider();
-        var client = services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableServiceClient;
+        var client = GetStorageOptions(services).TableServiceClient;
         Assert.NotNull(client);
         Assert.Equal("account", client.AccountName);
         Assert.Equal(new Uri("https://account.table.example/"), client.Uri);
@@ -166,15 +170,15 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
         Configure(builder, "First");
         Configure(builder, "Second");
 
-        Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(AzureTableJournalStorageProvider));
-        Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(IJournalStorageProvider));
-        Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(IJournalStorageCatalog));
+        AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
+        AssertNamedRegistration<IJournalStorageCatalog>(builder.Services);
+        AssertNamedRegistration<IJournaledStateManagerFactory>(builder.Services);
         Assert.Single(builder.Services, descriptor => descriptor.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
 
         using var services = builder.Services.BuildServiceProvider();
         Assert.Equal(
             "second",
-            services.GetRequiredService<IOptions<AzureTableJournalStorageOptions>>().Value.TableName);
+            GetStorageOptions(services).TableName);
         Assert.Equal(
             "orleans-binary",
             services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey);
@@ -196,7 +200,14 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
 
     private static void Configure(TestSiloBuilder builder, string sectionName)
         => new AzureTableStorageGrainJournalingProviderBuilder()
-            .Configure(builder, "provider-name", builder.Configuration.GetSection(sectionName));
+            .Configure(builder, ProviderName, builder.Configuration.GetSection(sectionName));
+
+    private static AzureTableJournalStorageOptions GetStorageOptions(IServiceProvider services)
+        => services.GetRequiredService<IOptionsMonitor<AzureTableJournalStorageOptions>>().Get(ProviderName);
+
+    private static void AssertNamedRegistration<TService>(IServiceCollection services)
+        => Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService)
+            && descriptor.IsKeyedService && Equals(descriptor.ServiceKey, ProviderName));
 
     private static TestSiloBuilder CreateBuilder(params (string Key, string? Value)[] values)
     {

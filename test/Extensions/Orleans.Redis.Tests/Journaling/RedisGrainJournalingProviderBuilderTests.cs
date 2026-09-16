@@ -20,6 +20,7 @@ namespace Tester.Redis.Journaling;
 public sealed class RedisGrainJournalingProviderBuilderTests
 {
     private const string ConfigurationSectionName = "Orleans:GrainJournaling:Redis";
+    private const string ProviderName = "redis";
 
     [Fact]
     public void Configure_FullConfiguration_BindsSettingsAndJournalFormat()
@@ -33,7 +34,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
             (nameof(JournaledStateManagerOptions.JournalFormatKey), "configured-format"));
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
         var managerOptions = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value;
 
         Assert.NotNull(options.ConfigurationOptions);
@@ -48,6 +49,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
         Assert.Equal(789, options.ReadChunkSize);
         Assert.Equal(1234, options.InitStage);
         Assert.Equal("configured-format", managerOptions.JournalFormatKey);
+        Assert.Null(services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value.KeyPrefix);
     }
 
     [Fact]
@@ -59,7 +61,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
             [("ConnectionStrings:journal-redis", connectionString)]);
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
 
         Assert.NotNull(options.ConfigurationOptions);
         var endpoint = Assert.IsType<DnsEndPoint>(Assert.Single(options.ConfigurationOptions.EndPoints));
@@ -79,7 +81,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
             [("ConnectionStrings:journal-redis", "named-host:6381,abortConnect=false")]);
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
 
         Assert.NotNull(options.ConfigurationOptions);
         var endpoint = Assert.IsType<DnsEndPoint>(Assert.Single(options.ConfigurationOptions.EndPoints));
@@ -98,7 +100,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
         builder.Services.AddKeyedSingleton(serviceKey, multiplexer);
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
         var (configuredMultiplexer, isShared) = await options.CreateMultiplexer(options);
 
         Assert.Same(multiplexer, configuredMultiplexer);
@@ -122,7 +124,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
             (nameof(JournaledStateManagerOptions.JournalFormatKey), " "));
 
         using var services = builder.Services.BuildServiceProvider();
-        var options = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var options = GetStorageOptions(services);
         var managerOptions = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value;
 
         Assert.Null(options.ConfigurationOptions);
@@ -138,10 +140,12 @@ public sealed class RedisGrainJournalingProviderBuilderTests
     public void Configure_RegistersJournalStorageServicesExactlyOnce()
     {
         var builder = ConfigureBuilder();
+        new RedisGrainJournalingProviderBuilder().Configure(
+            builder, ProviderName, builder.Configuration.GetSection(ConfigurationSectionName));
 
-        Assert.Single(builder.Services, service => service.ServiceType == typeof(RedisJournalStorageProvider));
-        Assert.Single(builder.Services, service => service.ServiceType == typeof(IJournalStorageProvider));
-        Assert.Single(builder.Services, service => service.ServiceType == typeof(IJournalStorageCatalog));
+        AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
+        AssertNamedRegistration<IJournalStorageCatalog>(builder.Services);
+        AssertNamedRegistration<IJournaledStateManagerFactory>(builder.Services);
         Assert.Single(
             builder.Services,
             service => service.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>)
@@ -167,11 +171,18 @@ public sealed class RedisGrainJournalingProviderBuilderTests
 
         new RedisGrainJournalingProviderBuilder().Configure(
             builder,
-            "redis",
+            ProviderName,
             configuration.GetSection(ConfigurationSectionName));
 
         return builder;
     }
+
+    private static RedisJournalStorageOptions GetStorageOptions(IServiceProvider services)
+        => services.GetRequiredService<IOptionsMonitor<RedisJournalStorageOptions>>().Get(ProviderName);
+
+    private static void AssertNamedRegistration<TService>(IServiceCollection services)
+        => Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService)
+            && descriptor.IsKeyedService && Equals(descriptor.ServiceKey, ProviderName));
 
     private sealed class TestSiloBuilder(IConfiguration configuration) : ISiloBuilder
     {

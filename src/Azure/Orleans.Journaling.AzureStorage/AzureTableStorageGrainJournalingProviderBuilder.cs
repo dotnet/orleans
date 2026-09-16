@@ -11,8 +11,9 @@ internal sealed class AzureTableStorageGrainJournalingProviderBuilder : IProvide
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureTableJournalStorage();
-        var optionsBuilder = builder.Services.AddOptions<AzureTableJournalStorageOptions>();
+        name ??= ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+        builder.AddAzureTableJournalStorage(name);
+        var optionsBuilder = builder.Services.AddJournalStorageOptions<AzureTableJournalStorageOptions>(name);
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
             var previousTableName = options.TableName;
