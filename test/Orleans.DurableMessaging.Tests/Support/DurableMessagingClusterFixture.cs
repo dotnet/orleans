@@ -14,11 +14,15 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 public class DurableMessagingClusterFixture : IAsyncLifetime
 {
-    public DurableMessagingClusterFixture() : this(1)
+    public DurableMessagingClusterFixture() : this(receiverOnly: true)
     {
     }
 
-    private DurableMessagingClusterFixture(int initialSilos)
+    public DurableMessagingClusterFixture(bool receiverOnly) : this(1, receiverOnly)
+    {
+    }
+
+    protected DurableMessagingClusterFixture(int initialSilos, bool receiverOnly = false)
     {
         Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         Storage = new ControlledJournalStorageProvider();
@@ -27,6 +31,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
         ActivationProbe = new ActivationValidationProbe();
+        OutboxPumpTimerProbe = new OutboxPumpTimerProbe();
         var clusterId = $"durable-messaging-{Guid.NewGuid():N}";
         var serviceId = $"durable-messaging-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder((short)initialSilos);
@@ -49,7 +54,17 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton(SnapshotProbe);
             siloBuilder.Services.AddSingleton(ActivationProbe);
             siloBuilder.UseInMemoryDurableJobs();
-            ReceiverTestServices.Add(siloBuilder.Services, ConfigureOptions);
+            if (receiverOnly)
+            {
+                ReceiverTestServices.Add(siloBuilder.Services, ConfigureOptions);
+            }
+            else
+            {
+                siloBuilder.AddDurableMessaging(ConfigureOptions);
+            }
+            ReceiverTestServices.AddObservedStateProbes(siloBuilder.Services);
+
+            ControlledTimerRegistry.Decorate(siloBuilder.Services, OutboxPumpTimerProbe);
             siloBuilder.ConfigureServices(services =>
                 ControlledDurableJobManager.Decorate(services, JobManagerProbe));
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
@@ -76,6 +91,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public HandlerProbe HandlerProbe { get; }
     public SnapshotProbe SnapshotProbe { get; }
     public ActivationValidationProbe ActivationProbe { get; }
+    public OutboxPumpTimerProbe OutboxPumpTimerProbe { get; }
 
     public Task<DurableEndpointSnapshot> WaitForEffectCountAsync(IDurableMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(
@@ -139,6 +155,13 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     {
         await Cluster.DisposeAsync();
         Metrics.Dispose();
+    }
+}
+
+public sealed class MultiSiloDurableMessagingClusterFixture : DurableMessagingClusterFixture
+{
+    public MultiSiloDurableMessagingClusterFixture() : base(2)
+    {
     }
 }
 

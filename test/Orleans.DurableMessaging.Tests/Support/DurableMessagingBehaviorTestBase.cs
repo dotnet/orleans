@@ -9,8 +9,13 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
 {
-    protected DurableMessagingBehaviorTestBase() : this(new DurableMessagingClusterFixture()) { }
+    protected DurableMessagingBehaviorTestBase(bool receiverOnly = true)
+        : this(new DurableMessagingClusterFixture(receiverOnly))
+    {
+    }
+
     protected DurableMessagingBehaviorTestBase(DurableMessagingClusterFixture fixture) => Fixture = fixture;
+
     protected DurableMessagingClusterFixture Fixture { get; }
 
     public ValueTask InitializeAsync() => Fixture.InitializeAsync();
