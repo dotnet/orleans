@@ -64,6 +64,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly int _maxRetainedDeadLetters;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
+    private int _disposed;
     private int _handlerWriteRejected;
     private int _metricsActive;
     private int _resumeProcessingQueued;
@@ -1251,6 +1252,11 @@ internal sealed partial class DurableInboxExtension :
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         StopProcessing();
         _shutdownCts.Dispose();
     }

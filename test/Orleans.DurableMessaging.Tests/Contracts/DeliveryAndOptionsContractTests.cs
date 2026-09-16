@@ -186,6 +186,35 @@ public sealed class DeliveryAndOptionsContractTests
     }
 
     [Fact]
+    public void InboxDispose_CancelsWorkOnceAndSupportsRepeatedDisposal()
+    {
+        var assembly = typeof(IDurableInbox).Assembly;
+        var extensionType = assembly.GetType("Orleans.DurableMessaging.DurableInboxExtension", throwOnError: true)!;
+        var coordinatorType = assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpCoordinator", throwOnError: true)!;
+        var extension = (IDisposable)RuntimeHelpers.GetUninitializedObject(extensionType);
+        var coordinator = Activator.CreateInstance(coordinatorType)!;
+        using var shutdown = new CancellationTokenSource();
+        var token = shutdown.Token;
+        var cancellationCount = 0;
+        using var registration = token.Register(() => cancellationCount++);
+        extensionType.GetField("_shutdownCts", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, shutdown);
+        extensionType.GetField("_pumpCoordinator", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, coordinator);
+        object?[] acquireArguments = ["owner", token, null];
+        Assert.True((bool)coordinatorType.GetMethod("TryAcquire")!.Invoke(coordinator, acquireArguments)!);
+
+        extension.Dispose();
+
+        Assert.True(token.IsCancellationRequested);
+        Assert.Equal(1, cancellationCount);
+        Assert.False((bool)coordinatorType.GetMethod("IsCurrent")!.Invoke(coordinator, [acquireArguments[2]])!);
+        Assert.Throws<ObjectDisposedException>(() => shutdown.Token);
+
+        extension.Dispose();
+
+        Assert.Equal(1, cancellationCount);
+    }
+
+    [Fact]
     public async Task InboxLifecycleStart_ObservesPreCanceledLifecycleToken()
     {
         var extensionType = typeof(IDurableInbox).Assembly.GetType(
