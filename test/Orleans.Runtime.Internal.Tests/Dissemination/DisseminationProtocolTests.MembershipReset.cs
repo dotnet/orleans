@@ -11,19 +11,13 @@ public partial class DisseminationProtocolTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OlderFullMembershipValueReachesAuthoritativeOwner(bool antiEntropy)
+    public async Task OlderFullMembershipValueDoesNotReachOwner(bool antiEntropy)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(41011);
         var peer = CreateSilo(41012);
         var current = CreateMembershipSnapshot(100, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
         var notification = CreateMembershipSnapshot(2, current.Entries.Values.ToArray());
-        var authority = CreateMembershipSnapshot(101, current.Entries.Values.Select(entry =>
-        {
-            var result = entry.Copy();
-            result.HostName = "authoritative";
-            return result;
-        }).ToArray());
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer>();
         var manager = new FakeMembershipManager(current);
@@ -31,9 +25,7 @@ public partial class DisseminationProtocolTests
         manager.ProcessGossipSnapshotHandler = (snapshot, token) =>
         {
             token.ThrowIfCancellationRequested();
-            Assert.Equal(notification.Version, snapshot.Version);
             validations++;
-            manager.CurrentSnapshot = authority;
             return Task.CompletedTask;
         };
         var ns = CreateMembershipNamespace(manager, serializer);
@@ -53,12 +45,11 @@ public partial class DisseminationProtocolTests
             else
             {
                 var response = await protocol.ReceiveBroadcast(new() { Sender = peer, Values = values }, cancellationToken);
-                Assert.Equal(101, Assert.Single(response.Acknowledgments[ns.Name]).Version);
+                Assert.Equal(100, Assert.Single(response.Acknowledgments[ns.Name]).Version);
             }
 
-            Assert.Equal(1, validations);
-            Assert.Same(authority, manager.CurrentSnapshot);
-            Assert.Equal("authoritative", manager.CurrentSnapshot.Entries[local].HostName);
+            Assert.Equal(0, validations);
+            Assert.Same(current, manager.CurrentSnapshot);
         }
         finally
         {
@@ -68,7 +59,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task AntiEntropyConsultsMembershipNamespaceWhenPeerVersionIsAhead()
+    public async Task AntiEntropyDoesNotSendOlderMembershipToAnAheadPeer()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(41013);
@@ -87,11 +78,7 @@ public partial class DisseminationProtocolTests
                 Digests = new() { [ns.Name] = [new(DisseminationKey.Default, 100)] },
             }, cancellationToken);
 
-            var value = Assert.Single(GetAntiEntropyResponseValues(response)).Value;
-            Assert.Equal(0, value.FromVersion);
-            Assert.Equal(2, value.ToVersion);
-            Assert.NotNull(Assert.IsType<MembershipTableSnapshotUpdate>(
-                serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload)).Snapshot);
+            Assert.Empty(GetAntiEntropyResponseValues(response));
         }
         finally
         {
@@ -100,7 +87,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public void MembershipRepairSendsFullStateWhenPeerVersionIsAhead()
+    public void MembershipRepairMaterializesTheCurrentOwnerSnapshot()
     {
         var local = CreateSilo(41001);
         var snapshot = CreateMembershipSnapshot(2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
@@ -124,7 +111,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipResetSupersedesPriorIncarnationAndDelayedPublication()
+    public async Task MembershipCurrentViewSupersedesDelayedPublication()
     {
         var members = CreateSilos(20);
         var old = CreateMembershipSnapshot(1, members.Select(
@@ -134,30 +121,28 @@ public partial class DisseminationProtocolTests
         var manager = new FakeMembershipManager(old);
         var ns = CreateMembershipNamespace(manager, serializer);
         Assert.Equal(1, Assert.Single(ns.Digests).Version);
-        manager.CurrentSnapshot = CreateMembershipSnapshot(100, old.Entries.Values.ToArray());
-        Assert.Equal(100, Assert.Single(ns.Digests).Version);
-        var reset = CreateMembershipSnapshot(2, old.Entries.Values.Select(entry =>
+        var current = CreateMembershipSnapshot(100, old.Entries.Values.Select(entry =>
         {
             var result = entry.Copy();
-            result.HostName = "new-table";
+            result.HostName = "current-view";
             return result;
         }).ToArray());
-        manager.CurrentSnapshot = reset;
-        Assert.Equal(2, Assert.Single(ns.Digests).Version);
+        manager.CurrentSnapshot = current;
+        Assert.Equal(100, Assert.Single(ns.Digests).Version);
 
         var publications = new FakeDisseminationService();
         Assert.True(await ns.PublishAsync(publications, old, TestContext.Current.CancellationToken));
-        Assert.Equal(2, Assert.Single(publications.Values).ToVersion);
+        Assert.Equal(100, Assert.Single(publications.Values).ToVersion);
         var repair = ns.CreateRepair(new(
             DisseminationKey.Default, 1, 1024 * 1024, 1024 * 1024));
         Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
         var value = repair.Value;
         Assert.Equal(0, value.FromVersion);
-        Assert.Equal(2, value.ToVersion);
+        Assert.Equal(100, value.ToVersion);
         var payload = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
         var repaired = Assert.IsType<MembershipTableSnapshot>(payload.Snapshot);
         Assert.Equal(members.Length, repaired.Entries.Count);
-        Assert.All(repaired.Entries.Values, entry => Assert.Equal("new-table", entry.HostName));
+        Assert.All(repaired.Entries.Values, entry => Assert.Equal("current-view", entry.HostName));
     }
 }

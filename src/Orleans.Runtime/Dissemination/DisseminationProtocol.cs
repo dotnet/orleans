@@ -921,7 +921,7 @@ Complete:
                     continue;
                 }
 
-                if (localDigest.Version < peerDigest.Version && !requestedNamespace.ValidateOlderFullValues
+                if (localDigest.Version < peerDigest.Version
                     || localDigest.Version == peerDigest.Version
                     && localDigest.Fingerprint == peerDigest.Fingerprint)
                 {
@@ -1617,8 +1617,7 @@ Complete:
         }
 
         var localVersion = disseminationNamespace.GetVersion(value.Key);
-        if (value.ToVersion < localVersion
-            && (value.FromVersion > 0 || !disseminationNamespace.ValidateOlderFullValues))
+        if (value.ToVersion < localVersion)
         {
             result = DisseminationApplyResult.Obsolete;
             return true;

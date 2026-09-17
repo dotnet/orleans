@@ -71,50 +71,6 @@ public sealed class DisseminationClusterTests
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
-    [Fact]
-    public async Task DevelopmentPrimaryRestartRejectsRetainedPreResetMembership()
-    {
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        cancellation.CancelAfter(TimeSpan.FromMinutes(3));
-        var cancellationToken = cancellation.Token;
-        var builder = new TestClusterBuilder(3);
-        builder.Options.InitializeClientOnDeploy = false;
-        builder.AddSiloBuilderConfigurator<EnabledDisseminationConfigurator>();
-        await using var cluster = builder.Build();
-        await cluster.DeployAsync(cancellationToken);
-        var primary = Assert.IsType<InProcessSiloHandle>(cluster.Primary);
-        Assert.IsType<SystemTargetBasedMembershipTable>(primary.SiloHost.Services.GetRequiredService<IMembershipTable>());
-        var primaryManager = primary.SiloHost.Services.GetRequiredService<IMembershipManager>();
-        await primaryManager.Refresh(null, cancellationToken, requireFresh: true);
-        var retained = primaryManager.CurrentSnapshot;
-        Assert.Equal(3, retained.ActiveNodeCount);
-        var originalSilos = cluster.GetActiveSilos().ToArray();
-
-        var restarted = Assert.IsType<InProcessSiloHandle>(
-            await cluster.RestartSiloAsync(primary).WaitAsync(cancellationToken));
-        Assert.NotEqual(primary.SiloAddress, restarted.SiloAddress);
-        var manager = restarted.SiloHost.Services.GetRequiredService<IMembershipManager>();
-        Assert.True(manager.CurrentSnapshot.Version < retained.Version);
-        await manager.ProcessGossipSnapshot(retained, cancellationToken);
-        Assert.Equal(SiloStatus.Active, manager.LocalSiloStatus);
-        Assert.Contains(restarted.SiloAddress, manager.CurrentSnapshot.Entries.Keys);
-        Assert.DoesNotContain(primary.SiloAddress, manager.CurrentSnapshot.Entries.Keys);
-
-        foreach (var silo in originalSilos.Where(silo => !ReferenceEquals(silo, primary)))
-        {
-            await cluster.RestartSiloAsync(silo).WaitAsync(cancellationToken);
-        }
-
-        foreach (var silo in cluster.GetActiveSilos().Cast<InProcessSiloHandle>())
-        {
-            var current = silo.SiloHost.Services.GetRequiredService<IMembershipManager>();
-            await current.Refresh(null, cancellationToken, requireFresh: true);
-            Assert.Equal(SiloStatus.Active, current.LocalSiloStatus);
-            Assert.Contains(restarted.SiloAddress, current.CurrentSnapshot.Entries.Keys);
-            Assert.DoesNotContain(primary.SiloAddress, current.CurrentSnapshot.Entries.Keys);
-        }
-    }
-
     public sealed class EnabledDisseminationConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder builder) => builder.ConfigureServices(services =>

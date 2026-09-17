@@ -25,8 +25,6 @@ internal sealed class MembershipDisseminationNamespace(
 
     public bool BroadcastsAreDeltas => true;
 
-    public bool ValidateOlderFullValues => true;
-
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public IEnumerable<DisseminationKey> Keys => MembershipKeys;
