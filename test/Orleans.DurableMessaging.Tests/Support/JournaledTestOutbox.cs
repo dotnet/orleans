@@ -21,6 +21,11 @@ internal sealed class JournaledTestOutbox(
     public Exception? Failure => _failure?.SourceException;
     public IReadOnlyList<Guid> LastCapturedIds { get; private set; } = [];
     public Action? BeforeFinalization { get; set; }
+    public Action? AfterWriteCompleted { get; set; }
+    public TaskScheduler? PreparationScheduler { get; private set; }
+    public TaskScheduler? ContinuationScheduler { get; private set; }
+    public IGrainContext? PreparationContext { get; private set; }
+    public IGrainContext? ContinuationContext { get; private set; }
 
     public PreparationBarrier BlockNextPreparation()
     {
@@ -66,6 +71,8 @@ internal sealed class JournaledTestOutbox(
     public async ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        PreparationScheduler = TaskScheduler.Current;
+        PreparationContext = ReceiverTestServices.CurrentGrainContext;
         _admitted = _pending.ToArray();
         var barrier = _nextPreparation;
         _nextPreparation = null;
@@ -74,6 +81,8 @@ internal sealed class JournaledTestOutbox(
             barrier.Entered.TrySetResult();
             await barrier.Continue.Task.WaitAsync(cancellationToken);
         }
+        ContinuationScheduler = TaskScheduler.Current;
+        ContinuationContext = ReceiverTestServices.CurrentGrainContext;
         BeforeFinalization?.Invoke();
     }
 
@@ -94,6 +103,7 @@ internal sealed class JournaledTestOutbox(
             _pending.Remove(entry.Key);
         }
         _admitted = [];
+        AfterWriteCompleted?.Invoke();
     }
     public void OnRecoveryCompleted() { }
     public void OnFaulted(Exception exception) => _failure = ExceptionDispatchInfo.Capture(exception);
