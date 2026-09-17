@@ -103,6 +103,24 @@ public class NatsStreamOptionsValidator(NatsOptions options, string? name = null
                 $"The {nameof(NatsOptions.NumReplicas)} must be at least 1 for the NATS stream provider '{name}'.");
         }
 
+        if (options.BatchSize < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.BatchSize)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.PartitionCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.PartitionCount)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.ProducerCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.ProducerCount)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
         if (!Enum.IsDefined(typeof(StreamConfigStorage), options.StorageType))
         {
             throw new OrleansConfigurationException(
