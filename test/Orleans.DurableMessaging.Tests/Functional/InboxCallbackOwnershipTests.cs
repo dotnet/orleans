@@ -3,6 +3,8 @@ using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Functional;
@@ -183,6 +185,56 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.MaxConcurrentHandlers);
+    }
+
+    [Fact]
+    public async Task PreviousOwnerCallback_DuringReplacementPreparation_QuiescesUntilAcceptanceCommits()
+    {
+        var receiver = NewGrain();
+        var oldJob = CreateJob(receiver, "previous-physical", "previous-shard", "previous:1");
+        await receiver.SetInboxOwnershipAsync("previous:1", oldJob);
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
+        using var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/replacement-quiescence");
+        using var envelope = CreateEnvelope(receiver, NewMessage(116, "replacement-quiescence"), "messages/replacement-quiescence");
+        using var timers = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        var delivery = DeliverAsync(receiver, envelope.Value);
+        await schedule.WaitUntilEnteredAsync();
+
+        var callback = await InvokeDurableCallbackAsync(receiver, oldJob);
+
+        Assert.Equal(DurableJobRunStatus.InProgress, callback.Status);
+        Assert.DoesNotContain(timers.Events, item => item.Payload is GrainTimerEvents.Created created
+            && ReferenceEquals(created.GrainContext, context));
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        Assert.False(delivery.IsCompleted);
+        Assert.Equal(oldJob.Id, Fixture.GetSnapshot(receiver).InboxJob?.Id);
+        schedule.Continue();
+        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        await handler.WaitUntilEnteredAsync();
+        var accepted = Fixture.GetSnapshot(receiver);
+        var replacement = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+        Assert.Same(replacement, accepted.InboxJob);
+        Assert.Equal(replacement.Metadata!["orleans.messaging.ownership-id"], accepted.InboxJobId);
+        Assert.Equal(DurableJobRunStatus.Completed, (await InvokeDurableCallbackAsync(receiver, oldJob, dequeueCount: 2)).Status);
+        Assert.False(grain.Faulted.Task.IsCompleted);
+        handler.Release();
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(1, completed.ProcessedMessageCount);
+    }
+
+    private static async Task<DurableJobRunResult> InvokeDurableCallbackAsync(IDurableMessagingTestGrain receiver, DurableJob job, int dequeueCount = 1)
+    {
+        var assembly = typeof(DurableJob).Assembly;
+        var receiverType = assembly.GetType("Orleans.DurableJobs.IDurableJobReceiverExtension", throwOnError: true)!;
+        var reference = receiver.AsReference(receiverType);
+        var run = Activator.CreateInstance(assembly.GetType("Orleans.DurableJobs.JobRunContext", throwOnError: true)!,
+            job, Guid.NewGuid().ToString("N"), dequeueCount)!;
+        return await (ValueTask<DurableJobRunResult>)receiverType.GetMethod("HandleDurableJobAsync")!
+            .Invoke(reference, [run, TestContext.Current.CancellationToken])!;
     }
 
     private IDurableJobFeatureHandler GetExtension(IDurableMessagingTestGrain receiver) =>

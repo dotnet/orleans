@@ -57,6 +57,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly DurableMessagingPumpCoordinator _pumpCoordinator = new();
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
+    private readonly TimeSpan _processedCompactionInterval;
     private readonly int _maxProcessingAttempts;
     private readonly int _batchSize;
     private readonly TimeSpan _retryDelay;
@@ -84,6 +85,8 @@ internal sealed partial class DurableInboxExtension :
     private InboxWrite[] _admittedWrites = [];
     private string? _durableCompletedJobId;
     private string? _committingCompletedJobId;
+    private DateTimeOffset? _nextProcessedExpiry;
+    private DateTimeOffset? _lastProcessedCompaction;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -166,6 +169,7 @@ internal sealed partial class DurableInboxExtension :
         _jobTimeProvider = jobTimeProvider;
         _maxCapacity = options.MaxCapacity;
         _deduplicationWindow = options.DeduplicationWindow;
+        _processedCompactionInterval = TimeSpan.FromTicks(Math.Max(1, _deduplicationWindow.Ticks / 4));
         _maxProcessingAttempts = options.MaxProcessingAttempts;
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
@@ -595,6 +599,7 @@ internal sealed partial class DurableInboxExtension :
                         RemoveMessage(handler.Key);
                         _messageStates.Remove(handler.Key);
                         _processed[handler.Key] = now;
+                        TrackProcessedExpiry(now);
                     }
                     break;
                 case ClearOwnerWrite clear:
@@ -603,7 +608,6 @@ internal sealed partial class DurableInboxExtension :
                     {
                         throw new InvalidOperationException("The admitted inbox owner cannot be cleared while work is pending.");
                     }
-                    CompactProcessedMessages();
                     _completedJobId.Value = clear.Owner.Id;
                     _jobId.Value = null;
                     _job.Value = null;
@@ -613,6 +617,12 @@ internal sealed partial class DurableInboxExtension :
                         _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt);
                     break;
             }
+        }
+
+        var maintenanceTime = _timeProvider.GetUtcNow();
+        if (IsProcessedMaintenanceDue(maintenanceTime))
+        {
+            CompactProcessedMessages(maintenanceTime);
         }
     }
 
@@ -683,6 +693,8 @@ internal sealed partial class DurableInboxExtension :
         _durableJob = _job.Value;
         _durableCompletedJobId = _completedJobId.Value;
         _ownershipStateError = DurableMessagingJobOwnership.GetPairError(_jobId.Value, _job.Value);
+        _lastProcessedCompaction = null;
+        RebuildProcessedExpiry();
         _recoveryCompleted = true;
         ReconcileInboxDepth();
     }
@@ -697,6 +709,8 @@ internal sealed partial class DurableInboxExtension :
         _durableJob = null;
         _durableCompletedJobId = null;
         _ownershipStateError = null;
+        _nextProcessedExpiry = null;
+        _lastProcessedCompaction = null;
         ReconcileInboxDepth();
     }
 
@@ -723,7 +737,8 @@ internal sealed partial class DurableInboxExtension :
         DurableMessagingActivationValidator.Validate(_grainContext);
         await ResumeProcessingAsync(cancellationToken).ConfigureAwait(true);
         if (_deadLetters.Values.Any(entry => DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), entry.DeadLetteredAt, _deadLetterRetentionPeriod))
-            || _deadLetters.Count > _maxRetainedDeadLetters)
+            || _deadLetters.Count > _maxRetainedDeadLetters
+            || HasExpiredProcessedMessages(_timeProvider.GetUtcNow()))
         {
             await SubmitAsync(new CompactWrite(_stateGeneration)).ConfigureAwait(true);
         }
@@ -808,7 +823,7 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.Completed;
         }
 
-        if (_pendingOwnershipIds.Contains(ownershipId) || _admittedWrites.Any(static operation => operation is ClearOwnerWrite))
+        if (_pendingOwnershipIds.Count != 0 || _admittedWrites.Any(static operation => operation is ClearOwnerWrite))
         {
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
@@ -979,7 +994,17 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.Completed;
         }
 
-        var delay = GetNextAttemptAt() - _timeProvider.GetUtcNow();
+        if (HasExpiredProcessedMessages(_timeProvider.GetUtcNow()))
+        {
+            await SubmitAsync(new CompactWrite(_stateGeneration)).ConfigureAwait(true);
+        }
+
+        var nextAttempt = GetNextAttemptAt();
+        if (GetNextProcessedMaintenance() is { } maintenance && maintenance < nextAttempt)
+        {
+            nextAttempt = maintenance;
+        }
+        var delay = nextAttempt - _timeProvider.GetUtcNow();
         return DurableJobRunResult.RescheduleAt(DurableMessagingTime.AddClamped(
             _jobTimeProvider.GetUtcNow(), delay > TimeSpan.Zero ? delay : TimeSpan.Zero));
     }
@@ -991,13 +1016,92 @@ internal sealed partial class DurableInboxExtension :
         return attempts.Any(value => value is null || value <= now) ? now : attempts.Min()!.Value;
     }
 
-    private void CompactProcessedMessages()
+    private DateTimeOffset? GetNextProcessedMaintenance()
     {
-        var now = _timeProvider.GetUtcNow();
-        foreach (var entry in _processed.Where(pair => DurableMessagingTime.IsExpired(now, pair.Value, _deduplicationWindow)).ToList())
+        if (_nextProcessedExpiry is not { } next)
         {
-            _processed.Remove(entry.Key);
+            return null;
         }
+        if (_lastProcessedCompaction is { } last)
+        {
+            if (_processedCompactionInterval.Ticks > DateTimeOffset.MaxValue.UtcTicks - last.UtcTicks)
+            {
+                return null;
+            }
+            var earliestScan = DurableMessagingTime.AddClamped(last, _processedCompactionInterval);
+            if (earliestScan > next)
+            {
+                next = earliestScan;
+            }
+        }
+        return next;
+    }
+
+    private bool IsProcessedMaintenanceDue(DateTimeOffset now) =>
+        GetNextProcessedMaintenance() is { } next && now >= next;
+
+    private bool HasExpiredProcessedMessages(DateTimeOffset now)
+    {
+        if (!IsProcessedMaintenanceDue(now))
+        {
+            return false;
+        }
+        if (_processed.Any(pair => DurableMessagingTime.IsExpired(now, pair.Value, _deduplicationWindow)))
+        {
+            return true;
+        }
+
+        _lastProcessedCompaction = now;
+        RebuildProcessedExpiry();
+        return false;
+    }
+
+    private void TrackProcessedExpiry(DateTimeOffset processedAt)
+    {
+        if (_deduplicationWindow.Ticks > DateTimeOffset.MaxValue.UtcTicks - processedAt.UtcTicks)
+        {
+            return;
+        }
+        var expiry = DurableMessagingTime.AddClamped(processedAt, _deduplicationWindow);
+        if (_nextProcessedExpiry is null || expiry < _nextProcessedExpiry)
+        {
+            _nextProcessedExpiry = expiry;
+        }
+    }
+
+    private void RebuildProcessedExpiry()
+    {
+        _nextProcessedExpiry = null;
+        foreach (var entry in _processed)
+        {
+            TrackProcessedExpiry(entry.Value);
+        }
+    }
+
+    private void CompactProcessedMessages(DateTimeOffset now)
+    {
+        // Amortize dictionary scans over retention time; ordinary completion and owner-clear writes only check the deadline.
+        List<(GrainId, Guid)>? expired = null;
+        _nextProcessedExpiry = null;
+        foreach (var entry in _processed)
+        {
+            if (DurableMessagingTime.IsExpired(now, entry.Value, _deduplicationWindow))
+            {
+                (expired ??= []).Add(entry.Key);
+            }
+            else
+            {
+                TrackProcessedExpiry(entry.Value);
+            }
+        }
+        if (expired is not null)
+        {
+            foreach (var key in expired)
+            {
+                _processed.Remove(key);
+            }
+        }
+        _lastProcessedCompaction = now;
     }
 
     private void EnsureMetricsActive()

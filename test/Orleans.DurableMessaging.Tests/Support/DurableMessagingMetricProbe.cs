@@ -23,6 +23,7 @@ public sealed class DurableMessagingMetricProbe : IDisposable
                         or "orleans-durablejobs-job-attempts-started"
                         or "orleans-durablejobs-handler-executions-started"
                         or "orleans-durablejobs-jobs-completed"
+                        or "orleans-durablejobs-jobs-rescheduled"
                         or "orleans-durable-messaging-inbox-depth"
                         or "orleans-durable-messaging-outbox-depth")
                 {

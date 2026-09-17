@@ -42,7 +42,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     }
 
     [Fact]
-    public async Task ExpiryReplacement_WhenJournalWriteFails_RetainsDedupeRecord()
+    public async Task ExpiryReplacementFailure_ReplaysDedupeRecordBeforeExpiryMaintenance()
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         using var envelope = CreateEnvelope(
@@ -62,13 +62,15 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         var failed = await receiver.GetSnapshotAsync();
         Assert.Equal(0, failed.InboxCount);
         Assert.Equal(1, Assert.Single(failed.Effects).Count);
-        Assert.Equal(1, failed.ProcessedMessageCount);
+        var replayed = Assert.IsType<DurableMessagingTestGrain>(fixture.GetGrainContext(receiver).GrainInstance).ReplayedSnapshot;
+        Assert.Equal(1, Assert.IsType<DurableEndpointSnapshot>(replayed).ProcessedMessageCount);
+        Assert.Equal(0, failed.ProcessedMessageCount);
 
         await receiver.RequestDeactivationAsync();
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(failed.ActivationId, recovered.ActivationId);
         Assert.Equal(0, recovered.InboxCount);
-        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(0, recovered.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);

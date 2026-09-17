@@ -249,7 +249,13 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public void OnWriteStarted() => Captures.Add(CreateSnapshot());
 
     public void OnWriteCompleted() => PublishSnapshot();
-    public void OnRecoveryCompleted() => PublishSnapshot();
+    internal DurableEndpointSnapshot? ReplayedSnapshot { get; private set; }
+
+    public void OnRecoveryCompleted()
+    {
+        ReplayedSnapshot = CreateSnapshot();
+        _snapshotProbe.Publish(this.GetGrainId(), ReplayedSnapshot);
+    }
 
     private async ValueTask HandleAsync(
         DurableTestMessage message,
