@@ -46,9 +46,38 @@ implement the catalog and lifecycle contracts declared by the registered provide
 A provider name identifies storage, rather than a journal format or an individual
 durable state. Register each selected physical namespace once and keep its
 account, container, table, bucket, key prefix, and naming functions stable while
-it contains work. `Orleans:Journal:ProviderType` selects the provider for the
-`Default` journal storage binding; `Orleans:Journal:ServiceKey` selects the Azure
-or Redis client from dependency injection.
+it contains work.
+
+Configure each journal storage binding under `Orleans:Journal:{name}`.
+`ProviderType` selects its storage provider, and `ServiceKey` selects its Azure
+or Redis client from dependency injection. Orleans passes each entry's name and
+configuration section to the registered provider builder. Use `Default` as the
+name for grain journaling; other names configure additional storage bindings.
+
+For example, these entries configure the default journal and an archive with
+separate registered Redis clients and key prefixes:
+
+```json
+{
+  "Orleans": {
+    "Journal": {
+      "Default": {
+        "ProviderType": "Redis",
+        "ServiceKey": "primary-redis",
+        "KeyPrefix": "primary-journal"
+      },
+      "archive": {
+        "ProviderType": "Redis",
+        "ServiceKey": "archive-redis",
+        "KeyPrefix": "archive-journal"
+      }
+    }
+  }
+}
+```
+
+The equivalent environment-variable key for the archive client is
+`Orleans__Journal__archive__ServiceKey`.
 
 For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
 selects the journaled implementation.

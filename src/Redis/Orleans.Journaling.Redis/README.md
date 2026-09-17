@@ -31,7 +31,7 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
-Set `Orleans:Journal:ProviderType` to `Redis` to configure the default journal storage provider. If the Redis connection is already registered in dependency injection, select the keyed client using `Orleans:Journal:ServiceKey`.
+Set `Orleans:Journal:{name}:ProviderType` to `Redis` to configure a named journal storage provider. Use `Default` as the name for grain journaling. If the Redis connection is already registered in dependency injection, select the keyed client using `Orleans:Journal:{name}:ServiceKey`. Each entry has its own connection and storage options.
 
 ## Journal discovery
 

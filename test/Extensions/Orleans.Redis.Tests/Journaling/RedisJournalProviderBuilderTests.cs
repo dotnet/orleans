@@ -20,8 +20,8 @@ namespace Tester.Redis.Journaling;
 [TestCategory("Redis")]
 public sealed class RedisJournalProviderBuilderTests
 {
-    private const string ConfigurationSectionName = "Orleans:Journal";
     private const string ProviderName = "redis";
+    private const string ConfigurationSectionName = $"Orleans:Journal:{ProviderName}";
 
     [Fact]
     public void Assembly_RegistersExpectedProviderMetadata()

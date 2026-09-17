@@ -126,15 +126,17 @@ namespace NonSilo.Tests
             Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
         }
 
-        [Fact]
-        public void SiloBuilder_ConfiguresJournalProviderFromConfiguration()
+        [Theory]
+        [InlineData("Default")]
+        [InlineData("archive")]
+        public void SiloBuilder_ConfiguresNamedJournalProviderFromConfiguration(string providerName)
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { "Orleans:Journal:ProviderType", "TestJournal" },
-                { "Orleans:Journal:ServiceKey", "journal-client" }
+                { $"Orleans:Journal:{providerName}:ProviderType", "TestJournal" },
+                { $"Orleans:Journal:{providerName}:ServiceKey", "journal-client" }
             };
 
             using var host = new HostBuilder()
@@ -149,20 +151,60 @@ namespace NonSilo.Tests
                 .Build();
 
             var invocation = Assert.Single(host.Services.GetServices<JournalProviderInvocation>());
-            Assert.Null(invocation.Name);
-            Assert.Equal("Orleans:Journal", invocation.ConfigurationSection.Path);
+            Assert.Equal(providerName, invocation.Name);
+            Assert.Equal($"Orleans:Journal:{providerName}", invocation.ConfigurationSection.Path);
             Assert.Equal("TestJournal", invocation.ConfigurationSection["ProviderType"]);
             Assert.Equal("journal-client", invocation.ConfigurationSection["ServiceKey"]);
         }
 
         [Fact]
-        public void SiloBuilder_IncludesKnownJournalProvidersInErrorMessage()
+        public void SiloBuilder_ConfiguresMultipleNamedJournalProvidersFromConfiguration()
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { "Orleans:Journal:ProviderType", "InvalidJournalProvider" }
+                { "Orleans:Journal:Default:ProviderType", "TestJournal" },
+                { "Orleans:Journal:Default:ServiceKey", "default-client" },
+                { "Orleans:Journal:archive:ProviderType", "TestJournal" },
+                { "Orleans:Journal:archive:ServiceKey", "archive-client" }
+            };
+
+            using var host = new HostBuilder()
+                .ConfigureAppConfiguration(configBuilder =>
+                {
+                    configBuilder.AddInMemoryCollection(configDict);
+                })
+                .UseOrleans(siloBuilder =>
+                {
+                    siloBuilder.UseLocalhostClustering();
+                })
+                .Build();
+
+            var invocations = host.Services.GetServices<JournalProviderInvocation>().ToArray();
+            Assert.Equal(2, invocations.Length);
+
+            var defaultInvocation = Assert.Single(invocations, invocation => invocation.Name == "Default");
+            Assert.Equal("Orleans:Journal:Default", defaultInvocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournal", defaultInvocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("default-client", defaultInvocation.ConfigurationSection["ServiceKey"]);
+
+            var archiveInvocation = Assert.Single(invocations, invocation => invocation.Name == "archive");
+            Assert.Equal("Orleans:Journal:archive", archiveInvocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournal", archiveInvocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("archive-client", archiveInvocation.ConfigurationSection["ServiceKey"]);
+        }
+
+        [Theory]
+        [InlineData("Default")]
+        [InlineData("archive")]
+        public void SiloBuilder_IncludesKnownJournalProvidersInErrorMessage(string providerName)
+        {
+            var configDict = new Dictionary<string, string?>
+            {
+                { "Orleans:ClusterId", "test-cluster" },
+                { "Orleans:ServiceId", "test-service" },
+                { $"Orleans:Journal:{providerName}:ProviderType", "InvalidJournalProvider" }
             };
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
