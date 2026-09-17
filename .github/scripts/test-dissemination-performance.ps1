@@ -107,6 +107,28 @@ try {
         }
         Write-Output 'Passed 5 repository-boundary checks.'
 
+        & {
+            $inspected = [System.Collections.Generic.List[string]]::new()
+            $denied = Join-Path $testArtifacts 'unreadable'
+            function Get-Item {
+                [CmdletBinding()]
+                param([string] $LiteralPath, [switch] $Force)
+                $inspected.Add($LiteralPath)
+                throw [System.UnauthorizedAccessException]::new('Boundary inspection denied.')
+            }
+            $rejected = $false
+            try {
+                Assert-NoLinks $denied
+            }
+            catch [System.UnauthorizedAccessException] {
+                $rejected = $true
+            }
+            if (!$rejected -or $inspected.Count -ne 1 -or $inspected[0] -ne $denied) {
+                throw 'Boundary inspection must propagate access errors at the requested path.'
+            }
+        }
+        Write-Output 'Passed boundary access-error propagation check.'
+
         $harnessSource = Join-Path $root 'test' 'Dissemination.PerformanceHarness'
         $checkout = Join-Path $testArtifacts 'runtime-checkout'
         $existingHarness = Join-Path $checkout 'test' 'Dissemination.IntegrationHarness'

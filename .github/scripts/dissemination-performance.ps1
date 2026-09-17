@@ -54,11 +54,15 @@ function Assert-NoLinks([string] $Path) {
     }
     $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
     while (![string]::Equals($current, $root, $comparison)) {
-        if (Test-Path -LiteralPath $current) {
-            $item = Get-Item -LiteralPath $current -Force
-            if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-                throw "Artifact and runtime paths must use ordinary directories: $current"
-            }
+        $item = $null
+        try {
+            $item = Get-Item -LiteralPath $current -Force -ErrorAction Stop
+        }
+        catch [System.Management.Automation.ItemNotFoundException] {
+            # Missing descendants are created only after validating their existing parents.
+        }
+        if ($null -ne $item -and $item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+            throw "Artifact and runtime paths must use ordinary directories: $current"
         }
         $parent = Split-Path -Parent $current
         if (!$parent -or [string]::Equals($parent, $current, $comparison)) {
