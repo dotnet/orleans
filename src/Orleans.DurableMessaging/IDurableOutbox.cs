@@ -97,6 +97,9 @@ public interface IDurableOutbox
     /// return () => outbox.Send(envelope);
     /// </code>
     /// </example>
+    /// <exception cref="ArgumentException">
+    /// The envelope has an empty message ID, a default receiver grain ID, or missing data.
+    /// </exception>
     /// <exception cref="InvalidOperationException">
     /// An envelope with the same message ID but different content is already present.
     /// </exception>
