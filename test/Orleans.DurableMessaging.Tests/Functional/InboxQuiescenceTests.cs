@@ -174,6 +174,49 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         Assert.Equal(0, (await receiver.GetSnapshotAsync()).ProcessedMessageCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeliveryWhileOwnerClearIsAdmitted_WaitsAndAcceptsWithoutFencing(bool interleaved)
+    {
+        var receiver = NewGrain();
+        var owner = CreateJob(receiver, ReceiverTestServices.InboxJobName, "clear-overlap:1");
+        await receiver.SetInboxOwnershipAsync("clear-overlap:1", owner);
+        using var incoming = CreateEnvelope(receiver, NewMessage(181, "after-clear"));
+        await receiver.SetControlEnvelopeAsync(incoming.Value);
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        using var preparation = GetOutbox(context).BlockNextPreparation();
+        Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner)).Status);
+        await preparation.WaitAsync();
+        Assert.Equal("ClearOwnerWrite", Assert.Single(GetAdmitted(context).Cast<object>()).GetType().Name);
+        Task delivery;
+        if (interleaved)
+        {
+            delivery = InvokeJobAsync(receiver, CreateJob(receiver, "test/deliver-envelope"));
+            await grain.ControlDeliveryEntered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            delivery = DeliverAsync(receiver, incoming.Value);
+        }
+        Assert.False(delivery.IsCompleted);
+        preparation.Release();
+        await delivery;
+        if (interleaved)
+        {
+            Assert.Equal(DurableJobRunStatus.Completed, (await (Task<DurableJobRunResult>)delivery).Status);
+        }
+        else
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await (Task<DeliveryResult>)delivery).Status);
+        }
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.False(grain.Faulted.Task.IsCompleted);
+        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+    }
+
     private static JournaledTestOutbox GetOutbox(IGrainContext context) =>
         (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
 

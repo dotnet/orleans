@@ -237,6 +237,19 @@ internal sealed partial class DurableInboxExtension :
             throw new ArgumentException($"The envelope receiver '{envelope.ReceiverId}' does not match this grain '{_grainContext.GrainId}'.", nameof(envelope));
         }
 
+        if (envelope.MessageId == Guid.Empty)
+        {
+            throw new ArgumentException("The envelope message ID must not be empty.", nameof(envelope));
+        }
+        if (envelope.SenderId.IsDefault)
+        {
+            throw new ArgumentException("The envelope sender must not be the default grain ID.", nameof(envelope));
+        }
+        if (envelope.Data is null)
+        {
+            throw new ArgumentException("The envelope data must be provided.", nameof(envelope));
+        }
+
         EnsureMetricsActive();
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         var delivery = DeliverUnderGateAsync(envelope);
@@ -1027,14 +1040,26 @@ internal sealed partial class DurableInboxExtension :
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, _grainContext.GrainId.Type.ToString(), envelope.RouteKey);
         }
 
-        ValidateOwner(owner);
-        if (_inboxDict.Count == 0)
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
         {
-            if (clearOwnershipWhenEmpty)
+            ValidateReady();
+            if (!IsCurrentOwner(owner))
             {
-                await SubmitAsync(new ClearOwnerWrite(owner)).ConfigureAwait(true);
+                return DurableJobRunResult.Completed;
             }
-            return DurableJobRunResult.Completed;
+            if (_inboxDict.Count == 0)
+            {
+                if (clearOwnershipWhenEmpty)
+                {
+                    await SubmitAsync(new ClearOwnerWrite(owner)).ConfigureAwait(true);
+                }
+                return DurableJobRunResult.Completed;
+            }
+        }
+        finally
+        {
+            _gate.Release();
         }
 
         if (HasExpiredProcessedMessages(_timeProvider.GetUtcNow()))

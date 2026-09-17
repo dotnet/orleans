@@ -21,6 +21,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
+    Task SetControlEnvelopeAsync(DurableEnvelope envelope);
     Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate);
 }
 
@@ -230,6 +231,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
+    private DurableEnvelope? _controlEnvelope;
+    internal TaskCompletionSource ControlDeliveryEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task SetControlEnvelopeAsync(DurableEnvelope envelope)
+    {
+        _controlEnvelope = envelope;
+        return Task.CompletedTask;
+    }
+
     internal TaskScheduler? JobScheduler { get; private set; }
     internal IGrainContext? JobGrainContext { get; private set; }
 
@@ -239,6 +249,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         JobGrainContext = ReceiverTestServices.CurrentGrainContext;
         switch (context.Job.Name)
         {
+            case "test/deliver-envelope":
+                ControlDeliveryEntered.TrySetResult();
+                var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
+                await extension.DeliverAsync(_controlEnvelope ?? throw new InvalidOperationException("A control envelope must be configured."), attemptCancellationToken);
+                break;
             case "test/write-journal":
                 await StateManager.WriteStateAsync(attemptCancellationToken);
                 break;
@@ -272,7 +287,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     internal Exception? NextWriteRejection { get; set; }
-
     public void OnWriteRequested()
     {
         if (NextWriteRejection is { } exception)
