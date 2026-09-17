@@ -26,11 +26,13 @@ public class NatsOptions
 
     /// <summary>
     /// Gets or sets the maximum number of messages to fetch in a single batch.
+    /// The value must be at least 1.
     /// </summary>
     public int BatchSize { get; set; } = 100;
 
     /// <summary>
     /// Gets or sets the number of partitions in the NATS JetStream stream.
+    /// The value must be at least 1.
     /// This value determines the deterministic subject partitioning scheme and must match the number of
     /// Orleans stream queues configured for the provider.
     /// </summary>
@@ -47,6 +49,7 @@ public class NatsOptions
 
     /// <summary>
     /// Gets or sets the number of connections used to send stream messages to NATS JetStream.
+    /// The value must be at least 1.
     /// </summary>
     public int ProducerCount { get; set; } = 8;
 
@@ -96,6 +99,24 @@ public class NatsStreamOptionsValidator(NatsOptions options, string? name = null
         {
             throw new OrleansConfigurationException(
                 $"The {nameof(NatsOptions.NumReplicas)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.BatchSize < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.BatchSize)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.PartitionCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.PartitionCount)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.ProducerCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.ProducerCount)} must be at least 1 for the NATS stream provider '{name}'.");
         }
 
         if (!Enum.IsDefined(typeof(StreamConfigStorage), options.StorageType))
