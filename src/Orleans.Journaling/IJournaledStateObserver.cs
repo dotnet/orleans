@@ -102,7 +102,8 @@ public interface IJournaledStateObserver
     /// Called exactly once after the failure is recorded and before admitted and queued operations
     /// are completed with that failure. Use this notification to stop external preparation and callbacks;
     /// durable state must remain unchanged. Exceptions from this callback are logged and isolated.
-    /// Caller-wait cancellation completes independently of this notification.
+    /// Cancellation which fails an admitted operation also triggers this notification. Shutdown while
+    /// the manager is idle completes normally. Caller-wait cancellation completes independently of this notification.
     /// </remarks>
     void OnFaulted(Exception exception) { }
 }

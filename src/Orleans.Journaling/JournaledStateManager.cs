@@ -212,7 +212,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             try
             {
                 await _workSignal.WaitAsync().ConfigureAwait(true);
-                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                if (_shutdownCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
 
                 while (true)
                 {
