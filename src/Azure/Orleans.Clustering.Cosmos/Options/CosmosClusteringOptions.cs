@@ -3,6 +3,10 @@ namespace Orleans.Clustering.Cosmos;
 /// <summary>
 /// Options for configuring Azure Cosmos DB clustering.
 /// </summary>
+/// <remarks>
+/// Membership uses single-partition transactions and session-ordered reads. Configure the account
+/// with a single writable region and Session, BoundedStaleness, or Strong consistency.
+/// </remarks>
 public class CosmosClusteringOptions : CosmosOptions
 {
     private const string ORLEANS_CLUSTER_CONTAINER = "OrleansCluster";
