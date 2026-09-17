@@ -26,7 +26,7 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var sender = GrainId.Create("capacity-test-sender", Guid.NewGuid().ToString("N"));
         var poison = new DurableEnvelopeBuilder(sessions, sender)
             .To(receiver.GetGrainId(), "messages/capacity")
-            .WithBody(new DurableTestMessage(Guid.NewGuid(), 31, "poison", ThrowAfterStaging: true))
+            .WithBody(new DurableTestMessage(Guid.NewGuid(), 31, "poison", ThrowDuringPreparation: true))
             .Build();
         var rejected = new DurableEnvelopeBuilder(sessions, sender)
             .To(receiver.GetGrainId(), "messages/capacity")

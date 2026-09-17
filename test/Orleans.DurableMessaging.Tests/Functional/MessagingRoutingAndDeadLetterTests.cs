@@ -27,7 +27,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : DurableMessagingBehavio
                     Guid.NewGuid(),
                     20 + sequence,
                     $"dead-letter-{sequence}",
-                    ThrowAfterStaging: true));
+                    ThrowDuringPreparation: true));
             messageIds.Add(envelope.Value.MessageId);
             Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
             await Fixture.SnapshotProbe.WaitAsync(
@@ -52,7 +52,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : DurableMessagingBehavio
                 Guid.NewGuid(),
                 30,
                 "expired-dead-letter",
-                ThrowAfterStaging: true));
+                ThrowDuringPreparation: true));
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         var before = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);

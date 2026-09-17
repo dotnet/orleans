@@ -53,10 +53,12 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         await fixture.WaitForEffectCountAsync(receiver, 1);
         await WaitForIdleInboxAsync(receiver);
         fixture.Clock.Advance(TimeSpan.FromMinutes(10));
+        var oldContext = fixture.GetGrainContext(receiver);
         fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
 
         await Assert.ThrowsAnyAsync<Exception>(() => DeliverAsync(receiver, envelope.Value));
 
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var failed = await receiver.GetSnapshotAsync();
         Assert.Equal(0, failed.InboxCount);
         Assert.Equal(1, Assert.Single(failed.Effects).Count);

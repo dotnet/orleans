@@ -20,14 +20,17 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         const string route = "messages/repair-owner";
         using var envelope = CreateEnvelope(receiver, NewMessage(90, "repaired"), route);
         await receiver.SeedInboxStateAsync(envelope.Value, null, null);
-        var extension = GetExtension(receiver);
+        var oldContext = Fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var orphan = CreateJob(receiver, "orphan", "old-shard", "old:1");
         using var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
         var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
 
-        await Fixture.RevertStateAsync(receiver);
+        var activation = receiver.GetSnapshotAsync();
         await schedule.WaitUntilEnteredAsync();
+        var extension = GetExtension(receiver);
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, orphan)).Status);
         Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
         Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
@@ -40,6 +43,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
 
         write.Release();
+        await activation;
         await handler.WaitUntilEnteredAsync();
         Assert.Equal(DurableJobRunStatus.Completed, (await ExecuteAsync(extension, orphan)).Status);
         var owned = Fixture.GetSnapshot(receiver);
@@ -67,20 +71,24 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
             envelope.Value,
             fault == "handle-only" ? null : "owner:1",
             fault == "generation-only" ? null : handle);
-        await Fixture.RevertStateAsync(receiver);
         var extension = GetExtension(receiver);
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
-
         var lifecycle = await Assert.ThrowsAsync<InvalidOperationException>(() => ((ILifecycleObserver)extension).OnStart(TestContext.Current.CancellationToken));
         var callback = await Assert.ThrowsAsync<InvalidOperationException>(async () => await ExecuteAsync(extension, handle));
-
+        var delivery = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await ((IDurableInboxExtension)extension).DeliverAsync(envelope.Value, TestContext.Current.CancellationToken));
         Assert.Equal(lifecycle.Message, callback.Message);
+        Assert.Equal(lifecycle.Message, delivery.Message);
         Assert.Contains(fault == "mismatched-metadata" ? "metadata does not match" : "both be present or both be absent", lifecycle.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
         Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
-        Assert.Equal(1, Fixture.GetSnapshot(receiver).InboxCount);
-        Assert.Empty(Fixture.GetSnapshot(receiver).Effects);
+        var oldContext = Fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var replayFailure = await Assert.ThrowsAnyAsync<Exception>(() => receiver.GetSnapshotAsync());
+        Assert.Contains(lifecycle.Message, replayFailure.ToString(), StringComparison.Ordinal);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
     }
 
     [Theory]
@@ -116,36 +124,35 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task CallbacksDuringRecovery_WaitUntilCommittedOwnerIsRestored()
+    public async Task CallbacksDuringFreshInitialization_WaitUntilCommittedOwnerIsRestored()
     {
         var receiver = NewGrain();
-        const string route = "messages/callback-recovery";
+        const string route = "messages/callback-initialization";
+        using var envelope = CreateEnvelope(receiver, NewMessage(93, "initialization"), route);
+        var handle = CreateJob(receiver, "committed-physical", "committed-shard", "owner:1");
+        await receiver.SeedInboxStateAsync(envelope.Value, "owner:1", handle);
+        var oldContext = Fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var read = Fixture.Storage.BlockRead(JournalId.FromGrainId(receiver.GetGrainId()));
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
-        using var envelope = CreateEnvelope(receiver, NewMessage(93, "recovery"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        await handler.WaitUntilEnteredAsync();
-        var owned = Fixture.GetSnapshot(receiver);
-        var handle = Assert.IsType<DurableJob>(owned.InboxJob);
+        var activation = receiver.GetSnapshotAsync();
+        await read.WaitUntilEnteredAsync();
         var extension = GetExtension(receiver);
         var orphan = CreateJob(receiver, "orphan", "orphan-shard", "stale:1");
-        var read = Fixture.Storage.BlockRead(JournalId.FromGrainId(receiver.GetGrainId()));
-        var recovery = Fixture.RevertStateAsync(receiver).AsTask();
-        await read.WaitUntilEnteredAsync();
-
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, handle)).Status);
         Assert.Equal(DurableJobRunStatus.InProgress, (await ExecuteAsync(extension, orphan)).Status);
         read.Release();
-        await recovery;
-
+        await activation;
+        await handler.WaitUntilEnteredAsync();
         Assert.Equal(DurableJobRunStatus.Completed, (await ExecuteAsync(extension, orphan)).Status);
         var recovered = Fixture.GetSnapshot(receiver);
         Assert.Equal(handle.Id, recovered.InboxJob?.Id);
         Assert.Equal(handle.ShardId, recovered.InboxJob?.ShardId);
-        Assert.Equal(owned.InboxJobId, recovered.InboxJobId);
         handler.Release();
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.Equal(1, Assert.Single(completed.Effects).Count);
-        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+        await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(DurableJobRunStatus.Completed, (await ExecuteAsync(extension, orphan)).Status);
+        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
     }
 
     [Fact]

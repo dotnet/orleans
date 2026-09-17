@@ -14,10 +14,8 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task StageEffectAsync(DurableEffect effect);
     Task StageOutputAsync(DurableEnvelope envelope);
     Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
-    Task RevertStateAsync();
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
     Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job);
-    Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
@@ -41,10 +39,10 @@ public sealed record DurableTestMessage(
     [property: Id(1)] int Sequence,
     [property: Id(2)] string Value,
     [property: Id(3)] GrainId? ForwardTo = null,
-    [property: Id(4)] bool ThrowAfterStaging = false,
+    [property: Id(8)] bool ThrowDuringPreparation = false,
     [property: Id(5)] bool CommitDuringHandling = false,
     [property: Id(6)] bool DeleteDuringHandling = false,
-    [property: Id(7)] bool ThrowOnceAfterStaging = false);
+    [property: Id(9)] bool ThrowOnceDuringPreparation = false);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableEffect(
@@ -107,7 +105,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private int _nullNullableValueMessageCalls;
     private int _handlerSelectionCalls;
     private int _mutatingSelectionCalls;
-    private bool _deactivateOnNextRecovery;
     private readonly HashSet<Guid> _failedOnce = [];
 
     public DurableMessagingTestGrain(
@@ -173,8 +170,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
-    public async Task RevertStateAsync() => await StateManager.RevertPendingChangesAsync(CancellationToken.None);
-
     public async Task SetInboxOwnershipAsync(string ownershipId, DurableJob job)
     {
         _inboxJobId.Value = ownershipId;
@@ -190,12 +185,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _inboxJobId.Value = ownershipId;
         _inboxJob.Value = job;
         await WriteStateAsync();
-    }
-
-    public Task DeactivateOnNextRecoveryAsync()
-    {
-        _deactivateOnNextRecovery = true;
-        return Task.CompletedTask;
     }
 
     public Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route)
@@ -234,28 +223,33 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     internal DurableEndpointSnapshot GetSnapshotForTest() => CreateSnapshot();
 
-    internal void DeactivateOnNextRecoveryForTest() => _deactivateOnNextRecovery = true;
-
     public Task RequestDeactivationAsync()
     {
         DeactivateOnIdle();
         return Task.CompletedTask;
     }
 
-    public void OnWriteStarted()
-    {
-    }
+    internal Exception? NextWriteRejection { get; set; }
 
-    public void OnWriteCompleted() => PublishSnapshot();
-    public void OnRecoveryCompleted()
+    public void OnWriteRequested()
     {
-        PublishSnapshot();
-        if (_deactivateOnNextRecovery)
+        if (NextWriteRejection is { } exception)
         {
-            _deactivateOnNextRecovery = false;
-            DeactivateOnIdle();
+            NextWriteRejection = null;
+            throw exception;
         }
     }
+
+    internal TaskCompletionSource<Exception> Faulted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public void OnFaulted(Exception exception) => Faulted.TrySetResult(exception);
+
+    internal List<DurableEndpointSnapshot> Captures { get; } = [];
+
+    public void OnWriteStarted() => Captures.Add(CreateSnapshot());
+
+    public void OnWriteCompleted() => PublishSnapshot();
+    public void OnRecoveryCompleted() => PublishSnapshot();
 
     private async ValueTask HandleAsync(
         DurableTestMessage message,
@@ -272,40 +266,35 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 await gate.Continue.Task.WaitAsync(cancellationToken);
             }
 
-            _effects.TryGetValue(message.LogicalId, out var prior);
-            _effects[message.LogicalId] = new DurableEffect(
-                message.LogicalId,
-                (prior?.Count ?? 0) + 1,
-                message.Sequence,
-                message.Value);
-
+            cancellationToken.ThrowIfCancellationRequested();
             if (message.CommitDuringHandling)
             {
                 await WriteStateAsync(cancellationToken);
             }
-
             if (message.DeleteDuringHandling)
             {
                 await StateManager.DeleteStateAsync(cancellationToken);
             }
-
-            if (message.ForwardTo is { } target)
+            if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && _failedOnce.Add(message.LogicalId)))
             {
-                var outgoing = context.CreateEnvelope()
-                    .To(target, "messages/forwarded")
-                    .WithBody(message with { ForwardTo = null, ThrowAfterStaging = false })
-                    .Build();
-                context.Send(outgoing);
-                if (context.Envelope.RouteKey == "messages/duplicate-output")
-                {
-                    context.Send(outgoing);
-                }
+                throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }
 
-            if (message.ThrowAfterStaging
-                || (message.ThrowOnceAfterStaging && _failedOnce.Add(message.LogicalId)))
+            DurableEnvelope? outgoing = null;
+            if (message.ForwardTo is { } target)
             {
-                throw new InvalidOperationException($"Injected handler failure for {message.LogicalId}.");
+                outgoing = context.CreateEnvelope().To(target, "messages/forwarded")
+                    .WithBody(message with { ForwardTo = null, ThrowDuringPreparation = false }).Build();
+            }
+            _effects.TryGetValue(message.LogicalId, out var prior);
+            _effects[message.LogicalId] = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
+            if (outgoing is { } output)
+            {
+                context.Send(output);
+                if (context.Envelope.RouteKey == "messages/duplicate-output")
+                {
+                    context.Send(output);
+                }
             }
         }
         finally
@@ -318,7 +307,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     private bool AttemptWriteDuringHandlerSelection()
     {
-        _inboxJobId.Value = "invalid-handler-selection-write";
         try
         {
             WriteStateAsync().GetAwaiter().GetResult();
