@@ -14,7 +14,7 @@ namespace Orleans.Journaling.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestCategory("BVT")]
-public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
+public sealed class AzureTableStorageJournalingProviderBuilderTests
 {
     private const string ProviderName = "provider-name";
     private static readonly Uri NamedServiceUri = new("https://named.table.example/");
@@ -184,22 +184,24 @@ public sealed class AzureTableStorageGrainJournalingProviderBuilderTests
             services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey);
     }
 
-    [Fact]
-    public void Assembly_RegistersExpectedProviderMetadata()
+    [Theory]
+    [InlineData("AzureTableStorage", typeof(AzureTableStorageJournalingProviderBuilder))]
+    [InlineData("AzureBlobStorage", typeof(AzureBlobStorageJournalingProviderBuilder))]
+    public void Assembly_RegistersExpectedProviderMetadata(string providerType, Type builderType)
     {
         var attribute = typeof(AzureTableStorageHostingExtensions)
             .Assembly
             .GetCustomAttributes<RegisterProviderAttribute>()
-            .Single(candidate => candidate.Type == typeof(AzureTableStorageGrainJournalingProviderBuilder));
+            .Single(candidate => candidate.Type == builderType);
 
-        Assert.Equal("AzureTableStorage", attribute.Name);
-        Assert.Equal("GrainJournaling", attribute.Kind);
+        Assert.Equal(providerType, attribute.Name);
+        Assert.Equal("Journaling", attribute.Kind);
         Assert.Equal("Silo", attribute.Target);
-        Assert.Equal(typeof(AzureTableStorageGrainJournalingProviderBuilder), attribute.Type);
+        Assert.Equal(builderType, attribute.Type);
     }
 
     private static void Configure(TestSiloBuilder builder, string sectionName)
-        => new AzureTableStorageGrainJournalingProviderBuilder()
+        => new AzureTableStorageJournalingProviderBuilder()
             .Configure(builder, ProviderName, builder.Configuration.GetSection(sectionName));
 
     private static AzureTableJournalStorageOptions GetStorageOptions(IServiceProvider services)

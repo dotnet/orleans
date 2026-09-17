@@ -1,43 +1,36 @@
-using Azure.Data.Tables;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("AzureTableStorage", "GrainJournaling", "Silo", typeof(AzureTableStorageGrainJournalingProviderBuilder))]
+[assembly: RegisterProvider("AzureBlobStorage", "Journaling", "Silo", typeof(AzureBlobStorageJournalingProviderBuilder))]
 namespace Orleans.Hosting;
 
-internal sealed class AzureTableStorageGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AzureBlobStorageJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         name ??= ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
-        builder.AddAzureTableJournalStorage(name, configure: null);
-        var optionsBuilder = builder.Services.AddJournalStorageOptions<AzureTableJournalStorageOptions>(name);
+        builder.AddAzureBlobJournalStorage(name, configure: null);
+        var optionsBuilder = builder.Services.AddJournalStorageOptions<AzureBlobJournalStorageOptions>(name);
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
-            var previousTableName = options.TableName;
-            configurationSection.Bind(options);
-
-            var tableName = configurationSection[nameof(options.TableName)];
-            if (!string.IsNullOrEmpty(tableName))
+            var containerName = configurationSection["ContainerName"];
+            if (!string.IsNullOrEmpty(containerName))
             {
-                options.TableName = tableName;
-            }
-            else
-            {
-                options.TableName = previousTableName;
+                options.ContainerName = containerName;
             }
 
             var serviceKey = configurationSection["ServiceKey"];
             if (!string.IsNullOrEmpty(serviceKey))
             {
                 // Get a client by name.
-                options.TableServiceClient = services.GetRequiredKeyedService<TableServiceClient>(serviceKey);
+                options.BlobServiceClient = services.GetRequiredKeyedService<BlobServiceClient>(serviceKey);
             }
             else
             {
-                // Construct a table service client from a connection string.
+                // Construct a connection multiplexer from a connection string.
                 var connectionName = configurationSection["ConnectionName"];
                 var connectionString = configurationSection["ConnectionString"];
                 if (!string.IsNullOrEmpty(connectionName) && string.IsNullOrEmpty(connectionString))
@@ -50,11 +43,11 @@ internal sealed class AzureTableStorageGrainJournalingProviderBuilder : IProvide
                 {
                     if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                     {
-                        options.TableServiceClient = new(uri);
+                        options.BlobServiceClient = new(uri);
                     }
                     else
                     {
-                        options.TableServiceClient = new(connectionString);
+                        options.BlobServiceClient = new(connectionString);
                     }
                 }
             }

@@ -18,10 +18,24 @@ namespace Tester.Redis.Journaling;
 [TestArea("Journaling")]
 [TestCategory("BVT")]
 [TestCategory("Redis")]
-public sealed class RedisGrainJournalingProviderBuilderTests
+public sealed class RedisJournalingProviderBuilderTests
 {
-    private const string ConfigurationSectionName = "Orleans:GrainJournaling:Redis";
     private const string ProviderName = "redis";
+    private const string ConfigurationSectionName = $"Orleans:Journaling:{ProviderName}";
+
+    [Fact]
+    public void Assembly_RegistersExpectedProviderMetadata()
+    {
+        var attribute = typeof(RedisJournalStorageHostingExtensions)
+            .Assembly
+            .GetCustomAttributes<RegisterProviderAttribute>()
+            .Single(candidate => candidate.Type == typeof(RedisJournalingProviderBuilder));
+
+        Assert.Equal("Redis", attribute.Name);
+        Assert.Equal("Journaling", attribute.Kind);
+        Assert.Equal("Silo", attribute.Target);
+        Assert.Equal(typeof(RedisJournalingProviderBuilder), attribute.Type);
+    }
 
     [Fact]
     public void AddRedisJournalStorage_NullConfigure_UsesDefaultProvider()
@@ -153,7 +167,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
     public void Configure_RegistersJournalStorageServicesExactlyOnce()
     {
         var builder = ConfigureBuilder();
-        new RedisGrainJournalingProviderBuilder().Configure(
+        new RedisJournalingProviderBuilder().Configure(
             builder, ProviderName, builder.Configuration.GetSection(ConfigurationSectionName));
 
         AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
@@ -182,7 +196,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
         var builder = new TestSiloBuilder(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
 
-        new RedisGrainJournalingProviderBuilder().Configure(
+        new RedisJournalingProviderBuilder().Configure(
             builder,
             ProviderName,
             configuration.GetSection(ConfigurationSectionName));

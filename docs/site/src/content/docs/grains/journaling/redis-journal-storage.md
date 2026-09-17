@@ -23,9 +23,11 @@ The named overload accepts a provider name followed by the options delegate.
 Use distinct names with independent connections or key prefixes for separate
 journal namespaces. A named provider's options, catalog, storage, and
 state-manager factory resolve together; the unnamed overload continues to
-configure default grain journaling. A `ServiceKey` in configuration chooses the
-client connection, while the `GrainJournaling` provider name chooses the storage
-binding.
+configure default grain journaling. Set `Orleans:Journaling:{name}:ProviderType` to
+`Redis` to configure each named storage binding, and use
+`Orleans:Journaling:{name}:ServiceKey` to select its client connection from dependency
+injection. Use `Default` as the name for grain journaling, for example
+`Orleans:Journaling:Default:ProviderType`.
 
 Durable Jobs can select a Redis write provider and retain another provider for
 draining. Keep the old prefix, credentials, and mutation permissions until every

@@ -47,6 +47,7 @@ Orleans automatically binds the `Orleans` configuration section when <xref:Micro
 | `Orleans:Endpoints` | Silo | Advertised and listening endpoints |
 | `Orleans:Clustering` | Silo and client | One clustering provider |
 | `Orleans:Reminders` | Silo | One reminder provider |
+| `Orleans:Journaling:{name}` | Silo | Named journal storage providers; `Default` configures grain journaling |
 | `Orleans:BroadcastChannel:{name}` | Silo and client | Named broadcast-channel providers |
 | `Orleans:Streaming:{name}` | Silo and client | Named stream providers |
 | `Orleans:GrainStorage:{name}` | Silo | Named grain storage providers |
