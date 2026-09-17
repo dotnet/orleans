@@ -54,6 +54,12 @@ disposed, or foreign handles are rejected before mutation.
 Envelope identity/equivalence checks retain the existing routing, payload and declared-type
 metadata semantics.
 
+The messaging participant validates the grain's execution model at the first activation
+lifecycle stage, after the runtime assigns the constructed grain instance and before
+journal initialization or replay. Supported activations use a single, noninterleaving
+grain execution model. Grain construction and local state registration precede this
+validation.
+
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job
 handle. Recovery restores that pair and repairs an absent owner for pending work.

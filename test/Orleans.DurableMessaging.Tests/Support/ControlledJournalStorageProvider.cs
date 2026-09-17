@@ -12,6 +12,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
+    private readonly ConcurrentDictionary<JournalId, int> _reads = new();
+    private readonly ConcurrentDictionary<JournalId, int> _initializations = new();
 
     public string? JournalFormatKey { get; private set; }
 
@@ -77,6 +79,9 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
+
+    public int GetReadCount(JournalId journalId) => _reads.TryGetValue(journalId, out var count) ? count : 0;
+    public int GetInitializationCount(JournalId journalId) => _initializations.TryGetValue(journalId, out var count) ? count : 0;
 
     private async ValueTask BeforeWriteAsync(JournalId journalId, CancellationToken cancellationToken)
     {
@@ -153,14 +158,18 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
+            owner._reads.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
             await owner.BeforeReadAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReadAsync(consumer, cancellationToken).ConfigureAwait(false);
         }
 
         public ValueTask<bool> CreateIfNotExistsAsync(
             IReadOnlyDictionary<string, string>? metadata = null,
-            CancellationToken cancellationToken = default) =>
-            inner.CreateIfNotExistsAsync(metadata, cancellationToken);
+            CancellationToken cancellationToken = default)
+        {
+            owner._initializations.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+            return inner.CreateIfNotExistsAsync(metadata, cancellationToken);
+        }
 
         public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default) =>
             inner.GetMetadataAsync(cancellationToken);
