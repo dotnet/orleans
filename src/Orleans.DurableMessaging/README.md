@@ -117,7 +117,7 @@ Serialized null bodies remain valid; route selection supplies delivery and dead-
 outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
 context bytes, and declared type metadata.
 
-The participant installs one messaging observer with explicit inbox and outbox
+The selected activation setup installs one messaging observer with explicit inbox and outbox
 endpoints. After inbox handler preparation, outbox preparation seals the capture's
 intent set and obtains scheduler acknowledgement for any required owner. This also
 repairs an absent owner for already-nonempty recovered work before capture. Healthy
@@ -147,7 +147,9 @@ requires quiescent messaging operations and clears pending intents after success
 
 This intermediate project remains non-packable. Receiver tests compose the inbox
 with existing Journaling and DurableJobs services and a journaled test outbox for
-isolation. Outbox component tests construct the actual runtime through test-only
-reflection and public interfaces. Public `AddDurableMessaging` hosting composition,
+isolation. Bootstrap tests compose the real outbox and verify marker-selected and
+legacy grains through atomic capture, fresh replay, remote delivery, and deduplication.
+Outbox component tests construct the actual runtime through test-only reflection and
+public interfaces. Public `AddDurableMessaging` hosting composition,
 full-cluster sender/receiver integration, package publishing, and documentation-site
 wiring are assembled in the final consumer layer.
