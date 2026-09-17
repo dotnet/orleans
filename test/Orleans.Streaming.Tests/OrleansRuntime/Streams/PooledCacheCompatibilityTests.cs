@@ -87,7 +87,7 @@ public class PooledCacheCompatibilityTests
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(4, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
         Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
-        progress.RecordDeliverySuccess();
+        progress.RecordDeliveryCompletion();
         Assert.Equal(4, progress.SafeSequenceToken?.SequenceNumber);
     }
 

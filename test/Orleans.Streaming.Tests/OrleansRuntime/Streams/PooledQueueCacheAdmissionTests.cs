@@ -67,7 +67,7 @@ public class PooledQueueCacheAdmissionTests
         }
 
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cache.TryGetNextMessageWithResult(cursor, out _).Kind);
-        ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
 
         // A successful commit advances the reporting deadline exactly once.
         cache.Add([], ReportTime);
