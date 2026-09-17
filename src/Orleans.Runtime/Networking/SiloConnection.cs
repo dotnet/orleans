@@ -279,12 +279,20 @@ namespace Orleans.Runtime.Messaging
             {
                 LogDebugSiloRejectingMessage(this.Log, this.LocalSiloAddress, msg, reason);
 
+                var rejectionReason = $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}";
+                var exception = new SiloUnavailableException();
+                if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequest(msg, this.LocalSiloAddress))
+                {
+                    this.messageCenter.RejectForwardedClientRequest(msg, rejectionReason, exception);
+                    return;
+                }
+
                 // Done retrying, send back an error instead
                 this.messageCenter.SendRejection(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new SiloUnavailableException());
+                    rejectionReason,
+                    exception);
             }
             else
             {
