@@ -227,7 +227,8 @@ namespace Orleans.Runtime.MembershipService
                         }
                         catch (Exception exc)
                         {
-                            LogErrorParsingMembershipTableDataIgnoring(exc, tableEntry);
+                            LogErrorParsingMembershipEntry(exc, tableEntry);
+                            throw;
                         }
                     }
                 }
@@ -474,9 +475,9 @@ namespace Orleans.Runtime.MembershipService
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_61,
             Level = LogLevel.Error,
-            Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}. Ignoring this entry."
+            Message = "Intermediate error parsing SiloInstanceTableEntry to MembershipTableData: {Data}."
         )]
-        private partial void LogErrorParsingMembershipTableDataIgnoring(Exception ex, SiloInstanceTableEntry data);
+        private partial void LogErrorParsingMembershipEntry(Exception ex, SiloInstanceTableEntry data);
 
         [LoggerMessage(
             EventId = (int)TableStorageErrorCode.AzureTable_60,
