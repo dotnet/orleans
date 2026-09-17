@@ -107,8 +107,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = false;
 
             //perform purge
-            foreach (var cache in cacheList)
-                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
             int expectedItemCountInCacheList = itemAddToCache + itemAddToCache;
@@ -132,8 +132,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             this.purgePredicate.ShouldPurge = true;
 
             //perform purge
-            foreach (var cache in cacheList)
-                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Assert
             int expectedItemCountInCaches = 0;
@@ -170,8 +170,8 @@ namespace ServiceBus.Tests.EvictionStrategyTests
                     expectedPurgedBuffers.Add(purgedBufferList[i]);
             });
 
-            foreach (var cache in cacheList)
-                cache.UpdateDeliveryProgress(cache.ReadBoundary, DateTime.UtcNow);
+            this.receiver1.TryPurgeFromCache(out _);
+            this.receiver2.TryPurgeFromCache(out _);
 
             //Each cache should have all buffers purged
             this.evictionStrategyList.ForEach(strategy => Assert.Empty(strategy.InUseBuffers));

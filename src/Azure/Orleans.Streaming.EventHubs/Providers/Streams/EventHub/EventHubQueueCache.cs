@@ -92,11 +92,9 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        /// <inheritdoc />
-        public void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
+        internal void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
         {
             ArgumentNullException.ThrowIfNull(safeToken);
-            EnableCertifiedDeliveryProgress();
             deliveryBoundary = safeToken;
             try
             {
@@ -109,24 +107,15 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        /// <inheritdoc />
-        public virtual bool TryEnableCertifiedDeliveryProgress()
-        {
-            if (GetType() != typeof(EventHubQueueCache)
-                || dataAdapter.GetType() != typeof(EventHubDataAdapter)
-                || evictionStrategy.GetType() != typeof(ChronologicalEvictionStrategy))
-            {
-                return false;
-            }
+        // Custom compositions retain their released behavior. Only native components or
+        // fault-injection tests which explicitly enabled this cache use certified progress.
+        internal bool TryEnableCertifiedDeliveryProgress()
+            => certifiedDeliveryProgress = certifiedDeliveryProgress
+                || (GetType() == typeof(EventHubQueueCache)
+                    && dataAdapter.GetType() == typeof(EventHubDataAdapter)
+                    && evictionStrategy.GetType() == typeof(ChronologicalEvictionStrategy));
 
-            EnableCertifiedDeliveryProgress();
-            return true;
-        }
-
-        /// <summary>
-        /// Enables the certified contract for a derived cache which supplies compatible cursors and eviction.
-        /// </summary>
-        protected void EnableCertifiedDeliveryProgress() => certifiedDeliveryProgress = true;
+        internal void EnableCertifiedDeliveryProgress() => certifiedDeliveryProgress = true;
 
         private sealed class CertifiedPurgeView(EventHubQueueCache owner) : IPurgeObservable
         {
