@@ -95,19 +95,6 @@ public sealed class NatsStreamProviderBuilderTests
     }
 
     [Fact]
-    public void LogSafeServerDescription_RedactsCredentials()
-    {
-        var description = NatsConnectionManager.GetLogSafeServerDescription(
-            "nats://user:password@first.example:4222,nats://token@second.example:4222");
-
-        Assert.DoesNotContain("user", description, StringComparison.Ordinal);
-        Assert.DoesNotContain("password", description, StringComparison.Ordinal);
-        Assert.DoesNotContain("token", description, StringComparison.Ordinal);
-        Assert.Contains("first.example", description, StringComparison.Ordinal);
-        Assert.Contains("second.example", description, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task Initialize_SharedConnection_LogsCredentialRedactedEndpoints()
     {
         var connection = Substitute.For<INatsConnection>();

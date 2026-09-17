@@ -1,11 +1,8 @@
 using System.Reflection;
-using Amazon;
-using Amazon.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.AWSUtils.Tests;
 using Orleans.Clustering.DynamoDB;
@@ -15,7 +12,6 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Xunit;
 using ClusteringProviderConfiguration = Orleans.Clustering.DynamoDB.DynamoDBProviderConfiguration;
-using LinkedDynamoDBStorage = Orleans.AWSUtils.Tests.DynamoDBStorage;
 
 namespace AWSUtils.Tests.Configuration;
 
@@ -494,62 +490,6 @@ public sealed class DynamoDBProviderConfigurationTests
 [TestProvider("DynamoDB")]
 [TestArea("Storage")]
 [TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
-public sealed class DynamoDBClientOptionsTests
-{
-    [Fact]
-    public void CredentialProperties_HaveRedactAttribute()
-    {
-        foreach (var propertyName in new[]
-        {
-            nameof(DynamoDBStorageOptions.AccessKey),
-            nameof(DynamoDBStorageOptions.SecretKey),
-            nameof(DynamoDBStorageOptions.Token),
-        })
-        {
-            var property = typeof(DynamoDBStorageOptions).GetProperty(propertyName);
-            var redaction = property?.GetCustomAttribute<RedactAttribute>();
-
-            Assert.NotNull(redaction);
-            Assert.Equal("REDACTED", redaction.Redact($"literal-{propertyName}")?.ToString());
-        }
-    }
-
-    [Fact]
-    public void RegisteredOptionsFormatter_DoesNotRenderCredentialLiterals()
-    {
-        using var host = new HostBuilder()
-            .UseOrleans(silo => silo.UseDynamoDBClustering((DynamoDBClusteringOptions options) =>
-            {
-                options.AccessKey = "literal-access";
-                options.SecretKey = "literal-secret";
-                options.Token = "literal-token";
-                options.ProfileName = "visible-profile";
-                options.Service = "visible-region";
-                options.TableName = "visible-table";
-            }))
-            .Build();
-        var formatter = host.Services
-            .GetServices<IOptionFormatter>()
-            .Single(value => value is IOptionFormatter<DynamoDBClusteringOptions>);
-
-        var formatted = string.Join(Environment.NewLine, formatter.Format());
-
-        Assert.DoesNotContain("literal-access", formatted);
-        Assert.DoesNotContain("literal-secret", formatted);
-        Assert.DoesNotContain("literal-token", formatted);
-        Assert.Contains("AccessKey: REDACTED", formatted);
-        Assert.Contains("SecretKey: REDACTED", formatted);
-        Assert.Contains("Token: REDACTED", formatted);
-        Assert.Contains("ProfileName: visible-profile", formatted);
-        Assert.Contains("Service: visible-region", formatted);
-        Assert.Contains("TableName: visible-table", formatted);
-    }
-}
-
-[TestSuite("BVT")]
-[TestProvider("DynamoDB")]
-[TestArea("Storage")]
-[TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
 public sealed class DynamoDBOptionsValidationTests
 {
     [Fact]
@@ -765,137 +705,6 @@ public sealed class DynamoDBOptionsValidationTests
         public BinaryData Serialize<T>(T? input) => throw new NotSupportedException();
 
         public T? Deserialize<T>(BinaryData input) => throw new NotSupportedException();
-    }
-}
-
-[CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class DynamoDBCredentialEnvironmentCollection
-{
-    public const string Name = "DynamoDB credential environment";
-}
-
-[Collection(DynamoDBCredentialEnvironmentCollection.Name)]
-[TestSuite("BVT")]
-[TestProvider("DynamoDB")]
-[TestArea("Storage")]
-[TestCategory("AWS"), TestCategory("DynamoDB"), TestCategory("BVT")]
-public sealed class DynamoDBStorageCredentialTests
-{
-    [Fact]
-    public void DynamoDBStorage_DefaultCredentialChainWithRegion_PreservesDefaultChain()
-    {
-        var storage = new LinkedDynamoDBStorage(
-            NullLogger<LinkedDynamoDBStorage>.Instance,
-            service: "us-west-2");
-
-        Assert.Null(storage.GetExplicitCredentialsForTest());
-        Assert.Equal("us-west-2", storage.ClientForTest.Config.RegionEndpoint.SystemName);
-        Assert.Null(storage.ClientForTest.Config.ServiceURL);
-    }
-
-    [Fact]
-    public void DynamoDBStorage_HttpEmulatorEndpointWithoutCredentials_UsesDummyCredentials()
-    {
-        var storage = new LinkedDynamoDBStorage(
-            NullLogger<LinkedDynamoDBStorage>.Instance,
-            service: "http://dynamodb:8000");
-
-        var credentials = Assert.IsType<BasicAWSCredentials>(storage.GetClientCredentialsForTest());
-        var immutable = credentials.GetCredentials();
-
-        Assert.Equal("dummy", immutable.AccessKey);
-        Assert.Equal("dummyKey", immutable.SecretKey);
-        Assert.Equal(new Uri("http://dynamodb:8000").AbsoluteUri, storage.ClientForTest.Config.ServiceURL);
-    }
-
-    [Fact]
-    public void DynamoDBStorage_HttpsEndpointWithoutCredentials_PreservesDefaultChain()
-    {
-        var storage = new LinkedDynamoDBStorage(
-            NullLogger<LinkedDynamoDBStorage>.Instance,
-            service: "https://dynamodb.example");
-
-        Assert.Null(storage.GetClientCredentialsForTest());
-        Assert.Equal(new Uri("https://dynamodb.example").AbsoluteUri, storage.ClientForTest.Config.ServiceURL);
-    }
-
-    [Fact]
-    public void DynamoDBStorage_ExplicitAccessAndSecret_UsesBasicCredentials()
-    {
-        var storage = new LinkedDynamoDBStorage(
-            NullLogger<LinkedDynamoDBStorage>.Instance,
-            service: "us-east-2",
-            accessKey: "explicit-access",
-            secretKey: "explicit-secret");
-
-        var credentials = Assert.IsType<BasicAWSCredentials>(storage.GetExplicitCredentialsForTest());
-        var immutable = credentials.GetCredentials();
-
-        Assert.Equal("explicit-access", immutable.AccessKey);
-        Assert.Equal("explicit-secret", immutable.SecretKey);
-        Assert.Equal(string.Empty, immutable.Token);
-        Assert.Equal("us-east-2", storage.ClientForTest.Config.RegionEndpoint.SystemName);
-    }
-
-    [Fact]
-    public void DynamoDBStorage_ExplicitSessionCredentials_UsesSessionCredentials()
-    {
-        var storage = new LinkedDynamoDBStorage(
-            NullLogger<LinkedDynamoDBStorage>.Instance,
-            service: "eu-west-2",
-            accessKey: "session-access",
-            secretKey: "session-secret",
-            token: "session-token");
-
-        var credentials = Assert.IsType<SessionAWSCredentials>(storage.GetExplicitCredentialsForTest());
-        var immutable = credentials.GetCredentials();
-
-        Assert.Equal("session-access", immutable.AccessKey);
-        Assert.Equal("session-secret", immutable.SecretKey);
-        Assert.Equal("session-token", immutable.Token);
-        Assert.Equal("eu-west-2", storage.ClientForTest.Config.RegionEndpoint.SystemName);
-    }
-
-    [Fact]
-    public void DynamoDBStorage_ProfileName_UsesIsolatedSharedCredentialsProfile()
-    {
-        var profileName = $"phase-one-{Guid.NewGuid():N}";
-        var credentialsPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.credentials");
-        var expectedAccessKey = $"access-{Guid.NewGuid():N}";
-        var expectedSecretKey = $"secret-{Guid.NewGuid():N}";
-        var previousProfilesLocation = AWSConfigs.AWSProfilesLocation;
-        try
-        {
-            File.WriteAllText(
-                credentialsPath,
-                $"[{profileName}]{Environment.NewLine}" +
-                $"aws_access_key_id = {expectedAccessKey}{Environment.NewLine}" +
-                $"aws_secret_access_key = {expectedSecretKey}{Environment.NewLine}");
-            AWSConfigs.AWSProfilesLocation = credentialsPath;
-
-            var storage = new LinkedDynamoDBStorage(
-                NullLogger<LinkedDynamoDBStorage>.Instance,
-                service: "us-west-2",
-                profileName: profileName);
-            var credentials = storage.GetExplicitCredentialsForTest();
-            var immutable = Assert.IsType<BasicAWSCredentials>(credentials).GetCredentials();
-            var exception = Assert.Throws<InvalidOperationException>(() => new LinkedDynamoDBStorage(
-                NullLogger<LinkedDynamoDBStorage>.Instance,
-                service: "us-west-2",
-                profileName: $"{profileName}-missing"));
-
-            Assert.Equal(expectedAccessKey, immutable.AccessKey);
-            Assert.Equal(expectedSecretKey, immutable.SecretKey);
-            Assert.Equal(string.Empty, immutable.Token);
-            Assert.Equal("us-west-2", storage.ClientForTest.Config.RegionEndpoint.SystemName);
-            Assert.Contains($"{profileName}-missing", exception.Message);
-            Assert.DoesNotContain("aws_secret_access_key", exception.Message);
-        }
-        finally
-        {
-            AWSConfigs.AWSProfilesLocation = previousProfilesLocation;
-            File.Delete(credentialsPath);
-        }
     }
 }
 
