@@ -74,15 +74,16 @@ public class SqlServerStorageForTestingTests
                 cancellationToken: cancellationToken));
         await using var competingConnection = new SqlConnection(storage.CurrentConnectionString);
         await competingConnection.OpenAsync(cancellationToken);
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var stopReconnecting = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var reconnectAttempts = Enumerable.Range(0, 4)
             .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
             .ToArray();
         var reconnectingClients = reconnectAttempts
-            .Select(attempt => ReconnectAndHoldUntilCanceledAsync(
+            .Select(attempt => ReconnectAndHoldUntilStoppedAsync(
                 storage.CurrentConnectionString,
                 attempt,
-                cancellation.Token))
+                stopReconnecting.Token,
+                cancellationToken))
             .ToArray();
 
         try
@@ -101,7 +102,7 @@ public class SqlServerStorageForTestingTests
         }
         finally
         {
-            await cancellation.CancelAsync();
+            await stopReconnecting.CancelAsync();
             await Task.WhenAll(reconnectingClients);
         }
 
@@ -129,41 +130,43 @@ public class SqlServerStorageForTestingTests
         Assert.NotNull(state.Item5);
     }
 
-    private static async Task ReconnectAndHoldUntilCanceledAsync(
+    private static async Task ReconnectAndHoldUntilStoppedAsync(
         string connectionString,
         TaskCompletionSource reconnectAttempt,
+        CancellationToken stoppingToken,
         CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await using var connection = new SqlConnection(connectionString);
+                // Worker shutdown drains SQL operations; test cancellation still aborts I/O.
                 await connection.OpenAsync(cancellationToken);
                 reconnectAttempt.TrySetResult();
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1";
-                while (!cancellationToken.IsCancellationRequested)
+                while (!stoppingToken.IsCancellationRequested)
                 {
                     _ = await command.ExecuteScalarAsync(cancellationToken);
-                    await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(10), stoppingToken);
                 }
             }
             catch (SqlException)
             {
-                if (!cancellationToken.IsCancellationRequested)
+                if (!stoppingToken.IsCancellationRequested)
                 {
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+                        await Task.Delay(TimeSpan.FromMilliseconds(10), stoppingToken);
                     }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     {
                         return;
                     }
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
             }
         }
