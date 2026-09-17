@@ -17,6 +17,12 @@ internal static class ReceiverTestServices
 {
     public const string InboxJobName = "orleans.messaging.inbox-drain";
 
+    private static readonly Func<IGrainContext?> ReadCurrentContext = typeof(IGrainContext).Assembly
+        .GetType("Orleans.Runtime.RuntimeContext", throwOnError: true)!
+        .GetProperty("Current")!.GetMethod!.CreateDelegate<Func<IGrainContext?>>();
+
+    public static IGrainContext? CurrentGrainContext => ReadCurrentContext();
+
     public static Type GetImplementationType(string name) =>
         typeof(IDurableInbox).Assembly.GetType($"Orleans.DurableMessaging.{name}", throwOnError: true)!;
 
