@@ -37,7 +37,12 @@ Acceptance and ownership repair retain local proposals until scheduling is ackno
 and a healthy journal operation admits them. Its finalizer applies the complete envelope
 and ownership pair. A journal failure permanently fences the activation, signals pending
 preparations and callbacks, and faults its waiters. A fresh activation replays the actual
-durable outcome, including commits whose acknowledgement failed. Retained duplicates return `Duplicate`; expiry permits
+durable outcome, including commits whose acknowledgement failed.
+A delivery caller can cancel its wait while the owned operation retains admission
+through completion. Activation shutdown drains that operation, and delivery failures
+are logged and observed even after the caller has left.
+
+Retained duplicates return `Duplicate`; expiry permits
 acceptance again. Capacity limits return `Backpressured` before persistence.
 `CanHandle` implementations are pure metadata predicates: the handler keeps grain
 state and injected durable state unchanged until `HandleAsync`. The selection

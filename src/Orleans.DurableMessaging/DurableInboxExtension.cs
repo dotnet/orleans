@@ -65,6 +65,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly int _maxRetainedDeadLetters;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
+    private Task _activeDelivery = Task.CompletedTask;
     private int _disposed;
     private int _handlerWriteRejected;
     private int _metricsActive;
@@ -234,6 +235,14 @@ internal sealed partial class DurableInboxExtension :
 
         EnsureMetricsActive();
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        var delivery = DeliverUnderGateAsync(envelope);
+        _activeDelivery = delivery;
+        delivery.Ignore();
+        return await delivery.WaitAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task<DeliveryResult> DeliverUnderGateAsync(DurableEnvelope envelope)
+    {
         try
         {
             ValidateReady();
@@ -289,6 +298,11 @@ internal sealed partial class DurableInboxExtension :
                     _pendingOwnershipIds.Remove(proposal.Id);
                 }
             }
+        }
+        catch (Exception exception)
+        {
+            LogDeliveryOperationFailed(_logger, exception, envelope.MessageId, envelope.SenderId, _grainContext.GrainId);
+            throw;
         }
         finally
         {
@@ -744,10 +758,11 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    public Task OnStop(CancellationToken cancellationToken)
+    public async Task OnStop(CancellationToken cancellationToken)
     {
         StopProcessing();
-        return Task.CompletedTask;
+        // The operation retains admission after its caller leaves; its failure is logged and observed independently.
+        await _activeDelivery.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
     }
 
     internal void StopProcessing()
@@ -1150,6 +1165,10 @@ internal sealed partial class DurableInboxExtension :
     }
 
     // Structured logging using LoggerMessage source generator
+
+    [LoggerMessage(Level = LogLevel.Error, EventName = "DeliveryOperationFailed",
+        Message = "Durable inbox delivery of message {MessageId} from {SenderId} to {GrainId} failed")]
+    private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId grainId);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
