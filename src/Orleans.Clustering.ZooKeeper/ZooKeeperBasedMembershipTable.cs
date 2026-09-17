@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Membership
     /// Every Orleans deployment has a node   /UniqueDeploymentId
     /// Every Silo's state is saved in        /UniqueDeploymentId/IP:Port@Gen
     /// Every Silo's IAmAlive is saved in     /UniqueDeploymentId/IP:Port@Gen/IAmAlive
-    /// IAmAlive is saved in a separate node because its updates are unconditional.
+    /// IAmAlive is saved in a separate node so compare-and-set heartbeat updates preserve the membership row's version.
     /// 
     /// a node's ZK version is its ETag:
     /// the table version is the version of /UniqueDeploymentId
@@ -131,25 +131,8 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
-            return UsingZookeeper(async zk =>
-            {
-                var getRowTask = GetRow(zk, siloAddress, cancellationToken);
-                var getTableNodeTask = zk.getDataAsync("/");//get the current table version
-
-                List<Tuple<MembershipEntry, string>> rows = new List<Tuple<MembershipEntry, string>>(1);
-                try
-                {
-                    await Task.WhenAll(getRowTask, getTableNodeTask);
-                    rows.Add(await getRowTask);
-                }
-                catch (KeeperException.NoNodeException)
-                {
-                    //that's ok because orleans expects an empty list in case of a missing row
-                }
-
-                var tableVersion = ConvertToTableVersion((await getTableNodeTask).Stat);
-                return new MembershipTableData(rows, tableVersion);
-            }, this.deploymentConnectionString, this.watcher, cancellationToken, true);
+            return UsingZookeeper(zk => ReadCoreAsync(zk, siloAddress, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
         }
 
         /// <summary>
@@ -170,20 +153,68 @@ namespace Orleans.Runtime.Membership
 
         internal static Task<MembershipTableData> ReadAllAsync(string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
         {
-            return UsingZookeeper(async zk =>
-            {
-                var childrenResult = await zk.getChildrenAsync("/");//get all the child nodes (without the data)
-
-                var childrenTasks = //get the data from each child node
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child), cancellationToken)).ToList();
-
-                var childrenTaskResults = await Task.WhenAll(childrenTasks);
-
-                var tableVersion = ConvertToTableVersion(childrenResult.Stat);//this is the current table version
-
-                return new MembershipTableData(childrenTaskResults.ToList(), tableVersion);
-            }, deploymentConnectionString, watcher, cancellationToken, true);
+            return UsingZookeeper(zk => ReadCoreAsync(zk, null, cancellationToken),
+                deploymentConnectionString, watcher, cancellationToken);
         }
+
+        internal static async Task<MembershipTableData> ReadCoreAsync(
+            NativeOperations zk, SiloAddress? siloAddress, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await zk.Sync("/");
+                cancellationToken.ThrowIfCancellationRequested();
+                Stat before;
+                IEnumerable<SiloAddress> addresses;
+                if (siloAddress is null)
+                {
+                    var children = await zk.GetChildren("/");
+                    before = children.Stat;
+                    addresses = children.Children.Select(SiloAddress.FromParsableString);
+                }
+                else
+                {
+                    before = (await zk.GetData("/")).Stat;
+                    addresses = [siloAddress];
+                }
+
+                var pendingRows = Task.WhenAll(addresses.Select(address => GetRow(zk, address, siloAddress is not null, cancellationToken)));
+                Tuple<MembershipEntry, string>?[] rows;
+                try
+                {
+                    rows = await pendingRows;
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    // Observe every parallel read: a removed row must not hide another request's failure.
+                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(exception => exception is not KeeperException.NoNodeException);
+                    if (failure is not null)
+                    {
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var current = await zk.GetData("/");
+                    if (SameVersion(before, current.Stat))
+                    {
+                        throw;
+                    }
+
+                    continue;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                var after = await zk.GetData("/");
+                if (SameVersion(before, after.Stat))
+                {
+                    return new MembershipTableData(rows.OfType<Tuple<MembershipEntry, string>>().ToList(), ConvertToTableVersion(after.Stat));
+                }
+            }
+        }
+
+        private static bool SameVersion(Stat before, Stat after) =>
+            before.getVersion() == after.getVersion() && before.getCversion() == after.getCversion();
 
         /// <summary>
         /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
@@ -213,6 +244,14 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(tableVersion);
             cancellationToken.ThrowIfCancellationRequested();
 
+            return UsingZookeeper(zk => InsertRowCoreAsync(zk, entry, tableVersion, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<bool> InsertRowCoreAsync(
+            NativeOperations zk, MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             byte[] newRowData = Serialize(entry);
@@ -220,10 +259,26 @@ namespace Orleans.Runtime.Membership
 
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
 
-            return TryTransaction(t => t
-                .setData("/", null, expectedTableVersion)//increments the version of node "/"
-                .create(rowPath, newRowData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
-                .create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT), cancellationToken);
+            try
+            {
+                await zk.Multi(
+                [
+                    Op.setData("/", null, expectedTableVersion),
+                    Op.create(rowPath, newRowData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT),
+                    Op.create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+                ]);
+                return true;
+            }
+            catch (KeeperException e) when (e is KeeperException.NodeExistsException or KeeperException.BadVersionException)
+            {
+                return false;
+            }
+            catch (KeeperException.NoNodeException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await zk.GetData("/");
+                return false;
+            }
         }
 
         /// <summary>
@@ -258,18 +313,58 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(tableVersion);
             cancellationToken.ThrowIfCancellationRequested();
 
+            return UsingZookeeper(zk => UpdateRowCoreAsync(zk, entry, etag, tableVersion, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<bool> UpdateRowCoreAsync(
+            NativeOperations zk, MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
+        {
             string rowPath = ConvertToRowPath(entry.SiloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
-            var newRowIAmAliveData = Serialize(entry.IAmAliveTime);
-
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
             int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
-            return TryTransaction(t => t
-                .setData("/", null, expectedTableVersion)//increments the version of node "/"
-                .setData(rowPath, newRowData, expectedRowVersion)//increments the version of node "/IP:Port@Gen"
-                .setData(rowIAmAlivePath, newRowIAmAliveData), cancellationToken);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if ((await zk.GetData("/")).Stat.getVersion() != expectedTableVersion)
+                {
+                    return false;
+                }
+
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if ((await zk.GetData(rowPath)).Stat.getVersion() != expectedRowVersion)
+                    {
+                        return false;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var heartbeat = await zk.GetData(rowIAmAlivePath);
+                    var time = new DateTime(Math.Max(entry.IAmAliveTime.Ticks, Deserialize<DateTime>(heartbeat.Data).Ticks), DateTimeKind.Utc);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.Multi(
+                    [
+                        Op.setData("/", null, expectedTableVersion),
+                        Op.setData(rowPath, newRowData, expectedRowVersion),
+                        Op.setData(rowIAmAlivePath, Serialize(time), heartbeat.Stat.getVersion())
+                    ]);
+                    return true;
+                }
+                catch (KeeperException.BadVersionException)
+                {
+                    // Retry heartbeat races while retaining the caller's row and table preconditions.
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.GetData("/");
+                    return false;
+                }
+            }
         }
 
         /// <summary>
@@ -294,10 +389,43 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(entry);
             cancellationToken.ThrowIfCancellationRequested();
 
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            byte[] newRowIAmAliveData = Serialize(entry.IAmAliveTime);
-            //update the data for IAmAlive unconditionally
-            return UsingZookeeper(zk => zk.setDataAsync(rowIAmAlivePath, newRowIAmAliveData), this.deploymentConnectionString, this.watcher, cancellationToken);
+            return UsingZookeeper(zk => UpdateIAmAliveCoreAsync(entry, zk.GetData, zk.SetData, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<bool> UpdateIAmAliveCoreAsync(
+            MembershipEntry entry,
+            Func<string, Task<DataResult>> getData,
+            Func<string, byte[], int, Task<Stat>> setData,
+            CancellationToken cancellationToken)
+        {
+            var path = ConvertToRowIAmAlivePath(entry.SiloAddress);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var heartbeat = await getData(path);
+                    if (Deserialize<DateTime>(heartbeat.Data) >= entry.IAmAliveTime)
+                    {
+                        return true;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await setData(path, Serialize(entry.IAmAliveTime), heartbeat.Stat.getVersion());
+                    return true;
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await getData("/");
+                    return true;
+                }
+                catch (KeeperException.BadVersionException)
+                {
+                    // Preserve the maximum when another heartbeat or status update wins the race.
+                }
+            }
         }
 
         /// <summary>
@@ -318,59 +446,70 @@ namespace Orleans.Runtime.Membership
             }, cancellationToken);
         }
 
-        private async Task<bool> TryTransaction(Func<Transaction, Transaction> transactionFunc, CancellationToken cancellationToken)
-        {
-            try
-            {
-                await UsingZookeeper(zk => transactionFunc(zk.transaction()).commitAsync(), this.deploymentConnectionString, this.watcher, cancellationToken);
-                return true;
-            }
-            catch (KeeperException e)
-            {
-                //these exceptions are thrown when the transaction fails to commit due to semantical reasons
-                if (e is KeeperException.NodeExistsException || e is KeeperException.NoNodeException ||
-                    e is KeeperException.BadVersionException)
-                {
-                    return false;
-                }
-                throw;
-            }
-        }
-
         /// <summary>
         /// Reads the nodes /IP:Port@Gen and /IP:Port@Gen/IAmAlive (which together is one row)
         /// </summary>
         /// <param name="zk">The zookeeper instance used for the read</param>
         /// <param name="siloAddress">The silo address.</param>
+        /// <param name="allowMissing">Whether a missing row is represented by an empty point read.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
-        private static async Task<Tuple<MembershipEntry, string>> GetRow(ZooKeeper zk, SiloAddress siloAddress, CancellationToken cancellationToken)
+        private static async Task<Tuple<MembershipEntry, string>?> GetRow(NativeOperations zk, SiloAddress siloAddress, bool allowMissing, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string rowPath = ConvertToRowPath(siloAddress);
             string rowIAmAlivePath = ConvertToRowIAmAlivePath(siloAddress);
 
-            var rowDataTask = zk.getDataAsync(rowPath);
-            var rowIAmAliveDataTask = zk.getDataAsync(rowIAmAlivePath);
+            DataResult row;
+            try
+            {
+                row = await zk.GetData(rowPath);
+            }
+            catch (KeeperException.NoNodeException) when (allowMissing)
+            {
+                return null;
+            }
 
-            await Task.WhenAll(rowDataTask, rowIAmAliveDataTask);
+            cancellationToken.ThrowIfCancellationRequested();
+            var heartbeat = await zk.GetData(rowIAmAlivePath);
+            MembershipEntry me = Deserialize<MembershipEntry>(row.Data);
+            me.IAmAliveTime = Deserialize<DateTime>(heartbeat.Data);
 
-            MembershipEntry me = Deserialize<MembershipEntry>((await rowDataTask).Data);
-            me.IAmAliveTime = Deserialize<DateTime>((await rowIAmAliveDataTask).Data);
-
-            int rowVersion = (await rowDataTask).Stat.getVersion();
+            int rowVersion = row.Stat.getVersion();
 
             return new Tuple<MembershipEntry, string>(me, rowVersion.ToString(CultureInfo.InvariantCulture));
         }
 
-        private static async Task<T> UsingZookeeper<T>(Func<ZooKeeper, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken, bool canBeReadOnly = false)
+        // These delegates expose the native request boundary for deterministic tests of the real operation loops.
+        internal sealed class NativeOperations(
+            Func<string, Task<DataResult>> getData,
+            Func<string, Task<ChildrenResult>> getChildren,
+            Func<string, Task> sync,
+            Func<List<Op>, Task> multi,
+            Func<string, byte[], int, Task<Stat>> setData)
+        {
+            internal Func<string, Task<DataResult>> GetData { get; } = getData;
+            internal Func<string, Task<ChildrenResult>> GetChildren { get; } = getChildren;
+            internal Func<string, Task> Sync { get; } = sync;
+            internal Func<List<Op>, Task> Multi { get; } = multi;
+            internal Func<string, byte[], int, Task<Stat>> SetData { get; } = setData;
+        }
+
+        private static async Task<T> UsingZookeeper<T>(Func<NativeOperations, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var operation = ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zk =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return zkMethod(zk);
-            }, canBeReadOnly);
+                return zkMethod(new NativeOperations(
+                    path => zk.getDataAsync(path), path => zk.getChildrenAsync(path), zk.sync,
+                    operations => zk.multiAsync(operations), zk.setDataAsync));
+            });
 
+            return await AwaitOperationAsync(operation, cancellationToken);
+        }
+
+        internal static async Task<T> AwaitOperationAsync<T>(Task<T> operation, CancellationToken cancellationToken)
+        {
             // ZooKeeperNetEx is tokenless. Keep the client alive until pending requests and
             // asynchronous disposal finish, observing failures even if the caller stops waiting.
             operation.Ignore();
@@ -446,23 +585,54 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            return UsingZookeeper(async zk =>
-            {
-                var childrenResult = await zk.getChildrenAsync("/");
-                var rows = await Task.WhenAll(
-                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child), cancellationToken)));
+            return UsingZookeeper(zk => CleanupCoreAsync(zk, beforeDate, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
 
-                foreach (var (entry, _) in rows)
+        internal static async Task<bool> CleanupCoreAsync(NativeOperations zk, DateTimeOffset beforeDate, CancellationToken cancellationToken)
+        {
+            var cutoff = beforeDate.UtcDateTime;
+            while (true)
+            {
+                var table = await ReadCoreAsync(zk, null, cancellationToken);
+                var candidates = table.Members.Where(row => row.Item1.Status == SiloStatus.Dead
+                    && row.Item1.StartTime < cutoff && row.Item1.IAmAliveTime < cutoff
+                    && row.Item1.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) != true).ToList();
+                if (candidates.Count == 0)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.Ticks)
-                    {
-                        await DeleteRecursive(zk, ConvertToRowPath(entry.SiloAddress), cancellationToken);
-                    }
+                    return true;
                 }
 
-                return true;
-            }, this.deploymentConnectionString, this.watcher, cancellationToken);
+                foreach (var (entry, etag) in candidates)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var heartbeatPath = ConvertToRowIAmAlivePath(entry.SiloAddress);
+                        var heartbeat = await zk.GetData(heartbeatPath);
+                        if (Deserialize<DateTime>(heartbeat.Data) >= cutoff)
+                        {
+                            continue;
+                        }
+
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await zk.Multi(
+                        [
+                            Op.delete(heartbeatPath, heartbeat.Stat.getVersion()),
+                            Op.delete(ConvertToRowPath(entry.SiloAddress), int.Parse(etag, CultureInfo.InvariantCulture))
+                        ]);
+                    }
+                    catch (KeeperException.BadVersionException)
+                    {
+                        // Re-evaluate eligibility after a concurrent row or heartbeat update.
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await zk.GetData("/");
+                    }
+                }
+            }
         }
 
         [LoggerMessage(
