@@ -12,18 +12,13 @@ namespace Orleans.Clustering.Cassandra.Hosting;
 public class CassandraClusteringOptions
 {
     /// <summary>
-    /// Optionally configure time-to-live behavior for the membership table row data in Cassandra itself, allowing
-    /// defunct silo cleanup even if a cluster is no longer running.
-    /// <para/>
-    /// When this is <c>true</c>, <see cref="ClusterMembershipOptions.DefunctSiloCleanupPeriod"/> CAN be null to enable
-    /// Cassandra-only defunct silo cleanup. Either way, the Cassandra TTL will still be configured from the
-    /// configured <see cref="ClusterMembershipOptions.DefunctSiloExpiration"/> value.
+    /// Gets or sets whether Cassandra expires Dead membership rows after
+    /// <see cref="ClusterMembershipOptions.DefunctSiloExpiration"/>.
     /// </summary>
     /// <remarks>
-    /// Initial implementation of https://github.com/dotnet/orleans/issues/9164 in that it only affects silo entries
-    /// that are updated with IAmAlive and will not attempt to update, for instance, the entire membership table. It
-    /// also will not affect membership tables that have already been created, since it uses the Cassandra table-level
-    /// <c>default_time_to_live</c>.
+    /// Live membership rows and the table version remain persistent. Dead-row writes and advancing heartbeats
+    /// refresh the retention period for all row fields together. Expiration and explicit cleanup retire Dead
+    /// rows while preserving the table version. This applies to writes in both new and existing tables.
     /// </remarks>
     public bool UseCassandraTtl { get; set; }
 
