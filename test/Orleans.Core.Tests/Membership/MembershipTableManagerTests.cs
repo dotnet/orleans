@@ -33,6 +33,8 @@ namespace NonSilo.Tests.Membership
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper membershipGossiper;
         private readonly SiloLifecycleSubject lifecycle;
+        private readonly ClusterMembershipOptions membershipOptions = new();
+        private MembershipTableManager? membershipTableManager;
 
         public MembershipTableManagerTests(ITestOutputHelper output)
         {
@@ -1508,7 +1510,30 @@ namespace NonSilo.Tests.Membership
                 Options.Create(new DevelopmentClusterMembershipOptions { PrimarySiloEndpoint = primarySilo.Endpoint }));
             services.GetService(typeof(ILocalSiloDetails)).Returns(this.localSiloDetails);
             services.GetService(typeof(IInternalGrainFactory)).Returns(grainFactory);
-            return new SystemTargetBasedMembershipTable(services, this.loggerFactory.CreateLogger<SystemTargetBasedMembershipTable>());
+            services.GetService(typeof(MembershipTableManager)).Returns(_ => this.membershipTableManager);
+            var provider = new SystemTargetBasedMembershipTable(services, this.loggerFactory.CreateLogger<SystemTargetBasedMembershipTable>());
+            provider.ConfigureMembershipOptions(this.membershipOptions, provider);
+            return provider;
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task GossipSnapshotPolicySelectsAuthoritativeRefresh(bool useGossipSnapshots)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            this.membershipOptions.UseGossipSnapshots = useGossipSnapshots;
+            var table = new InMemoryMembershipTable(new TableVersion(1, "1"));
+            using var manager = CreateMembershipTableManager(table);
+            var peer = Entry(Silo("127.0.0.1:200@100"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
+            var incoming = Snapshot(new MembershipVersion(100), peer);
+
+            await manager.RefreshFromSnapshot(incoming, cancellationToken);
+
+            Assert.Equal(new MembershipVersion(useGossipSnapshots ? 100 : 1), manager.MembershipTableSnapshot.Version);
+            Assert.Equal(useGossipSnapshots, manager.MembershipTableSnapshot.Entries.ContainsKey(peer.SiloAddress));
+            Assert.Equal(useGossipSnapshots ? 0 : 1, table.Calls.Count(call => call.Method == nameof(IMembershipTable.ReadAllAsync)));
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         [Theory]
@@ -1595,8 +1620,10 @@ namespace NonSilo.Tests.Membership
             if (developmentProvider)
             {
                 var error = await Assert.ThrowsAsync<OrleansException>(
-                    () => manager.Refresh(cancellationToken: cancellationToken, requireFresh: true));
+                    () => provider.ReadAllAsync(cancellationToken));
                 Assert.Contains("version decreased from 100 to 1", error.Message, StringComparison.Ordinal);
+                await Assert.ThrowsAsync<OrleansException>(
+                    () => manager.Refresh(cancellationToken: cancellationToken, requireFresh: true));
                 this.fatalErrorHandler.Received(1).OnFatalException(
                     manager, Arg.Is<string>(reason => reason.Contains("Restart this silo", StringComparison.Ordinal)), null);
             }
@@ -1812,9 +1839,9 @@ namespace NonSilo.Tests.Membership
             IAsyncTimerFactory? timerFactory = null,
             SiloLifecycleSubject? lifecycle = null)
         {
-            return new MembershipTableManager(
+            return this.membershipTableManager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
-                clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
+                clusterMembershipOptions: Options.Create(this.membershipOptions),
                 membershipTable: membershipTable,
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,

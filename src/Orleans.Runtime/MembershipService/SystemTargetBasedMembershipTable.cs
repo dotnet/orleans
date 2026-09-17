@@ -15,6 +15,7 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
+        private MembershipTableManager? membershipTableManager;
         private IMembershipTableSystemTarget grain = null!;
 
         public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
@@ -22,6 +23,16 @@ namespace Orleans.Runtime.MembershipService
             this.serviceProvider = serviceProvider;
             this.logger = logger;
         }
+
+        internal void ConfigureMembershipOptions(ClusterMembershipOptions options, IMembershipTable selectedProvider)
+        {
+            if (ReferenceEquals(this, selectedProvider))
+            {
+                options.UseGossipSnapshots = false;
+                options.TerminatingStatusUpdateTimeout = TimeSpan.FromMilliseconds(500);
+            }
+        }
+
         [Obsolete("Use InitializeMembershipTableAsync instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
@@ -108,7 +119,25 @@ namespace Orleans.Runtime.MembershipService
         [Obsolete("Use ReadAllAsync instead.")]
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default) => this.grain.ReadAllAsync(cancellationToken);
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Resolve the owner after construction, since its constructor receives this provider.
+            var manager = this.membershipTableManager ??= this.serviceProvider.GetRequiredService<MembershipTableManager>();
+            // Capture before issuing the read: an older read completing after a newer one is not a reset.
+            var observedVersion = manager.MembershipTableSnapshot.Version;
+            var table = await this.grain.ReadAllAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (table.Version.Version < observedVersion.Value)
+            {
+                var reason = $"The development membership table version decreased from {observedVersion} to {table.Version.Version}. "
+                    + "Its previous incarnation is no longer authoritative. Restart this silo against the recreated table.";
+                manager.KillMyselfLocally(reason);
+                throw new OrleansException(reason);
+            }
+
+            return table;
+        }
 
         [Obsolete("Use InsertRowAsync instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
