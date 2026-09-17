@@ -261,7 +261,7 @@ namespace Orleans.Providers.Streams.Common
             InclusiveStartToken = null;
         }
 
-        void IQueueCacheCursorProgress.RecordDeliverySuccess()
+        void IQueueCacheCursorProgress.RecordDeliveryCompletion()
         {
             if (firstPendingElement is null || CacheMiss.HasValue)
             {

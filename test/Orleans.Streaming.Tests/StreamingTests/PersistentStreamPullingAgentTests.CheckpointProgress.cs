@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -14,11 +15,17 @@ namespace UnitTests.StreamingTests;
 public partial class PersistentStreamPullingAgentTests
 {
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public async Task ReceiptProvider_ExhaustedDeliveryPreservesItsSkipPolicy()
+    public void PersistentDeliveryRetriesAreOptIn()
+        => Assert.False(new StreamPullingAgentOptions().RetryFailedDeliveries);
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceiptProvider_ExhaustedDeliveryPreservesItsSkipPolicy(bool retry)
     {
         var backoff = Substitute.For<IBackoffProvider>();
         backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
-        await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff, checkpointing: false);
+        await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff, checkpointing: false, retryFailedDeliveries: retry);
         await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
         var acknowledged = new List<long>();
         var consumer = new RecordingConsumer
@@ -142,15 +149,19 @@ public partial class PersistentStreamPullingAgentTests
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
-    [InlineData(false, 1)]
-    [InlineData(false, 2)]
-    [InlineData(true, 1)]
-    [InlineData(true, 2)]
-    public async Task CheckpointProgress_ExhaustedDeliveryRetriesThreeBeforeAcknowledgingFour(bool pooled, int batchSize)
+    [InlineData(false, 1, false)]
+    [InlineData(false, 2, false)]
+    [InlineData(true, 1, false)]
+    [InlineData(true, 2, false)]
+    [InlineData(false, 1, true)]
+    [InlineData(false, 2, true)]
+    [InlineData(true, 1, true)]
+    [InlineData(true, 2, true)]
+    public async Task CheckpointProgress_ExhaustedDeliveryFollowsConfiguredPolicy(bool pooled, int batchSize, bool retry)
     {
         var backoff = Substitute.For<IBackoffProvider>();
         backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Injected exhausted delivery budget"));
-        await using var scenario = await CreateCheckpointScenario(pooled, batchSize, deliveryBackoff: backoff);
+        await using var scenario = await CreateCheckpointScenario(pooled, batchSize, deliveryBackoff: backoff, retryFailedDeliveries: retry);
         await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
         scenario.Idle.State = StreamConsumerDataState.Active;
         await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
@@ -193,20 +204,23 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
 
+            failDelivery = false;
             releaseError.SetResult();
             await failedRun.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Same(originalCursor, scenario.Idle.Cursor);
             Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
-            failDelivery = false;
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, retry ? 2 : 200);
 
             await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0u, 0u), TestContext.Current.CancellationToken);
 
-            Assert.Equal(batchSize == 1 ? new long[] { 3, 3, 4 } : new long[] { 3, 4, 3, 4 }, attempts);
-            Assert.Equal(new long[] { 3, 4 }, acknowledged);
+            Assert.Equal(retry
+                ? batchSize == 1 ? new long[] { 3, 3, 4 } : new long[] { 3, 4, 3, 4 }
+                : new long[] { 3, 4 }, attempts);
+            Assert.Equal(retry ? new long[] { 3, 4 } : batchSize == 1 ? new long[] { 4 } : [], acknowledged);
             backoff.Received(1).Next(Arg.Any<int>());
             Assert.Single(consumer.Errors);
             Assert.Same(originalCursor, scenario.Idle.Cursor);
-            Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            Assert.Equal(retry || batchSize == 1 ? 4 : 1, scenario.Idle.LastProcessedToken?.SequenceNumber);
             Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
@@ -216,6 +230,120 @@ public partial class PersistentStreamPullingAgentTests
             releaseError.TrySetResult();
             await failedRun.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CheckpointProgress_DefaultSkipPreservesRepositioningDuringErrorHandling(bool pooled, bool finishHandshakeFirst)
+    {
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
+        await using var scenario = await CreateCheckpointScenario(pooled, batchSize: 2, deliveryBackoff: backoff);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        var errorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseError = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handshakeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandshake = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failDelivery = true;
+        var delivered = new List<long>();
+        var consumer = new RecordingConsumer
+        {
+            OnDelivery = batch =>
+            {
+                if (failDelivery) return Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Delivery failed"));
+                delivered.AddRange(CheckpointBatchSequences(batch));
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+            OnError = _ =>
+            {
+                errorStarted.TrySetResult();
+                return releaseError.Task;
+            },
+            OnHandshake = () =>
+            {
+                handshakeStarted.TrySetResult();
+                return releaseHandshake.Task;
+            },
+        };
+        scenario.Idle.StreamConsumer = consumer;
+        var delivery = scenario.Accessor.RunConsumerCursor(scenario.Idle);
+        Task handshake = Task.CompletedTask;
+        try
+        {
+            await errorStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            handshake = scenario.Accessor.AddSubscriber(scenario.Idle);
+            await handshakeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            if (finishHandshakeFirst)
+            {
+                releaseHandshake.SetResult(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(3)));
+                await handshake.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+
+            releaseError.SetResult();
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Empty(delivered);
+            Assert.Equal(finishHandshakeFirst ? 3 : 1, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            if (!finishHandshakeFirst)
+            {
+                await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
+                // Keep the newly attached cursor idle until the replay assertions below.
+                scenario.Idle.State = StreamConsumerDataState.Active;
+                releaseHandshake.SetResult(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(3)));
+                await handshake.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                scenario.Idle.State = StreamConsumerDataState.Inactive;
+            }
+
+            Assert.Equal(3, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            Assert.Equal(3, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 3);
+            failDelivery = false;
+            await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+            Assert.Equal(new long[] { 4 }, delivered);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
+        }
+        finally
+        {
+            releaseError.TrySetResult();
+            releaseHandshake.TrySetResult(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(3)));
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await handshake.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task CheckpointProgress_DefaultSkipRetainsDeliveryWhenErrorHandlingThrows()
+    {
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
+        var error = new InvalidOperationException("Synchronous failure handler exception");
+        var failureHandler = Substitute.For<IStreamFailureHandler>();
+        failureHandler.OnDeliveryFailure(Arg.Any<GuidId>(), Arg.Any<string>(), Arg.Any<StreamId>(), Arg.Any<StreamSequenceToken>())
+            .Returns(_ => throw error);
+        await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff, failureHandler: failureHandler);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        scenario.Idle.StreamConsumer = new RecordingConsumer
+        {
+            OnDelivery = _ => Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Delivery failed")),
+        };
+
+        Assert.Same(error, await Assert.ThrowsAsync<InvalidOperationException>(() => scenario.Accessor.RunConsumerCursor(scenario.Idle)));
+        Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
+
+        var recovered = new ImmediateRecordingConsumer();
+        scenario.Idle.StreamConsumer = recovered;
+        await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+        Assert.Equal(new long[] { 3, 4 }, recovered.DeliveredTokens.Select(token => token.SequenceNumber));
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
@@ -389,7 +517,7 @@ public partial class PersistentStreamPullingAgentTests
             while (cursor.MoveNextWithResult().Kind == QueueCacheCursorMoveResultKind.Success)
             {
                 cachedSequences.Add(cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
-                ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+                ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
             }
 
             Assert.Equal(new long[] { 1, 2 }, cachedSequences);

@@ -167,6 +167,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan MaxEventDeliveryTime { get { throw null; } set { } }
 
+        public bool RetryFailedDeliveries { get { throw null; } set { } }
+
         public System.TimeSpan StreamInactivityPeriod { get { throw null; } set { } }
     }
 

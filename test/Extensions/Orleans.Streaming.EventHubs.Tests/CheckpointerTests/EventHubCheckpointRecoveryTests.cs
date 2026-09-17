@@ -109,6 +109,52 @@ public class EventHubCheckpointRecoveryTests
         Assert.Empty(resumedConsumer.Errors);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PersistentDeliveryFailure_CheckpointsAccordingToConfiguredPolicy(bool retry)
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var idleId = StreamId.Create("policy", "idle");
+        var busyId = StreamId.Create("policy", "busy");
+        var events = Enumerable.Range(1, 4)
+            .Select(sequence => CreateEvent(adapter, sequence % 2 == 1 ? idleId : busyId, sequence)).ToArray();
+        var store = new CheckpointStore();
+        var acknowledged = new List<int>();
+        var idle = new RecordingConsumer
+        {
+            OnDelivery = batch =>
+            {
+                if (batch.SequenceToken.SequenceNumber == 3)
+                {
+                    return Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Persistent consumer failure"));
+                }
+                acknowledged.AddRange(batch.GetEvents<int>().Select(item => item.Item1));
+                return Task.FromResult<StreamHandshakeToken?>(null);
+            },
+        };
+        var busy = new RecordingConsumer();
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
+        await using var lifetime = await CreateAgent(services, adapter, events, store,
+            options: new StreamPullingAgentOptions { RetryFailedDeliveries = retry }, deliveryBackoff: backoff);
+        var idleSubscription = await lifetime.AddConsumer(idleId, idle);
+        var busySubscription = await lifetime.AddConsumer(busyId, busy);
+        Assert.True(await lifetime.Read(2));
+        await lifetime.Accessor.AddSubscriber(idleSubscription);
+        await lifetime.Accessor.AddSubscriber(busySubscription);
+
+        Assert.True(await lifetime.Read(2));
+        Assert.Equal([1], acknowledged);
+        Assert.Equal([2, 4], busy.Events);
+        Assert.Equal(1, idleSubscription.LastProcessedToken?.SequenceNumber);
+        Assert.Equal(retry ? 2 : 4, idleSubscription.LastSafePartitionToken?.SequenceNumber);
+        Assert.Single(idle.Errors);
+        await lifetime.Accessor.Shutdown();
+        Assert.Equal([retry ? "2" : "4"], store.Writes);
+    }
+
     private static ServiceProvider CreateServices()
         => new ServiceCollection()
             .AddMetrics()
@@ -402,7 +448,7 @@ public class EventHubCheckpointRecoveryTests
         var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var first).Kind);
         Assert.Equal(1, Assert.Single(first!.GetEvents<int>()).Item1);
-        ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+        ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
         cache.UpdateDeliveryProgress(Token(1), Now.UtcDateTime.AddMinutes(1));
 
         var probe = pool.Allocate();
@@ -467,7 +513,7 @@ public class EventHubCheckpointRecoveryTests
         {
             Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);
             Assert.Equal(expected, Assert.Single(batch!.GetEvents<int>()).Item1);
-            ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+            ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
         }
         Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cache.TryGetNextMessageWithResult(cursor, out _).Kind);
         cache.UpdateDeliveryProgress(Token(2), Now.UtcDateTime.AddMinutes(1));
@@ -545,7 +591,7 @@ public class EventHubCheckpointRecoveryTests
         void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
         public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
         public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
-        public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)inner).RecordDeliverySuccess();
+        public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
     }
 
     private static EventData CreateEvent(EventHubDataAdapter adapter, StreamId streamId, int sequence)
@@ -570,7 +616,9 @@ public class EventHubCheckpointRecoveryTests
         CheckpointStore store,
         bool purgeImmediately = false,
         bool legacyTransport = false,
-        bool enableCertifiedProgress = false)
+        bool enableCertifiedProgress = false,
+        StreamPullingAgentOptions? options = null,
+        IBackoffProvider? deliveryBackoff = null)
     {
         PartitionTransport? transport = null;
         var settings = new EventHubPartitionSettings
@@ -653,11 +701,11 @@ public class EventHubCheckpointRecoveryTests
             pubSub,
             new NoOpStreamFilter(),
             Queue,
-            new StreamPullingAgentOptions(),
+            options ?? new StreamPullingAgentOptions(),
             queueAdapter,
             adapterCache,
             new NoOpStreamDeliveryFailureHandler(),
-            new FixedBackoff(TimeSpan.Zero),
+            deliveryBackoff ?? new FixedBackoff(TimeSpan.Zero),
             new FixedBackoff(TimeSpan.Zero),
             new FakeTimeProvider(Now),
             shared);

@@ -715,8 +715,8 @@ namespace Orleans.Providers.Streams.Common
             cursor.InclusiveStartToken = null;
         }
 
-        internal void RecordDeliverySuccess(object cursorObj)
-            => GetCursor(cursorObj).RecordDeliverySuccess();
+        internal void RecordDeliveryCompletion(object cursorObj)
+            => GetCursor(cursorObj).RecordDeliveryCompletion();
 
         internal void AbandonPendingDelivery(object cursorObj)
         {
@@ -962,7 +962,7 @@ namespace Orleans.Providers.Streams.Common
                 pendingSequenceToken = token;
             }
 
-            public void RecordDeliverySuccess()
+            public void RecordDeliveryCompletion()
             {
                 if (!hasPendingDelivery || RetryPendingDelivery || CacheMiss.HasValue)
                 {

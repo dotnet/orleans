@@ -570,7 +570,7 @@ namespace Orleans.Streaming.EventHubs
 
             public StreamSequenceToken? SafeSequenceToken => progress.SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => progress.SetDeliveredThrough(token);
-            public void RecordDeliverySuccess() => progress.RecordDeliverySuccess();
+            public void RecordDeliveryCompletion() => progress.RecordDeliveryCompletion();
             void IQueueCacheCursorProgress.RecordDeliveryFailure() => progress.RecordDeliveryFailure();
         }
 
