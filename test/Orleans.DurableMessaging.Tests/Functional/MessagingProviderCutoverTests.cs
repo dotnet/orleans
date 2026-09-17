@@ -46,9 +46,14 @@ public sealed class MessagingProviderCutoverTests
             silo.AddDurableMessaging();
             silo.Services.AddSingleton<HandlerProbe>();
             silo.Services.AddSingleton(snapshots);
-            silo.Services.AddScoped<IJournaledStateManager>(services => services
-                .GetRequiredKeyedService<IJournaledStateManagerFactory>("state")
-                .Create(JournalId.FromGrainId(services.GetRequiredService<IGrainContext>().GrainId)));
+            silo.Services.AddScoped<IJournaledStateManager>(services =>
+            {
+                var context = services.GetRequiredService<IGrainContext>();
+                var manager = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("state")
+                    .Create(JournalId.FromGrainId(context.GrainId));
+                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(context.ObservableLifecycle);
+                return manager;
+            });
         });
         await using var cluster = builder.Build();
         await cluster.DeployAsync(Token);
@@ -662,7 +667,8 @@ public sealed class MessagingProviderCutoverTests
             var services = scope.ServiceProvider;
             Manager = services.GetRequiredService<IJournaledStateManager>();
             Manager.RegisterObserver(Fault);
-            foreach (var participant in services.GetServices<IJournaledGrainParticipant>()) participant.Initialize();
+            Manager.RegisterObserver((IJournaledStateObserver)services.GetRequiredService(
+                ReceiverTestServices.GetImplementationType("DurableMessagingJournalObserver")));
             Inbox = services.GetRequiredService<IDurableInbox>();
             Outbox = services.GetRequiredService<IDurableOutbox>();
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));

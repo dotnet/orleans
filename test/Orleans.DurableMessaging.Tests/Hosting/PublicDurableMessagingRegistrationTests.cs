@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -16,6 +17,44 @@ namespace Orleans.DurableMessaging.Tests.Hosting;
 [TestArea("DurableMessaging")]
 public sealed class PublicDurableMessagingRegistrationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddDurableMessaging_RepeatedPublicRegistrationRetainsOneConfiguratorAndScopedBindings(bool useSiloBuilder)
+    {
+        var builder = new TestSiloBuilder();
+        var services = builder.Services;
+        for (var invocation = 0; invocation < 2; invocation++)
+        {
+            if (useSiloBuilder)
+            {
+                Assert.Same(builder, builder.AddDurableMessaging());
+            }
+            else
+            {
+                Assert.Same(services, services.AddDurableMessaging());
+            }
+        }
+
+        var configuratorType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingGrainTypeConfigurator", throwOnError: true)!;
+        var configurator = Assert.Single(services, descriptor =>
+            descriptor.ServiceType == typeof(IConfigureGrainTypeComponents) && descriptor.ImplementationType == configuratorType);
+        Assert.Equal(ServiceLifetime.Singleton, configurator.Lifetime);
+        foreach (var contract in new[] { typeof(IDurableInbox), typeof(IDurableOutbox), typeof(IDurableMessagingDiagnostics) })
+        {
+            var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == contract && !descriptor.IsKeyedService);
+            Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
+        }
+
+        var endpoint = Assert.Single(services, descriptor =>
+            descriptor.IsKeyedService && Equals(descriptor.ServiceKey, "__orleans.durable-messaging.outbox-observer"));
+        Assert.Equal(ServiceLifetime.Scoped, endpoint.Lifetime);
+        var extension = Assert.Single(services, descriptor =>
+            descriptor.ServiceType == typeof(IGrainExtension) && Equals(descriptor.ServiceKey, typeof(IDurableInboxExtension)));
+        Assert.Equal(ServiceLifetime.Scoped, extension.Lifetime);
+    }
+
     [Fact]
     public void AddDurableMessaging_RegistersPublicScopedContractsAndInboxExtensionKey()
     {
@@ -200,6 +239,12 @@ public sealed class PublicDurableMessagingRegistrationTests
     private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
     [Orleans.Concurrency.Reentrant]

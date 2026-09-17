@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
+using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
@@ -13,8 +14,16 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableMessaging")]
-public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessagingBehaviorTestBase(new BootstrapClusterFixture())
+public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehaviorTestBase
 {
+    public DurableMessagingGrainTypeConfiguratorTests() : this(new BootstrapClusterFixture())
+    {
+    }
+
+    protected DurableMessagingGrainTypeConfiguratorTests(BootstrapClusterFixture fixture) : base(fixture)
+    {
+    }
+
     private BootstrapDeliveryProbe Delivery => ((BootstrapClusterFixture)Fixture).Delivery;
     private BootstrapProbe Probe => ((BootstrapClusterFixture)Fixture).Probe;
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -235,17 +244,18 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     public void RepeatedRegistration_InstallsOneTypeConfigurator()
     {
         var services = new ServiceCollection();
-        ReceiverTestServices.Add(services, static _ => { });
-        BootstrapOutboxServices.Add(services);
-        ReceiverTestServices.Add(services, static _ => { });
-        BootstrapOutboxServices.Add(services);
+        services.AddDurableMessaging();
+        services.AddDurableMessaging();
         var descriptor = Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IConfigureGrainTypeComponents));
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
         Assert.Equal(ReceiverTestServices.GetImplementationType("DurableMessagingGrainTypeConfigurator"), descriptor.ImplementationType);
-        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IDurableOutbox));
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IDurableOutbox) && !descriptor.IsKeyedService);
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IDurableOutbox)
+            && descriptor.IsKeyedService && Equals(descriptor.ServiceKey, BootstrapOutboxServices.StateName));
         foreach (var stateName in BootstrapOutboxServices.StateNames)
         {
-            Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, stateName));
+            Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, stateName)
+                && descriptor.ServiceType != typeof(IDurableOutbox));
         }
         Assert.Empty(typeof(IDurableMessagingGrain).GetInterfaces());
         Assert.Empty(typeof(IDurableMessagingGrain).GetMethods());
@@ -267,6 +277,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Same(observation.Value, services.GetRequiredKeyedService<IDurableValue<int>>("bootstrap-value"));
         Assert.Same(observation.Inbox, services.GetRequiredService<IDurableInbox>());
         Assert.Same(observation.Outbox, services.GetRequiredService<IDurableOutbox>());
+        Assert.Same(observation.Outbox, services.GetRequiredKeyedService<IDurableOutbox>(BootstrapOutboxServices.StateName));
         Assert.Equal(ReceiverTestServices.GetImplementationType("DurableOutbox"), observation.Outbox!.GetType());
         Assert.True(observation.Inbox!.TryGetHandler(BootstrapState.Route, out var handler));
         Assert.Same(state, handler);

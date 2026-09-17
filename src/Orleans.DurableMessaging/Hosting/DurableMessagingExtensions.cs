@@ -25,6 +25,10 @@ public static class DurableMessagingExtensions
     /// <summary>
     /// Adds durable inbox and outbox messaging support to the silo.
     /// </summary>
+    /// <remarks>
+    /// Grains implementing <see cref="IDurableMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
+    /// bind their scoped messaging services during activation setup, before journal recovery.
+    /// </remarks>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configureOptions">The optional action used to configure inbox and outbox behavior.</param>
     /// <returns>The silo builder.</returns>
@@ -37,6 +41,10 @@ public static class DurableMessagingExtensions
     /// <summary>
     /// Adds durable inbox and outbox messaging services.
     /// </summary>
+    /// <remarks>
+    /// Grains implementing <see cref="IDurableMessagingGrain"/> or deriving from <see cref="DurableGrain"/>
+    /// bind their scoped messaging services during activation setup, before journal recovery.
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configureOptions">The optional action used to configure inbox and outbox behavior.</param>
     /// <returns>The service collection.</returns>
@@ -154,9 +162,8 @@ public static class DurableMessagingExtensions
                 TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
                 maxRetainedEntries: 65_536);
         });
-        services.TryAddScoped<DurableMessagingGrainParticipant>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
+            ServiceDescriptor.Singleton<IConfigureGrainTypeComponents, DurableMessagingGrainTypeConfigurator>());
         return services;
     }
 }
