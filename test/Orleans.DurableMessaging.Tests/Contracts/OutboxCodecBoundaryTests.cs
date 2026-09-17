@@ -148,6 +148,135 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, recovered.DeadLetterCount);
     }
 
+    [Fact]
+    public async Task RecoveryRepairRequestVeto_DeactivatesHealthyOwnerlessActivation()
+    {
+        await using var seed = await CodecFixture.CreateAsync();
+        var journal = new JournalId($"repair-veto/{Guid.NewGuid():N}");
+        await seed.SeedOwnerlessJournalAsync(journal, seed.CreateEnvelope());
+        var veto = new RequestVetoObserver();
+        await using var fixture = await CodecFixture.CreateAsync(seed.Storage, journal, additionalObserver: veto);
+        var writes = fixture.Storage.GetSuccessfulWriteCount(journal);
+
+        await fixture.RunRepairTimerAsync();
+
+        Assert.Equal(1, veto.RequestCount);
+        Assert.Equal(0, veto.FaultCount);
+        Assert.Null(fixture.Observer.Failure);
+        Assert.Single(fixture.Messages);
+        Assert.Null(fixture.Job.Value);
+        Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        var deactivation = Assert.Single(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
+        var reason = Assert.IsType<DeactivationReason>(deactivation.GetArguments()[0]);
+        Assert.Equal(DeactivationReasonCode.ApplicationError, reason.ReasonCode);
+        Assert.Same(veto.Failure, reason.Exception);
+        Assert.Same(veto.Failure, await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()));
+        Assert.Null(fixture.Observer.Failure);
+
+        await using var recovered = await CodecFixture.CreateAsync(seed.Storage, journal);
+        await recovered.RunRepairTimerAsync();
+        Assert.NotNull(recovered.Job.Value);
+        Assert.Single(recovered.Messages);
+    }
+
+    [Fact]
+    public async Task AdmittedRepairSchedulingFailure_UsesExistingTerminalFault()
+    {
+        await using var seed = await CodecFixture.CreateAsync();
+        var journal = new JournalId($"repair-fault/{Guid.NewGuid():N}");
+        await seed.SeedOwnerlessJournalAsync(journal, seed.CreateEnvelope());
+        await using var fixture = await CodecFixture.CreateAsync(seed.Storage, journal);
+        var failure = new IOException("Admitted scheduling failed.");
+        fixture.Jobs.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<DurableJob>(failure));
+        var writes = fixture.Storage.GetSuccessfulWriteCount(journal);
+
+        await fixture.RunRepairTimerAsync();
+
+        Assert.Same(failure, fixture.Observer.Failure);
+        Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Single(fixture.Jobs.ReceivedCalls(), call => call.GetMethodInfo().Name == "ScheduleJobAsync");
+        Assert.DoesNotContain(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
+        var fenced = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(failure, fenced.InnerException);
+        await using var recovered = await CodecFixture.CreateAsync(seed.Storage, journal);
+        await recovered.RunRepairTimerAsync();
+        Assert.NotNull(recovered.Job.Value);
+        Assert.Single(recovered.Messages);
+    }
+
+    [Theory]
+    [InlineData("message", false)]
+    [InlineData("receiver", false)]
+    [InlineData("data", false)]
+    [InlineData("message", true)]
+    [InlineData("receiver", true)]
+    [InlineData("data", true)]
+    public async Task DirectSendMalformedStructure_FailsBeforeIntentOrJournalMutation(string field, bool existingIntent)
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var valid = fixture.CreateEnvelope();
+        if (existingIntent) { fixture.Outbox.Send(valid); }
+        var invalid = field switch
+        {
+            "message" => valid with { MessageId = Guid.Empty },
+            "receiver" => valid with { ReceiverId = default },
+            "data" => valid with { Data = null! },
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+
+        var error = Assert.ThrowsAny<ArgumentException>(() => fixture.Outbox.Send(invalid));
+
+        Assert.Equal("envelope", error.ParamName);
+        Assert.Equal(existingIntent ? 1 : 0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Equal(0, fixture.Probe.Count(nameof(DurableEnvelope)));
+        Assert.Null(fixture.Observer.Failure);
+        if (existingIntent) { Assert.Equal(valid, Assert.Single(fixture.Outbox.Messages)); }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task DirectSendBlankRoute_PreservesExplicitIdentityNullBodyAndRoutingOutcome(string? route)
+    {
+        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound(route!));
+        var message = fixture.CreateNullBodyEnvelope() with
+        {
+            MessageId = Guid.Parse("89cabd50-d5c6-4bed-a94e-d7c312ed5139"),
+            RouteKey = route!
+        };
+        Assert.True(message.Data.TryGetBody<string>(out var body));
+        Assert.Null(body);
+
+        fixture.Outbox.Send(message);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(message.MessageId, Assert.Single(fixture.Messages).Key);
+        await fixture.DeliverAsync();
+
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(1, fixture.DeadLetterCount);
+        Assert.Equal(2, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Null(fixture.Observer.Failure);
+    }
+
+    private sealed class RequestVetoObserver : IJournaledStateObserver
+    {
+        public int RequestCount { get; private set; }
+        public int FaultCount { get; private set; }
+        public InvalidOperationException Failure { get; } = new("Request rejected before admission.");
+        public void OnWriteRequested() { RequestCount++; throw Failure; }
+        public void OnWriteStarted() { }
+        public void OnWriteCompleted() { }
+        public void OnRecoveryCompleted() { }
+        public void OnFaulted(Exception exception) => FaultCount++;
+    }
+
     [GenerateSerializer]
     public sealed record Payload([property: Id(0)] byte[] Bytes);
 
@@ -197,6 +326,9 @@ public sealed class OutboxCodecBoundaryTests
         public IDurableDictionary<Guid, DurableEnvelope> Messages { get; }
         public IDurableValue<DurableJob> Job { get; }
         public EndpointObserver Observer { get; }
+        public IGrainContext Context { get; }
+        public ITimerRegistry TimerRegistry { get; }
+        public ILocalDurableJobManager Jobs { get; }
         public int DeadLetterCount
         {
             get
@@ -208,7 +340,7 @@ public sealed class OutboxCodecBoundaryTests
             }
         }
 
-        private CodecFixture(ControlledJournalStorageProvider? storage, JournalId? journalId, DeliveryResult delivery, int maxAttempts)
+        private CodecFixture(ControlledJournalStorageProvider? storage, JournalId? journalId, DeliveryResult delivery, int maxAttempts, IJournaledStateObserver? additionalObserver)
         {
             JournalId = journalId ?? new JournalId($"codec-boundary/{Guid.NewGuid():N}");
             Storage = storage ?? new ControlledJournalStorageProvider();
@@ -234,14 +366,15 @@ public sealed class OutboxCodecBoundaryTests
             silo.AddJournalStorage();
             services.AddSingleton<IJournalStorageProvider>(Storage);
             services.AddScoped(sp => sp.GetRequiredService<IJournaledStateManagerFactory>().Create(JournalId));
-            var context = Substitute.For<IGrainContext>();
+            var context = Context = Substitute.For<IGrainContext>();
             context.GrainId.Returns(GrainId.Create("sender", "codec-boundary"));
             context.GrainInstance.Returns(new object());
             context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
             services.AddSingleton(context);
-            services.AddSingleton(Substitute.For<ITimerRegistry>());
+            TimerRegistry = Substitute.For<ITimerRegistry>();
+            services.AddSingleton(TimerRegistry);
             services.AddSingleton(Substitute.For<IDurableJobHandlerRegistry>());
-            var jobs = Substitute.For<ILocalDurableJobManager>();
+            var jobs = Jobs = Substitute.For<ILocalDurableJobManager>();
             jobs.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>()).Returns(call =>
             {
                 var request = call.ArgAt<ScheduleJobRequest>(0);
@@ -274,20 +407,45 @@ public sealed class OutboxCodecBoundaryTests
             Observer = new EndpointObserver((IJournaledStateObserver)endpoint.GetType().GetProperty("Observer")!.GetValue(endpoint)!,
                 endpoint.GetType().GetMethod("FinalizeWrite")!.CreateDelegate<Action<CancellationToken>>(endpoint), Probe);
             Manager.RegisterObserver(Observer);
+            if (additionalObserver is not null) { Manager.RegisterObserver(additionalObserver); }
             Messages = _scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox");
             Job = _scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle");
             _deliver = Outbox.GetType().GetMethod("DeliverPendingMessagesAsync")!.CreateDelegate<Func<CancellationToken, Task>>(Outbox);
         }
 
         public static async Task<CodecFixture> CreateAsync(ControlledJournalStorageProvider? storage = null, JournalId? journalId = null,
-            DeliveryResult? delivery = null, int maxAttempts = 1)
+            DeliveryResult? delivery = null, int maxAttempts = 1, IJournaledStateObserver? additionalObserver = null)
         {
-            var result = new CodecFixture(storage, journalId, delivery ?? DeliveryResult.Accepted(), maxAttempts);
+            var result = new CodecFixture(storage, journalId, delivery ?? DeliveryResult.Accepted(), maxAttempts, additionalObserver);
             await result.Manager.InitializeAsync(TestContext.Current.CancellationToken);
             return result;
         }
         public DurableEnvelope CreateEnvelope() => new DurableEnvelopeBuilder(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"))
             .To(GrainId.Create("receiver", "codec-boundary"), "codec").WithBody(new Payload(new byte[4096])).Build();
+        public DurableEnvelope CreateNullBodyEnvelope() => new DurableEnvelopeBuilder(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"))
+            .To(GrainId.Create("receiver", "codec-boundary"), "codec").WithBody<string?>(null).Build();
+
+        public async Task SeedOwnerlessJournalAsync(JournalId journal, DurableEnvelope envelope)
+        {
+            await using var manager = _services.GetRequiredService<IJournaledStateManagerFactory>().Create(journal);
+            var type = typeof(IJournaledStateManager).Assembly.GetType("Orleans.Journaling.DurableDictionary`2", throwOnError: true)!
+                .MakeGenericType(typeof(Guid), typeof(DurableEnvelope));
+            var messages = (IDurableDictionary<Guid, DurableEnvelope>)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type,
+                "__orleans.durable-messaging.outbox", manager);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            messages.Add(envelope.MessageId, envelope);
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        }
+
+        public async Task RunRepairTimerAsync()
+        {
+            var call = Assert.Single(TimerRegistry.ReceivedCalls(), value => value.GetMethodInfo().Name == "RegisterGrainTimer");
+            var arguments = call.GetArguments();
+            var callback = (Delegate)arguments[1]!;
+            await ((Task)callback.DynamicInvoke(arguments[2], TestContext.Current.CancellationToken)!)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+
         public Task DeliverAsync() => _deliver(TestContext.Current.CancellationToken);
         public async ValueTask DisposeAsync()
         {
