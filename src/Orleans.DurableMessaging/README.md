@@ -167,7 +167,8 @@ Transport is at-least-once and unordered. Retained deduplication records provide
 effectively-once handler effects. Applications which require ordering carry
 sequence numbers and converge on application-defined order. A single
 non-interleaving activation owns each grain journal and its pumps. The journaled
-state manager supports rollback and commit/recovery observers.
+state manager admits writes through preparation and synchronous finalization, then
+reports capture, completion and terminal faults through its observers.
 
 Use shared, production-grade Journaling and Durable Jobs storage for multi-silo
 deployments. In-memory storage supports development and tests. Inbox and outbox

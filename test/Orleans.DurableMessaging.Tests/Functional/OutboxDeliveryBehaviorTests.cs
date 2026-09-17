@@ -125,12 +125,14 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var before = await sender.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(sender);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         var message = NewMessage(55, "schedule-retry");
         Fixture.JobManagerProbe.FailAfterNext(jobName);
 
         await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<IOException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.IsType<IOException>(await oldGrain.Faulted.Task);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
         var fresh = await sender.GetSnapshotAsync();
         Assert.NotEqual(before.ActivationId, fresh.ActivationId);
@@ -170,13 +172,15 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var before = await sender.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(sender);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         await sender.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 53, "failed-write"));
         Fixture.Storage.FailWrite(JournalId.FromGrainId(sender.GetGrainId()));
 
         var failure = await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(
             receiver.GetGrainId(), "messages/write-failure", NewMessage(53, "failed-write")));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask()));
+        Assert.Equal(failure.Message, Assert.IsType<IOException>(await oldGrain.Faulted.Task).Message);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
         var recovered = await sender.GetSnapshotAsync();
 
         Assert.NotEqual(before.ActivationId, recovered.ActivationId);

@@ -131,11 +131,12 @@ public static class DurableMessagingExtensions
         });
         services.TryAddScoped<IDurableInbox>(sp => sp.GetRequiredService<DurableInbox>());
 
-        services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>(DurableMessagingStateNames.Outbox);
+        services.TryAddScoped<DurableOutbox>();
+        services.TryAddKeyedScoped<IDurableOutbox>(DurableMessagingStateNames.Outbox, (sp, _) => sp.GetRequiredService<DurableOutbox>());
         services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>(DurableMessagingStateNames.Outbox));
         services.TryAddKeyedScoped<DurableMessagingJournalEndpoint>(DurableMessagingStateNames.OutboxObserver, (sp, _) =>
         {
-            var outbox = (DurableOutbox)sp.GetRequiredKeyedService<IDurableOutbox>(DurableMessagingStateNames.Outbox);
+            var outbox = sp.GetRequiredService<DurableOutbox>();
             return new DurableMessagingJournalEndpoint(outbox, outbox.FinalizeWrite);
         });
         services.TryAddScoped<DurableMessagingJournalObserver>();
