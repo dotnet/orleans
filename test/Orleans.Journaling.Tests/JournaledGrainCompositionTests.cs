@@ -31,6 +31,13 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         Assert.Equal(new string?[] { null, null }, await grain.GetActivationValues());
         var first = await fixture.ReadProbe(grain);
         Assert.Same(first.Context.GrainInstance, first.ConstructorInstance);
+        var firstObserver = Assert.IsType<JournalCompositionObserver>(first.Observer);
+        Assert.Same(first.Manager, firstObserver.Manager);
+        Assert.Same(firstObserver, first.Context.ActivationServices.GetRequiredService<JournalCompositionObserver>());
+        Assert.Equal(["RecoveryStarted", "RecoveryCompleted", "Activated"], firstObserver.Calls);
+        Assert.Equal(new string?[] { null, null }, firstObserver.RecoveredValues);
+        Assert.Empty(firstObserver.Faults);
+        Assert.Throws<NotSupportedException>(() => first.Manager!.RegisterObserver(firstObserver));
         Assert.Equal(1, fixture.Storage.Get(first.Context.GrainId).Reads);
         Assert.Equal(grainClass == typeof(InjectedJournalGrain) ? 0 : 1, first.SetupCount);
         Assert.Equal(first.SetupCount, first.Feature?.ParticipationCount ?? 0);
@@ -41,6 +48,11 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         Assert.Equal(new string?[] { "one", "two" }, await grain.GetValues());
         Assert.Equal(1, fixture.Storage.Get(first.Context.GrainId).Writes);
         Assert.Equal(1, fixture.Storage.Get(first.Context.GrainId).Managers);
+        Assert.Equal(new[]
+        {
+            "RecoveryStarted", "RecoveryCompleted", "Activated", "WriteRequested", "WritePreparing",
+            "WriteFinalizing", "WriteStarted", "WriteCompleted"
+        }, firstObserver.Calls);
 
         var other = fixture.GetGrain(grainClass);
         Assert.Equal(new string?[] { null, null }, await other.GetActivationValues());
@@ -48,9 +60,17 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         Assert.NotSame(first.Manager, isolated.Manager);
         Assert.NotSame(first.First, isolated.First);
         Assert.NotSame(first.Context.ActivationServices, isolated.Context.ActivationServices);
+        var isolatedObserver = Assert.IsType<JournalCompositionObserver>(isolated.Observer);
+        Assert.NotSame(firstObserver, isolatedObserver);
+        Assert.Same(isolated.Manager, isolatedObserver.Manager);
+        Assert.Equal(["RecoveryStarted", "RecoveryCompleted", "Activated"], isolatedObserver.Calls);
 
+        var firstCalls = firstObserver.Calls.ToArray();
         await Deactivate(first);
         Assert.Equal(1, first.Disposals);
+        Assert.Equal(1, firstObserver.Disposals);
+        Assert.Empty(firstObserver.Faults);
+        Assert.Equal(firstCalls, firstObserver.Calls);
         Assert.Equal(first.SetupCount, first.Feature?.Disposals ?? 0);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => first.Manager.InitializeAsync(Cancellation).AsTask());
 
@@ -59,6 +79,13 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         var replacement = await fixture.ReadProbe(grain);
         Assert.NotSame(first.Manager, replacement.Manager);
         Assert.NotSame(first.First, replacement.First);
+        var replacementObserver = Assert.IsType<JournalCompositionObserver>(replacement.Observer);
+        Assert.NotSame(firstObserver, replacementObserver);
+        Assert.Same(replacement.Manager, replacementObserver.Manager);
+        Assert.Equal(["RecoveryStarted", "RecoveryCompleted", "Activated"], replacementObserver.Calls);
+        Assert.Equal(new[] { "one", "two" }, replacementObserver.RecoveredValues);
+        Assert.Empty(replacementObserver.Faults);
+        Assert.Equal(firstCalls, firstObserver.Calls);
         Assert.Equal(first.SetupCount, replacement.SetupCount);
         Assert.Equal(2, fixture.Storage.Get(first.Context.GrainId).Reads);
         Assert.Equal(2, fixture.Storage.Get(first.Context.GrainId).Managers);
@@ -73,6 +100,10 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
 
         await Deactivate(isolated);
         await Deactivate(replacement);
+        Assert.Equal(1, isolatedObserver.Disposals);
+        Assert.Equal(1, replacementObserver.Disposals);
+        Assert.Empty(isolatedObserver.Faults);
+        Assert.Empty(replacementObserver.Faults);
     }
 
     [Theory]
@@ -96,6 +127,18 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
             Assert.Equal(1, feature.Disposals);
         }
 
+        if (grainClass == typeof(JournalActivationFailureGrain))
+        {
+            var observer = Assert.IsType<JournalCompositionObserver>(probe.Observer);
+            Assert.Empty(observer.Faults);
+            Assert.Equal(1, observer.Disposals);
+            Assert.Equal(["RecoveryStarted", "RecoveryCompleted"], observer.Calls);
+        }
+        else
+        {
+            Assert.Null(probe.Observer);
+        }
+
         await Assert.ThrowsAsync<ObjectDisposedException>(() => probe.Manager!.InitializeAsync(Cancellation).AsTask());
     }
 
@@ -107,6 +150,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         var probe = await fixture.ReadProbe(grain);
         Assert.Null(probe.Manager);
         Assert.Null(probe.Feature);
+        Assert.Null(probe.Observer);
         Assert.Equal(0, probe.SetupCount);
         Assert.False(fixture.Storage.Contains(JournalId.FromGrainId(grain.GetGrainId())));
         await Deactivate(probe);
@@ -114,28 +158,55 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PlainGrain_TerminalWriteFailureReactivatesAndReplaysActualCommit(bool committed)
+    [InlineData(typeof(PlainJournalGrain), false)]
+    [InlineData(typeof(PlainJournalGrain), true)]
+    [InlineData(typeof(ApplicationJournalGrain), false)]
+    [InlineData(typeof(ApplicationJournalGrain), true)]
+    [InlineData(typeof(InjectedJournalGrain), false)]
+    [InlineData(typeof(InjectedJournalGrain), true)]
+    [InlineData(typeof(ConvenienceJournalGrain), false)]
+    [InlineData(typeof(ConvenienceJournalGrain), true)]
+    public async Task Composition_TerminalWriteFailureNotifiesObserverAndRecoversFreshScope(Type grainClass, bool committed)
     {
-        var grain = fixture.GetGrain(typeof(PlainJournalGrain));
+        var grain = fixture.GetGrain(grainClass);
         await grain.SetValues("old one", "old two");
         var first = await fixture.ReadProbe(grain);
         var storage = fixture.Storage.Get(first.Context.GrainId);
+        var observer = Assert.IsType<JournalCompositionObserver>(first.Observer);
+        Assert.Same(first.Manager, observer.Manager);
         storage.FailNextWrite = committed;
         var error = await Assert.ThrowsAsync<IOException>(() => grain.SetValues("new one", "new two"));
         Assert.Equal(JournalCompositionStorage.FailureMessage, error.Message);
+        var fault = Assert.IsType<IOException>(Assert.Single(observer.Faults));
+        Assert.Equal(error.Message, fault.Message);
+        Assert.Equal(new[]
+        {
+            "RecoveryStarted", "RecoveryCompleted", "Activated", "WriteRequested", "WritePreparing",
+            "WriteFinalizing", "WriteStarted", "WriteCompleted", "WriteRequested", "WritePreparing",
+            "WriteFinalizing", "WriteStarted", "Faulted"
+        }, observer.Calls);
         await first.Context.Deactivated.WaitAsync(Timeout, Cancellation);
         Assert.Equal(1, first.Disposals);
+        Assert.Equal(1, observer.Disposals);
+        Assert.Single(observer.Faults);
         var expected = committed ? new[] { "new one", "new two" } : new[] { "old one", "old two" };
         Assert.Equal(expected, await grain.GetActivationValues());
         Assert.Equal(expected, await grain.GetValues());
         var replacement = await fixture.ReadProbe(grain);
         Assert.NotSame(first.Manager, replacement.Manager);
         Assert.NotSame(first.First, replacement.First);
+        var replacementObserver = Assert.IsType<JournalCompositionObserver>(replacement.Observer);
+        Assert.NotSame(observer, replacementObserver);
+        Assert.Same(replacement.Manager, replacementObserver.Manager);
+        Assert.Equal(expected, replacementObserver.RecoveredValues);
+        Assert.Equal(["RecoveryStarted", "RecoveryCompleted", "Activated"], replacementObserver.Calls);
+        Assert.Empty(replacementObserver.Faults);
         Assert.Equal(2, storage.Managers);
         Assert.Equal(2, storage.Reads);
         await Deactivate(replacement);
+        Assert.Equal(1, replacementObserver.Disposals);
+        Assert.Empty(replacementObserver.Faults);
+        Assert.Single(observer.Faults);
     }
 
     [Fact]
@@ -161,13 +232,18 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         await using (manager)
         {
             var value = new DurableValue<string>("value", manager, codec);
+            using var observer = new JournalCompositionObserver(manager, () => [value.Value]);
+            manager.RegisterObserver(observer);
+            Assert.Empty(observer.Calls);
             Assert.Equal(0, fixture.Storage.Get(id).Reads);
             await manager.InitializeAsync(Cancellation);
+            Assert.Equal(["RecoveryStarted", "RecoveryCompleted"], observer.Calls);
             value.Value = "standalone";
             await manager.WriteStateAsync(Cancellation);
             fixture.Storage.Get(id).FailNextWrite = false;
             value.Value = "uncommitted";
-            await Assert.ThrowsAsync<IOException>(() => manager.WriteStateAsync(Cancellation).AsTask());
+            var exception = await Assert.ThrowsAsync<IOException>(() => manager.WriteStateAsync(Cancellation).AsTask());
+            Assert.Same(exception, Assert.Single(observer.Faults));
             Assert.False(probe.Context.Deactivated.IsCompleted);
             Assert.Equal(new[] { "grain one", "grain two" }, await grain.GetValues());
         }
@@ -175,8 +251,14 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         await using (var recovered = factory.Create(id))
         {
             var value = new DurableValue<string>("value", recovered, codec);
+            using var observer = new JournalCompositionObserver(recovered, () => [value.Value]);
+            recovered.RegisterObserver(observer);
+            Assert.Empty(observer.Calls);
             await recovered.InitializeAsync(Cancellation);
             Assert.Equal("standalone", value.Value);
+            Assert.Equal(["standalone"], observer.RecoveredValues);
+            Assert.Equal(["RecoveryStarted", "RecoveryCompleted"], observer.Calls);
+            Assert.Empty(observer.Faults);
         }
 
         Assert.Equal(2, fixture.Storage.Get(id).Managers);
@@ -235,10 +317,22 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         Assert.Same(value, grain.Value);
         Assert.Same(grain.State, grain.State);
         Assert.Same(scopedManager, grain.Manager);
+        using var observer = new JournalCompositionObserver(scopedManager, () => [value.Value]);
+        scopedManager.RegisterObserver(observer);
+        Assert.Empty(observer.Calls);
+        Assert.Equal(1, lifecycle.Subscriptions);
         await lifecycle.OnStart(Cancellation);
+        Assert.Equal(["RecoveryStarted", "RecoveryCompleted"], observer.Calls);
         value.Value = "helper";
         await grain.Commit();
         await lifecycle.OnStop(Cancellation);
+        Assert.Equal(new[]
+        {
+            "RecoveryStarted", "RecoveryCompleted", "WriteRequested", "WritePreparing",
+            "WriteFinalizing", "WriteStarted", "WriteCompleted"
+        }, observer.Calls);
+        Assert.Empty(observer.Faults);
+        Assert.Equal(1, lifecycle.Subscriptions);
 
         await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
         var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonJournalExtensions.JournalFormatKey);
@@ -379,6 +473,9 @@ public sealed class JournalCompositionFixture : IntegrationTestFixture
             silo.Services.AddSingleton<JournalCompositionRegistry>();
             silo.Services.AddScoped<JournalCompositionProbe>();
             silo.Services.AddScoped<JournalCompositionFeature>();
+            silo.Services.AddScoped(static services => new JournalCompositionObserver(
+                services.GetRequiredService<IJournaledStateManager>(),
+                services.GetRequiredService<JournalCompositionProbe>().Read));
             silo.Services.AddSingleton<JournalCompositionStorageProvider>();
             silo.Services.AddSingleton<IJournalStorageProvider>(static services => services.GetRequiredService<JournalCompositionStorageProvider>());
             silo.Services.AddSingleton<IConfigureGrainTypeComponents, JournalCompositionConfigurator>();
@@ -411,6 +508,7 @@ public sealed class JournalCompositionProbe : IDisposable
     public IDurableValue<string>? First { get; set; }
     public IDurableValue<string>? Second { get; set; }
     public JournalCompositionFeature? Feature { get; set; }
+    public JournalCompositionObserver? Observer { get; set; }
     public object? ConstructorInstance { get; private set; }
     public List<string> Events { get; } = [];
     public int SetupCount { get; set; }
@@ -432,6 +530,7 @@ public sealed class JournalCompositionProbe : IDisposable
         ActivationValues = Read();
         Activated = true;
         Events.Add("activated");
+        Observer?.Calls.Enqueue("Activated");
         return Task.CompletedTask;
     }
     public string?[] Read() => [First!.Value, Second!.Value];
@@ -450,24 +549,76 @@ internal sealed class JournalCompositionConfigurator(GrainClassMap map, JournalC
 {
     public void Configure(GrainType grainType, GrainProperties properties, GrainTypeSharedContext shared)
     {
-        if (map.TryGetGrainClass(grainType, out var type) && typeof(IJournalFeatureGrain).IsAssignableFrom(type))
+        if (map.TryGetGrainClass(grainType, out var type)
+            && (typeof(IJournalFeatureGrain).IsAssignableFrom(type) || type == typeof(InjectedJournalGrain)))
         {
-            registry.Configurations.AddOrUpdate(grainType, 1, static (_, count) => count + 1);
+            if (typeof(IJournalFeatureGrain).IsAssignableFrom(type))
+            {
+                registry.Configurations.AddOrUpdate(grainType, 1, static (_, count) => count + 1);
+                shared.AddActivationSetup(static context =>
+                {
+                    var probe = context.ActivationServices.GetRequiredService<JournalCompositionProbe>();
+                    Assert.Same(probe.ConstructorInstance, context.GrainInstance);
+                    Assert.NotNull(context.GrainInstance);
+                    probe.SetupCount++;
+                    probe.Events.Add("setup");
+                    context.ActivationServices.GetRequiredService<JournalCompositionFeature>().Participate(context.ObservableLifecycle);
+                    if (context.GrainInstance is JournalSetupFailureGrain)
+                    {
+                        throw new InvalidOperationException("Expected setup failure.");
+                    }
+                });
+            }
+
             shared.AddActivationSetup(static context =>
             {
                 var probe = context.ActivationServices.GetRequiredService<JournalCompositionProbe>();
                 Assert.Same(probe.ConstructorInstance, context.GrainInstance);
-                Assert.NotNull(context.GrainInstance);
-                probe.SetupCount++;
-                probe.Events.Add("setup");
-                context.ActivationServices.GetRequiredService<JournalCompositionFeature>().Participate(context.ObservableLifecycle);
-                if (context.GrainInstance is JournalSetupFailureGrain)
-                {
-                    throw new InvalidOperationException("Expected setup failure.");
-                }
+                var observer = context.ActivationServices.GetRequiredService<JournalCompositionObserver>();
+                Assert.Same(probe.Manager, observer.Manager);
+                Assert.Empty(observer.Calls);
+                observer.Manager.RegisterObserver(observer);
+                probe.Observer = observer;
             });
         }
     }
+}
+
+public sealed class JournalCompositionObserver(IJournaledStateManager manager, Func<string?[]> readState)
+    : IJournaledStateObserver, IDisposable
+{
+    public IJournaledStateManager Manager { get; } = manager;
+    public ConcurrentQueue<string> Calls { get; } = new();
+    public ConcurrentQueue<Exception> Faults { get; } = new();
+    public string?[] RecoveredValues { get; private set; } = [];
+    public int Disposals { get; private set; }
+    public void OnRecoveryStarted() => Calls.Enqueue("RecoveryStarted");
+    public void OnRecoveryCompleted()
+    {
+        RecoveredValues = readState();
+        Calls.Enqueue("RecoveryCompleted");
+    }
+    public void OnWriteRequested() => Calls.Enqueue("WriteRequested");
+    public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls.Enqueue("WritePreparing");
+        return default;
+    }
+    public ValueTask OnWriteFinalizingAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls.Enqueue("WriteFinalizing");
+        return default;
+    }
+    public void OnWriteStarted() => Calls.Enqueue("WriteStarted");
+    public void OnWriteCompleted() => Calls.Enqueue("WriteCompleted");
+    public void OnFaulted(Exception exception)
+    {
+        Faults.Enqueue(exception);
+        Calls.Enqueue("Faulted");
+    }
+    public void Dispose() => Disposals++;
 }
 
 public sealed class JournalCompositionFeature : ILifecycleParticipant<IGrainLifecycle>, IDisposable

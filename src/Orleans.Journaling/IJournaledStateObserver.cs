@@ -12,6 +12,12 @@ namespace Orleans.Journaling;
 /// operation at a time, so later queued writes wait for its preparation, finalization, and capture.
 /// </para>
 /// <para>
+/// Grain-scoped manager factories enroll their managers before returning them. Feature setup can
+/// resolve the enrolled manager and register observers before lifecycle startup using
+/// <see cref="Orleans.Runtime.GrainTypeSharedContext.AddActivationSetup"/>. Managers created through
+/// <see cref="IJournaledStateManagerFactory"/> have caller-owned initialization and disposal.
+/// </para>
+/// <para>
 /// Every observer prepares before finalization begins, and every observer finalizes before state
 /// capture. After finalization completes, start notifications and state capture run synchronously.
 /// Completion follows every successful write boundary, including a no-op write which persists zero
