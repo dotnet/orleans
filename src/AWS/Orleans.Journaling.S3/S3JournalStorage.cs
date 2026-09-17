@@ -450,7 +450,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             var manifest = CreateWalManifest(walMetadata);
             SetWal(walProperties.ETag, CreateWalProviderState(manifest, walProperties.ContentLength, partsCount), walProperties.LastModified);
 
-            var expectedFormat = manifest.Metadata.Format;
+            var expectedFormat = manifest.Metadata.FormatKey;
             IJournalMetadata? checkpointMetadata = null;
             string? checkpointObjectKey = null;
             await using var checkpointPayload = manifest.Checkpoint is not null ? CreateTemporaryPayloadStream() : null;
@@ -470,7 +470,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 }
 
                 checkpointPayload!.Position = 0;
-                expectedFormat = checkpointMetadata.Format;
+                expectedFormat = checkpointMetadata.FormatKey;
             }
 
             GetObjectResponse walResult;
@@ -517,7 +517,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     await SkipStreamAsync(walResult.ResponseStream, manifest.WalOffset, cancellationToken).ConfigureAwait(false);
                 }
 
-                var metadata = manifest.Metadata.Format is { Length: > 0 }
+                var metadata = manifest.Metadata.FormatKey is { Length: > 0 }
                     ? manifest.Metadata
                     : expectedFormat is { Length: > 0 }
                         ? new JournalMetadata(expectedFormat)
@@ -1129,7 +1129,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateWalMetadata(WalManifest manifest)
     {
-        var metadata = CreateObjectMetadata(manifest.Metadata.Format);
+        var metadata = CreateObjectMetadata(manifest.Metadata.FormatKey);
         metadata[MetadataVersionMetadataKey] = manifest.MetadataVersion ?? CreateMetadataVersion();
         if (manifest.Generation is { Length: > 0 })
         {
@@ -1201,7 +1201,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
     private static WalProviderState CreateWalProviderState(WalManifest manifest, long contentLength, int? partsCount)
         => new(
-            manifest.Metadata.Format,
+            manifest.Metadata.FormatKey,
             manifest.Checkpoint?.Name,
             manifest.WalOffset,
             manifest.Generation,

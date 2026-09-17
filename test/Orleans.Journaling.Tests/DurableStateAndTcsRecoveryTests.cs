@@ -17,7 +17,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
     public async Task OrleansBinaryCodec_StateAndTcs_WriteAndRecover()
     {
         var sut = CreateTestSystem();
-        var state = new DurableState<string>("state", sut.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
+        var state = new JournaledPersistentState<string>("state", sut.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
@@ -31,7 +31,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var state2 = new DurableState<string>("state", sut2.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
+        var state2 = new JournaledPersistentState<string>("state", sut2.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
         var tcs2 = new DurableTaskCompletionSource<int>(
             "tcs",
             sut2.Manager,
@@ -55,7 +55,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         var storage = new VolatileJournalStorage();
         var codec = new TrackingPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool);
         var sut = CreateTestSystem(storage: storage);
-        var state = new DurableState<string>("state", sut.Manager, codec);
+        var state = new JournaledPersistentState<string>("state", sut.Manager, codec);
         var grainState = (IStorage<string>)state;
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
@@ -68,7 +68,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.Equal("0", grainState.Etag);
 
         var recovered = CreateTestSystem(storage: storage);
-        var recoveredState = new DurableState<string>("state", recovered.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
+        var recoveredState = new JournaledPersistentState<string>("state", recovered.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
         await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var recoveredStorage = (IStorage<string>)recoveredState;

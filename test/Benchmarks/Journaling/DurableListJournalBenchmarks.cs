@@ -19,7 +19,7 @@ public class DurableListJournalBenchmarks
     private IDurableListCommandCodec<int> _codec = null!;
     private IJournalFormat _journalFormat = null!;
     private DurableList<int> _list = null!;
-    private IJournaledState _state = null!;
+    private IStateMachine _state = null!;
     private OrleansBinaryJournalBufferWriter _writeBuffer = null!;
     private OrleansBinaryJournalBufferWriter _encodedJournalStreamWriter = null!;
     private ArcBuffer _encodedJournalData;
@@ -128,9 +128,11 @@ public class DurableListJournalBenchmarks
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterState(string name, IJournaledState state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));
+        public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));
 
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState state)
+        public TState GetOrAddState<TState>(string name) where TState : class => throw new NotSupportedException();
+
+        public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState state) where TState : class
         {
             state = null!;
             return false;
@@ -140,11 +142,13 @@ public class DurableListJournalBenchmarks
 
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask DisposeAsync() => default;
     }
 
     private sealed class RecoveryConsumer(
         IDurableListCommandCodec<int> codec,
-        int capacity) : IJournaledState, IDurableListCommandHandler<int>
+        int capacity) : IStateMachine, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -152,14 +156,13 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
+        void IStateMachine.Reset(JournalStreamWriter storage) => Reset();
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
-        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
-        void IJournaledState.AppendSnapshot(JournalStreamWriter writer) { }
-        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
+        void IStateMachine.WriteSnapshot(JournalStreamWriter writer) { }
 
         public void ApplyAdd(int item) => _items.Add(item);
 

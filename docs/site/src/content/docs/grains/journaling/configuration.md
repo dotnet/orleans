@@ -7,13 +7,13 @@ ms.topic: how-to
 
 # Configure Orleans Journaling
 
-Configure a default journal storage provider on every silo that hosts grains or activation-scoped features using durable state. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and Orleans binary reader.
+Configure a default journal storage provider on every silo that hosts grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager>. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
 
 ## Configure grain-scoped composition
 
-The standard <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registration supplies one scoped <xref:Orleans.Journaling.IJournaledStateManager> per activation. The manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Inject that manager and keyed durable states into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Recovery then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
+The standard <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registration supplies one scoped `IDurableStateManager` per activation. The manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Inject that manager into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Declare states through its `GetOrAdd` helpers or keyed injection during construction or synchronous activation setup. Recovery at <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
 
 Storage registration makes these services available across the silo. Per-grain journal reads and writes are triggered by activations which resolve the manager directly or through a durable-state dependency. Unrelated grain activations retain their existing persistence behavior.
 
@@ -101,11 +101,12 @@ startup. Bindings remain fixed for that process's lifetime.
 See [Migrate Durable Jobs storage](durable-jobs-migration.md) for named selection,
 deployment staging, and full-namespace retirement checks. The runnable sample
 linked from that guide exercises the new APIs against packages built from this
-repository; existing published snippet packages predate named-provider selection.
+repository. The journaling snippet projects reference the current repository
+sources so their configuration examples use the APIs in the current checkout.
 
 ## Configure the JSON format
 
-JSON Lines is the default write format. Register source-generated metadata for every application type used as a durable key, value, collection item, persistent state, or durable task result:
+JSON Lines is the default write format. <xref:Orleans.Journaling.Json.JsonJournalHostingExtensions.UseJsonJournalFormat*> registers source-generated metadata for application types used as durable keys, values, collection items, persistent state, or durable task results:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_json_format":::
 
@@ -115,7 +116,7 @@ Serializer naming policies affect application payload values. Journal command na
 
 ## Migrate a journal format
 
-Providers persist a format key with journal metadata. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata.
+Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
 Use this deployment sequence:
 
@@ -141,6 +142,6 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services which use an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+<xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

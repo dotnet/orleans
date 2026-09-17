@@ -12,7 +12,7 @@ namespace Orleans.Journaling.Tests;
 public sealed class JournalBufferWriterOwnershipTests
 {
     private const string BinaryFormat = OrleansBinaryJournalFormat.JournalFormatKey;
-    private const string JsonFormat = JsonJournalExtensions.JournalFormatKey;
+    private const string JsonFormat = JsonLinesJournalFormat.JournalFormatKey;
 
     [Theory]
     [InlineData(BinaryFormat)]

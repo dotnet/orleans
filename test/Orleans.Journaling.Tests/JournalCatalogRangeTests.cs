@@ -33,7 +33,7 @@ public sealed class JournalCatalogRangeTests
     [Fact]
     public void Snapshot_RetainsBoundsAndDerivesNarrowerNativePrefix()
     {
-        var options = new ListOptions
+        var options = new JournalCatalogListOptions
         {
             Prefix = new("jobs/"),
             MinId = new("jobs/shards/20260909-a"),
@@ -101,7 +101,7 @@ public sealed class JournalCatalogRangeTests
         var strictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
         foreach (var fromBounds in new[] { false, true })
         {
-            var options = new ListOptions
+            var options = new JournalCatalogListOptions
             {
                 Prefix = fromBounds ? default : new(prefix),
                 MinId = min,

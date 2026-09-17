@@ -5,6 +5,10 @@ Microsoft Orleans Journaling persists durable state changes as ordered journal d
 
 The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Journaling supplies the journal format and keyed durable-entry codecs which durable states use to encode and recover their own operations.
 
+Application code uses `IDurableStateManager` to declare durable states and acknowledge their writes.
+`IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
+`IJournaledStateManager` extends the application interface with journal ownership and lifetime operations.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
@@ -54,7 +58,12 @@ siloBuilder
     });
 ```
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers can persist the journal format key as metadata alongside journal bytes. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
+Provider registration calls `JournalingHostingExtensions.AddJournaling` to register core services,
+formats, state factories, and activation lifecycle integration. Use `AddJournalStorage<TProvider>`
+for an application-supplied storage provider. `AddJournaling` is core setup; a provider registration
+supplies the backing storage.
+
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -66,11 +75,10 @@ siloBuilder
             options.JournalFormatKey = "orleans-binary"));
 ```
 
-To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)`. When a grain recovers data written with a different format than the configured write format, the next write is forced to a full snapshot so the journal is rewritten using JSON and the storage format metadata is updated.
+To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to `JsonLinesJournalFormat.JournalFormatKey` and call `UseJsonJournalFormat(...)`, provided by `JsonJournalHostingExtensions`. When a grain recovers data written with a different format than the configured write format, the next write is forced to a full snapshot so the journal is rewritten using JSON and the storage format metadata is updated.
 
 ## Example - Using durable states
 ```csharp
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Journaling;
 
@@ -80,41 +88,137 @@ public interface IShoppingCartGrain : IGrainWithStringKey
     ValueTask<Dictionary<string, int>> GetItems(CancellationToken cancellationToken);
 }
 
-public sealed class ShoppingCartGrain(
-    IJournaledStateManager stateManager,
-    [FromKeyedServices("cart")] IDurableDictionary<string, int> cart)
+public sealed class ShoppingCartGrain(IDurableStateManager states)
     : Grain, IShoppingCartGrain
 {
+    private readonly IDurableDictionary<string, int> _cart =
+        states.GetOrAddDictionary<string, int>("cart");
+
     public async ValueTask AddItem(string itemId, int quantity, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        cart[itemId] = quantity;
-        await stateManager.WriteStateAsync(cancellationToken);
+        _cart[itemId] = quantity;
+        await states.WriteStateAsync(cancellationToken);
     }
 
     public ValueTask<Dictionary<string, int>> GetItems(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new(cart.ToDictionary());
+        return new(_cart.ToDictionary());
     }
 }
 ```
 
-The standard state manager registered by `AddJournalStorage` enrolls itself in the grain lifecycle when constructed with the activation's `IGrainContext`. Constructor-injected durable states register with that manager, and recovery completes before `OnActivateAsync` and grain requests. This works with `Grain` or an application-owned grain base class. Registering journal storage makes the services available; only activations which resolve the manager perform per-grain journal I/O.
+The field initializer declares the state during construction. The standard state manager registered by
+`AddJournaling` enrolls itself once in the grain lifecycle when constructed with the activation's
+`IGrainContext`, before resolution returns. Recovery at `SetupState` completes before `OnActivateAsync`
+and grain requests. Ordinary `Grain` subclasses, application-owned grain bases, `IGrainBase`
+implementations, and activation-scoped features can inject `IDurableStateManager`. Registering journal
+storage makes the services available; only activations which resolve the manager perform per-grain
+journal I/O.
 
-`DurableGrain` remains an optional convenience base exposing `StateManager`, `GetOrCreateState`, and `WriteStateAsync`. Grain-scoped managers are enrolled before resolution returns. Custom managers establish this in their constructor or registration factory, enrolling their `ILifecycleParticipant<IGrainLifecycle>` or subscribing their initialization and shutdown callbacks directly.
+`DurableGrain` remains a convenience base class exposing that same application interface through
+`StateManager` and forwarding its protected `WriteStateAsync` helper. Grain-scoped managers are enrolled
+before resolution returns. Custom manager replacements establish this in their constructor or
+registration factory, enrolling their `ILifecycleParticipant<IGrainLifecycle>` or subscribing their
+initialization and shutdown callbacks directly.
 
-Managers created with an explicit `JournalId` through `IJournaledStateManagerFactory`, or constructed directly from storage without a grain context, retain caller-owned initialization and disposal even when created inside a grain call. Register their states and await `InitializeAsync(cancellationToken)` with the operation's token before use, or deliberately supply them through a registration which assigns lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle. Flow the caller's cancellation token through asynchronous grain and state-manager operations.
+Shared activation setup actions run synchronously after construction and can first resolve the manager
+or additional states. Enrollment remains open until the lifecycle's `First` stage, so a feature can resolve
+its dependencies and enroll its own participant during setup. After lifecycle startup, first resolution
+of the standard manager fails early. A feature which uses recovered state runs after `SetupState`;
+work required before application activation runs before `Activate`. Flow the caller's cancellation token
+through asynchronous grain and state-manager operations.
+
+`GetOrAddState<TState>(name)` takes an application contract, such as
+`IDurableDictionary<string, int>`, and uses a registered factory to construct its state-machine
+implementation. `DurableStateManagerExtensions` supplies `GetOrAddDictionary`, `GetOrAddList`,
+`GetOrAddQueue`, `GetOrAddSet`, `GetOrAddValue`, `GetOrAddTaskCompletionSource`, and
+`GetOrAddPersistentState` helpers.
+
+Declare new states during construction or synchronous activation setup, before initialization. After initialization succeeds,
+read and mutate their recovered contents. Later `GetOrAdd` requests resolve existing names; a request
+for a missing name fails immediately before changing the registry. `TryGetState<TState>` performs
+lookup without creation. Use keys inside a declared durable dictionary for runtime-varying identities.
+
+Names use ordinal comparison within one manager. Repeated requests for a compatible contract return
+the same instance; an incompatible contract or closed generic type fails immediately. Keyed injection
+of `[FromKeyedServices("cart")] IDurableDictionary<string, int>` returns the same object as
+`states.GetOrAddDictionary<string, int>("cart")`, regardless of which path resolves it first.
 
 All durable state types use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
+## Custom state and standalone ownership
+
+Register an application contract and its implementation with
+`services.AddDurableState<TState, TImplementation>()`. The implementation implements both `TState`
+and `IStateMachine`. The manager owns construction, registration, and binding; constructors receive
+dependencies and leave registration to the manager. Unsupported application contracts produce an
+explicit registration error at `GetOrAddState`.
+
+The parameterless registration overload resolves constructor dependencies through dependency
+injection. For name-aware construction, use the overload accepting
+`Func<IServiceProvider, string, TImplementation>`: the callback receives the owning service
+provider and requested state name.
+
+`IStateMachine` consists of:
+
+- `Reset`: reset in-memory state and bind a `JournalStreamWriter`.
+- `ReplayEntry`: reconstruct state from a recorded operation.
+- `WritePendingEntries`: emit pending operations into the supplied writer.
+- `WriteSnapshot`: emit a reconstructible snapshot into the supplied writer.
+- `OnRecoveryCompleted`: finish reconstruction before application use.
+- `OnWriteCompleted`: publish effects that depend on storage acknowledgement.
+
+The recovery model uses fresh instances and replay. `JournalReplayContext.ResolveStateMachine`
+routes entries to the state machine for their stream.
+
+`IJournaledStateManager` extends `IDurableStateManager` and `IAsyncDisposable`. Its advanced owner
+API adds `RegisterStateMachine`, `InitializeAsync`, whole-journal `DeleteStateAsync`, and
+`PendingWriteByteCount`. `IJournaledStateManagerFactory.Create(JournalId)` creates a standalone
+manager with its own registry and lifetime. Declare states before initializing it:
+
+```csharp
+await using var manager = factory.Create(journalId);
+var count = manager.GetOrAddValue<int>("count");
+await manager.InitializeAsync(cancellationToken);
+
+count.Value++;
+await manager.WriteStateAsync(cancellationToken);
+```
+
+The factory's provider selection and the manager's configured format apply to every state it creates.
+The owner initializes and disposes standalone managers; Orleans performs those operations for
+grain-owned managers.
+
+Managers created with an explicit `JournalId` through `IJournaledStateManagerFactory`, or constructed
+directly from storage without a grain context, retain caller-owned initialization and disposal even when
+created inside a grain call. Register their states and await `InitializeAsync(cancellationToken)` with
+the operation's token before use, or deliberately supply them through a registration which assigns
+lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent
+of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle.
+
+## State identity and retirement
+
+Preserve state names across activations and deployments. A stream absent from the setup declarations
+enters the manager's automatic retirement grace period, seven days by default through
+`JournaledStateManagerOptions.RetirementGracePeriod`. Recovery preserves its entries during that
+period. Reintroduce the name during a later activation's setup to recover it; a compaction after the
+grace period removes the retired stream. Declare every state that must remain active on each activation,
+even when its contents will not be accessed.
+
+The application/protocol naming changes preserve persisted state names, stream identities, command
+tokens, format-key values, serialized member IDs, and provider metadata keys. Keep codecs available
+for retired streams and stored formats throughout the deployment and rollback window.
+
 ## Staging and failure boundaries
 
 The pending journal is shared by every caller using a state manager. Prepare fallible work and external
 acknowledgements in operation-local data. Once an outcome is safe to commit, apply its mutations to the
-durable states and await `WriteStateAsync`. Applications are responsible for sequencing that transition
+durable states and await `WriteStateAsync`. One acknowledgement covers the manager-wide journal
+batch, including changes staged by interleaved callers. Applications are responsible for sequencing that transition
 with other interleaved operations and for making uncertain-outcome retries idempotent.
 
 A failed journal operation permanently fences the manager, faults queued operations, and requests
@@ -128,7 +232,7 @@ acknowledgement or a fresh activation before deciding whether to retry an applic
 
 ## Storage format
 
-The JSON journaling format stores journal entries as true JSON Lines: UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should store `JsonJournalExtensions.JournalFormatKey` as the format key and may use `application/jsonl` as the MIME type.
+The JSON journaling format stores journal entries as true JSON Lines: UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should store `JsonLinesJournalFormat.JournalFormatKey` as the format key and may use `application/jsonl` as the MIME type.
 
 Each record contains the state id as element 0 and the durable operation payload array as element 1:
 
@@ -145,7 +249,7 @@ Existing data is read using its stored format metadata, or as legacy OrleansBina
 `IJournalStorageCatalog.ListAsync` returns an `IAsyncEnumerable<JournalCatalogEntry>` in provider traversal order.
 Each entry contains its `Id` and optional `Metadata`. Deduplicate by `Id` when unique identities
 are required, since repeated entries can carry different metadata versions.
-`ListOptions.Prefix` matches the raw beginning of `JournalId.Value`, including partial path
+`JournalCatalogListOptions.Prefix` matches the raw beginning of `JournalId.Value`, including partial path
 segments. For example, `jobs/shards/20260909` selects timestamped names for that UTC day.
 Use a trailing slash, such as `jobs/shards/`, to select a namespace's descendants.
 `MinId` and `MaxId` supply inclusive lower and upper bounds. All three constraints use
@@ -153,7 +257,7 @@ Use a trailing slash, such as `jobs/shards/`, to select a namespace's descendant
 leave the corresponding constraint open. Disjoint constraints produce an empty result.
 
 ```csharp
-var options = new ListOptions
+var options = new JournalCatalogListOptions
 {
     Prefix = new JournalId("jobs/shards/20260909"),
     MinId = new JournalId("jobs/shards/20260909T1000000000000Z-"),

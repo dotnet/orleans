@@ -874,7 +874,7 @@ public sealed class AzureBlobJournalStorageTests
 
         public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
-            JournalFormatKey = metadata?.Format;
+            JournalFormatKey = metadata?.FormatKey;
             while (buffer.Length > 0)
             {
                 var chunk = new byte[buffer.Length];

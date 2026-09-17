@@ -21,7 +21,7 @@ public sealed class VolatileJournalStorageProviderTests
                 new Dictionary<string, string> { ["owner"] = id }, cancellationToken);
         }
 
-        var options = new ListOptions { IncludeMetadata = !includeMetadata };
+        var options = new JournalCatalogListOptions { IncludeMetadata = !includeMetadata };
         var listing = provider.ListAsync(options, cancellationToken);
         options.IncludeMetadata = includeMetadata;
         await using var enumerator = listing.GetAsyncEnumerator(cancellationToken);
@@ -34,7 +34,7 @@ public sealed class VolatileJournalStorageProviderTests
                 var metadata = Assert.IsType<JournalMetadata>(enumerator.Current.Metadata);
                 var stored = await provider.CreateStorage(new(id)).GetMetadataAsync(cancellationToken);
                 Assert.NotNull(stored);
-                Assert.Equal(stored.Format, metadata.Format);
+                Assert.Equal(stored.FormatKey, metadata.FormatKey);
                 Assert.Equal(stored.ETag, metadata.ETag);
                 Assert.Equal(stored.Properties, metadata.Properties);
             }
@@ -89,7 +89,7 @@ public sealed class VolatileJournalStorageProviderTests
             await provider.CreateStorage(new(value)).CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        var options = new ListOptions { Prefix = new("other") };
+        var options = new JournalCatalogListOptions { Prefix = new("other") };
         var listing = provider.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("jobs/20260909");
         options.MinId = new("jobs/20260909-b");
@@ -120,7 +120,7 @@ public sealed class VolatileJournalStorageProviderTests
 
         var deleted = provider.CreateStorage(new("range/c"));
         await deleted.DeleteAsync(TestContext.Current.CancellationToken);
-        var options = new ListOptions { MinId = lower, MaxId = upper };
+        var options = new JournalCatalogListOptions { MinId = lower, MaxId = upper };
         Assert.Equal([lower, upper], await ToListAsync(provider.ListAsync(options, TestContext.Current.CancellationToken), TestContext.Current.CancellationToken));
 
         await deleted.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.Journaling;
 
 internal sealed class JournaledStateManagerFactory(
@@ -11,7 +13,22 @@ internal sealed class JournaledStateManagerFactory(
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        return new JournaledStateManager(shared, storageProvider, journalId);
+        var scope = shared.ServiceProvider.CreateAsyncScope();
+        try
+        {
+            var binding = scope.ServiceProvider.GetRequiredService<JournaledStateManagerBinding>();
+            var manager = new JournaledStateManager(
+                shared,
+                JournaledStateManager.CreateStorage(storageProvider, journalId),
+                scope.ServiceProvider,
+                scope);
+            binding.Manager = manager;
+            return manager;
+        }
+        catch
+        {
+            scope.Dispose();
+            throw;
+        }
     }
 }
-

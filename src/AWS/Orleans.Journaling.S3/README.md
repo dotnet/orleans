@@ -10,6 +10,17 @@ Buckets should be created ahead of time for AWS S3 Express One Zone. `CreateBuck
 
 Metadata updates rewrite the current WAL using a conditional single-object upload. Publish a checkpoint to compact the WAL before updating metadata when the replacement object would exceed S3's 5 GB (5,000,000,000 byte) single-upload limit. Checkpoint snapshots use the same upload limit.
 
+`AddS3JournalStorage` also calls `AddJournaling` to register core services and activation lifecycle
+integration. Application code injects `IDurableStateManager` and declares durable states before
+initialization using `GetOrAddState<TState>(name)` or its typed helpers. Keyed injection returns the
+same named object; `DurableGrain` provides a convenience base class. After recovery, existing states
+are available for lookup and mutation, while adding a missing name fails immediately. Await
+`WriteStateAsync` to acknowledge the manager's shared journal batch.
+
+Standalone consumers use `IJournaledStateManagerFactory.Create(JournalId)`, declare their states,
+then await `InitializeAsync` before using recovered contents. They own the resulting
+`IJournaledStateManager` lifetime and dispose it when work ends.
+
 ## Object layout
 
 `GetObjectKey` maps a logical journal id to its base object key (the identity mapping by default). WAL and checkpoint objects use separate namespaces:
@@ -23,9 +34,13 @@ S3 Express directory buckets benefit from slash-delimited prefixes. Unordered li
 
 ## Catalog enumeration
 
-`IJournalStorageCatalog.ListAsync` returns `JournalCatalogEntry` values incrementally in S3 traversal order. Each entry's `Id` is the journal identity. S3 entries always have null `Metadata`, including when `ListOptions.IncludeMetadata = true`: `ListObjectsV2` cannot project the complete journal format, ETag, and caller-owned properties together. Enumeration never adds separate per-journal metadata requests. Call `GetMetadataAsync` explicitly when metadata is needed.
+`IJournalStorageCatalog.ListAsync` returns `JournalCatalogEntry` values incrementally in S3 traversal order. Each entry's `Id` is the journal identity. S3 entries always have null `Metadata`, including when `JournalCatalogListOptions.IncludeMetadata = true`: `ListObjectsV2` cannot project the complete journal format, ETag, and caller-owned properties together. Enumeration never adds separate per-journal metadata requests. Call `GetMetadataAsync` explicitly when metadata is needed.
 
-`ListOptions.Prefix` is a raw ordinal string prefix, including partial segments; use a trailing `/` to select only entries inside a namespace. `MinId` and `MaxId` provide inclusive ordinal bounds, unlimited by default. All constraints are snapshotted when enumeration begins and checked before yielding. Empty intersections issue no request. Consumers needing due order must sort selected ids using `StringComparer.Ordinal`.
+Metadata exposes the stored format key through `IJournalMetadata.FormatKey` and
+`JournalMetadata.FormatKey`. This naming change preserves object keys, provider metadata keys,
+and stored format-key values.
+
+`JournalCatalogListOptions.Prefix` is a raw ordinal string prefix, including partial segments; use a trailing `/` to select only entries inside a namespace. `MinId` and `MaxId` provide inclusive ordinal bounds, unlimited by default. All constraints are snapshotted when enumeration begins and checked before yielding. Empty intersections issue no request. Consumers needing due order must sort selected ids using `StringComparer.Ordinal`.
 
 The provider handles `ListObjectsV2` continuations internally and requests up to 1000 objects per page. `UseOrderedListing` defaults to `false`, matching S3 Express directory buckets. Every native prefix begins with `wal/`, including unprefixed catalog requests. Directory mode widens a raw native prefix to its nearest slash-terminated directory boundary, retaining at least `wal/`. Directory buckets are unordered and do not support `StartAfter`: the provider scans that selected namespace and filters both bounds without stopping at the first future id.
 

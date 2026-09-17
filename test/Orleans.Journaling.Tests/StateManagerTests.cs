@@ -358,7 +358,7 @@ public class StateManagerTests : JournalingTestBase
         var storage = new BlockingAppendStorage();
         var sut = CreateTestSystem(storage: storage, provider: timeProvider);
         var state = new AlwaysWritingState();
-        sut.Manager.RegisterState("state", state);
+        sut.Manager.RegisterStateMachine("state", state);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
@@ -454,7 +454,7 @@ public class StateManagerTests : JournalingTestBase
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
         var notifications = new AlwaysWritingState();
-        sut.Manager.RegisterState("notifications", notifications);
+        sut.Manager.RegisterStateMachine("notifications", notifications);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
@@ -600,7 +600,7 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.Throws<InvalidOperationException>(() => sut.Manager.RegisterState("late", new AlwaysWritingState()));
+        Assert.Throws<InvalidOperationException>(() => sut.Manager.RegisterStateMachine("late", new AlwaysWritingState()));
 
         await sut.Manager.DisposeAsync();
         var recovered = CreateTestSystem(storage: storage);
@@ -625,6 +625,7 @@ public class StateManagerTests : JournalingTestBase
         var context = Substitute.For<IGrainContext>();
         var grainId = GrainId.Create("test-grain", "failing-journal");
         context.GrainId.Returns(grainId);
+        context.ActivationServices.Returns(ServiceProvider);
         storageProvider.CreateStorage(JournalId.FromGrainId(grainId)).Returns(storage);
         var shared = new JournaledStateManagerShared(
             ServiceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
@@ -732,7 +733,7 @@ public class StateManagerTests : JournalingTestBase
         var storage = new BlockingAppendStorage();
         var sut = CreateTestSystem(storage: storage);
         var state = new AlwaysWritingState();
-        sut.Manager.RegisterState("state", state);
+        sut.Manager.RegisterStateMachine("state", state);
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var first = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
@@ -774,7 +775,7 @@ public class StateManagerTests : JournalingTestBase
         var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var state = new ManualDirectWriteState();
-        sut.Manager.RegisterState("manual", state);
+        sut.Manager.RegisterStateMachine("manual", state);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
@@ -819,7 +820,7 @@ public class StateManagerTests : JournalingTestBase
         var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var state = new ManualDirectWriteState();
-        sut.Manager.RegisterState("manual", state);
+        sut.Manager.RegisterStateMachine("manual", state);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
@@ -1133,7 +1134,7 @@ public class StateManagerTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        Assert.False(sut.Manager.TryGetState("stale", out _));
+        Assert.False(sut.Manager.TryGetState<IStateMachine>("stale", out _));
         await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
     }
 
@@ -1707,7 +1708,7 @@ public class StateManagerTests : JournalingTestBase
 
         foreach (var entry in entries.Where(entry => entry.StreamId == streamId))
         {
-            ((IJournaledState)state).ReplayEntry(
+            ((IStateMachine)state).ReplayEntry(
                 new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, CodecTestHelpers.ReadBuffer(entry.Payload)),
                 context);
         }
@@ -1766,20 +1767,19 @@ public class StateManagerTests : JournalingTestBase
     {
         public List<CapturedJournalEntry> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(IEnumerable<JournalStreamId> streamIds)
+        public (JournalStreamId StreamId, IStateMachine State)[] Bind(IEnumerable<JournalStreamId> streamIds)
         {
-            return streamIds.Select(streamId => (streamId, (IJournaledState)new StreamSink(this, streamId))).ToArray();
+            return streamIds.Select(streamId => (streamId, (IStateMachine)new StreamSink(this, streamId))).ToArray();
         }
 
-        private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
+        private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IStateMachine
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }
-            public void AppendEntries(JournalStreamWriter writer) { }
-            public void AppendSnapshot(JournalStreamWriter writer) { }
-            public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void WritePendingEntries(JournalStreamWriter writer) { }
+            public void WriteSnapshot(JournalStreamWriter writer) { }
         }
     }
 
@@ -1812,7 +1812,7 @@ public class StateManagerTests : JournalingTestBase
             }
 
             var callbackPayload = _payload.ToArray();
-            var state = context.ResolveState(_streamId);
+            var state = context.ResolveStateMachine(_streamId);
             state.ReplayEntry(new JournalEntry(FormatKey, CodecTestHelpers.ReadBuffer(callbackPayload)), context);
 
             Array.Fill(callbackPayload, byte.MaxValue);
@@ -2472,7 +2472,7 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class ManualDirectWriteState : IJournaledState
+    private sealed class ManualDirectWriteState : IStateMachine
     {
         private JournalStreamWriter _writer;
         private bool _entryOpen;
@@ -2487,31 +2487,30 @@ public class StateManagerTests : JournalingTestBase
 
         public void MarkEntryClosing() => _entryOpen = false;
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) => _writer = writer;
 
-        public void AppendEntries(JournalStreamWriter writer)
+        public void WritePendingEntries(JournalStreamWriter writer)
         {
             AppendEntriesObservedOpenEntry |= _entryOpen;
         }
 
-        public void AppendSnapshot(JournalStreamWriter writer) { }
+        public void WriteSnapshot(JournalStreamWriter writer) { }
 
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class AlwaysWritingState : IJournaledState
+    private sealed class AlwaysWritingState : IStateMachine
     {
         public int AppendEntriesCount { get; private set; }
 
         public int WriteCompletedCount { get; private set; }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) { }
 
-        public void AppendEntries(JournalStreamWriter writer)
+        public void WritePendingEntries(JournalStreamWriter writer)
         {
             AppendEntriesCount++;
             using var entry = writer.BeginEntry();
@@ -2520,11 +2519,10 @@ public class StateManagerTests : JournalingTestBase
             entry.Commit();
         }
 
-        public void AppendSnapshot(JournalStreamWriter writer) => AppendEntries(writer);
+        public void WriteSnapshot(JournalStreamWriter writer) => WritePendingEntries(writer);
 
         public void OnWriteCompleted() => WriteCompletedCount++;
 
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class TrackingValueCodec<T>(IDurableValueCommandCodec<T> inner) : IDurableValueCommandCodec<T>

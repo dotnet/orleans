@@ -31,7 +31,7 @@ public sealed class JsonJournalOptions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddJournalStorage().UseJsonJournalFormat(options =>
+    /// builder.AddJournaling().UseJsonJournalFormat(options =>
     /// {
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
     /// });
@@ -49,13 +49,8 @@ public sealed class JsonJournalOptions
 /// <summary>
 /// Extension methods for configuring the JSON Lines Orleans.Journaling format.
 /// </summary>
-public static class JsonJournalExtensions
+public static class JsonJournalHostingExtensions
 {
-    /// <summary>
-    /// The well-known key for the JSON Lines journal format.
-    /// </summary>
-    public const string JournalFormatKey = "json";
-
     /// <summary>
     /// Configures this silo with the JSON Lines Orleans.Journaling format family.
     /// </summary>
@@ -64,11 +59,11 @@ public static class JsonJournalExtensions
     /// <returns>The silo builder for chaining.</returns>
     /// <example>
     /// <code>
-    /// builder.AddJournalStorage().UseJsonJournalFormat();
+    /// builder.AddJournaling().UseJsonJournalFormat();
     ///
-    /// builder.AddJournalStorage().UseJsonJournalFormat(MyJournalJsonContext.Default);
+    /// builder.AddJournaling().UseJsonJournalFormat(MyJournalJsonContext.Default);
     ///
-    /// builder.AddJournalStorage().UseJsonJournalFormat(options =>
+    /// builder.AddJournaling().UseJsonJournalFormat(options =>
     /// {
     ///     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
@@ -100,7 +95,7 @@ public static class JsonJournalExtensions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddJournalStorage().UseJsonJournalFormat(MyJournalJsonContext.Default);
+    /// builder.AddJournaling().UseJsonJournalFormat(MyJournalJsonContext.Default);
     /// </code>
     /// </example>
     public static ISiloBuilder UseJsonJournalFormat(this ISiloBuilder builder, IJsonTypeInfoResolver typeInfoResolver)
@@ -114,7 +109,7 @@ public static class JsonJournalExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        var key = JournalFormatServices.ValidateJournalFormatKey(JournalFormatKey);
+        var key = JournalFormatServices.ValidateJournalFormatKey(JsonLinesJournalFormat.JournalFormatKey);
         services.AddOptions<JsonJournalOptions>();
         if (tryAdd)
         {

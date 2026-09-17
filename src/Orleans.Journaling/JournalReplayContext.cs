@@ -20,19 +20,20 @@ public readonly struct JournalReplayContext
     public string WriteJournalFormatKey => Manager.WriteJournalFormatKey;
 
     /// <summary>
-    /// Gets the application-level service provider used to resolve journal services.
+    /// Gets the owning manager's service provider used to resolve journal services.
     /// </summary>
     /// <remarks>
-    /// This provider is not scoped to a grain activation or replay operation.
+    /// For activation-owned managers, this is the activation's service provider.
+    /// Factory-created standalone managers have their own service scope.
     /// </remarks>
     public IServiceProvider ServiceProvider => Manager.ServiceProvider;
 
     /// <summary>
-    /// Resolves the journaled state for <paramref name="streamId"/>.
+    /// Resolves the state machine for <paramref name="streamId"/>.
     /// </summary>
     /// <param name="streamId">The persisted journal stream id.</param>
-    /// <returns>The journaled state for the stream.</returns>
-    public IJournaledState ResolveState(JournalStreamId streamId) => Manager.ResolveState(streamId);
+    /// <returns>The state machine for the stream.</returns>
+    public IStateMachine ResolveStateMachine(JournalStreamId streamId) => Manager.ResolveStateMachine(streamId);
 
     /// <summary>
     /// Gets the command codec for <paramref name="entryFormatKey"/>.

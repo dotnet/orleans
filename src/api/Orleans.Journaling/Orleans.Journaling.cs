@@ -10,15 +10,26 @@ namespace Orleans.Journaling
 {
     public abstract partial class DurableGrain : Grain, IGrainBase
     {
-        protected IJournaledStateManager StateManager { get { throw null; } }
-
-        protected TState GetOrCreateState<TState>(string name)
-            where TState : class, IJournaledState { throw null; }
-
-        protected TState GetOrCreateState<TArg, TState>(string name, System.Func<TArg, TState> createState, TArg arg)
-            where TState : class, IJournaledState { throw null; }
+        protected IDurableStateManager StateManager { get { throw null; } }
 
         protected System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public static partial class DurableStateManagerExtensions
+    {
+        public static IDurableDictionary<TKey, TValue> GetOrAddDictionary<TKey, TValue>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static IDurableList<T> GetOrAddList<T>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static Runtime.IPersistentState<T> GetOrAddPersistentState<T>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static IDurableQueue<T> GetOrAddQueue<T>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static IDurableSet<T> GetOrAddSet<T>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static IDurableTaskCompletionSource<T> GetOrAddTaskCompletionSource<T>(this IDurableStateManager manager, string name) { throw null; }
+
+        public static IDurableValue<T> GetOrAddValue<T>(this IDurableStateManager manager, string name) { throw null; }
     }
 
     [GenerateSerializer]
@@ -47,18 +58,6 @@ namespace Orleans.Journaling
         Canceled = 3
     }
 
-    public static partial class HostingExtensions
-    {
-        public static Hosting.ISiloBuilder AddJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
-
-        public static Hosting.ISiloBuilder AddJournalStorage<TProvider>(this Hosting.ISiloBuilder builder, string name, System.Func<System.IServiceProvider, TProvider> factory)
-            where TProvider : class, IJournalStorageProvider { throw null; }
-
-        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name) { throw null; }
-
-        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
-    }
-
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>
     {
         void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer);
@@ -76,7 +75,7 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface IDurableDictionary<K, V> : System.Collections.Generic.IDictionary<K, V>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.IEnumerable
+    public partial interface IDurableDictionary<TKey, TValue> : System.Collections.Generic.IDictionary<TKey, TValue>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.IEnumerable
     {
     }
 
@@ -105,10 +104,6 @@ namespace Orleans.Journaling
     {
         void AddRange(System.Collections.Generic.IEnumerable<T> collection);
         System.Collections.ObjectModel.ReadOnlyCollection<T> AsReadOnly();
-    }
-
-    public partial interface IDurableNothing
-    {
     }
 
     public partial interface IDurableQueueCommandCodec<T>
@@ -171,6 +166,15 @@ namespace Orleans.Journaling
         bool SetEquals(System.Collections.Generic.IEnumerable<T> other);
     }
 
+    public partial interface IDurableStateManager
+    {
+        TState GetOrAddState<TState>(string name)
+            where TState : class;
+        bool TryGetState<TState>(string name, out TState? state)
+            where TState : class;
+        System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default);
+    }
+
     public partial interface IDurableTaskCompletionSourceCommandCodec<T>
     {
         void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer);
@@ -215,27 +219,14 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IJournaledState
-    {
-        void AppendEntries(JournalStreamWriter writer);
-        void AppendSnapshot(JournalStreamWriter writer);
-        IJournaledState DeepCopy();
-        void OnRecoveryCompleted();
-        void OnWriteCompleted();
-        void ReplayEntry(JournalEntry entry, JournalReplayContext context);
-        void Reset(JournalStreamWriter writer);
-    }
-
-    public partial interface IJournaledStateManager : System.IAsyncDisposable
+    public partial interface IJournaledStateManager : IDurableStateManager, System.IAsyncDisposable
     {
         long PendingWriteByteCount { get; }
 
-        System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
-        void RegisterState(string name, IJournaledState state);
+        System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken = default);
+        void RegisterStateMachine(string name, IStateMachine stateMachine);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
-        bool TryGetState(string name, out IJournaledState? state);
-        System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IJournaledStateManagerFactory
@@ -257,7 +248,7 @@ namespace Orleans.Journaling
     {
         string? ETag { get; }
 
-        string? Format { get; }
+        string? FormatKey { get; }
 
         System.Collections.Generic.IReadOnlyDictionary<string, string> Properties { get; }
     }
@@ -277,7 +268,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageCatalog
     {
-        System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJournalStorageConsumer
@@ -308,6 +299,16 @@ namespace Orleans.Journaling
         string FormatKey { get; }
 
         System.ReadOnlyMemory<byte> Payload { get; }
+    }
+
+    public partial interface IStateMachine
+    {
+        void OnRecoveryCompleted();
+        void OnWriteCompleted();
+        void ReplayEntry(JournalEntry entry, JournalReplayContext context);
+        void Reset(JournalStreamWriter writer);
+        void WritePendingEntries(JournalStreamWriter writer);
+        void WriteSnapshot(JournalStreamWriter writer);
     }
 
     public readonly partial struct JournalBufferReader
@@ -402,6 +403,17 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public sealed partial class JournalCatalogListOptions
+    {
+        public bool IncludeMetadata { get { throw null; } set { } }
+
+        public JournalId MaxId { get { throw null; } set { } }
+
+        public JournalId MinId { get { throw null; } set { } }
+
+        public JournalId Prefix { get { throw null; } set { } }
+    }
+
     public sealed partial class JournaledStateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
@@ -465,6 +477,30 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public static partial class JournalingHostingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableState<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, string, TImplementation> factory)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableState<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
+
+        public static Hosting.ISiloBuilder AddDurableState<TState, TImplementation>(this Hosting.ISiloBuilder builder, System.Func<System.IServiceProvider, string, TImplementation> factory)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
+
+        public static Hosting.ISiloBuilder AddDurableState<TState, TImplementation>(this Hosting.ISiloBuilder builder)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
+
+        public static Hosting.ISiloBuilder AddJournaling(this Hosting.ISiloBuilder builder) { throw null; }
+
+        public static Hosting.ISiloBuilder AddJournalStorage<TProvider>(this Hosting.ISiloBuilder builder, string name, System.Func<System.IServiceProvider, TProvider> factory)
+            where TProvider : class, IJournalStorageProvider { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name) { throw null; }
+
+        public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
+    }
+
     public static partial class JournalingTimeProviderNames
     {
         public const string Journaling = "Orleans.Journaling";
@@ -472,13 +508,13 @@ namespace Orleans.Journaling
 
     public sealed partial class JournalMetadata : IJournalMetadata
     {
-        public JournalMetadata(string? format, string? eTag = null, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null) { }
+        public JournalMetadata(string? formatKey, string? eTag = null, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null) { }
 
         public static IJournalMetadata Empty { get { throw null; } }
 
         public string? ETag { get { throw null; } }
 
-        public string? Format { get { throw null; } }
+        public string? FormatKey { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyDictionary<string, string> Properties { get { throw null; } }
     }
@@ -493,7 +529,7 @@ namespace Orleans.Journaling
 
         public readonly TCodec GetRequiredCommandCodec<TCodec>(string entryFormatKey, TCodec writeCommandCodec) { throw null; }
 
-        public readonly IJournaledState ResolveState(JournalStreamId streamId) { throw null; }
+        public readonly IStateMachine ResolveStateMachine(JournalStreamId streamId) { throw null; }
     }
 
     public static partial class JournalStorageConsumerExtensions
@@ -547,17 +583,6 @@ namespace Orleans.Journaling
         public readonly JournalEntryScope BeginEntry() { throw null; }
     }
 
-    public sealed partial class ListOptions
-    {
-        public bool IncludeMetadata { get { throw null; } set { } }
-
-        public JournalId MaxId { get { throw null; } set { } }
-
-        public JournalId MinId { get { throw null; } set { } }
-
-        public JournalId Prefix { get { throw null; } set { } }
-    }
-
     public sealed partial class VolatileJournalStorage : IJournalStorage
     {
         public VolatileJournalStorage() { }
@@ -591,7 +616,7 @@ namespace Orleans.Journaling
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
 
-        public System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Collections.Generic.IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 
@@ -685,9 +710,8 @@ namespace Orleans.Journaling.Json
         public void WriteSet(T value, JournalStreamWriter writer) { }
     }
 
-    public static partial class JsonJournalExtensions
+    public static partial class JsonJournalHostingExtensions
     {
-        public const string JournalFormatKey = "json";
         public static Hosting.ISiloBuilder UseJsonJournalFormat(this Hosting.ISiloBuilder builder, System.Action<JsonJournalOptions>? configure = null) { throw null; }
 
         public static Hosting.ISiloBuilder UseJsonJournalFormat(this Hosting.ISiloBuilder builder, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
@@ -698,6 +722,18 @@ namespace Orleans.Journaling.Json
         public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
 
         public JsonJournalOptions AddTypeInfoResolver(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
+    }
+
+    public sealed partial class JsonLinesJournalFormat : IJournalFormat
+    {
+        public const string JournalFormatKey = "json";
+        public string FormatKey { get { throw null; } }
+
+        public string? MimeType { get { throw null; } }
+
+        public JournalBufferWriter CreateWriter() { throw null; }
+
+        public void Replay(JournalBufferReader input, JournalReplayContext context) { }
     }
 
     public sealed partial class JsonPersistentStateCommandCodec<T> : IPersistentStateCommandCodec<T>

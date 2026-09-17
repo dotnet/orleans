@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
@@ -16,11 +17,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 #else
     private readonly object _lock = new();
 #endif
-    private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
-    private readonly Dictionary<uint, IJournaledState> _statesMap = [];
+    private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
+    private readonly Dictionary<uint, IStateMachine> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly AsyncServiceScope? _ownedScope;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -31,16 +34,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private ManagerState _state;
     private long _deletionGeneration;
     private Exception? _failure;
+    private bool _initializationStarted;
     private bool _migrationSnapshotRequired;
     private int _disposed;
+    private int _lifecycleEnrolled;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
-        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)))
+        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)), grainContext.ActivationServices)
     {
         _grainContext = grainContext;
         try
         {
             ((ILifecycleParticipant<IGrainLifecycle>)this).Participate(grainContext.ObservableLifecycle);
+            grainContext.SetComponent(this);
         }
         catch
         {
@@ -54,16 +60,21 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
     }
 
-    internal JournaledStateManager(JournaledStateManagerShared shared, IJournalStorage storage)
+    internal JournaledStateManager(
+        JournaledStateManagerShared shared,
+        IJournalStorage storage,
+        IServiceProvider? serviceProvider = null,
+        AsyncServiceScope? ownedScope = null)
     {
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
         _storage = storage;
+        _serviceProvider = serviceProvider ?? shared.ServiceProvider;
+        _ownedScope = ownedScope;
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(_serviceProvider, WriteJournalFormatKey);
+        var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(_serviceProvider, WriteJournalFormatKey);
         _journalWriter = _shared.JournalFormat.CreateWriter();
-        var serviceProvider = _shared.ServiceProvider;
-        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
-        var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
         // This allows us to recover the list of states ids without having to store it separately.
@@ -79,10 +90,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private static JournalId CreateJournalId(IGrainContext grainContext)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
+        JournalingGrainLifecycle.ThrowIfEnrollmentClosed(grainContext);
         return JournalId.FromGrainId(grainContext.GrainId);
     }
 
-    private static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, JournalId journalId)
+    internal static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, JournalId journalId)
     {
         ArgumentNullException.ThrowIfNull(storageProvider);
         if (journalId.IsDefault)
@@ -95,55 +107,125 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
 
-    internal IServiceProvider ServiceProvider => _shared.ServiceProvider;
+    internal IServiceProvider ServiceProvider => _serviceProvider;
 
-    public void RegisterState(string name, IJournaledState state)
+    public TState GetOrAddState<TState>(string name) where TState : class
     {
-        ArgumentNullException.ThrowIfNullOrEmpty(name);
-        _shutdownCancellation.Token.ThrowIfCancellationRequested();
+        if (TryGetState<TState>(name, out var existing))
+        {
+            return existing;
+        }
 
+        EnsureRegistrationAllowed();
+
+        // Open generic keyed registrations must use implementation types. Resolving their canonical
+        // scoped instance keeps keyed injection and programmatic access on the same construction path.
+        var result = _serviceProvider.GetKeyedService<TState>(name)
+            ?? throw new InvalidOperationException(
+                $"No durable state implementation is registered for contract '{typeof(TState)}' and name '{name}'. " +
+                "Register the contract using AddDurableState<TState, TImplementation>.");
+        if (result is not IStateMachine stateMachine)
+        {
+            throw new InvalidOperationException(
+                $"The durable state implementation for contract '{typeof(TState)}' and name '{name}' does not implement {nameof(IStateMachine)}.");
+        }
+
+        return RegisterResolvedState(name, result, stateMachine);
+    }
+
+    public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState? state) where TState : class
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
         lock (_lock)
         {
             ThrowIfFenced();
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            if (_states.TryGetValue(name, out var existing) && existing is not RetiredStateMachine)
+            {
+                state = existing as TState
+                    ?? throw new InvalidOperationException(
+                        $"A state named '{name}' is already registered with type '{existing.GetType()}', which is incompatible with '{typeof(TState)}'.");
+                return true;
+            }
+        }
+
+        state = null;
+        return false;
+    }
+
+    private void EnsureRegistrationAllowed()
+    {
+        lock (_lock)
+        {
+            ThrowIfFenced();
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_initializationStarted)
+            {
+                throw new InvalidOperationException("New states cannot be registered after journaled state manager initialization has begun.");
+            }
+        }
+    }
+
+    private TState RegisterResolvedState<TState>(string name, TState state, IStateMachine stateMachine) where TState : class
+    {
+        lock (_lock)
+        {
+            if (TryGetState<TState>(name, out var existing))
+            {
+                if (!ReferenceEquals(existing, state))
+                {
+                    throw new InvalidOperationException($"A different state instance is already registered with name '{name}'.");
+                }
+
+                return existing;
+            }
+
+            RegisterStateMachine(name, stateMachine);
+            return state;
+        }
+    }
+
+    internal TState GetOrAddState<TState, TImplementation>(string name, Func<IServiceProvider, string, TImplementation> factory)
+        where TState : class
+        where TImplementation : class, TState, IStateMachine
+    {
+        lock (_lock)
+        {
+            if (TryGetState<TState>(name, out var existing))
+            {
+                return existing;
+            }
+
+            EnsureRegistrationAllowed();
+            var state = factory(_serviceProvider, name)
+                ?? throw new InvalidOperationException($"The durable state factory for '{typeof(TState)}' returned null for name '{name}'.");
+            return RegisterResolvedState<TState>(name, state, state);
+        }
+    }
+
+    public void RegisterStateMachine(string name, IStateMachine stateMachine)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentNullException.ThrowIfNull(stateMachine);
+
+        lock (_lock)
+        {
+            EnsureRegistrationAllowed();
             if (_states.TryGetValue(name, out var existing))
             {
-                if (existing is RetiredState vessel)
-                {
-                    // If the existing state is a vessel for a retired one, it means the state was loaded from a previous
-                    // journal during recovery but has not been re-registered. We effectively are "staging" the resurrection of the state.
-                    // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
-                    // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
-                    state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
-                    var replayContext = new JournalReplayContext(this);
-                    foreach (var entry in vessel.PreservedEntries)
-                    {
-                        using var buffer = new ArcBufferWriter();
-                        buffer.Write(entry.Payload.Span);
-                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(buffer.Reader, isCompleted: true)), replayContext);
-                    }
-
-                    var id = _journalStreamDirectory[name];
-                    _states[name] = state;
-                    _statesMap[id] = state;
-                }
-                else
-                {
-                    // A real state is already registered with this name, this must be a developer error.
-                    throw new ArgumentException($"A state with the key '{name}' has already been registered.");
-                }
-            }
-            else
-            {
-                _states.Add(name, state);
+                throw new InvalidOperationException(
+                    $"A state named '{name}' is already registered with type '{existing.GetType()}' and cannot be registered as '{stateMachine.GetType()}'.");
             }
 
+            _states.Add(name, stateMachine);
             _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
         _workSignal.Signal();
     }
 
-    public async ValueTask InitializeAsync(CancellationToken cancellationToken)
+    public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
@@ -152,6 +234,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             ThrowIfFenced();
+            _initializationStarted = true;
             if (_workLoop is null)
             {
                 _workLoop = Start();
@@ -165,7 +248,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await task;
+        await task.WaitAsync(cancellationToken);
     }
 
     private Task Start()
@@ -591,7 +674,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                 Debug.Assert(state is not null);
 
-                if (state is RetiredState)
+                if (state is RetiredStateMachine)
                 {
                     LogRemovingRetiredState(_shared.Logger, name);
 
@@ -617,7 +700,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         foreach (var state in _statesMap.Values)
         {
-            if (state is RetiredState { PreservedEntries.Count: > 0 } retiredState)
+            if (state is RetiredStateMachine { PreservedEntries.Count: > 0 } retiredState)
             {
                 throw new InvalidOperationException(
                     $"Cannot migrate journal to format key '{_shared.JournalFormatKey}' because stream " +
@@ -629,20 +712,20 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalWriter.CreateJournalStreamWriter(streamId);
 
-    private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, uint id, IJournaledState state)
+    private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, uint id, IStateMachine state)
     {
         var writer = journalWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
         {
-            state.AppendSnapshot(writer);
+            state.WriteSnapshot(writer);
         }
         else
         {
-            state.AppendEntries(writer);
+            state.WritePendingEntries(writer);
         }
     }
 
-    public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
+    public async ValueTask DeleteStateAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
@@ -694,7 +777,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
             foreach (var (name, state) in _states)
             {
-                if (state is not RetiredState && !_journalStreamDirectory.ContainsKey(name))
+                if (state is not RetiredStateMachine && !_journalStreamDirectory.ContainsKey(name))
                 {
                     var id = _journalStreamDirectory.GetNextJournalStreamId();
                     while (_statesMap.ContainsKey(id))
@@ -710,7 +793,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             {
                 state.OnRecoveryCompleted();
 
-                if (state is RetiredState)
+                if (state is RetiredStateMachine)
                 {
                     // We can use TryAdd since recovery has finished.
                     if (_retirementTracker.TryAdd(name, _shared.TimeProvider.GetUtcNow().UtcDateTime))
@@ -733,7 +816,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         List<string>? retiredNames = null;
         foreach (var (name, state) in _states)
         {
-            if (state is RetiredState)
+            if (state is RetiredStateMachine)
             {
                 (retiredNames ??= []).Add(name);
             }
@@ -751,7 +834,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         _retirementTracker.ResetVolatileState();
     }
 
-    internal void BindStateForReplay(JournalStreamId streamId, IJournaledState state)
+    internal void BindStateForReplay(JournalStreamId streamId, IStateMachine state)
     {
         ArgumentNullException.ThrowIfNull(state);
         lock (_lock)
@@ -761,11 +844,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    internal IJournaledState ResolveState(JournalStreamId streamId)
+    internal IStateMachine ResolveStateMachine(JournalStreamId streamId)
     {
         if (!_statesMap.TryGetValue(streamId.Value, out var state))
         {
-            state = new RetiredState(streamId);
+            state = new RetiredStateMachine(streamId);
             _statesMap[streamId.Value] = state;
         }
 
@@ -779,7 +862,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return _shared.JournalFormat;
         }
 
-        return JournalFormatServices.GetRequiredJournalFormat(_shared.ServiceProvider, journalFormatKey);
+        return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);
     }
 
     private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalMetadata? metadata)
@@ -789,7 +872,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return;
         }
 
-        var journalFormatKey = metadata?.Format is { } storedFormatKey
+        var journalFormatKey = metadata?.FormatKey is { } storedFormatKey
             ? JournalFormatServices.ValidateJournalFormatKey(storedFormatKey)
             : _shared.JournalFormatKey;
         try
@@ -829,7 +912,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             $"The configured write journal format key is '{_shared.JournalFormatKey}'.",
             exception);
 
-    public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
+    public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -986,7 +1069,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
             else
             {
-                var vessel = new RetiredState(new(id));
+                var vessel = new RetiredStateMachine(new(id));
 
                 // We must not make the vessel self-register with the manager, since it will
                 // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
@@ -997,11 +1080,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
-
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
-    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
+    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
+    {
+        if (Interlocked.Exchange(ref _lifecycleEnrolled, 1) == 0)
+        {
+            observer.Subscribe(GrainLifecycleStage.SetupState, this);
+        }
+    }
+
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
     async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken) => await StopAsync(cancellationToken).ConfigureAwait(false);
 
@@ -1049,10 +1137,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return;
         }
 
-        await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
         {
             _shutdownCancellation.Dispose();
             _journalWriter.Dispose();
+            if (_ownedScope is { } scope)
+            {
+                await scope.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 
@@ -1165,7 +1261,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDurableDictionaryCommandCodec<string, uint> codec) : IJournaledState, IDurableDictionaryCommandHandler<string, uint>
+        IDurableDictionaryCommandCodec<string, uint> codec) : IStateMachine, IDurableDictionaryCommandHandler<string, uint>
     {
         public const uint Id = 0u;
 
@@ -1176,7 +1272,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public uint this[string name] => _ids[name];
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
@@ -1205,19 +1301,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public bool ApplyRemove(string name) => _ids.Remove(name);
 
-        public void ResetVolatileState() => ((IJournaledState)this).Reset(_manager.CreateJournalStreamWriter(new(Id)));
+        public void ResetVolatileState() => ((IStateMachine)this).Reset(_manager.CreateJournalStreamWriter(new(Id)));
 
-        void IJournaledState.Reset(JournalStreamWriter writer)
+        void IStateMachine.Reset(JournalStreamWriter writer)
         {
             _ids.Clear();
             _writer = writer;
         }
 
-        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
 
-        void IJournaledState.AppendSnapshot(JournalStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
+        void IStateMachine.WriteSnapshot(JournalStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
 
-        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
         void IDurableDictionaryCommandHandler<string, uint>.ApplySet(string key, uint value) => ApplySet(key, value);
 
@@ -1256,7 +1351,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         private readonly JournalStreamWriter _journalWriter = manager.CreateJournalStreamWriter(new(Id));
 
-        public void ResetVolatileState() => ((IJournaledState)this).Reset(_journalWriter);
+        public void ResetVolatileState() => ((IStateMachine)this).Reset(_journalWriter);
 
         protected override JournalStreamWriter GetWriter() => _journalWriter;
     }
@@ -1265,8 +1360,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     /// Used to keep retired states into a purgatory state until time-based purging or if a comeback occurs.
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
-    [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
-    private sealed class RetiredState(JournalStreamId streamId) : IJournaledState
+    [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
+    private sealed class RetiredStateMachine(JournalStreamId streamId) : IStateMachine
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
@@ -1274,10 +1369,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));
 
-        void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+        void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
         {
             foreach (var entry in _preservedEntries)
             {
@@ -1285,9 +1380,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
         }
 
-        void IJournaledState.Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
-        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
-        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
+        void IStateMachine.Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
+        void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
     }
 
     [LoggerMessage(

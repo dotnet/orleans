@@ -38,7 +38,7 @@ public sealed class AzureTableStorageJournalingProviderBuilderTests
         Assert.Equal(AzureTableJournalStorageOptions.DEFAULT_TABLE_NAME, storageOptions.TableName);
         Assert.Null(storageOptions.TableServiceClient);
         Assert.Null(storageOptions.CreateClient);
-        Assert.Equal(JsonJournalExtensions.JournalFormatKey, managerOptions.JournalFormatKey);
+        Assert.Equal(JsonLinesJournalFormat.JournalFormatKey, managerOptions.JournalFormatKey);
         AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
     }
 

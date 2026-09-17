@@ -1,11 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace Orleans.Journaling;
 
 /// <summary>
 /// Manages the durable states associated with a journal.
 /// </summary>
-public interface IJournaledStateManager : IAsyncDisposable
+public interface IJournaledStateManager : IDurableStateManager, IAsyncDisposable
 {
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;
@@ -18,35 +16,15 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    ValueTask InitializeAsync(CancellationToken cancellationToken);
+    ValueTask InitializeAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Registers a state with the manager.
+    /// Registers a state machine before initialization begins.
     /// </summary>
     /// <param name="name">The state's stable identifier.</param>
-    /// <param name="state">The state instance to register.</param>
-    void RegisterState(string name, IJournaledState state);
-
-    /// <summary>
-    /// Attempts to get a state registered with the manager.
-    /// </summary>
-    /// <param name="name">The state's stable identifier.</param>
-    /// <param name="state">The state instance, if one is registered for <paramref name="name"/>.</param>
-    bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state);
-
-    /// <summary>
-    /// Prepares and persists an update to the journal.
-    /// </summary>
-    /// <remarks>
-    /// Stage mutations only after the operation has established that they are safe to commit. Pending changes
-    /// are shared by all callers using this manager. A write failure permanently fences the manager and requests
-    /// deactivation of its owning grain. Owners of standalone managers must dispose the failed instance and
-    /// create a new manager with new state instances to recover durable state.
-    /// Cancellation stops the caller's wait; an already queued write continues to completion.
-    /// </remarks>
-    /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    ValueTask WriteStateAsync(CancellationToken cancellationToken);
+    /// <param name="stateMachine">The state machine instance to register.</param>
+    /// <exception cref="InvalidOperationException">Initialization has begun or the name is already registered.</exception>
+    void RegisterStateMachine(string name, IStateMachine stateMachine);
 
     /// <summary>
     /// Resets this instance, removing any persistent state.
@@ -57,7 +35,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    ValueTask DeleteStateAsync(CancellationToken cancellationToken);
+    ValueTask DeleteStateAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets an approximate count of bytes accumulated in the in-memory journal buffer that have

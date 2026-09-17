@@ -76,6 +76,7 @@ public abstract class JournalingTestBase
     {
         var services = new ServiceCollection();
         services.AddSerializer();
+        services.AddScoped<JournaledStateManagerBinding>();
         services.AddLogging(builder => builder.AddConsole());
         var customKey = journalFormat is null ? null : JournalFormatServices.ValidateJournalFormatKey(journalFormat.FormatKey);
         ConfigureBinaryJournalingServices(

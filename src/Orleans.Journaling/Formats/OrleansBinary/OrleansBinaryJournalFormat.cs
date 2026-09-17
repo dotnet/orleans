@@ -68,7 +68,7 @@ internal static class OrleansBinaryJournalReader
             }
 
             var streamId = new JournalStreamId(streamIdValue);
-            var state = context.ResolveState(streamId);
+            var state = context.ResolveStateMachine(streamId);
 
             // Slice the entry payload (post-streamId) so the state receives exactly one command body.
             var payloadLength = frameLength - payloadStart;

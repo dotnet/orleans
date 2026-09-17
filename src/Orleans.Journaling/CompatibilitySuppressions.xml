@@ -2,8 +2,120 @@
 <!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
 <Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.HostingExtensions</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IDurableDictionary`2</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IDurableNothing</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IJournaledState</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.Json.JsonJournalExtensions</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.HostingExtensions</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IDurableDictionary`2</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IDurableNothing</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.IJournaledState</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Orleans.Journaling.Json.JsonJournalExtensions</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.get_StateManager</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.GetOrCreateState``1(System.String)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.GetOrCreateState``2(System.String,System.Func{``0,``1},``0)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.RegisterState(System.String,Orleans.Journaling.IJournaledState)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync(System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.TryGetState(System.String,Orleans.Journaling.IJournaledState@)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournalMetadata.get_Format</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -17,6 +129,20 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.JournalMetadata.get_Format</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.JournalReplayContext.ResolveState(Orleans.Journaling.JournalStreamId)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.VolatileJournalStorageProvider.ListAsync(Orleans.Journaling.JournalId,System.Threading.CancellationToken)</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
@@ -24,7 +150,49 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.get_StateManager</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.GetOrCreateState``1(System.String)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.DurableGrain.GetOrCreateState``2(System.String,System.Func{``0,``1},``0)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.RegisterState(System.String,Orleans.Journaling.IJournaledState)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync(System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.TryGetState(System.String,Orleans.Journaling.IJournaledState@)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournalMetadata.get_Format</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -38,6 +206,20 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.JournalMetadata.get_Format</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Journaling.JournalReplayContext.ResolveState(Orleans.Journaling.JournalStreamId)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:Orleans.Journaling.VolatileJournalStorageProvider.ListAsync(Orleans.Journaling.JournalId,System.Threading.CancellationToken)</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
@@ -45,14 +227,42 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.ListOptions,System.Threading.CancellationToken)</Target>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine(System.String,Orleans.Journaling.IStateMachine)</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
-    <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.ListOptions,System.Threading.CancellationToken)</Target>
+    <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.JournalCatalogListOptions,System.Threading.CancellationToken)</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:Orleans.Journaling.IJournalMetadata.FormatKey</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine(System.String,Orleans.Journaling.IStateMachine)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.JournalCatalogListOptions,System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:Orleans.Journaling.IJournalMetadata.FormatKey</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>

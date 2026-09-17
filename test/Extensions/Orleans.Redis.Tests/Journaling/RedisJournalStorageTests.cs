@@ -49,7 +49,7 @@ public sealed class RedisJournalStorageTests
         var storage = new RedisJournalStorage(database, "raw-utf16", keyName, "json", options, id);
 
         Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
-        Assert.Equal("json", (await storage.GetMetadataAsync(TestContext.Current.CancellationToken))!.Format);
+        Assert.Equal("json", (await storage.GetMetadataAsync(TestContext.Current.CancellationToken))!.FormatKey);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), TestContext.Current.CancellationToken);
 
         var reader = new RedisJournalStorage(database, "raw-utf16", keyName, "json", options, id);
@@ -193,14 +193,14 @@ public sealed class RedisJournalStorageTests
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(metadata);
         Assert.Equal("test", metadata.Properties["owner"]);
-        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata.Format);
+        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata.FormatKey);
 
         var consumer = new CapturingJournalStorageConsumer();
         await provider.CreateStorage(JournalId.Create("redis", "append")).ReadAsync(consumer, TestContext.Current.CancellationToken);
 
         Assert.True(consumer.IsCompleted);
         Assert.Equal([1, 2, 3, 4, 5], consumer.Bytes.ToArray());
-        Assert.Equal(metadata.Format, consumer.Metadata?.Format);
+        Assert.Equal(metadata.FormatKey, consumer.Metadata?.FormatKey);
     }
 
     [Fact]
@@ -221,7 +221,7 @@ public sealed class RedisJournalStorageTests
 
         var listed = await ToListAsync(
             provider.ListAsync(
-                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                new JournalCatalogListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(3, listed.Count);
@@ -232,7 +232,7 @@ public sealed class RedisJournalStorageTests
 
         listed = await ToListAsync(
             provider.ListAsync(
-                new ListOptions { Prefix = JournalId.Create("redis", "list") },
+                new JournalCatalogListOptions { Prefix = JournalId.Create("redis", "list") },
                 TestContext.Current.CancellationToken),
             TestContext.Current.CancellationToken);
         Assert.Equal(2, listed.Count);
@@ -618,7 +618,7 @@ public sealed class RedisJournalStorageTests
 
         var metadata = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata!.Format);
+        Assert.Equal(new JournaledStateManagerOptions().JournalFormatKey, metadata!.FormatKey);
         Assert.Equal("caller", metadata.Properties["format"]);
     }
 

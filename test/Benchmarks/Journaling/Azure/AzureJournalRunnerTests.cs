@@ -273,7 +273,7 @@ public class AzureJournalRunnerTests
         await lifecycle.OnStart(token);
         try
         {
-            var options = new ListOptions { Prefix = new("catalog/"), MaxId = new("catalog/b") };
+            var options = new JournalCatalogListOptions { Prefix = new("catalog/"), MaxId = new("catalog/b") };
             Assert.Equal(new JournalId[] { new("catalog/a"), new("catalog/b") }, await ReadIdsAsync());
             Assert.All(counters, counter => Assert.False(counter.Enabled));
             collector.Start();

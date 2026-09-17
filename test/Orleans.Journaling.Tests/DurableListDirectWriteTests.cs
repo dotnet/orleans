@@ -94,9 +94,11 @@ public sealed class DurableListDirectWriteTests
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterState(string name, IJournaledState state) => state.Reset(writer.CreateWriter());
+        public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(writer.CreateWriter());
 
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        public TState GetOrAddState<TState>(string name) where TState : class => throw new NotSupportedException();
+
+        public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState? state) where TState : class
         {
             state = null;
             return false;
@@ -106,6 +108,8 @@ public sealed class DurableListDirectWriteTests
 
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask DisposeAsync() => default;
     }
 
     private sealed class TestJournalStreamWriter : IDisposable

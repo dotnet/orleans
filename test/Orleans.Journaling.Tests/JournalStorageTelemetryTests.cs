@@ -158,7 +158,7 @@ public sealed class JournalStorageTelemetryTests
                 cancellationToken: TestContext.Current.CancellationToken));
         }
 
-        var options = emptyRange ? new ListOptions { MinId = new("z"), MaxId = new("a") } : null;
+        var options = emptyRange ? new JournalCatalogListOptions { MinId = new("z"), MaxId = new("a") } : null;
         await using var enumerator = provider.ListAsync(options, TestContext.Current.CancellationToken)
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.False(await enumerator.MoveNextAsync());

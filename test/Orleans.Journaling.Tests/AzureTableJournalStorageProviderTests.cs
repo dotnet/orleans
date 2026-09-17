@@ -402,7 +402,7 @@ public sealed class AzureTableJournalStorageProviderTests
         }
 
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
-        var options = new ListOptions
+        var options = new JournalCatalogListOptions
         {
             Prefix = prefix is null ? default : new(prefix),
             MinId = minId is null ? default : new(minId),
@@ -443,7 +443,7 @@ public sealed class AzureTableJournalStorageProviderTests
     {
         var table = new FakeTableClient();
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
-        var options = new ListOptions
+        var options = new JournalCatalogListOptions
         {
             Prefix = prefix is null ? default : new(prefix),
             MinId = minId is null ? default : new(minId),
@@ -751,7 +751,7 @@ public sealed class AzureTableJournalStorageProviderTests
         table.AddHeader(new JournalId("orders/1"));
         table.AddHeader(new JournalId("orders/2"));
         table.AddHeader(new JournalId("orders/3"));
-        var options = new ListOptions { Prefix = new("unused"), MinId = new("z"), MaxId = new("z") };
+        var options = new JournalCatalogListOptions { Prefix = new("unused"), MinId = new("z"), MaxId = new("z") };
         using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
         var listing = context.Provider.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("orders");
