@@ -44,7 +44,11 @@ Under the cluster prefix, the provider maintains:
 | `<silo-address>` | The silo registration, including its host name, gateway port, start time, status, silo name, and failure-detector votes. |
 | `<silo-address>/iamalive` | The silo's periodic `IAmAlive` timestamp. |
 
-Membership-row changes and the corresponding version change use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) with compare-and-set operations. An `IAmAlive` update writes only its separate timestamp key and doesn't advance the table version. This value supports diagnostics and startup recovery; it isn't the direct heartbeat used to detect a failed silo. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
+Membership reads use Consul's consistent mode to read registrations, timestamps, and the table version together. Insertions and status updates use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) to atomically compare-and-set the registration, timestamp, and table version. Status and `IAmAlive` updates preserve the greatest stored timestamp; an `IAmAlive` update retains the table version.
+
+Cleanup removes Dead registrations whose start time, `IAmAlive` timestamp, and failure-detector votes all precede the cutoff. It compares the registration and timestamp keys atomically and retains the table version, preserving entries changed by concurrent writers.
+
+The `IAmAlive` timestamp supports diagnostics and startup recovery. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
 
 Orleans clients list the cluster prefix and select active registrations with a nonzero gateway port. If a client discovers no gateways, inspect the exact prefix used by the client and silos, then compare registration status, gateway ports, and advertised-address reachability.
 
