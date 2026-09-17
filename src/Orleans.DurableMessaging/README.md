@@ -131,8 +131,11 @@ outbox reuses as a local pending intent with the owning grain as sender. Journal
 codecs serialize envelopes and framework records during admitted application and
 capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
 journaled messages once per ID. Repeated equivalent enqueues preserve their original
-message, enqueue time, and commit status. Conflicting IDs fail; equivalence includes
-routing, timestamps, body and context bytes, and declared type metadata.
+message, enqueue time, and commit status. Direct envelopes require a nonempty message
+ID, an owning sender, a nondefault receiver, and envelope data before intent admission.
+Serialized null bodies remain valid; route selection supplies delivery and dead-letter
+outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
+context bytes, and declared type metadata.
 
 The participant installs one messaging observer with explicit inbox and outbox
 endpoints. After inbox handler preparation, outbox preparation seals the capture's
@@ -154,9 +157,12 @@ result. Outbox stop, fault, and deletion clear only outbox result entries. Diagn
 expose retained outbox dead letters and stage their removal for the next journal write.
 
 A terminal journal fault stops outbox preparation and callbacks while preserving the
-failed activation's journaled objects. Fresh instances replay the actual durable
-outcome, including ambiguous append acknowledgements. Canceling a caller's wait
-leaves an admitted write running through capture and acknowledgement. Deletion
+failed activation's journaled objects. An ownership-repair request veto before
+admission requests grain deactivation, allowing a fresh activation to retry the
+persisted work. Admitted failures retain the journal manager's terminal-fault path.
+Fresh instances replay the actual durable outcome, including ambiguous append
+acknowledgements. Canceling a caller's wait leaves an admitted write running through
+capture and acknowledgement. Deletion
 requires quiescent messaging operations and clears pending intents after success.
 
 This intermediate project remains non-packable. Receiver tests compose the inbox
