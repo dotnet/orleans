@@ -157,8 +157,8 @@ namespace Orleans.Runtime
         /// Determines whether this snapshot is a successor to another snapshot.
         /// </summary>
         /// <remarks>
-        /// At the same canonical membership version, the rowset is unchanged and progress consists
-        /// of newer liveness timestamps.
+        /// At the same canonical membership version, progress consists of newer liveness timestamps
+        /// or pruning previously Dead rows. Non-Dead rows are retained.
         /// </remarks>
         /// <param name="other">The snapshot to compare against.</param>
         /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
@@ -174,9 +174,9 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            if (Entries.Count != other.Entries.Count)
+            if (Entries.Count > other.Entries.Count)
             {
-                // Every rowset change requires a new canonical membership version.
+                // Adding a row requires a new canonical membership version.
                 return false;
             }
 
@@ -192,7 +192,20 @@ namespace Orleans.Runtime
                 heartbeatAdvanced |= entry.IAmAliveTime > otherEntry.IAmAliveTime;
             }
 
-            return heartbeatAdvanced;
+            if (Entries.Count == other.Entries.Count)
+            {
+                return heartbeatAdvanced;
+            }
+
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (previousEntry.Status != SiloStatus.Dead && !Entries.ContainsKey(silo))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public override string ToString()

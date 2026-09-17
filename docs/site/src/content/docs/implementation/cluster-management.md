@@ -19,6 +19,8 @@ The membership system provides a **canonical membership view**: a versioned view
 
 Per-silo `IAmAliveTime` is tracked independently of the canonical membership view. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAlive*> writes leave the view version unchanged. Snapshot updates retain the maximum observed timestamp for each silo, so local liveness timestamps advance monotonically as table reads and peer snapshots arrive. At the same version, merging retains the accepted versioned fields.
 
+Snapshots can prune previously `Dead` rows at the same version while retaining every non-Dead row. Pruning preserves the versioned fields and maximum `IAmAliveTime` of each retained entry.
+
 ```mermaid
 flowchart LR
     Table[(IMembershipTable)]

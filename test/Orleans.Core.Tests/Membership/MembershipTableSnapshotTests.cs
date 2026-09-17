@@ -275,8 +275,7 @@ namespace NonSilo.Tests.Membership
         [InlineData(SiloStatus.Active)]
         [InlineData(SiloStatus.ShuttingDown)]
         [InlineData(SiloStatus.Stopping)]
-        [InlineData(SiloStatus.Dead)]
-        public void SameVersionRowRemovalIsNotASuccessor(SiloStatus removedStatus)
+        public void SameVersionNonDeadRowRemovalIsNotASuccessor(SiloStatus removedStatus)
         {
             var active = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch.AddMinutes(1));
             var removed = Entry(Silo("127.0.0.1:200@1"), removedStatus, DateTimeOffset.UnixEpoch);
@@ -289,6 +288,38 @@ namespace NonSilo.Tests.Membership
             Assert.False(updated.IsSuccessorTo(previous));
             Assert.False(previous.IsSuccessorTo(updated));
             Assert.Contains(removed.SiloAddress, previous.Entries.Keys);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SameVersionDeadRowPruningPreservesCanonicalFieldsAndHeartbeat(bool fromPeer)
+        {
+            var active = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch.AddMinutes(2));
+            active.HostName = "active-host";
+            active.StartTime = DateTime.UnixEpoch;
+            var dead = Entry(Silo("127.0.0.1:200@1"), SiloStatus.Dead, DateTimeOffset.UnixEpoch);
+            var previous = MembershipTableSnapshot.Create(Table(active, dead));
+            var retained = active.WithIAmAliveTime(DateTime.UnixEpoch.AddMinutes(1));
+            var incoming = Table(retained);
+
+            var updated = fromPeer
+                ? MembershipTableSnapshot.Update(previous, MembershipTableSnapshot.Create(incoming))
+                : MembershipTableSnapshot.Update(previous, incoming);
+
+            Assert.Equal(previous.Version, updated.Version);
+            Assert.True(updated.IsSuccessorTo(previous));
+            Assert.False(previous.IsSuccessorTo(updated));
+            Assert.False(updated.IsSuccessorTo(updated));
+            var entry = Assert.Single(updated.Entries).Value;
+            Assert.Equal(active.SiloAddress, entry.SiloAddress);
+            Assert.Equal(SiloStatus.Active, entry.Status);
+            Assert.Equal(active.HostName, entry.HostName);
+            Assert.Equal(active.StartTime, entry.StartTime);
+            Assert.Equal(active.IAmAliveTime, entry.IAmAliveTime);
+            Assert.DoesNotContain(dead.SiloAddress, updated.Entries.Keys);
+            Assert.Contains(dead.SiloAddress, previous.Entries.Keys);
+            Assert.Equal(DateTime.UnixEpoch.AddMinutes(1), retained.IAmAliveTime);
         }
 
         [Theory]
@@ -332,24 +363,25 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public void EmptyCanonicalViewRequiresVersionAdvance()
+        public void SameVersionDeadRowPruningCanRemoveAllRows()
         {
             var previous = MembershipTableSnapshot.Create(Table(
                 Entry(Silo("127.0.0.1:100@1"), SiloStatus.Dead),
                 Entry(Silo("127.0.0.1:200@1"), SiloStatus.Dead)));
-            var empty = MembershipTableSnapshot.Create(Table());
-
-            Assert.Equal(previous.Version, empty.Version);
-            Assert.False(empty.IsSuccessorTo(previous));
-            Assert.True(new MembershipTableSnapshot(new MembershipVersion(previous.Version.Value + 1), empty.Entries)
-                .IsSuccessorTo(previous));
-            Assert.False(empty.IsSuccessorTo(empty));
-            Assert.Empty(empty.Entries);
+            Assert.All(
+                new[] { MembershipTableSnapshot.Update(previous, Table()), MembershipTableSnapshot.Update(previous, MembershipTableSnapshot.Create(Table())) },
+                empty =>
+                {
+                    Assert.Equal(previous.Version, empty.Version);
+                    Assert.True(empty.IsSuccessorTo(previous));
+                    Assert.False(empty.IsSuccessorTo(empty));
+                    Assert.Empty(empty.Entries);
+                });
             Assert.Equal(2, previous.Entries.Count);
         }
 
         [Fact]
-        public void SameVersionHeartbeatAdvanceRequiresCompleteCanonicalRowset()
+        public void SameVersionHeartbeatAdvancePreservesNonDeadRows()
         {
             var keep = Entry(Silo("127.0.0.1:100@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
             var active = Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active, DateTimeOffset.UnixEpoch);
@@ -358,7 +390,7 @@ namespace NonSilo.Tests.Membership
             var later = keep.WithIAmAliveTime(DateTime.UnixEpoch.AddMinutes(1));
 
             Assert.False(MembershipTableSnapshot.Create(Table(later, dead)).IsSuccessorTo(previous));
-            Assert.False(MembershipTableSnapshot.Create(Table(later, active)).IsSuccessorTo(previous));
+            Assert.True(MembershipTableSnapshot.Create(Table(later, active)).IsSuccessorTo(previous));
             Assert.True(MembershipTableSnapshot.Create(Table(later, active, dead)).IsSuccessorTo(previous));
             Assert.Equal(DateTime.UnixEpoch, previous.Entries[keep.SiloAddress].IAmAliveTime);
         }
