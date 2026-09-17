@@ -151,6 +151,63 @@ public class HierarchicalKeyTests
         Assert.False(root.IsParentOf(leaf));
     }
 
+    [Fact]
+    public void CreateChildKey_WithMultipleSegments_PreservesFlatKeyEquivalence()
+    {
+        var root = HierarchicalKey.Create("foo");
+        var composed = root.CreateChildKey("bar/baz");
+        var direct = HierarchicalKey.Create("foo/bar/baz");
+        var immediateParent = HierarchicalKey.Create("foo/bar");
+        var segments = new List<string>();
+        foreach (var segment in composed)
+        {
+            segments.Add(segment.ToString());
+        }
+
+        Assert.Equal(["foo", "bar", "baz"], segments);
+        Assert.Equal("foo/bar/baz", composed.ToString());
+        Assert.Equal(11, composed.Length);
+        Assert.True(composed.Equals(direct));
+        Assert.True(direct.Equals(composed));
+        Assert.False(composed.Equals(immediateParent));
+        Assert.Equal(direct.GetHashCode(), composed.GetHashCode());
+        Assert.True(root.IsAncestorOf(composed));
+        Assert.False(root.IsParentOf(composed));
+        Assert.True(immediateParent.IsParentOf(composed));
+        Assert.True(composed.IsChildOf(immediateParent));
+        Assert.Equal(immediateParent, composed.GetParent());
+    }
+
+    [Theory]
+    [InlineData(@"ba\/r/baz", @"ba\/r", @"root/fo\/o/ba\/r/baz")]
+    [InlineData(@"ba\\r/baz", @"ba\\r", @"root/fo\/o/ba\\r/baz")]
+    public void CreateChildKey_WithEscapedSegments_PreservesFlatKeyEquivalence(
+        string childValue, string escapedSegment, string expected)
+    {
+        var root = HierarchicalKey.Create(@"root/fo\/o");
+        var composed = root.CreateChildKey(childValue);
+        var direct = HierarchicalKey.Create(expected);
+        var immediateParent = HierarchicalKey.Create($@"root/fo\/o/{escapedSegment}");
+        var segments = new List<string>();
+        foreach (var segment in composed)
+        {
+            segments.Add(segment.ToString());
+        }
+
+        Assert.Equal(["root", @"fo\/o", escapedSegment, "baz"], segments);
+        Assert.Equal(expected, composed.ToString());
+        Assert.Equal(expected.Length, composed.Length);
+        Assert.True(composed.Equals(direct));
+        Assert.True(direct.Equals(composed));
+        Assert.False(composed.Equals(immediateParent));
+        Assert.Equal(direct.GetHashCode(), composed.GetHashCode());
+        Assert.True(root.IsAncestorOf(composed));
+        Assert.False(root.IsParentOf(composed));
+        Assert.True(immediateParent.IsParentOf(composed));
+        Assert.True(composed.IsChildOf(immediateParent));
+        Assert.Equal(immediateParent, composed.GetParent());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("bar//baz")]
