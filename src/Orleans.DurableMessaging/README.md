@@ -24,6 +24,10 @@ The inbox accepts a message after DurableJobs confirms scheduling and the journa
 commits the envelope together with its ownership generation and exact returned job
 handle. Recovery restores that pair and repairs an absent owner for pending work.
 Callbacks validate generation and physical job identity before processing.
+Delivery requires a nonempty message ID, a nondefault sender, and an envelope data
+container before duplicate lookup or admission. Serialized null message bodies remain
+valid payloads. Empty-owner clearing shares the inbox admission gate with delivery,
+so direct interleaved delivery proceeds after the clear's durable outcome.
 
 Handlers execute sequentially inside an admitted journal operation's preparation.
 The messaging observer prepares the inbox handler before the outbox prerequisites,
