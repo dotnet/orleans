@@ -32,7 +32,7 @@ internal static class ReceiverTestServices
         var extensionType = GetImplementationType("DurableInboxExtension");
         var instrumentsType = GetImplementationType("DurableMessagingInstruments");
         var pumpResultsType = GetImplementationType("DurableMessagingPumpResults");
-        var participantType = GetImplementationType("DurableMessagingGrainParticipant");
+        var configuratorType = GetImplementationType("DurableMessagingGrainTypeConfigurator");
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
         services.AddOptions<DurableInboxOptions>().Configure(configure);
         services.TryAddSingleton(instrumentsType);
@@ -105,8 +105,7 @@ internal static class ReceiverTestServices
                 TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
                 65_536);
         });
-        services.TryAddScoped(participantType);
-        services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IJournaledGrainParticipant), participantType));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IConfigureGrainTypeComponents), configuratorType));
     }
 
     private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName)
