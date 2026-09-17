@@ -4,10 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("AzureBlobStorage", "Journal", "Silo", typeof(AzureBlobStorageJournalProviderBuilder))]
+[assembly: RegisterProvider("AzureBlobStorage", "Journaling", "Silo", typeof(AzureBlobStorageJournalingProviderBuilder))]
 namespace Orleans.Hosting;
 
-internal sealed class AzureBlobStorageJournalProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AzureBlobStorageJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {

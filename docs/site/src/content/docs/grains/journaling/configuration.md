@@ -48,7 +48,7 @@ durable state. Register each selected physical namespace once and keep its
 account, container, table, bucket, key prefix, and naming functions stable while
 it contains work.
 
-Configure each journal storage binding under `Orleans:Journal:{name}`.
+Configure each journal storage binding under `Orleans:Journaling:{name}`.
 `ProviderType` selects its storage provider, and `ServiceKey` selects its Azure
 or Redis client from dependency injection. Orleans passes each entry's name and
 configuration section to the registered provider builder. Use `Default` as the
@@ -60,7 +60,7 @@ separate registered Redis clients and key prefixes:
 ```json
 {
   "Orleans": {
-    "Journal": {
+    "Journaling": {
       "Default": {
         "ProviderType": "Redis",
         "ServiceKey": "primary-redis",
@@ -77,7 +77,7 @@ separate registered Redis clients and key prefixes:
 ```
 
 The equivalent environment-variable key for the archive client is
-`Orleans__Journal__archive__ServiceKey`.
+`Orleans__Journaling__archive__ServiceKey`.
 
 For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
 selects the journaled implementation.

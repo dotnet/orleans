@@ -14,7 +14,7 @@ namespace Orleans.Journaling.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestCategory("BVT")]
-public sealed class AzureTableStorageJournalProviderBuilderTests
+public sealed class AzureTableStorageJournalingProviderBuilderTests
 {
     private const string ProviderName = "provider-name";
     private static readonly Uri NamedServiceUri = new("https://named.table.example/");
@@ -185,8 +185,8 @@ public sealed class AzureTableStorageJournalProviderBuilderTests
     }
 
     [Theory]
-    [InlineData("AzureTableStorage", typeof(AzureTableStorageJournalProviderBuilder))]
-    [InlineData("AzureBlobStorage", typeof(AzureBlobStorageJournalProviderBuilder))]
+    [InlineData("AzureTableStorage", typeof(AzureTableStorageJournalingProviderBuilder))]
+    [InlineData("AzureBlobStorage", typeof(AzureBlobStorageJournalingProviderBuilder))]
     public void Assembly_RegistersExpectedProviderMetadata(string providerType, Type builderType)
     {
         var attribute = typeof(AzureTableStorageHostingExtensions)
@@ -195,13 +195,13 @@ public sealed class AzureTableStorageJournalProviderBuilderTests
             .Single(candidate => candidate.Type == builderType);
 
         Assert.Equal(providerType, attribute.Name);
-        Assert.Equal("Journal", attribute.Kind);
+        Assert.Equal("Journaling", attribute.Kind);
         Assert.Equal("Silo", attribute.Target);
         Assert.Equal(builderType, attribute.Type);
     }
 
     private static void Configure(TestSiloBuilder builder, string sectionName)
-        => new AzureTableStorageJournalProviderBuilder()
+        => new AzureTableStorageJournalingProviderBuilder()
             .Configure(builder, ProviderName, builder.Configuration.GetSection(sectionName));
 
     private static AzureTableJournalStorageOptions GetStorageOptions(IServiceProvider services)

@@ -18,10 +18,10 @@ namespace Tester.Redis.Journaling;
 [TestArea("Journaling")]
 [TestCategory("BVT")]
 [TestCategory("Redis")]
-public sealed class RedisJournalProviderBuilderTests
+public sealed class RedisJournalingProviderBuilderTests
 {
     private const string ProviderName = "redis";
-    private const string ConfigurationSectionName = $"Orleans:Journal:{ProviderName}";
+    private const string ConfigurationSectionName = $"Orleans:Journaling:{ProviderName}";
 
     [Fact]
     public void Assembly_RegistersExpectedProviderMetadata()
@@ -29,12 +29,12 @@ public sealed class RedisJournalProviderBuilderTests
         var attribute = typeof(RedisJournalStorageHostingExtensions)
             .Assembly
             .GetCustomAttributes<RegisterProviderAttribute>()
-            .Single(candidate => candidate.Type == typeof(RedisJournalProviderBuilder));
+            .Single(candidate => candidate.Type == typeof(RedisJournalingProviderBuilder));
 
         Assert.Equal("Redis", attribute.Name);
-        Assert.Equal("Journal", attribute.Kind);
+        Assert.Equal("Journaling", attribute.Kind);
         Assert.Equal("Silo", attribute.Target);
-        Assert.Equal(typeof(RedisJournalProviderBuilder), attribute.Type);
+        Assert.Equal(typeof(RedisJournalingProviderBuilder), attribute.Type);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class RedisJournalProviderBuilderTests
     public void Configure_RegistersJournalStorageServicesExactlyOnce()
     {
         var builder = ConfigureBuilder();
-        new RedisJournalProviderBuilder().Configure(
+        new RedisJournalingProviderBuilder().Configure(
             builder, ProviderName, builder.Configuration.GetSection(ConfigurationSectionName));
 
         AssertNamedRegistration<IJournalStorageProvider>(builder.Services);
@@ -196,7 +196,7 @@ public sealed class RedisJournalProviderBuilderTests
         var builder = new TestSiloBuilder(configuration);
         builder.Services.AddSingleton<IConfiguration>(configuration);
 
-        new RedisJournalProviderBuilder().Configure(
+        new RedisJournalingProviderBuilder().Configure(
             builder,
             ProviderName,
             configuration.GetSection(ConfigurationSectionName));

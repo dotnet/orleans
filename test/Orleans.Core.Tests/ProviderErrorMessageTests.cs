@@ -7,7 +7,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Xunit;
 
-[assembly: RegisterProvider("TestJournal", "Journal", "Silo", typeof(NonSilo.Tests.ProviderErrorMessageTests.TestJournalProviderBuilder))]
+[assembly: RegisterProvider("TestJournaling", "Journaling", "Silo", typeof(NonSilo.Tests.ProviderErrorMessageTests.TestJournalingProviderBuilder))]
 
 namespace NonSilo.Tests
 {
@@ -129,14 +129,14 @@ namespace NonSilo.Tests
         [Theory]
         [InlineData("Default")]
         [InlineData("archive")]
-        public void SiloBuilder_ConfiguresNamedJournalProviderFromConfiguration(string providerName)
+        public void SiloBuilder_ConfiguresNamedJournalingProviderFromConfiguration(string providerName)
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { $"Orleans:Journal:{providerName}:ProviderType", "TestJournal" },
-                { $"Orleans:Journal:{providerName}:ServiceKey", "journal-client" }
+                { $"Orleans:Journaling:{providerName}:ProviderType", "TestJournaling" },
+                { $"Orleans:Journaling:{providerName}:ServiceKey", "journal-client" }
             };
 
             using var host = new HostBuilder()
@@ -150,24 +150,24 @@ namespace NonSilo.Tests
                 })
                 .Build();
 
-            var invocation = Assert.Single(host.Services.GetServices<JournalProviderInvocation>());
+            var invocation = Assert.Single(host.Services.GetServices<JournalingProviderInvocation>());
             Assert.Equal(providerName, invocation.Name);
-            Assert.Equal($"Orleans:Journal:{providerName}", invocation.ConfigurationSection.Path);
-            Assert.Equal("TestJournal", invocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal($"Orleans:Journaling:{providerName}", invocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournaling", invocation.ConfigurationSection["ProviderType"]);
             Assert.Equal("journal-client", invocation.ConfigurationSection["ServiceKey"]);
         }
 
         [Fact]
-        public void SiloBuilder_ConfiguresMultipleNamedJournalProvidersFromConfiguration()
+        public void SiloBuilder_ConfiguresMultipleNamedJournalingProvidersFromConfiguration()
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { "Orleans:Journal:Default:ProviderType", "TestJournal" },
-                { "Orleans:Journal:Default:ServiceKey", "default-client" },
-                { "Orleans:Journal:archive:ProviderType", "TestJournal" },
-                { "Orleans:Journal:archive:ServiceKey", "archive-client" }
+                { "Orleans:Journaling:Default:ProviderType", "TestJournaling" },
+                { "Orleans:Journaling:Default:ServiceKey", "default-client" },
+                { "Orleans:Journaling:archive:ProviderType", "TestJournaling" },
+                { "Orleans:Journaling:archive:ServiceKey", "archive-client" }
             };
 
             using var host = new HostBuilder()
@@ -181,30 +181,30 @@ namespace NonSilo.Tests
                 })
                 .Build();
 
-            var invocations = host.Services.GetServices<JournalProviderInvocation>().ToArray();
+            var invocations = host.Services.GetServices<JournalingProviderInvocation>().ToArray();
             Assert.Equal(2, invocations.Length);
 
             var defaultInvocation = Assert.Single(invocations, invocation => invocation.Name == "Default");
-            Assert.Equal("Orleans:Journal:Default", defaultInvocation.ConfigurationSection.Path);
-            Assert.Equal("TestJournal", defaultInvocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("Orleans:Journaling:Default", defaultInvocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournaling", defaultInvocation.ConfigurationSection["ProviderType"]);
             Assert.Equal("default-client", defaultInvocation.ConfigurationSection["ServiceKey"]);
 
             var archiveInvocation = Assert.Single(invocations, invocation => invocation.Name == "archive");
-            Assert.Equal("Orleans:Journal:archive", archiveInvocation.ConfigurationSection.Path);
-            Assert.Equal("TestJournal", archiveInvocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("Orleans:Journaling:archive", archiveInvocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournaling", archiveInvocation.ConfigurationSection["ProviderType"]);
             Assert.Equal("archive-client", archiveInvocation.ConfigurationSection["ServiceKey"]);
         }
 
         [Theory]
         [InlineData("Default")]
         [InlineData("archive")]
-        public void SiloBuilder_IncludesKnownJournalProvidersInErrorMessage(string providerName)
+        public void SiloBuilder_IncludesKnownJournalingProvidersInErrorMessage(string providerName)
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { $"Orleans:Journal:{providerName}:ProviderType", "InvalidJournalProvider" }
+                { $"Orleans:Journaling:{providerName}:ProviderType", "InvalidJournalingProvider" }
             };
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -221,20 +221,20 @@ namespace NonSilo.Tests
                     .Build();
             });
 
-            Assert.Contains("Could not find Journal provider named 'InvalidJournalProvider'", exception.Message);
+            Assert.Contains("Could not find Journaling provider named 'InvalidJournalingProvider'", exception.Message);
             Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
-            Assert.Contains("Known Journal providers:", exception.Message);
-            Assert.Contains("TestJournal", exception.Message);
+            Assert.Contains("Known Journaling providers:", exception.Message);
+            Assert.Contains("TestJournaling", exception.Message);
         }
 
-        internal sealed class TestJournalProviderBuilder : IProviderBuilder<ISiloBuilder>
+        internal sealed class TestJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
         {
             public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
             {
-                builder.Services.AddSingleton(new JournalProviderInvocation(name, configurationSection));
+                builder.Services.AddSingleton(new JournalingProviderInvocation(name, configurationSection));
             }
         }
 
-        private sealed record JournalProviderInvocation(string? Name, IConfigurationSection ConfigurationSection);
+        private sealed record JournalingProviderInvocation(string? Name, IConfigurationSection ConfigurationSection);
     }
 }
