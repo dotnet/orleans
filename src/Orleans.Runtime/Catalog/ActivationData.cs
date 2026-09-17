@@ -450,6 +450,8 @@ internal sealed partial class ActivationData :
             _shared.OnCreateActivation(this);
             GetComponent<IActivationLifecycleObserver>()?.OnCreateActivation(this);
 
+            _shared.SetupActivation(this);
+
             if (grainInstance is ILifecycleParticipant<IGrainLifecycle> participant)
             {
                 participant.Participate(ObservableLifecycle);

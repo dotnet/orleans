@@ -729,6 +729,8 @@ namespace Orleans.Runtime
 
         public Orleans.Serialization.Session.SerializerSessionPool SerializerSessionPool { get { throw null; } }
 
+        public void AddActivationSetup(System.Action<IGrainContext> setup) { }
+
         public object? GetComponent(System.Type componentType) { throw null; }
 
         public TComponent? GetComponent<TComponent>() { throw null; }

@@ -15,7 +15,7 @@ Orleans composes many independently registered services into one silo or client.
 
 <xref:Orleans.ILifecycleObservable> accepts subscriptions at integer stages. During startup it visits stages in ascending order; during shutdown it visits them in descending order. Every observer at a stage completes before the lifecycle advances.
 
-<xref:Orleans.ILifecycleObserver> provides asynchronous <xref:Orleans.ILifecycleObserver.OnStart*> and <xref:Orleans.ILifecycleObserver.OnStop*> callbacks. <xref:Orleans.ILifecycleParticipant`1> is the discovery contract used by dependency injection: a participant receives the lifecycle and subscribes itself.
+<xref:Orleans.ILifecycleObserver> provides asynchronous <xref:Orleans.ILifecycleObserver.OnStart*> and <xref:Orleans.ILifecycleObserver.OnStop*> callbacks. <xref:Orleans.ILifecycleParticipant`1> is the enrollment contract: a participant receives the lifecycle and subscribes itself. Silo and client hosting discover their registered participants through dependency injection; grain-scoped services have an explicit enrollment owner.
 
 ```mermaid
 sequenceDiagram
@@ -47,6 +47,16 @@ The reverse shutdown order is the key invariant. A service can continue using de
 The client uses the same pattern for gateway discovery, connections, stream providers, and the outside runtime client. The generic <xref:Orleans.ILifecycleObservable> also lets providers compose a private lifecycle when the silo-specific interface is unnecessary.
 
 The host-facing stage list and configuration examples are documented in [silo lifecycle](../host/silo-lifecycle.md). This page focuses on the protocol rather than where application startup code should be registered.
+
+## Grain activation composition
+
+<xref:Orleans.Runtime.IConfigureGrainTypeComponents> configures a shared plan for a grain type. A configurator can use <xref:Orleans.Metadata.GrainClassMap> to select implementation classes, then add synchronous actions with <xref:Orleans.Runtime.GrainTypeSharedContext.AddActivationSetup*>. Selection and composition occur when creating the shared context; activations execute the cached actions.
+
+<xref:Orleans.Runtime.GrainTypeSharedContext> seals setup registration after the configurators finish. When constructing an activation, the runtime assigns the fully constructed grain object and records creation before invoking setup actions in addition order. It then enrolls the grain object and starts the lifecycle. This boundary also applies to custom grain activators and to individual stateless workers.
+
+Setup delegates are shared and can run concurrently across activations. Resolve per-activation state through <xref:Orleans.Runtime.IGrainContext.ActivationServices> inside the action. Existing DI registrations retain their explicit enrollment paths. Setup failures follow activation-construction failure handling: subsequent setup and lifecycle startup are skipped, and the assigned grain and scope are disposed.
+
+See [shared activation setup](../grains/grain-lifecycle.md#shared-activation-setup) for a compiled interface-selection example.
 
 ## Subscription rules <a name="lifecycle-participation"></a>
 

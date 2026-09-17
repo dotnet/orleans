@@ -50,11 +50,29 @@ The grain lifecycle exposes ordered stages:
 | <xref:Orleans.Runtime.GrainLifecycleStage.Activate?displayProperty=nameWithType> | Grain activation and deactivation callbacks. |
 | <xref:Orleans.Runtime.GrainLifecycleStage.Last?displayProperty=nameWithType> | Latest subscription point. |
 
-Components that need ordered activation-scoped behavior can implement <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle> and subscribe through <xref:Orleans.Runtime.IGrainContext.ObservableLifecycle>. `IGrainActivationContext` has been removed; use <xref:Orleans.Runtime.IGrainContext>.
+Components that need ordered activation-scoped behavior can implement <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle> and subscribe through <xref:Orleans.Runtime.IGrainContext.ObservableLifecycle>. Use distinct stages when one component's startup depends on another completing. Callbacks within a stage can execute concurrently.
 
 :::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="lifecycle_participant":::
 
-Lifecycle participation is an advanced integration mechanism. Most grains should use <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*>.
+The runtime calls `Participate` on a grain object which implements the participant interface. Services use an explicit enrollment owner, such as a facet factory or the shared activation setup described below.
+
+### Shared activation setup
+
+Use <xref:Orleans.Runtime.IConfigureGrainTypeComponents> to select features for a grain implementation class and register reusable setup actions with <xref:Orleans.Runtime.GrainTypeSharedContext.AddActivationSetup*>. This example selects classes implementing an application-owned `ICachedGrain` marker:
+
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="activation_setup":::
+
+Register the configurator as a singleton and the feature state as scoped:
+
+:::code language="csharp" source="../snippets/compiled/Grains/GrainSnippets.cs" id="activation_setup_registration":::
+
+Orleans caches the selected setup actions in the shared grain type context. Each activation runs those actions in registration order after its grain constructor completes and <xref:Orleans.Runtime.IGrainContext.GrainInstance> is assigned. All setup actions finish before the runtime calls the grain object's `Participate` method and starts lifecycle callbacks. Each stateless worker activation runs the same shared setup with its own context.
+
+The shared action resolves `CacheParticipant` only for selected grains. Resolution uses the activation scope, so constructor injection of `CacheParticipant` and setup share the same scoped service. For interface injection, register an alias factory which resolves that concrete service. Ordinary concrete, keyed, and participant-interface DI registrations retain their explicit enrollment behavior.
+
+Setup actions can run concurrently for different activations. Keep shared actions stateless, or make captured shared data safe for concurrent access; keep activation-specific state in the activation scope. Add actions during shared type configuration. Use synchronous setup to enroll services and lifecycle callbacks for asynchronous initialization and shutdown. Assign one enrollment owner to each feature so that subscriptions are established once.
+
+A setup exception fails the activation, skips remaining setup actions and lifecycle startup, and triggers grain and activation-scope disposal. A fresh activation resolves fresh scoped state and runs the cached setup again.
 
 For the runtime lifecycle model shared by silos and grain activations, see [Orleans runtime lifecycle](../implementation/orleans-lifecycle.md).
 
