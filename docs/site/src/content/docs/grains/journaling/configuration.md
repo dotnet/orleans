@@ -17,7 +17,7 @@ The standard <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> regi
 
 Storage registration makes these services available across the silo. Per-grain journal reads and writes are triggered by activations which resolve the manager directly or through a durable-state dependency. Unrelated grain activations retain their existing persistence behavior.
 
-<xref:Orleans.Journaling.DurableGrain> provides optional protected helpers for the same standard manager and lifecycle enrollment for explicitly supplied managers exposing a lifecycle participant. Custom managers used with plain grains assign lifecycle enrollment to their service factory or a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup). Explicit <xref:Orleans.Journaling.JournalId> factories and manually constructed managers retain caller-owned initialization and disposal unless the caller deliberately assigns lifecycle ownership.
+<xref:Orleans.Journaling.DurableGrain> provides optional protected helpers for the same scoped manager. Every grain-scoped manager registration owns lifecycle enrollment before returning the manager, including custom registrations. Reusable features compose their own lifecycle work through a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup). Explicit <xref:Orleans.Journaling.JournalId> factories and manually constructed managers retain caller-owned initialization and disposal unless the caller deliberately assigns lifecycle ownership.
 
 See [Use durable state](durable-state.md) for source-backed constructor injection and feature setup examples, and [Activation and recovery](runtime-behavior.md#activation-and-recovery) for lifecycle ordering.
 

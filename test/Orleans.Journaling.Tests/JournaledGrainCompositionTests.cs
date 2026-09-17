@@ -200,14 +200,20 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
             : JournalId.FromGrainId(context.GrainId);
         if (overrideWithExplicitFactory)
         {
-            builder.Services.AddScoped(services => services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId));
+            builder.Services.AddScoped(services =>
+            {
+                var manager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
+                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(
+                    services.GetRequiredService<IGrainContext>().ObservableLifecycle);
+                return manager;
+            });
         }
 
         await using var services = builder.Services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         await using var scope = services.CreateAsyncScope();
         context.ActivationServices.Returns(scope.ServiceProvider);
         var scopedManager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
-        Assert.Equal(overrideWithExplicitFactory ? 0 : 1, lifecycle.Subscriptions);
+        Assert.Equal(1, lifecycle.Subscriptions);
         RuntimeContext.SetExecutionContext(context, out var previous);
         HelperJournalGrain grain;
         try
@@ -237,14 +243,23 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     }
 
     [Fact]
-    public void DurableGrain_EnrollsCustomLifecycleParticipant()
+    public async Task DurableGrain_UsesFactoryEnrolledCustomManager()
     {
         var manager = Substitute.For<IJournaledStateManager, ILifecycleParticipant<IGrainLifecycle>>();
         var context = Substitute.For<IGrainContext>();
         var lifecycle = new CompositionTestLifecycle();
-        using var services = new ServiceCollection().AddSingleton(manager).BuildServiceProvider();
-        context.ActivationServices.Returns(services);
+        await using var services = new ServiceCollection()
+            .AddScoped<IJournaledStateManager>(_ =>
+            {
+                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(lifecycle);
+                return manager;
+            })
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        await using var scope = services.CreateAsyncScope();
+        context.ActivationServices.Returns(scope.ServiceProvider);
         context.ObservableLifecycle.Returns(lifecycle);
+        Assert.Same(manager, scope.ServiceProvider.GetRequiredService<IJournaledStateManager>());
+        ((ILifecycleParticipant<IGrainLifecycle>)manager).Received(1).Participate(lifecycle);
         RuntimeContext.SetExecutionContext(context, out var previous);
         try
         {

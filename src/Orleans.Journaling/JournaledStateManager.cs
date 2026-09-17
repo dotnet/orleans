@@ -88,8 +88,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal IServiceProvider ServiceProvider => _shared.ServiceProvider;
 
-    internal bool IsLifecycleEnrolled { get; private set; }
-
     public void RegisterState(string name, IJournaledState state)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(name);
@@ -994,11 +992,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
-    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
-    {
-        observer.Subscribe(GrainLifecycleStage.SetupState, this);
-        IsLifecycleEnrolled = true;
-    }
+    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
     async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken) => await StopAsync(cancellationToken).ConfigureAwait(false);
 

@@ -11,18 +11,11 @@ public abstract class DurableGrain : Grain, IGrainBase
     /// Initializes a new instance of the <see cref="DurableGrain"/> class and resolves its state manager.
     /// </summary>
     /// <remarks>
-    /// The standard grain-scoped state manager enrolls in the lifecycle through its hosting factory.
-    /// This base class enrolls explicitly supplied state managers which implement
-    /// <see cref="ILifecycleParticipant{TLifecycleObservable}"/>, including factory-created managers.
+    /// The grain-scoped service factory enrolls the state manager in the grain lifecycle before returning it.
     /// </remarks>
     protected DurableGrain()
     {
         StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
-        if (StateManager is not JournaledStateManager { IsLifecycleEnrolled: true }
-            && StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
-        {
-            participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
-        }
     }
 
     /// <summary>
