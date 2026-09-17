@@ -623,6 +623,8 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var storageProvider = Substitute.For<IJournalStorageProvider>();
         var context = Substitute.For<IGrainContext>();
+        var lifecycle = Substitute.For<IGrainLifecycle>();
+        context.ObservableLifecycle.Returns(lifecycle);
         var grainId = GrainId.Create("test-grain", "failing-journal");
         context.GrainId.Returns(grainId);
         storageProvider.CreateStorage(JournalId.FromGrainId(grainId)).Returns(storage);
@@ -630,6 +632,7 @@ public class StateManagerTests : JournalingTestBase
             ServiceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(ManagerOptions), TimeProvider.System, ServiceProvider);
         await using var manager = new JournaledStateManager(shared, storageProvider, context);
+        lifecycle.Received(1).Subscribe(Arg.Any<string>(), GrainLifecycleStage.SetupState, manager);
         var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
         if (operation == "initialize")
         {
@@ -1165,6 +1168,8 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var provider = Substitute.For<IJournalStorageProvider>();
         var context = Substitute.For<IGrainContext>();
+        var lifecycle = Substitute.For<IGrainLifecycle>();
+        context.ObservableLifecycle.Returns(lifecycle);
         var grainId = GrainId.Create("test-grain", "idle-observer-shutdown");
         context.GrainId.Returns(grainId);
         provider.CreateStorage(JournalId.FromGrainId(grainId)).Returns(storage);
@@ -1175,6 +1180,7 @@ public class StateManagerTests : JournalingTestBase
             await Task.Factory.StartNew(async () =>
             {
                 await using var manager = new JournaledStateManager(shared, provider, context);
+                lifecycle.Received(1).Subscribe(Arg.Any<string>(), GrainLifecycleStage.SetupState, manager);
                 var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
                 var observer = new BoundaryStateObserver();
                 manager.RegisterObserver(observer);
@@ -1369,6 +1375,8 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var provider = Substitute.For<IJournalStorageProvider>();
         var context = Substitute.For<IGrainContext>();
+        var lifecycle = Substitute.For<IGrainLifecycle>();
+        context.ObservableLifecycle.Returns(lifecycle);
         var grainId = GrainId.Create("test-grain", "observer-fault");
         context.GrainId.Returns(grainId);
         provider.CreateStorage(JournalId.FromGrainId(grainId)).Returns(storage);
@@ -1376,6 +1384,7 @@ public class StateManagerTests : JournalingTestBase
             .Do(_ => throw deactivationFailure);
         var shared = new JournaledStateManagerShared(logger, Options.Create(ManagerOptions), TimeProvider.System, ServiceProvider);
         await using var manager = new JournaledStateManager(shared, provider, context);
+        lifecycle.Received(1).Subscribe(Arg.Any<string>(), GrainLifecycleStage.SetupState, manager);
         var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
         var preparing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var allowFailure = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

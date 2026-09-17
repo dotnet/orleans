@@ -12,9 +12,10 @@ namespace Orleans.Journaling;
 /// operation at a time, so later queued writes wait for its preparation, finalization, and capture.
 /// </para>
 /// <para>
-/// Grain-scoped manager factories enroll their managers before returning them. Feature setup can
-/// resolve the enrolled manager and register observers before lifecycle startup using
-/// <see cref="Orleans.Runtime.GrainTypeSharedContext.AddActivationSetup"/>. Managers created through
+/// The standard manager enrolls in the grain lifecycle during grain-bound construction. Feature
+/// setup can resolve the enrolled manager and register observers before lifecycle startup using
+/// <see cref="Orleans.Runtime.GrainTypeSharedContext.AddActivationSetup"/>. Custom scoped managers
+/// arrange enrollment in their constructor or registration factory. Managers created through
 /// <see cref="IJournaledStateManagerFactory"/> have caller-owned initialization and disposal.
 /// </para>
 /// <para>
