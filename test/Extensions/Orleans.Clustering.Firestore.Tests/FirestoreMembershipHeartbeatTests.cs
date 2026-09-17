@@ -170,33 +170,120 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Theory]
+    [InlineData(nameof(SiloInstanceEntity.IAmAliveTime))]
+    [InlineData(nameof(SiloInstanceEntity.Status))]
+    [InlineData(nameof(ClusterVersionEntity.MembershipVersion))]
+    [InlineData("Delete")]
+    public async Task FullRowUpdateRejectsConcurrentChangesWithoutSideEffects(string change)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var table = CreateTable(client);
+        Dictionary<string, Document>? concurrentState = null;
+        client.BeforeCommit = () =>
+        {
+            if (change == "Delete")
+            {
+                client.Documents.Remove(original.Name);
+            }
+            else
+            {
+                var value = change switch
+                {
+                    nameof(SiloInstanceEntity.Status) => new Value { IntegerValue = (int)SiloStatus.Dead },
+                    nameof(ClusterVersionEntity.MembershipVersion) => new Value { IntegerValue = 8 },
+                    _ => Time(Now)
+                };
+                client.Change(change == nameof(ClusterVersionEntity.MembershipVersion) ? VersionPath : original.Name, change, value);
+            }
+
+            concurrentState = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        };
+
+        Assert.False(await table.UpdateRowAsync(entry, ETag(original), NextVersion(client), TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, client.Transactions);
+        Assert.True(Assert.Single(client.Reads).Transaction.IsEmpty);
+        Assert.Equal(2, client.AttemptedWrites.Count);
+        Assert.Empty(client.CommittedWrites);
+        Assert.NotNull(concurrentState);
+        Assert.Equal(concurrentState.Count, client.Documents.Count);
+        Assert.All(concurrentState, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+    }
+
+    [Fact]
+    public async Task FullRowUpdateReadsWithoutHoldingTransactionLocks()
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var original = client.AddRow(entry, Now).Clone();
+        var version = client.Documents[VersionPath].Clone();
+
+        Assert.True(await CreateTable(client).UpdateRowAsync(
+            entry, ETag(original), NextVersion(client), TestContext.Current.CancellationToken));
+
+        var read = Assert.Single(client.Reads);
+        Assert.Equal(original.Name, Assert.Single(read.Documents));
+        Assert.True(read.Transaction.IsEmpty);
+        var commit = Assert.Single(client.Commits);
+        Assert.False(commit.Transaction.IsEmpty);
+        Assert.Equal(2, commit.Writes.Count);
+        Assert.Equal(original.UpdateTime, commit.Writes[0].CurrentDocument.UpdateTime);
+        Assert.Equal(version.UpdateTime, commit.Writes[1].CurrentDocument.UpdateTime);
+        Assert.Equal(Time(Now), client.Documents[original.Name].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FullRowUpdateRejectsConcurrentHeartbeatOrVersionChange(bool versionChanges)
+    public async Task FullRowUpdateRejectsMissingOrStaleRowBeforeOpeningTransaction(bool missing)
     {
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
         var version = client.Documents[VersionPath].Clone();
-        var table = CreateTable(client);
-        client.BeforeCommit = () => client.Change(
-            versionChanges ? VersionPath : original.Name,
-            versionChanges ? nameof(ClusterVersionEntity.MembershipVersion) : nameof(SiloInstanceEntity.IAmAliveTime),
-            versionChanges ? new Value { IntegerValue = 8 } : Time(Now));
-
-        Assert.False(await table.UpdateRowAsync(entry, ETag(original), NextVersion(client), TestContext.Current.CancellationToken));
-
-        Assert.Empty(client.CommittedWrites);
-        if (versionChanges)
+        if (missing)
         {
-            Assert.Equal(original, client.Documents[original.Name]);
-            Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
+            client.Documents.Remove(original.Name);
         }
         else
         {
-            Assert.Equal(Time(Now), client.Documents[original.Name].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
-            Assert.Equal(version, client.Documents[VersionPath]);
+            client.Change(original.Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
         }
+
+        Assert.False(await CreateTable(client).UpdateRowAsync(
+            entry, ETag(original), NextVersion(client), TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.AttemptedWrites);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(version, client.Documents[VersionPath]);
+        Assert.Equal(!missing, client.Documents.ContainsKey(original.Name));
+        if (!missing)
+        {
+            Assert.Equal(Time(Now), client.Documents[original.Name].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+        }
+    }
+
+    [Theory]
+    [InlineData(StatusCode.NotFound)]
+    [InlineData(StatusCode.PermissionDenied)]
+    [InlineData(StatusCode.Unavailable)]
+    public async Task FullRowReadInfrastructureFailuresRemainVisible(StatusCode status)
+    {
+        var failure = new RpcException(new Status(status, "infrastructure-failure"));
+        var client = new MembershipClient { ReadFailure = failure };
+        var entry = Entry();
+        var original = client.AddRow(entry, Now).Clone();
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() => CreateTable(client).UpdateRowAsync(
+            entry, ETag(original), NextVersion(client), TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.AttemptedWrites);
+        Assert.Empty(client.CommittedWrites);
     }
 
     [Theory]
@@ -482,10 +569,15 @@ public sealed class FirestoreMembershipHeartbeatTests
                 throw failure;
             }
 
-            Assert.False(request.Transaction.IsEmpty);
-            _readSets[request.Transaction].Add(name);
+            var documents = Documents;
+            if (!request.Transaction.IsEmpty)
+            {
+                _readSets[request.Transaction].Add(name);
+                documents = _snapshots[request.Transaction];
+            }
+
             var response = new BatchGetDocumentsResponse { ReadTime = Timestamp.FromDateTime(Now) };
-            if (_snapshots[request.Transaction].TryGetValue(name, out var document))
+            if (documents.TryGetValue(name, out var document))
             {
                 response.Found = document.Clone();
             }

@@ -237,27 +237,26 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
-            try
+            // Read before opening the write transaction to avoid holding a silo lock while acquiring
+            // the version lock. The row ETag binds the merged heartbeat to the row being replaced.
+            var current = await this._storage.ReadEntity<SiloInstanceEntity>(silo.Id, cancellationToken);
+            var result = false;
+            if (current is not null && current.ETag == silo.ETag)
             {
-                result = await this._storage.ExecuteTransaction(async transaction =>
+                silo.IAmAliveTime = current.IAmAliveTime > silo.IAmAliveTime ? current.IAmAliveTime : silo.IAmAliveTime;
+                try
                 {
-                    var snapshot = await transaction.GetSnapshotAsync(siloReference, transaction.CancellationToken);
-                    if (!snapshot.Exists || snapshot.UpdateTime != silo.ETag)
+                    result = await this._storage.ExecuteTransaction(transaction =>
                     {
-                        return false;
-                    }
-
-                    var current = snapshot.ConvertTo<SiloInstanceEntity>();
-                    silo.IAmAliveTime = current.IAmAliveTime > silo.IAmAliveTime ? current.IAmAliveTime : silo.IAmAliveTime;
-                    transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
-                    transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                    return true;
-                }, cancellationToken);
-            }
-            catch (RpcException exception) when (IsContention(exception))
-            {
-                result = false;
+                        transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
+                        transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                        return Task.FromResult(true);
+                    }, cancellationToken);
+                }
+                catch (RpcException exception) when (IsContention(exception))
+                {
+                    result = false;
+                }
             }
 
             if (result == false)
