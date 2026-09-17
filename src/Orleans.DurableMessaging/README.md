@@ -63,9 +63,11 @@ inbox, outbox, and single journal observer.
 Setup validates the grain's execution model after the runtime assigns the constructed
 grain instance and before lifecycle startup, journal initialization, or replay. Supported
 activations use a single, noninterleaving grain execution model. Grain construction and
-local state registration precede validation. The grain-scoped state-manager factory
-owns lifecycle enrollment, including application-supplied factories; messaging attaches
-its observer to that enrolled manager. Standalone managers have caller-owned lifecycles.
+local state registration precede validation. The standard state manager enrolls in the
+grain lifecycle during grain-bound construction; messaging attaches its observer to
+that enrolled manager. A scoped factory using an explicit `JournalId` enrolls its
+manager in the grain lifecycle before returning it. Standalone managers have
+caller-owned initialization and disposal.
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job
