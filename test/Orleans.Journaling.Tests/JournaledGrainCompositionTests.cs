@@ -184,8 +184,10 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         await Deactivate(probe);
     }
 
-    [Fact]
-    public async Task HostingFactory_EnrollsExactlyOnceAndDurableGrainRetainsHelpers()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HostingFactory_EnrollsExactlyOnceAndDurableGrainRetainsHelpers(bool overrideWithExplicitFactory)
     {
         var builder = CreateBuilder();
         var lifecycle = new CompositionTestLifecycle();
@@ -193,9 +195,19 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         context.GrainId.Returns(GrainId.Create("composition", "factory-enrollment"));
         context.ObservableLifecycle.Returns(lifecycle);
         builder.Services.AddScoped(_ => context);
+        var journalId = overrideWithExplicitFactory
+            ? new JournalId("explicit/scoped-override")
+            : JournalId.FromGrainId(context.GrainId);
+        if (overrideWithExplicitFactory)
+        {
+            builder.Services.AddScoped(services => services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId));
+        }
+
         await using var services = builder.Services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         await using var scope = services.CreateAsyncScope();
         context.ActivationServices.Returns(scope.ServiceProvider);
+        var scopedManager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        Assert.Equal(overrideWithExplicitFactory ? 0 : 1, lifecycle.Subscriptions);
         RuntimeContext.SetExecutionContext(context, out var previous);
         HelperJournalGrain grain;
         try
@@ -211,11 +223,17 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         var value = grain.Value;
         Assert.Same(value, grain.Value);
         Assert.Same(grain.State, grain.State);
-        Assert.Same(scope.ServiceProvider.GetRequiredService<IJournaledStateManager>(), grain.Manager);
+        Assert.Same(scopedManager, grain.Manager);
         await lifecycle.OnStart(Cancellation);
         value.Value = "helper";
         await grain.Commit();
         await lifecycle.OnStop(Cancellation);
+
+        await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonJournalExtensions.JournalFormatKey);
+        var recoveredValue = new DurableValue<string>("helper", recovered, codec);
+        await recovered.InitializeAsync(Cancellation);
+        Assert.Equal("helper", recoveredValue.Value);
     }
 
     [Fact]
