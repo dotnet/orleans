@@ -87,6 +87,9 @@ A route miss preserves the grain's staged state for its next journal write.
 Journal deletion requires completed delivery operations, released inbox gates, and
 idle pump leases. Interleaved control calls observe that quiescence boundary; the
 active handler retains its own logical persistence-request guard.
+Superseded queued pump executions release their retained result and cancellation
+registration. Inbox shutdown, terminal failure, and quiescent deletion clear only
+inbox execution entries; subsequent work recovers through the durable wakeup path.
 
 Processed-record maintenance starts at the earliest tracked expiry and amortizes
 subsequent maintenance cycles to at most once per quarter of the deduplication window.
