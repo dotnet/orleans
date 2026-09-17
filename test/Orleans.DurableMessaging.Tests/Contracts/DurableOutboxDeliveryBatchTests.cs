@@ -1298,12 +1298,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
         Assert.Equal(1, fixture.PendingMessageCount);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.GetOutboxDepth());
         Assert.Equal(0, fixture.Manager.WriteCompletedCount);
         Assert.Equal(0, fixture.Manager.FaultCount);
         Assert.True((await fixture.ExecuteJobAsync(fixture.Job.Value!, "before-ack", TestContext.Current.CancellationToken)).IsInProgress);
         release.SetResult();
         await fixture.Manager.WaitForIdleAsync();
         Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.GetOutboxDepth());
         Assert.Equal(1, fixture.Manager.WriteCompletedCount);
         using var recovered = fixture.Recreate();
         Assert.Single(recovered.Messages);
@@ -1410,6 +1414,235 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(typeof(void), fixture.Outbox.GetType().GetMethod("FinalizeWrite")!.ReturnType);
         Assert.Null(fixture.Outbox.GetType().GetMethod("OnWriteFinalizingAsync"));
         Assert.Equal(1, fixture.Manager.RegistrationCount);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(64)]
+    [InlineData(256)]
+    public async Task Depth_SendAndCountUseConstantDictionaryWorkPerIntent(int batchSize)
+    {
+        using var fixture = new OutboxFixture(durableJobId: "owner:1");
+        await fixture.StartAsync();
+        var containsCalls = fixture.Messages.ContainsKeyCalls;
+        var lookupCalls = fixture.Messages.TryGetValueCalls;
+        for (var i = 0; i < batchSize; i++)
+        {
+            fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+            Assert.Equal(i + 2, fixture.Outbox.Count);
+        }
+
+        Assert.Equal(0, fixture.Messages.ContainsKeyCalls - containsCalls);
+        Assert.Equal(batchSize, fixture.Messages.TryGetValueCalls - lookupCalls);
+        Assert.Equal(batchSize + 1, fixture.GetOutboxDepth());
+        Assert.Equal(batchSize, fixture.PendingMessageCount);
+        Assert.Single(fixture.Messages);
+        await fixture.CommitAsync();
+        Assert.Equal(batchSize + 1, fixture.Outbox.Count);
+        Assert.Equal(batchSize + 1, fixture.GetOutboxDepth());
+        Assert.Equal(0, fixture.PendingMessageCount);
+    }
+
+    [Fact]
+    public async Task Depth_FinalizedOverlapAndLateIntentsRemainDistinctThroughAcknowledgement()
+    {
+        var jobs = new BlockingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        fixture.Send(fixture.Envelope);
+        var duringPreparation = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        var afterCapture = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        fixture.Manager.AfterCapture = () =>
+        {
+            Assert.Equal(2, fixture.Outbox.Count);
+            Assert.Equal(2, fixture.Outbox.Messages.Count());
+            Assert.Equal(2, fixture.GetOutboxDepth());
+            Assert.Equal(2, fixture.PendingMessageCount);
+            Assert.Single(fixture.Messages);
+            fixture.Send(fixture.CreateEquivalentEnvelope());
+            Assert.Throws<InvalidOperationException>(() => fixture.Send(fixture.CreateConflictingEnvelope()));
+            fixture.Send(afterCapture);
+            Assert.Equal(3, fixture.Outbox.Count);
+            Assert.Equal(3, fixture.GetOutboxDepth());
+            return Task.CompletedTask;
+        };
+        var write = fixture.CommitAsync().AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        fixture.Send(duringPreparation);
+        Assert.Equal(2, fixture.Outbox.Count);
+        Assert.Equal(2, fixture.GetOutboxDepth());
+        Assert.Empty(fixture.Messages);
+        jobs.Release();
+        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, fixture.Outbox.Count);
+        Assert.Equal(3, fixture.Outbox.Messages.Count());
+        Assert.Equal(3, fixture.GetOutboxDepth());
+        Assert.False(fixture.IsPending(fixture.MessageId));
+        Assert.True(fixture.IsPending(duringPreparation.MessageId));
+        Assert.True(fixture.IsPending(afterCapture.MessageId));
+        using var captured = fixture.Recreate();
+        Assert.Equal(1, captured.Outbox.Count);
+        fixture.Manager.AfterCapture = null;
+        await fixture.CommitAsync();
+        Assert.Equal(3, fixture.Outbox.Count);
+        Assert.Equal(3, fixture.GetOutboxDepth());
+        Assert.Equal(0, fixture.PendingMessageCount);
+        using var recovered = fixture.Recreate();
+        await recovered.StartAsync();
+        Assert.Equal(3, recovered.Outbox.Count);
+        Assert.Equal(3, recovered.GetOutboxDepth());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Depth_FailedCaptureRemovesMetricContributionAndFreshReplayUsesDurableOutcome(bool committed)
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        var late = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        var failure = new IOException("Outbox depth append failure.");
+        if (committed)
+        {
+            fixture.Manager.FailAfterNextWrite(failure);
+        }
+        else
+        {
+            fixture.Manager.FailNextWrite(failure);
+        }
+        fixture.Manager.AfterCapture = () =>
+        {
+            fixture.Send(late);
+            Assert.Equal(2, fixture.Outbox.Count);
+            Assert.Equal(2, fixture.GetOutboxDepth());
+            return Task.CompletedTask;
+        };
+
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => fixture.CommitAsync().AsTask()));
+        Assert.Equal(2, fixture.Outbox.Count);
+        Assert.Equal(2, fixture.Outbox.Messages.Count());
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        Assert.Equal(2, fixture.PendingMessageCount);
+        Assert.Equal(0, fixture.Manager.WriteCompletedCount);
+        await fixture.StopAsync();
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        using var recovered = fixture.Recreate();
+        await recovered.StartAsync();
+        Assert.Equal(committed ? 1 : 0, recovered.Outbox.Count);
+        Assert.Equal(committed ? 1 : 0, recovered.GetOutboxDepth());
+        Assert.False(recovered.Outbox.TryGetMessage(late.MessageId, out _));
+    }
+
+    [Fact]
+    public async Task Depth_PartialFinalizationCountsEachIntentOnceBeforeTerminalFailure()
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        var failure = new IOException("Message state insertion failed.");
+        fixture.MessageStates.BeforeAdd = () =>
+        {
+            Assert.Single(fixture.Messages);
+            Assert.Equal(2, fixture.PendingMessageCount);
+            Assert.Equal(2, fixture.Outbox.Count);
+            Assert.Equal(2, fixture.Outbox.Messages.Count());
+            Assert.Equal(2, fixture.GetOutboxDepth());
+            throw failure;
+        };
+
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => fixture.CommitAsync().AsTask()));
+        Assert.Equal(2, fixture.Outbox.Count);
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        Assert.Equal(0, fixture.Manager.CaptureCount);
+        using var recovered = fixture.Recreate();
+        Assert.Equal(0, recovered.Outbox.Count);
+    }
+
+    [Theory]
+    [InlineData(DeliveryStatus.Accepted)]
+    [InlineData(DeliveryStatus.Duplicate)]
+    [InlineData(DeliveryStatus.DeadLettered)]
+    [InlineData(DeliveryStatus.Backpressured)]
+    [InlineData(DeliveryStatus.RouteNotFound)]
+    public async Task Depth_DeliveryOutcomesAdjustOnlyRemovedMessages(DeliveryStatus status)
+    {
+        var result = status switch
+        {
+            DeliveryStatus.Accepted => DeliveryResult.Accepted(),
+            DeliveryStatus.Duplicate => DeliveryResult.Duplicate(),
+            DeliveryStatus.DeadLettered => DeliveryResult.DeadLettered("rejected"),
+            DeliveryStatus.Backpressured => DeliveryResult.Backpressured(),
+            DeliveryStatus.RouteNotFound => DeliveryResult.RouteNotFound("missing"),
+            _ => throw new ArgumentOutOfRangeException(nameof(status))
+        };
+        using var fixture = new OutboxFixture(_ => ValueTask.FromResult(result),
+            maxDeliveryAttempts: status == DeliveryStatus.RouteNotFound ? 1 : 3, durableJobId: "owner:1");
+        var outgoing = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        fixture.Send(outgoing);
+        Assert.Equal(2, fixture.GetOutboxDepth());
+        var expected = status == DeliveryStatus.Backpressured ? 2 : 1;
+        fixture.Manager.AfterCapture = () =>
+        {
+            Assert.Equal(expected, fixture.Outbox.Count);
+            Assert.Equal(expected, fixture.Outbox.Messages.Count());
+            Assert.Equal(expected, fixture.GetOutboxDepth());
+            Assert.True(fixture.IsPending(outgoing.MessageId));
+            return Task.CompletedTask;
+        };
+        await fixture.DeliverAsync();
+
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Equal(expected, fixture.Outbox.Count);
+        Assert.Equal(expected, fixture.GetOutboxDepth());
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Equal(status == DeliveryStatus.RouteNotFound ? 1 : 0, fixture.DeadLetters.Count);
+        using var recovered = fixture.Recreate();
+        await recovered.StartAsync();
+        Assert.Equal(expected, recovered.Outbox.Count);
+        Assert.Equal(expected, recovered.GetOutboxDepth());
+    }
+
+    [Fact]
+    public async Task Depth_QuiescentDeleteDiscardsLocalIntentsAndStartsNewEpoch()
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        fixture.Send(fixture.Envelope);
+        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        var epoch = fixture.GetOwnershipEpoch();
+        Assert.Equal(2, fixture.GetOutboxDepth());
+        await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Outbox.Messages);
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        Assert.NotEqual(epoch, fixture.GetOwnershipEpoch());
+        fixture.Send(fixture.Envelope);
+        await fixture.CommitAsync();
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.GetOutboxDepth());
+        Assert.Equal(0, fixture.PendingMessageCount);
+    }
+
+    [Fact]
+    public async Task Depth_StopIsIdempotentAndFreshRecoveryReactivatesOnlyPersistedMessages()
+    {
+        using var fixture = new OutboxFixture(durableJobId: "owner:1");
+        await fixture.StartAsync();
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.GetOutboxDepth());
+        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        Assert.Equal(2, fixture.GetOutboxDepth());
+        await fixture.StopAsync();
+        Assert.Equal(2, fixture.Outbox.Count);
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        await fixture.StopAsync();
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        using var recovered = fixture.Recreate();
+        await recovered.StartAsync();
+        Assert.Equal(1, recovered.Outbox.Count);
+        Assert.Equal(1, recovered.GetOutboxDepth());
+        await recovered.StopAsync();
+        Assert.Equal(0, recovered.GetOutboxDepth());
     }
 
     private sealed class OutboxFixture : IDisposable
@@ -1809,6 +2042,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int Count => (int)_type.GetProperty("Count")!.GetValue(Instance)!;
         public long Version => ((ITestDurableState)Instance).Version;
 
+        public Action? BeforeAdd
+        {
+            set => _type.GetProperty("BeforeAdd")!.SetValue(Instance, value);
+        }
+
         public void Add(Guid key, object value) =>
             _type.GetMethod("Add", [typeof(Guid), value.GetType()])!.Invoke(Instance, [key, value]);
 
@@ -2115,9 +2353,13 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int Count => _items.Count;
         public bool IsReadOnly => false;
         public long Version => _version;
+        public int ContainsKeyCalls { get; private set; }
+        public int TryGetValueCalls { get; private set; }
+        public Action? BeforeAdd { get; set; }
 
         public void Add(TKey key, TValue value)
         {
+            BeforeAdd?.Invoke();
             _items.Add(key, value);
             _version++;
         }
@@ -2138,7 +2380,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         }
 
         public bool Contains(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item);
-        public bool ContainsKey(TKey key) => _items.ContainsKey(key);
+        public bool ContainsKey(TKey key)
+        {
+            ContainsKeyCalls++;
+            return _items.ContainsKey(key);
+        }
         public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) =>
             ((ICollection<KeyValuePair<TKey, TValue>>)_items).CopyTo(array, arrayIndex);
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _items.GetEnumerator();
@@ -2164,7 +2410,11 @@ public sealed class DurableOutboxDeliveryBatchTests
             return true;
         }
 
-        public bool TryGetValue(TKey key, out TValue value) => _items.TryGetValue(key, out value!);
+        public bool TryGetValue(TKey key, out TValue value)
+        {
+            TryGetValueCalls++;
+            return _items.TryGetValue(key, out value!);
+        }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         object ITestDurableState.Capture() =>
