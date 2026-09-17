@@ -269,7 +269,7 @@ public partial class DisseminationProtocolTests
             try
             {
                 await Task.WhenAll(protocols.Values.Select(protocol => protocol.StopAsync(canceled)))
-                    .WaitAsync(TimeSpan.FromSeconds(5));
+                    .WaitAsync(TimeSpan.FromSeconds(5), token);
             }
             catch (OperationCanceledException) when (canceled.IsCancellationRequested)
             {
@@ -310,8 +310,60 @@ public partial class DisseminationProtocolTests
             await ns.ApplyValueAsync(value, TestContext.Current.CancellationToken));
     }
 
-    [Fact]
-    public async Task MembershipFullRepairMergesIncomparableCleanupAndHeartbeatState()
+    [Theory]
+    [InlineData("duplicate-upsert")]
+    [InlineData("upsert-and-remove")]
+    [InlineData("same-view-removal")]
+    [InlineData("same-view-addition")]
+    [InlineData("wire-version-mismatch")]
+    public async Task MembershipDeltaRejectsInvalidShapeBeforeOwnerMutation(string scenario)
+    {
+        var local = CreateSilo(45911);
+        var added = CreateSilo(45912);
+        var initial = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(initial);
+        var ns = CreateMembershipNamespace(manager, serializer);
+        var entry = initial.Entries[local].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(10));
+        var value = scenario switch
+        {
+            "duplicate-upsert" => CreateMembershipDelta(serializer, 1, 2, [entry, entry], []),
+            "upsert-and-remove" => CreateMembershipDelta(serializer, 1, 2, [entry], [local]),
+            "same-view-removal" => CreateMembershipDelta(serializer, 1, 1, [], [local]),
+            "same-view-addition" => CreateMembershipDelta(serializer, 1, 1,
+                [CreateMembershipEntry(added, SiloStatus.Joining, DateTime.UnixEpoch)], []),
+            "wire-version-mismatch" => new DisseminationValue(DisseminationKey.Default, 1, 3,
+                CreateMembershipDelta(serializer, 1, 2, [entry], []).Payload),
+            _ => throw new InvalidOperationException(scenario),
+        };
+        var ownerCalls = 0;
+        manager.ProcessGossipSnapshotHandler = (_, _) =>
+        {
+            ownerCalls++;
+            return Task.CompletedTask;
+        };
+
+        Assert.Equal(DisseminationApplyResult.Rejected,
+            await ns.ApplyValueAsync(value, TestContext.Current.CancellationToken));
+        Assert.Equal(0, ownerCalls);
+        Assert.Same(initial, manager.CurrentSnapshot);
+    }
+
+    [Theory]
+    [InlineData(false, SiloStatus.Dead)]
+    [InlineData(true, SiloStatus.Dead)]
+    [InlineData(false, SiloStatus.Created)]
+    [InlineData(true, SiloStatus.Created)]
+    [InlineData(false, SiloStatus.Joining)]
+    [InlineData(true, SiloStatus.Joining)]
+    [InlineData(false, SiloStatus.Active)]
+    [InlineData(true, SiloStatus.Active)]
+    [InlineData(false, SiloStatus.ShuttingDown)]
+    [InlineData(true, SiloStatus.ShuttingDown)]
+    [InlineData(false, SiloStatus.Stopping)]
+    [InlineData(true, SiloStatus.Stopping)]
+    public async Task MembershipSameVersionPruningRemovesOnlyDeadRows(bool delta, SiloStatus removedStatus)
     {
         var local = CreateSilo(45401);
         var first = CreateSilo(45402);
@@ -323,17 +375,104 @@ public partial class DisseminationProtocolTests
             CreateMembershipEntry(first, SiloStatus.Dead, DateTime.UnixEpoch)));
         var receiverManager = new FakeMembershipManager(CreateMembershipSnapshot(7,
             CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch, DateTime.UnixEpoch.AddSeconds(40)),
-            CreateMembershipEntry(second, SiloStatus.Dead, DateTime.UnixEpoch)));
+            CreateMembershipEntry(second, removedStatus, DateTime.UnixEpoch)));
         var source = CreateMembershipNamespace(sourceManager, serializer);
         var receiver = CreateMembershipNamespace(receiverManager, serializer);
 
+        var sameVersion = delta
+            ? CreateMembershipDelta(serializer, 7, 7, [], [second])
+            : GetMembershipRepair(source, 7);
+        Assert.Equal(removedStatus == SiloStatus.Dead ? DisseminationApplyResult.Applied : DisseminationApplyResult.Rejected,
+            await receiver.ApplyValueAsync(sameVersion, TestContext.Current.CancellationToken));
+        Assert.Equal(removedStatus != SiloStatus.Dead, receiverManager.CurrentSnapshot.Entries.ContainsKey(second));
+        Assert.DoesNotContain(first, receiverManager.CurrentSnapshot.Entries.Keys);
+
+        sourceManager.CurrentSnapshot = CreateMembershipSnapshot(8,
+            sourceManager.CurrentSnapshot.Entries[local]);
+        var removal = delta
+            ? CreateMembershipDelta(serializer, 7, 8, [], [second])
+            : GetMembershipRepair(source, 7);
         Assert.Equal(DisseminationApplyResult.Applied,
-            await receiver.ApplyValueAsync(GetMembershipRepair(source, 7), TestContext.Current.CancellationToken));
+            await receiver.ApplyValueAsync(removal, TestContext.Current.CancellationToken));
         Assert.Equal(local, Assert.Single(receiverManager.CurrentSnapshot.Entries).Key);
         Assert.Equal(DateTime.UnixEpoch.AddSeconds(40), receiverManager.CurrentSnapshot.Entries[local].IAmAliveTime);
+        Assert.Equal(8, receiverManager.CurrentSnapshot.Version.Value);
+    }
+
+    [Fact]
+    public async Task MembershipDeltaCanPruneAllDeadRowsWithoutResurrection()
+    {
+        var first = CreateSilo(45921);
+        var second = CreateSilo(45922);
+        var initial = CreateMembershipSnapshot(7,
+            CreateMembershipEntry(first, SiloStatus.Dead, DateTime.UnixEpoch),
+            CreateMembershipEntry(second, SiloStatus.Dead, DateTime.UnixEpoch));
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var sourceManager = new FakeMembershipManager(initial);
+        var source = CreateMembershipNamespace(sourceManager, serializer);
+        var receiverManager = new FakeMembershipManager(initial);
+        var receiver = CreateMembershipNamespace(receiverManager, serializer);
+        var request = new DisseminationRepairRequest(DisseminationKey.Default, 7, 1024 * 1024, 1024 * 1024);
+        var baseline = source.CreateBroadcast(request, baseline: null).BroadcastState;
+        var staleFull = source.CreateRepair(request).Value;
+        sourceManager.CurrentSnapshot = CreateMembershipSnapshot(7);
+        var delta = source.CreateBroadcast(request, baseline).Value;
+
+        Assert.Equal(new[] { first, second }, ReadMembershipDelta(serializer, delta).RemovedSilos.Order());
         Assert.Equal(DisseminationApplyResult.Applied,
-            await source.ApplyValueAsync(GetMembershipRepair(receiver, 7), TestContext.Current.CancellationToken));
-        AssertMembershipState(receiverManager.CurrentSnapshot, sourceManager.CurrentSnapshot);
+            await receiver.ApplyValueAsync(delta, TestContext.Current.CancellationToken));
+        Assert.Empty(receiverManager.CurrentSnapshot.Entries);
+        Assert.Equal(7, receiverManager.CurrentSnapshot.Version.Value);
+        Assert.Equal(DisseminationApplyResult.Duplicate,
+            await receiver.ApplyValueAsync(delta, TestContext.Current.CancellationToken));
+        Assert.Equal(DisseminationApplyResult.Duplicate,
+            await receiver.ApplyValueAsync(staleFull, TestContext.Current.CancellationToken));
+        Assert.Empty(receiverManager.CurrentSnapshot.Entries);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task MembershipHeartbeatAcceptanceIsIndependentOfStartTime(bool delta, bool rejectOwnerUpdate)
+    {
+        var local = CreateSilo(45901);
+        var start = DateTime.UnixEpoch.AddYears(50);
+        var heartbeat = DateTime.UnixEpoch.AddSeconds(10);
+        var initial = CreateMembershipSnapshot(1,
+            CreateMembershipEntry(local, SiloStatus.Active, start, DateTime.MinValue));
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(initial);
+        if (rejectOwnerUpdate)
+        {
+            manager.ProcessGossipSnapshotHandler = (_, _) => Task.CompletedTask;
+        }
+
+        var ns = CreateMembershipNamespace(manager, serializer);
+        var fingerprint = Assert.Single(ns.Digests).Fingerprint;
+        var entry = initial.Entries[local].WithIAmAliveTime(heartbeat);
+        var value = delta
+            ? CreateMembershipDelta(serializer, 1, 1, [entry], [])
+            : new DisseminationValue(DisseminationKey.Default, 0, 1,
+                serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = CreateMembershipSnapshot(1, entry) }));
+
+        var result = await ns.ApplyValueAsync(value, TestContext.Current.CancellationToken);
+
+        Assert.Equal(rejectOwnerUpdate ? DisseminationApplyResult.Rejected : DisseminationApplyResult.Applied, result);
+        Assert.Equal(start, manager.CurrentSnapshot.Entries[local].StartTime);
+        Assert.Equal(rejectOwnerUpdate ? DateTime.MinValue : heartbeat, manager.CurrentSnapshot.Entries[local].IAmAliveTime);
+        if (rejectOwnerUpdate)
+        {
+            Assert.Equal(fingerprint, Assert.Single(ns.Digests).Fingerprint);
+        }
+        else
+        {
+            Assert.NotEqual(fingerprint, Assert.Single(ns.Digests).Fingerprint);
+            Assert.True(manager.CurrentSnapshot.IsSuccessorTo(initial));
+        }
     }
 
     [Fact]
@@ -509,7 +648,7 @@ public partial class DisseminationProtocolTests
             };
             try
             {
-                await Task.WhenAll(stops).WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.WhenAll(stops).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {

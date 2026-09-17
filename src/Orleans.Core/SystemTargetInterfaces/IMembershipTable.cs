@@ -71,8 +71,8 @@ namespace Orleans
         /// Cleans up defunct silo entries older than <paramref name="beforeDate"/>.
         /// </summary>
         /// <remarks>
-        /// Providers can remove expired inactive entries without advancing the table version.
-        /// Active entries are retained.
+        /// Cleanup can remove retained Dead entries at the same membership version.
+        /// All other entries remain part of that canonical view.
         /// </remarks>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>

@@ -270,7 +270,7 @@ internal sealed class MembershipDisseminationNamespace(
                 {
                     entries[silo] = MergeHeartbeat(existing, entry);
                 }
-                else if (entry.Status == SiloStatus.Active)
+                else if (entry.Status != SiloStatus.Dead)
                 {
                     return null;
                 }
@@ -286,7 +286,7 @@ internal sealed class MembershipDisseminationNamespace(
         foreach (var silo in delta.RemovedSilos)
         {
             if (silo is null || !touched.Add(silo)
-                || sameVersion && entries.TryGetValue(silo, out var existing) && existing.Status == SiloStatus.Active)
+                || sameVersion && entries.TryGetValue(silo, out var existing) && existing.Status != SiloStatus.Dead)
             {
                 return null;
             }
@@ -308,7 +308,7 @@ internal sealed class MembershipDisseminationNamespace(
             {
                 entries[silo] = MergeHeartbeat(entry, update);
             }
-            else if (entry.Status == SiloStatus.Active)
+            else if (entry.Status != SiloStatus.Dead)
             {
                 return null;
             }
@@ -320,7 +320,7 @@ internal sealed class MembershipDisseminationNamespace(
 
         foreach (var (silo, entry) in incoming.Entries)
         {
-            if (entry.Status == SiloStatus.Active && !current.Entries.ContainsKey(silo))
+            if (entry.Status != SiloStatus.Dead && !current.Entries.ContainsKey(silo))
             {
                 return null;
             }
@@ -343,12 +343,12 @@ internal sealed class MembershipDisseminationNamespace(
         {
             if (current.Entries.TryGetValue(entry.SiloAddress, out var existing))
             {
-                if (existing.EffectiveIAmAliveTime < entry.IAmAliveTime)
+                if (existing.IAmAliveTime < entry.IAmAliveTime)
                 {
                     return false;
                 }
             }
-            else if (entry.Status == SiloStatus.Active)
+            else if (entry.Status != SiloStatus.Dead)
             {
                 return false;
             }
@@ -372,15 +372,28 @@ internal sealed class MembershipDisseminationNamespace(
         foreach (var entry in snapshot.Entries.OrderBy(static entry => entry.Key))
         {
             hash = unchecked((hash ^ (uint)entry.Key.GetConsistentHashCode()) * prime);
-            hash = unchecked((hash ^ (ulong)entry.Value.EffectiveIAmAliveTime.Ticks) * prime);
+            hash = unchecked((hash ^ (ulong)entry.Value.IAmAliveTime.Ticks) * prime);
         }
 
         return unchecked((long)hash);
     }
 
+    // Comparing cross-version snapshots identifies the entries to include in a sparse broadcast.
     private static bool MembershipEntriesEqual(MembershipEntry left, MembershipEntry right) =>
-        MembershipTableSnapshot.AreVersionedFieldsEqual(left, right)
-        && left.IAmAliveTime == right.IAmAliveTime;
+        ReferenceEquals(left, right)
+        || left.SiloAddress.Equals(right.SiloAddress)
+        && left.Status == right.Status
+        && left.ProxyPort == right.ProxyPort
+        && string.Equals(left.HostName, right.HostName, StringComparison.Ordinal)
+        && string.Equals(left.SiloName, right.SiloName, StringComparison.Ordinal)
+        && string.Equals(left.RoleName, right.RoleName, StringComparison.Ordinal)
+        && left.UpdateZone == right.UpdateZone
+        && left.FaultZone == right.FaultZone
+        && left.StartTime == right.StartTime
+        && left.IAmAliveTime == right.IAmAliveTime
+        && (ReferenceEquals(left.SuspectTimes, right.SuspectTimes)
+            || left.SuspectTimes is not null && right.SuspectTimes is not null
+            && left.SuspectTimes.SequenceEqual(right.SuspectTimes));
 
     private static bool MembershipSnapshotsEqual(
         MembershipTableSnapshot left,
@@ -399,7 +412,7 @@ internal sealed class MembershipDisseminationNamespace(
         foreach (var (siloAddress, entry) in left.Entries)
         {
             if (!right.Entries.TryGetValue(siloAddress, out var other)
-                || !MembershipEntriesEqual(entry, other))
+                || entry.IAmAliveTime != other.IAmAliveTime)
             {
                 return false;
             }
