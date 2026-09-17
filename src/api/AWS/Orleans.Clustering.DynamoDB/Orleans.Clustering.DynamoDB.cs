@@ -20,6 +20,7 @@ namespace Orleans.Clustering.DynamoDB
 
         public string Service { get { throw null; } set { } }
 
+        [Redact]
         public string? Token { get { throw null; } set { } }
     }
 
