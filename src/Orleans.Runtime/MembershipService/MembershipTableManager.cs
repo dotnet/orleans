@@ -177,6 +177,23 @@ namespace Orleans.Runtime.MembershipService
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Development clustering recreates its volatile table when the primary restarts.
+            // Peer snapshots have no table incarnation, so notifications refresh that authority.
+            if (this.membershipTableProvider is SystemTargetBasedMembershipTable)
+            {
+                try
+                {
+                    await this.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    throw;
+                }
+
+                return;
+            }
+
             // Check if a refresh is underway
             var pending = this.pendingRefresh;
             if (pending != null && !pending.IsCompleted)
@@ -186,13 +203,14 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
+            cancellationToken.ThrowIfCancellationRequested();
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await this.membershipTableProvider.ReadAllAsync(cancellationToken);
+            var table = await this.ReadMembershipTable(cancellationToken);
 
             bool success;
             try
@@ -212,6 +230,28 @@ namespace Orleans.Runtime.MembershipService
 
             // If cleanup was not required then the cleanup result is ignored.
             return !requireCleanup || success;
+        }
+
+        private Task<MembershipTableData> ReadMembershipTable(CancellationToken cancellationToken) =>
+            this.membershipTableProvider is SystemTargetBasedMembershipTable
+                ? ReadDevelopmentMembershipTable(cancellationToken)
+                : this.membershipTableProvider.ReadAllAsync(cancellationToken);
+
+        private async Task<MembershipTableData> ReadDevelopmentMembershipTable(CancellationToken cancellationToken)
+        {
+            // Capture before issuing the read: an older read completing after a newer one is not a reset.
+            var observedVersion = this.MembershipTableSnapshot.Version;
+            var table = await this.membershipTableProvider.ReadAllAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (table.Version.Version < observedVersion.Value)
+            {
+                var reason = $"The development membership table version decreased from {observedVersion} to {table.Version.Version}. "
+                    + "Its previous incarnation is no longer authoritative. Restart this silo against the recreated table.";
+                this.KillMyselfLocally(reason);
+                throw new OrleansException(reason);
+            }
+
+            return table;
         }
 
         private async Task Start(CancellationToken cancellationToken)
@@ -454,7 +494,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
+            var table = await ReadMembershipTable(cancellationToken);
 
             LogDebugTryUpdateMyStatusGlobalOnce(this.log, newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from", table.ToString());
             LogMissedIAmAlives(table);
@@ -562,6 +602,11 @@ namespace Orleans.Runtime.MembershipService
             MembershipTableSnapshot previous,
             MembershipTableSnapshot updated)
         {
+            if (updated.Version < previous.Version)
+            {
+                return previous;
+            }
+
             if (!previous.Entries.TryGetValue(this.myAddress, out var previousLocalSiloEntry)
                 || previousLocalSiloEntry.Status == SiloStatus.Created)
             {
@@ -909,7 +954,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> InnerTryKill(SiloAddress silo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
+            var table = await ReadMembershipTable(cancellationToken);
 
             LogDebugTryKillReadMembershipTable(this.log, table.ToString());
 
@@ -956,7 +1001,7 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> InnerTryToSuspectOrKill(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
+            var table = await ReadMembershipTable(cancellationToken);
             var now = GetDateTimeUtcNow();
 
             LogDebugTryToSuspectOrKillReadMembershipTable(this.log, table.ToString());
@@ -1031,7 +1076,7 @@ namespace Orleans.Runtime.MembershipService
             var ok = await membershipTableProvider.UpdateRowAsync(entry, eTag, table.Version.Next(), cancellationToken);
             if (ok)
             {
-                table = await membershipTableProvider.ReadAllAsync(cancellationToken);
+                table = await ReadMembershipTable(cancellationToken);
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
 
                 // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
@@ -1063,7 +1108,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     LogDebugSuccessfullyUpdatedStatusToDead(this.log, entry.SiloAddress);
 
-                    var table = await membershipTableProvider.ReadAllAsync(cancellationToken);
+                    var table = await ReadMembershipTable(cancellationToken);
                     this.ProcessTableUpdate(table, "DeclareDead");
                     GossipToOthers(entry.SiloAddress, entry.Status, GossipTimeout, cancellationToken).Ignore();
                     return true;

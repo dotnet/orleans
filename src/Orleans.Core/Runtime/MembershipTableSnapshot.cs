@@ -47,7 +47,7 @@ namespace Orleans.Runtime
             var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
               ? MembershipVersion.MinValue
               : new MembershipVersion(table.Version.Version);
-            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1));
+            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1), preserveVersionedFields: true);
         }
 
         /// <summary>
@@ -63,7 +63,11 @@ namespace Orleans.Runtime
             return Update(previousSnapshot, updated.Version, updated.Entries.Values);
         }
 
-        private static MembershipTableSnapshot Update(MembershipTableSnapshot previousSnapshot, MembershipVersion version, IEnumerable<MembershipEntry> updatedEntries)
+        private static MembershipTableSnapshot Update(
+            MembershipTableSnapshot previousSnapshot,
+            MembershipVersion version,
+            IEnumerable<MembershipEntry> updatedEntries,
+            bool preserveVersionedFields = false)
         {
             ArgumentNullException.ThrowIfNull(previousSnapshot);
             ArgumentNullException.ThrowIfNull(updatedEntries);
@@ -72,6 +76,16 @@ namespace Orleans.Runtime
             foreach (var item in updatedEntries)
             {
                 var entry = item;
+                if (preserveVersionedFields && version == previousSnapshot.Version
+                    && previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
+                {
+                    // Provider reads can round fields from our committed write. Only liveness advances
+                    // at the same table version; retain the versioned fields we already accepted.
+                    entry = entry.IAmAliveTime > previousEntry.IAmAliveTime
+                        ? previousEntry.WithIAmAliveTime(entry.IAmAliveTime)
+                        : previousEntry;
+                }
+
                 entry = PreserveIAmAliveTime(previousSnapshot, entry);
                 entries.Add(entry.SiloAddress, entry);
             }
@@ -170,25 +184,78 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            foreach (var entry in Entries)
+            var heartbeatAdvanced = false;
+            foreach (var (silo, entry) in Entries)
             {
-                if (!other.Entries.TryGetValue(entry.Key, out var otherEntry))
+                if (!other.Entries.TryGetValue(silo, out var otherEntry)
+                    || !AreVersionedFieldsEqual(entry, otherEntry))
                 {
-                    // Something is amiss.
+                    // Membership changes require a table-version advance.
+                    return false;
+                }
+
+                heartbeatAdvanced |= entry.EffectiveIAmAliveTime > otherEntry.EffectiveIAmAliveTime;
+            }
+
+            if (Entries.Count == other.Entries.Count)
+            {
+                return heartbeatAdvanced;
+            }
+
+            // Cleanup can remove inactive entries without advancing the table version or a heartbeat.
+            // Accept that inventory change while retaining every Active entry and the remaining statuses.
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (previousEntry.Status == SiloStatus.Active && !Entries.ContainsKey(silo))
+                {
                     return false;
                 }
             }
 
-            // This is a successor if any silo has a later EffectiveIAmAliveTime.
-            foreach (var entry in Entries)
+            return true;
+        }
+
+        internal static bool AreVersionedFieldsEqual(MembershipEntry left, MembershipEntry right)
+        {
+            if (ReferenceEquals(left, right))
             {
-                if (entry.Value.EffectiveIAmAliveTime > other.Entries[entry.Key].EffectiveIAmAliveTime)
+                return true;
+            }
+
+            if (!left.SiloAddress.Equals(right.SiloAddress)
+                || left.Status != right.Status
+                || left.ProxyPort != right.ProxyPort
+                || !string.Equals(left.HostName, right.HostName, StringComparison.Ordinal)
+                || !string.Equals(left.SiloName, right.SiloName, StringComparison.Ordinal)
+                || !string.Equals(left.RoleName, right.RoleName, StringComparison.Ordinal)
+                || left.UpdateZone != right.UpdateZone
+                || left.FaultZone != right.FaultZone
+                || left.StartTime != right.StartTime)
+            {
+                return false;
+            }
+
+            var leftSuspects = left.SuspectTimes;
+            var rightSuspects = right.SuspectTimes;
+            if (ReferenceEquals(leftSuspects, rightSuspects))
+            {
+                return true;
+            }
+
+            if (leftSuspects is null || rightSuspects is null || leftSuspects.Count != rightSuspects.Count)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < leftSuspects.Count; index++)
+            {
+                if (!leftSuspects[index].Equals(rightSuspects[index]))
                 {
-                    return true;
+                    return false;
                 }
             }
 
-            return false;
+            return true;
         }
 
         public override string ToString()
