@@ -68,6 +68,7 @@ To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to
 ## Example - Using durable states
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.Journaling;
 
 public interface IShoppingCartGrain : IGrainWithStringKey
@@ -77,18 +78,25 @@ public interface IShoppingCartGrain : IGrainWithStringKey
 }
 
 public sealed class ShoppingCartGrain(
+    IJournaledStateManager stateManager,
     [FromKeyedServices("cart")] IDurableDictionary<string, int> cart)
-    : DurableGrain, IShoppingCartGrain
+    : Grain, IShoppingCartGrain
 {
     public async ValueTask AddItem(string itemId, int quantity)
     {
         cart[itemId] = quantity;
-        await WriteStateAsync();
+        await stateManager.WriteStateAsync(CancellationToken.None);
     }
 
     public ValueTask<Dictionary<string, int>> GetItems() => new(cart.ToDictionary());
 }
 ```
+
+The standard grain-scoped factory registered by `AddJournalStorage` enrolls the state manager in the grain lifecycle before returning it. Constructor-injected durable states register with that manager, and recovery completes before `OnActivateAsync` and grain requests. This works with `Grain` or an application-owned grain base class. Registering journal storage makes the services available; only activations which resolve the manager perform per-grain journal I/O.
+
+`DurableGrain` remains an optional convenience base exposing `StateManager`, `GetOrCreateState`, and `WriteStateAsync`. It also enrolls explicitly supplied managers implementing `ILifecycleParticipant<IGrainLifecycle>`, including a standard manager supplied by a custom registration, while preserving the standard hosting factory's completed enrollment. A custom manager used with an ordinary grain assigns enrollment to its service factory or an explicit shared activation setup action.
+
+Managers created with an explicit `JournalId` through `IJournaledStateManagerFactory`, or constructed manually, retain caller-owned initialization and disposal even when created inside a grain call. Register their states and await `InitializeAsync(CancellationToken.None)` before use, or deliberately supply them through a registration which assigns lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle. The asynchronous `IJournaledStateManager` methods require a cancellation-token argument.
 
 All durable state types use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 

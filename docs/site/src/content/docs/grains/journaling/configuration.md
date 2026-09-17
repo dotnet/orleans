@@ -7,9 +7,19 @@ ms.topic: how-to
 
 # Configure Orleans Journaling
 
-Configure a default journal storage provider on every silo that can activate a <xref:Orleans.Journaling.DurableGrain>. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and Orleans binary reader.
+Configure a default journal storage provider on every silo that hosts grains or activation-scoped features using durable state. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state keyed services, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
+
+## Configure grain-scoped composition
+
+The standard <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registration supplies one scoped <xref:Orleans.Journaling.IJournaledStateManager> per activation. Its service factory enrolls the concrete manager in the grain lifecycle before returning it. Inject that manager and keyed durable states into an ordinary <xref:Orleans.Grain>, an application-owned grain base, or an activation-scoped feature. Recovery then completes before <xref:Orleans.Grain.OnActivateAsync*> and requests.
+
+Storage registration makes these services available across the silo. Per-grain journal reads and writes are triggered by activations which resolve the manager directly or through a durable-state dependency. Unrelated grain activations retain their existing persistence behavior.
+
+<xref:Orleans.Journaling.DurableGrain> provides optional protected helpers for the same standard manager and lifecycle enrollment for explicitly supplied managers exposing a lifecycle participant. Custom managers used with plain grains assign lifecycle enrollment to their service factory or a [shared activation setup action](../grain-lifecycle.md#shared-activation-setup). Explicit <xref:Orleans.Journaling.JournalId> factories and manually constructed managers retain caller-owned initialization and disposal unless the caller deliberately assigns lifecycle ownership.
+
+See [Use durable state](durable-state.md) for source-backed constructor injection and feature setup examples, and [Activation and recovery](runtime-behavior.md#activation-and-recovery) for lifecycle ordering.
 
 ## Choose a storage provider
 
@@ -131,6 +141,6 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services which use an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.
