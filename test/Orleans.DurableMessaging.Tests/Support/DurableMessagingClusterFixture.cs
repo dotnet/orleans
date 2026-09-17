@@ -95,18 +95,10 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public DurableEnvelope[] GetStagedOutput(IDurableMessagingTestGrain grain) =>
         GetGrainContext(grain).ActivationServices.GetRequiredService<IDurableOutbox>().Messages.ToArray();
 
-    public ValueTask RevertStateAsync(IDurableMessagingTestGrain grain) =>
-        GetGrainContext(grain).ActivationServices
-            .GetRequiredService<IJournaledStateManager>()
-            .RevertPendingChangesAsync(TestContext.Current.CancellationToken);
-
     public ValueTask WriteStateAsync(IDurableMessagingTestGrain grain) =>
         GetGrainContext(grain).ActivationServices
             .GetRequiredService<IJournaledStateManager>()
             .WriteStateAsync(TestContext.Current.CancellationToken);
-
-    public void DeactivateOnNextRecovery(IDurableMessagingTestGrain grain) =>
-        GetGrainInstance(grain).DeactivateOnNextRecoveryForTest();
 
     internal IGrainContext GetGrainContext(IDurableMessagingTestGrain grain)
     {
