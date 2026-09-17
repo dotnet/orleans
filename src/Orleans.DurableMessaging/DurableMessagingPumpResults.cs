@@ -181,6 +181,44 @@ internal sealed class DurableMessagingPumpResults
         Finish(execution, result: null, exception);
     }
 
+    public void Discard(DurableMessagingPumpExecution execution)
+    {
+        Entry? removed = null;
+        lock (_lock)
+        {
+            if (_entries.TryGetValue(execution.Key, out var entry)
+                && entry.Generation == execution.Generation
+                && entry.State != EntryState.Running)
+            {
+                _entries.Remove(execution.Key);
+                removed = entry;
+            }
+        }
+
+        if (removed is not null)
+        {
+            DisposeRegistration(removed);
+        }
+    }
+
+    public void Clear(string jobName)
+    {
+        List<Entry>? removed = null;
+        lock (_lock)
+        {
+            foreach (var pair in _entries.ToArray())
+            {
+                if (string.Equals(pair.Key.JobName, jobName, StringComparison.Ordinal))
+                {
+                    _entries.Remove(pair.Key);
+                    (removed ??= []).Add(pair.Value);
+                }
+            }
+        }
+
+        DisposeRegistrations(removed);
+    }
+
     public bool TryTake(
         DurableMessagingPumpExecutionKey key,
         out DurableJobRunResult? result,
@@ -322,8 +360,15 @@ internal sealed class DurableMessagingPumpResults
 
         foreach (var entry in entries)
         {
-            entry.CancellationRegistration.Dispose();
+            DisposeRegistration(entry);
         }
+    }
+
+    private static void DisposeRegistration(Entry entry)
+    {
+        var registration = entry.CancellationRegistration;
+        entry.CancellationRegistration = default;
+        registration.Dispose();
     }
 
     private sealed class Entry(long generation, DateTimeOffset createdAt)
