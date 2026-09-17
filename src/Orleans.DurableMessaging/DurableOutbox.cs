@@ -171,6 +171,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             throw new InvalidOperationException(
                 $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
         }
+        DurableEnvelopeValidation.Validate(envelope);
+        if (envelope.ReceiverId.IsDefault)
+        {
+            throw new ArgumentException("The envelope receiver must not be the default grain ID.", nameof(envelope));
+        }
         if (TryGetMessage(envelope.MessageId, out var existing))
         {
             if (!DurableEnvelopeEquivalence.AreEquivalent(existing, envelope))
@@ -1254,6 +1259,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             catch (Exception exception)
             {
                 LogPumpLoopError(owner._logger, exception);
+                if (owner._failure is null && !owner._shutdown.IsCancellationRequested)
+                {
+                    owner._grainContext.Deactivate(new DeactivationReason(
+                        DeactivationReasonCode.ApplicationError, exception, "Durable outbox ownership repair failed."), CancellationToken.None);
+                }
             }
             finally
             {
