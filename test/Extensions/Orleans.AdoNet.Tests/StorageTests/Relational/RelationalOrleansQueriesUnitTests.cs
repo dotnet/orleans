@@ -1,8 +1,13 @@
 using System.Data;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 using Orleans.Streaming.AdoNet;
 using UnitTests.StorageTests.Relational.Fakes;
 using ClusteringQueries = Orleans.Clustering.AdoNet.Storage.RelationalOrleansQueries;
@@ -42,6 +47,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         "UpdateMembershipKey",
         "DeleteMembershipTableEntriesKey",
         "CleanupDefunctSiloEntriesKey",
+        "CleanupDefunctSiloEntryKey",
     ];
 
     private static readonly string[] StreamingQueryKeys =
@@ -271,6 +277,7 @@ public sealed class RelationalOrleansQueriesUnitTests
         Assert.Null(member.SuspectTimes);
         Assert.Equal(42, result.Version.Version);
         Assert.Equal("42", result.Version.VersionEtag);
+        Assert.Equal("42", Assert.Single(result.Members).Item2);
         AssertOperationCall(storage, Sql("MembershipReadAllKey"));
         storage.VerifyComplete();
     }
@@ -951,7 +958,7 @@ public sealed class RelationalOrleansQueriesUnitTests
 
         var memberAndEtag = Assert.Single(result.Members);
         var member = memberAndEtag.Item1;
-        Assert.Equal(string.Empty, memberAndEtag.Item2);
+        Assert.Equal("106", memberAndEtag.Item2);
         Assert.Equal(address, member.SiloAddress);
         Assert.Equal("silo-read-row", member.SiloName);
         Assert.Equal("host-read-row", member.HostName);
@@ -1241,22 +1248,258 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.VerifyComplete();
     }
 
-    [Fact]
-    public async Task CleanupDefunctSiloEntriesAsync_ExecutesSentinelQueryAndCapturesUtcDateTime()
+    [Theory]
+    [InlineData("start")]
+    [InlineData("heartbeat")]
+    [InlineData("vote")]
+    public async Task CleanupDefunctSiloEntriesAsync_UsesExactExclusiveCutoffAndCapturedValues(string latest)
     {
-        var beforeDate = new DateTimeOffset(2026, 8, 28, 4, 15, 30, TimeSpan.FromHours(5.5));
+        var boundary = new DateTime(2026, 8, 27, 22, 45, 30, 123, DateTimeKind.Utc);
+        var start = latest == "start" ? boundary : boundary.AddMinutes(-3);
+        var heartbeat = latest == "heartbeat" ? boundary : boundary.AddMinutes(-2);
+        var vote = latest == "vote" ? boundary : boundary.AddMinutes(-1);
+        var suspectTimes = $"10.4.5.8:11224@16,{LogFormatter.PrintDate(vote.AddMinutes(-1))}|10.4.5.7:11223@15,{LogFormatter.PrintDate(vote)}";
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
-            .ExpectExecute(Sql("CleanupDefunctSiloEntriesKey"), affectedRows: 5);
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, SiloStatus.Dead, start, heartbeat, suspectTimes))
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, SiloStatus.Dead, start, heartbeat, suspectTimes))
+            .ExpectExecute(Sql("CleanupDefunctSiloEntryKey"), affectedRows: 1);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+        var cutoff = new DateTimeOffset(boundary).ToOffset(TimeSpan.FromHours(5.5));
+
+        await queries.CleanupDefunctSiloEntriesAsync(cutoff, "cluster-cleanup", TestContext.Current.CancellationToken);
+        Assert.Equal(2, storage.Calls.Count);
+        await queries.CleanupDefunctSiloEntriesAsync(cutoff.AddTicks(1), "cluster-cleanup", TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [GetQueriesSql, Sql("MembershipReadAllKey"), Sql("MembershipReadAllKey"), Sql("CleanupDefunctSiloEntryKey")],
+            storage.Calls.Select(call => call.Query));
+        var deletion = Assert.Single(storage.Calls, call => call.Query == Sql("CleanupDefunctSiloEntryKey"));
+        Assert.Equal(ExpectedCallKind.Execute, deletion.Kind);
+        AssertParameters(
+            deletion,
+            ("DeploymentId", "cluster-cleanup"),
+            ("Address", "10.4.5.6"),
+            ("Port", 11_222),
+            ("Generation", 14),
+            ("StartTime", start),
+            ("IAmAliveTime", heartbeat),
+            ("SuspectTimes", suspectTimes));
+        Assert.Equal(TestContext.Current.CancellationToken, deletion.CancellationToken);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task CleanupDefunctSiloEntriesAsync_PreservesEveryNonDeadStatus()
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc);
+        foreach (var status in Enum.GetValues<SiloStatus>().Where(status => status != SiloStatus.Dead))
+        {
+            var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+                .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, status, time, time));
+            var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+            await queries.CleanupDefunctSiloEntriesAsync(time.AddDays(1), "cluster-cleanup", TestContext.Current.CancellationToken);
+
+            AssertOperationCall(storage, Sql("MembershipReadAllKey"));
+            storage.VerifyComplete();
+        }
+    }
+
+    [Fact]
+    public async Task CleanupDefunctSiloEntriesAsync_MaxVersionStillPrunesDeadRows()
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc);
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(int.MaxValue, SiloStatus.Dead, time, time))
+            .ExpectExecute(Sql("CleanupDefunctSiloEntryKey"), affectedRows: 1);
         var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
-        await queries.CleanupDefunctSiloEntriesAsync(beforeDate, "cluster-cleanup", TestContext.Current.CancellationToken);
+        await queries.CleanupDefunctSiloEntriesAsync(time.AddTicks(1), "cluster-cleanup", TestContext.Current.CancellationToken);
 
-        var call = AssertOperationCall(storage, Sql("CleanupDefunctSiloEntriesKey"), ExpectedCallKind.Execute);
-        AssertParameters(
-            call,
-            ("DeploymentId", "cluster-cleanup"),
-            ("IAmAliveTime", new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc)));
-        Assert.Equal(DateTimeKind.Utc, Assert.IsType<DateTime>(Parameter(call, "IAmAliveTime").Value).Kind);
+        Assert.Equal(3, storage.Calls.Count);
+        AssertParameters(storage.Calls[2],
+            ("DeploymentId", "cluster-cleanup"), ("Address", "10.4.5.6"), ("Port", 11_222), ("Generation", 14),
+            ("StartTime", time), ("IAmAliveTime", time), ("SuspectTimes", DBNull.Value));
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task CleanupDefunctSiloEntriesAsync_ContinuesAfterConcurrentRowChange()
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc);
+        var rows = CreateMembershipCleanupRow(8, SiloStatus.Dead, time, time);
+        var second = rows.NewRow();
+        second.ItemArray = rows.Rows[0].ItemArray;
+        second["Generation"] = 15;
+        rows.Rows.Add(second);
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(Sql("MembershipReadAllKey"), rows)
+            .ExpectExecute(Sql("CleanupDefunctSiloEntryKey"), affectedRows: 0)
+            .ExpectExecute(Sql("CleanupDefunctSiloEntryKey"), affectedRows: 1);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        await queries.CleanupDefunctSiloEntriesAsync(time.AddTicks(1), "cluster-cleanup", TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [GetQueriesSql, Sql("MembershipReadAllKey"), Sql("CleanupDefunctSiloEntryKey"), Sql("CleanupDefunctSiloEntryKey")],
+            storage.Calls.Select(call => call.Query));
+        Assert.Equal([14, 15], storage.Calls.Skip(2).Select(call => Assert.IsType<int>(Parameter(call, "Generation").Value)).Order());
+        storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData("Microsoft.Data.SqlClient", DbType.DateTime2)]
+    [InlineData("Npgsql", DbType.DateTime)]
+    [InlineData("MySql.Data.MySqlClient", DbType.DateTime)]
+    [InlineData("Oracle.ManagedDataAccess.Client", DbType.DateTime)]
+    public async Task CleanupDefunctSiloEntriesAsync_PreservesCapturedTimestampPrecision(string invariant, DbType expectedType)
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, 123, DateTimeKind.Utc).AddTicks(4560);
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(invariant), MembershipQueryKeys)
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, SiloStatus.Dead, time, time))
+            .ExpectExecute(Sql("CleanupDefunctSiloEntryKey"), affectedRows: 1);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        await queries.CleanupDefunctSiloEntriesAsync(time.AddTicks(1), "cluster-cleanup", TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, storage.Calls.Count);
+        foreach (var name in new[] { "StartTime", "IAmAliveTime" })
+        {
+            var parameter = Parameter(storage.Calls[2], name);
+            Assert.Equal(expectedType, parameter.DbType);
+            Assert.Equal(time, parameter.Value);
+        }
+
+        storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CleanupDefunctSiloEntriesAsync_PropagatesStorageFailureWithoutRetry(bool canceled)
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc);
+        Exception failure = canceled ? new OperationCanceledException() : new InvalidOperationException("Storage unavailable.");
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, SiloStatus.Dead, time, time))
+            .ExpectExecuteException(Sql("CleanupDefunctSiloEntryKey"), failure);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        Assert.Same(failure, await Record.ExceptionAsync(
+            () => queries.CleanupDefunctSiloEntriesAsync(time.AddTicks(1), "cluster-cleanup", TestContext.Current.CancellationToken)));
+
+        Assert.Equal(3, storage.Calls.Count);
+        Assert.Equal(Sql("CleanupDefunctSiloEntryKey"), storage.Calls[2].Query);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task CleanupDefunctSiloEntriesAsync_CancellationAfterReadPreventsDelete()
+    {
+        var time = new DateTime(2026, 8, 27, 22, 45, 30, DateTimeKind.Utc);
+        using var cancellation = new CancellationTokenSource();
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(Sql("MembershipReadAllKey"), CreateMembershipCleanupRow(8, SiloStatus.Dead, time, time));
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+        storage.BeforeSelector = cancellation.Cancel;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => queries.CleanupDefunctSiloEntriesAsync(time.AddTicks(1), "cluster-cleanup", cancellation.Token));
+
+        AssertOperationCall(storage, Sql("MembershipReadAllKey"));
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task CreateInstance_RequiresCapturedMembershipCleanupQuery()
+    {
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(),
+            MembershipQueryKeys.Where(key => key != "CleanupDefunctSiloEntryKey").ToArray());
+
+        var failure = await Assert.ThrowsAsync<ArgumentException>(
+            () => ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken));
+
+        Assert.Contains("CleanupDefunctSiloEntryKey", failure.Message, StringComparison.Ordinal);
+        AssertOnlyQueryLoadCall(storage);
+        storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" 7")]
+    [InlineData("7 ")]
+    [InlineData("+7")]
+    [InlineData("07")]
+    [InlineData("-1")]
+    [InlineData("2147483648")]
+    [InlineData("opaque")]
+    [InlineData(null)]
+    public async Task MembershipWrites_RejectNoncanonicalTokensWithoutStorageEffects(string? etag)
+    {
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        Assert.False(await queries.InsertMembershipRowAsync("cluster", new MembershipEntry(), etag!, TestContext.Current.CancellationToken));
+        Assert.False(await queries.UpdateMembershipRowAsync("cluster", new MembershipEntry(), etag!, TestContext.Current.CancellationToken));
+
+        AssertOnlyQueryLoadCall(storage);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task MembershipWrites_ObserveCancellationBeforeTokenComparison()
+    {
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => queries.InsertMembershipRowAsync("cluster", new MembershipEntry(), "invalid", cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => queries.UpdateMembershipRowAsync("cluster", new MembershipEntry(), "invalid", cancellation.Token));
+
+        AssertOnlyQueryLoadCall(storage);
+        storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("6")]
+    [InlineData("07")]
+    [InlineData("7 ")]
+    [InlineData(null)]
+    public async Task UpdateRowAsync_RejectsMismatchedRowTokenBeforeStorage(string? etag)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var table = new AdoNetClusteringTable(services, Options.Create(new ClusterOptions()),
+            Options.Create(new AdoNetClusteringSiloOptions()), NullLogger<AdoNetClusteringTable>.Instance);
+
+        Assert.False(await table.UpdateRowAsync(new MembershipEntry(), etag!, new TableVersion(8, "7"), TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipWrites_PropagateConditionalFailure(bool update)
+    {
+        var key = update ? "UpdateMembershipKey" : "InsertMembershipKey";
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(Sql(key), CreateTable([("Result", typeof(int))], [0]));
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+        var entry = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11_111, 1),
+            SiloName = "silo",
+            HostName = "host",
+        };
+
+        var result = update
+            ? await queries.UpdateMembershipRowAsync("cluster", entry, "7", TestContext.Current.CancellationToken)
+            : await queries.InsertMembershipRowAsync("cluster", entry, "7", TestContext.Current.CancellationToken);
+
+        Assert.False(result);
+        Assert.Equal(7, Parameter(AssertOperationCall(storage, Sql(key)), "Version").Value);
         storage.VerifyComplete();
     }
 
@@ -1288,6 +1531,16 @@ public sealed class RelationalOrleansQueriesUnitTests
         Assert.Equal("/* duplicate converter sentinel */ SELECT 42", result.Value);
         Assert.False(reader.Read());
     }
+
+    private static DataTable CreateMembershipCleanupRow(int version, SiloStatus status, DateTime start, DateTime heartbeat, string? suspectTimes = null) =>
+        CreateTable(
+            [
+                ("StartTime", typeof(DateTime)), ("Port", typeof(int)), ("Generation", typeof(int)),
+                ("Address", typeof(string)), ("SiloName", typeof(string)), ("HostName", typeof(string)),
+                ("Status", typeof(int)), ("ProxyPort", typeof(int)), ("IAmAliveTime", typeof(DateTime)),
+                ("SuspectTimes", typeof(string)), ("Version", typeof(long)),
+            ],
+            [start, 11_222, 14, "10.4.5.6", "silo-cleanup", "host-cleanup", (int)status, 30_004, heartbeat, suspectTimes, (long)version]);
 
     private static readonly (string Name, Type Type)[] StreamMessageColumns =
     [

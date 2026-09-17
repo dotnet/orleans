@@ -99,6 +99,11 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         internal string CleanupDefunctSiloEntriesKey => queries[nameof(CleanupDefunctSiloEntriesKey)];
 
+        /// <summary>
+        /// Deletes a dead membership row whose captured activity values still match.
+        /// </summary>
+        internal string CleanupDefunctSiloEntryKey => queries[nameof(CleanupDefunctSiloEntryKey)];
+
 #endif
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER

@@ -172,6 +172,12 @@ namespace Orleans.Runtime.MembershipService
                 throw new ArgumentNullException(nameof(tableVersion));
             }
 
+            // Relational reads use the table version as the row etag.
+            if (!string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             try
             {
                 return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag, cancellationToken);

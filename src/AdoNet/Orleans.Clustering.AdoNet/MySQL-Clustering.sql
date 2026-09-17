@@ -35,7 +35,7 @@ VALUES
     -- is not needed nor is it checked.
     UPDATE OrleansMembershipTable
     SET
-        IAmAliveTime = @IAmAliveTime
+        IAmAliveTime = GREATEST(IAmAliveTime, @IAmAliveTime)
     WHERE
         DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
         AND Address = @Address AND @Address IS NOT NULL
@@ -89,7 +89,19 @@ CREATE PROCEDURE InsertMembershipKey(
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
     START TRANSACTION;
+
+    UPDATE OrleansMembershipVersionTable
+    SET Version = Version + 1
+    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
+        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647;
+    SET _ROWCOUNT = ROW_COUNT();
+
     INSERT INTO OrleansMembershipTable
     (
         DeploymentId,
@@ -114,7 +126,7 @@ BEGIN
         _ProxyPort,
         _StartTime,
         _IAmAliveTime) AS TMP
-    WHERE NOT EXISTS
+    WHERE _ROWCOUNT > 0 AND NOT EXISTS
     (
     SELECT 1
     FROM
@@ -125,14 +137,6 @@ BEGIN
         AND Port = _Port AND _Port IS NOT NULL
         AND Generation = _Generation AND _Generation IS NOT NULL
     );
-
-    UPDATE OrleansMembershipVersionTable
-    SET
-        Version = Version + 1
-    WHERE
-        DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
-        AND Version = _Version AND _Version IS NOT NULL
-        AND ROW_COUNT() > 0;
 
     SET _ROWCOUNT = ROW_COUNT();
 
@@ -151,29 +155,19 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateMembershipKey','
-    START TRANSACTION;
+    UPDATE OrleansMembershipVersionTable v
+    INNER JOIN OrleansMembershipTable m ON m.DeploymentId = v.DeploymentId
+    SET v.Version = v.Version + 1,
+        m.Status = @Status,
+        m.SuspectTimes = @SuspectTimes,
+        m.IAmAliveTime = GREATEST(m.IAmAliveTime, @IAmAliveTime)
+    WHERE v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+        AND v.Version = @Version AND @Version IS NOT NULL AND v.Version < 2147483647
+        AND m.Address = @Address AND @Address IS NOT NULL
+        AND m.Port = @Port AND @Port IS NOT NULL
+        AND m.Generation = @Generation AND @Generation IS NOT NULL;
 
-    UPDATE OrleansMembershipVersionTable
-    SET
-        Version = Version + 1
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Version = @Version AND @Version IS NOT NULL;
-
-    UPDATE OrleansMembershipTable
-    SET
-        Status = @Status,
-        SuspectTimes = @SuspectTimes,
-        IAmAliveTime = @IAmAliveTime
-    WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Address = @Address AND @Address IS NOT NULL
-        AND Port = @Port AND @Port IS NOT NULL
-        AND Generation = @Generation AND @Generation IS NOT NULL
-        AND ROW_COUNT() > 0;
-
-    SELECT ROW_COUNT();
-    COMMIT;
+    SELECT ROW_COUNT() > 0;
 ');
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
@@ -262,5 +256,18 @@ VALUES
     WHERE DeploymentId = @DeploymentId
         AND @DeploymentId IS NOT NULL
         AND IAmAliveTime < @IAmAliveTime
-        AND Status !=3;
+        AND StartTime < @IAmAliveTime
+        AND COALESCE(SuspectTimes, '''') = ''''
+        AND Status = 6;
+');
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'CleanupDefunctSiloEntryKey','
+    DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = @DeploymentId AND Status = 6
+        AND Address = @Address AND Port = @Port AND Generation = @Generation
+        AND IAmAliveTime = @IAmAliveTime AND StartTime = @StartTime
+        AND CAST(COALESCE(SuspectTimes, '''') AS BINARY) = CAST(COALESCE(@SuspectTimes, '''') AS BINARY);
 ');
