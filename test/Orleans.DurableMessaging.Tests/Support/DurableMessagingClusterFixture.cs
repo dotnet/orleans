@@ -62,6 +62,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             });
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(
                 serviceProvider => (IJournalStorageCatalog)serviceProvider.GetRequiredService<IJournalStorageProvider>());
+            ConfigureServices(siloBuilder.Services);
         });
         Cluster = builder.Build();
     }
@@ -116,6 +117,8 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     private DurableMessagingTestGrain GetGrainInstance(IDurableMessagingTestGrain grain) =>
         GetGrainContext(grain).GrainInstance as DurableMessagingTestGrain
         ?? throw new InvalidOperationException($"Grain '{grain.GetGrainId()}' has an unexpected implementation.");
+
+    protected virtual void ConfigureServices(IServiceCollection services) { }
 
     protected virtual void ConfigureOptions(DurableInboxOptions options)
     {
