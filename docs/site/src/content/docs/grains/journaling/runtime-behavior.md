@@ -11,7 +11,7 @@ Orleans Journaling assigns one <xref:Orleans.Journaling.JournalId> to each grain
 
 ## Activation and recovery
 
-The standard grain-scoped <xref:Orleans.Journaling.IJournaledStateManager> factory registered by <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> creates the concrete manager and enrolls it in the grain lifecycle before returning it. Resolving a keyed durable state also resolves this manager. Each activation shares one manager across its injected states and features.
+The standard grain-scoped <xref:Orleans.Journaling.IJournaledStateManager> registered by <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Resolving a keyed durable state also resolves this manager. Each activation shares one manager across its injected states and features.
 
 Constructor injection registers durable states before lifecycle startup. Orleans completes the grain constructor and assigns <xref:Orleans.Runtime.IGrainContext.GrainInstance>, then runs any shared activation setup actions before calling the grain object's `Participate` method and starting the lifecycle. A feature can resolve additional activation-scoped states and enroll its own participant in those actions. All subscriptions are established before lifecycle startup.
 
@@ -33,9 +33,9 @@ Storage providers can split reads at arbitrary byte boundaries. The journal form
 
 ### Custom and caller-owned managers
 
-Every grain-scoped manager registration owns lifecycle enrollment before returning the manager. Custom registrations follow the same contract by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
+Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor. Custom managers establish it in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
 
-Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory> with an explicit <xref:Orleans.Journaling.JournalId>, and manually constructed managers, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Register their states, await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with a cancellation token, and dispose the manager when processing ends. A caller can deliberately assign lifecycle ownership by enrolling the manager in a grain-scoped registration factory. Creation through the explicit-journal factory keeps failure handling independent of the ambient activation, including after the caller enrolls that manager in a lifecycle.
+Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory> with an explicit <xref:Orleans.Journaling.JournalId>, and managers constructed directly from storage without a grain context, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Register their states, await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with the operation's cancellation token, and dispose the manager when processing ends. A caller can deliberately assign lifecycle ownership by enrolling the manager in a grain-scoped registration factory. Creation through the explicit-journal factory keeps failure handling independent of the ambient activation, including after the caller enrolls that manager in a lifecycle.
 
 ## Mutation and write acknowledgement
 
@@ -111,4 +111,4 @@ This behavior supports staged deployments and rollback. Keep the previous format
 
 ## Deactivation and shutdown
 
-Grain deactivation stops the lifecycle-bound state manager's work loop, and activation-scope disposal releases its resources. Completed writes are the durability barrier. Await every required write during the grain call which made the mutation, and size host shutdown grace periods for writes already in progress. Owners of explicit-journal or manually constructed managers arrange their own shutdown and disposal.
+Grain deactivation stops the lifecycle-bound state manager's work loop, and activation-scope disposal releases its resources. Completed writes are the durability barrier. Await every required write during the grain call which made the mutation, and size host shutdown grace periods for writes already in progress. Owners of explicit-journal or standalone managers arrange their own shutdown and disposal.

@@ -17,13 +17,13 @@ Compose an ordinary <xref:Orleans.Grain> with an injected <xref:Orleans.Journali
 
 :::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="composed_shopping_cart":::
 
-The standard grain-scoped service factory enrolls the manager in the grain lifecycle when constructor injection resolves it. Durable states register during construction, and recovery finishes before <xref:Orleans.Grain.OnActivateAsync*> and request processing. The same composition works with an application-owned grain base class.
+The standard manager enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Durable states register during construction, and recovery finishes before <xref:Orleans.Grain.OnActivateAsync*> and request processing. The same composition works with an application-owned grain base class.
 
-The dictionary mutation is immediately visible to the current activation. Awaiting <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> establishes the durability point for every pending durable-state mutation on that grain. The manager's asynchronous APIs require a <xref:System.Threading.CancellationToken> argument; pass a token with the operation's lifetime or <xref:System.Threading.CancellationToken.None>.
+The dictionary mutation is immediately visible to the current activation. Awaiting <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> establishes the durability point for every pending durable-state mutation on that grain. Accept a <xref:System.Threading.CancellationToken> on grain operations and flow it through state-manager calls so cancellation follows the caller's operation lifetime.
 
 <xref:Orleans.Journaling.DurableGrain> remains a convenience base exposing its protected <xref:Orleans.Journaling.DurableGrain.StateManager>, <xref:Orleans.Journaling.DurableGrain.GetOrCreateState*>, and <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> members. Choose that base when those helpers fit the application; constructor-injected composition gives existing grain hierarchies the same standard recovery behavior.
 
-The composition example is compiled against repository source so it exercises the factory-owned lifecycle behavior. The format and collection snippets use the approved published package versions.
+The composition example is compiled against repository source so it exercises constructor-owned lifecycle enrollment.
 
 ## Select a state type
 
@@ -63,7 +63,7 @@ Register the feature as scoped and the configurator as singleton:
 
 :::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journaled_feature_registration":::
 
-The action resolves the feature from <xref:Orleans.Runtime.IGrainContext.ActivationServices> and enrolls its lifecycle participant. Resolving the feature's dependencies also resolves the standard state manager, whose factory owns the manager's enrollment. The feature uses a stage after <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> and before <xref:Orleans.Runtime.GrainLifecycleStage.Activate> so it increments recovered state before application activation begins.
+The action resolves the feature from <xref:Orleans.Runtime.IGrainContext.ActivationServices> and enrolls its lifecycle participant. Resolving the feature's dependencies also constructs the standard state manager, which enrolls itself in the grain lifecycle. The feature uses a stage after <xref:Orleans.Runtime.GrainLifecycleStage.SetupState> and before <xref:Orleans.Runtime.GrainLifecycleStage.Activate> so it increments recovered state before application activation begins.
 
 Keep one enrollment owner per participant. Setup actions are shared across concurrent activations; resolve activation-specific data from the supplied context and keep shared callbacks stateless. See [Shared activation setup](../grain-lifecycle.md#shared-activation-setup) and [Journaling activation and recovery](runtime-behavior.md#activation-and-recovery) for ordering and failure behavior.
 

@@ -5,6 +5,9 @@ Azure Blob Storage. It exercises durable dictionaries, lists, queues, sets, valu
 task completion sources, and regular persistent state, then deactivates and
 reactivates the grain to verify recovery.
 
+The host's stopping token flows through grain calls, journal writes, and Azure
+storage operations. Graceful shutdown uses the configured host shutdown deadline.
+
 ## Run the sample
 
 Install the .NET 10 SDK, the Aspire CLI, and a Docker-compatible container runtime.

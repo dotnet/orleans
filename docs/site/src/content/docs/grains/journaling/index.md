@@ -14,7 +14,7 @@ Orleans Journaling is an experimental persistence model that records mutations t
 
 ## Programming model
 
-A journaling grain composes <xref:Orleans.Journaling.IJournaledStateManager> with named durable states received through keyed dependency injection. The standard manager factory owns lifecycle enrollment, so constructor-injected state recovers before application activation and requests. This works with an ordinary <xref:Orleans.Grain>, an application-owned grain base, or a reusable activation-scoped feature. <xref:Orleans.Journaling.DurableGrain> remains an optional convenience base with protected state-manager helpers.
+A journaling grain composes <xref:Orleans.Journaling.IJournaledStateManager> with named durable states received through keyed dependency injection. The standard manager enrolls itself in the lifecycle during grain-bound construction, so constructor-injected state recovers before application activation and requests. This works with an ordinary <xref:Orleans.Grain>, an application-owned grain base, or a reusable activation-scoped feature. <xref:Orleans.Journaling.DurableGrain> remains an optional convenience base with protected state-manager helpers.
 
 Orleans currently provides:
 
