@@ -247,6 +247,98 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Null(fixture.CompletedJobId.Value);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CanceledRemoteBatch_CapturedTokenSupportsLateRegistration(bool stopActivation, bool failDelivery)
+    {
+        const string ownershipId = "owner:1";
+        var captured = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<DeliveryResult>? remoteAttempt = null;
+        var callbacks = 0;
+        var lateFailure = new IOException("Late canceled remote failure.");
+        using var fixture = new OutboxFixture(
+            token => new ValueTask<DeliveryResult>(remoteAttempt = RunRemoteAttemptAsync(token)),
+            durableJobId: ownershipId);
+        Assert.True((await fixture.ExecuteJobAsync(ownershipId)).IsInProgress);
+        await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+        var token = await captured.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var (cancellation, batchAttempts) = fixture.GetPendingBatchState();
+        var attempt = Assert.IsAssignableFrom<Task<DeliveryResult>>(remoteAttempt);
+        Assert.False(attempt.IsCompleted);
+
+        var replacement = fixture.CreateJobForTest("replacement-physical-job", ownershipId);
+        if (stopActivation)
+        {
+            await fixture.StopAsync();
+        }
+        else
+        {
+            fixture.Job.Value = replacement;
+            fixture.Manager.CommitExternalOwner();
+            fixture.TimerRegistry.ClearReceivedCalls();
+            Assert.True((await fixture.ExecuteJobAsync(
+                replacement, "replacement-run", TestContext.Current.CancellationToken)).IsInProgress);
+            await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+        }
+
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(token.IsCancellationRequested);
+        Assert.False(attempt.IsCompleted);
+        Assert.Throws<ObjectDisposedException>(() => cancellation.Token);
+        Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
+        release.SetResult();
+        if (failDelivery)
+        {
+            Assert.Same(lateFailure, await Assert.ThrowsAsync<IOException>(
+                () => attempt.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)));
+        }
+        else
+        {
+            Assert.Equal(DeliveryStatus.Accepted,
+                (await attempt.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).Status);
+        }
+
+        await Task.WhenAll(batchAttempts).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(2, callbacks);
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Single(fixture.Messages);
+        Assert.Equal(0, fixture.MessageStates.GetProperty<int>(fixture.MessageId, "AttemptCount"));
+        Assert.Equal(0, fixture.DeadLetters.Count);
+        Assert.Equal(stopActivation ? 0 : 1, fixture.Manager.WriteCount);
+        Assert.Equal(0, fixture.Manager.FaultCount);
+        Assert.Equal(ownershipId, fixture.JobId.Value);
+        Assert.Equal(stopActivation ? $"job-{ownershipId}" : replacement.Id, fixture.Job.Value?.Id);
+        Assert.Null(fixture.CompletedJobId.Value);
+
+        async Task<DeliveryResult> RunRemoteAttemptAsync(CancellationToken cancellationToken)
+        {
+            using var initialRegistration = cancellationToken.Register(cancellationObserved.SetResult);
+            captured.SetResult(cancellationToken);
+            await release.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(cancellationToken.CanBeCanceled);
+            Assert.True(cancellationToken.IsCancellationRequested);
+            using var lateRegistration = cancellationToken.Register(() => callbacks++);
+            using var lateUnsafeRegistration = cancellationToken.UnsafeRegister(_ => callbacks++, null);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            Assert.True(linked.IsCancellationRequested);
+            var cancellationError = Assert.Throws<OperationCanceledException>(cancellationToken.ThrowIfCancellationRequested);
+            Assert.Equal(cancellationToken, cancellationError.CancellationToken);
+            var delayError = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
+            Assert.Equal(cancellationToken, delayError.CancellationToken);
+            if (failDelivery)
+            {
+                throw lateFailure;
+            }
+            return DeliveryResult.Accepted();
+        }
+    }
+
     [Fact]
     public async Task FailureAfterDeliveryCommit_LeavesTerminalCleanupToFreshCallback()
     {
@@ -1345,6 +1437,15 @@ public sealed class DurableOutboxDeliveryBatchTests
             return (ValueTask<DurableJobRunResult>)_outbox.GetType()
                 .GetMethod("ExecuteJobAsync", BindingFlags.Instance | BindingFlags.Public)!
                 .Invoke(_outbox, [context, cancellationToken])!;
+        }
+
+        public (CancellationTokenSource Source, Task[] Attempts) GetPendingBatchState()
+        {
+            var batch = _outbox.GetType().GetField("_pendingDeliveryBatch", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(_outbox)!;
+            var source = (CancellationTokenSource)batch.GetType().GetProperty("Cancellation")!.GetValue(batch)!;
+            var attempts = ((IEnumerable)batch.GetType().GetProperty("Attempts")!.GetValue(batch)!).Cast<Task>().ToArray();
+            return (source, attempts);
         }
 
         public SemaphoreSlim GetGate(string fieldName) =>
