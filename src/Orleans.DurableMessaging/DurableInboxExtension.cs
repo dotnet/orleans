@@ -767,7 +767,6 @@ internal sealed partial class DurableInboxExtension :
     public async Task OnStart(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        DurableMessagingActivationValidator.Validate(_grainContext);
         await ResumeProcessingAsync(cancellationToken).ConfigureAwait(true);
         if (_deadLetters.Values.Any(entry => DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), entry.DeadLetteredAt, _deadLetterRetentionPeriod))
             || _deadLetters.Count > _maxRetainedDeadLetters
