@@ -109,9 +109,13 @@ previous owner remains responsible or cleanup was committed.
 Cancellation of a caller's wait for
 <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
 queued write running through capture and acknowledgement. Feature completion tracks
-both the triggering write and its admitted descriptor acknowledgement. Gate waits,
-durable attempts and timer turns retain their own cancellation lifetimes. An outgoing
-remote batch keeps its durable attempt token across timer turns.
+both the triggering write and its admitted descriptor acknowledgement. A delivery
+caller can also cancel its wait while the owned delivery operation retains admission
+through completion. Activation shutdown drains that operation; late failures are
+observed and logged even after the caller has left. Deletion waits for completed
+delivery operations, released gates and idle pump leases. Durable attempts and timer
+turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
+durable attempt token across timer turns.
 
 ## Backpressure, retries, and dead letters
 
@@ -133,6 +137,12 @@ Malformed typed bodies follow the same retry and dead-letter path during handler
 deserialization, while later envelopes remain available for recovery and processing.
 A successfully decoded null body is delivered as null. Typed handler parameters are
 explicitly null-capable and handlers which require a non-null body must validate it.
+
+Processed-record maintenance begins at the earliest tracked expiry and amortizes
+subsequent maintenance cycles to at most once per quarter of the deduplication window.
+It joins admitted writes while the inbox is busy; durable pump maintenance and fresh
+activation also remove due records. A maintenance-only write requires expired records.
+Delivery evaluates each duplicate against its exact retention boundary.
 
 ## Deployment requirements
 
