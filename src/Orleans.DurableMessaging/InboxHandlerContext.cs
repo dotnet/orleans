@@ -117,40 +117,25 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     }
 
     /// <inheritdoc />
-    /// <remarks>
-    /// <para>
-    /// The envelope is added to the outbox immediately, but persistence is deferred until
-    /// <c>IJournaledStateManager.WriteStateAsync()</c> is called (typically after the handler completes
-    /// successfully). This ensures that outbound messages are persisted atomically with any grain
-    /// state changes made during handler execution.
-    /// </para>
-    /// <para>
-    /// If the handler throws an exception before state is persisted, the message will not be sent.
-    /// This provides transactional semantics: either the handler completes and all outbound messages
-    /// are sent, or the handler fails and no messages are sent.
-    /// </para>
-    /// </remarks>
     /// <example>
     /// <code>
     /// public async ValueTask HandleAsync(OrderRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
-    ///     // Process order (may throw exceptions)
-    ///     var result = await ProcessOrder(request);
+    ///     var result = await PrepareOrder(request);
     ///
-    ///     // These messages are only persisted if ProcessOrder succeeds
+    ///     // Prepare both envelopes before staging either message.
     ///     var confirmation = context.CreateEnvelope()
     ///         .To(request.CustomerId, "order/confirmed")
     ///         .WithBody(result)
     ///         .Build();
-    ///     context.Send(confirmation);
     ///
     ///     var fulfillment = context.CreateEnvelope()
     ///         .To(fulfillmentGrain, "fulfillment/create")
     ///         .WithBody(result)
     ///         .Build();
-    ///     context.Send(fulfillment);
     ///
-    ///     // If we reach here, both messages will be persisted atomically
+    ///     context.Send(confirmation);
+    ///     context.Send(fulfillment);
     /// }
     /// </code>
     /// </example>
