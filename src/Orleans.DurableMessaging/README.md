@@ -187,24 +187,34 @@ Exact route registration retains the original handler instance and takes precede
 over generic handler selection. Operational diagnostics expose retained dead letters
 and stage their removal for the next journal write.
 
-The outbox stages envelopes with the owning grain as sender. The journal write
-schedules delivery before committing each new batch with its ownership generation
-and exact returned DurableJob handle. Commit notifications release the captured
-messages for delivery. Equivalent repeated enqueues preserve the original message
-and its commit status; conflicting envelopes with the same message ID fail. Envelope
-equivalence includes routing, timestamps, body and context bytes, and declared types.
+The outbox accepts serialized envelopes into local pending intents with the owning
+grain as sender. `Count`, `Messages`, and `TryGetMessage` include those intents and
+journaled messages once per ID. Repeated equivalent enqueues preserve their original
+message, enqueue time, and commit status. Conflicting IDs fail; equivalence includes
+routing, timestamps, body and context bytes, and declared type metadata.
 
-Recovery restores the journaled ownership pair and repairs pending work with an
-absent owner. Failed ownership writes restore committed state before retry backoff,
-including when recovery resolves an ambiguous commit response. Callbacks validate
-generation and physical job identity across awaited operations, coalesce by logical
-ownership, and commit terminal ownership cleanup. Recovery hands subsequent delivery
-results and terminal cleanup to callbacks for the recovered state and job handle.
-Loopback delivery executes through the local inbox;
-remote batches yield between timer turns and retain the durable attempt's
-cancellation token. Delivery outcomes commit message removal or bounded retry and
-dead-letter state. Diagnostics expose retained outbox dead letters and stage their
-removal for the next journal write.
+The participant installs one messaging observer with explicit inbox and outbox
+endpoints. After inbox handler preparation, outbox preparation seals the capture's
+intent set and obtains scheduler acknowledgement for any required owner. This also
+repairs an absent owner for already-nonempty recovered work before capture. Healthy
+owners retain their exact handles. Synchronous finalization applies the complete
+ownership generation, returned DurableJob, and prepared envelopes. Acknowledgement
+releases exactly that capture's messages; later intents remain pending for the next
+admitted operation.
+
+Delivery computes outcomes locally across awaits. Its admitted operation validates
+the physical owner, activation generation, and message eligibility before applying
+message removal, retry, and dead-letter changes synchronously. Loopback calls use
+the local inbox; remote batches yield between timer turns and retain the durable
+attempt's cancellation lifetime. Callbacks coalesce by logical ownership and perform
+idempotent terminal cleanup. Diagnostics expose retained outbox dead letters and
+stage their removal for the next journal write.
+
+A terminal journal fault stops outbox preparation and callbacks while preserving the
+failed activation's journaled objects. Fresh instances replay the actual durable
+outcome, including ambiguous append acknowledgements. Canceling a caller's wait
+leaves an admitted write running through capture and acknowledgement. Deletion
+requires quiescent messaging operations and clears pending intents after success.
 
 This intermediate project remains non-packable. Receiver tests compose the inbox
 with existing Journaling and DurableJobs services and a journaled test outbox for
