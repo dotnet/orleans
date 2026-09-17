@@ -403,6 +403,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public void OnDeleteCompleted()
     {
         _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
         _stateGeneration++;
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _reservedSequence = _jobSequence.Value;
@@ -808,6 +809,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         _stateGeneration++;
         _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
         try
         {
             _shutdown.Cancel();
@@ -881,6 +883,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         _failure?.Throw();
         _shutdown.Token.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
         ThrowIfOwnershipStateInvalid();
         if (!DurableMessagingJobOwnership.TryGetOwnershipId(context.Job, out var ownershipId))
         {
@@ -892,6 +895,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
+        var key = new DurableMessagingPumpExecutionKey(
+            JobName,
+            context.Job.Id,
+            context.RunId,
+            Volatile.Read(ref _stateGeneration));
         if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
         {
             var disposition = DurableMessagingJobOwnership.ResolveMismatch(
@@ -903,12 +911,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             {
                 LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
                 _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
-                return DurableJobRunResult.Completed;
+                return CompleteObsoleteExecution(key);
             }
 
             if (disposition == OwnershipMismatchDisposition.CompleteStale)
             {
-                return DurableJobRunResult.Completed;
+                return CompleteObsoleteExecution(key);
             }
 
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
@@ -921,14 +929,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
         if (!DurableMessagingJobOwnership.IsSamePhysicalJob(_job.Value, context.Job))
         {
-            return DurableJobRunResult.Completed;
+            return CompleteObsoleteExecution(key);
         }
 
-        var key = new DurableMessagingPumpExecutionKey(
-            JobName,
-            context.Job.Id,
-            context.RunId,
-            Volatile.Read(ref _stateGeneration));
         if (_pumpResults.TryTake(key, out var result, out var exception))
         {
             if (exception is not null)
@@ -980,6 +983,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
     }
 
+    private DurableJobRunResult CompleteObsoleteExecution(DurableMessagingPumpExecutionKey key)
+    {
+        // Stable ownership retires this run; its retained result will no longer be polled.
+        _pumpResults.TryTake(key, out _, out _);
+        return DurableJobRunResult.Completed;
+    }
+
     private async Task RunPumpTimerAsync(
         DurableMessagingPumpExecution execution,
         DurableMessagingPumpLease lease,
@@ -987,7 +997,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         CancellationToken jobCancellation,
         CancellationToken timerCancellation)
     {
-        if (!_pumpCoordinator.IsCurrent(lease) || !_pumpResults.TryBegin(execution))
+        if (!_pumpCoordinator.IsCurrent(lease) || !IsCurrentPump(job, execution.Key.StateGeneration))
+        {
+            _pumpResults.Discard(execution);
+            return;
+        }
+
+        if (!_pumpResults.TryBegin(execution))
         {
             return;
         }
