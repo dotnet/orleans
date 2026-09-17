@@ -68,6 +68,13 @@ silos, verify their configuration, and then resume.
 Retain A's credentials and namespace through its final cleanup. Existing A work
 continues mutating A while B receives new jobs.
 
+During graceful shutdown, each silo drains admitted requests and stops active
+job attempts, then releases populated shards for another silo to claim and
+deletes empty shard journals. This includes active shards waiting for a future
+start time or queue changes. Cleanup uses the host's shutdown deadline, so allow
+time for storage operations and investigate logged ownership or cleanup failures
+before retiring a provider.
+
 ## Understand routing during the drain
 
 New schedules use newly created shards in B. Discovery sweeps A and B with one
