@@ -15,13 +15,21 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
+        private readonly IFatalErrorHandler fatalErrorHandler;
+        private IMembershipManager? membershipManager;
+        private int fatalErrorReported;
         private IMembershipTableSystemTarget grain = null!;
 
-        public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
+        public SystemTargetBasedMembershipTable(
+            IServiceProvider serviceProvider,
+            ILogger<SystemTargetBasedMembershipTable> logger,
+            IFatalErrorHandler fatalErrorHandler)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
+            this.fatalErrorHandler = fatalErrorHandler;
         }
+
         [Obsolete("Use InitializeMembershipTableAsync instead.")]
         public Task InitializeMembershipTable(bool tryInitTableVersion) => InitializeMembershipTableAsync(tryInitTableVersion, CancellationToken.None);
 
@@ -103,12 +111,52 @@ namespace Orleans.Runtime.MembershipService
         [Obsolete("Use ReadRowAsync instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default) => this.grain.ReadRowAsync(key, cancellationToken);
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedVersion = GetCurrentVersion();
+            var table = await this.grain.ReadRowAsync(key, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateVersion(observedVersion, table);
+            return table;
+        }
 
         [Obsolete("Use ReadAllAsync instead.")]
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
-        public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default) => this.grain.ReadAllAsync(cancellationToken);
+        public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedVersion = GetCurrentVersion();
+            var table = await this.grain.ReadAllAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateVersion(observedVersion, table);
+            return table;
+        }
+
+        private MembershipVersion GetCurrentVersion()
+        {
+            // Resolve after owner construction, and include versions learned through committed writes and gossip.
+            var manager = this.membershipManager ??= this.serviceProvider.GetRequiredService<IMembershipManager>();
+            return manager.CurrentSnapshot.Version;
+        }
+
+        private void ValidateVersion(MembershipVersion observedVersion, MembershipTableData table)
+        {
+            // Compare with the version known before this read began so overlapping reads can finish out of order.
+            if (table.Version.Version < observedVersion.Value)
+            {
+                var reason = $"The development membership table version decreased from {observedVersion} to {table.Version.Version}. "
+                    + "The cluster's membership state has been lost and this silo must terminate.";
+                var exception = new OrleansException(reason);
+                if (Interlocked.Exchange(ref this.fatalErrorReported, 1) == 0)
+                {
+                    this.fatalErrorHandler.OnFatalException(this, reason, exception);
+                }
+
+                throw exception;
+            }
+        }
 
         [Obsolete("Use InsertRowAsync instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);

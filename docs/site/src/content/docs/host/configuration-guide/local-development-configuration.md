@@ -33,6 +33,8 @@ The client and silo must use matching gateway ports, <xref:Orleans.Configuration
 - Configure a shared development clustering primary and assign each silo unique silo and gateway ports.
 - Run the same production clustering provider against a local container or emulator.
 
+Development clustering keeps its membership table in the primary silo's memory, with membership versions increasing throughout the cluster's lifetime. Losing that table invalidates the cluster; restart all of its silos to establish a new cluster. A surviving silo which reads a table version below the membership version it already knows invokes <xref:Orleans.Runtime.IFatalErrorHandler.OnFatalException*>. For overlapping reads, the comparison uses the version known when each read began.
+
 Aspire is usually the easiest option because it allocates endpoints, starts dependencies, injects configuration, and displays logs for every replica.
 
 > [!IMPORTANT]

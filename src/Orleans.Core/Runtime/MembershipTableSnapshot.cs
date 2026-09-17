@@ -7,8 +7,12 @@ using System.Text;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Represents an immutable snapshot of cluster membership state.
+    /// Represents an immutable snapshot of a canonical membership view and per-silo liveness timestamps.
     /// </summary>
+    /// <remarks>
+    /// A version identifies the same canonical membership view throughout the cluster.
+    /// Updates retain versioned fields at the same version and the maximum observed IAmAliveTime for each silo.
+    /// </remarks>
     [GenerateSerializer, Immutable]
     internal sealed class MembershipTableSnapshot : ISpanFormattable
     {
@@ -63,33 +67,35 @@ namespace Orleans.Runtime
             return Update(previousSnapshot, updated.Version, updated.Entries.Values);
         }
 
-        private static MembershipTableSnapshot Update(MembershipTableSnapshot previousSnapshot, MembershipVersion version, IEnumerable<MembershipEntry> updatedEntries)
+        private static MembershipTableSnapshot Update(
+            MembershipTableSnapshot previousSnapshot,
+            MembershipVersion version,
+            IEnumerable<MembershipEntry> updatedEntries)
         {
-            ArgumentNullException.ThrowIfNull(previousSnapshot);
-            ArgumentNullException.ThrowIfNull(updatedEntries);
-
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                entry = PreserveIAmAliveTime(previousSnapshot, entry);
+                if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
+                {
+                    var iAmAliveTime = entry.IAmAliveTime > previousEntry.IAmAliveTime
+                        ? entry.IAmAliveTime
+                        : previousEntry.IAmAliveTime;
+                    if (version == previousSnapshot.Version)
+                    {
+                        entry = previousEntry;
+                    }
+
+                    if (entry.IAmAliveTime < iAmAliveTime)
+                    {
+                        entry = entry.WithIAmAliveTime(iAmAliveTime);
+                    }
+                }
+
                 entries.Add(entry.SiloAddress, entry);
             }
 
             return new MembershipTableSnapshot(version, entries.ToImmutable());
-        }
-
-        private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
-        {
-            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
-            // and therefore can be clobbered by torn reads.
-            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
-                && previousEntry.IAmAliveTime > entry.IAmAliveTime)
-            {
-                entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
-            }
-
-            return entry;
         }
 
         /// <summary>
@@ -150,6 +156,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Determines whether this snapshot is a successor to another snapshot.
         /// </summary>
+        /// <remarks>
+        /// At the same canonical membership version, progress consists of newer liveness timestamps
+        /// or pruning previously Dead rows. Non-Dead rows are retained.
+        /// </remarks>
         /// <param name="other">The snapshot to compare against.</param>
         /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
         public bool IsSuccessorTo(MembershipTableSnapshot other)
@@ -166,29 +176,36 @@ namespace Orleans.Runtime
 
             if (Entries.Count > other.Entries.Count)
             {
-                // Something is amiss.
+                // Adding a row requires a new canonical membership version.
                 return false;
             }
 
-            foreach (var entry in Entries)
+            var heartbeatAdvanced = false;
+            foreach (var (silo, entry) in Entries)
             {
-                if (!other.Entries.TryGetValue(entry.Key, out var otherEntry))
+                if (!other.Entries.TryGetValue(silo, out var otherEntry))
                 {
-                    // Something is amiss.
+                    // Membership changes require a table-version advance.
+                    return false;
+                }
+
+                heartbeatAdvanced |= entry.IAmAliveTime > otherEntry.IAmAliveTime;
+            }
+
+            if (Entries.Count == other.Entries.Count)
+            {
+                return heartbeatAdvanced;
+            }
+
+            foreach (var (silo, previousEntry) in other.Entries)
+            {
+                if (previousEntry.Status != SiloStatus.Dead && !Entries.ContainsKey(silo))
+                {
                     return false;
                 }
             }
 
-            // This is a successor if any silo has a later EffectiveIAmAliveTime.
-            foreach (var entry in Entries)
-            {
-                if (entry.Value.EffectiveIAmAliveTime > other.Entries[entry.Key].EffectiveIAmAliveTime)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return true;
         }
 
         public override string ToString()
