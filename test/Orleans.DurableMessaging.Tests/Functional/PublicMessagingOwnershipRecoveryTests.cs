@@ -116,12 +116,14 @@ public sealed class PublicMessagingOwnershipRecoveryTests : DurableMessagingBeha
         var before = await sender.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(sender);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         Fixture.Storage.FailWrite(JournalId.FromGrainId(sender.GetGrainId()), matchingWrite: 3);
 
         await sender.SendAsync(receiver.GetGrainId(), "messages/outbox-clear-retry", NewMessage(56, "outbox-clear-retry"));
         _ = await Fixture.WaitForEffectCountAsync(receiver, 1);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<IOException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.IsType<IOException>(await oldGrain.Faulted.Task);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
         _ = await sender.GetSnapshotAsync();
         var cleaned = await Fixture.SnapshotProbe.WaitAsync(sender.GetGrainId(),
             snapshot => snapshot.ActivationId != before.ActivationId && snapshot.OutboxCount == 0 && snapshot.OutboxJobId is null);

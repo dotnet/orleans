@@ -29,23 +29,24 @@ for a follow-up message.
 
 Durable Messaging has the following boundaries:
 
-- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> stages an envelope in the
-  grain journal. Before journal capture, Durable Messaging allocates a logical ownership
-  token and durably schedules an outbox wake-up carrying that token. The envelope,
-  ownership token, returned job handle, and other journaled grain effects then become
-  durable in one commit. The job polls safely while the envelope is provisional, and
-  dispatch starts only after that commit succeeds.
+- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> creates a local pending
+  intent. Outbox inspection includes local intents and journaled messages once per ID.
+  An admitted write prepares the required durable wake-up before applying the envelope,
+  ownership generation, and exact returned job handle synchronously. Journal capture
+  includes those changes with the grain's safe staged effects. Completion releases
+  exactly the captured messages for dispatch; later intents await another write.
 - Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
   whether the original is provisional or durable. Reusing that ID with different routing,
   correlation, body, or request-context content throws without changing the outbox.
-- A failed inbox-handler attempt restores the last durable journal version before
-  retry or dead-letter accounting commits. The failed attempt's staged effects and
-  outgoing envelopes are discarded at that boundary.
-- Inbox handlers stage journaled effects and outgoing envelopes. Durable Messaging
-  commits those changes together with inbox completion after the handler returns;
-  handlers cannot create an earlier journal commit or delete boundary.
-- Deleting the grain journal discards staged inbox and outbox work and clears the
-  corresponding volatile pump bookkeeping before a later write begins.
+- Handlers complete fallible work using local values before staging shared journaled
+  effects. Expected preparation failures produce retry or dead-letter accounting.
+  Each application mutation is safe for a queued journal write to commit.
+- The admitted journal operation prepares its inbox handlers, then the outgoing
+  messages and scheduling prerequisites. Synchronous finalization applies the validated
+  inbox completion, deduplication and outbox ownership. Their capture includes the
+  handler's safe effects. Other queued writes wait for this operation to finish.
+- Deletion requires quiescent messaging operations. Successful deletion clears durable
+  messaging state and pending intents before subsequent writes begin.
 - A receiver allocates an ownership token and places it in a scheduled inbox job
   before committing the envelope, token, and returned job handle together. It returns
   `Accepted` after that commit succeeds.
@@ -76,22 +77,50 @@ After recovery, a scheduled generation with no committed owner and no work is a
 confirmed orphan and completes, so Durable Jobs removes it. If recovered work has
 neither an ownership generation nor a job handle, recovery schedules a replacement and
 commits its generation and returned handle before the orphan terminates. Callbacks poll
-until replacement ownership commits, preserving the existing durable wake-up if
-scheduling or persistence must retry. Ownership-clear write failures restore the
-preceding ownership pair, so its job retains responsibility. Recovery retains a healthy
-committed owner; Durable Jobs handles that job's shard and silo failover. A partial pair
+until replacement ownership commits. A healthy recovered owner retains its exact
+handle; Durable Jobs handles that job's shard and silo failover. A partial pair
 or mismatched ownership metadata reports an invariant violation and blocks activation
 and drain execution. Pump callbacks execute as non-interleaving grain timer turns,
 keeping infrastructure writes and handler effects within their owning journal
 boundaries.
 
+## Handler preparation and terminal recovery
+
+<xref:Orleans.DurableMessaging.IInboxHandler.CanHandle*> is a pure metadata predicate.
+Exact registration preserves handler identity; generic predicates run in registration
+order. Selection keeps shared application state unchanged. Its context exposes envelope
+metadata and grain identity, and validates access to outgoing-message operations.
+
+<xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> prepares fallible computation,
+I/O and envelope serialization using local values before applying shared effects. The
+framework's single messaging observer prepares handlers before outbox prerequisites,
+then validates the admitted ownership and applies both endpoints synchronously in the
+grain turn. The captured set is fixed for that operation. Unexpected owner, generation
+or message invalidation after handler invocation faults the whole admitted operation.
+
+An admitted preparation, finalization, capture or storage failure permanently fences
+the journal manager, signals both messaging endpoints, faults pending operations and
+requests grain deactivation. A fresh activation creates new state objects and replays
+the actual durable outcome. A failed append response can follow a successful storage
+commit: replay restores that committed envelope and exact ownership handle. A failed
+ownership-clear write follows the same boundary; fresh replay determines whether the
+previous owner remains responsible or cleanup was committed.
+
+Cancellation of a caller's wait for
+<xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
+queued write running through capture and acknowledgement. Feature completion tracks
+both the triggering write and its admitted descriptor acknowledgement. Gate waits,
+durable attempts and timer turns retain their own cancellation lifetimes. An outgoing
+remote batch keeps its durable attempt token across timer turns.
+
 ## Backpressure, retries, and dead letters
 
 The inbox rejects new, nonduplicate envelopes with `Backpressured` when it reaches
 <xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions.MaxCapacity>. The
-sender retains and retries the envelope. Handler failures restore the preceding durable
-state before retry accounting is committed. Messages move to the appropriate inbox or
-outbox dead-letter collection after their configured attempt or age limit. Use
+sender retains and retries the envelope. Handlers report expected failures during
+preparation, before shared application mutations. Retry accounting is applied with
+inbox completion policy in the admitted write. Messages move to the appropriate inbox
+or outbox dead-letter collection after their configured attempt or age limit. Use
 <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics> to inspect those records.
 After an operator or application has handled a record, remove it with
 <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveInboxDeadLetter*>
@@ -121,10 +150,9 @@ Durable Messaging grains use non-reentrant execution. Activation validates the g
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,
 or `StatelessWorker` declarations. A single non-interleaving activation owns each grain
 journal and pump, keeping infrastructure writes within their owning transaction.
-The Journaling implementation must provide
-<xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
-<xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
-receives commit and recovery notifications. Activation reports a
+The Journaling implementation admits serialized writes with preparation and synchronous
+finalization, and accepts <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*>
+so Durable Messaging receives commit, initial recovery and terminal-fault notifications. Activation reports a
 durable-messaging-specific diagnostic when observer registration is unsupported. Use
 shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
 journal storage support development and tests.
