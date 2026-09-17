@@ -460,17 +460,18 @@ namespace UnitTests.MembershipTests
             Assert.True(ok, "InsertRow Dead failed");
 
             newTableVersion = table.Version.Next();
-            var oldEntryJoining = CreateMembershipEntryForTest();
-            oldEntryJoining.IAmAliveTime = oldEntryJoining.IAmAliveTime.AddDays(-10);
-            oldEntryJoining.StartTime = oldEntryJoining.StartTime.AddDays(-10);
-            oldEntryJoining.Status = SiloStatus.Joining;
-            ok = await membershipTable.InsertRowAsync(oldEntryJoining, newTableVersion, cancellationToken);
+            var oldEntryActive = CreateMembershipEntryForTest();
+            oldEntryActive.IAmAliveTime = oldEntryActive.IAmAliveTime.AddDays(-10);
+            oldEntryActive.StartTime = oldEntryActive.StartTime.AddDays(-10);
+            oldEntryActive.Status = SiloStatus.Active;
+            ok = await membershipTable.InsertRowAsync(oldEntryActive, newTableVersion, cancellationToken);
             table = await membershipTable.ReadAllAsync(cancellationToken);
 
-            Assert.True(ok, "InsertRow Joining failed");
+            Assert.True(ok, "InsertRow Active failed");
 
             newTableVersion = table.Version.Next();
             var newEntry = CreateMembershipEntryForTest();
+            newEntry.Status = SiloStatus.Active;
             ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, cancellationToken);
 
             Assert.True(ok, "InsertRow failed");
@@ -481,8 +482,9 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal(3, data.Members.Count);
 
-            // Every status other than Active should get cleared out if old
-            foreach (var siloStatus in Enum.GetValues<SiloStatus>())
+            var activeAddresses = new List<SiloAddress> { oldEntryActive.SiloAddress, newEntry.SiloAddress };
+            var deadAddresses = new List<SiloAddress> { oldEntryDead.SiloAddress };
+            foreach (var siloStatus in new[] { SiloStatus.Active, SiloStatus.Dead })
             {
                 var oldEntry = CreateMembershipEntryForTest();
                 oldEntry.IAmAliveTime = oldEntry.IAmAliveTime.AddDays(-10);
@@ -493,6 +495,7 @@ namespace UnitTests.MembershipTests
 
                 Assert.True(ok, "InsertRow failed");
 
+                (siloStatus == SiloStatus.Active ? activeAddresses : deadAddresses).Add(oldEntry.SiloAddress);
                 newTableVersion = table.Version.Next();
             }
 
@@ -501,7 +504,10 @@ namespace UnitTests.MembershipTests
             data = await membershipTable.ReadAllAsync(cancellationToken);
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
 
-            Assert.Equal(2, data.Members.Count);
+            Assert.Equal(3, data.Members.Count);
+            Assert.All(data.Members, row => Assert.Equal(SiloStatus.Active, row.Item1.Status));
+            Assert.All(activeAddresses, address => Assert.NotNull(data.TryGet(address)));
+            Assert.All(deadAddresses, address => Assert.Null(data.TryGet(address)));
         }
 
         // Utility methods
