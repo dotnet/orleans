@@ -20,11 +20,18 @@ This project supplies the durable messaging protocol, handler routing, and journ
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
-The messaging participant validates the grain's execution model at the first activation
-lifecycle stage, after the runtime assigns the constructed grain instance and before
-journal initialization or replay. Supported activations use a single, noninterleaving
-grain execution model. Grain construction and local state registration precede this
-validation.
+`IDurableMessagingGrain` is a local capability which selects durable messaging activation
+setup. Implement it on a grain class, an application base class, or an application grain
+interface. Existing `DurableGrain` implementations receive the same setup automatically.
+Selection is cached with the concrete grain type, and each activation reuses its scoped
+inbox, outbox, and single journal observer.
+
+Setup validates the grain's execution model after the runtime assigns the constructed
+grain instance and before lifecycle startup, journal initialization, or replay. Supported
+activations use a single, noninterleaving grain execution model. Grain construction and
+local state registration precede validation. The grain-scoped state-manager factory
+owns lifecycle enrollment, including application-supplied factories; messaging attaches
+its observer to that enrolled manager. Standalone managers have caller-owned lifecycles.
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job
