@@ -54,8 +54,10 @@ context enforces access to metadata and grain identity; its outbound-message API
 throw during selection. Journal observers reject explicit write/delete requests
 inside selection and handling, preserving the runtime's completion commit.
 A route miss preserves the grain's staged state for its next journal write.
-Journal deletion requires completed delivery operations, released inbox gates, and
-idle pump leases. Interleaved control calls observe that quiescence boundary; the
+The grain owner quiesces delivery and pumping for the full journal deletion operation,
+and resumes delivery after awaiting successful deletion. Journal deletion requires
+completed delivery operations, released inbox gates, and idle pump leases.
+Interleaved control calls observe that quiescence boundary; the
 active handler retains its own logical persistence-request guard.
 Superseded queued pump executions release their retained result and cancellation
 registration. Inbox shutdown, terminal failure, and quiescent deletion clear only
