@@ -106,8 +106,10 @@ Exact route registration retains the original handler instance and takes precede
 over generic handler selection. Operational diagnostics expose retained dead letters
 and stage their removal for the next journal write.
 
-The outbox accepts serialized envelopes into local pending intents with the owning
-grain as sender. `Count`, `Messages`, and `TryGetMessage` include those intents and
+The builder encodes the body and request context into an envelope buffer which the
+outbox reuses as a local pending intent with the owning grain as sender. Journal
+codecs serialize envelopes and framework records during admitted application and
+capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
 journaled messages once per ID. Repeated equivalent enqueues preserve their original
 message, enqueue time, and commit status. Conflicting IDs fail; equivalence includes
 routing, timestamps, body and context bytes, and declared type metadata.
