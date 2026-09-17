@@ -58,7 +58,7 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
             receiver.GetGrainId(),
             static snapshot => snapshot.InboxJobId is null && snapshot.InboxJob is null);
         Assert.Null(completed.InboxJob);
-        Assert.True(Fixture.Storage.GetSuccessfulWriteCount(journalId) >= 2);
+        Assert.Equal(3, Fixture.Storage.GetSuccessfulWriteCount(journalId));
     }
 
     [Fact]
@@ -93,23 +93,26 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
-    public async Task ConcurrentWriteCannotCaptureInboxAcceptanceBeforeScheduling()
+    public async Task ConcurrentWriteDuringLocalAcceptancePreparation_PreservesSafeStagingOnly()
     {
         var receiver = NewGrain();
+        var effect = new DurableEffect(Guid.NewGuid(), 1, 74, "prior-safe-state");
+        await receiver.StageEffectAsync(effect);
         using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
-        using var envelope = CreateEnvelope(receiver, NewMessage(74, "schedule-barrier"));
-
+        using var envelope = CreateEnvelope(receiver, NewMessage(75, "schedule-barrier"));
         var delivery = DeliverAsync(receiver, envelope.Value);
         await schedule.WaitUntilEnteredAsync();
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => Fixture.WriteStateAsync(receiver).AsTask());
-        Assert.Contains("waiting for job scheduling", exception.Message, StringComparison.Ordinal);
-
+        var staged = Fixture.GetSnapshot(receiver);
+        Assert.Equal(0, staged.InboxCount);
+        Assert.Null(staged.InboxJobId);
+        Assert.Null(staged.InboxJob);
+        await Fixture.WriteStateAsync(receiver);
+        Assert.Equal(effect, Assert.Single(Fixture.GetSnapshot(receiver).Effects));
+        Assert.False(delivery.IsCompleted);
         schedule.Continue();
         Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.Equal("schedule-barrier", Assert.Single(completed.Effects).Value);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
+        Assert.Equal(new[] { "prior-safe-state", "schedule-barrier" }, completed.Effects.Select(static e => e.Value));
     }
 
     [Fact]

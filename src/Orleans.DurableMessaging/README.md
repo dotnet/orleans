@@ -59,10 +59,19 @@ commits the envelope together with its ownership generation and exact returned j
 handle. Recovery restores that pair and repairs an absent owner for pending work.
 Callbacks validate generation and physical job identity before processing.
 
-Handlers execute sequentially. Their journaled effects, staged output, inbox
-completion, and `(SenderId, MessageId)` deduplication record commit together after
-the handler returns. A failed handler restores committed state and applies bounded
-retry and dead-letter policy. Retained duplicates return `Duplicate`; expiry permits
+Handlers execute sequentially inside an admitted journal operation's preparation.
+The messaging observer prepares the inbox handler before the outbox prerequisites,
+then synchronously finalizes their state. Journaled handler effects, outgoing intents,
+inbox completion, and `(SenderId, MessageId)` deduplication are captured together;
+other queued writes wait for that operation. Handlers complete fallible work using
+local values before staging safe application effects. Expected preparation failures
+produce bounded retry or dead-letter accounting in the admitted operation.
+
+Acceptance and ownership repair retain local proposals until scheduling is acknowledged
+and a healthy journal operation admits them. Its finalizer applies the complete envelope
+and ownership pair. A journal failure permanently fences the activation, signals pending
+preparations and callbacks, and faults its waiters. A fresh activation replays the actual
+durable outcome, including commits whose acknowledgement failed. Retained duplicates return `Duplicate`; expiry permits
 acceptance again. Capacity limits return `Backpressured` before persistence.
 `CanHandle` implementations are pure metadata predicates: the handler keeps grain
 state and injected durable state unchanged until `HandleAsync`. The selection

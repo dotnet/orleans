@@ -59,11 +59,17 @@ internal static class DurableMessagingJobOwnership
         && string.Equals(expected.Id, actual.Id, StringComparison.Ordinal)
         && string.Equals(expected.ShardId, actual.ShardId, StringComparison.Ordinal);
 
+    public static string CreateId(string epoch, long sequence)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(epoch);
+        return $"{epoch}:{sequence.ToString(CultureInfo.InvariantCulture)}";
+    }
+
     public static string NextId(string epoch, IDurableValue<long> sequence)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(epoch);
         sequence.Value++;
-        return $"{epoch}:{sequence.Value.ToString(CultureInfo.InvariantCulture)}";
+        return CreateId(epoch, sequence.Value);
     }
 
     public static bool IsCompleted(string? completedOwnershipId, string ownershipId)
