@@ -115,14 +115,15 @@ public interface IInboxHandler
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// <para>
-    /// The envelope is available via <see cref="IInboxHandlerContext.Envelope"/>, eliminating the need
-    /// for a redundant parameter. This simplifies the method signature and follows Orleans' established
-    /// patterns for context-based APIs.
+    /// Prepare and validate the operation using local values before mutating journaled state or
+    /// calling <see cref="IInboxHandlerContext.Send"/>. Complete failure-prone work, including
+    /// asynchronous preparation and envelope serialization, before staging its effects.
     /// </para>
     /// <para>
-    /// The handler should not throw exceptions for business logic errors; instead, it should handle them
-    /// gracefully (e.g., log, send error response, etc.). Unhandled exceptions will be logged and may
-    /// prevent the message from being marked as processed, depending on the inbox configuration.
+    /// Every staged mutation and outbound message must already be safe to commit. Pending journal
+    /// changes are shared by all callers using the grain's state manager, and a journal write captures
+    /// those shared changes. Represent expected business failures as validated outcomes before staging
+    /// state changes or response messages.
     /// </para>
     /// </remarks>
     ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
@@ -192,6 +193,10 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// <param name="context">Handler context for creating and sending envelopes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// Follow the preparation and safe-to-commit staging requirements of
+    /// <see cref="IInboxHandler.HandleAsync"/>.
+    /// </remarks>
     ValueTask HandleAsync([AllowNull] TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
