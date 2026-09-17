@@ -55,6 +55,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly CancellationTokenSource _shutdown = new();
 
     private readonly Dictionary<Guid, PendingMessage> _pendingMessages = [];
+    private int _unfinalizedMessageCount;
     private readonly List<OutboxWrite> _pendingWrites = [];
     private PendingMessage[] _admittedMessages = [];
     private OutboxWrite[] _admittedWrites = [];
@@ -148,7 +149,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.Activate, this);
     }
 
-    public int Count => _messages.Count + _pendingMessages.Keys.Count(key => !_messages.ContainsKey(key));
+    public int Count => _messages.Count + _unfinalizedMessageCount;
 
     public IEnumerable<DurableEnvelope> Messages => _messages.Values.Concat(
         _pendingMessages.Where(pair => !_messages.ContainsKey(pair.Key)).Select(static pair => pair.Value.Envelope));
@@ -187,6 +188,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
         _pendingMessages.Add(envelope.MessageId, new(envelope, state));
+        _unfinalizedMessageCount++;
         EnsureMetricsActive();
         ReconcileOutboxDepth();
         _instruments.OnOutboxMessageSent(_grainContext.GrainId.Type.ToString(), envelope.RouteKey);
@@ -296,6 +298,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         foreach (var message in _admittedMessages)
         {
             _messages.Add(message.Envelope.MessageId, message.Envelope);
+            // Finalized intents stay pending until acknowledgement, but already count in journaled state.
+            _unfinalizedMessageCount--;
             _messageStates.Add(message.Envelope.MessageId, message.State);
         }
         foreach (var result in _preparedDeliveries)
@@ -413,6 +417,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _reservedSequence = _jobSequence.Value;
         _pendingMessages.Clear();
+        _unfinalizedMessageCount = 0;
         _durableOwnershipId = null;
         _durableJob = null;
         _durableCompletedJobId = null;
