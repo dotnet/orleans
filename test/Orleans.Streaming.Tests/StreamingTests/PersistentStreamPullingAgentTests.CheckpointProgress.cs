@@ -64,7 +64,7 @@ public partial class PersistentStreamPullingAgentTests
         Assert.Equal(200, scenario.Busy.LastProcessedToken?.SequenceNumber);
         Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
         Assert.Equal(200, scenario.Busy.LastSafePartitionToken?.SequenceNumber);
-        Assert.True(scenario.Idle.IsCaughtUp);
+        Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
         var idleConsumer = Assert.IsType<ImmediateRecordingConsumer>(scenario.Idle.StreamConsumer);
         Assert.Equal(1, Assert.Single(idleConsumer.DeliveredTokens).SequenceNumber);
         await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
@@ -131,7 +131,6 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Equal(100, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             Assert.Equal(100, cursor.SafeSequenceToken?.SequenceNumber);
             Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
-            Assert.True(scenario.Idle.IsCaughtUp);
             Assert.Null(scenario.Idle.PendingBatch);
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 100);
         }
@@ -209,7 +208,7 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Same(originalCursor, scenario.Idle.Cursor);
             Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
             Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
-            Assert.True(scenario.Idle.IsCaughtUp);
+            Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
         }
         finally
