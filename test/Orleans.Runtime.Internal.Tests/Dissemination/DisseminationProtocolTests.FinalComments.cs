@@ -77,7 +77,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipInventoryCleanupRespectsManagerLocalEntryRetention()
+    public async Task MembershipInventoryCleanupDoesNotAcknowledgeRetainedLocalEntry()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(40311);
@@ -96,10 +96,28 @@ public partial class DisseminationProtocolTests
             DisseminationKey.Default, 0, 2, serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = incoming }));
 
         Assert.True(incoming.IsSuccessorTo(current));
-        Assert.Equal(DisseminationApplyResult.Duplicate, await ns.ApplyValueAsync(value, cancellationToken));
+        Assert.Equal(DisseminationApplyResult.Rejected, await ns.ApplyValueAsync(value, cancellationToken));
         Assert.Same(current, manager.MembershipTableSnapshot);
         Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[local].Status);
         Assert.Equal(new[] { local, peer }, manager.MembershipTableSnapshot.Entries.Keys.Order());
+
+        var protocol = CreateProtocol(new FakeTransport(local, peer), [ns]);
+        try
+        {
+            var response = await protocol.ReceiveBroadcast(new()
+            {
+                Sender = peer,
+                SupportsCompactAcknowledgments = true,
+                Values = new() { [ns.Name] = [new() { Value = value, TimeToLive = TimeSpan.FromSeconds(30) }] },
+            }, cancellationToken);
+            Assert.False(response.AllVersionsAcknowledged);
+            Assert.Equal(current.Version.Value, Assert.Single(response.Acknowledgments[ns.Name]).Version);
+            Assert.Same(current, manager.MembershipTableSnapshot);
+        }
+        finally
+        {
+            await protocol.StopAsync(cancellationToken);
+        }
     }
 
     [Theory]
