@@ -96,7 +96,7 @@ namespace Tester.Redis.Clustering
         [Fact]
         public async Task UpdateRowInParallel()
         {
-            await MembershipTable_UpdateRowInParallel(false);
+            await MembershipTable_UpdateRowInParallel();
         }
 
         [Fact]
@@ -108,7 +108,7 @@ namespace Tester.Redis.Clustering
         [Fact]
         public async Task CleanupDefunctSiloEntries()
         {
-            await MembershipTable_CleanupDefunctSiloEntries(false);
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }
