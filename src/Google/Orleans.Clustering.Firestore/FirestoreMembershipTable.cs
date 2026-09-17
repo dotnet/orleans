@@ -73,15 +73,34 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var entities = await this._storage.ReadAllEntities<SiloInstanceEntity>(cancellationToken);
-        var defunctEntries = entities
-            .Where(entity => entity.Id != this._partitionId)
-            .Where(entity => entity.Status != (int)SiloStatus.Active)
-            .Where(entity => GetEffectiveUpdateTime(entity) < beforeDate)
-            .ToArray();
+        var collection = this._storage.GetCollection();
+        while (await this._storage.ExecuteTransaction(async transaction =>
+        {
+            var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
+            var defunct = snapshot.Documents
+                .Where(document => document.Id != this._partitionId)
+                .Where(document =>
+                {
+                    var entity = document.ConvertTo<SiloInstanceEntity>();
+                    return entity.Status == (int)SiloStatus.Dead && GetEffectiveUpdateTime(entity) < beforeDate;
+                })
+                .Take(FirestoreDataManager.MaxBatchSize)
+                .ToArray();
+            if (defunct.Length == 0)
+            {
+                return false;
+            }
 
-        await Task.WhenAll(defunctEntries.Chunk(FirestoreDataManager.MaxBatchSize)
-            .Select(chunk => this._storage.DeleteEntities(chunk, cancellationToken)));
+            foreach (var document in defunct)
+            {
+                transaction.Delete(document.Reference, Precondition.LastUpdated(document.UpdateTime!.Value));
+            }
+
+            return true;
+        }, cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
     }
 
     [Obsolete("Use ReadRowAsync instead.")]
@@ -221,11 +240,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             bool result;
             try
             {
-                result = await this._storage.ExecuteTransaction(transaction =>
+                result = await this._storage.ExecuteTransaction(async transaction =>
                 {
+                    var snapshot = await transaction.GetSnapshotAsync(siloReference, transaction.CancellationToken);
+                    if (!snapshot.Exists || snapshot.UpdateTime != silo.ETag)
+                    {
+                        return false;
+                    }
+
+                    var current = snapshot.ConvertTo<SiloInstanceEntity>();
+                    silo.IAmAliveTime = current.IAmAliveTime > silo.IAmAliveTime ? current.IAmAliveTime : silo.IAmAliveTime;
                     transaction.Update(siloReference, silo.GetFields(), Precondition.LastUpdated(silo.ETag.Value));
                     transaction.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                    return Task.FromResult(true);
+                    return true;
                 }, cancellationToken);
             }
             catch (RpcException exception) when (IsContention(exception))
@@ -261,7 +288,14 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             {
                 var snapshot = await transaction.GetSnapshotAsync(document, transaction.CancellationToken);
                 if (!snapshot.Exists)
-                    throw new KeyNotFoundException($"Could not find silo entry for {id}");
+                {
+                    var version = await transaction.GetSnapshotAsync(
+                        this._storage.GetCollection().Document(this._partitionId), transaction.CancellationToken);
+                    if (!version.Exists)
+                        throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
+
+                    return false;
+                }
 
                 if (snapshot.ConvertTo<SiloInstanceEntity>().IAmAliveTime >= iAmAliveTime)
                 {
