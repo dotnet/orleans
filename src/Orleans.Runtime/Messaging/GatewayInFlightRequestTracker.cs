@@ -183,7 +183,10 @@ namespace Orleans.Runtime.Messaging
             if (updated
                 && _deferredResponses is { } deferredResponses
                 && deferredResponses.TryGetValue(requestId, out var responses)
-                && responses.Find(response => response.SendingSilo?.Equals(currentTargetSilo) is true) is { } response)
+                && responses.Find(
+                    response => response.SendingSilo?.Equals(currentTargetSilo) is true
+                        && (response.GatewayRequestAttempt == 0
+                            || response.ForwardCount == trackedRequest.ForwardCount)) is { } response)
             {
                 requests.Remove(requestId);
                 ClearAuxiliaryState(requestId);
