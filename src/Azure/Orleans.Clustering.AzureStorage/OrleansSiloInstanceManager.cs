@@ -274,16 +274,12 @@ namespace Orleans.AzureUtils
                     .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)
                         && entry.Entity.Status == INSTANCE_STATUS_DEAD
                         && GetEffectiveUpdateTime(entry.Entity) < beforeDate.UtcDateTime)
-                    .Take(this.storagePolicyOptions.MaxBulkUpdateRows)
                     .ToList();
-                if (defunct.Count == 0)
-                {
-                    return;
-                }
 
                 try
                 {
-                    await storage.DeleteTableEntriesAsync(defunct, cancellationToken);
+                    await DeleteEntriesBatch(defunct, cancellationToken);
+                    return;
                 }
                 catch (RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.PreconditionFailed || IsRowNotFound(exception))
                 {
