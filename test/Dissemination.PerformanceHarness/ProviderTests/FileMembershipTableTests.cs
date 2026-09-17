@@ -14,6 +14,67 @@ public sealed class FileMembershipTableTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"orleans-dissemination-cleanup-{Guid.NewGuid():N}");
 
     [Fact]
+    public async Task PersistedSuspectVotesPreserveDuplicatesOrderAndLatestUpdate()
+    {
+        var table = CreateTable();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = CreateEntry(SiloStatus.Dead, 1);
+        var repeatedVoter = CreateEntry(SiloStatus.Active, 2).SiloAddress;
+        entry.AddSuspector(repeatedVoter, Cutoff.AddSeconds(-1));
+        entry.AddSuspector(repeatedVoter, Cutoff);
+        entry.AddSuspector(CreateEntry(SiloStatus.Active, 3).SiloAddress, Cutoff.AddSeconds(-2));
+        var initial = await table.ReadAllAsync(cancellationToken);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), cancellationToken));
+
+        var reopened = CreateTable();
+        var inserted = await reopened.ReadAllAsync(cancellationToken);
+        var insertedRow = Assert.Single(inserted.Members);
+        Assert.Equal(entry.SuspectTimes, insertedRow.Item1.SuspectTimes);
+        Assert.Equal(Cutoff, insertedRow.Item1.EffectiveUpdateTime);
+
+        entry.AddSuspector(repeatedVoter, Cutoff.AddSeconds(1));
+        Assert.True(await reopened.UpdateRowAsync(entry, insertedRow.Item2, inserted.Version.Next(), cancellationToken));
+        var updatedTable = CreateTable();
+        var updated = await updatedTable.ReadAllAsync(cancellationToken);
+        var updatedRow = Assert.Single(updated.Members);
+        Assert.Equal(entry.SuspectTimes, updatedRow.Item1.SuspectTimes);
+        Assert.Equal(Cutoff.AddSeconds(1), updatedRow.Item1.EffectiveUpdateTime);
+
+        await updatedTable.CleanupDefunctSiloEntriesAsync(Cutoff.AddSeconds(1), cancellationToken);
+        var retained = Assert.Single((await updatedTable.ReadAllAsync(cancellationToken)).Members);
+        Assert.Equal(entry.SuspectTimes, retained.Item1.SuspectTimes);
+        await updatedTable.CleanupDefunctSiloEntriesAsync(Cutoff.AddSeconds(1).AddTicks(1), cancellationToken);
+        Assert.Empty((await updatedTable.ReadAllAsync(cancellationToken)).Members);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PersistedSuspectVotesPreserveNullAndEmptyLists(bool absent)
+    {
+        var table = CreateTable();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, cancellationToken);
+        var entry = CreateEntry(SiloStatus.Active, 1);
+        entry.SuspectTimes = absent ? null : [];
+        var initial = await table.ReadAllAsync(cancellationToken);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), cancellationToken));
+
+        var reopened = CreateTable();
+        var persisted = Assert.Single((await reopened.ReadAllAsync(cancellationToken)).Members).Item1.SuspectTimes;
+        if (absent)
+        {
+            Assert.Null(persisted);
+        }
+        else
+        {
+            Assert.NotNull(persisted);
+            Assert.Empty(persisted);
+        }
+    }
+
+    [Fact]
     public async Task DeleteInvalidatesThePreviousTableEtag()
     {
         var table = CreateTable();

@@ -180,7 +180,8 @@ alongside the file-backed provider and its protocol. These BVT cases exercise
 persisted membership cleanup: all expired non-active statuses are removed, while
 active rows and rows updated at or after the cutoff retain their ETags. Cleanup uses
 the selected runtime's `EffectiveUpdateTime`, including startup, heartbeat and
-suspect-vote timestamps.
+suspect-vote timestamps. Persisted vote lists retain their order, repeated voters,
+and null-versus-empty state across inserts and updates.
 Clearing membership advances the table ETag so writes from an earlier snapshot
 are rejected. Heartbeat dirty writes preserve the table version and update only
 the liveness timestamp.
@@ -188,7 +189,7 @@ the liveness timestamp.
 ```powershell
 dotnet test --project test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj `
   --framework net10.0 --filter-class 'Orleans.Dissemination.PerformanceHarness.FileMembershipTableTests' `
-  --minimum-expected-tests 12
+  --minimum-expected-tests 15
 ```
 
 The scaling test runs through the script's explicit manual-run marker and published

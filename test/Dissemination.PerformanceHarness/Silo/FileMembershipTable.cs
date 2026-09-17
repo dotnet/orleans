@@ -191,6 +191,8 @@ internal sealed class FileMembershipTable(NodeConfiguration configuration) : IMe
 
     private sealed record Row(EntryData Entry, string Etag);
 
+    internal sealed record SuspectVote(string Address, DateTime Time);
+
     internal sealed record EntryData(
         string Address,
         int Status,
@@ -202,13 +204,13 @@ internal sealed class FileMembershipTable(NodeConfiguration configuration) : IMe
         int FaultZone,
         DateTime StartTime,
         DateTime IAmAliveTime,
-        Dictionary<string, DateTime> Suspects)
+        List<SuspectVote>? Suspects)
     {
         public static EntryData From(MembershipEntry entry) => new(
             entry.SiloAddress.ToParsableString(), (int)entry.Status, entry.ProxyPort,
             entry.HostName, entry.SiloName, entry.RoleName, entry.UpdateZone, entry.FaultZone,
             entry.StartTime, entry.IAmAliveTime,
-            entry.SuspectTimes?.ToDictionary(pair => pair.Item1.ToParsableString(), pair => pair.Item2) ?? []);
+            entry.SuspectTimes?.Select(pair => new SuspectVote(pair.Item1.ToParsableString(), pair.Item2)).ToList());
 
         public MembershipEntry ToEntry() => new()
         {
@@ -222,7 +224,7 @@ internal sealed class FileMembershipTable(NodeConfiguration configuration) : IMe
             FaultZone = FaultZone,
             StartTime = StartTime,
             IAmAliveTime = IAmAliveTime,
-            SuspectTimes = Suspects.Select(pair => Tuple.Create(SiloAddress.FromParsableString(pair.Key), pair.Value)).ToList(),
+            SuspectTimes = Suspects?.Select(vote => Tuple.Create(SiloAddress.FromParsableString(vote.Address), vote.Time)).ToList(),
         };
     }
 }
