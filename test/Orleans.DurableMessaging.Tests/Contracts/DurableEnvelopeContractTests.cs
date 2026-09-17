@@ -297,12 +297,12 @@ public sealed class DurableEnvelopeContractTests : IDisposable
             CreatedAt = first.CreatedAt,
         };
 
-        var outboxType = typeof(IDurableOutbox).Assembly.GetType(
-            "Orleans.DurableMessaging.DurableOutbox",
+        var equivalenceType = typeof(IDurableOutbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableEnvelopeEquivalence",
             throwOnError: true)!;
-        var areEquivalent = outboxType.GetMethod(
+        var areEquivalent = equivalenceType.GetMethod(
             "AreEquivalent",
-            BindingFlags.Static | BindingFlags.NonPublic)!;
+            BindingFlags.Static | BindingFlags.Public)!;
 
         Assert.False((bool)areEquivalent.Invoke(null, [first, second])!);
     }
