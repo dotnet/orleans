@@ -191,9 +191,12 @@ The builder encodes the body and request context into an envelope buffer which t
 outbox reuses as a local pending intent with the owning grain as sender. Journal
 codecs serialize envelopes and framework records during admitted application and
 capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
-journaled messages once per ID. Repeated equivalent enqueues preserve their original
-message, enqueue time, and commit status. Direct envelopes require a nonempty message
-ID, an owning sender, a nondefault receiver, and envelope data before intent admission.
+journaled messages once per ID. `Count` and depth metrics combine the journaled count
+with the number of local intents awaiting finalization in constant time. Finalized
+intents remain delivery-fenced until their exact capture is acknowledged. Repeated
+equivalent enqueues preserve their original message, enqueue time, and commit status.
+Direct envelopes require a nonempty message ID, an owning sender, a nondefault receiver,
+and envelope data before intent admission.
 Serialized null bodies remain valid; route selection supplies delivery and dead-letter
 outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
 context bytes, and declared type metadata.
