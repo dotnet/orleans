@@ -236,6 +236,10 @@ namespace Orleans.DurableMessaging
         bool RemoveOutboxDeadLetter(System.Guid messageId);
     }
 
+    public partial interface IDurableMessagingGrain
+    {
+    }
+
     public partial interface IDurableOutbox
     {
         int Count { get; }
