@@ -17,6 +17,11 @@ public static class HostingExtensions
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
+    /// <remarks>
+    /// Resolving the standard grain-scoped <see cref="IJournaledStateManager"/> enrolls it in the grain lifecycle.
+    /// Its registered durable states recover during <see cref="GrainLifecycleStage.SetupState"/>, before grain activation.
+    /// Managers created through <see cref="IJournaledStateManagerFactory"/> have caller-owned initialization and disposal.
+    /// </remarks>
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();
@@ -26,10 +31,23 @@ public static class HostingExtensions
                 : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager>(static services =>
-            new JournaledStateManager(
+        {
+            var context = services.GetRequiredService<IGrainContext>();
+            var manager = new JournaledStateManager(
                 services.GetRequiredService<JournaledStateManagerShared>(),
                 services.GetRequiredService<IJournalStorageProvider>(),
-                services.GetRequiredService<IGrainContext>()));
+                context);
+            try
+            {
+                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(context.ObservableLifecycle);
+                return manager;
+            }
+            catch
+            {
+                ((IDisposable)manager).Dispose();
+                throw;
+            }
+        });
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
                 ?? ActivatorUtilities.CreateInstance<JournaledStateManagerFactory>(services));

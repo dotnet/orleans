@@ -215,11 +215,6 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IJournaledGrainParticipant
-    {
-        void Initialize();
-    }
-
     public partial interface IJournaledState
     {
         void AppendEntries(JournalStreamWriter writer);

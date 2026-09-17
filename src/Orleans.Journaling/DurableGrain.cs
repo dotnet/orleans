@@ -3,30 +3,23 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Provides a base class for grains which manage journaled durable state.
+/// Provides convenience methods for grains which manage journaled durable state.
 /// </summary>
 public abstract class DurableGrain : Grain, IGrainBase
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="DurableGrain"/> class, associates its state manager
-    /// with the grain lifecycle, and initializes its journaled feature participants.
+    /// Initializes a new instance of the <see cref="DurableGrain"/> class and resolves its state manager.
     /// </summary>
     /// <remarks>
-    /// All registered <see cref="IJournaledGrainParticipant"/> services are constructed before their
-    /// initializers run in registration order. Initialization completes before journal recovery begins.
-    /// Participant construction and initialization failures propagate to the activation caller.
+    /// The standard grain-scoped state manager enrolls in the lifecycle through its hosting factory.
+    /// This base class enrolls custom state managers which implement <see cref="ILifecycleParticipant{TLifecycleObservable}"/>.
     /// </remarks>
     protected DurableGrain()
     {
         StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
-        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
+        if (StateManager is not JournaledStateManager && StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
-        }
-
-        foreach (var feature in ServiceProvider.GetServices<IJournaledGrainParticipant>().ToArray())
-        {
-            feature.Initialize();
         }
     }
 
