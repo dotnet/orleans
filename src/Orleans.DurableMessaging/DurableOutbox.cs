@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -14,8 +13,6 @@ using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Timers;
 
@@ -57,7 +54,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly SemaphoreSlim _deliveryGate = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
 
-    private readonly SerializerSessionPool _sessionPool;
     private readonly Dictionary<Guid, PendingMessage> _pendingMessages = [];
     private readonly List<OutboxWrite> _pendingWrites = [];
     private PendingMessage[] _admittedMessages = [];
@@ -104,7 +100,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         IDurableJobHandlerRegistry jobHandlers,
         DurableMessagingPumpResults pumpResults,
         [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider jobTimeProvider,
-        SerializerSessionPool sessionPool,
         IOptions<DurableInboxOptions> options)
     {
         ArgumentNullException.ThrowIfNull(manager);
@@ -124,9 +119,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         ArgumentNullException.ThrowIfNull(jobHandlers);
         ArgumentNullException.ThrowIfNull(pumpResults);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
-        ArgumentNullException.ThrowIfNull(sessionPool);
         ArgumentNullException.ThrowIfNull(options);
-        _sessionPool = sessionPool;
         _stateManager = manager;
         _messages = messages;
         _grainFactory = grainFactory;
@@ -187,7 +180,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             }
             return;
         }
-        ValidateSerialization(envelope);
         var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
         _pendingMessages.Add(envelope.MessageId, new(envelope, state));
         EnsureMetricsActive();
@@ -250,10 +242,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             }
         }
         _preparedDeliveries = deliveries.ToArray();
-        foreach (var message in _admittedMessages)
-        {
-            ValidateSerialization(message.State);
-        }
 
         var hasWork = _messages.Count + _admittedMessages.Length > deliveries.Count(static result => result.Remove);
         if (hasWork && (!HasCommittedOwnership() || _admittedWrites.OfType<OwnershipWrite>().Any(static write => write.ReplaceExisting)))
@@ -270,7 +258,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 Metadata = DurableMessagingJobOwnership.CreateMetadata(id)
             }, cancellation.Token).ConfigureAwait(true);
             ValidateOwner(_preparedOwner);
-            ValidateSerialization(job);
             _preparedOwnership = new(id, sequence, job);
         }
     }
@@ -508,15 +495,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         || !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
         || (_job.Value is not null && !DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value));
 
-    private void ValidateSerialization<T>(T value)
-    {
-        var buffer = new ArrayBufferWriter<byte>();
-        using var session = _sessionPool.GetSession();
-        var writer = Writer.Create(buffer, session);
-        _sessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
-        writer.Commit();
-    }
-
     private DeliveryCandidate[] SelectMessages()
     {
         var now = _jobTimeProvider.GetUtcNow();
@@ -732,7 +710,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 Reason = state.LastError,
                 AttemptCount = state.AttemptCount
             };
-            ValidateSerialization(letter);
             PrepareDeadLetters();
             DurableDeadLetterRetention.Compact(_preparedDeadLetters!, now, _deadLetterRetentionPeriod,
                 _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
@@ -742,7 +719,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         var exponent = Math.Min(state.AttemptCount - 1, DurableInboxOptions.MaximumBackoffExponent);
         state.NextAttemptAt = DurableMessagingTime.AddClamped(now, TimeSpan.FromTicks(_backpressureRetryDelay.Ticks * (1L << exponent)));
-        ValidateSerialization(state);
         return new(outcome, false, state);
     }
 
