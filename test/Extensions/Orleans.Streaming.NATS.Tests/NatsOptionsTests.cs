@@ -4,8 +4,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streaming.NATS;
 using Orleans.Streaming.NATS.Hosting;
