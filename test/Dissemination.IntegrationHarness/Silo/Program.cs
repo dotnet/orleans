@@ -76,7 +76,7 @@ internal static class Program
                     options.MaxJoinAttemptTime = TimeSpan.FromSeconds(60);
                 });
                 services.Configure<DeploymentLoadPublisherOptions>(options =>
-                    options.DeploymentLoadPublisherRefreshTime = TimeSpan.FromHours(1));
+                    options.DeploymentLoadPublisherRefreshTime = TimeSpan.FromSeconds(1));
                 services.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromSeconds(5));
                 services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(15));
                 services.Configure<SiloConnectionOptions>(options =>

@@ -88,17 +88,6 @@ public sealed class DisseminationOverlayOptions
     public int AggregationFanOutFactor { get; set; } = 8;
 
     /// <summary>
-    /// Gets or sets the maximum number of logical aggregation distribution waves admitted by the root per second.
-    /// </summary>
-    /// <remarks>
-    /// Rate admission can add a wait beyond the namespace's collection window. Relays forward admitted waves
-    /// immediately without another collection window or rate admission wait. The batch item and byte limits
-    /// can split one logical wave into multiple wire messages, which do not each consume a separate wave allowance.
-    /// </remarks>
-    /// <value>The default is 5 and the value must be between 1 and 1000, inclusive.</value>
-    public int AggregationBroadcastsPerSecond { get; set; } = 5;
-
-    /// <summary>
     /// Gets or sets the interval between anti-entropy repair rounds.
     /// </summary>
     /// <value>The interval is 5 seconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
@@ -198,9 +187,8 @@ public sealed class DisseminationNamespaceOptions
     /// Per-peer batches can contain values from multiple namespaces and use the shortest configured delay among
     /// enabled namespaces. High-priority namespaces (see <see cref="Priority"/>) do not coalesce and are excluded
     /// from this calculation.
-    /// For aggregation trees, this is the root's collection window. Admission under
-    /// <see cref="DisseminationOverlayOptions.AggregationBroadcastsPerSecond"/> can add a separate wait;
-    /// relays forward admitted waves immediately. Batch limits can split a logical wave into multiple wire messages.
+    /// Deployment-load aggregation uses its publisher's refresh interval as the cohort deadline.
+    /// Producer ingress and distribution relays send immediately. Batch limits can split a cohort into multiple wire messages.
     /// </remarks>
     /// <value>The delay is 100 milliseconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);

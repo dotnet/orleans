@@ -52,7 +52,7 @@ public class DeploymentLoadPublisherTests
 
         await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
-        await rig.Dissemination.Received(1).Publish(
+        await rig.Dissemination.Received(1).PublishAggregated(
             Arg.Any<IDisseminationNamespace>(), rig.LocalSilo,
             rig.Publisher.LocalRuntimeStatistics.DateTime.Ticks, Arg.Any<CancellationToken>());
         await rig.DirectTarget.Received(confirmed ? 0 : 1).UpdateRuntimeStatistics(
@@ -65,9 +65,9 @@ public class DeploymentLoadPublisherTests
         using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        rig.Dissemination.Publish(
+        rig.Dissemination.PublishAggregated(
             Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
-            .Returns(_ => ValueTask.FromCanceled<bool>(cancellation.Token));
+            .Returns(_ => ValueTask.FromCanceled<DisseminationPublicationReceipt>(cancellation.Token));
 
         await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
@@ -80,12 +80,12 @@ public class DeploymentLoadPublisherTests
     {
         using var rig = CreateTestRig(TimeSpan.FromSeconds(5), enableDissemination: true);
         using var cancellation = new CancellationTokenSource();
-        rig.Dissemination.Publish(
+        rig.Dissemination.PublishAggregated(
             Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 cancellation.Cancel();
-                return ValueTask.FromCanceled<bool>(call.ArgAt<CancellationToken>(3));
+                return ValueTask.FromCanceled<DisseminationPublicationReceipt>(call.ArgAt<CancellationToken>(3));
             });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rig.Publisher.PublishStatistics(cancellation.Token));
@@ -100,12 +100,15 @@ public class DeploymentLoadPublisherTests
         var timeProvider = (FakeTimeProvider)rig.ServiceProvider.GetRequiredService<TimeProvider>();
         var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
         var completed = false;
-        rig.Dissemination.Publish(
+        rig.Dissemination.PublishAggregated(
             Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
-            .Returns(call => new ValueTask<bool>(PublishAsync(call.ArgAt<CancellationToken>(3))));
+            .Returns(call => new ValueTask<DisseminationPublicationReceipt>(PublishAsync(call.ArgAt<CancellationToken>(3))));
         var publication = rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
         var token = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
+        timeProvider.Advance(TimeSpan.FromSeconds(5));
+        Assert.False(token.IsCancellationRequested);
+        Assert.False(publication.IsCompleted);
         timeProvider.Advance(TimeSpan.FromSeconds(5));
         await publication.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
@@ -114,13 +117,13 @@ public class DeploymentLoadPublisherTests
         await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(
             rig.LocalSilo, rig.Publisher.LocalRuntimeStatistics, TestContext.Current.CancellationToken);
 
-        async Task<bool> PublishAsync(CancellationToken cancellationToken)
+        async Task<DisseminationPublicationReceipt> PublishAsync(CancellationToken cancellationToken)
         {
             started.SetResult(cancellationToken);
             try
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                return true;
+                return new(true, TimeSpan.FromSeconds(5));
             }
             finally
             {
@@ -458,9 +461,9 @@ public class DeploymentLoadPublisherTests
         control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(initialStatistics));
         grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Arg.Any<SiloAddress>()).Returns(control);
         var dissemination = Substitute.For<IDisseminationService>();
-        dissemination.Publish(
+        dissemination.PublishAggregated(
             Arg.Any<IDisseminationNamespace>(), Arg.Any<DisseminationKey>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
-            .Returns(ValueTask.FromResult(true));
+            .Returns(ValueTask.FromResult(new DisseminationPublicationReceipt(true, refreshTime)));
 
         var services = new ServiceCollection();
         services.AddSerializer();

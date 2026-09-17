@@ -75,6 +75,12 @@ public partial class DisseminationProtocolTests
         method = typeof(IDisseminationSystemTarget).GetMethod(nameof(IDisseminationSystemTarget.ExchangeAntiEntropy));
         Assert.NotNull(method);
         Assert.Equal("EF58CB3D", method.GetCustomAttribute<Orleans.AliasAttribute>()?.Alias);
+
+        method = typeof(IDisseminationSystemTarget).GetMethod(nameof(IDisseminationSystemTarget.PublishAggregated));
+        Assert.NotNull(method);
+        Assert.False(method.IsDefined(typeof(Orleans.Concurrency.OneWayAttribute), inherit: false));
+        Assert.Equal("8C810F59", method.GetCustomAttribute<Orleans.AliasAttribute>()?.Alias);
+        Assert.Equal(typeof(Task<DisseminationPublicationReceipt>), method.ReturnType);
     }
 
     [Fact]
@@ -3198,7 +3204,7 @@ public partial class DisseminationProtocolTests
     public void NamespaceOptionsUseExpectedUpdateCadenceDefaults()
     {
         Assert.Equal(TimeSpan.FromSeconds(5), new DeploymentLoadPublisherOptions().Dissemination.ExpectedUpdateCadence);
-        Assert.Equal(TimeSpan.FromMilliseconds(25), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), new DeploymentLoadPublisherOptions().Dissemination.MaxCoalescingDelay);
         Assert.Equal(8192, new DeploymentLoadPublisherOptions().Dissemination.MaxPendingItemCount);
         Assert.Equal(TimeSpan.FromSeconds(10), new ClusterMembershipOptions().Dissemination.ExpectedUpdateCadence);
     }
@@ -4211,6 +4217,10 @@ public partial class DisseminationProtocolTests
 
         public Func<DisseminationValue, CancellationToken, ValueTask<bool>>? PublishHandler { get; set; }
 
+        public async ValueTask<DisseminationPublicationReceipt> PublishAggregated(
+            IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, CancellationToken cancellationToken) =>
+            new(await Publish(disseminationNamespace, key, version, cancellationToken), disseminationNamespace.AggregationPeriod);
+
         public async ValueTask<bool> Publish(
             IDisseminationNamespace disseminationNamespace,
             DisseminationKey key,
@@ -4269,6 +4279,11 @@ public partial class DisseminationProtocolTests
         public List<(SiloAddress Peer, DisseminationBroadcastBatch Batch)> BroadcastBatches { get; } = new();
 
         public List<(SiloAddress Peer, DisseminationAntiEntropyRequest Request)> AntiEntropyRequests { get; } = new();
+
+        public List<(SiloAddress Peer, DisseminationPublicationRequest Request)> PublicationRequests { get; } = [];
+
+        public Func<SiloAddress, DisseminationPublicationRequest, CancellationToken, Task<DisseminationPublicationReceipt>> PublishAggregatedHandler { get; set; } =
+            static (_, _, _) => Task.FromResult(new DisseminationPublicationReceipt(true, TimeSpan.FromSeconds(1)));
 
         public IInternalGrainFactory GrainFactory { get; }
 
@@ -4421,6 +4436,17 @@ public partial class DisseminationProtocolTests
 
     private sealed class FakeDisseminationSystemTarget(SiloAddress peer, FakeTransport transport) : IDisseminationSystemTarget
     {
+        public Task<DisseminationPublicationReceipt> PublishAggregated(
+            DisseminationPublicationRequest request, CancellationToken cancellationToken)
+        {
+            lock (transport.PublicationRequests)
+            {
+                transport.PublicationRequests.Add((peer, request));
+            }
+
+            return transport.PublishAggregatedHandler(peer, request, cancellationToken);
+        }
+
         public Task<DisseminationBroadcastResponse> PushBroadcast(
             DisseminationBroadcastBatch batch,
             CancellationToken cancellationToken) =>
@@ -6165,6 +6191,8 @@ public partial class DisseminationProtocolTests
             TimeSpan.FromSeconds(5),
             TestContext.Current.CancellationToken);
         timeProvider.Advance(harness.RefreshTime);
+        Assert.False(publish.IsCompleted);
+        timeProvider.Advance(harness.RefreshTime);
         await publish.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         AssertDirectRecipients(harness, harness.ActiveOne, harness.ActiveTwo);
@@ -6369,6 +6397,23 @@ public partial class DisseminationProtocolTests
         public IReadOnlyList<SiloAddress> UnconfirmedPeers { get; set; } = [];
 
         public TaskCompletionSource PublishStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Func<IDisseminationNamespace, DisseminationKey, long, CancellationToken, ValueTask<DisseminationPublicationReceipt>>? AggregatedPublishHandler { get; set; }
+
+        public async ValueTask<DisseminationPublicationReceipt> PublishAggregated(
+            IDisseminationNamespace disseminationNamespace, DisseminationKey key, long version, CancellationToken cancellationToken)
+        {
+            if (AggregatedPublishHandler is null)
+            {
+                return new(await Publish(disseminationNamespace, key, version, cancellationToken), disseminationNamespace.AggregationPeriod);
+            }
+
+            PublishCalls.Add((disseminationNamespace, key, version));
+            PublishStarted.TrySetResult();
+            var result = await AggregatedPublishHandler(disseminationNamespace, key, version, cancellationToken);
+            PublishResults.Add(result.Accepted);
+            return result;
+        }
 
         public Func<IDisseminationNamespace, DisseminationKey, long, CancellationToken, ValueTask<bool>> PublishHandler { get; set; } =
             static (_, _, _, _) => ValueTask.FromResult(true);

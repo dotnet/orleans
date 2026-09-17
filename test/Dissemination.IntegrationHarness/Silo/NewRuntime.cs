@@ -201,8 +201,7 @@ internal static class NewRuntime
     }
 }
 
-// System targets use the normal incoming-call filter pipeline. This filter blocks only tree
-// application; native ExchangeAntiEntropy requests/responses continue over the real connection.
+// Gate cohort ingress and tree application while native anti-entropy uses the real connection.
 internal sealed class DisseminationTreeGate : IIncomingGrainCallFilter
 {
     private readonly InFlightCallGate _gate = new();
@@ -215,7 +214,7 @@ internal sealed class DisseminationTreeGate : IIncomingGrainCallFilter
 
     public Task Invoke(IIncomingGrainCallContext context) =>
         context.InterfaceMethod.DeclaringType == typeof(IDisseminationSystemTarget)
-        && context.InterfaceMethod.Name == nameof(IDisseminationSystemTarget.PushBroadcast)
+        && context.InterfaceMethod.Name is nameof(IDisseminationSystemTarget.PushBroadcast) or nameof(IDisseminationSystemTarget.PublishAggregated)
             ? _gate.Invoke(context.Invoke)
             : context.Invoke();
 }

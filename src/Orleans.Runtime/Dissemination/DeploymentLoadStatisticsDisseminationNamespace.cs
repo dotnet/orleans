@@ -19,6 +19,8 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
 
     public DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.AggregationTree;
 
+    public TimeSpan AggregationPeriod => options.CurrentValue.DeploymentLoadPublisherRefreshTime;
+
     public DisseminationNamespaceOptions Options => options.CurrentValue.Dissemination;
 
     public DisseminationValue CreateValue(SiloAddress origin, SiloRuntimeStatistics statistics)

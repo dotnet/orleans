@@ -45,11 +45,6 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AggregationFanOutFactor)} must be greater than 0.");
         }
 
-        if (overlay.AggregationBroadcastsPerSecond is < 1 or > 1000)
-        {
-            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AggregationBroadcastsPerSecond)} must be between 1 and 1000.");
-        }
-
         if (overlay.AntiEntropyInterval < TimeSpan.FromMilliseconds(1)
             || overlay.AntiEntropyInterval > MaxPeriodicTimerPeriod)
         {

@@ -8,7 +8,29 @@ internal interface IDisseminationSystemTarget : ISystemTarget
 
     [Alias("EF58CB3D")]
     Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(DisseminationAntiEntropyRequest request, CancellationToken cancellationToken);
+
+    [Alias("8C810F59")]
+    Task<DisseminationPublicationReceipt> PublishAggregated(DisseminationPublicationRequest request, CancellationToken cancellationToken);
 }
+
+[GenerateSerializer, Immutable]
+internal sealed class DisseminationPublicationRequest
+{
+    [Id(0)]
+    public required SiloAddress Sender { get; init; }
+
+    [Id(1)]
+    public DisseminationNamespace Namespace { get; init; }
+
+    [Id(2)]
+    public required DisseminationBroadcastValue Value { get; init; }
+}
+
+// Admission covers the sealed cohort's distribution work. The delay targets its next sampling boundary.
+[GenerateSerializer, Immutable]
+internal readonly record struct DisseminationPublicationReceipt(
+    [property: Id(0)] bool Accepted,
+    [property: Id(1)] TimeSpan NextPublicationDelay);
 
 [GenerateSerializer, Immutable]
 internal readonly struct DisseminationNamespace : IEquatable<DisseminationNamespace>, IComparable<DisseminationNamespace>, IComparable, ISpanFormattable

@@ -566,8 +566,6 @@ namespace Orleans.Configuration
 
     public sealed partial class DisseminationOverlayOptions
     {
-        public int AggregationBroadcastsPerSecond { get { throw null; } set { } }
-
         public int AggregationFanOutFactor { get { throw null; } set { } }
 
         public System.TimeSpan AntiEntropyInterval { get { throw null; } set { } }

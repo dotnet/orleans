@@ -12,6 +12,8 @@ internal interface IDisseminationNamespace
 
     DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.BroadcastTree;
 
+    TimeSpan AggregationPeriod => Options.MaxCoalescingDelay;
+
     // Full values can be authority-refresh hints even when their numeric version is older.
     bool ValidateOlderFullValues => false;
 

@@ -9,5 +9,11 @@ internal interface IDisseminationService
         long version,
         CancellationToken cancellationToken);
 
+    ValueTask<DisseminationPublicationReceipt> PublishAggregated(
+        IDisseminationNamespace disseminationNamespace,
+        DisseminationKey key,
+        long version,
+        CancellationToken cancellationToken);
+
     IReadOnlyList<SiloAddress> GetUnconfirmedPeers(IDisseminationNamespace disseminationNamespace);
 }

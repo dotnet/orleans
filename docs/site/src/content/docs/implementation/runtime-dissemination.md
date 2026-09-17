@@ -1,7 +1,7 @@
 ---
 title: Runtime state dissemination
 description: Architecture, invariants, repair, failure semantics, and integration boundaries for Orleans runtime dissemination.
-ms.date: 09/10/2026
+ms.date: 09/16/2026
 ms.topic: concept-article
 ---
 
@@ -23,6 +23,9 @@ flowchart LR
     Producer[Runtime state producer] --> Namespace[IDisseminationNamespace]
     Namespace --> Protocol[DisseminationProtocol]
     Protocol --> Queue[Per-peer broadcast pumps]
+    Protocol --> Cohort[Load cohorts and publication receipts]
+    Cohort --> Queue
+    Cohort -.-> Producer
     Queue --> Target[Remote dissemination system target]
     Target --> Apply[Namespace apply]
     Apply --> Forward[Deterministic forwarding tree]
@@ -31,7 +34,7 @@ flowchart LR
     Repair --> Authority
 ```
 
-`DisseminationProtocol` coordinates routing, peer capability evidence, anti-entropy, and application isolation. `DisseminationRootBatcher` owns the aggregation root's bounded, latest-key pending set and broadcast cadence. `DisseminationBroadcastQueue` owns per-peer scheduling, retry, drain, and acknowledged-version ledgers. `DisseminationMembership` projects one membership snapshot into topology-specific member sets. Each `IDisseminationNamespace` owns serialization, current versions, retained history, payload limits, repair construction, and application semantics.
+`DisseminationProtocol` coordinates routing, peer capability evidence, anti-entropy, and application isolation. `DisseminationRootBatcher` owns the aggregation root's bounded latest-key cohorts, producer contributions, and seal receipts. `DisseminationBroadcastQueue` owns per-peer scheduling, retry, drain, and acknowledged-version ledgers. `DisseminationMembership` projects one membership snapshot into topology-specific member sets. Each `IDisseminationNamespace` owns serialization, current versions, retained history, payload limits, repair construction, and application semantics.
 
 Queue entries contain `(namespace, key)` identities. A pump acquires both destination ownership and a global broadcast slot before materializing a repair. Coalesced notifications therefore use the latest namespace state and acknowledged baseline after admission, without retaining serialized payloads for waiting peers.
 
@@ -71,15 +74,19 @@ Every silo derives routing from the same ordered membership projection. Members 
 
 Membership uses the broadcast forest: for fanout `f` and zero-based member index `i`, a forwarding node selects children starting at `f * (i + 1)` and continuing for at most `f` members. An originator sends to the first `f` members, excluding itself, plus its normal forwarding children.
 
-Deployment load uses root aggregation followed by tree distribution. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. Its fanout defaults to eight, independently of the membership forest. Each non-root producer sends its own update directly to the root immediately. The root retains one latest notification per key and collects for 25 ms. It starts at most five normal broadcast waves per second, so the next deadline is the later of the first pending notification plus the collection window and the previous wave start plus 200 ms. New arrivals keep that deadline. An idle root sends after the collection window, while sustained traffic combines updates between paced waves.
+Deployment load uses root aggregation followed by tree distribution. Node `i > 0` has parent `(i - 1) / f`; its children start at `f * i + 1`. Its fanout defaults to eight, independently of the membership forest. Each non-root producer sends its own fresh sample directly to the root through a dedicated aggregation RPC. The root's own sample enters the same cohort locally. A cohort captures its expected Active producer incarnations and retains the latest notification per key. It seals after every expected producer contributes, or after the configured publication period elapses from cohort opening. New arrivals preserve that deadline; duplicate messages and ordinary forwarding hints preserve distinct-producer counting.
 
-Admitted waves enter every child queue atomically. Relays forward immediately. The root's pending set stays outside the per-peer queues, so urgent membership traffic can proceed without prematurely flushing unadmitted load values. Explicit flush and shutdown drain can bypass normal pacing within their caller's cancellation budget. A former root hands pending state to the current root, including when it has left Active membership.
+Ingress RPCs remain open asynchronously until the cohort seals and its distribution work is admitted. Their receipts carry the remaining delay to the cohort's next publication boundary: `max(0, cohort start + period - receipt time)`. The publisher applies that delay to its sampling timer. Complete, phase-aligned cohorts can seal quickly while preserving approximately one sample per silo per period. A cohort that reaches its deadline schedules its next sample promptly. Local monotonic timing handles these relative delays across machines.
+
+The ingress receipt path has independent local-attempt admission. Membership uses its existing immediate peer pumps while load receipts are held. Each admitted cohort enters child queues through bounded batch admission, and relays forward immediately. Explicit flush and shutdown seal partial cohorts within the caller's cancellation budget. A former root hands pending state to the current root, including when it has left Active membership. Shutdown seals cohorts before waiting for their held protocol admissions, then drains peer queues.
 
 Aggregation ledgers advance on broadcast acknowledgments, after the receiver processes the batch and attempts downstream queue admission. An ingress producer which is also a child receives its own update in the root's distribution batch and forwards it to its descendants. Passive evidence of a peer's local value serves repair; broadcast acknowledgments establish distribution progress. Anti-entropy repairs gaps left by bounded queue admission or changed topology.
 
-At one publication per silo per second, root ingress contributes `N - 1` requests per second. With `R` root waves per second, healthy fitting batches add at most roughly `R * (N - 1)` distribution requests. At the default five waves per second, the model is `6 * (N - 1)`, or 11,994 requests per second for 2,000 silos. An eight-child relay sends up to approximately 40 distribution requests per second. These are protocol projections, not measured multi-host capacity. Acknowledgment replies, retries, repair, topology transitions, forced drains, and wire-message splitting add separate work. Payload delivery still includes each recipient's copy of the statistics.
+At one publication and one fitting cohort per second, root ingress contributes `N - 1` requests and tree distribution contributes another `N - 1`. The healthy steady-state model is `2 * (N - 1)`: 18 load requests per second at 10 silos, 198 at 100 silos, and 3,998 at 2,000 silos. An eight-child relay distributes approximately eight batches per second. Including the default periodic anti-entropy budget, the respective projections are 24, 258, and 5,198 requests per second, plus their replies. Root ingress remains concentrated at the root. These are algorithmic projections; production capacity and tail latency require measurement. Retries, topology transitions, forced drains, fallback, and wire-message splitting add work. Payload delivery includes each recipient's copy of the statistics.
 
-Active members are ordered by silo address. Ingress moves toward a smaller root; distribution moves toward larger children. A non-root node receiving an ingress from a higher-address sender redirects it to its current root immediately, accommodating a changed root without adding another batching window. Membership repair reconciles differing views.
+Cohort completeness depends on the slowest expected producer. Healthy aligned arrivals produce a short collection delay; an absent or paused producer makes the cohort use its full deadline. Repeatedly incomplete cohorts can leave samples approaching two publication periods old before replacement. Startup, membership changes, scheduling skew, and synchronized ingress/reply bursts are important latency and capacity cases.
+
+Active members are ordered by silo address. Ingress moves toward a smaller root; distribution moves toward larger children. A former root rejects new contribution requests, allowing the publisher's direct path to preserve delivery while subsequent publications resolve the new root. Already accepted cohort state and ordinary aggregation forwarding hints move toward the current root. Membership repair reconciles differing views.
 
 Namespaces select a membership scope before topology construction:
 
@@ -104,7 +111,7 @@ Dissemination is opt-in. Enable <xref:Orleans.Configuration.DisseminationOptions
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.TargetHopCount> | 2 | Target depth used to derive fanout. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.MinFanOutFactor> / <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxFanOutFactor> | 4 / 32 | Bounds for derived fanout. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AggregationFanOutFactor> | 8 | Maximum children per load-distribution relay. |
-| <xref:Orleans.Configuration.DisseminationOverlayOptions.AggregationBroadcastsPerSecond> | 5 | Normal root broadcast-wave frequency. |
+| <xref:Orleans.Configuration.DeploymentLoadPublisherOptions.DeploymentLoadPublisherRefreshTime> | 1 second | Load sampling period, cohort deadline, and receipt-driven next-round target. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyInterval> | 5 seconds | Repair-round cadence and retry-delay ceiling. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.AntiEntropyPeerCount> | 3 | Maximum peers selected in one repair round and independent per-silo active local repair attempt limit. |
 | <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxAntiEntropyBatchItems> / <xref:Orleans.Configuration.DisseminationOverlayOptions.MaxAntiEntropyBatchBytes> | 8,192 / 1 MiB | Independent repair limits, capped by the global batch limits and negotiated with the peer. |
@@ -116,7 +123,7 @@ Dissemination is opt-in. Enable <xref:Orleans.Configuration.DisseminationOptions
 
 Each integration has its own <xref:Orleans.Configuration.DisseminationNamespaceOptions>. Operators can enable and tune membership and deployment-load dissemination independently while retaining the local concurrency and per-message bounds.
 
-Deployment load samples remain on the one-second publication cadence. Root collection defaults to 25 ms with a five-wave-per-second admission limit, and the expected repair-update cadence remains five seconds. Producer ingress and relay forwarding bypass collection delays. Membership retains high priority and bypasses coalescing. Configure the load pending-key bound to cover the intended active inventory and stalls; each newer notification replaces the retained value for that key rather than adding another sample.
+Deployment load samples use the configured publication period, with receipt feedback aligning subsequent samples to cohort boundaries. The expected repair-update cadence remains five seconds. Producer ingress and relay forwarding send immediately; root receipts follow cohort sealing. The publication receipt budget is twice the publication period, capped by the platform timer limit: one period for collection and one for transport and scheduling. Ordinary RPC timeouts also apply. Caller cancellation stops the publication; an unavailable or rejecting root, receipt expiry, or a shorter RPC timeout selects the direct delivery path. Membership retains high priority and bypasses coalescing. Configure the load pending-key bound to cover the intended active inventory and stalls; each newer notification replaces the retained value for that key rather than adding another sample.
 
 Inventory and peer-ledger maintenance runs on membership changes and bounded one-second maintenance opportunities instead of every received update. Failed passes remain eligible for retry. This keeps full inventory scans out of the normal per-message root path while promptly retiring peers when the routing view changes.
 

@@ -44,6 +44,14 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
             version,
             token).AsTask(), cancellationToken);
 
+    async ValueTask<DisseminationPublicationReceipt> IDisseminationService.PublishAggregated(
+        IDisseminationNamespace disseminationNamespace,
+        DisseminationKey key,
+        long version,
+        CancellationToken cancellationToken) =>
+        await this.RunOrQueueTask(token => _protocol.PublishAggregated(
+            disseminationNamespace, key, version, token).AsTask(), cancellationToken);
+
     IReadOnlyList<SiloAddress> IDisseminationService.GetUnconfirmedPeers(
         IDisseminationNamespace disseminationNamespace) =>
         _protocol.GetUnconfirmedPeers(disseminationNamespace);
@@ -52,6 +60,11 @@ internal sealed partial class DisseminationSystemTarget : SystemTarget, IDissemi
         DisseminationBroadcastBatch batch,
         CancellationToken cancellationToken) =>
         _protocol.ReceiveBroadcast(batch, cancellationToken);
+
+    Task<DisseminationPublicationReceipt> IDisseminationSystemTarget.PublishAggregated(
+        DisseminationPublicationRequest request,
+        CancellationToken cancellationToken) =>
+        _protocol.ReceivePublication(request, cancellationToken);
 
     async Task<DisseminationAntiEntropyResponse> IDisseminationSystemTarget.ExchangeAntiEntropy(
         DisseminationAntiEntropyRequest request,

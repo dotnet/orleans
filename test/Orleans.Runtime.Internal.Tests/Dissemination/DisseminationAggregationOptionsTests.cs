@@ -27,12 +27,11 @@ public class DisseminationAggregationOptionsTests
         var membership = new ClusterMembershipOptions();
 
         Assert.Equal(8, options.Overlay.AggregationFanOutFactor);
-        Assert.Equal(5, options.Overlay.AggregationBroadcastsPerSecond);
         Assert.Equal(8192, options.Overlay.MaxAntiEntropyBatchItems);
         Assert.Equal(1048576, options.Overlay.MaxAntiEntropyBatchBytes);
         Assert.Equal(options.MaxBatchItems, options.Overlay.MaxAntiEntropyBatchItems);
         Assert.Equal(options.MaxBatchBytes, options.Overlay.MaxAntiEntropyBatchBytes);
-        Assert.Equal(TimeSpan.FromMilliseconds(25), load.Dissemination.MaxCoalescingDelay);
+        Assert.Equal(new DisseminationNamespaceOptions().MaxCoalescingDelay, load.Dissemination.MaxCoalescingDelay);
         Assert.Equal(8192, load.Dissemination.MaxPendingItemCount);
         Assert.Equal(TimeSpan.FromSeconds(5), load.Dissemination.ExpectedUpdateCadence);
         Assert.Equal(TimeSpan.FromSeconds(1), load.DeploymentLoadPublisherRefreshTime);
@@ -46,13 +45,12 @@ public class DisseminationAggregationOptionsTests
     }
 
     [Theory]
-    [InlineData(1, 1, 1, 1)]
-    [InlineData(int.MaxValue, 1000, int.MaxValue, int.MaxValue)]
-    public void ValidatorAcceptsPositiveBounds(int fanout, int broadcastsPerSecond, int items, int bytes)
+    [InlineData(1, 1, 1)]
+    [InlineData(int.MaxValue, int.MaxValue, int.MaxValue)]
+    public void ValidatorAcceptsPositiveBounds(int fanout, int items, int bytes)
     {
         var options = new DisseminationOptions();
         options.Overlay.AggregationFanOutFactor = fanout;
-        options.Overlay.AggregationBroadcastsPerSecond = broadcastsPerSecond;
         options.Overlay.MaxAntiEntropyBatchItems = items;
         options.Overlay.MaxAntiEntropyBatchBytes = bytes;
 
@@ -69,20 +67,6 @@ public class DisseminationAggregationOptionsTests
         options.Overlay.AggregationFanOutFactor = value;
 
         AssertValidationFailure(options, "AggregationFanOutFactor must be greater than 0.");
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(int.MinValue)]
-    [InlineData(1001)]
-    [InlineData(int.MaxValue)]
-    public void ValidatorRejectsOutOfRangeAggregationBroadcastRate(int value)
-    {
-        var options = new DisseminationOptions();
-        options.Overlay.AggregationBroadcastsPerSecond = value;
-
-        AssertValidationFailure(options, "AggregationBroadcastsPerSecond must be between 1 and 1000.");
     }
 
     [Theory]

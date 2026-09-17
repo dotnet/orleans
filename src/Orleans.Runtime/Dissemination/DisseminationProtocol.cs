@@ -1304,30 +1304,26 @@ Complete:
     {
         var admittedOperations = _admission.CloseAsync();
         _antiEntropySendGate.Stop();
+        _publicationSendGate.Stop();
+        DisseminationRootBatcher[] roots;
+        lock (_rootBatcherLock)
+        {
+            _rootBatchersStopped = true;
+            roots = [.. _rootBatchers.Values];
+            _rootBatchers.Clear();
+        }
+
+        // Sealing releases held ingress receipts, so it precedes waiting for their protocol admissions.
+        var rootStops = Task.WhenAll(roots.Select(root => root.StopAsync(cancellationToken)));
         try
         {
-            await _antiEntropyShutdown.CancelAsync();
-            // Admitted publishers and receivers finish enqueueing before the accepted broadcasts drain.
-            await admittedOperations.WaitAsync(cancellationToken);
+            await Task.WhenAll(_antiEntropyShutdown.CancelAsync(), _publicationShutdown.CancelAsync());
+            await Task.WhenAll(rootStops, admittedOperations.WaitAsync(cancellationToken));
         }
         finally
         {
-            DisseminationRootBatcher[] roots;
-            lock (_rootBatcherLock)
-            {
-                _rootBatchersStopped = true;
-                roots = [.. _rootBatchers.Values];
-                _rootBatchers.Clear();
-            }
-
-            try
-            {
-                await Task.WhenAll(roots.Select(root => root.StopAsync(cancellationToken)));
-            }
-            finally
-            {
-                await _broadcastQueue.StopAsync(cancellationToken);
-            }
+            rootStops.Ignore();
+            await _broadcastQueue.StopAsync(cancellationToken);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -1478,29 +1474,29 @@ Complete:
         IDisseminationNamespace disseminationNamespace,
         ReadOnlySpan<DisseminationBroadcastQueue.KeyNotification> notifications)
     {
-        DisseminationRootBatcher root;
+        return notifications.IsEmpty || GetRootBatcher(disseminationNamespace)?.Notify(notifications) == true;
+    }
+
+    private DisseminationRootBatcher? GetRootBatcher(IDisseminationNamespace disseminationNamespace)
+    {
         lock (_rootBatcherLock)
         {
             if (_rootBatchersStopped)
             {
-                return false;
+                return null;
             }
 
-            if (notifications.IsEmpty)
-            {
-                return true;
-            }
-
-            if (!_rootBatchers.TryGetValue(disseminationNamespace.Name, out root!))
+            if (!_rootBatchers.TryGetValue(disseminationNamespace.Name, out var root))
             {
                 root = new(
                     _timeProvider, disseminationNamespace, _options,
+                    () => _membership.GetSnapshot(disseminationNamespace.MembershipScope),
                     values => DispatchRootBatch(disseminationNamespace, values), _logger);
                 _rootBatchers.Add(disseminationNamespace.Name, root);
             }
-        }
 
-        return root.Notify(notifications);
+            return root;
+        }
     }
 
     private bool DispatchRootBatch(

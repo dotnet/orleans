@@ -6,8 +6,8 @@ using KeyNotification = Orleans.Runtime.Dissemination.DisseminationBroadcastQueu
 
 namespace Orleans.Runtime.Dissemination;
 
-// This budget counts logical root waves, not wire messages: each peer queue still owns payload
-// materialization, byte limits, splitting, and RPC lifetime. Only bounded key identities live here.
+// Cohorts contain identities, not values. Peer queues still own payload materialization, byte
+// limits, splitting, and RPC lifetime. A receipt acknowledges admission there, not delivery.
 internal sealed partial class DisseminationRootBatcher
 {
     internal delegate bool DispatchCallback(ReadOnlySpan<KeyNotification> notifications);
@@ -17,21 +17,24 @@ internal sealed partial class DisseminationRootBatcher
     private readonly IDisseminationNamespace _namespace;
     private readonly DisseminationNamespace _namespaceName;
     private readonly IOptionsMonitor<DisseminationOptions> _options;
+    private readonly Func<DisseminationMembershipSnapshot> _getMembership;
     private readonly DispatchCallback _dispatch;
     private readonly ILogger _logger;
     private readonly WakeTimer _timer;
     private readonly Task _worker;
     private readonly Dictionary<DisseminationKey, PendingKey> _pending = [];
     private readonly LinkedList<PendingKey> _ready = [];
+    private readonly Dictionary<SiloAddress, Producer> _producers = [];
+    private DisseminationMembershipSnapshot? _membership;
+    private Cohort? _cohort;
     private TaskCompletionSource? _drainCompletion;
     private Exception? _failure;
-    private long? _firstPendingTimestamp;
-    private long? _lastDispatchTimestamp;
     private long _generation;
+    private long? _retryTimestamp;
+    private TimeSpan _retryPeriod;
     private bool _dispatching;
     private bool _workerActive;
-    private bool _retrying;
-    private bool _forceHandoff;
+    private bool _handoff;
     private bool _stopping;
     private bool _aborted;
     private CancellationToken _abortToken;
@@ -40,6 +43,7 @@ internal sealed partial class DisseminationRootBatcher
         TimeProvider timeProvider,
         IDisseminationNamespace disseminationNamespace,
         IOptionsMonitor<DisseminationOptions> options,
+        Func<DisseminationMembershipSnapshot> getMembership,
         DispatchCallback dispatch,
         ILogger logger)
     {
@@ -47,6 +51,7 @@ internal sealed partial class DisseminationRootBatcher
         _namespace = disseminationNamespace;
         _namespaceName = disseminationNamespace.Name;
         _options = options;
+        _getMembership = getMembership;
         _dispatch = dispatch;
         _logger = logger;
         _timer = new(timeProvider);
@@ -54,12 +59,11 @@ internal sealed partial class DisseminationRootBatcher
         _worker = RunAsync();
     }
 
-    // False means at least one distinct key was not admitted. Updates to retained keys still succeed
-    // at the limit, including keys currently inside the synchronous dispatch callback.
+    // Hints (including owner inventory and forwarded values) never count as fresh contributions.
     public bool Notify(ReadOnlySpan<KeyNotification> notifications)
     {
         var settings = GetSettings();
-        var accepted = true;
+        var membership = _getMembership();
         var rejected = 0;
         var wake = false;
         lock (_lock)
@@ -70,56 +74,26 @@ internal sealed partial class DisseminationRootBatcher
                 return false;
             }
 
+            membership = RefreshMembershipUnsafe(membership);
             if (!settings.Enabled)
             {
-                // Disabling explicitly abandons queued hints; re-enabling does not replay them.
-                // Namespace state and anti-entropy, rather than this queue, own durable convergence.
                 ClearPendingUnsafe();
-                accepted = false;
                 wake = true;
+                rejected = notifications.Length;
             }
             else
             {
-                var wasEmpty = _pending.Count == 0;
-                var now = _timeProvider.GetTimestamp();
+                var wasEmpty = _ready.Count == 0;
                 foreach (var notification in notifications)
                 {
-                    if (_pending.TryGetValue(notification.Key, out var pending))
+                    if (!IsEligible(notification, membership)
+                        || !TryAddUnsafe(notification, settings, membership, out _))
                     {
-                        // Even an unchanged notification can race an inventory/version read. Protect
-                        // it from pruning without making duplicate in-flight values dirty again.
-                        pending.AdmissionGeneration = ++_generation;
-                        if (!notification.Force && notification.Version <= pending.Notification.Version)
-                        {
-                            continue;
-                        }
-
-                        pending.Notification = new(
-                            notification.Key,
-                            Math.Max(notification.Version, pending.Notification.Version),
-                            pending.Notification.Force || notification.Force);
-                        pending.Generation = pending.AdmissionGeneration;
-                        pending.PendingSince ??= now;
+                        rejected++;
                     }
-                    else
-                    {
-                        if (_pending.Count >= settings.MaxPendingItemCount)
-                        {
-                            accepted = false;
-                            rejected++;
-                            continue;
-                        }
-
-                        pending = new(notification, ++_generation, now);
-                        _pending.Add(notification.Key, pending);
-                        _ready.AddLast(pending.Node);
-                    }
-
-                    _firstPendingTimestamp ??= now;
-                    // Replacements cannot advance the earliest pending timestamp or its deadline.
-                    // Avoid waking/rearming once per key while a root is collecting thousands of keys.
-                    wake |= wasEmpty || settings.HighPriority;
                 }
+
+                wake = _ready.Count > 0 && (wasEmpty || settings.HighPriority);
             }
         }
 
@@ -130,42 +104,103 @@ internal sealed partial class DisseminationRootBatcher
 
         if (rejected > 0)
         {
-            try
+            ReportRejection(rejected, settings.MaxPendingItemCount);
+        }
+
+        return settings.Enabled && rejected == 0;
+    }
+
+    public ValueTask<DisseminationPublicationReceipt> PublishAsync(
+        KeyNotification notification, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var settings = GetSettings();
+        var membership = _getMembership();
+        Task<ReceiptOutcome> completion;
+        var wake = false;
+        lock (_lock)
+        {
+            ThrowIfFailedUnsafe();
+            membership = RefreshMembershipUnsafe(membership);
+            if (_stopping || !settings.Enabled || !membership.IsAggregationRoot
+                || notification.Version <= 0
+                || notification.Key.Value is not SiloAddress silo || !membership.ContainsMember(silo))
             {
-                LogAdmissionRejected(_logger, _namespaceName, rejected, settings.MaxPendingItemCount);
-            }
-            catch (Exception exception)
-            {
-                Fail(exception);
-                DisposeTimer();
+                return new(new DisseminationPublicationReceipt(false, settings.Period));
             }
 
-            for (var index = 0; index < rejected; index++)
+            if (_producers.TryGetValue(silo, out var producer) && notification.Version <= producer.Version)
             {
-                try
+                // A retry must neither contribute again nor start another publication period.
+                // Force on a retry is not a new invalidation; independent invalidations use Notify.
+                if (_pending.TryGetValue(notification.Key, out var retained))
                 {
-                    DisseminationInstruments.OnQueueAdmissionRejected(_namespaceName);
+                    retained.AdmissionGeneration = ++_generation;
                 }
-                catch (Exception exception)
+
+                if (notification.Version <= producer.CompletedVersion && producer.Outcome is { } outcome)
                 {
-                    try
-                    {
-                        LogDiagnosticFailed(_logger, exception, _namespaceName);
-                    }
-                    catch (Exception loggingFailure)
-                    {
-                        Fail(new AggregateException(exception, loggingFailure));
-                        DisposeTimer();
-                    }
+                    return new(CreateReceipt(outcome));
                 }
+
+                completion = notification.Version <= producer.InFlightVersion && producer.InFlightReceipt is { } inFlight
+                    ? inFlight.Task : producer.Receipt!.Task;
+            }
+            else
+            {
+                var wasEmpty = _ready.Count == 0;
+                if (!TryAddUnsafe(notification, settings, membership, out var pending, contribution: true))
+                {
+                    return new(new DisseminationPublicationReceipt(false, settings.Period));
+                }
+
+                producer ??= new();
+                _producers[silo] = producer;
+                producer.Version = notification.Version;
+                // All newer versions before sealing share one signal and occupy one producer slot.
+                pending.Receipt ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                producer.Receipt = pending.Receipt;
+                pending.Producer = producer;
+                pending.ProducerVersion = notification.Version;
+                _cohort!.HasPublications = true;
+                if (_cohort!.Membership.ContainsMember(silo))
+                {
+                    _cohort.Contributors.Add(silo);
+                }
+
+                completion = pending.Receipt.Task;
+                wake = wasEmpty
+                    || _cohort.Contributors.Count == _cohort.Membership.Members.Length;
             }
         }
 
-        return accepted;
+        if (wake)
+        {
+            Wake();
+        }
+
+        return AwaitReceiptAsync(completion, cancellationToken);
     }
 
-    // Flush forces all currently retained work into peer queues, not onto the wire. Concurrent
-    // admissions join this drain. A partial admission never turns a forced drain into a busy loop.
+    private async ValueTask<DisseminationPublicationReceipt> AwaitReceiptAsync(
+        Task<ReceiptOutcome> completion, CancellationToken cancellationToken)
+    {
+        // Cancellation detaches this RPC only. Other callers and the admitted contribution survive.
+        var outcome = await completion.WaitAsync(cancellationToken).ConfigureAwait(false);
+        lock (_lock)
+        {
+            ThrowIfFailedUnsafe();
+        }
+
+        return CreateReceipt(outcome);
+    }
+
+    private DisseminationPublicationReceipt CreateReceipt(ReceiptOutcome outcome)
+    {
+        var delay = outcome.Period - _timeProvider.GetElapsedTime(outcome.Started);
+        return new(outcome.Accepted, delay > TimeSpan.Zero ? delay : TimeSpan.Zero);
+    }
+
     public async Task FlushAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -192,8 +227,6 @@ internal sealed partial class DisseminationRootBatcher
         }
     }
 
-    // Cancellation ends this owner's drain budget and abandons remaining hints. A wave already
-    // claimed for synchronous dispatch cannot be interrupted; subsequent waves will not be claimed.
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         lock (_lock)
@@ -214,6 +247,7 @@ internal sealed partial class DisseminationRootBatcher
                 _aborted = true;
                 _abortToken = cancellationToken;
                 ClearPendingUnsafe();
+                CompleteDrainUnsafe();
             }
 
             DisposeTimer();
@@ -241,52 +275,77 @@ internal sealed partial class DisseminationRootBatcher
             }
         }
 
-        var retiredCount = 0;
-        for (var i = 0; i < candidates.Count; i++)
+        // Namespace callbacks may reenter and may block. Reconcile against admission generations.
+        foreach (var candidate in candidates)
         {
-            var candidate = candidates[i];
-            // Owner inventory was captured before entering this method. A positive current version
-            // means the key has since become live; namespace calls must not hold the batcher lock.
-            if (_namespace.GetVersion(candidate.Key) <= 0)
+            if (_namespace.GetVersion(candidate.Key) > 0)
             {
-                candidates[retiredCount++] = candidate;
+                continue;
             }
-        }
 
-        lock (_lock)
-        {
-            for (var i = 0; i < retiredCount; i++)
+            lock (_lock)
             {
-                var candidate = candidates[i];
                 if (_pending.TryGetValue(candidate.Key, out var pending)
                     && ReferenceEquals(pending, candidate.Pending)
                     && pending.AdmissionGeneration == candidate.Generation)
                 {
-                    _pending.Remove(candidate.Key);
-                    if (pending.Node.List is not null)
-                    {
-                        _ready.Remove(pending.Node);
-                    }
+                    RemoveUnsafe(pending);
                 }
             }
-
-            RecomputeFirstPendingUnsafe();
         }
 
         Wake();
     }
 
-    // Called when the local silo loses the root role, not for ordinary membership changes. Request
-    // Flush-equivalent scheduling without a drain observer; the dispatcher resolves the new root.
-    // This does not store credits for later work or bypass partial-retry pacing.
     public void WakeForMembershipChange()
     {
+        var membership = _getMembership();
         lock (_lock)
         {
-            _forceHandoff |= _pending.Count > 0;
+            RefreshMembershipUnsafe(membership);
+            // A new root is a different admission destination, so bypass an old child's retry floor.
+            _handoff |= _ready.Count > 0;
         }
 
         Wake();
+    }
+
+    private bool TryAddUnsafe(
+        KeyNotification notification, in Settings settings,
+        DisseminationMembershipSnapshot membership, out PendingKey pending, bool contribution = false)
+    {
+        if (_pending.TryGetValue(notification.Key, out pending!))
+        {
+            pending.AdmissionGeneration = ++_generation;
+            if (!notification.Force && notification.Version <= pending.Notification.Version
+                && (!contribution || pending.Node.List is not null))
+            {
+                return true;
+            }
+
+            pending.Notification = new(notification.Key,
+                Math.Max(notification.Version, pending.Notification.Version),
+                pending.Notification.Force || notification.Force);
+            pending.Generation = pending.AdmissionGeneration;
+        }
+        else
+        {
+            if (_pending.Count >= settings.MaxPendingItemCount)
+            {
+                return false;
+            }
+
+            pending = new(notification, ++_generation);
+            _pending.Add(notification.Key, pending);
+        }
+
+        _cohort ??= new(membership, _timeProvider.GetTimestamp(), settings.Period);
+        if (pending.Node.List is null)
+        {
+            _ready.AddLast(pending.Node);
+        }
+
+        return true;
     }
 
     private async Task RunAsync()
@@ -298,6 +357,9 @@ internal sealed partial class DisseminationRootBatcher
                 while (true)
                 {
                     var settings = GetSettings();
+                    var membership = _getMembership();
+                    PendingDispatch[] work;
+                    Cohort cohort;
                     lock (_lock)
                     {
                         _workerActive = true;
@@ -306,13 +368,15 @@ internal sealed partial class DisseminationRootBatcher
                             return;
                         }
 
+                        membership = RefreshMembershipUnsafe(membership);
                         if (!settings.Enabled)
                         {
                             ClearPendingUnsafe();
                         }
 
-                        if (_pending.Count == 0)
+                        if (_ready.Count == 0)
                         {
+                            _cohort = null;
                             CompleteDrainUnsafe();
                             if (_stopping)
                             {
@@ -323,16 +387,41 @@ internal sealed partial class DisseminationRootBatcher
                             break;
                         }
 
-                        var delay = GetDelayUnsafe(settings);
+                        var delay = GetDelayUnsafe(settings.HighPriority);
                         if (delay > TimeSpan.Zero)
                         {
                             _timer.Change(delay);
                             _workerActive = false;
                             break;
                         }
+
+                        cohort = _cohort!;
+                        work = new PendingDispatch[_ready.Count];
+                        for (var i = 0; i < work.Length; i++)
+                        {
+                            var pending = _ready.First!.Value;
+                            _ready.RemoveFirst();
+                            work[i] = new(pending, pending.Generation, pending.Notification,
+                                pending.Receipt, pending.Producer, pending.ProducerVersion);
+                            if (pending.Producer is { } producer)
+                            {
+                                producer.InFlightVersion = pending.ProducerVersion;
+                                producer.InFlightReceipt = pending.Receipt;
+                            }
+
+                            pending.InFlight = pending.Receipt;
+                            pending.Receipt = null;
+                            pending.Producer = null;
+                            pending.Notification = pending.Notification with { Force = false };
+                        }
+
+                        _cohort = null;
+                        _handoff = false;
+                        _retryTimestamp = null;
+                        _dispatching = true;
                     }
 
-                    Dispatch();
+                    Dispatch(work, cohort, settings);
                 }
             }
         }
@@ -351,163 +440,226 @@ internal sealed partial class DisseminationRootBatcher
         }
     }
 
-    private TimeSpan GetDelayUnsafe(in BatchingSettings settings)
+    private TimeSpan GetDelayUnsafe(bool highPriority)
     {
-        var pacedDelay = _lastDispatchTimestamp is { } last
-            ? settings.BroadcastInterval - _timeProvider.GetElapsedTime(last)
-            : TimeSpan.Zero;
-        if (_stopping || _drainCompletion is not null || _forceHandoff || settings.HighPriority)
+        var cohort = _cohort!;
+        if (_handoff)
         {
-            return _retrying ? pacedDelay : TimeSpan.Zero;
+            return TimeSpan.Zero;
         }
 
-        var collectionDelay = settings.CollectionDelay
-            - _timeProvider.GetElapsedTime(_firstPendingTimestamp!.Value);
-        return collectionDelay > pacedDelay ? collectionDelay : pacedDelay;
+        var retryDelay = _retryTimestamp is { } retry
+            ? _retryPeriod - _timeProvider.GetElapsedTime(retry) : TimeSpan.Zero;
+        var complete = cohort.Membership.Members.Length > 0
+            && cohort.Contributors.Count == cohort.Membership.Members.Length;
+        var collectionDelay = _stopping || _drainCompletion is not null
+            || highPriority && !cohort.HasPublications || complete
+            ? TimeSpan.Zero : cohort.Period - _timeProvider.GetElapsedTime(cohort.Started);
+        return collectionDelay > retryDelay ? collectionDelay : retryDelay;
     }
 
-    // Keeping snapshots in a synchronous method prevents the worker state machine from retaining
-    // dispatched arrays across timer waits. Newer notifications never mutate a captured snapshot.
-    private void Dispatch()
+    private void Dispatch(PendingDispatch[] work, Cohort cohort, in Settings settings)
     {
-        var settings = GetSettings();
-        PendingDispatch[] work;
-        KeyNotification[] notifications;
-        lock (_lock)
+        var notifications = new KeyNotification[Math.Min(work.Length, settings.MaxBatchItems)];
+        for (var offset = 0; offset < work.Length; offset += notifications.Length)
         {
-            if (_failure is not null || _aborted || _ready.Count == 0
-                || !settings.Enabled || GetDelayUnsafe(settings) > TimeSpan.Zero)
-            {
-                return;
-            }
-
-            var count = Math.Min(_ready.Count, Math.Max(1, settings.MaxBatchItems));
-            work = new PendingDispatch[count];
-            notifications = new KeyNotification[count];
-            for (var i = 0; i < count; i++)
-            {
-                var pending = _ready.First!.Value;
-                _ready.RemoveFirst();
-                notifications[i] = pending.Notification;
-                work[i] = new(pending, pending.Generation, pending.PendingSince!.Value, pending.Notification);
-                // A successful attempt consumes Force; a failed admission must preserve it for peers
-                // which still hold an earlier same-version state.
-                pending.Notification = pending.Notification with { Force = false };
-                pending.PendingSince = null;
-            }
-
-            _dispatching = true;
-            _lastDispatchTimestamp = _timeProvider.GetTimestamp();
-        }
-
-        var accepted = false;
-        Exception? dispatchFailure = null;
-        try
-        {
-            accepted = _dispatch(notifications);
-        }
-        catch (Exception exception)
-        {
-            dispatchFailure = exception;
-        }
-        finally
-        {
+            // Revalidate before every chunk: a callback can change membership or exhaust Stop's budget.
+            var membership = _getMembership();
+            var count = Math.Min(notifications.Length, work.Length - offset);
+            var sendCount = 0;
             lock (_lock)
             {
-                foreach (var item in work)
+                membership = RefreshMembershipUnsafe(membership);
+                if (_aborted || _failure is not null)
                 {
-                    var pending = item.Pending;
-                    if (!_pending.TryGetValue(pending.Notification.Key, out var current)
-                        || !ReferenceEquals(current, pending))
+                    break;
+                }
+
+                for (var i = offset; i < offset + count; i++)
+                {
+                    var item = work[i];
+                    if (IsCurrentUnsafe(item.Pending) && IsEligible(item.Notification, membership))
                     {
-                        // Pruning can retire an in-flight identity and admit a new one with the same key.
+                        notifications[sendCount++] = item.Notification;
+                    }
+                }
+            }
+
+            var accepted = false;
+            try
+            {
+                accepted = sendCount > 0 && _dispatch(notifications.AsSpan(0, sendCount));
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    LogDispatchFailed(_logger, exception, _namespaceName);
+                }
+                catch (Exception loggingFailure)
+                {
+                    Fail(new AggregateException("The root dispatch recovery diagnostic failed.", exception, loggingFailure));
+                }
+            }
+
+            lock (_lock)
+            {
+                for (var i = offset; i < offset + count; i++)
+                {
+                    var item = work[i];
+                    var pending = item.Pending;
+                    var admitted = accepted && IsEligible(item.Notification, membership)
+                        && !_aborted && _failure is null && IsCurrentUnsafe(pending);
+                    CompleteReceiptUnsafe(item, new(admitted, cohort.Started, cohort.Period));
+                    pending.InFlight = null;
+                    if (!IsCurrentUnsafe(pending))
+                    {
                         continue;
                     }
 
-                    if (accepted && pending.Generation == item.Generation)
+                    if (admitted && pending.Generation == item.Generation)
                     {
                         _pending.Remove(pending.Notification.Key);
                     }
-                    else
+                    else if (!admitted && !_aborted && _failure is null)
                     {
-                        if (!accepted)
+                        // Receipts are final even after partial child admission. Only bounded hints
+                        // retry; publishers can use direct fallback without waiting on a congested child.
+                        if (pending.Notification.Version == item.Notification.Version)
                         {
-                            pending.PendingSince = item.PendingSince;
-                            if (pending.Notification.Version == item.Notification.Version)
+                            pending.Notification = pending.Notification with
                             {
-                                pending.Notification = pending.Notification with
-                                {
-                                    Force = pending.Notification.Force || item.Notification.Force,
-                                };
-                            }
+                                Force = pending.Notification.Force || item.Notification.Force,
+                            };
                         }
 
-                        _ready.AddLast(pending.Node);
-                    }
-                }
+                        _cohort ??= new(membership, _timeProvider.GetTimestamp(), settings.Period);
+                        if (pending.Node.List is null)
+                        {
+                            _ready.AddLast(pending.Node);
+                        }
 
-                _retrying = !accepted;
-                _dispatching = false;
-                RecomputeFirstPendingUnsafe();
-                if (_pending.Count == 0)
-                {
-                    CompleteDrainUnsafe();
+                        _retryTimestamp = _timeProvider.GetTimestamp();
+                        _retryPeriod = settings.Period;
+                    }
                 }
             }
         }
 
-        if (dispatchFailure is not null)
+        lock (_lock)
         {
-            try
+            _dispatching = false;
+            if (_pending.Count == 0)
             {
-                LogDispatchFailed(_logger, dispatchFailure, _namespaceName);
-            }
-            catch (Exception loggingFailure)
-            {
-                Fail(new AggregateException("The root dispatch recovery diagnostic failed.", dispatchFailure, loggingFailure));
+                CompleteDrainUnsafe();
             }
         }
     }
 
-    private BatchingSettings GetSettings()
+    private void CompleteReceiptUnsafe(PendingDispatch item, ReceiptOutcome outcome)
+    {
+        if (item.Receipt is null)
+        {
+            return;
+        }
+
+        if (item.Producer is { } producer)
+        {
+            if (item.ProducerVersion >= producer.CompletedVersion)
+            {
+                producer.CompletedVersion = item.ProducerVersion;
+                producer.Outcome = outcome;
+            }
+
+            if (ReferenceEquals(producer.InFlightReceipt, item.Receipt))
+            {
+                producer.InFlightReceipt = null;
+            }
+        }
+
+        item.Receipt.TrySetResult(outcome);
+    }
+
+    private DisseminationMembershipSnapshot RefreshMembershipUnsafe(DisseminationMembershipSnapshot membership)
+    {
+        if (_membership is { } current
+            && (ReferenceEquals(current, membership) || membership.MembershipVersion.Value < current.MembershipVersion.Value))
+        {
+            return current;
+        }
+
+        _membership = membership;
+        foreach (var silo in _producers.Keys.Where(silo => !membership.ContainsMember(silo)).ToArray())
+        {
+            _producers.Remove(silo);
+        }
+
+        foreach (var pending in _pending.Values.Where(pending => !IsEligible(pending.Notification, membership)).ToArray())
+        {
+            RemoveUnsafe(pending);
+        }
+
+        return membership;
+    }
+
+    private static bool IsEligible(KeyNotification notification, DisseminationMembershipSnapshot membership) =>
+        notification.Key.Value is not SiloAddress silo || membership.ContainsMember(silo);
+
+    private bool IsCurrentUnsafe(PendingKey pending) =>
+        _pending.TryGetValue(pending.Notification.Key, out var current) && ReferenceEquals(current, pending);
+
+    private void RemoveUnsafe(PendingKey pending)
+    {
+        var outcome = new ReceiptOutcome(false, _cohort?.Started ?? _timeProvider.GetTimestamp(), _cohort?.Period ?? TimeSpan.Zero);
+        CompleteReceiptUnsafe(new(pending, pending.Generation, pending.Notification,
+            pending.Receipt, pending.Producer, pending.ProducerVersion), outcome);
+        pending.InFlight?.TrySetResult(outcome);
+        if (pending.Receipt is not null && pending.Notification.Key.Value is SiloAddress silo)
+        {
+            _cohort?.Contributors.Remove(silo);
+        }
+
+        _pending.Remove(pending.Notification.Key);
+        if (pending.Node.List is not null)
+        {
+            _ready.Remove(pending.Node);
+        }
+
+        if (_ready.Count == 0)
+        {
+            _cohort = null;
+        }
+    }
+
+    private Settings GetSettings()
     {
         var options = _options.CurrentValue;
         var namespaceOptions = _namespace.Options;
+        var period = _namespace.AggregationPeriod;
         return new(
             options.Enabled && namespaceOptions.Enabled,
             namespaceOptions.Priority == DisseminationPriority.High,
-            namespaceOptions.MaxPendingItemCount,
-            options.MaxBatchItems,
-            namespaceOptions.MaxCoalescingDelay,
-            TimeSpan.FromSeconds(1d / Math.Clamp(options.Overlay.AggregationBroadcastsPerSecond, 1, 1000)));
-    }
-
-    private void RecomputeFirstPendingUnsafe()
-    {
-        _firstPendingTimestamp = null;
-        foreach (var pending in _ready)
-        {
-            var timestamp = pending.PendingSince!.Value;
-            if (_firstPendingTimestamp is null || timestamp < _firstPendingTimestamp.Value)
-            {
-                _firstPendingTimestamp = timestamp;
-            }
-        }
+            Math.Max(1, namespaceOptions.MaxPendingItemCount),
+            Math.Max(1, options.MaxBatchItems),
+            TimeSpan.FromMilliseconds(Math.Clamp(period.TotalMilliseconds, 1, uint.MaxValue - 1)));
     }
 
     private void ClearPendingUnsafe()
     {
-        _pending.Clear();
-        _ready.Clear();
-        _firstPendingTimestamp = null;
-        _retrying = false;
-        _forceHandoff = false;
+        foreach (var pending in _pending.Values.ToArray())
+        {
+            RemoveUnsafe(pending);
+        }
+
+        _cohort = null;
+        _retryTimestamp = null;
+        _handoff = false;
     }
 
     private void CompleteDrainUnsafe()
     {
-        _retrying = false;
-        _forceHandoff = false;
+        _retryTimestamp = null;
+        _handoff = false;
         _drainCompletion?.TrySetResult();
         _drainCompletion = null;
     }
@@ -563,6 +715,30 @@ internal sealed partial class DisseminationRootBatcher
         }
     }
 
+    private void ReportRejection(int count, int limit)
+    {
+        try
+        {
+            LogAdmissionRejected(_logger, _namespaceName, count, limit);
+            for (var i = 0; i < count; i++)
+            {
+                try
+                {
+                    DisseminationInstruments.OnQueueAdmissionRejected(_namespaceName);
+                }
+                catch (Exception exception)
+                {
+                    LogDiagnosticFailed(_logger, exception, _namespaceName);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail(exception);
+            DisposeTimer();
+        }
+    }
+
     private void Fail(Exception exception)
     {
         lock (_lock)
@@ -573,7 +749,8 @@ internal sealed partial class DisseminationRootBatcher
             }
 
             _failure = exception;
-            // Complete normally and read _failure after awaiting: no abandoned shared task faults.
+            // Signals complete normally: a canceled caller must not leave an unobserved task fault.
+            ClearPendingUnsafe();
             _drainCompletion?.TrySetResult();
         }
 
@@ -583,7 +760,7 @@ internal sealed partial class DisseminationRootBatcher
         }
         catch
         {
-            // A failing logger must not hide the original failure from admission/drain callers.
+            // Preserve the original failure for admission and drain callers even if logging fails.
         }
     }
 
@@ -592,31 +769,47 @@ internal sealed partial class DisseminationRootBatcher
         public KeyNotification Notification;
         public long Generation;
         public long AdmissionGeneration;
-        public long? PendingSince;
+        public long ProducerVersion;
+        public Producer? Producer;
+        public TaskCompletionSource<ReceiptOutcome>? Receipt;
+        public TaskCompletionSource<ReceiptOutcome>? InFlight;
         public LinkedListNode<PendingKey> Node { get; }
 
-        public PendingKey(KeyNotification notification, long generation, long pendingSince)
+        public PendingKey(KeyNotification notification, long generation)
         {
             Notification = notification;
             Generation = generation;
             AdmissionGeneration = generation;
-            PendingSince = pendingSince;
             Node = new(this);
         }
     }
 
+    private sealed class Producer
+    {
+        public long Version;
+        public long CompletedVersion = long.MinValue;
+        public long InFlightVersion;
+        public ReceiptOutcome? Outcome;
+        public TaskCompletionSource<ReceiptOutcome>? Receipt;
+        public TaskCompletionSource<ReceiptOutcome>? InFlightReceipt;
+    }
+
+    private sealed class Cohort(DisseminationMembershipSnapshot membership, long started, TimeSpan period)
+    {
+        public DisseminationMembershipSnapshot Membership { get; } = membership;
+        public long Started { get; } = started;
+        public TimeSpan Period { get; } = period;
+        public HashSet<SiloAddress> Contributors { get; } = [];
+        public bool HasPublications;
+    }
+
+    private readonly record struct ReceiptOutcome(bool Accepted, long Started, TimeSpan Period);
     private readonly record struct PendingDispatch(
-        PendingKey Pending, long Generation, long PendingSince, KeyNotification Notification);
+        PendingKey Pending, long Generation, KeyNotification Notification,
+        TaskCompletionSource<ReceiptOutcome>? Receipt, Producer? Producer, long ProducerVersion);
+    private readonly record struct Settings(bool Enabled, bool HighPriority, int MaxPendingItemCount, int MaxBatchItems, TimeSpan Period);
 
-    private readonly record struct BatchingSettings(
-        bool Enabled,
-        bool HighPriority,
-        int MaxPendingItemCount,
-        int MaxBatchItems,
-        TimeSpan CollectionDelay,
-        TimeSpan BroadcastInterval);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Dissemination root dispatch for {Namespace} failed and will retry at the root pacing cadence.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dissemination root dispatch for {Namespace} failed. Receipts are rejected and retained hints will retry after the publication period.")]
     private static partial void LogDispatchFailed(ILogger logger, Exception exception, DisseminationNamespace @namespace);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Dissemination root for {Namespace} rejected {Count} new keys at its pending-key limit of {Limit}.")]
