@@ -13,8 +13,8 @@ namespace Orleans.DurableMessaging;
 /// envelope and outbox, and provides a factory method for creating pre-configured envelope builders.
 /// </para>
 /// <para>
-/// The implementation is immutable and thread-safe. Envelope builders created via <see cref="CreateEnvelope"/>
-/// are independent instances and can be used concurrently (though individual builders are not thread-safe).
+/// The context and its outbox are used on the owning grain's execution context. Each
+/// <see cref="CreateEnvelope"/> call creates an independent builder for local preparation.
 /// </para>
 /// </remarks>
 internal sealed class InboxHandlerContext : IInboxHandlerContext
