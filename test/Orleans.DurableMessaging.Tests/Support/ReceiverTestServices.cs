@@ -34,7 +34,6 @@ internal static class ReceiverTestServices
         services.TryAddScoped(extensionType, sp => CreateInstance(
             extensionType,
             sp.GetRequiredService<IGrainContext>(),
-            sp.GetRequiredService<IGrainFactory>(),
             sp.GetRequiredService<ITimerRegistry>(),
             sp.GetRequiredService<IJournaledStateManager>(),
             sp.GetRequiredService<SerializerSessionPool>(),
@@ -79,6 +78,12 @@ internal static class ReceiverTestServices
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
         services.AddScoped<IDurableOutbox, JournaledTestOutbox>();
+        services.AddKeyedScoped(GetImplementationType("DurableMessagingJournalEndpoint"), "__orleans.durable-messaging.outbox-observer", (sp, _) =>
+        {
+            var outbox = (JournaledTestOutbox)sp.GetRequiredService<IDurableOutbox>();
+            return CreateInstance(GetImplementationType("DurableMessagingJournalEndpoint"), outbox, (Action<CancellationToken>)outbox.FinalizeWrite);
+        });
+        services.AddScoped(GetImplementationType("DurableMessagingJournalObserver"));
         services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
         services.TryAddScoped(pumpResultsType, sp =>
         {

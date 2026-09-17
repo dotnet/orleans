@@ -15,61 +15,77 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTestBase
 {
     [Fact]
-    public async Task RecoveryDuringInboxScheduling_PreventsFalseAcceptance()
-    {
-        var receiver = NewGrain();
-        using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
-        using var envelope = CreateEnvelope(receiver, NewMessage(77, "recovered-during-schedule"));
-
-        var delivery = DeliverAsync(receiver, envelope.Value);
-        await schedule.WaitUntilEnteredAsync();
-        await Fixture.RevertStateAsync(receiver);
-        schedule.Continue();
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => delivery);
-        Assert.Contains("interrupted by state recovery", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(0, Fixture.GetSnapshot(receiver).InboxCount);
-    }
-
-    [Fact]
-    public async Task FailedInboxAcceptance_RevertsEnvelopeAndOrphanedJobCannotProcess()
+    public async Task JournalFailureDuringLocalScheduling_PreventsOldContextApply()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
-        var depthBaseline = Fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth");
+        var oldContext = Fixture.GetGrainContext(receiver);
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
+        var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 77, "uncommitted"));
+        using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
+        using var envelope = CreateEnvelope(receiver, NewMessage(77, "failed-during-schedule"));
+        var delivery = DeliverAsync(receiver, envelope.Value);
+        await schedule.WaitUntilEnteredAsync();
+        Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        var failure = await Assert.ThrowsAsync<IOException>(() => oldManager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(failure, await oldGrain.Faulted.Task);
+        schedule.Continue();
+        await Assert.ThrowsAsync<IOException>(() => delivery);
+        var oldState = oldGrain.GetSnapshotForTest();
+        Assert.Equal(0, oldState.InboxCount);
+        Assert.Null(oldState.InboxJobId);
+        Assert.Null(oldState.InboxJob);
+        Assert.Single(oldState.Effects);
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(oldState.ActivationId, recovered.ActivationId);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(0, recovered.InboxCount);
+    }
+
+    [Fact]
+    public async Task FailedInboxAcceptance_FencesOldObjectsAndFreshReplayOmitsEnvelope()
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        var oldContext = Fixture.GetGrainContext(receiver);
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
+        var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var envelope = CreateEnvelope(receiver, NewMessage(2, "failed-acceptance"));
-
-        await Assert.ThrowsAnyAsync<Exception>(
-            () => DeliverAsync(receiver, envelope.Value));
-
-        var reverted = await receiver.GetSnapshotAsync();
-        Assert.Equal(0, reverted.InboxCount);
-        Assert.Empty(reverted.Effects);
-        Assert.Equal(depthBaseline, Fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
-        await receiver.RequestDeactivationAsync();
+        await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
+        var failed = oldGrain.GetSnapshotForTest();
+        Assert.Equal(1, failed.InboxCount);
+        Assert.NotNull(failed.InboxJob);
+        Assert.Empty(failed.Effects);
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var recovered = await receiver.GetSnapshotAsync();
-        Assert.NotEqual(reverted.ActivationId, recovered.ActivationId);
+        Assert.NotEqual(before.ActivationId, recovered.ActivationId);
+        Assert.NotSame(oldManager, Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService<IJournaledStateManager>());
         Assert.Equal(0, recovered.InboxCount);
+        Assert.Null(recovered.InboxJob);
         Assert.Empty(recovered.Effects);
-        Assert.Equal(depthBaseline, Fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
-
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.Equal(depthBaseline, Fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
+        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
     }
 
     [Fact]
     public async Task AmbiguousInboxAcceptanceCommit_PreservesAndProcessesRecoveredEnvelope()
     {
         var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        var oldContext = Fixture.GetGrainContext(receiver);
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
         Fixture.Storage.FailAfterWrite(journalId);
         using var envelope = CreateEnvelope(receiver, NewMessage(76, "ambiguous-acceptance"));
 
         await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
 
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.NotEqual(before.ActivationId, completed.ActivationId);
         Assert.Equal("ambiguous-acceptance", Assert.Single(completed.Effects).Value);
         Assert.Equal(0, completed.InboxCount);
     }
@@ -80,7 +96,6 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         const string jobName = "orleans.messaging.inbox-drain";
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
-        await receiver.DeactivateOnNextRecoveryAsync();
         var barrier = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var attemptBaseline = Fixture.Metrics.GetCount("orleans-durablejobs-job-attempts-started");
         var completionBaseline = Fixture.Metrics.GetCount("orleans-durablejobs-jobs-completed");
@@ -123,7 +138,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
     }
 
     [Fact]
-    public async Task InboxJobClearWriteFailure_RevertsThenRecoversAfterActivationLoss()
+    public async Task InboxJobClearWriteFailure_FencesThenRecoversInFreshActivation()
     {
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
@@ -133,7 +148,6 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()), matchingWrite: 2);
-        Fixture.DeactivateOnNextRecovery(receiver);
         handler.Release();
 
         var recovered = await Fixture.SnapshotProbe.WaitAsync(
@@ -220,18 +234,18 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
     }
 
     [Fact]
-    public async Task SchedulingFailureBeforeEnqueue_RollsBackAcceptanceAndRetrySchedulesOnce()
+    public async Task SchedulingFailureBeforeApply_PreservesStateAndRetrySchedulesOnce()
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(61, "schedule-failure"));
         Fixture.JobManagerProbe.FailNext(ReceiverTestServices.InboxJobName);
 
         await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
-        var reverted = await receiver.GetSnapshotAsync();
-        Assert.Equal(0, reverted.InboxCount);
-        Assert.Null(reverted.InboxJobId);
-        Assert.Null(reverted.InboxJob);
-        Assert.Empty(reverted.Effects);
+        var unchanged = await receiver.GetSnapshotAsync();
+        Assert.Equal(0, unchanged.InboxCount);
+        Assert.Null(unchanged.InboxJobId);
+        Assert.Null(unchanged.InboxJob);
+        Assert.Empty(unchanged.Effects);
         Assert.Empty(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
@@ -242,7 +256,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
     }
 
     [Fact]
-    public async Task InboxSchedulingFailure_RevertsAcceptanceAndRetryDoesNotStrandMessage()
+    public async Task AmbiguousSchedulingFailure_LeavesAcceptanceLocalAndRetryUsesNewToken()
     {
         const string jobName = "orleans.messaging.inbox-drain";
         var receiver = NewGrain();

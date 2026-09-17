@@ -53,13 +53,13 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
-    public async Task HandlerFailure_RollsBackEffectCompletionAndOutgoingThenDeadLetters()
+    public async Task HandlerPreparationFailure_DeadLettersWithoutStagingEffectsOrOutput()
     {
         var receiver = NewGrain();
         var sink = NewGrain();
         using var envelope = CreateEnvelope(
             receiver,
-            new DurableTestMessage(Guid.NewGuid(), 9, "rollback", sink.GetGrainId(), ThrowAfterStaging: true));
+            new DurableTestMessage(Guid.NewGuid(), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
         var accepted = await DeliverAsync(receiver, envelope.Value);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
@@ -71,7 +71,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var deadLetter = Assert.Single(state.InboxDeadLetters);
         Assert.Equal(envelope.Value.MessageId, deadLetter.MessageId);
         Assert.Equal(1, deadLetter.AttemptCount);
-        Assert.Contains("Injected handler failure", deadLetter.Reason, StringComparison.Ordinal);
+        Assert.Contains("Injected handler preparation failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
         await receiver.RequestDeactivationAsync();
         var recovered = await receiver.GetSnapshotAsync();
@@ -144,7 +144,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
-    public async Task HandlerSelectionWriteAttemptRevertsBeforeRejectingDelivery()
+    public async Task HandlerSelectionWriteAttemptRejectsBeforeStaging()
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(
@@ -157,7 +157,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         await receiver.RequestDeactivationAsync();
         var snapshot = await receiver.GetSnapshotAsync();
 
-        Assert.Contains("mutate journaled state", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("cannot be committed or deleted", exception.Message, StringComparison.Ordinal);
         Assert.Null(snapshot.InboxJobId);
         Assert.Equal(0, snapshot.InboxCount);
         Assert.Empty(snapshot.Effects);
@@ -167,79 +167,82 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     public async Task HandlerCannotCommitBeforeInboxCompletion()
     {
         var receiver = NewGrain();
-        var message = new DurableTestMessage(
-            Guid.NewGuid(),
-            10,
-            "premature-commit",
-            CommitDuringHandling: true);
-        using var envelope = CreateEnvelope(receiver, message);
-
+        _ = await receiver.GetSnapshotAsync();
+        var oldContext = Fixture.GetGrainContext(receiver);
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
+        using var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-commit") with { CommitDuringHandling = true });
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
-
-        Assert.Empty(state.Effects);
-        var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Contains("cannot be committed", deadLetter.Reason, StringComparison.Ordinal);
+        var exception = await oldGrain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Contains("cannot be committed or deleted", Assert.IsType<InvalidOperationException>(exception).Message, StringComparison.Ordinal);
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var failed = oldGrain.GetSnapshotForTest();
+        Assert.Empty(failed.Effects);
+        Assert.Empty(failed.InboxDeadLetters);
+        Assert.Equal(1, failed.InboxCount);
+        Assert.Equal(0, failed.ProcessedMessageCount);
     }
 
     [Fact]
     public async Task HandlerCannotDeleteStateBeforeInboxCompletion()
     {
         var receiver = NewGrain();
-        var message = new DurableTestMessage(
-            Guid.NewGuid(),
-            11,
-            "premature-delete",
-            DeleteDuringHandling: true);
-        using var envelope = CreateEnvelope(receiver, message);
-
+        _ = await receiver.GetSnapshotAsync();
+        var oldContext = Fixture.GetGrainContext(receiver);
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
+        using var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-delete") with { DeleteDuringHandling = true });
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
-
-        Assert.Empty(state.Effects);
-        var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Contains("cannot be committed or deleted", deadLetter.Reason, StringComparison.Ordinal);
+        var exception = await oldGrain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Contains("cannot be committed or deleted", Assert.IsType<InvalidOperationException>(exception).Message, StringComparison.Ordinal);
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var failed = oldGrain.GetSnapshotForTest();
+        Assert.Empty(failed.Effects);
+        Assert.Empty(failed.InboxDeadLetters);
+        Assert.Equal(1, failed.InboxCount);
+        Assert.Equal(0, failed.ProcessedMessageCount);
     }
 
     [Fact]
-    public async Task RecoveryDuringHandler_LeavesMessageRetryable()
+    public async Task HandlerCompletionWriteFailure_FencesOldManagerAndFreshActivationRetries()
     {
         var receiver = NewGrain();
-        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/recover-handler");
-        using var envelope = CreateEnvelope(
-            receiver,
-            NewMessage(78, "recover-handler"),
-            "messages/recover-handler");
-
+        var before = await receiver.GetSnapshotAsync();
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-failure");
+        using var envelope = CreateEnvelope(receiver, NewMessage(78, "completion-failure"), "messages/completion-failure");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
-        await Fixture.RevertStateAsync(receiver);
+        var oldContext = Fixture.GetGrainContext(receiver);
+        var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.Release();
-
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<Exception>(() => oldManager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.Equal(1, Assert.Single(completed.Effects).Count);
-        Assert.Equal(0, completed.InboxCount);
-    }
-
-    [Fact]
-    public async Task RecoveryDuringHandlerFailure_DiscardsStaleFailureAccounting()
-    {
-        var receiver = NewGrain();
-        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/recover-handler-failure");
-        using var envelope = CreateEnvelope(
-            receiver,
-            NewMessage(79, "recover-handler-failure") with { ThrowOnceAfterStaging = true },
-            "messages/recover-handler-failure");
-
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        await handler.WaitUntilEnteredAsync();
-        await Fixture.RevertStateAsync(receiver);
-        handler.Release();
-
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.NotEqual(before.ActivationId, completed.ActivationId);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Empty(completed.InboxDeadLetters);
         Assert.Equal(0, completed.InboxCount);
+    }
+
+    [Fact]
+    public async Task PreparationFailureAccountingWriteFailure_RecoversInFreshActivation()
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failure-accounting");
+        using var envelope = CreateEnvelope(receiver, NewMessage(79, "failure-accounting") with { ThrowDuringPreparation = true }, "messages/failure-accounting");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var oldContext = Fixture.GetGrainContext(receiver);
+        Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        handler.Release();
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
+        var completed = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        Assert.NotEqual(before.ActivationId, completed.ActivationId);
+        Assert.Equal(1, Assert.Single(completed.InboxDeadLetters).AttemptCount);
+        Assert.Empty(completed.Effects);
+        Assert.Empty(Fixture.GetStagedOutput(receiver));
     }
 
     [Fact]
