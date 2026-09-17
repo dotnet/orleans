@@ -170,8 +170,13 @@ namespace Orleans.Streaming.Kinesis
                     AuthenticationRegion = GetRegionName(options),
                 };
 
-                return !string.IsNullOrEmpty(options.AccessKey) && !string.IsNullOrEmpty(options.SecretKey)
-                    ? new AmazonKinesisClient(new BasicAWSCredentials(options.AccessKey, options.SecretKey), config)
+                if (!string.IsNullOrEmpty(options.AccessKey) && !string.IsNullOrEmpty(options.SecretKey))
+                {
+                    return new AmazonKinesisClient(new BasicAWSCredentials(options.AccessKey, options.SecretKey), config);
+                }
+
+                return options.Service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    ? new AmazonKinesisClient(new BasicAWSCredentials("dummy", "dummy"), config)
                     : new AmazonKinesisClient(config);
             }
 

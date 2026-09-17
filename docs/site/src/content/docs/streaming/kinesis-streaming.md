@@ -24,7 +24,7 @@ Configure every Orleans client which publishes through the provider with the sam
 
 :::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_client":::
 
-When explicit credentials aren't configured, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html). In production, prefer workload credentials such as an IAM role. Set <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.Service> when using a custom Kinesis-compatible endpoint.
+For AWS regions and HTTPS endpoints, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html) when explicit credentials are omitted. In production, prefer workload credentials such as an IAM role. Set <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.Service> when using a custom Kinesis-compatible endpoint. HTTP emulator endpoints use the development credentials `dummy` and `dummy` unless explicit keys are configured.
 
 ## Configure Kinesis with Aspire
 
