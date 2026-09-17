@@ -85,6 +85,12 @@ The default factory defers activation until `CreateAdapter`, after the stream pr
 has acquired the factory, so initialization failures use the same asynchronous cleanup path as shutdown. The factory
 owns connections it creates even if producer construction fails.
 
+Each partition's adapter receiver also owns its factory-created connection. It closes that connection after closing
+the partition receiver on shutdown or partition handoff, including when initialization or checkpoint flushing fails.
+Connections supplied through the connection-instance overload remain caller-owned on both producer and receiver paths.
+Receiver and connection cleanup failures are logged individually, even after the shutdown wait times out, and combined
+when both fail before shutdown completes.
+
 The Azure SDK can map the same partition key to a different partition when switching between direct and buffered
 producers. Avoid changing publishing modes while strict ordering must be preserved for active streams.
 
