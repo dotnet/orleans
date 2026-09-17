@@ -185,6 +185,86 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task CohortPublisherOwningCancellationPreservesNativeDirectCompletion()
+    {
+        await using var harness = new CohortPublisherHarness(refreshTime: TimeSpan.Zero);
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var directStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.DirectHandler = async token =>
+        {
+            using var registration = token.Register(() => cancellationObserved.TrySetResult());
+            directStarted.TrySetResult(token);
+            await cancellationObserved.Task;
+        };
+        var owning = harness.Publisher.RunOrQueueTask(
+            async token =>
+            {
+                await harness.Publisher.PublishStatistics(token);
+                return true;
+            },
+            caller.Token);
+        try
+        {
+            var nativeToken = await directStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var joining = harness.Publisher.RunOrQueueTask(
+                async token =>
+                {
+                    await harness.Publisher.PublishStatistics(token);
+                    return true;
+                },
+                TestContext.Current.CancellationToken);
+            await harness.OwnerBarrierAsync();
+            var nativeSample = harness.Publisher.LocalRuntimeStatistics;
+            Assert.False(owning.IsCompleted);
+            Assert.False(joining.IsCompleted);
+            Assert.Single(harness.DirectUpdates);
+            Assert.Equal(caller.Token, nativeToken);
+
+            caller.Cancel();
+            await Task.WhenAll(owning, joining).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.True(owning.IsCompletedSuccessfully);
+            Assert.True(joining.IsCompletedSuccessfully);
+            Assert.Same(nativeSample, harness.Publisher.LocalRuntimeStatistics);
+            Assert.Same(nativeSample, harness.Publisher.PeriodicStatistics[harness.Publisher.Silo]);
+            Assert.Single(harness.DirectUpdates);
+            Assert.Empty(harness.Dissemination.Publications);
+        }
+        finally
+        {
+            caller.Cancel();
+        }
+    }
+
+    [Fact]
+    public async Task CohortPublisherOwningCancellationPreservesNativeReceiptCompletion()
+    {
+        await using var harness = new CohortPublisherHarness();
+        await harness.StartAsync();
+        harness.Dissemination.AutomaticReceipt = null;
+        harness.Dissemination.PreserveNativeCompletion = true;
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var owning = harness.Publisher.RunOrQueueTask(
+            async token =>
+            {
+                await harness.Publisher.PublishStatistics(token);
+                return true;
+            },
+            caller.Token);
+        var publication = await harness.Dissemination.NextPublicationAsync();
+        caller.Cancel();
+        publication.Receipt.SetResult(new(true, harness.Period));
+        await owning.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(owning.IsCompletedSuccessfully);
+        Assert.True(publication.Token.IsCancellationRequested);
+        Assert.Single(harness.Dissemination.Publications);
+        Assert.Equal(1, harness.Dissemination.QueryCount);
+        Assert.Empty(harness.DirectUpdates);
+    }
+
+    [Fact]
     public async Task CohortPublisherStartupReceiptWaitKeepsInboundOwnerApplicationLive()
     {
         await using var harness = new CohortPublisherHarness();
@@ -317,7 +397,7 @@ public partial class DisseminationProtocolTests
     {
         private readonly ServiceProvider _serializerServices;
 
-        public CohortPublisherHarness()
+        public CohortPublisherHarness(TimeSpan? refreshTime = null)
         {
             var local = CreateSilo(40501);
             Peer = CreateSilo(40502);
@@ -325,7 +405,7 @@ public partial class DisseminationProtocolTests
             statusOracle.SetStatus(local, SiloStatus.Active);
             statusOracle.SetStatus(Peer, SiloStatus.Active);
             var details = new FakeLocalSiloDetails(local);
-            Options = new() { DeploymentLoadPublisherRefreshTime = Period };
+            Options = new() { DeploymentLoadPublisherRefreshTime = refreshTime ?? Period };
             Options.Dissemination.Enabled = true;
             _serializerServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
             TimerClock = new(Clock);
@@ -453,6 +533,7 @@ public partial class DisseminationProtocolTests
 
         public ConcurrentQueue<CohortPublisherPublication> Publications { get; } = new();
         public DisseminationPublicationReceipt? AutomaticReceipt { get; set; } = new(true, TimeSpan.FromSeconds(1));
+        public bool PreserveNativeCompletion { get; set; }
         public Exception? Failure { get; set; }
         public IReadOnlyList<SiloAddress> UnconfirmedPeers { get; set; } = [];
         public int QueryCount { get; set; }
@@ -475,7 +556,8 @@ public partial class DisseminationProtocolTests
                 publication.Receipt.SetResult(receipt);
             }
 
-            var result = new ValueTask<DisseminationPublicationReceipt>(publication.Receipt.Task.WaitAsync(cancellationToken));
+            var result = new ValueTask<DisseminationPublicationReceipt>(
+                PreserveNativeCompletion ? publication.Receipt.Task : publication.Receipt.Task.WaitAsync(cancellationToken));
             _publications.Writer.TryWrite(publication);
             return result;
         }

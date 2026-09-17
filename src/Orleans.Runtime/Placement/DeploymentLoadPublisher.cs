@@ -125,10 +125,14 @@ namespace Orleans.Runtime
             cancellationToken.ThrowIfCancellationRequested();
             // Startup and the interleaving timer can overlap. Join the pending sample instead of
             // submitting another source publication while its cohort is still open.
-            var publication = _publicationTask is { IsCompleted: false } pending
-                ? pending
-                : _publicationTask = PublishStatisticsCore(cancellationToken);
-            return await publication.WaitAsync(cancellationToken);
+            if (_publicationTask is { IsCompleted: false } pending)
+            {
+                return await AwaitSharedPublication(pending, cancellationToken);
+            }
+
+            // Native operations own this caller's cancellation and may complete successfully
+            // after observing it. Only joining callers need an independently cancellable wait.
+            return await (_publicationTask = PublishStatisticsCore(cancellationToken));
         }
 
         private async Task<StatisticsPublication> PublishStatisticsCore(CancellationToken cancellationToken)
@@ -240,10 +244,32 @@ namespace Orleans.Runtime
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var publication = _disseminationPublicationTask is { IsCompleted: false } pending
-                ? pending
-                : _disseminationPublicationTask = PublishStatisticsViaDisseminationCore(myStats, cancellationToken);
-            return await publication.WaitAsync(cancellationToken);
+            if (_disseminationPublicationTask is { IsCompleted: false } pending)
+            {
+                return await AwaitSharedPublication(pending, cancellationToken);
+            }
+
+            return await (_disseminationPublicationTask = PublishStatisticsViaDisseminationCore(myStats, cancellationToken));
+        }
+
+        private static async Task<StatisticsPublication> AwaitSharedPublication(
+            Task<StatisticsPublication> publication,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await publication.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (publication.IsCompletedSuccessfully)
+                {
+                    return await publication;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
         }
 
         private async Task<StatisticsPublication> PublishStatisticsViaDisseminationCore(
@@ -279,7 +305,6 @@ namespace Orleans.Runtime
                     myStats.DateTime.Ticks,
                     cancellation.Token);
                 var receiptTimestamp = timeProvider.GetTimestamp();
-                cancellationToken.ThrowIfCancellationRequested();
                 return new(receipt, timeProvider, receiptTimestamp);
             }
             catch (OperationCanceledException) when (
