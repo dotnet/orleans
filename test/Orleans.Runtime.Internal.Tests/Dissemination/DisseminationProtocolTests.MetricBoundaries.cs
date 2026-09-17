@@ -36,6 +36,7 @@ public partial class DisseminationProtocolTests
         };
         var failure = new InvalidOperationException("Metric observer failure.");
         var failures = 0;
+        var broadcastFailureThread = 0;
         var listenerArmed = 1;
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, owner) =>
@@ -51,6 +52,17 @@ public partial class DisseminationProtocolTests
             if (Volatile.Read(ref listenerArmed) == 0)
             {
                 return;
+            }
+
+            // Failure counters have no namespace tag. This completed fake transport failure is observed
+            // synchronously on its throwing thread, so unrelated background failures cannot claim it.
+            if (operation == "broadcast-failure")
+            {
+                var thread = Environment.CurrentManagedThreadId;
+                if (Interlocked.CompareExchange(ref broadcastFailureThread, 0, thread) != thread)
+                {
+                    return;
+                }
             }
 
             if (operation is "broadcast-receive" or "broadcast-send" or "publication")
@@ -122,12 +134,18 @@ public partial class DisseminationProtocolTests
                     break;
                 case "broadcast-failure":
                     ns.SetValue("value", 1);
+                    DisseminationInstruments.OnBroadcastSendFailure(DisseminationFailureReason.Error);
+                    Assert.Equal(0, Volatile.Read(ref failures));
                     transport.SendBroadcastResponseHandler = (target, batch, _) =>
                     {
                         transport.BroadcastBatches.Add((target, batch));
-                        return transport.BroadcastBatches.Count == 1
-                            ? Task.FromException<DisseminationBroadcastResponse>(new InvalidOperationException("Transport failure."))
-                            : Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
+                        if (transport.BroadcastBatches.Count == 1)
+                        {
+                            Volatile.Write(ref broadcastFailureThread, Environment.CurrentManagedThreadId);
+                            return Task.FromException<DisseminationBroadcastResponse>(new InvalidOperationException("Transport failure."));
+                        }
+
+                        return Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
                     };
                     Assert.True(await protocol.Publish(ns, "value", 1, cancellationToken));
                     await protocol.FlushPendingBroadcast(cancellationToken);
@@ -143,6 +161,7 @@ public partial class DisseminationProtocolTests
             }
 
             Assert.Equal(1, Volatile.Read(ref failures));
+            Assert.Equal(0, Volatile.Read(ref broadcastFailureThread));
             if (operation is not ("broadcast-send" or "broadcast-failure"))
             {
                 Assert.Contains(logger.Entries, entry => ReferenceEquals(entry.Exception, failure));
