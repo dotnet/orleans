@@ -130,20 +130,24 @@ The `WithOrleansProviderType(...)` resource annotation is implemented upstream i
 
 Aspire provisions and starts the backing resource, then the silo configures the Orleans journal provider from the injected resource reference. The [Journaling with Azure Blob JSON sample](../grains/journaling/samples.md) demonstrates programmatic provider registration with Azurite and verifies state recovery after grain reactivation.
 
-The equivalent configuration-driven path uses the `Orleans:GrainJournaling` section:
+The equivalent configuration-driven path uses named entries in the `Orleans:Journaling` section. The `Default` entry configures the default journal storage binding:
 
 ```json
 {
   "Orleans": {
-    "GrainJournaling": {
-      "ProviderType": "AzureBlobStorage",
-      "ConnectionName": "blobs"
+    "Journaling": {
+      "Default": {
+        "ProviderType": "AzureBlobStorage",
+        "ConnectionName": "blobs"
+      }
     }
   }
 }
 ```
 
 Register the keyed Aspire client or inject the named connection used by the selected provider before calling <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>. Orleans activates the provider during silo startup and validates its connection and provider-specific options.
+
+Additional entries such as `Orleans:Journaling:archive` configure independent named storage bindings. Each entry selects its provider type, client reference, and backend storage options.
 
 Aspire resource-model support for emitting this section is tracked by [microsoft/aspire#19609](https://github.com/microsoft/aspire/issues/19609).
 

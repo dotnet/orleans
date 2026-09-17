@@ -43,7 +43,7 @@ Aspire injects the Redis connection and keyed client. Configure the journaling p
 
 :::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="redis_journaling_aspire":::
 
-The silo registers the `orleans-redis` keyed client before `UseOrleans`, as shown in the [Redis provider silo example](../grain-persistence/redis-storage.md#use-with-aspire). Orleans then activates Redis journal storage from `Orleans:GrainJournaling`.
+The silo registers the `orleans-redis` keyed client before `UseOrleans`, as shown in the [Redis provider silo example](../grain-persistence/redis-storage.md#use-with-aspire). Orleans then activates the default Redis journal storage binding from `Orleans:Journaling:Default`.
 
 ## Storage behavior
 

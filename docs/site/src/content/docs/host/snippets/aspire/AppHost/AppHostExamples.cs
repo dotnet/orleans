@@ -201,8 +201,8 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WithEnvironment("Orleans__GrainJournaling__ProviderType", "Redis")
-            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", "orleans-redis")
+            .WithEnvironment("Orleans__Journaling__Default__ProviderType", "Redis")
+            .WithEnvironment("Orleans__Journaling__Default__ServiceKey", "orleans-redis")
             .WaitFor(redis);
 
         builder.Build().Run();
@@ -222,8 +222,8 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WithEnvironment("Orleans__GrainJournaling__ProviderType", "AzureTableStorage")
-            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", "orleans-tables")
+            .WithEnvironment("Orleans__Journaling__Default__ProviderType", "AzureTableStorage")
+            .WithEnvironment("Orleans__Journaling__Default__ServiceKey", "orleans-tables")
             .WaitFor(storage);
 
         builder.Build().Run();

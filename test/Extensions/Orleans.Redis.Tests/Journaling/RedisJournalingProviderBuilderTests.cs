@@ -29,7 +29,7 @@ public sealed class RedisJournalingProviderBuilderTests
         var attribute = typeof(RedisJournalStorageHostingExtensions)
             .Assembly
             .GetCustomAttributes<RegisterProviderAttribute>()
-            .Single(candidate => candidate.Type == typeof(RedisJournalingProviderBuilder));
+            .Single(candidate => candidate.Type == typeof(RedisJournalingProviderBuilder) && candidate.Name == "Redis");
 
         Assert.Equal("Redis", attribute.Name);
         Assert.Equal("Journaling", attribute.Kind);

@@ -92,7 +92,7 @@ public sealed class AzureStorageAspireIntegrationTests
     [Theory]
     [InlineData("AzureTableStorage")]
     [InlineData("AzureBlobStorage")]
-    public async Task AspireConfiguration_ActivatesGrainJournalingProvider(string providerType)
+    public async Task AspireConfiguration_ActivatesDefaultAndNamedJournalingProviders(string providerType)
     {
         var configuration = await CreateJournalingConfigurationAsync(providerType);
 
@@ -103,6 +103,11 @@ public sealed class AzureStorageAspireIntegrationTests
             Assert.Same(
                 host.Services.GetRequiredKeyedService<TableServiceClient>(TablesResourceName),
                 options.TableServiceClient);
+            var namedOptions = host.Services.GetRequiredService<IOptionsMonitor<AzureTableJournalStorageOptions>>().Get("archive");
+            Assert.Same(options.TableServiceClient, namedOptions.TableServiceClient);
+            Assert.Equal("defaultjournal", options.TableName);
+            Assert.Equal("archivejournal", namedOptions.TableName);
+            Assert.NotSame(options, namedOptions);
         }
         else
         {
@@ -110,6 +115,11 @@ public sealed class AzureStorageAspireIntegrationTests
             Assert.Same(
                 host.Services.GetRequiredKeyedService<BlobServiceClient>(BlobsResourceName),
                 options.BlobServiceClient);
+            var namedOptions = host.Services.GetRequiredService<IOptionsMonitor<AzureBlobJournalStorageOptions>>().Get("archive");
+            Assert.Same(options.BlobServiceClient, namedOptions.BlobServiceClient);
+            Assert.Equal("defaultjournal", options.ContainerName);
+            Assert.Equal("archivejournal", namedOptions.ContainerName);
+            Assert.NotSame(options, namedOptions);
         }
     }
 
@@ -184,10 +194,17 @@ public sealed class AzureStorageAspireIntegrationTests
         var blobs = storage.AddBlobs(BlobsResourceName);
         var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
         var serviceKey = providerType == "AzureTableStorage" ? tables.Resource.Name : blobs.Resource.Name;
+        var storageNameOption = providerType == "AzureTableStorage"
+            ? "TableName"
+            : "ContainerName";
         var silo = builder.AddContainer("silo", "unused")
             .WithReference(orleans)
-            .WithEnvironment("Orleans__GrainJournaling__ProviderType", providerType)
-            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", serviceKey)
+            .WithEnvironment("Orleans__Journaling__Default__ProviderType", providerType)
+            .WithEnvironment("Orleans__Journaling__Default__ServiceKey", serviceKey)
+            .WithEnvironment($"Orleans__Journaling__Default__{storageNameOption}", "defaultjournal")
+            .WithEnvironment("Orleans__Journaling__archive__ProviderType", providerType)
+            .WithEnvironment("Orleans__Journaling__archive__ServiceKey", serviceKey)
+            .WithEnvironment($"Orleans__Journaling__archive__{storageNameOption}", "archivejournal")
             .WithEnvironment($"ConnectionStrings__{TablesResourceName}", "UseDevelopmentStorage=true")
             .WithEnvironment($"ConnectionStrings__{BlobsResourceName}", "UseDevelopmentStorage=true");
 
@@ -200,7 +217,8 @@ public sealed class AzureStorageAspireIntegrationTests
                 && !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
                 || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
 
-        AssertProvider(configuration, "GrainJournaling", null, providerType, serviceKey);
+        AssertProvider(configuration, "Journaling", "Default", providerType, serviceKey);
+        AssertProvider(configuration, "Journaling", "archive", providerType, serviceKey);
         return configuration;
     }
 

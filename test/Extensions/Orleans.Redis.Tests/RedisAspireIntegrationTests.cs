@@ -40,7 +40,8 @@ public sealed class RedisAspireIntegrationTests
         AssertProvider(configuration, "Reminders", null, expectedProviderType);
         AssertProvider(configuration, "GrainDirectory", "directory", expectedProviderType);
         AssertProvider(configuration, "Streaming", "stream", expectedProviderType);
-        AssertProvider(configuration, "GrainJournaling", null, expectedProviderType);
+        AssertProvider(configuration, "Journaling", "Default", expectedProviderType);
+        AssertProvider(configuration, "Journaling", "archive", expectedProviderType);
     }
 
     [Theory]
@@ -75,6 +76,7 @@ public sealed class RedisAspireIntegrationTests
         var directory = services.GetRequiredService<IOptionsMonitor<RedisGrainDirectoryOptions>>().Get("directory");
         var streaming = services.GetRequiredService<IOptionsMonitor<RedisStreamingOptions>>().Get("stream");
         var journaling = services.GetRequiredService<IOptions<RedisJournalStorageOptions>>().Value;
+        var namedJournaling = services.GetRequiredService<IOptionsMonitor<RedisJournalStorageOptions>>().Get("archive");
 
         AssertShared(keyedMultiplexer, await clustering.CreateMultiplexer(clustering));
         AssertShared(keyedMultiplexer, await storage.CreateMultiplexer(storage));
@@ -82,16 +84,20 @@ public sealed class RedisAspireIntegrationTests
         AssertShared(keyedMultiplexer, await directory.CreateMultiplexer(directory));
         AssertShared(keyedMultiplexer, await streaming.CreateMultiplexer(streaming));
         AssertShared(keyedMultiplexer, await journaling.CreateMultiplexer(journaling));
+        AssertShared(keyedMultiplexer, await namedJournaling.CreateMultiplexer(namedJournaling));
+        Assert.Equal("default-journal", journaling.KeyPrefix);
+        Assert.Equal("archive-journal", namedJournaling.KeyPrefix);
+        Assert.NotSame(journaling, namedJournaling);
         Assert.True(await keyedMultiplexer.GetDatabase().PingAsync() >= TimeSpan.Zero);
     }
 
     [Fact]
-    public void Assembly_RegistersRedisAndAzureAliasesForGrainJournaling()
+    public void Assembly_RegistersRedisAndAzureAliasesForJournaling()
     {
         var registrations = typeof(RedisJournalStorageOptions)
             .Assembly
             .GetCustomAttributes<RegisterProviderAttribute>()
-            .Where(attribute => attribute.Kind == "GrainJournaling")
+            .Where(attribute => attribute.Kind == "Journaling")
             .Select(attribute => (attribute.Name, attribute.Target))
             .ToHashSet();
 
@@ -128,8 +134,12 @@ public sealed class RedisAspireIntegrationTests
         var orleans = ConfigureOrleans(builder, redis);
         var silo = builder.AddContainer("silo", "unused")
             .WithReference(orleans)
-            .WithEnvironment("Orleans__GrainJournaling__ProviderType", providerType)
-            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", ResourceName)
+            .WithEnvironment("Orleans__Journaling__Default__ProviderType", providerType)
+            .WithEnvironment("Orleans__Journaling__Default__ServiceKey", ResourceName)
+            .WithEnvironment("Orleans__Journaling__Default__KeyPrefix", "default-journal")
+            .WithEnvironment("Orleans__Journaling__archive__ProviderType", providerType)
+            .WithEnvironment("Orleans__Journaling__archive__ServiceKey", ResourceName)
+            .WithEnvironment("Orleans__Journaling__archive__KeyPrefix", "archive-journal")
             .WithEnvironment($"ConnectionStrings__{ResourceName}", connectionString);
 
         await using var app = await builder.BuildAsync();
