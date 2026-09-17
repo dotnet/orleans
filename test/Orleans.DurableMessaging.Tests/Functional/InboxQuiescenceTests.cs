@@ -217,6 +217,110 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeliveryBeforeDeleteCompletes_ViolatesQuiescenceAndFailsClosed(bool existingOwner)
+    {
+        var receiver = NewGrain();
+        using var seed = CreateEnvelope(receiver, NewMessage(188, "preserved-before-delete"));
+        if (existingOwner)
+        {
+            var owner = CreateJob(receiver, ReceiverTestServices.InboxJobName, "delete-order:1");
+            await receiver.SeedInboxStateAsync(seed.Value, "delete-order:1", owner);
+        }
+        else
+        {
+            _ = await receiver.GetSnapshotAsync();
+        }
+        await receiver.RetryWriteStateAsync();
+        using var incoming = CreateEnvelope(receiver, NewMessage(189, "invalid-delete-order"));
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+        var outbox = GetOutbox(context);
+        var started = new TaskCompletionSource<(Task Delete, Task<DeliveryResult> Delivery)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var scheduling = existingOwner ? null : Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
+        var token = TestContext.Current.CancellationToken;
+        outbox.AfterWriteCompleted = () =>
+        {
+            outbox.AfterWriteCompleted = null;
+            try
+            {
+                Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+                var delete = manager.DeleteStateAsync(token).AsTask();
+                var delivery = extension.DeliverAsync(incoming.Value, token).AsTask();
+                started.SetResult((delete, delivery));
+            }
+            catch (Exception exception) { started.SetException(exception); }
+        };
+        var journalId = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
+        await receiver.RetryWriteStateAsync();
+        var operations = await started.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
+        if (scheduling is not null)
+        {
+            await scheduling.WaitUntilEnteredAsync();
+        }
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => operations.Delete);
+        Assert.Contains("quiescent", failure.Message, StringComparison.Ordinal);
+        Assert.Same(failure, await grain.Faulted.Task);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => operations.Delivery));
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
+        Assert.Empty(grain.GetSnapshotForTest().Effects);
+        Assert.Equal(existingOwner ? 1 : 0, grain.GetSnapshotForTest().InboxCount);
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), token);
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
+        if (existingOwner)
+        {
+            var handled = await Fixture.WaitForEffectCountAsync(receiver, 1);
+            Assert.Equal("preserved-before-delete", Assert.Single(handled.Effects).Value);
+        }
+        else
+        {
+            Assert.Empty(recovered.Effects);
+            Assert.Equal(0, recovered.InboxCount);
+        }
+    }
+
+    [Fact]
+    public async Task AwaitedDeleteThenDirectDelivery_UsesResetStateWithoutFencing()
+    {
+        var receiver = NewGrain();
+        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 190, "delete-this"));
+        await receiver.RetryWriteStateAsync();
+        var before = await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        using var envelope = CreateEnvelope(receiver, NewMessage(191, "new-state"));
+        Assert.Equal(DeliveryStatus.Accepted, (await receiver.DeleteJournalThenDeliverAsync(envelope.Value)).Status);
+        var after = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        _ = await receiver.GetSnapshotAsync();
+        Assert.Equal(before.ActivationId, after.ActivationId);
+        Assert.Equal("new-state", Assert.Single(after.Effects).Value);
+        Assert.Equal(1, after.ProcessedMessageCount);
+        Assert.False(grain.Faulted.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task RejectedDeleteRequest_LeavesInboxAvailableForDelivery()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        grain.NextDeleteRejection = new InvalidOperationException("Injected delete request veto.");
+        var rejected = await InvokeJobAsync(receiver, CreateJob(receiver, "test/delete-journal"));
+        Assert.Equal(DurableJobRunStatus.Failed, rejected.Status);
+        Assert.Contains("delete request veto", Assert.IsType<InvalidOperationException>(rejected.Exception).Message, StringComparison.Ordinal);
+        Assert.False(grain.Faulted.Task.IsCompleted);
+        using var envelope = CreateEnvelope(receiver, NewMessage(192, "after-veto"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
+    }
+
     private static JournaledTestOutbox GetOutbox(IGrainContext context) =>
         (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
 
