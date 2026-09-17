@@ -54,6 +54,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     public async Task OutgoingPreparationFault_FencesBothEndpointsBeforeQueuedWaitersResume()
     {
         using var attempt = await PrepareAttemptAsync("fault-ordering");
+        var extension = attempt.Context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         var queued = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         var failure = new IOException("Injected outgoing prerequisite failure.");
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
@@ -62,7 +63,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => queued));
         Assert.Same(failure, await attempt.Grain.Faulted.Task);
         Assert.Same(failure, attempt.Outbox.Failure);
-        var extension = attempt.Context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+        await attempt.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(async () =>
             await ((IDurableInboxExtension)extension).DeliverAsync(attempt.Envelope, TestContext.Current.CancellationToken)));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
@@ -70,7 +71,6 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Single(failed.Effects);
         Assert.Equal(1, failed.InboxCount);
         Assert.Equal(0, failed.ProcessedMessageCount);
-        await attempt.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await attempt.Receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(attempt.Receiver, 1);
         Assert.NotEqual(failed.ActivationId, recovered.ActivationId);
