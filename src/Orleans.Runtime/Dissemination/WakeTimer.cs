@@ -62,6 +62,24 @@ internal sealed class WakeTimer : IDisposable
     }
 
     /// <summary>
+    /// Disarms the timer and consumes any pending wake, leaving an active waiter in place.
+    /// </summary>
+    public void Reset()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _armed = false;
+            _signaled = false;
+            _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    /// <summary>
     /// Immediately completes the current wait, or causes the next wait to complete immediately.
     /// </summary>
     public void Wake()

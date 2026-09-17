@@ -264,6 +264,7 @@ public partial class DisseminationProtocolTests
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
         var timeProvider = new FakeTimeProvider();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sendCount = 0;
         transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
         {
@@ -273,22 +274,38 @@ public partial class DisseminationProtocolTests
             }
 
             transport.BroadcastBatches.Add((target, batch));
+            sent.TrySetResult();
             return Task.CompletedTask;
         };
 
         var ns = new FakeNamespace(local);
         var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = schedules.WaitAsync(
+            scheduled => scheduled.LocalSilo.Equals(local) && scheduled.Peer.Equals(peer)
+                && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        try
+        {
+            var firstResult = await PublishValue(protocol, ns, ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1), TestContext.Current.CancellationToken);
+            await retry;
+            Assert.Equal(1, sendCount);
+            var beforeNotification = timeProvider.GetTimestamp();
+            var secondResult = await PublishValue(protocol, ns, ns.CreateValue(FakeNamespace.DefaultKey, sequence: 2), TestContext.Current.CancellationToken);
+            await sent.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var firstResult = await PublishValue(protocol, ns, ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1), TestContext.Current.CancellationToken);
-        await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
-        var secondResult = await PublishValue(protocol, ns, ns.CreateValue(FakeNamespace.DefaultKey, sequence: 2), TestContext.Current.CancellationToken);
-        await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
-
-        Assert.True(firstResult);
-        Assert.True(secondResult);
-        Assert.Equal(2, sendCount);
-        var batch = Assert.Single(transport.BroadcastBatches);
-        Assert.Equal(2, GetBroadcastValues(batch.Batch).Single().Value.ToVersion);
+            Assert.True(firstResult);
+            Assert.True(secondResult);
+            Assert.Equal(TimeSpan.Zero, timeProvider.GetElapsedTime(beforeNotification));
+            Assert.Equal(2, sendCount);
+            var batch = Assert.Single(transport.BroadcastBatches);
+            Assert.Equal(2, GetBroadcastValues(batch.Batch).Single().Value.ToVersion);
+        }
+        finally
+        {
+            ns.Options.Enabled = false;
+            await protocol.StopAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     [Theory]
@@ -489,9 +506,8 @@ public partial class DisseminationProtocolTests
             ns,
             ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
             TestContext.Current.CancellationToken));
-        await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
         var retry = await schedule.WaitAsync(
-            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry,
+            e => e.LocalSilo.Equals(local) && e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry,
             TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, sendCount);
@@ -503,6 +519,7 @@ public partial class DisseminationProtocolTests
         Assert.Equal(
             new[] { 1L, 1L },
             transport.BroadcastBatches.Select(batch => Assert.Single(GetBroadcastValues(batch.Batch)).Value.ToVersion));
+        await protocol.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -616,13 +633,13 @@ public partial class DisseminationProtocolTests
     [Fact]
     public async Task BroadcastBatchingStopsPeerFlushAfterSendFailure()
     {
-        var local = CreateSilo(11111);
-        var peer = CreateSilo(11112);
-        var transport = new FakeTransport(local, peer);
-        var timeProvider = new AutoAdvancingTimeProvider(TimeSpan.FromSeconds(2));
+        var (local, peer, transport, ns) = CreatePeerFixture();
+        var timeProvider = new FakeTimeProvider();
         var sendCount = 0;
+        var attempted = new List<DisseminationKey>();
         transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
         {
+            attempted.Add(Assert.Single(GetBroadcastValues(batch)).Value.Key);
             if (Interlocked.Increment(ref sendCount) == 1)
             {
                 throw new InvalidOperationException("transient send failure");
@@ -632,33 +649,29 @@ public partial class DisseminationProtocolTests
             return Task.CompletedTask;
         };
 
-        var ns = new FakeNamespace(local);
-        DisseminationOptions? optionsRef = null;
-        var protocol = CreateProtocol(transport, ns, options =>
+        ns.SetValue("first", 1);
+        ns.SetValue("second", 1);
+        ns.SetValue("third", 1);
+        var queue = CreateBroadcastQueue(transport, [ns], options => options.MaxBatchItems = 1, timeProvider);
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = schedules.WaitAsync(
+            scheduled => scheduled.LocalSilo.Equals(local) && scheduled.Peer.Equals(peer)
+                && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        try
         {
-            optionsRef = options;
-            options.MaxBatchItems = 10;
-        }, timeProvider);
-
-        var publications = BeforeBroadcastPumpsRun(() =>
-        {
-            var pending = new[]
-            {
-                PublishValue(protocol, ns, ns.CreateValue("first", sequence: 1), TestContext.Current.CancellationToken),
-                PublishValue(protocol, ns, ns.CreateValue("second", sequence: 1), TestContext.Current.CancellationToken),
-                PublishValue(protocol, ns, ns.CreateValue("third", sequence: 1), TestContext.Current.CancellationToken),
-            };
-            optionsRef!.MaxBatchItems = 1;
-            return pending;
-        });
-        foreach (var publication in publications)
-        {
-            Assert.True(await publication);
+            Assert.True(queue.NotifyBatch(peer, ns, [new("first", 1, true), new("second", 1, true), new("third", 1, true)]));
+            await retry;
+            Assert.Equal(1, sendCount);
+            Assert.Equal(new DisseminationKey[] { "first" }, attempted);
+            Assert.Equal(1, ns.RepairRequestCount);
+            Assert.Empty(transport.BroadcastBatches);
         }
-        await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
-
-        Assert.Equal(1, sendCount);
-        Assert.Empty(transport.BroadcastBatches);
+        finally
+        {
+            ns.Options.Enabled = false;
+            await queue.StopAsync(TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -670,6 +683,7 @@ public partial class DisseminationProtocolTests
         var transport = new FakeTransport(local, failedPeer, healthyPeer);
         var timeProvider = new FakeTimeProvider();
         var failedPeerAttempts = 0;
+        var healthySent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
         {
             if (Equals(target, failedPeer) && Interlocked.Increment(ref failedPeerAttempts) == 1)
@@ -682,6 +696,11 @@ public partial class DisseminationProtocolTests
                 transport.BroadcastBatches.Add((target, batch));
             }
 
+            if (target.Equals(healthyPeer))
+            {
+                healthySent.TrySetResult();
+            }
+
             return Task.CompletedTask;
         };
 
@@ -690,9 +709,14 @@ public partial class DisseminationProtocolTests
         {
             options.Overlay.FanOutFactor = static _ => 10;
         }, timeProvider);
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = schedules.WaitAsync(
+            scheduled => scheduled.LocalSilo.Equals(local) && scheduled.Peer.Equals(failedPeer)
+                && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.True(await PublishValue(protocol, ns, ns.CreateValue("first", sequence: 1), TestContext.Current.CancellationToken));
-        await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+        await Task.WhenAll(retry, healthySent.Task).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(1, failedPeerAttempts);
         Assert.Equal(new[] { healthyPeer }, GetSentBroadcastPeers(transport));
 
@@ -701,6 +725,7 @@ public partial class DisseminationProtocolTests
         await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
         Assert.Equal(2, failedPeerAttempts);
         Assert.Equal(new[] { failedPeer, healthyPeer }.OrderBy(static peer => peer), GetSentBroadcastPeers(transport).OrderBy(static peer => peer));
+        await protocol.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -4030,22 +4055,6 @@ public partial class DisseminationProtocolTests
         }
     }
 
-    private sealed class AutoAdvancingTimeProvider(TimeSpan step) : TimeProvider
-    {
-        private readonly object _lock = new();
-        private DateTimeOffset _utcNow = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            lock (_lock)
-            {
-                var result = _utcNow;
-                _utcNow += step;
-                return result;
-            }
-        }
-    }
-
     private sealed class RecordingFakeTimeProvider : TimeProvider
     {
         private readonly FakeTimeProvider _inner = new();
@@ -4878,10 +4887,16 @@ public partial class DisseminationProtocolTests
         };
         ns.Options.MaxPendingItemCount = 1;
         var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = schedules.WaitAsync(
+            scheduled => scheduled.LocalSilo.Equals(local) && scheduled.Peer.Equals(peer)
+                && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         ns.Inner.SetValue("ack", 1);
 
         queue.Notify(peer, ns, "ack");
-        await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
+        await retry;
+        Assert.Equal(1, sendCount);
         ns.Inner.SetValue("ack", 2);
         queue.Notify(peer, ns, "ack");
         await queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
@@ -6633,8 +6648,8 @@ public partial class DisseminationProtocolTests
         try
         {
             queue.Notify(peer, ns, "value");
-            var flush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             var sendCancellation = await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var flush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
 
             clock.Advance(ns.Options.StaleItemTtl);
             await flush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -6678,8 +6693,8 @@ public partial class DisseminationProtocolTests
         try
         {
             Assert.True(queue.Notify(peer, ns, "value"));
-            var firstFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             var sendCancellation = await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var firstFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             clock.Advance(ns.Options.StaleItemTtl);
             await firstFlush.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.True(sendCancellation.IsCancellationRequested);
@@ -6812,12 +6827,12 @@ public partial class DisseminationProtocolTests
         try
         {
             Assert.True(queue.Notify(blocked, ns, "value"));
-            var initialFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             var remoteCancellation = await blockedStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var initialFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             var healthyQueued = admission.Wait(healthy, "queued", TestContext.Current.CancellationToken);
             Assert.True(queue.Notify(healthy, ns, "value"));
-            var healthyFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             await healthyQueued.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            var healthyFlush = queue.FlushPendingBroadcast(TestContext.Current.CancellationToken);
             Assert.Equal(1, sends[blocked]);
             Assert.False(sends.ContainsKey(healthy));
             Assert.Equal(1, ns.RepairRequestCount);
@@ -7169,7 +7184,7 @@ public partial class DisseminationProtocolTests
             Assert.True(await PublishValue(node.Protocol, ns, ns.CreateValue(keys[i], i + 1), network.Cancellation));
         }
 
-        await network.Flush(network.Cancellation);
+        await network.WaitForBroadcastRetries(members, network.Cancellation);
         Assert.Equal(12, network.Broadcasts.Count);
         Assert.All(network.Broadcasts, static send => Assert.False(send.Delivered));
         await network.RunSweep(network.Cancellation);
@@ -7218,10 +7233,11 @@ public partial class DisseminationProtocolTests
         var receiverNamespace = Assert.IsType<FakeNamespace>(receiver.Namespace);
         Assert.True(await PublishValue(
             source.Protocol, sourceNamespace, sourceNamespace.CreateValue(FakeNamespace.DefaultKey, 1), network.Cancellation));
-        await network.Flush(network.Cancellation);
+        await network.WaitForBroadcastRetries([source.Address], network.Cancellation);
         Assert.Equal(2, network.Broadcasts.Count);
         Assert.All(network.Broadcasts, static send => Assert.True(send.Delivered));
         AssertFakeState(receiverNamespace, (FakeNamespace.DefaultKey, 1));
+        network.DropTreeBroadcasts = true;
 
         sourceNamespace.SetValue(FakeNamespace.DefaultKey, 3);
         olderNamespace.SetValue(FakeNamespace.DefaultKey, 2);
@@ -7251,7 +7267,7 @@ public partial class DisseminationProtocolTests
 
         try
         {
-            network.Clock.Advance(TimeSpan.FromSeconds(1));
+            network.Clock.Advance(RecoveryNetwork.RepairCadence);
             var round = receiver.Protocol.RunAntiEntropyRound(network.Cancellation);
             await bothRepliesCaptured.Task.WaitAsync(TimeSpan.FromSeconds(5), network.Cancellation);
             Assert.Equal(3, Assert.Single(GetAntiEntropyResponseValues(replies[source.Address])).Value.ToVersion);
@@ -7265,7 +7281,7 @@ public partial class DisseminationProtocolTests
             AssertFakeState(receiverNamespace, (FakeNamespace.DefaultKey, 3));
             Assert.Equal(2, receiverNamespace.ApplyCounts[FakeNamespace.DefaultKey]);
             receiver.Transport.ExchangeAntiEntropyHandler = (peer, _, _) => ValueTask.FromResult(replies[peer]);
-            network.Clock.Advance(TimeSpan.FromSeconds(1));
+            network.Clock.Advance(RecoveryNetwork.RepairCadence);
             await receiver.Protocol.RunAntiEntropyRound(network.Cancellation);
             AssertFakeState(receiverNamespace, (FakeNamespace.DefaultKey, 3));
             Assert.Equal(2, receiverNamespace.ApplyCounts[FakeNamespace.DefaultKey]);
@@ -7393,7 +7409,7 @@ public partial class DisseminationProtocolTests
         managers[source.Address].CurrentSnapshot = advanced;
         Assert.NotEqual(oldFingerprint, source.Namespace.Digests.Single().Fingerprint);
         Assert.True(await source.Protocol.Publish(source.Namespace, DisseminationKey.Default, 7, network.Cancellation));
-        await network.Flush(network.Cancellation);
+        await network.WaitForBroadcastRetries([source.Address], network.Cancellation);
         await network.RunSweep(network.Cancellation);
         foreach (var member in members)
         {
@@ -7402,6 +7418,7 @@ public partial class DisseminationProtocolTests
 
         var repairCount = network.Replies.Sum(static response => GetAntiEntropyResponseValues(response).Count());
         await network.RunSweep(network.Cancellation);
+        var broadcastsBeforeDuplicates = network.Broadcasts.ToArray();
         var duplicate = source.Namespace.CreateRepair(new DisseminationRepairRequest(
             DisseminationKey.Default, null, 1024 * 1024, 1024 * 1024)).Value;
         foreach (var member in members.Skip(1))
@@ -7425,6 +7442,7 @@ public partial class DisseminationProtocolTests
         Assert.Equal(0, applied[source.Address]);
         Assert.Equal(18, network.RequestCount);
         Assert.Equal(repairCount, network.Replies.Sum(static response => GetAntiEntropyResponseValues(response).Count()));
+        Assert.Equal(broadcastsBeforeDuplicates, network.Broadcasts.ToArray());
         Assert.Equal(2, network.Broadcasts.Count);
         Assert.All(network.Broadcasts, static send => Assert.False(send.Delivered));
     }
@@ -7469,7 +7487,7 @@ public partial class DisseminationProtocolTests
             for (var round = 1; round <= 4; round++)
             {
                 sourceNamespace.SetValue(keys[0], round);
-                network.Clock.Advance(TimeSpan.FromSeconds(1));
+                network.Clock.Advance(RecoveryNetwork.RepairCadence);
                 await receiver.Protocol.RunAntiEntropyRound(network.Cancellation);
             }
 
@@ -7485,7 +7503,7 @@ public partial class DisseminationProtocolTests
 
             for (var round = 0; round < 2; round++)
             {
-                network.Clock.Advance(TimeSpan.FromSeconds(1));
+                network.Clock.Advance(RecoveryNetwork.RepairCadence);
                 await receiver.Protocol.RunAntiEntropyRound(network.Cancellation);
             }
 
@@ -7527,8 +7545,10 @@ public partial class DisseminationProtocolTests
     // Every delivery enters a real protocol. There is deliberately no legacy transport or direct namespace-copy path.
     private sealed class RecoveryNetwork : IAsyncDisposable
     {
+        public static readonly TimeSpan RepairCadence = TimeSpan.FromMilliseconds(1);
         private readonly Dictionary<SiloAddress, RecoveryNode> _nodes = [];
         private readonly CancellationTokenSource _cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        private readonly BroadcastScheduleObserver _schedules = new();
         private SiloAddress[] _participants;
 
         public RecoveryNetwork(
@@ -7540,7 +7560,7 @@ public partial class DisseminationProtocolTests
             foreach (var member in members)
             {
                 var ns = createNamespace(member);
-                ns.Options.ExpectedUpdateCadence = TimeSpan.FromSeconds(1);
+                ns.Options.ExpectedUpdateCadence = RepairCadence;
                 var transport = new FakeTransport(member, members.Where(peer => !peer.Equals(member)).ToArray());
                 var protocol = CreateProtocol(transport, [ns], options =>
                 {
@@ -7609,7 +7629,8 @@ public partial class DisseminationProtocolTests
         public async Task RunSweep(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Clock.Advance(TimeSpan.FromSeconds(1));
+            // Repair progresses while the fixed 100 ms broadcast retry timer remains dormant.
+            Clock.Advance(RepairCadence);
             foreach (var member in _participants)
             {
                 await _nodes[member].Protocol.RunAntiEntropyRound(cancellationToken)
@@ -7617,6 +7638,26 @@ public partial class DisseminationProtocolTests
             }
 
             Sweeps++;
+        }
+
+        public async Task WaitForBroadcastRetries(SiloAddress[] publishers, CancellationToken cancellationToken)
+        {
+            var waits = publishers.SelectMany(publisher =>
+                GetOriginatorTreeTargets(publisher, _nodes[publisher].Transport.Peers, fanout: 8)
+                    .Select(peer => _schedules.WaitAsync(
+                        scheduled => scheduled.LocalSilo.Equals(publisher) && scheduled.Peer.Equals(peer)
+                            && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+                        TimeSpan.FromSeconds(5), cancellationToken))).ToArray();
+            try
+            {
+                await Task.WhenAll(waits);
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException(
+                    $"Recovery broadcasts did not enter backoff for {string.Join(", ", publishers.Select(static silo => silo.ToString()))}; "
+                    + $"broadcasts={Broadcasts.Count}, repair requests={RequestCount}, sweeps={Sweeps}.", exception);
+            }
         }
 
         public async Task Flush(CancellationToken cancellationToken)
@@ -7631,6 +7672,7 @@ public partial class DisseminationProtocolTests
         public async ValueTask DisposeAsync()
         {
             _cancellation.Cancel();
+            var cleanupToken = _cancellation.Token;
             foreach (var node in _nodes.Values)
             {
                 node.Namespace.Options.Enabled = false;
@@ -7638,15 +7680,25 @@ public partial class DisseminationProtocolTests
 
             try
             {
-                foreach (var node in _nodes.Values)
-                {
-                    await node.Protocol.StopAsync(TestContext.Current.CancellationToken)
-                        .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                }
+                // Teardown aborts accepted retries; scenarios assert graceful drainage before disposal.
+                await Task.WhenAll(_nodes.Values.Select(StopNode))
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             }
             finally
             {
+                _schedules.Dispose();
                 _cancellation.Dispose();
+            }
+
+            async Task StopNode(RecoveryNode node)
+            {
+                try
+                {
+                    await node.Protocol.StopAsync(cleanupToken);
+                }
+                catch (OperationCanceledException exception) when (exception.CancellationToken == cleanupToken)
+                {
+                }
             }
         }
     }

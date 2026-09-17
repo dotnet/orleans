@@ -46,6 +46,60 @@ public class WakeTimerTests
     }
 
     [Fact]
+    public async Task ResetConsumesRedundantWakeBeforeRetryIsArmed()
+    {
+        var timeProvider = new FakeTimeProvider();
+        using var timer = new WakeTimer(timeProvider);
+        var first = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
+        timer.Wake();
+        timer.Wake();
+        Assert.True(await first);
+
+        timer.Reset();
+        timer.Change(TimeSpan.FromMilliseconds(100));
+        var retry = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
+        Assert.False(retry.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(99));
+        Assert.False(retry.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        Assert.True(await retry.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResetDisarmsOldDeadlineAndPreservesActiveWaiter(bool cancelWait)
+    {
+        var timeProvider = new FakeTimeProvider();
+        using var timer = new WakeTimer(timeProvider);
+        using var cancellation = new CancellationTokenSource();
+        var wait = timer.WaitAsync(cancellation.Token).AsTask();
+        timer.Change(TimeSpan.FromMilliseconds(100));
+        timeProvider.Advance(TimeSpan.FromMilliseconds(50));
+        timer.Reset();
+        timeProvider.Advance(TimeSpan.FromMilliseconds(50));
+        Assert.False(wait.IsCompleted);
+
+        if (cancelWait)
+        {
+            cancellation.Cancel();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => wait.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            timer.Wake();
+            Assert.True(await timer.WaitAsync(TestContext.Current.CancellationToken));
+        }
+        else
+        {
+            timer.Change(TimeSpan.FromMilliseconds(100));
+            timeProvider.Advance(TimeSpan.FromMilliseconds(99));
+            Assert.False(wait.IsCompleted);
+            timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+            Assert.True(await wait.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        }
+    }
+
+    [Fact]
     public async Task StaleCallbackDoesNotWakeRearmedTimer()
     {
         var timeProvider = new ControllableTimeProvider();

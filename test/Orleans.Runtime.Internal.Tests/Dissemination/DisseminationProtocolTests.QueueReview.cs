@@ -134,6 +134,77 @@ public partial class DisseminationProtocolTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task RedundantNotificationAndFlushWakesRespectRetryBoundary(bool transportFailure, bool publishNewVersion)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (_, peer, transport, ns) = CreatePeerFixture(41601, 41602);
+        var clock = new FakeTimeProvider();
+        var context = new MembershipReviewContinuationContext();
+        var versions = new List<long>();
+        ns.SetValue("value", 1);
+        transport.SendBroadcastResponseHandler = (_, batch, _) =>
+        {
+            versions.Add(Assert.Single(GetBroadcastValues(batch)).Value.ToVersion);
+            return versions.Count == 1
+                ? transportFailure
+                    ? Task.FromException<DisseminationBroadcastResponse>(new InvalidOperationException("Initial send fails."))
+                    : Task.FromResult(new DisseminationBroadcastResponse
+                    {
+                        Acknowledgments = new() { [ns.Name] = [new("value", 0)] },
+                    })
+                : Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
+        };
+        var queue = CreateBroadcastQueue(transport, [ns], timeProvider: clock);
+        try
+        {
+            Task initialFlush;
+            var previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(context);
+            try
+            {
+                Assert.True(queue.Notify(peer, ns, "value"));
+                initialFlush = queue.FlushPendingBroadcast(cancellationToken);
+                Assert.False(initialFlush.IsCompleted);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+
+            context.RunAll();
+            await initialFlush.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.Equal(new long[] { 1 }, versions);
+            clock.Advance(TimeSpan.FromMilliseconds(99));
+            context.RunAll();
+            Assert.Equal(new long[] { 1 }, versions);
+            if (publishNewVersion)
+            {
+                ns.SetValue("value", 2);
+                Assert.True(queue.Notify(peer, ns, "value"));
+            }
+            else
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(1));
+            }
+
+            context.RunAll();
+            Assert.Equal(new long[] { 1, publishNewVersion ? 2 : 1 }, versions);
+            Assert.Equal(2, ns.RepairRequestCount);
+        }
+        finally
+        {
+            ns.Options.Enabled = false;
+            var stop = queue.StopAsync(cancellationToken);
+            context.RunAll();
+            await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ShutdownDrainRetriesUntilAcceptedWorkIsAcknowledged(bool transportFailure)
@@ -145,14 +216,24 @@ public partial class DisseminationProtocolTests
         var ns = new FakeNamespace(local);
         ns.SetValue(FakeNamespace.DefaultKey, 2);
         var sentVersions = new List<long>();
-        transport.SendBroadcastResponseHandler = (_, batch, _) =>
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendBroadcastResponseHandler = async (_, batch, token) =>
         {
             sentVersions.Add(Assert.Single(GetBroadcastValues(batch)).Value.ToVersion);
-            return sentVersions.Count == 1
-                ? transportFailure
-                    ? Task.FromException<DisseminationBroadcastResponse>(new InvalidOperationException("Transient send failure."))
-                    : Task.FromResult(new DisseminationBroadcastResponse())
-                : Task.FromResult(FakeTransport.CreateAcknowledgment(batch));
+            if (sentVersions.Count == 1)
+            {
+                firstStarted.TrySetResult();
+                await releaseFirst.Task.WaitAsync(token);
+                if (transportFailure)
+                {
+                    throw new InvalidOperationException("Transient send failure.");
+                }
+
+                return new DisseminationBroadcastResponse();
+            }
+
+            return FakeTransport.CreateAcknowledgment(batch);
         };
         var queue = CreateBroadcastQueue(transport, [ns], timeProvider: clock);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -163,10 +244,13 @@ public partial class DisseminationProtocolTests
             TimeSpan.FromSeconds(5),
             TestContext.Current.CancellationToken);
 
-        Assert.True(queue.Notify(peer, ns, FakeNamespace.DefaultKey));
-        var stop = queue.StopAsync(cancellation.Token);
+        Task? stop = null;
         try
         {
+            Assert.True(queue.Notify(peer, ns, FakeNamespace.DefaultKey));
+            await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            stop = queue.StopAsync(cancellation.Token);
+            releaseFirst.TrySetResult();
             var scheduled = await retry;
             Assert.False(stop.IsCompleted);
             Assert.False(queue.Notify(peer, ns, "after-stop"));
@@ -179,12 +263,14 @@ public partial class DisseminationProtocolTests
         }
         finally
         {
+            releaseFirst.TrySetResult();
             cancellation.Cancel();
+            stop ??= queue.StopAsync(cancellation.Token);
             try
             {
                 await stop.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellation.Token)
             {
             }
         }

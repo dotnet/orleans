@@ -545,7 +545,6 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             cancellationToken.ThrowIfCancellationRequested();
             Task? flushCompletion;
-            var wake = false;
             lock (_lock)
             {
                 if (_pumpFailure is { } pumpFailure)
@@ -556,7 +555,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 if (DirtyCount > 0)
                 {
                     flushCompletion = _nextFlushCompletion.Task;
-                    wake = true;
+                    _flushTimer.Wake();
                 }
                 else
                 {
@@ -569,11 +568,6 @@ internal sealed partial class DisseminationBroadcastQueue
                 return;
             }
 
-            if (wake)
-            {
-                _flushTimer.Wake();
-            }
-
             flushCompletion.Ignore();
             await flushCompletion.WaitAsync(cancellationToken);
         }
@@ -582,7 +576,6 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             Task? flushCompletion;
             TaskCompletionSource? droppedFlushCompletion = null;
-            var wake = false;
             var alreadyStopping = false;
             lock (_lock)
             {
@@ -604,7 +597,6 @@ internal sealed partial class DisseminationBroadcastQueue
                         else if (DirtyCount > 0)
                         {
                             flushCompletion = _nextFlushCompletion.Task;
-                            wake = true;
                         }
                         else
                         {
@@ -630,9 +622,12 @@ internal sealed partial class DisseminationBroadcastQueue
             droppedFlushCompletion?.TrySetResult();
             try
             {
-                if (wake)
+                lock (_lock)
                 {
-                    _flushTimer.Wake();
+                    if (ReferenceEquals(flushCompletion, _nextFlushCompletion.Task))
+                    {
+                        _flushTimer.Wake();
+                    }
                 }
 
                 while (flushCompletion is not null)
@@ -707,6 +702,8 @@ internal sealed partial class DisseminationBroadcastQueue
             // Move one dirty generation to in-flight atomically; a concurrent notification can mark it dirty again.
             lock (_lock)
             {
+                // All wakes issued before this drain refer to the work being consumed now.
+                _flushTimer.Reset();
                 if (DirtyCount == 0)
                 {
                     return;

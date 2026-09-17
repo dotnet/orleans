@@ -63,6 +63,23 @@ public partial class DisseminationProtocolTests
         public override void Post(SendOrPostCallback callback, object? state) =>
             _continuations.Writer.TryWrite((callback, state));
 
+        public void RunAll()
+        {
+            var previous = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(this);
+            try
+            {
+                while (_continuations.Reader.TryRead(out var continuation))
+                {
+                    continuation.Callback(continuation.State);
+                }
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previous);
+            }
+        }
+
         public async Task<(SendOrPostCallback Callback, object? State)> TakeContinuation(CancellationToken cancellationToken)
         {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
