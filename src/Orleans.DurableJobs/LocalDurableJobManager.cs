@@ -34,6 +34,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly DurableJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
     private readonly CancellationTokenSource _requestCts = new();
+    private readonly CancellationTokenSource _cleanupCts = new();
     private Task? _listenForClusterChangesTask;
     private Task? _periodicCheckTask;
 
@@ -240,6 +241,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private async Task Stop(CancellationToken ct)
     {
         var admissionDrained = _admission.CloseAsync();
+        using var cleanupCancellation = ct.Register(() => CancelForShutdown(_cleanupCts, "cleanup"));
         LogStopping(_logger, _runningShards.Count);
 
         CancelForShutdown(_requestCts, "requests");
@@ -628,22 +630,25 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         try
         {
-            await _shardExecutor.RunShardAsync(shard, _cts.Token);
-
-            // Unregister the shard from the manager
             try
             {
-                await _shardManager.UnregisterShardAsync(shard, _cts.Token);
+                await _shardExecutor.RunShardAsync(shard, _cts.Token);
+            }
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+            {
+                // Execution cancellation leaves ownership cleanup with this runner.
+            }
+
+            // Cleanup is canceled by the shutdown deadline, independently of execution.
+            try
+            {
+                await _shardManager.UnregisterShardAsync(shard, _cleanupCts.Token);
                 LogUnregisteredShard(_logger, shard.Id);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
                 LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
-        }
-        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
-        {
-            // Cancellation initiated by Stop is expected.
         }
         finally
         {
