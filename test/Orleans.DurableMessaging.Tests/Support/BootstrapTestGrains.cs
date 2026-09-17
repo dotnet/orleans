@@ -236,11 +236,15 @@ public sealed class AlwaysInterleaveBootstrapGrain(BootstrapObservation observat
 
 public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
 {
+    public BootstrapClusterFixture(bool useServiceCollection = false)
+        : base(1, receiverOnly: false, useServiceCollection: useServiceCollection)
+    {
+    }
+
     public BootstrapProbe Probe { get; } = new();
     public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
-        BootstrapOutboxServices.Add(services);
         services.AddSingleton(Probe);
         services.AddSingleton(Delivery);
         services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
