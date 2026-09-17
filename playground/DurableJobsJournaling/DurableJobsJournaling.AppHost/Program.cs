@@ -35,7 +35,7 @@ var backend = StorageBackendConfiguration.Parse(builder.Configuration.GetValue("
 var storage = builder.AddAzureStorage("storage");
 if (backend.IsEmulator())
 {
-    storage.RunAsEmulator();
+    storage.RunAsEmulator(emulator => emulator.WithDataVolume());
 }
 else
 {
@@ -76,7 +76,7 @@ if (backend == StorageBackend.PremiumBlob)
 var orleans = builder.AddOrleans("cluster")
     .WithClustering(tables);
 
-var runId = Guid.NewGuid().ToString("N");
+var runId = builder.Configuration["Playground:Storage:RunId"] ?? Guid.NewGuid().ToString("N");
 var silo = builder.AddProject<Projects.DurableJobsJournaling_Silo>("silo")
     .WithReference(orleans)
     .WithReference(tables)
@@ -86,6 +86,11 @@ var silo = builder.AddProject<Projects.DurableJobsJournaling_Silo>("silo")
     .WithEnvironment("Playground__Storage__Provider", backend.ToString())
     .WithEnvironment("Playground__Storage__Container", $"durablejobs-{runId}")
     .WithEnvironment("Playground__Storage__Table", $"durablejobs{runId}")
+    .WithEnvironment("Playground__Storage__ContainerB", $"durablejobs-b-{runId}")
+    .WithEnvironment("Playground__Storage__TableB", $"durablejobsb{runId}")
+    .WithEnvironment("Playground__Migration__ActiveProviderName", builder.Configuration.GetValue("Playground:Migration:ActiveProviderName", "jobs-a"))
+    .WithEnvironment("Playground__Migration__DrainOtherProvider", builder.Configuration.GetValue("Playground:Migration:DrainOtherProvider", true).ToString())
+    .WithEnvironment("Playground__Migration__ReportInventory", builder.Configuration.GetValue("Playground:Migration:ReportInventory", false).ToString())
     .WithEnvironment("OTEL_METRIC_EXPORT_INTERVAL", OtelMetricExportIntervalMilliseconds);
 
 if (backend.UsesTableJournal())

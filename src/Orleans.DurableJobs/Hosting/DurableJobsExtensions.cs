@@ -83,12 +83,8 @@ public static class DurableJobsExtensions
     /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
     public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder)
     {
-        builder.AddDurableJobs();
-        builder.AddJournalStorage();
-        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
-
-        builder.ConfigureServices(services => services.UseVolatileJournaledDurableJobs());
-        return builder;
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.AddVolatileJournalStorage().UseJournaledDurableJobs();
     }
 
     /// <summary>
@@ -101,19 +97,54 @@ public static class DurableJobsExtensions
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
     internal static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
     {
-        var builder = new ServiceCollectionSiloBuilder(services);
-        builder.AddJournalStorage();
-        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
-        return services.UseVolatileJournaledDurableJobs();
+        new ServiceCollectionSiloBuilder(services).UseInMemoryDurableJobs();
+        return services;
     }
 
-    private static IServiceCollection UseVolatileJournaledDurableJobs(this IServiceCollection services)
+    /// <summary>
+    /// Configures Durable Jobs to create shards in the selected write journal provider
+    /// and drain existing shards from all selected providers.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configure">The optional Durable Jobs configuration delegate.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder UseJournaledDurableJobs(this ISiloBuilder builder, Action<DurableJobsOptions>? configure = null)
     {
-        services.TryAddSingleton<VolatileJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, VolatileJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageCatalog, VolatileJournalStorageProvider>();
-        services.TryAddSingleton<JournaledJobShardManager>();
-        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.AddDurableJobs();
+        builder.AddJournalStorage();
+        builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        if (configure is not null)
+        {
+            builder.Services.Configure(configure);
+        }
+
+        var services = builder.Services;
+        services.TryAddSingleton<DurableJobsJournalProviders>();
+        services.TryAddSingleton(sp => new JournaledJobShardManager(
+            sp.GetRequiredService<ILocalSiloDetails>(),
+            sp.GetRequiredService<DurableJobsJournalProviders>(),
+            sp.GetRequiredService<IClusterMembershipService>(),
+            sp,
+            sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
+            sp.GetRequiredService<IOptions<JournaledStateManagerOptions>>(),
+            sp.GetRequiredService<DurableJobsInstruments>(),
+            sp.GetRequiredService<ILogger<JournaledJobShardManager>>()));
+        services.TryAddFromExisting<JobShardManager, JournaledJobShardManager>();
+        services.TryAddSingleton<IDurableJobsStorageInspector, DurableJobsStorageInspector>();
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures Durable Jobs to use the selected named journal providers.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">The optional Durable Jobs configuration delegate.</param>
+    /// <returns>The service collection.</returns>
+    public static IServiceCollection UseJournaledDurableJobs(this IServiceCollection services, Action<DurableJobsOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        new ServiceCollectionSiloBuilder(services).UseJournaledDurableJobs(configure);
         return services;
     }
 

@@ -98,6 +98,8 @@ items:
         items:
           - name: Overview
             href: grains/journaling/index.md
+          - name: Migrate Durable Jobs storage
+            href: grains/journaling/durable-jobs-migration.md
           - name: Use durable state
             href: grains/journaling/durable-state.md
           - name: Runtime behavior and consistency

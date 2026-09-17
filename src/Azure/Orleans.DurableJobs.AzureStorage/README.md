@@ -29,6 +29,76 @@ provides runnable Blob/Table backend selection. The
 measure append, checkpoint, recovery, and catalog workloads with bounded work
 and explicit resource ownership.
 
+### Named providers and account migration
+
+For explicit storage selection, register
+`AddAzureBlobJournalStorage("jobs-a", configure)` or
+`AddAzureTableJournalStorage("jobs-a", configure)` and call
+`UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs-a")`.
+Both builder and service-collection APIs are supported. Each name has its own
+backend options, storage provider, catalog, and state-manager factory. Named
+registrations leave default grain journaling independent.
+
+To move new work to another account, container, or table, retain A's original
+namespace under `"jobs-a"` and register B's namespace under `"jobs-b"`:
+
+```csharp
+siloBuilder
+    .AddAzureBlobJournalStorage("jobs-a", options =>
+    {
+        options.BlobServiceClient = originalAccountClient;
+        options.ContainerName = "jobs";
+    })
+    .AddAzureBlobJournalStorage("jobs-b", options =>
+    {
+        options.BlobServiceClient = newAccountClient;
+        options.ContainerName = "jobs";
+    })
+    .UseJournaledDurableJobs(options =>
+    {
+        options.ActiveProviderName = "jobs-b";
+        options.DrainingProviderNames.Add("jobs-a");
+    });
+```
+
+The same pattern works with separate Table names/clients, or a Blob-to-Table
+change. Register each physical namespace under one selected name; changing a
+name's account or mapping while it contains work changes where those jobs can
+be found.
+
+With one selected provider, uncached shard lookup reads its metadata directly.
+With B plus A selected, discovery reads both catalogs and known-ID lookup checks
+B then A as needed. Existing jobs, including retries, reschedules, cancellation,
+and deletion, continue writing A. New shards are created only in B. Shard IDs
+and `DurableJob` handles remain timestamp/GUID-based and provider-independent.
+Storage errors remain distinct from successful absence.
+
+Before enabling B writes, deploy both selected bindings to all scheduling silos
+with A as write provider and B as draining. Then roll out B as write provider
+and A as draining. These settings take effect at startup. Pause scheduling for
+a strict cutover boundary; otherwise A-configured silos can keep creating A
+shards until the rollout and their admitted scheduling requests finish.
+
+Keep A's identity authorized for listing, reads, conditional metadata updates,
+journal writes, compaction, and deletes for the entire drain. These permissions
+allow existing jobs to progress and their shards to be cleaned up.
+Preserve WAL/checkpoint or Table partition mappings and the
+readers needed to recover both providers.
+
+Use `IDurableJobsStorageInspector.InspectAsync("jobs-a", cancellationToken)`
+for a full `jobs/shards/` inventory, including future-dated and poisoned work.
+Report inventory failures as unknown. After **all writers** have cut over,
+require successful complete inventories with a total shard count of zero,
+including unrecognized entries, before removing A. Retirement combines these
+live observations with independent evidence of completed cluster-wide writer
+cutover.
+
+The [migration sample](../../../samples/DurableJobsMigration/README.md)
+uses disk-backed Azurite, two Blob namespaces, separate prepare/drain processes,
+and local inventory reporting. See the
+[core migration guidance](../../Orleans.DurableJobs/README.md#cut-over-and-retire-a-provider)
+for rollback and retirement criteria.
+
 #### Using Connection String
 ```csharp
 using Azure.Storage.Blobs;

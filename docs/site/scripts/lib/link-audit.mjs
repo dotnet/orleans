@@ -757,6 +757,8 @@ export async function auditRenderedInternalLinks({
         targetUrl.origin !== 'https://dotnet.github.io' &&
         targetUrl.origin !== 'https://docs.invalid'
       ) {
+        const normalized = new URL(targetUrl);
+        normalized.hash = '';
         const sourceTarget = repositorySourceTarget(targetUrl, repositoryRoot);
         if (sourceTarget) {
           if (sourceTarget.error) {
@@ -779,11 +781,10 @@ export async function auditRenderedInternalLinks({
               );
             }
           }
+          externalTargets?.delete(normalized.href);
           continue;
         }
         if (['http:', 'https:'].includes(targetUrl.protocol) && externalTargets) {
-          const normalized = new URL(targetUrl);
-          normalized.hash = '';
           if (!externalTargets.has(normalized.href)) {
             externalTargets.set(normalized.href, [
               { relativeFile: route, line: 1, rendered: true },

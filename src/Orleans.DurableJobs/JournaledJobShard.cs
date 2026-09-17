@@ -31,6 +31,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// Initializes a new instance of the <see cref="JournaledJobShard"/> class.
     /// </summary>
     /// <param name="shardId">The unique identifier for this job shard.</param>
+    /// <param name="provider">The journal provider containing this shard.</param>
     /// <param name="startTime">The start time of the time range managed by this shard.</param>
     /// <param name="endTime">The end time of the time range managed by this shard.</param>
     /// <param name="metadata">Optional metadata associated with this job shard.</param>
@@ -46,6 +47,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// <param name="durableJobsInstruments">The durable jobs metrics instruments.</param>
     public JournaledJobShard(
         JobShardId shardId,
+        DurableJobsJournalProvider provider,
         DateTimeOffset startTime,
         DateTimeOffset endTime,
         IReadOnlyDictionary<string, string>? metadata,
@@ -58,6 +60,7 @@ internal sealed class JournaledJobShard : IJobShard
         DurableJobsInstruments? durableJobsInstruments = null)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(stateManager);
         ArgumentNullException.ThrowIfNull(shardManager);
         if (batchLingerDelay < TimeSpan.Zero)
@@ -66,6 +69,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
 
         Id = shardId.Value;
+        Provider = provider;
         StartTime = startTime;
         EndTime = endTime;
         Metadata = metadata is { Count: > 0 } ? new Dictionary<string, string>(metadata, StringComparer.Ordinal) : null;
@@ -86,6 +90,8 @@ internal sealed class JournaledJobShard : IJobShard
 
     /// <inheritdoc/>
     public string Id { get; }
+
+    internal DurableJobsJournalProvider Provider { get; }
 
     /// <inheritdoc/>
     public DateTimeOffset StartTime { get; }
@@ -416,7 +422,7 @@ internal sealed class JournaledJobShard : IJobShard
             bool isOwned;
             try
             {
-                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false);
+                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Provider, Id, _shutdownCancellation.Token).ConfigureAwait(false);
             }
             finally
             {
@@ -518,7 +524,7 @@ internal sealed class JournaledJobShard : IJobShard
             switch (operation)
             {
                 case MarkAsCompleteOperation markAsComplete:
-                    if (!_state.IsAddingCompleted && await _shardManager.TryMarkShardClosedAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+                    if (!_state.IsAddingCompleted && await _shardManager.TryMarkShardClosedAsync(Provider, Id, _shutdownCancellation.Token).ConfigureAwait(false))
                     {
                         _state.MarkAsComplete();
                     }

@@ -87,6 +87,27 @@ namespace Orleans.DurableJobs
         RescheduleRequested = 3
     }
 
+    public sealed partial class DurableJobsStorageStatus
+    {
+        internal DurableJobsStorageStatus() { }
+
+        public bool IsWriteProvider { get { throw null; } }
+
+        public System.DateTimeOffset? NewestShardStartTime { get { throw null; } }
+
+        public System.DateTimeOffset? OldestShardStartTime { get { throw null; } }
+
+        public long OwnedShardCount { get { throw null; } }
+
+        public long PoisonedShardCount { get { throw null; } }
+
+        public string ProviderName { get { throw null; } }
+
+        public long ShardCount { get { throw null; } }
+
+        public long UnrecognizedShardCount { get { throw null; } }
+    }
+
     public static partial class DurableJobTimeProviderNames
     {
         public const string DurableJobs = "Orleans.DurableJobs";
@@ -106,6 +127,11 @@ namespace Orleans.DurableJobs
     public partial interface IDurableJobHandlerRegistry
     {
         void Register(IDurableJobFeatureHandler handler);
+    }
+
+    public partial interface IDurableJobsStorageInspector
+    {
+        System.Threading.Tasks.ValueTask<DurableJobsStorageStatus> InspectAsync(string providerName, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJobRunContext
@@ -221,11 +247,19 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddDurableJobs(this ISiloBuilder builder) { throw null; }
 
         public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseJournaledDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<DurableJobsOptions>? configure = null) { throw null; }
+
+        public static ISiloBuilder UseJournaledDurableJobs(this ISiloBuilder builder, System.Action<DurableJobsOptions>? configure = null) { throw null; }
     }
 
     public sealed partial class DurableJobsOptions
     {
+        public string ActiveProviderName { get { throw null; } set { } }
+
         public bool ConcurrencySlowStartEnabled { get { throw null; } set { } }
+
+        public System.Collections.Generic.List<string> DrainingProviderNames { get { throw null; } }
 
         public System.TimeSpan JobStatusPollInterval { get { throw null; } set { } }
 

@@ -50,6 +50,20 @@ it contains work. A configuration-based `GrainJournaling` provider name selects
 the journal registration; `ServiceKey` selects the Azure or Redis client from
 dependency injection.
 
+For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
+selects the journaled implementation.
+<xref:Orleans.Hosting.DurableJobsOptions.ActiveProviderName> selects the provider
+for new shards and defaults to `Default`.
+<xref:Orleans.Hosting.DurableJobsOptions.DrainingProviderNames> selects additional
+providers containing existing shards and is empty by default. All selected
+bindings require storage, catalog, and factory services and are validated at
+startup. Bindings remain fixed for that process's lifetime.
+
+See [Migrate Durable Jobs storage](durable-jobs-migration.md) for named selection,
+deployment staging, and full-namespace retirement checks. The runnable sample
+linked from that guide exercises the new APIs against packages built from this
+repository; existing published snippet packages predate named-provider selection.
+
 ## Configure the JSON format
 
 JSON Lines is the default write format. Register source-generated metadata for every application type used as a durable key, value, collection item, persistent state, or durable task result:
@@ -88,6 +102,6 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 
 ## Development storage
 
-<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery.
+<xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> registers core services and resolves an <xref:Orleans.Journaling.IJournalStorageProvider>. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.HostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

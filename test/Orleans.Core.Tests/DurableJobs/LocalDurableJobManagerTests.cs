@@ -1986,6 +1986,88 @@ public class LocalDurableJobManagerTests
         await shard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancelAsync_AfterProviderCutoverUsesOriginalHandleAndJournalWhileNewSchedulesUseWriteProvider(bool routeFromUncachedSilo)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var a = new VolatileJournalStorageProvider();
+        var b = new VolatileJournalStorageProvider();
+        await using var servicesA = CreateJournaledServices(a, time);
+        await using var servicesB = CreateJournaledServices(b, time);
+        var bindingA = new DurableJobsJournalProvider("A", a, a, servicesA.GetRequiredService<IJournaledStateManagerFactory>());
+        var bindingB = new DurableJobsJournalProvider("B", b, b, servicesB.GetRequiredService<IJournaledStateManagerFactory>());
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var caller = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(owner, SiloStatus.Active);
+        membership.SetSiloStatus(caller, SiloStatus.Active);
+        var options = CreateOptions();
+        options.ActiveProviderName = "B";
+        options.DrainingProviderNames.Add("A");
+        var managerOptions = servicesB.GetRequiredService<IOptions<JournaledStateManagerOptions>>();
+        var original = new JournaledJobShardManager(new TestLocalSiloDetails(owner),
+            new DurableJobsJournalProviders(bindingA, bindingB), membership, servicesA, Options.Create(options), managerOptions);
+        var future = time.GetUtcNow().AddYears(10);
+        await using var shard = await original.CreateShardAsync(future, future.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        var handle = await shard.TryScheduleJobAsync(CreateScheduleRequest(future, "before-cutover"), token);
+        Assert.NotNull(handle);
+        await original.UnregisterShardAsync(shard, token);
+
+        var cutover = new JournaledJobShardManager(new TestLocalSiloDetails(owner),
+            new DurableJobsJournalProviders(bindingB, bindingA), membership, servicesB, Options.Create(options), managerOptions);
+        var recovered = Assert.Single(await cutover.AssignJobShardsAsync(future, 1, token));
+        Assert.True(recovered.IsAddingCompleted);
+        Assert.Equal(handle.ShardId, recovered.Id);
+        var receiver = CreateManager(cutover, time, options, siloAddress: owner);
+        var receiverAccessor = new LocalDurableJobManager.TestAccessor(receiver);
+        receiverAccessor.AddWritableShard(future, recovered);
+        var remote = Substitute.For<ILocalDurableJobManagerSystemTarget>();
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(LocalDurableJobManager.JobManagerGrainType, owner)
+            .Returns(remote);
+        remote.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>())
+            .Returns(call => receiver.CancelAsync(call.ArgAt<DurableJob>(0), call.ArgAt<CancellationToken>(1)));
+        var lookup = new JournaledJobShardManager(new TestLocalSiloDetails(caller),
+            new DurableJobsJournalProviders(bindingB, bindingA), membership, servicesB, Options.Create(options), managerOptions);
+        var routingManager = CreateManager(lookup, time, options, grainFactory);
+        try
+        {
+            // Scheduling encounters the recovered closed shard but must create a writable shard in B.
+            var newHandle = await receiver.ScheduleJobAsync(CreateScheduleRequest(future, "after-cutover"), token);
+            Assert.NotEqual(handle.ShardId, newHandle.ShardId);
+            var newId = JobShardId.Parse(newHandle.ShardId).ToJournalId();
+            var oldId = JobShardId.Parse(handle.ShardId).ToJournalId();
+            Assert.NotNull(await b.CreateStorage(newId).GetMetadataAsync(token));
+            Assert.Null(await a.CreateStorage(newId).GetMetadataAsync(token));
+            Assert.Null(await b.CreateStorage(oldId).GetMetadataAsync(token));
+
+            Assert.True(await (routeFromUncachedSilo ? routingManager : receiver).CancelAsync(handle, token));
+            Assert.Equal(0, await recovered.GetJobCountAsync());
+            Assert.False(await receiver.CancelAsync(handle, token));
+            if (routeFromUncachedSilo)
+            {
+                await remote.Received(1).CancelAsync(handle, Arg.Any<CancellationToken>());
+            }
+            else
+            {
+                await remote.DidNotReceive().CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>());
+            }
+
+            await CreateLifecycleObserver(receiver).OnStop(token);
+            Assert.Null(await a.CreateStorage(oldId).GetMetadataAsync(token));
+            Assert.NotNull(await b.CreateStorage(newId).GetMetadataAsync(token));
+        }
+        finally
+        {
+            await CreateLifecycleObserver(receiver).OnStop(token);
+            await CreateLifecycleObserver(routingManager).OnStop(token);
+            await recovered.DisposeAsync();
+        }
+    }
+
     [Fact]
     public async Task CancelAsync_NullJob_Throws()
     {
@@ -2205,6 +2287,80 @@ public class LocalDurableJobManagerTests
         Assert.Null(await storageProvider
             .CreateStorage(JobShardId.Parse(job.ShardId).ToJournalId())
             .GetMetadataAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ProviderCutover_DiscoveredOldJobExecutesAndDeletesAWhileNewFutureJobRemainsInB()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var a = new VolatileJournalStorageProvider();
+        var b = new VolatileJournalStorageProvider();
+        await using var servicesA = CreateJournaledServices(a, time);
+        await using var servicesB = CreateJournaledServices(b, time);
+        var bindingA = new DurableJobsJournalProvider("A", a, a, servicesA.GetRequiredService<IJournaledStateManagerFactory>());
+        var bindingB = new DurableJobsJournalProvider("B", b, b, servicesB.GetRequiredService<IJournaledStateManagerFactory>());
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var details = new TestLocalSiloDetails(silo);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var options = CreateOptions();
+        var original = new JournaledJobShardManager(details, new DurableJobsJournalProviders(bindingA, bindingB),
+            membership, servicesA, Options.Create(options), servicesA.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+        await using var shard = await original.CreateShardAsync(time.GetUtcNow(), time.GetUtcNow().AddMinutes(1),
+            new Dictionary<string, string>(), token);
+        var oldJob = await shard.TryScheduleJobAsync(CreateScheduleRequest(time.GetUtcNow(), "execute-from-A"), token);
+        Assert.NotNull(oldJob);
+        await original.UnregisterShardAsync(shard, token);
+        var cutover = new JournaledJobShardManager(details, new DurableJobsJournalProviders(bindingB, bindingA),
+            membership, servicesB, Options.Create(options), servicesB.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
+        var recovered = Assert.Single(await cutover.AssignJobShardsAsync(time.GetUtcNow(), 1, token));
+        var handled = new TaskCompletionSource<IJobRunContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(call => new ValueTask<DurableJobRunResult>(HandleAsync(call.ArgAt<IJobRunContext>(0))));
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        var manager = CreateManager(cutover, time, options, grainFactory);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        try
+        {
+            var futureJob = await manager.ScheduleJobAsync(CreateScheduleRequest(time.GetUtcNow().AddYears(1), "remain-in-B"), token);
+            accessor.TryActivateShard(recovered);
+            var context = await handled.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Equal(oldJob.Id, context.Job.Id);
+            Assert.Equal(oldJob.ShardId, context.Job.ShardId);
+            Assert.Equal("execute-from-A", context.Job.Name);
+            Assert.Equal(1, context.DequeueCount);
+            Assert.True(accessor.TryGetRunningShardTask(recovered.Id, out var running));
+            complete.SetResult();
+            await running!.WaitAsync(TimeSpan.FromSeconds(5), token);
+
+            var oldId = JobShardId.Parse(oldJob.ShardId).ToJournalId();
+            var newId = JobShardId.Parse(futureJob.ShardId).ToJournalId();
+            Assert.Null(await a.CreateStorage(oldId).GetMetadataAsync(token));
+            Assert.Null(await b.CreateStorage(oldId).GetMetadataAsync(token));
+            Assert.Null(await a.CreateStorage(newId).GetMetadataAsync(token));
+            Assert.NotNull(await b.CreateStorage(newId).GetMetadataAsync(token));
+            await extension.Received(1).HandleDurableJobAsync(
+                Arg.Is<IJobRunContext>(run => run.Job.Id == oldJob.Id), Arg.Any<CancellationToken>());
+            await extension.DidNotReceive().HandleDurableJobAsync(
+                Arg.Is<IJobRunContext>(run => run.Job.Id == futureJob.Id), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            complete.TrySetResult();
+            await CreateLifecycleObserver(manager).OnStop(token);
+            await recovered.DisposeAsync();
+        }
+
+        async Task<DurableJobRunResult> HandleAsync(IJobRunContext context)
+        {
+            handled.TrySetResult(context);
+            await complete.Task.WaitAsync(token);
+            return DurableJobRunResult.Completed;
+        }
     }
 
     [Fact]
@@ -2555,9 +2711,10 @@ public class LocalDurableJobManagerTests
         FakeTimeProvider timeProvider,
         DurableJobsOptions options,
         IInternalGrainFactory? grainFactory = null,
-        ILogger<LocalDurableJobManager>? logger = null)
+        ILogger<LocalDurableJobManager>? logger = null,
+        SiloAddress? siloAddress = null)
     {
-        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        siloAddress ??= SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
         var localSiloDetails = new TestLocalSiloDetails(siloAddress);
         grainFactory ??= Substitute.For<IInternalGrainFactory>();
         var overloadDetector = Substitute.For<IOverloadDetector>();

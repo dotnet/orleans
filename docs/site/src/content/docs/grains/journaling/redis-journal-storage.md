@@ -27,6 +27,14 @@ configure default grain journaling. A `ServiceKey` in configuration chooses the
 client connection, while the `GrainJournaling` provider name chooses the storage
 binding.
 
+Durable Jobs can select a Redis write provider and retain another provider for
+draining. Keep the old prefix, credentials, and mutation permissions until every
+old shard is resolved: claims, retries, cancellation, compaction, and deletion
+continue there. A Redis catalog scan has live-listing semantics, so successful
+inventory is an observation rather than a transactionally frozen cluster view.
+Follow [Migrate Durable Jobs storage](durable-jobs-migration.md), including
+repeated complete inventories after all scheduling silos have cut over.
+
 ## Storage behavior
 
 The provider stores journal data in Redis strings and journal metadata in Redis hashes. Per-journal reads and mutations use atomic Lua scripts. Catalog operations discover journals by scanning metadata keys on each connected primary Redis server.

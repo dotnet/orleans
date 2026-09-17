@@ -105,6 +105,97 @@ builder.UseOrleans(siloBuilder =>
 });
 ```
 
+## Select named journal storage
+
+`UseJournaledDurableJobs` on `ISiloBuilder` or `IServiceCollection` installs the
+journaled shard manager and Durable Jobs JSON metadata independently of the
+storage backend. Register a catalog-capable journal provider, then select it
+with `DurableJobsOptions.ActiveProviderName`. The default name is `"Default"`.
+`DrainingProviderNames` is initially empty.
+
+```csharp
+siloBuilder
+    .AddAzureBlobJournalStorage("jobs-a", options =>
+    {
+        options.BlobServiceClient = originalClient;
+        options.ContainerName = "jobs-original";
+    })
+    .AddAzureBlobJournalStorage("jobs-b", options =>
+    {
+        options.BlobServiceClient = currentClient;
+        options.ContainerName = "jobs-current";
+    })
+    .UseJournaledDurableJobs(options =>
+    {
+        options.ActiveProviderName = "jobs-b";
+        options.DrainingProviderNames.Add("jobs-a");
+    });
+```
+
+Named Blob, Table, Redis, S3, and volatile registrations bind storage, catalog,
+and state-manager factory to the same configured namespace. Explicit names
+leave the default provider for grain journaling independent. Keep each physical
+namespace registered under one selected name. `UseInMemoryDurableJobs`,
+`UseAzureBlobDurableJobs`, and `UseAzureTableDurableJobs` remain convenience
+compositions for the default binding. Volatile storage retains jobs for the
+lifetime of its process; use persistent storage for restart recovery.
+
+The `"Default"` storage binding retains the existing unnamed backend-options
+pipeline; non-default bindings such as `"jobs-a"` use named backend options.
+
+Most deployments select one provider. An uncached known-shard lookup then
+reads that provider's metadata directly, irrespective of other journal providers
+registered for grain state. During migration, discovery covers the write and
+draining providers, and uncached known-ID lookups read the write provider first,
+then draining providers as needed. An unavailable provider surfaces a lookup
+failure; absence requires successful checks across all selected providers.
+
+New schedules use shards created in the write provider. Existing shards retain
+their original provider for ownership, replay, execution, retry, rescheduling,
+cancellation, compaction, and deletion. Timestamp/GUID shard IDs,
+`jobs/shards/<id>` paths, and provider-independent serialized `DurableJob`
+handles stay unchanged. A shard has one authoritative storage location
+throughout its lifetime.
+
+### Cut over and retire a provider
+
+Bindings are fixed at startup. For an A-to-B migration:
+
+1. Deploy both bindings and select A for writes and B for draining on **every**
+   scheduling silo before any silo creates B work.
+2. Roll out B for writes and A for draining. A-configured silos can still create
+   A shards during this rollout. Cutover finishes when every scheduling silo
+   uses B and prior scheduling calls have finished. Pause application scheduling
+   during the change if a strict cutover boundary is required.
+3. Retain mutation permissions on A. Draining requires listing, reads, claims,
+   durable updates, retries, cancellation, compaction, and deletion.
+4. After all writers have cut over, inspect A's complete namespace using
+   `IDurableJobsStorageInspector.InspectAsync("jobs-a", cancellationToken)`.
+   Resolve all remaining shards, including future-dated, owned, poisoned, and
+   unrecognized entries. Repeat successful inventories according to the
+   backend's live-listing behavior.
+5. Remove A from `DrainingProviderNames` only after a verified full drain.
+   Retire the binding/storage only when its other consumers have also finished.
+
+The inspector returns `DurableJobsStorageStatus` with `ProviderName`,
+`IsWriteProvider`, `ShardCount`, `OwnedShardCount`, `PoisonedShardCount`,
+`UnrecognizedShardCount`, and nullable `OldestShardStartTime` /
+`NewestShardStartTime`. It reads a complete catalog snapshot through the calling
+process using read-only catalog and metadata operations. Failures fault the
+call: display **unknown** when inspection fails. Counts describe shards, each
+of which can contain many jobs; owned/poisoned counts can overlap. Retirement
+requires successful full-zero inventory plus completed cluster-wide writer
+cutover.
+
+To roll back, keep both providers selected and switch writes to A with B
+draining. Existing B jobs continue in B. Preserve storage namespaces and
+compatible journal readers throughout the migration.
+
+See the [restart-based migration sample](../../samples/DurableJobsMigration/README.md)
+for durable Azure emulator storage, retained-handle cancellation, and local
+inventory checks, and the [migration guide](../../docs/site/src/content/docs/grains/journaling/durable-jobs-migration.md)
+for deployment and monitoring details.
+
 ## Shard discovery and lookahead
 
 Each silo discovers shards whose start time is within `DurableJobsOptions.ShardLoadLookaheadPeriod`
@@ -123,8 +214,12 @@ lists the raw `jobs/shards/` prefix with an inclusive `ListOptions.MaxId` bound 
 horizon. The range includes every earlier start time, including jobs overdue after a long
 outage. Future shard identities are filtered by the catalog before candidate metadata reads.
 
-Each periodic or membership check starts a fresh, locally scoped sweep. Discovery requests
-catalog metadata, orders and deduplicates the selected entries, then uses each supplied
+Each periodic or membership check starts a fresh, locally scoped sweep over every selected
+provider. Candidates share an oldest-first ordering and aggregate claim budget.
+Discovery enumerates the selected catalogs in configured order, requesting metadata and
+buffering each provider's candidates until that enumeration succeeds. Once all selected
+catalogs have completed or faulted, discovery orders and deduplicates the successful
+results, then uses each supplied
 ownership snapshot with an ETag or reads current metadata when that snapshot is unavailable.
 For a snapshot naming the local silo as owner, discovery reuses the cached shard or reads
 current metadata on a cache miss. The refreshed descriptor determines eligibility, ownership,
@@ -147,8 +242,12 @@ to provide consistent oldest-first processing across providers. Storage listing 
 latency remain provider-dependent. Blob, Table, and Volatile catalogs supply metadata snapshots
 alongside identities; S3 and Redis require separate candidate metadata reads.
 
-The sweep owns its enumeration and selected identity set until completion. Storage errors
-propagate to the runtime's error reporting, and a later check starts a fresh sweep. Shards
+The sweep owns its enumeration and selected identity set until completion. During migration,
+a catalog failure discards that provider's partial results; an assignment failure skips its
+remaining candidates. Errors are reported with the provider name, and a later check retries
+with a fresh sweep. Recovery latency includes every selected catalog's listing requests
+and storage-client retry delays. Configure request timeouts and retry limits on the storage
+clients to match the recovery latency requirements. Shards
 already delivered to the local manager are tracked before cancellation is observed and
 continue through their execution lifecycle.
 Cancellation flows through listing, metadata, and journal operations.

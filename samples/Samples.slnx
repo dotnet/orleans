@@ -39,6 +39,10 @@
   <Folder Name="/CustomGrainCallReturnType/">
     <Project Path="CustomGrainCallReturnType/CustomGrainCallReturnType.csproj" />
   </Folder>
+  <Folder Name="/DurableJobsMigration/">
+    <Project Path="DurableJobsMigration/DurableJobsMigration.AppHost/DurableJobsMigration.AppHost.csproj" />
+    <Project Path="DurableJobsMigration/DurableJobsMigration/DurableJobsMigration.csproj" />
+  </Folder>
   <Folder Name="/Deployment/" />
   <Folder Name="/Deployment/AzureAppService/" />
   <Folder Name="/Deployment/AzureAppService/Abstractions/">
