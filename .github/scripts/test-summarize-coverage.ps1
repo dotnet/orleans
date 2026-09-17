@@ -670,6 +670,60 @@ try {
             'Runtime crash dump upload must run after a failed test coordinator.'
     }
 
+    Invoke-Test 'captures Windows net10 test host diagnostics' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $filterMatch = [regex]::Match(
+            $workflow,
+            '(?m)^\s*filter-query:\s+(?<filter>/\[\(Provider=None\)&\(Suite=\$\{\{ matrix\.suite \}\}\)&\(Area!=CodeGen\)\])\r?$'
+        )
+        Assert-Equal $true $filterMatch.Success 'The standard test filter was not found.'
+        $bvtFilter = $filterMatch.Groups['filter'].Value.Replace('${{ matrix.suite }}', 'BVT')
+        Assert-Matches `
+            $dotnetTestAction `
+            "if: runner\.os == 'Windows' && inputs\.framework == 'net10\.0' && inputs\.filter-query == '$([regex]::Escape($bvtFilter))'" `
+            'Test host diagnostics must target the Windows net10 BVT partition.'
+        $diagnosticsIndex = $dotnetTestAction.IndexOf('  - name: Prepare Windows test host diagnostics', [StringComparison]::Ordinal)
+        $testIndex = $dotnetTestAction.IndexOf('  - name: Test', [StringComparison]::Ordinal)
+        Assert-Equal `
+            $true `
+            ($diagnosticsIndex -ge 0 -and $diagnosticsIndex -lt $testIndex) `
+            'Windows test host diagnostics must be configured before test execution.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC=1' `
+            'Microsoft Testing Platform diagnostics must be enabled.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_VERBOSITY=Trace' `
+            'Microsoft Testing Platform diagnostics must include controller lifecycle details.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE=1' `
+            'Microsoft Testing Platform diagnostics must be flushed before a host terminates.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY=\$resultDirectory' `
+            'Microsoft Testing Platform diagnostics must flow through the test diagnostics artifact.'
+        Assert-Matches `
+            $dotnetTestAction `
+            "(?s)- name: Prepare Windows test host diagnostics.*?'DOTNET_CreateDumpDiagnostics=1'.*?- name: Restore" `
+            'Windows runtime dump diagnostics must be enabled before the test host starts.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'windows-net10-runner\.json' `
+            'The runner image and source commit must be retained with crash diagnostics.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'windows-net10-dotnet-info\.txt' `
+            'The installed SDK and runtime details must be retained with crash diagnostics.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            '\*\*/TestResults/\*' `
+            'Windows test host diagnostics must be retained by the test diagnostics artifact.'
+    }
+
     Invoke-Test 'uses external coverage collection for CI builds' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../actions/setup-test-environment/action.yml')

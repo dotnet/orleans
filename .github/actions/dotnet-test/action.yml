@@ -32,6 +32,30 @@ runs:
         'DOTNET_DbgMiniDumpName=${{ github.workspace }}/TestResults/dotnet-test.%p.dmp'
         'DOTNET_CreateDumpDiagnostics=1'
       ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+  - name: Prepare Windows test host diagnostics
+    if: runner.os == 'Windows' && inputs.framework == 'net10.0' && inputs.filter-query == '/[(Provider=None)&(Suite=BVT)&(Area!=CodeGen)]'
+    shell: pwsh
+    run: |
+      $resultDirectory = '${{ github.workspace }}/TestResults'
+      New-Item -ItemType Directory -Force -Path $resultDirectory | Out-Null
+      @(
+        'TESTINGPLATFORM_DIAGNOSTIC=1'
+        'TESTINGPLATFORM_DIAGNOSTIC_VERBOSITY=Trace'
+        'TESTINGPLATFORM_DIAGNOSTIC_SYNCHRONOUS_WRITE=1'
+        "TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY=$resultDirectory"
+        'DOTNET_CreateDumpDiagnostics=1'
+      ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      @{
+        Commit = '${{ github.sha }}'
+        Framework = '${{ inputs.framework }}'
+        ImageOS = $env:ImageOS
+        ImageVersion = $env:ImageVersion
+      } | ConvertTo-Json | Set-Content -LiteralPath "$resultDirectory/windows-net10-runner.json" -Encoding utf8NoBOM
+      dotnet --info 2>&1 | Set-Content -LiteralPath "$resultDirectory/windows-net10-dotnet-info.txt" -Encoding utf8NoBOM
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'Failed to capture dotnet --info for Windows test host diagnostics.'
+      }
+      exit 0
   - name: Restore
     shell: pwsh
     run: ./.github/scripts/invoke-restore.ps1
