@@ -50,6 +50,7 @@ public sealed class BootstrapObservation : IDisposable
 public sealed class BootstrapState : IInboxHandler, IDisposable
 {
     public const string Route = "bootstrap";
+    public static GrainId OutputTarget { get; } = GrainId.Create("bootstrap-output", "capture");
     private readonly HandlerProbe _handlers;
     public BootstrapState(BootstrapObservation observation, IJournaledStateManager manager, HandlerProbe handlers,
         [FromKeyedServices("bootstrap-value")] IDurableValue<int> value, IDurableInbox inbox, IDurableOutbox outbox)
@@ -92,7 +93,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
             await barrier.Continue.Task.WaitAsync(cancellationToken);
         }
         var value = Observation.Value!.Value + 1;
-        var outgoing = context.CreateEnvelope().To(GrainId.Create("bootstrap-output", "capture"), "output").WithBody(value).Build();
+        var outgoing = context.CreateEnvelope().To(OutputTarget, "output").WithBody(value).Build();
         var batch = await context.Outbox.PrepareSendAsync([outgoing], cancellationToken);
         return () =>
         {
@@ -244,12 +245,15 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
     public const string StatelessPlacementAlias = "bootstrap-worker-alias";
     public const string OrdinaryPlacementAlias = "bootstrap-directory-alias";
     public BootstrapProbe Probe { get; } = new();
+    public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
-        ReceiverTestServices.Add(services, ConfigureOptions);
+        BootstrapOutboxServices.Add(services);
         services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
+        services.AddSingleton(Delivery);
+        services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();
         var extensionType = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
