@@ -719,6 +719,10 @@ try {
             'windows-net10-dotnet-info\.txt' `
             'The installed SDK and runtime details must be retained with crash diagnostics.'
         Assert-Matches `
+            $dotnetTestAction `
+            'Failed to capture Windows test host metadata' `
+            'Advisory metadata capture must not prevent the test partition from running.'
+        Assert-Matches `
             $archiveTestResultsAction `
             '\*\*/TestResults/\*' `
             'Windows test host diagnostics must be retained by the test diagnostics artifact.'

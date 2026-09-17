@@ -45,15 +45,19 @@ runs:
         "TESTINGPLATFORM_DIAGNOSTIC_OUTPUT_DIRECTORY=$resultDirectory"
         'DOTNET_CreateDumpDiagnostics=1'
       ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      @{
-        Commit = '${{ github.sha }}'
-        Framework = '${{ inputs.framework }}'
-        ImageOS = $env:ImageOS
-        ImageVersion = $env:ImageVersion
-      } | ConvertTo-Json | Set-Content -LiteralPath "$resultDirectory/windows-net10-runner.json" -Encoding utf8NoBOM
-      dotnet --info 2>&1 | Set-Content -LiteralPath "$resultDirectory/windows-net10-dotnet-info.txt" -Encoding utf8NoBOM
-      if ($LASTEXITCODE -ne 0) {
-        Write-Warning 'Failed to capture dotnet --info for Windows test host diagnostics.'
+      try {
+        @{
+          Commit = '${{ github.sha }}'
+          Framework = '${{ inputs.framework }}'
+          ImageOS = $env:ImageOS
+          ImageVersion = $env:ImageVersion
+        } | ConvertTo-Json | Set-Content -LiteralPath "$resultDirectory/windows-net10-runner.json" -Encoding utf8NoBOM
+        dotnet --info 2>&1 | Set-Content -LiteralPath "$resultDirectory/windows-net10-dotnet-info.txt" -Encoding utf8NoBOM
+        if ($LASTEXITCODE -ne 0) {
+          Write-Warning 'Failed to capture dotnet --info for Windows test host diagnostics.'
+        }
+      } catch {
+        Write-Warning "Failed to capture Windows test host metadata: $_"
       }
       exit 0
   - name: Restore
