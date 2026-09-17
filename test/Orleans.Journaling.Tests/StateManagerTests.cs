@@ -888,6 +888,13 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public void StateManager_RegisterObserverDefaultImplementationRejectsNull()
+    {
+        IJournaledStateManager manager = new LegacyStateManager();
+        Assert.Throws<ArgumentNullException>("observer", () => manager.RegisterObserver(null!));
+    }
+
+    [Fact]
     public void StateManager_RegisterObserverDefaultImplementationPreservesCompatibility()
     {
         IJournaledStateManager manager = new LegacyStateManager();

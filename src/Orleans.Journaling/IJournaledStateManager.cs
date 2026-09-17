@@ -34,15 +34,19 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// Observers must be registered before <see cref="InitializeAsync"/> begins.
     /// Each operation uses a stable snapshot of registered observers. The default implementation
-    /// throws <see cref="NotSupportedException"/>; implementations supporting observers override this method.
+    /// validates that <paramref name="observer"/> is non-null, then throws <see cref="NotSupportedException"/>.
+    /// Implementations supporting observers override this method.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="observer"/> is null.</exception>
     /// <exception cref="InvalidOperationException">The observer is already registered.</exception>
     /// <exception cref="NotSupportedException">
     /// Initialization has started, or the manager uses the default implementation.
     /// </exception>
-    void RegisterObserver(IJournaledStateObserver observer) =>
+    void RegisterObserver(IJournaledStateObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
         throw new NotSupportedException("This journaled state manager does not support observers.");
+    }
 
     /// <summary>
     /// Attempts to get a state registered with the manager.
