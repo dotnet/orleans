@@ -74,8 +74,8 @@ public class EventHubCheckpointRecoveryTests
             Assert.Equal(Enumerable.Range(2, 199), busy.Events);
             Assert.Equal(1, idleSubscription.LastProcessedToken!.SequenceNumber);
             Assert.Equal(200, busySubscription.LastProcessedToken!.SequenceNumber);
-            Assert.True(idleSubscription.IsCaughtUp);
-            Assert.True(busySubscription.IsCaughtUp);
+            Assert.Equal(200, idleSubscription.LastSafePartitionToken!.SequenceNumber);
+            Assert.Equal(200, busySubscription.LastSafePartitionToken!.SequenceNumber);
             Assert.Empty(store.State.Checkpoint);
 
             await first.Accessor.Shutdown();
