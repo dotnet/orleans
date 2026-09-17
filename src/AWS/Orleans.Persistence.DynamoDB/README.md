@@ -26,17 +26,21 @@ var builder = Host.CreateApplicationBuilder(args)
                 name: "dynamoStore",
                 configureOptions: options =>
                 {
-                    options.AccessKey = "YOUR_AWS_ACCESS_KEY";
-                    options.SecretKey = "YOUR_AWS_SECRET_KEY";
-                    options.Region = "us-east-1";
+                    options.Service = "us-east-1";
                     options.TableName = "OrleansGrainState";
-                    options.CreateIfNotExists = true;
+                    options.UseProvisionedThroughput = false;
                 });
     });
 
 // Run the host
 await builder.RunAsync();
 ```
+
+## Endpoints and credentials
+
+`Service` selects an AWS region or an HTTP/HTTPS endpoint URL. `AccessKey` and `SecretKey` supply explicit credentials; adding `Token` supplies session credentials. `ProfileName` selects a named AWS profile when explicit keys are omitted. These credentials apply to both regions and endpoint URLs.
+
+The AWS SDK credential chain supplies credentials for regions and HTTPS endpoints when explicit keys and a profile are omitted. HTTP endpoints use the local-development credentials `dummy` and `dummyKey` in that case. Configure explicit credentials when a DynamoDB Local instance uses an access key to select its database.
 
 ## Example - Using Grain Storage in a Grain
 ```csharp
