@@ -7,7 +7,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Xunit;
 
-[assembly: RegisterProvider("TestGrainJournaling", "GrainJournaling", "Silo", typeof(NonSilo.Tests.ProviderErrorMessageTests.TestGrainJournalingProviderBuilder))]
+[assembly: RegisterProvider("TestJournal", "Journal", "Silo", typeof(NonSilo.Tests.ProviderErrorMessageTests.TestJournalProviderBuilder))]
 
 namespace NonSilo.Tests
 {
@@ -127,14 +127,14 @@ namespace NonSilo.Tests
         }
 
         [Fact]
-        public void SiloBuilder_ConfiguresGrainJournalingProviderFromConfiguration()
+        public void SiloBuilder_ConfiguresJournalProviderFromConfiguration()
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { "Orleans:GrainJournaling:ProviderType", "TestGrainJournaling" },
-                { "Orleans:GrainJournaling:ServiceKey", "journal-client" }
+                { "Orleans:Journal:ProviderType", "TestJournal" },
+                { "Orleans:Journal:ServiceKey", "journal-client" }
             };
 
             using var host = new HostBuilder()
@@ -148,21 +148,21 @@ namespace NonSilo.Tests
                 })
                 .Build();
 
-            var invocation = Assert.Single(host.Services.GetServices<GrainJournalingProviderInvocation>());
+            var invocation = Assert.Single(host.Services.GetServices<JournalProviderInvocation>());
             Assert.Null(invocation.Name);
-            Assert.Equal("Orleans:GrainJournaling", invocation.ConfigurationSection.Path);
-            Assert.Equal("TestGrainJournaling", invocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("Orleans:Journal", invocation.ConfigurationSection.Path);
+            Assert.Equal("TestJournal", invocation.ConfigurationSection["ProviderType"]);
             Assert.Equal("journal-client", invocation.ConfigurationSection["ServiceKey"]);
         }
 
         [Fact]
-        public void SiloBuilder_IncludesKnownGrainJournalingProvidersInErrorMessage()
+        public void SiloBuilder_IncludesKnownJournalProvidersInErrorMessage()
         {
             var configDict = new Dictionary<string, string?>
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
-                { "Orleans:GrainJournaling:ProviderType", "InvalidJournalingProvider" }
+                { "Orleans:Journal:ProviderType", "InvalidJournalProvider" }
             };
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -179,20 +179,20 @@ namespace NonSilo.Tests
                     .Build();
             });
 
-            Assert.Contains("Could not find GrainJournaling provider named 'InvalidJournalingProvider'", exception.Message);
+            Assert.Contains("Could not find Journal provider named 'InvalidJournalProvider'", exception.Message);
             Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
-            Assert.Contains("Known GrainJournaling providers:", exception.Message);
-            Assert.Contains("TestGrainJournaling", exception.Message);
+            Assert.Contains("Known Journal providers:", exception.Message);
+            Assert.Contains("TestJournal", exception.Message);
         }
 
-        internal sealed class TestGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
+        internal sealed class TestJournalProviderBuilder : IProviderBuilder<ISiloBuilder>
         {
             public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
             {
-                builder.Services.AddSingleton(new GrainJournalingProviderInvocation(name, configurationSection));
+                builder.Services.AddSingleton(new JournalProviderInvocation(name, configurationSection));
             }
         }
 
-        private sealed record GrainJournalingProviderInvocation(string? Name, IConfigurationSection ConfigurationSection);
+        private sealed record JournalProviderInvocation(string? Name, IConfigurationSection ConfigurationSection);
     }
 }

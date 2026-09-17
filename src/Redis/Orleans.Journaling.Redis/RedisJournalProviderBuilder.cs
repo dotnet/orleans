@@ -5,11 +5,11 @@ using Orleans.Journaling;
 using Orleans.Providers;
 using StackExchange.Redis;
 
-[assembly: RegisterProvider("Redis", "GrainJournaling", "Silo", typeof(Orleans.Hosting.RedisGrainJournalingProviderBuilder))]
+[assembly: RegisterProvider("Redis", "Journal", "Silo", typeof(Orleans.Hosting.RedisJournalProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-internal sealed class RedisGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class RedisJournalProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
