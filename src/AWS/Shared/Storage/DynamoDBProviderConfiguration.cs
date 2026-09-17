@@ -21,17 +21,20 @@ namespace Orleans.Reminders.DynamoDB
         private readonly IConfigurationSection _providerSection;
         private readonly IConfiguration _configuration;
         private readonly IReadOnlyDictionary<string, string> _connectionValues;
+        private readonly bool _hasDirectConnectionString;
         private readonly string? _referenceName;
 
         private DynamoDBProviderConfiguration(
             IConfigurationSection providerSection,
             IConfiguration configuration,
             IReadOnlyDictionary<string, string> connectionValues,
+            bool hasDirectConnectionString,
             string? referenceName)
         {
             _providerSection = providerSection;
             _configuration = configuration;
             _connectionValues = connectionValues;
+            _hasDirectConnectionString = hasDirectConnectionString;
             _referenceName = referenceName;
         }
 
@@ -51,15 +54,23 @@ namespace Orleans.Reminders.DynamoDB
 
             var referenceName = serviceKey ?? connectionName;
             var connectionString = GetNonEmpty(providerSection["ConnectionString"]);
+            var hasDirectConnectionString = connectionString is not null;
             if (connectionString is null && referenceName is not null)
             {
                 connectionString = configuration.GetConnectionString(referenceName);
+                if (connectionName is not null && string.IsNullOrWhiteSpace(connectionString))
+                {
+                    throw new OrleansConfigurationException(
+                        $"DynamoDB provider configuration section '{providerSection.Path}' references ConnectionName '{connectionName}', " +
+                        "but its connection string was not found.");
+                }
             }
 
             return new(
                 providerSection,
                 configuration,
                 ParseConnectionString(connectionString),
+                hasDirectConnectionString,
                 referenceName);
         }
 
@@ -92,6 +103,11 @@ namespace Orleans.Reminders.DynamoDB
                 return value;
             }
 
+            if (_hasDirectConnectionString && GetConnectionValue(names) is { } directValue)
+            {
+                return directValue;
+            }
+
             if (_referenceName is not null)
             {
                 value = GetSectionValue(_configuration.GetSection($"{AwsResourcesConfigurationSection}:{_referenceName}"), names);
@@ -110,9 +126,14 @@ namespace Orleans.Reminders.DynamoDB
                 }
             }
 
+            return _hasDirectConnectionString ? null : GetConnectionValue(names);
+        }
+
+        private string? GetConnectionValue(string[] names)
+        {
             foreach (var name in names)
             {
-                if (_connectionValues.TryGetValue(name, out value) && GetNonEmpty(value) is { } connectionValue)
+                if (_connectionValues.TryGetValue(name, out var value) && GetNonEmpty(value) is { } connectionValue)
                 {
                     return connectionValue;
                 }

@@ -69,4 +69,6 @@ AWS Aspire CDK table references emit the table name under `AWS:Resources:{resour
 
 The providers also accept `ConnectionName`, `ConnectionString`, and nested `ConnectionProperties` or `Resource` values. Direct provider values take precedence over referenced resource outputs, including when an alias such as `Region`, `Endpoint`, `SessionToken`, or `Profile` is used. A connection string can contain `Service`, `Region`, `ServiceURL`, `Endpoint`, `TableName`, `AccessKey`, `SecretKey`, `Token` or `SessionToken`, and `ProfileName` or `Profile`.
 
+A provider-local `ConnectionString` takes precedence over referenced resource outputs. An explicit `ConnectionName` resolves a required `ConnectionStrings:<name>` entry when no direct connection string is supplied. `ServiceKey` supports structured resource outputs, with a named connection string as a fallback for fields those outputs omit.
+
 For infrastructure-managed tables, set `CreateIfNotExists` and `UpdateIfExists` to `false`. The compiled CDK example uses on-demand billing, so it also sets `UseProvisionedThroughput` to `false`.

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
 namespace Orleans.Clustering.AdoNet.Storage;
@@ -39,20 +40,26 @@ internal static class AdoNetProviderConfiguration
 
     public static string? GetConnectionString(IConfigurationSection configurationSection, IServiceProvider services)
     {
+        var serviceKey = configurationSection["ServiceKey"];
+        var connectionName = configurationSection["ConnectionName"];
+        if (!string.IsNullOrWhiteSpace(serviceKey)
+            && !string.IsNullOrWhiteSpace(connectionName)
+            && !string.Equals(serviceKey, connectionName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new OrleansConfigurationException(
+                $"ADO.NET provider configuration section '{configurationSection.Path}' cannot specify different ServiceKey and ConnectionName values.");
+        }
+
         var connectionString = configurationSection["ConnectionString"];
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             return connectionString;
         }
 
-        var connectionName = configurationSection["ServiceKey"];
-        if (string.IsNullOrWhiteSpace(connectionName))
-        {
-            connectionName = configurationSection["ConnectionName"];
-        }
+        var referenceName = string.IsNullOrWhiteSpace(serviceKey) ? connectionName : serviceKey;
 
-        return string.IsNullOrWhiteSpace(connectionName)
+        return string.IsNullOrWhiteSpace(referenceName)
             ? null
-            : services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
+            : services.GetRequiredService<IConfiguration>().GetConnectionString(referenceName);
     }
 }

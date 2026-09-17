@@ -192,6 +192,78 @@ public sealed class DynamoDBProviderConfigurationTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Create_MissingNamedConnection_IdentifiesReferenceAndSection(string? connectionString)
+    {
+        var exception = Assert.Throws<OrleansConfigurationException>(() => Bind(new()
+        {
+            ["Provider:ConnectionName"] = "orders",
+            ["ConnectionStrings:orders"] = connectionString,
+            ["AWS:Region"] = "fallback-region",
+            ["AWS:Resources:orders:Service"] = "resource-region",
+        }));
+
+        Assert.Contains("Provider", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ConnectionName", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("orders", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_DirectConnectionStringOverridesReferencedResourceValues()
+    {
+        var (_, provider, options) = Bind(new()
+        {
+            ["Provider:ServiceKey"] = "orders",
+            ["Provider:ConnectionString"] =
+                "Endpoint=https://explicit.example;AccessKey=explicit-access;SecretKey=explicit-secret;" +
+                "SessionToken=explicit-token;TableName=explicit-table",
+            ["AWS:Resources:orders:Service"] = "resource-region",
+            ["AWS:Resources:orders:AccessKey"] = "resource-access",
+            ["AWS:Resources:orders:SecretKey"] = "resource-secret",
+            ["AWS:Resources:orders:Token"] = "resource-token",
+            ["AWS:Resources:orders:TableName"] = "resource-table",
+            ["AWS:Resources:orders:ServiceId"] = "resource-service-id",
+            ["ORDERS_SERVICE"] = "encoded-region",
+            ["ConnectionStrings:orders"] = "Service=named-region",
+        });
+
+        Assert.Equal("https://explicit.example", options.Service);
+        Assert.Equal("explicit-access", options.AccessKey);
+        Assert.Equal("explicit-secret", options.SecretKey);
+        Assert.Equal("explicit-token", options.Token);
+        Assert.Equal("explicit-table", provider.GetValue("TableName"));
+        Assert.Equal("resource-service-id", provider.GetValue("ServiceId"));
+    }
+
+    [Fact]
+    public void Create_ExplicitConnectionStringOverridesMissingNamedConnection()
+    {
+        var (_, _, options) = Bind(new()
+        {
+            ["Provider:ConnectionName"] = "missing",
+            ["Provider:ConnectionString"] = "Service=explicit-region",
+        });
+
+        Assert.Equal("explicit-region", options.Service);
+    }
+
+    [Fact]
+    public void Create_NamedConnectionRemainsFallbackForResourceValues()
+    {
+        var (_, provider, options) = Bind(new()
+        {
+            ["Provider:ConnectionName"] = "orders",
+            ["AWS:Resources:orders:Service"] = "resource-region",
+            ["ConnectionStrings:orders"] = "Service=named-region;TableName=named-table",
+        });
+
+        Assert.Equal("resource-region", options.Service);
+        Assert.Equal("named-table", provider.GetValue("TableName"));
+    }
+
+    [Theory]
     [InlineData("provider-region", "https://endpoint.invalid", "aws-section", "aws-region", "aws-default", "provider-region")]
     [InlineData(null, "https://endpoint.invalid", "aws-section", "aws-region", "aws-default", "https://endpoint.invalid")]
     [InlineData(null, null, "aws-section", "aws-region", "aws-default", "aws-section")]

@@ -79,6 +79,8 @@ An `IProviderConfiguration` can emit the `AdoNet` provider type, an explicit inv
 
 Explicit `Invariant` and `ConnectionString` values take precedence over inferred values. `ServiceKey` resolves an Aspire-injected connection string, and `ConnectionName` resolves a conventional .NET connection string.
 
+When both `ServiceKey` and `ConnectionName` are configured, they must identify the same connection-string entry. Orleans compares the names case-insensitively and reports conflicting references with their provider configuration section.
+
 ## Configure SQL Server
 
 Use `Microsoft.Data.SqlClient` for SQL Server:
