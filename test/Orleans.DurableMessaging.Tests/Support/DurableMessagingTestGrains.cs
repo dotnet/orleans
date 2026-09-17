@@ -21,6 +21,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
+    Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate);
 }
 
 [GenerateSerializer, Immutable]
@@ -238,6 +239,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         JobGrainContext = ReceiverTestServices.CurrentGrainContext;
         switch (context.Job.Name)
         {
+            case "test/write-journal":
+                await StateManager.WriteStateAsync(attemptCancellationToken);
+                break;
             case "test/delete-journal":
                 await StateManager.DeleteStateAsync(attemptCancellationToken);
                 break;
@@ -245,6 +249,25 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 break;
             default:
                 throw new NotSupportedException($"Unknown test job '{context.Job.Name}'.");
+        }
+    }
+
+    public async Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate)
+    {
+        if (!_handlerProbe.TryGet(this.GetGrainId(), barrierRoute, out var barrier))
+        {
+            throw new InvalidOperationException("The pump-turn barrier must be armed.");
+        }
+        barrier.Entered.TrySetResult();
+        await barrier.Continue.Task;
+        if (replacement is { } envelope)
+        {
+            var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
+            await extension.DeliverAsync(envelope);
+        }
+        if (deactivate)
+        {
+            DeactivateOnIdle();
         }
     }
 
