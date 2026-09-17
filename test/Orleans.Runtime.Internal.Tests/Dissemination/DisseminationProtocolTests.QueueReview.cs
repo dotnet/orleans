@@ -148,7 +148,9 @@ public partial class DisseminationProtocolTests
         using var schedules = new BroadcastScheduleObserver();
         var retry = schedules.WaitAsync(
             value => value.LocalSilo.Equals(local) && value.Peer.Equals(peer)
-                && value.Reason == DisseminationBroadcastScheduleReason.Retry);
+                && value.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5),
+            cancellationToken);
         ns.SetValue("value", 1);
         transport.SendBroadcastResponseHandler = (_, batch, _) =>
         {
