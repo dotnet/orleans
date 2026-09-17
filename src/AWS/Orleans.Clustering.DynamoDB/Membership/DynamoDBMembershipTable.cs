@@ -19,8 +19,6 @@ namespace Orleans.Clustering.DynamoDB
 {
     internal partial class DynamoDBMembershipTable : IMembershipTable
     {
-        private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
-
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
         private const string MEMBERSHIP_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss.fff 'GMT'";
         private const int MAX_BATCH_SIZE = 25;
@@ -233,7 +231,12 @@ namespace Orleans.Clustering.DynamoDB
 
                     var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", item => new SiloInstanceRecord(item), cancellationToken);
 
-                    if (records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
+                    var versionAfter = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
+                        fields => new SiloInstanceRecord(fields), cancellationToken);
+                    if (versionAfter is null
+                        || versionAfter.ETag != versionRow.ETag
+                        || !records.Exists(record => record.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW
+                            && record.ETag == versionRow.ETag))
                     {
                         LogWarningFoundInconsistencyReadingAllSiloEntries();
                         await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
@@ -299,17 +302,10 @@ namespace Orleans.Clustering.DynamoDB
 
                     result = true;
                 }
-                catch (TransactionCanceledException canceledException)
+                catch (TransactionCanceledException canceledException) when (IsContention(canceledException))
                 {
-                    if (canceledException.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal)) //not a good way to check for this currently
-                    {
-                        result = false;
-                        LogWarningInsertFailedDueToContention(entry);
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    result = false;
+                    LogWarningInsertFailedDueToContention(entry);
                 }
 
                 return result;
@@ -339,6 +335,19 @@ namespace Orleans.Clustering.DynamoDB
 
                 siloEntry.ETag = currentEtag + 1;
 
+                var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
+                    fields => new SiloInstanceRecord(fields), cancellationToken);
+                if (current is null || current.ETag != currentEtag)
+                {
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(current.IAmAliveTime)
+                    && LogFormatter.ParseDate(current.IAmAliveTime) > entry.IAmAliveTime)
+                {
+                    siloEntry.IAmAliveTime = current.IAmAliveTime;
+                }
+
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, tableVersion.VersionEtag);
@@ -354,15 +363,21 @@ namespace Orleans.Clustering.DynamoDB
                     var etagConditionalExpression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
                     var siloConditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = etag } } };
-                    var siloEntryUpdate = new Update
+                    var heartbeatCondition = $"attribute_not_exists({SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})";
+                    if (current.IAmAliveTime is not null)
+                    {
+                        heartbeatCondition = $"{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} = :currentHeartbeat";
+                        siloConditionalValues.Add(":currentHeartbeat", new AttributeValue(current.IAmAliveTime));
+                    }
+
+                    // Compare the independently updated heartbeat to preserve its maximum when replacing the row.
+                    var siloEntryUpdate = new Put
                     {
                         TableName = this.options.TableName,
-                        Key = siloEntry.GetKeys(),
-                        ConditionExpression = etagConditionalExpression
+                        Item = siloEntry.GetFields(includeKeys: true),
+                        ConditionExpression = $"{etagConditionalExpression} AND {heartbeatCondition}",
+                        ExpressionAttributeValues = siloConditionalValues
                     };
-                    (siloEntryUpdate.UpdateExpression, siloEntryUpdate.ExpressionAttributeValues) =
-                        this.storage.ConvertUpdate(siloEntry.GetFields(), siloConditionalValues);
-
 
                     var versionConditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = tableVersion.VersionEtag } } };
                     var versionEntryUpdate = new Update
@@ -374,20 +389,13 @@ namespace Orleans.Clustering.DynamoDB
                     (versionEntryUpdate.UpdateExpression, versionEntryUpdate.ExpressionAttributeValues) =
                         this.storage.ConvertUpdate(versionEntry.GetFields(), versionConditionalValues);
 
-                    await this.storage.WriteTxAsync(cancellationToken, updates: new[] { siloEntryUpdate, versionEntryUpdate });
+                    await this.storage.WriteTxAsync(cancellationToken, puts: new[] { siloEntryUpdate }, updates: new[] { versionEntryUpdate });
                     result = true;
                 }
-                catch (TransactionCanceledException canceledException)
+                catch (TransactionCanceledException canceledException) when (IsContention(canceledException))
                 {
-                    if (canceledException.Message.Contains("ConditionalCheckFailed", StringComparison.Ordinal)) //not a good way to check for this currently
-                    {
-                        result = false;
-                        LogWarningUpdateFailedDueToContention(canceledException, entry, etag);
-                    }
-                    else
-                    {
-                        throw;
-                    }
+                    result = false;
+                    LogWarningUpdateFailedDueToContention(canceledException, entry, etag);
                 }
 
                 return result;
@@ -410,8 +418,42 @@ namespace Orleans.Clustering.DynamoDB
                 LogDebugMergeEntry(entry);
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
-                var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}) AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})";
-                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, cancellationToken, expression);
+                var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME})"
+                    + $" AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})"
+                    + $" AND (attribute_not_exists({SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})"
+                    + $" OR {SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} < :{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})";
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, cancellationToken, expression);
+                        break;
+                    }
+                    catch (ConditionalCheckFailedException)
+                    {
+                        var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
+                            values => new SiloInstanceRecord(values), cancellationToken);
+                        if (current is null)
+                        {
+                            var versionKeys = new Dictionary<string, AttributeValue>
+                            {
+                                [SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME] = new AttributeValue(this.clusterId),
+                                [SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME] = new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW)
+                            };
+                            _ = await storage.ReadSingleEntryAsync(this.options.TableName, versionKeys,
+                                values => new SiloInstanceRecord(values), cancellationToken)
+                                ?? throw new KeyNotFoundException("No version row found for membership table");
+                            break;
+                        }
+
+                        if (!string.IsNullOrEmpty(current.IAmAliveTime)
+                            && LogFormatter.ParseDate(current.IAmAliveTime) >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
+                        {
+                            break;
+                        }
+                    }
+                }
             }
             catch (Exception exc)
             {
@@ -425,7 +467,7 @@ namespace Orleans.Clustering.DynamoDB
             try
             {
                 var memEntries = new List<Tuple<MembershipEntry, string>>();
-                var tableVersion = NotFoundTableVersion;
+                TableVersion? tableVersion = null;
                 foreach (var tableEntry in entries)
                 {
                     if (string.Equals(tableEntry.SiloIdentity, SiloInstanceRecord.TABLE_VERSION_ROW, StringComparison.Ordinal))
@@ -443,10 +485,12 @@ namespace Orleans.Clustering.DynamoDB
                         catch (Exception exc)
                         {
                             LogErrorIntermediateErrorParsingSiloInstanceTableEntry(exc, tableEntry);
+                            throw;
                         }
                     }
                 }
-                var data = new MembershipTableData(memEntries, tableVersion);
+                var data = new MembershipTableData(memEntries,
+                    tableVersion ?? throw new KeyNotFoundException("No version row found for membership table"));
                 return data;
             }
             catch (Exception exc)
@@ -579,11 +623,46 @@ namespace Orleans.Clustering.DynamoDB
                 };
                 var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
 
-                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => new SiloInstanceRecord(item), cancellationToken);
-                var defunctRecordKeys = records.Where(r => SiloIsDefunct(r, beforeDate)).Select(r => r.GetKeys());
+                var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => item, cancellationToken);
+                await Task.WhenAll(records.Where(fields => SiloIsDefunct(new SiloInstanceRecord(fields), beforeDate))
+                    .Select(DeleteDefunctEntry));
 
-                await Task.WhenAll(defunctRecordKeys.BatchIEnumerable(MAX_BATCH_SIZE)
-                    .Select(async batch => await this.storage.DeleteEntriesAsync(this.options.TableName, batch, cancellationToken)));
+                async Task DeleteDefunctEntry(Dictionary<string, AttributeValue> fields)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var conditions = new List<string>();
+                    var values = new Dictionary<string, AttributeValue>();
+                    foreach (var attribute in new[]
+                    {
+                        SiloInstanceRecord.STATUS_PROPERTY_NAME,
+                        SiloInstanceRecord.ETAG_PROPERTY_NAME,
+                        SiloInstanceRecord.START_TIME_PROPERTY_NAME,
+                        SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME,
+                        SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME,
+                        SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME
+                    })
+                    {
+                        if (fields.TryGetValue(attribute, out var value))
+                        {
+                            conditions.Add($"{attribute} = :{attribute}");
+                            values.Add($":{attribute}", value);
+                        }
+                        else
+                        {
+                            conditions.Add($"attribute_not_exists({attribute})");
+                        }
+                    }
+
+                    try
+                    {
+                        await this.storage.DeleteEntryAsync(this.options.TableName, new SiloInstanceRecord(fields).GetKeys(),
+                            cancellationToken, string.Join(" AND ", conditions), values);
+                    }
+                    catch (ConditionalCheckFailedException)
+                    {
+                        // A changed row is reconsidered by the next cleanup.
+                    }
+                }
             }
             catch (Exception exc)
             {
@@ -594,15 +673,27 @@ namespace Orleans.Clustering.DynamoDB
 
         internal static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
         {
-            return DateTimeOffset.TryParseExact(
-                        silo.IAmAliveTime,
-                        MEMBERSHIP_DATE_FORMAT,
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
-                        out var iAmAliveTime)
-                    && iAmAliveTime < beforeDate
-                    && silo.Status != (int)SiloStatus.Active;
+            return silo.Status == (int)SiloStatus.Dead
+                && !string.IsNullOrEmpty(silo.IAmAliveTime)
+                && IsBeforeCutoff(silo.IAmAliveTime)
+                && IsBeforeCutoff(silo.StartTime)
+                && (string.IsNullOrEmpty(silo.SuspectingTimes)
+                    || silo.SuspectingTimes.Split('|').All(IsBeforeCutoff));
+
+            bool IsBeforeCutoff(string? value) => string.IsNullOrEmpty(value)
+                || (DateTimeOffset.TryParseExact(
+                    value,
+                    MEMBERSHIP_DATE_FORMAT,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out var timestamp)
+                    && timestamp < beforeDate);
         }
+
+        private static bool IsContention(TransactionCanceledException exception) =>
+            exception.CancellationReasons is { Count: > 0 } reasons
+            && reasons.All(reason => reason.Code is "None" or "ConditionalCheckFailed" or "TransactionConflict")
+            && reasons.Any(reason => reason.Code is "ConditionalCheckFailed" or "TransactionConflict");
 
         [LoggerMessage(
             Level = LogLevel.Information,

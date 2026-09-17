@@ -663,7 +663,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
+            => DeleteEntryAsync(tableName, keys, CancellationToken.None, conditionExpression, conditionValues);
+
+        internal Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, CancellationToken cancellationToken,
+            string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
             try
@@ -680,7 +685,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return _ddbClient.DeleteItemAsync(request);
+                return _ddbClient.DeleteItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
