@@ -61,7 +61,7 @@ Therefore, grain state is protected from parallel access by the scheduler but ca
 
 The user-facing rules are documented in [request scheduling](../grains/request-scheduling.md). Internally, request admission and task serialization remain separate layers.
 
-Admission is a state machine layered over the activation scheduler and shared thread pool. `ActivationData` keeps pending requests and running requests, evaluates the current interleaving policy, and starts an eligible request by enqueueing its work on the activation scheduler. Completion signals admission to reevaluate the queue. A request which is waiting on an incomplete task therefore occupies a logical slot according to the request policy, while its executing thread returns to the pool.
+Admission is a state machine layered over the activation scheduler and shared thread pool. `ActivationData` keeps pending requests and running requests, evaluates an incoming request against every active request, and starts it when every pair is compatible under the current interleaving policy. Completion signals admission to reevaluate the queue. A request which is waiting on an incomplete task therefore occupies a logical slot according to the request policy, while its executing thread returns to the pool.
 
 Call-chain reentrancy is narrower than grain-wide reentrancy: it permits progress for calls which belong to the current chain while preserving the non-interleaving default for unrelated calls. `AlwaysInterleave` and `MayInterleave` are explicit opt-ins because they trade simpler invariants for throughput or avoidance of dependency cycles.
 
