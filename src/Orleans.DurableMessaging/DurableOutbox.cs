@@ -781,7 +781,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public async Task OnStart(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        DurableMessagingActivationValidator.Validate(_grainContext);
         ValidateReady();
         EnsureMetricsActive();
         if (_messages.Count > 0)
