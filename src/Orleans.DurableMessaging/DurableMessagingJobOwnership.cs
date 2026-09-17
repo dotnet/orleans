@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Orleans.DurableJobs;
-using Orleans.Journaling;
 using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
@@ -63,13 +62,6 @@ internal static class DurableMessagingJobOwnership
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(epoch);
         return $"{epoch}:{sequence.ToString(CultureInfo.InvariantCulture)}";
-    }
-
-    public static string NextId(string epoch, IDurableValue<long> sequence)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(epoch);
-        sequence.Value++;
-        return CreateId(epoch, sequence.Value);
     }
 
     public static bool IsCompleted(string? completedOwnershipId, string ownershipId)
