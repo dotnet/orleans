@@ -136,7 +136,8 @@ internal sealed partial class DisseminationProtocol
             return Reject("root-changed");
         }
 
-        var result = await ApplyReceivedValue(ns, request.Value, request.Sender, options, receivedTimestamp, cancellationToken);
+        var result = await ApplyReceivedValue(
+            ns, request.Value, request.Sender, options, receivedTimestamp, allowDelta: false, cancellationToken);
         if (result is not (DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate))
         {
             return Reject("application-rejected");

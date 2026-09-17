@@ -11,6 +11,8 @@ internal interface IDisseminationNamespace
 
     DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.BroadcastTree;
 
+    bool BroadcastsAreDeltas => false;
+
     TimeSpan AggregationPeriod => TimeSpan.FromSeconds(1);
 
     // Full values can be authority-refresh hints even when their numeric version is older.
@@ -36,9 +38,19 @@ internal interface IDisseminationNamespace
 
     DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request);
 
+    DisseminationRepairResult CreateBroadcast(
+        in DisseminationRepairRequest request,
+        DisseminationBroadcastState? baseline) => CreateRepair(request);
+
     ValueTask<DisseminationApplyResult> ApplyValueAsync(
         DisseminationValue value,
         CancellationToken cancellationToken);
+}
+
+// Owned by the namespace and retained with an acknowledged peer/key until that knowledge is pruned.
+internal abstract class DisseminationBroadcastState(long version)
+{
+    public long Version { get; } = version;
 }
 
 internal enum DisseminationMembershipScope
@@ -69,11 +81,12 @@ internal readonly struct DisseminationRepairRequest(
     public int MaxPayloadBytes { get; } = maxPayloadBytes;
 }
 
-// Version reports the current namespace version; a Produced result carries its full value.
+// A produced result carries one full repair or broadcast update at Version.
 internal readonly struct DisseminationRepairResult(
     DisseminationRepairStatus status,
     long version,
-    DisseminationValue value)
+    DisseminationValue value,
+    DisseminationBroadcastState? broadcastState = null)
 {
     public DisseminationRepairStatus Status { get; } = status;
 
@@ -81,11 +94,15 @@ internal readonly struct DisseminationRepairResult(
 
     public DisseminationValue Value { get; } = value;
 
+    public DisseminationBroadcastState? BroadcastState { get; } = broadcastState;
+
     public static DisseminationRepairResult Current(long version) =>
         new(DisseminationRepairStatus.Current, version, default);
 
-    public static DisseminationRepairResult Produced(DisseminationValue value) =>
-        new(DisseminationRepairStatus.Produced, value.ToVersion, value);
+    public static DisseminationRepairResult Produced(
+        DisseminationValue value,
+        DisseminationBroadcastState? broadcastState = null) =>
+        new(DisseminationRepairStatus.Produced, value.ToVersion, value, broadcastState);
 
     public static DisseminationRepairResult Unavailable(long version) =>
         new(DisseminationRepairStatus.Unavailable, version, default);
@@ -98,7 +115,7 @@ internal enum DisseminationRepairStatus
 {
     // The peer is already at or beyond the resolved version.
     Current,
-    // Value contains the current full value.
+    // Value contains the current repair or broadcast update.
     Produced,
     // The key has no current value.
     Unavailable,

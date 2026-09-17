@@ -215,8 +215,23 @@ internal sealed partial class DisseminationProtocol
                     batch.Sender,
                     options,
                     receivedTimestamp,
+                    allowDelta: disseminationNamespace.BroadcastsAreDeltas,
                     cancellationToken);
-                namespaceKeys[item.Value.Key] = new(sentVersion, keyState.Applied || result is DisseminationApplyResult.Applied);
+                var accepted = result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate;
+                namespaceKeys[item.Value.Key] = new(
+                    sentVersion,
+                    keyState.Applied || result is DisseminationApplyResult.Applied,
+                    accepted && (!existing || keyState.Accepted));
+                if (disseminationNamespace.BroadcastsAreDeltas
+                    && item.Value.FromVersion > 0
+                    && result == DisseminationApplyResult.Rejected)
+                {
+                    // A missing broadcast baseline should participate in the next repair round.
+                    lock (_valueUpdateLock)
+                    {
+                        _lastValueUpdates.Remove(new(namespaceName, item.Value.Key));
+                    }
+                }
             }
         }
 
@@ -289,7 +304,7 @@ internal sealed partial class DisseminationProtocol
             foreach (var (key, state) in keys)
             {
                 // A different version needs an explicit acknowledgment to preserve the peer's exact repair baseline.
-                if (disseminationNamespace.GetVersion(key) != state.SentVersion)
+                if (!state.Accepted || disseminationNamespace.GetVersion(key) != state.SentVersion)
                 {
                     return false;
                 }
@@ -299,7 +314,7 @@ internal sealed partial class DisseminationProtocol
         return true;
     }
 
-    private readonly record struct ReceivedKeyState(long SentVersion, bool Applied);
+    private readonly record struct ReceivedKeyState(long SentVersion, bool Applied, bool Accepted);
 
     public async Task RunAntiEntropyRound(CancellationToken cancellationToken)
     {
@@ -627,6 +642,7 @@ internal sealed partial class DisseminationProtocol
                         response.Sender,
                         options,
                         receivedTimestamp,
+                        allowDelta: false,
                         cancellationToken);
                 }
             }
@@ -1075,6 +1091,7 @@ Complete:
         SiloAddress sender,
         DisseminationOptions options,
         long receivedTimestamp,
+        bool allowDelta,
         CancellationToken cancellationToken)
     {
         try
@@ -1085,6 +1102,7 @@ Complete:
                 sender,
                 options,
                 receivedTimestamp,
+                allowDelta,
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1112,6 +1130,7 @@ Complete:
         SiloAddress sender,
         DisseminationOptions options,
         long receivedTimestamp,
+        bool allowDelta,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -1131,8 +1150,7 @@ Complete:
             return DisseminationApplyResult.Obsolete;
         }
 
-        // Only full values are supported; obsolete values need no deserialization unless the owner validates authority.
-        if (TryGetTerminalApplyResult(disseminationNamespace, item.Value, out var terminalResult))
+        if (TryGetTerminalApplyResult(disseminationNamespace, item.Value, allowDelta, out var terminalResult))
         {
             EmitApplyResult(namespaceName, item, sender, terminalResult);
             return terminalResult;
@@ -1588,16 +1606,19 @@ Complete:
     private static bool TryGetTerminalApplyResult(
         IDisseminationNamespace disseminationNamespace,
         DisseminationValue value,
+        bool allowDelta,
         out DisseminationApplyResult result)
     {
-        if (value.FromVersion != 0 || value.ToVersion <= 0)
+        if (value.ToVersion <= 0 || value.FromVersion < 0
+            || value.FromVersion > 0 && (!allowDelta || value.FromVersion > value.ToVersion))
         {
             result = DisseminationApplyResult.Rejected;
             return true;
         }
 
         var localVersion = disseminationNamespace.GetVersion(value.Key);
-        if (value.ToVersion < localVersion && !disseminationNamespace.ValidateOlderFullValues)
+        if (value.ToVersion < localVersion
+            && (value.FromVersion > 0 || !disseminationNamespace.ValidateOlderFullValues))
         {
             result = DisseminationApplyResult.Obsolete;
             return true;

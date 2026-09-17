@@ -215,7 +215,7 @@ internal readonly struct DigestEntry
     public long Fingerprint { get; }
 }
 
-// Values carry full state. FromVersion remains zero on the wire.
+// FromVersion zero carries full state; a positive baseline identifies a namespace-specific broadcast delta.
 [GenerateSerializer, Immutable]
 internal readonly struct DisseminationValue
 {
@@ -275,7 +275,8 @@ internal sealed class DisseminationBroadcastResponse
     [Id(1)]
     public List<DisseminationNamespace> UnsupportedNamespaces { get; init; } = [];
 
-    // Certifies the maximum transmitted version of every key. Namespace entries retain capability evidence.
+    // Certifies accepted values and the exact maximum transmitted version of every key.
+    // Namespace entries retain capability evidence.
     [Id(2)]
     public bool AllVersionsAcknowledged { get; init; }
 }

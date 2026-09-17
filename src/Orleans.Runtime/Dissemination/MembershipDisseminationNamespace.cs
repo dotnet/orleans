@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -5,7 +6,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Dissemination;
 
-// Full snapshots preserve the complete inventory and same-version heartbeat advances.
+// Broadcasts compare immutable snapshots; repair carries the complete current inventory.
 internal sealed class MembershipDisseminationNamespace(
     IMembershipManager membershipManager,
     IOptionsMonitor<ClusterMembershipOptions> options,
@@ -13,12 +14,16 @@ internal sealed class MembershipDisseminationNamespace(
 {
     private static readonly DisseminationKey[] MembershipKeys = [DisseminationKey.Default];
     private readonly object _cacheLock = new();
-    private MembershipTableSnapshot? _cachedSnapshot;
+    private BroadcastState? _cachedState;
     private byte[]? _cachedPayload;
+    private BroadcastState? _cachedBroadcastBase;
+    private DisseminationValue _cachedBroadcast;
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
     public DisseminationMembershipScope MembershipScope => DisseminationMembershipScope.AllMembers;
+
+    public bool BroadcastsAreDeltas => true;
 
     public bool ValidateOlderFullValues => true;
 
@@ -67,19 +72,93 @@ internal sealed class MembershipDisseminationNamespace(
         lock (_cacheLock)
         {
             // Re-read the owner under the cache lock: publication arguments can outlive the state they describe.
-            var snapshot = membershipManager.CurrentSnapshot;
-            var version = snapshot.Version.Value;
-            if (_cachedSnapshot is null || !MembershipSnapshotsEqual(_cachedSnapshot, snapshot))
-            {
-                _cachedPayload = null;
-            }
-
-            _cachedSnapshot = snapshot;
-            _cachedPayload ??= serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot });
+            var state = GetCurrentState();
+            var version = state.Version;
+            _cachedPayload ??= serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = state.Snapshot });
             return _cachedPayload.Length <= request.MaxPayloadBytes && _cachedPayload.Length <= request.MaxBatchBytes
                 ? DisseminationRepairResult.Produced(new DisseminationValue(DisseminationKey.Default, 0, version, _cachedPayload))
                 : DisseminationRepairResult.InsufficientCapacity(version);
         }
+    }
+
+    public DisseminationRepairResult CreateBroadcast(
+        in DisseminationRepairRequest request,
+        DisseminationBroadcastState? baseline)
+    {
+        if (request.Key != DisseminationKey.Default)
+        {
+            return DisseminationRepairResult.Unavailable(version: 0);
+        }
+
+        lock (_cacheLock)
+        {
+            var current = GetCurrentState();
+            if (current.Version <= 0)
+            {
+                return DisseminationRepairResult.Unavailable(current.Version);
+            }
+
+            if (request.FromVersion > current.Version)
+            {
+                return DisseminationRepairResult.Current(current.Version);
+            }
+
+            // An empty current-view delta establishes a comparison baseline. Missing views use full repair.
+            var previous = baseline is null ? current : (BroadcastState)baseline;
+            if (previous.Version > current.Version)
+            {
+                return DisseminationRepairResult.Current(current.Version);
+            }
+
+            if (!ReferenceEquals(_cachedBroadcastBase, previous))
+            {
+                var updated = ImmutableArray.CreateBuilder<MembershipEntry>();
+                foreach (var (silo, entry) in current.Snapshot.Entries)
+                {
+                    if (!previous.Snapshot.Entries.TryGetValue(silo, out var old)
+                        || !MembershipEntriesEqual(old, entry))
+                    {
+                        updated.Add(entry);
+                    }
+                }
+
+                var removed = ImmutableArray.CreateBuilder<SiloAddress>();
+                foreach (var silo in previous.Snapshot.Entries.Keys)
+                {
+                    if (!current.Snapshot.Entries.ContainsKey(silo))
+                    {
+                        removed.Add(silo);
+                    }
+                }
+
+                var delta = new MembershipTableSnapshotDelta(
+                    previous.Snapshot.Version, current.Snapshot.Version,
+                    updated.ToImmutable(), removed.ToImmutable());
+                _cachedBroadcast = new(
+                    DisseminationKey.Default, previous.Version, current.Version,
+                    serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Delta = delta }));
+                _cachedBroadcastBase = previous;
+            }
+
+            return _cachedBroadcast.Payload.Length <= request.MaxPayloadBytes
+                && _cachedBroadcast.Payload.Length <= request.MaxBatchBytes
+                ? DisseminationRepairResult.Produced(_cachedBroadcast, current)
+                : DisseminationRepairResult.InsufficientCapacity(current.Version);
+        }
+    }
+
+    private BroadcastState GetCurrentState()
+    {
+        var snapshot = membershipManager.CurrentSnapshot;
+        if (_cachedState is null || !MembershipSnapshotsEqual(_cachedState.Snapshot, snapshot))
+        {
+            _cachedState = new(snapshot);
+            _cachedPayload = null;
+            _cachedBroadcastBase = null;
+            _cachedBroadcast = default;
+        }
+
+        return _cachedState;
     }
 
     public async ValueTask<DisseminationApplyResult> ApplyValueAsync(
@@ -92,31 +171,196 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
-        if (value.FromVersion != 0
-            || serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload)?.Snapshot is not { } snapshot
-            || value.ToVersion != snapshot.Version.Value)
+        if (serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload) is not { } update)
         {
             return DisseminationApplyResult.Rejected;
         }
 
-        // The membership manager merges maximum per-entry IAmAliveTime before publishing a full snapshot.
-        var currentSnapshot = membershipManager.CurrentSnapshot;
-        if (snapshot.Version == currentSnapshot.Version)
+        var previous = membershipManager.CurrentSnapshot;
+        MembershipTableSnapshot? snapshot;
+        IEnumerable<MembershipEntry> heartbeats;
+        IEnumerable<SiloAddress> removed;
+        if (update.Delta is { } delta)
         {
-            // Same-version snapshots can advance liveness or remove inactive entries.
-            if (!snapshot.IsSuccessorTo(currentSnapshot))
+            if (update.Snapshot is not null
+                || value.FromVersion != delta.BaseVersion.Value
+                || value.ToVersion != delta.Version.Value
+                || delta.BaseVersion.Value <= 0
+                || delta.Version < delta.BaseVersion
+                || delta.UpdatedEntries.IsDefault || delta.RemovedSilos.IsDefault)
             {
-                return DisseminationApplyResult.Duplicate;
+                return DisseminationApplyResult.Rejected;
             }
+
+            if (delta.Version < previous.Version)
+            {
+                return DisseminationApplyResult.Obsolete;
+            }
+
+            if (previous.Version != delta.BaseVersion && previous.Version != delta.Version)
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            snapshot = ApplyDelta(previous, delta);
+            heartbeats = delta.UpdatedEntries;
+            removed = delta.RemovedSilos;
+        }
+        else if (update.Snapshot is { } full
+            && value.FromVersion == 0
+            && value.ToVersion == full.Version.Value)
+        {
+            snapshot = full.Version == previous.Version ? MergeSameVersion(previous, full) : full;
+            heartbeats = full.Entries.Values;
+            removed = full.Version == previous.Version
+                ? previous.Entries.Keys.Where(silo => !full.Entries.ContainsKey(silo))
+                : [];
+        }
+        else
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
+        if (snapshot is null)
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
+        if (MembershipSnapshotsEqual(previous, snapshot) && CoversChanges(previous, heartbeats, removed))
+        {
+            return DisseminationApplyResult.Duplicate;
         }
 
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        var result = MembershipSnapshotsEqual(currentSnapshot, membershipManager.CurrentSnapshot)
+        var current = membershipManager.CurrentSnapshot;
+        if (snapshot.Version < current.Version)
+        {
+            return DisseminationApplyResult.Obsolete;
+        }
+
+        // A concurrent authority refresh can publish while the gossip call waits. Confirm the requested
+        // effects, rather than treating any unrelated owner change as acceptance of this update.
+        if (current.Version != snapshot.Version || !CoversChanges(current, heartbeats, removed))
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
+        return MembershipSnapshotsEqual(previous, current)
             ? DisseminationApplyResult.Duplicate
             : DisseminationApplyResult.Applied;
-        return snapshot.Version < currentSnapshot.Version && result == DisseminationApplyResult.Duplicate
-            ? DisseminationApplyResult.Obsolete
-            : result;
+    }
+
+    private static MembershipTableSnapshot? ApplyDelta(
+        MembershipTableSnapshot current,
+        MembershipTableSnapshotDelta delta)
+    {
+        var entries = current.Entries.ToBuilder();
+        var touched = new HashSet<SiloAddress>();
+        var sameVersion = current.Version == delta.Version;
+        foreach (var entry in delta.UpdatedEntries)
+        {
+            if (entry?.SiloAddress is not { } silo || !touched.Add(silo))
+            {
+                return null;
+            }
+
+            if (sameVersion)
+            {
+                if (entries.TryGetValue(silo, out var existing))
+                {
+                    entries[silo] = MergeHeartbeat(existing, entry);
+                }
+                else if (entry.Status == SiloStatus.Active)
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                entries[silo] = entries.TryGetValue(silo, out var existing)
+                    ? MergeHeartbeat(entry, existing)
+                    : entry;
+            }
+        }
+
+        foreach (var silo in delta.RemovedSilos)
+        {
+            if (silo is null || !touched.Add(silo)
+                || sameVersion && entries.TryGetValue(silo, out var existing) && existing.Status == SiloStatus.Active)
+            {
+                return null;
+            }
+
+            entries.Remove(silo);
+        }
+
+        return new(delta.Version, entries.ToImmutable());
+    }
+
+    private static MembershipTableSnapshot? MergeSameVersion(
+        MembershipTableSnapshot current,
+        MembershipTableSnapshot incoming)
+    {
+        var entries = current.Entries.ToBuilder();
+        foreach (var (silo, entry) in current.Entries)
+        {
+            if (incoming.Entries.TryGetValue(silo, out var update))
+            {
+                entries[silo] = MergeHeartbeat(entry, update);
+            }
+            else if (entry.Status == SiloStatus.Active)
+            {
+                return null;
+            }
+            else
+            {
+                entries.Remove(silo);
+            }
+        }
+
+        foreach (var (silo, entry) in incoming.Entries)
+        {
+            if (entry.Status == SiloStatus.Active && !current.Entries.ContainsKey(silo))
+            {
+                return null;
+            }
+        }
+
+        return new(current.Version, entries.ToImmutable());
+    }
+
+    private static MembershipEntry MergeHeartbeat(MembershipEntry current, MembershipEntry incoming) =>
+        incoming.IAmAliveTime > current.IAmAliveTime
+            ? current.WithIAmAliveTime(incoming.IAmAliveTime)
+            : current;
+
+    private static bool CoversChanges(
+        MembershipTableSnapshot current,
+        IEnumerable<MembershipEntry> updated,
+        IEnumerable<SiloAddress> removed)
+    {
+        foreach (var entry in updated)
+        {
+            if (current.Entries.TryGetValue(entry.SiloAddress, out var existing))
+            {
+                if (existing.EffectiveIAmAliveTime < entry.IAmAliveTime)
+                {
+                    return false;
+                }
+            }
+            else if (entry.Status == SiloStatus.Active)
+            {
+                return false;
+            }
+        }
+
+        return !removed.Any(current.Entries.ContainsKey);
+    }
+
+    private sealed class BroadcastState(MembershipTableSnapshot snapshot)
+        : DisseminationBroadcastState(snapshot.Version.Value)
+    {
+        public MembershipTableSnapshot Snapshot { get; } = snapshot;
     }
 
     private static long GetFingerprint(MembershipTableSnapshot snapshot)
@@ -170,4 +414,27 @@ internal sealed class MembershipTableSnapshotUpdate
 {
     [Id(0)]
     public MembershipTableSnapshot? Snapshot { get; init; }
+
+    [Id(1)]
+    public MembershipTableSnapshotDelta? Delta { get; init; }
+}
+
+[GenerateSerializer, Immutable]
+internal sealed class MembershipTableSnapshotDelta(
+    MembershipVersion baseVersion,
+    MembershipVersion version,
+    ImmutableArray<MembershipEntry> updatedEntries,
+    ImmutableArray<SiloAddress> removedSilos)
+{
+    [Id(0)]
+    public MembershipVersion BaseVersion { get; } = baseVersion;
+
+    [Id(1)]
+    public MembershipVersion Version { get; } = version;
+
+    [Id(2)]
+    public ImmutableArray<MembershipEntry> UpdatedEntries { get; } = updatedEntries;
+
+    [Id(3)]
+    public ImmutableArray<SiloAddress> RemovedSilos { get; } = removedSilos;
 }

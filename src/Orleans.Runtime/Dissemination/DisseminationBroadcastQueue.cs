@@ -369,7 +369,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 var knownVersion = keyState?.KnownVersion;
                 if (knownVersion is null && namespaceState.KnownVersions.TryGetValue(key, out var recordedVersion))
                 {
-                    knownVersion = recordedVersion;
+                    knownVersion = recordedVersion.Version;
                 }
 
                 if (knownVersion >= version)
@@ -845,7 +845,7 @@ internal sealed partial class DisseminationBroadcastQueue
             List<PendingKeyWork> initialWork,
             CancellationToken cancellationToken)
         {
-            // Every pass re-materializes repairs from the latest acknowledged version instead of retaining serialized messages.
+            // Materialize current broadcasts after admission using the peer's acknowledged baseline.
             var pending = new Queue<PendingKeyWork>(initialWork);
             var requiresBackoff = false;
             var madeProgress = false;
@@ -905,13 +905,13 @@ internal sealed partial class DisseminationBroadcastQueue
                             continue;
                         }
 
-                        var knownVersion = GetKnownVersion(work);
+                        var (knownVersion, baseline) = GetBroadcastBaseline(work);
                         var request = new DisseminationRepairRequest(
                             work.Key,
                             knownVersion,
                             currentOptions.MaxBatchBytes - byteCount,
                             work.Namespace.Options.MaxPayloadBytes);
-                        var repair = work.Namespace.CreateRepair(request);
+                        var repair = work.Namespace.CreateBroadcast(request, baseline);
                         if (repair.Status is DisseminationRepairStatus.Current)
                         {
                             // The namespace confirms that the peer is already current, so no RPC is needed.
@@ -944,7 +944,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         }
 
                         if (repair.Status is not DisseminationRepairStatus.Produced
-                            || !ValidateRepair(request, repair))
+                            || !ValidateBroadcast(work.Namespace, request, repair))
                         {
                             // Invalid or temporarily unavailable repairs retain the dirty key and enter backoff.
                             pending.Dequeue();
@@ -968,7 +968,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         itemCount++;
                         byteCount += value.Payload.Length;
 
-                        sentKeys.Add(new(work, knownVersion, value.ToVersion));
+                        sentKeys.Add(new(work, knownVersion, value.ToVersion, repair.BroadcastState));
                         if (itemCount >= currentOptions.MaxBatchItems || byteCount >= currentOptions.MaxBatchBytes)
                         {
                             break;
@@ -1018,7 +1018,7 @@ internal sealed partial class DisseminationBroadcastQueue
                             continue;
                         }
 
-                        var completion = CompleteAcknowledged(sent, acknowledgedVersion);
+                        var completion = CompleteAcknowledged(sent, acknowledgedVersion, response.AllVersionsAcknowledged);
                         madeProgress |= completion.MadeProgress;
                         requiresBackoff |= completion.RequiresBackoff;
                     }
@@ -1167,13 +1167,17 @@ internal sealed partial class DisseminationBroadcastQueue
             return result;
         }
 
-        private long? GetKnownVersion(PendingKeyWork work)
+        private (long? Version, DisseminationBroadcastState? State) GetBroadcastBaseline(PendingKeyWork work)
         {
             lock (_lock)
             {
-                return TryGetKeyStateUnsafe(work, out _, out var keyState)
-                    ? keyState.KnownVersion
-                    : work.KnownVersion;
+                if (!TryGetKeyStateUnsafe(work, out _, out var keyState))
+                {
+                    return (work.KnownVersion, null);
+                }
+
+                var state = keyState.BroadcastState;
+                return (keyState.KnownVersion, state?.Version == keyState.KnownVersion ? state : null);
             }
         }
 
@@ -1207,7 +1211,7 @@ internal sealed partial class DisseminationBroadcastQueue
             }
         }
 
-        private SendWorkResult CompleteAcknowledged(SentKey sent, long acknowledgedVersion)
+        private SendWorkResult CompleteAcknowledged(SentKey sent, long acknowledgedVersion, bool accepted)
         {
             lock (_lock)
             {
@@ -1220,6 +1224,11 @@ internal sealed partial class DisseminationBroadcastQueue
                 if (previousVersion is null || acknowledgedVersion > previousVersion)
                 {
                     keyState.KnownVersion = acknowledgedVersion;
+                }
+
+                if (accepted && keyState.KnownVersion == sent.SentVersion)
+                {
+                    keyState.BroadcastState = sent.BroadcastState;
                 }
 
                 var madeProgress = sent.FromVersion is null
@@ -1320,6 +1329,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 foreach (var keyState in namespaceState.Keys.Values)
                 {
                     keyState.KnownVersion = null;
+                    keyState.BroadcastState = null;
                 }
 
                 if (namespaceState.Keys.Count == 0)
@@ -1474,7 +1484,8 @@ internal sealed partial class DisseminationBroadcastQueue
             DisseminationKey key) =>
             disseminationNamespace.Digests.Any(entry => entry.Key == key);
 
-        private static bool ValidateRepair(
+        private static bool ValidateBroadcast(
+            IDisseminationNamespace disseminationNamespace,
             in DisseminationRepairRequest request,
             in DisseminationRepairResult repair)
         {
@@ -1482,8 +1493,11 @@ internal sealed partial class DisseminationBroadcastQueue
             return repair.Status is DisseminationRepairStatus.Produced
                 && repair.Version > 0
                 && value.Key == request.Key
-                && value.FromVersion == 0
+                && (disseminationNamespace.BroadcastsAreDeltas
+                    ? value.FromVersion > 0 && value.FromVersion <= value.ToVersion
+                    : value.FromVersion == 0)
                 && value.ToVersion == repair.Version
+                && (repair.BroadcastState is null || repair.BroadcastState.Version == value.ToVersion)
                 && value.Payload.Length <= request.MaxPayloadBytes
                 && value.Payload.Length <= request.MaxBatchBytes;
         }
@@ -1494,25 +1508,31 @@ internal sealed partial class DisseminationBroadcastQueue
 
             public Dictionary<DisseminationKey, PeerKeyState> Keys { get; } = [];
 
-            public Dictionary<DisseminationKey, long> KnownVersions { get; } = [];
+            public Dictionary<DisseminationKey, PeerKnowledge> KnownVersions { get; } = [];
 
             public PeerKeyState AddKey(DisseminationKey key)
             {
                 var result = new PeerKeyState();
                 if (KnownVersions.TryGetValue(key, out var knownVersion))
                 {
-                    result.KnownVersion = knownVersion;
+                    result.KnownVersion = knownVersion.Version;
+                    result.BroadcastState = knownVersion.State;
                 }
 
                 Keys.Add(key, result);
                 return result;
             }
 
-            public void ObserveKnownVersion(DisseminationKey key, long version)
+            public void ObserveKnownVersion(
+                DisseminationKey key,
+                long version,
+                DisseminationBroadcastState? state = null)
             {
-                if (!KnownVersions.TryGetValue(key, out var knownVersion) || version > knownVersion)
+                state = state?.Version == version ? state : null;
+                if (!KnownVersions.TryGetValue(key, out var knownVersion) || version > knownVersion.Version
+                    || version == knownVersion.Version && state is not null)
                 {
-                    KnownVersions[key] = version;
+                    KnownVersions[key] = new(version, state);
                 }
             }
 
@@ -1520,7 +1540,7 @@ internal sealed partial class DisseminationBroadcastQueue
             {
                 if (keyState.KnownVersion is { } knownVersion)
                 {
-                    ObserveKnownVersion(key, knownVersion);
+                    ObserveKnownVersion(key, knownVersion, keyState.BroadcastState);
                 }
 
                 Keys.Remove(key);
@@ -1543,6 +1563,8 @@ internal sealed partial class DisseminationBroadcastQueue
             // A null version means no known baseline. Dirty can coexist with InFlight when a newer notification arrives mid-send.
             public long? KnownVersion { get; set; }
 
+            public DisseminationBroadcastState? BroadcastState { get; set; }
+
             public long NotificationGeneration { get; set; }
 
             public long NotificationVersion { get; set; }
@@ -1562,7 +1584,10 @@ internal sealed partial class DisseminationBroadcastQueue
         private readonly record struct SentKey(
             PendingKeyWork Work,
             long? FromVersion,
-            long SentVersion);
+            long SentVersion,
+            DisseminationBroadcastState? BroadcastState);
+
+        private readonly record struct PeerKnowledge(long Version, DisseminationBroadcastState? State);
 
         private readonly record struct DigestKey(
             DisseminationNamespace Namespace,

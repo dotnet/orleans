@@ -2254,7 +2254,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipNamespacePublishesIndependentlyApplicableFullSnapshots()
+    public async Task MembershipPublicationValidationProducesIndependentlyApplicableFullRepairs()
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
@@ -2324,7 +2324,7 @@ public partial class DisseminationProtocolTests
     [Theory]
     [InlineData(false, 2)]
     [InlineData(true, 3)]
-    public async Task MembershipNamespacePublishesCurrentSnapshotWhenNotificationIsSuperseded(bool baselineAccepted, long nextVersion)
+    public async Task MembershipPublicationValidationUsesCurrentSnapshotWhenNotificationIsSuperseded(bool baselineAccepted, long nextVersion)
     {
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
@@ -2360,7 +2360,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipNamespacePublishesFullInventoryWhenTopologyChanges()
+    public async Task MembershipPublicationValidationIncludesFullInventoryWhenTopologyChanges()
     {
         var local = CreateSilo(11111);
         var firstPeer = CreateSilo(11112);
@@ -6458,7 +6458,7 @@ public partial class DisseminationProtocolTests
         var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sends = 0;
-        transport.SendBroadcastHandler = async (peer, batch, cancellationToken) =>
+        transport.SendBroadcastResponseHandler = async (peer, batch, cancellationToken) =>
         {
             lock (transport.BroadcastBatches)
             {
@@ -6473,6 +6473,12 @@ public partial class DisseminationProtocolTests
                     await releaseSend.Task.WaitAsync(cancellationToken);
                 }
             }
+
+            return new DisseminationBroadcastResponse
+            {
+                Acknowledgments = FakeTransport.CreateAcknowledgment(batch).Acknowledgments,
+                AllVersionsAcknowledged = true,
+            };
         };
         var protocol = CreateProtocol(
             transport,
@@ -6509,8 +6515,10 @@ public partial class DisseminationProtocolTests
             var forwarded = Assert.Single(GetBroadcastValues(transport.BroadcastBatches[1].Batch));
             var update = Assert.IsType<MembershipTableSnapshotUpdate>(
                 serializer.Deserialize<MembershipTableSnapshotUpdate>(forwarded.Value.Payload));
-            Assert.NotNull(update.Snapshot);
-            Assert.Equal(DateTime.UnixEpoch.AddSeconds(2), update.Snapshot.Entries[sender].IAmAliveTime);
+            Assert.Null(update.Snapshot);
+            var delta = Assert.IsType<MembershipTableSnapshotDelta>(update.Delta);
+            Assert.Equal(DateTime.UnixEpoch.AddSeconds(2),
+                Assert.Single(delta.UpdatedEntries, entry => entry.SiloAddress.Equals(sender)).IAmAliveTime);
             Assert.Equal(1, forwarded.Value.ToVersion);
         }
         finally
