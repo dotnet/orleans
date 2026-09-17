@@ -39,7 +39,7 @@ namespace Orleans.Streaming.EventHubs
         public string Partition { get; set; } = null!;
     }
 
-    internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, ICheckpointingQueueCache, IQueueAdapterReceiverReadRecovery
+    internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, ICheckpointingQueueCache
     {
         public const int MaxMessagesPerRead = 1000;
         private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(5);
@@ -53,6 +53,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly LoadSheddingOptions loadSheddingOptions;
         private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
         private IEventHubQueueCache? cache;
+        private EventHubQueueCache? certifiedCache;
 
         private IEventHubReceiver? receiver;
 
@@ -63,7 +64,7 @@ namespace Orleans.Streaming.EventHubs
         private List<EventData>? _pendingMessages;
         private List<StreamPosition>? _pendingPositions;
         private List<IBatchContainer>? _pendingNotifications;
-        public bool UsesCertifiedDeliveryProgress { get; private set; }
+        public bool UsesCertifiedDeliveryProgress => certifiedCache is not null;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -140,7 +141,7 @@ namespace Orleans.Streaming.EventHubs
             var watch = Stopwatch.StartNew();
             try
             {
-                UsesCertifiedDeliveryProgress = false;
+                certifiedCache = null;
                 this.checkpointer = await this.checkpointerFactory(
                     this.settings.Partition,
                     cancellationToken);
@@ -158,8 +159,13 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
-                UsesCertifiedDeliveryProgress = this.receiver is IQueueAdapterReceiverReadRecovery
-                    && this.cache.TryEnableCertifiedDeliveryProgress();
+                if (this.receiver is IQueueAdapterReceiverReadRecovery
+                    && this.cache is EventHubQueueCache nativeCache
+                    && nativeCache.TryEnableCertifiedDeliveryProgress())
+                {
+                    certifiedCache = nativeCache;
+                }
+
                 if (UsesCertifiedDeliveryProgress && this.receiver is EventHubReceiverProxy proxy)
                 {
                     await proxy.InitializeAsync(cancellationToken);
@@ -340,7 +346,7 @@ namespace Orleans.Streaming.EventHubs
 
         public void UpdateDeliveryProgress(StreamSequenceToken? safeToken, DateTime utcNow)
         {
-            if (!UsesCertifiedDeliveryProgress)
+            if (certifiedCache is not { } progressCache)
             {
                 if (safeToken is IEventHubPartitionLocation legacy
                     && long.TryParse(legacy.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
@@ -357,7 +363,7 @@ namespace Orleans.Streaming.EventHubs
                 throw new ArgumentException("Certified Event Hubs progress must identify a partition record offset.", nameof(safeToken));
             }
 
-            this.cache!.UpdateDeliveryProgress(safeToken, utcNow);
+            progressCache.UpdateDeliveryProgress(safeToken, utcNow);
             this.checkpointer!.Update(location.EventHubOffset, utcNow, CancellationToken.None);
         }
 
@@ -397,6 +403,7 @@ namespace Orleans.Streaming.EventHubs
 
                 // clear cache and receiver
                 IEventHubQueueCache? localCache = Interlocked.Exchange(ref this.cache, null);
+                certifiedCache = null;
 
                 var localReceiver = Interlocked.Exchange(ref this.receiver, null);
 
@@ -500,21 +507,13 @@ namespace Orleans.Streaming.EventHubs
         }
 
         private IQueueCacheCursor CreateCursor(object cursor)
-            => UsesCertifiedDeliveryProgress ? new ProgressCursor(cache!, cursor) : new Cursor(cache!, cursor);
+            => certifiedCache is { } progressCache ? new ProgressCursor(progressCache, cursor) : new Cursor(cache!, cursor);
 
         private class Cursor : IQueueCacheCursor
         {
             private readonly IEventHubQueueCache cache;
             private readonly object cursor;
             private IBatchContainer? current;
-
-            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSequenceToken? token)
-            {
-                this.cache = cache;
-#pragma warning disable CS0618 // Preserve the exact legacy exception and cursor behavior.
-                this.cursor = cache.GetCursor(streamId, token);
-#pragma warning restore CS0618
-            }
 
             public Cursor(IEventHubQueueCache cache, object cursor)
             {
@@ -564,11 +563,10 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        private sealed class ProgressCursor(IEventHubQueueCache cache, object cursor)
+        private sealed class ProgressCursor(EventHubQueueCache cache, object cursor)
             : Cursor(cache, cursor), IQueueCacheCursorProgress
         {
-            private readonly IQueueCacheCursorProgress progress = cursor as IQueueCacheCursorProgress
-                ?? throw new OrleansConfigurationException($"Event Hubs cursor {cursor.GetType().FullName} must expose {nameof(IQueueCacheCursorProgress)}.");
+            private readonly IQueueCacheCursorProgress progress = (IQueueCacheCursorProgress)cursor;
 
             public StreamSequenceToken? SafeSequenceToken => progress.SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => progress.SetDeliveredThrough(token);

@@ -15,7 +15,7 @@ namespace Orleans.Streams;
 /// cache; that capability is advertised by <see cref="ICheckpointingQueueCache"/>.
 /// An observed cache miss remains unresolved until the owner deliberately acquires a new cursor.
 /// </remarks>
-public interface IQueueCacheCursorProgress
+internal interface IQueueCacheCursorProgress
 {
     /// <summary>
     /// Gets the last fully accounted provider record, or <see langword="null"/> while the prefix is unknown.
