@@ -151,6 +151,10 @@ namespace Orleans.Runtime.Messaging
             bool allowResponseReaddress = true)
         {
             Debug.Assert(!msg.IsLocalOnly);
+            if (sendMessage is null && IsForwardedClientRequest(msg, _siloAddress))
+            {
+                sendMessage = SendForwardedClientRequest;
+            }
 
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             var isBlockedApplicationMessage = IsBlockingApplicationMessages
@@ -611,7 +615,6 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     reason,
                     exception);
-                rejection.SendingSilo = _siloAddress;
                 rejection.RequestContextData = null;
                 SendMessage(rejection);
                 return;
@@ -652,6 +655,18 @@ namespace Orleans.Runtime.Messaging
                     LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
                 }
             }
+        }
+
+        internal void RejectForwardedClientRequest(Message message, string reason, Exception exception)
+        {
+            _messagingInstruments.OnRejectedMessage(message);
+            var rejection = messageFactory.CreateRejectionResponse(
+                message,
+                Message.RejectionTypes.Transient,
+                reason,
+                exception);
+            rejection.RequestContextData = null;
+            SendMessage(rejection);
         }
 
         private void ResendMessageImpl(
