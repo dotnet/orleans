@@ -70,11 +70,6 @@ namespace Orleans
         /// <summary>
         /// Removes dead silo entries whose last known update precedes <paramref name="beforeDate"/>.
         /// </summary>
-        /// <remarks>
-        /// Preserves every non-dead entry. The last known update includes startup, liveness, and suspect-vote
-        /// timestamps so a recent death declaration remains available to readers.
-        /// Dead rows can be removed at the current table version.
-        /// </remarks>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>
         [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
@@ -178,8 +173,7 @@ namespace Orleans
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
-        /// 1) The versioned fields of the MembershipEntry for this silo will be replaced by the supplied fields,
-        ///    and IAmAliveTime will retain the maximum of its stored and supplied values.
+        /// 1) The MembershipEntry for this silo will be updated using the supplied entry.
         /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
@@ -213,12 +207,11 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Advances the silo's IAmAliveTime to the maximum of the stored and supplied timestamps.
+        /// Updates the IAmAliveTime column of the MembershipEntry for this silo.
         /// </summary>
         /// <remarks>
         /// Preserves the other membership fields and the table version, including its ETag.
-        /// The row ETag may change. Both heartbeat and versioned row updates preserve the maximum timestamp.
-        /// A delayed report for a removed silo preserves the row's absence.
+        /// The row ETag may change.
         /// </remarks>
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>

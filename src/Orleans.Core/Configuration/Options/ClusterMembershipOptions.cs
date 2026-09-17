@@ -119,7 +119,7 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// Gets or sets the retention period after which dead silo entries are eligible for removal.
-        /// Retention uses the latest startup, liveness, or suspect-vote timestamp.
+        /// The cleanup agent identifies expired entries using the latest startup, liveness, or suspect-vote timestamp.
         /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
         /// </summary>
         /// <value>Defunct silos are eligible for removal from membership after one week by default.</value>

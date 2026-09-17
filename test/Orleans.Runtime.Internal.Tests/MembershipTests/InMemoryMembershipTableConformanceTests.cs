@@ -111,7 +111,7 @@ public partial class InMemoryMembershipTableTests
     }
 
     [Fact]
-    public void UpdateIAmAlive_NewerThenOlder_PreservesMaximumAndTableVersion()
+    public void UpdateIAmAlive_OutOfOrderReports_PreservesMaximumAndTableVersion()
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
