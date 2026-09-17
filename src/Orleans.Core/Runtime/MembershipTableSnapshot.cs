@@ -72,40 +72,30 @@ namespace Orleans.Runtime
             MembershipVersion version,
             IEnumerable<MembershipEntry> updatedEntries)
         {
-            ArgumentNullException.ThrowIfNull(previousSnapshot);
-            ArgumentNullException.ThrowIfNull(updatedEntries);
-
             var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                if (version == previousSnapshot.Version
-                    && previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
+                if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
                 {
-                    // The same version identifies the same canonical membership view.
-                    entry = entry.IAmAliveTime > previousEntry.IAmAliveTime
-                        ? previousEntry.WithIAmAliveTime(entry.IAmAliveTime)
-                        : previousEntry;
+                    var iAmAliveTime = entry.IAmAliveTime > previousEntry.IAmAliveTime
+                        ? entry.IAmAliveTime
+                        : previousEntry.IAmAliveTime;
+                    if (version == previousSnapshot.Version)
+                    {
+                        entry = previousEntry;
+                    }
+
+                    if (entry.IAmAliveTime < iAmAliveTime)
+                    {
+                        entry = entry.WithIAmAliveTime(iAmAliveTime);
+                    }
                 }
 
-                entry = PreserveIAmAliveTime(previousSnapshot, entry);
                 entries.Add(entry.SiloAddress, entry);
             }
 
             return new MembershipTableSnapshot(version, entries.ToImmutable());
-        }
-
-        private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
-        {
-            // Retain the maximum IAmAliveTime, since IAmAliveTime updates do not increase membership version
-            // and therefore can be clobbered by torn reads.
-            if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
-                && previousEntry.IAmAliveTime > entry.IAmAliveTime)
-            {
-                entry = entry.WithIAmAliveTime(previousEntry.IAmAliveTime);
-            }
-
-            return entry;
         }
 
         /// <summary>
@@ -166,6 +156,10 @@ namespace Orleans.Runtime
         /// <summary>
         /// Determines whether this snapshot is a successor to another snapshot.
         /// </summary>
+        /// <remarks>
+        /// At the same canonical membership version, progress consists of newer liveness timestamps
+        /// or completed defunct-entry cleanup.
+        /// </remarks>
         /// <param name="other">The snapshot to compare against.</param>
         /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
         public bool IsSuccessorTo(MembershipTableSnapshot other)
@@ -189,14 +183,13 @@ namespace Orleans.Runtime
             var heartbeatAdvanced = false;
             foreach (var (silo, entry) in Entries)
             {
-                if (!other.Entries.TryGetValue(silo, out var otherEntry)
-                    || !AreVersionedFieldsEqual(entry, otherEntry))
+                if (!other.Entries.TryGetValue(silo, out var otherEntry))
                 {
                     // Membership changes require a table-version advance.
                     return false;
                 }
 
-                heartbeatAdvanced |= entry.EffectiveIAmAliveTime > otherEntry.EffectiveIAmAliveTime;
+                heartbeatAdvanced |= entry.IAmAliveTime > otherEntry.IAmAliveTime;
             }
 
             if (Entries.Count == other.Entries.Count)
@@ -209,49 +202,6 @@ namespace Orleans.Runtime
             foreach (var (silo, previousEntry) in other.Entries)
             {
                 if (previousEntry.Status == SiloStatus.Active && !Entries.ContainsKey(silo))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        internal static bool AreVersionedFieldsEqual(MembershipEntry left, MembershipEntry right)
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (!left.SiloAddress.Equals(right.SiloAddress)
-                || left.Status != right.Status
-                || left.ProxyPort != right.ProxyPort
-                || !string.Equals(left.HostName, right.HostName, StringComparison.Ordinal)
-                || !string.Equals(left.SiloName, right.SiloName, StringComparison.Ordinal)
-                || !string.Equals(left.RoleName, right.RoleName, StringComparison.Ordinal)
-                || left.UpdateZone != right.UpdateZone
-                || left.FaultZone != right.FaultZone
-                || left.StartTime != right.StartTime)
-            {
-                return false;
-            }
-
-            var leftSuspects = left.SuspectTimes;
-            var rightSuspects = right.SuspectTimes;
-            if (ReferenceEquals(leftSuspects, rightSuspects))
-            {
-                return true;
-            }
-
-            if (leftSuspects is null || rightSuspects is null || leftSuspects.Count != rightSuspects.Count)
-            {
-                return false;
-            }
-
-            for (var index = 0; index < leftSuspects.Count; index++)
-            {
-                if (!leftSuspects[index].Equals(rightSuspects[index]))
                 {
                     return false;
                 }
