@@ -35,7 +35,9 @@ its observer to that enrolled manager. Standalone managers have caller-owned lif
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job
-handle. Recovery restores that pair and repairs an absent owner for pending work.
+handle. Admission counts acknowledged pending work in constant time from inbox and
+provisional-acceptance counts. Recovery restores that pair and repairs an absent owner
+for pending work.
 Callbacks validate generation and physical job identity before processing.
 Delivery requires a nonempty message ID, a nondefault sender, and an envelope data
 container before duplicate lookup or admission. Serialized null message bodies remain

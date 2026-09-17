@@ -442,7 +442,8 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private int GetDurableInboxCount() => _inboxDict.Keys.Count(key => !_provisionalAcceptances.Contains(key));
+    // Every provisional key is an inbox key; acknowledgement removes only its provisional marker.
+    private int GetDurableInboxCount() => _inboxDict.Count - _provisionalAcceptances.Count;
 
     public void OnWriteRequested()
     {
