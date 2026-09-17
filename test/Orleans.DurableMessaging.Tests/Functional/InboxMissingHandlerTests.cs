@@ -7,6 +7,7 @@ using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.TestingHost.Diagnostics;
+using Orleans.Timers;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Functional;
@@ -111,10 +112,24 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
 
         Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
-        Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await RunPumpAsync(receiver, job)).Status);
+        using (var runningLocalDrain = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), envelope.Value.RouteKey))
+        {
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+            await runningLocalDrain.WaitUntilEnteredAsync();
+            var retry = RunPumpAsync(receiver, job);
+            await OnTurnAsync(context, static () => { });
+            await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, retry);
+            runningLocalDrain.Release();
+            Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await retry).Status);
+        }
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
         Fixture.Clock.Advance(TimeSpan.FromMinutes(2));
-        Assert.Equal(DurableJobRunStatus.Completed, (await RunPumpAsync(receiver, job)).Status);
+        using var runningRequestedPump = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), envelope.Value.RouteKey);
+        var terminal = RunPumpAsync(receiver, job);
+        await runningRequestedPump.WaitUntilEnteredAsync();
+        await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, terminal);
+        runningRequestedPump.Release();
+        Assert.Equal(DurableJobRunStatus.Completed, (await terminal).Status);
         var completed = await receiver.GetSnapshotAsync();
         var deadLetter = Assert.Single(completed.InboxDeadLetters);
         Assert.Equal(3, deadLetter.AttemptCount);
@@ -129,6 +144,21 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(1, ScheduleCount(receiver));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
         Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).Faulted.Task.IsCompleted);
+    }
+
+    private static async Task AssertUnrelatedTimerDoesNotCompleteAsync(IGrainContext context, DiagnosticEventCollector events, Task pump)
+    {
+        IGrainTimer unrelated = null!;
+        await OnTurnAsync(context, () => unrelated = context.ActivationServices.GetRequiredService<ITimerRegistry>()
+            .RegisterGrainTimer(context, static (_, _) => Task.CompletedTask, 0,
+                new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan) { Interleave = true }));
+        using (unrelated)
+        {
+            await events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+                item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, unrelated),
+                TimeSpan.FromSeconds(30), Cancellation);
+            Assert.False(pump.IsCompleted);
+        }
     }
 
     private static void AssertPendingRetry(IGrainContext context, DurableEndpointSnapshot snapshot, int expectedAttempts, DateTimeOffset nextAttempt)
@@ -151,25 +181,97 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
     }
     private int ScheduleCount(IDurableMessagingTestGrain receiver) =>
         Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId());
-    private static Task<DiagnosticEvent> WaitForPumpAsync(DiagnosticEventCollector events, GrainId grainId) =>
-        events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
-            item => item.Payload is GrainTimerEvents.TickStop stop && stop.GrainContext.GrainId == grainId,
+    private static async Task<DiagnosticEvent> WaitForPumpAsync(DiagnosticEventCollector events, GrainId grainId)
+    {
+        var created = await events.WaitForEventAsync(nameof(GrainTimerEvents.Created),
+            item => item.Payload is GrainTimerEvents.Created timer && timer.GrainContext.GrainId == grainId && IsInboxTimer(timer.Timer),
             TimeSpan.FromSeconds(30), Cancellation);
+        var timer = Assert.IsType<GrainTimerEvents.Created>(created.Payload).Timer;
+        return await events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
+            TimeSpan.FromSeconds(30), Cancellation);
+    }
+    private static bool IsInboxTimer(IGrainTimer timer) => timer.GetType().GenericTypeArguments is [var state]
+        && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension");
     private async Task<DurableJobRunResult> RunPumpAsync(IDurableMessagingTestGrain receiver, DurableJob job)
     {
         var context = Fixture.GetGrainContext(receiver);
         var feature = (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        var run = new PumpContext(job);
-        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        DurableJobRunResult result = null!;
-        await OnTurnAsync(context, () => result = feature.ExecuteJobAsync(run, Cancellation).GetAwaiter().GetResult());
-        if (result.IsInProgress)
+        var completion = new PumpCompletion(context, feature, new PumpContext(job));
+        using var subscription = GrainTimerEvents.AllEvents.Subscribe(completion);
+        await OnTurnAsync(context, completion.Start);
+        return await completion.Result.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+    }
+    private sealed class PumpCompletion(IGrainContext context, IDurableJobFeatureHandler feature, IJobRunContext run)
+        : IObserver<GrainTimerEvents.TimerEvent>
+    {
+        private IGrainTimer? _timer;
+        private bool _capturing;
+        private bool _started;
+        public TaskCompletionSource<DurableJobRunResult> Result { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Start()
         {
-            var stopped = await WaitForPumpAsync(events, receiver.GetGrainId());
-            Assert.Null(Assert.IsType<GrainTimerEvents.TickStop>(stopped.Payload).Exception);
-            await OnTurnAsync(context, () => result = feature.ExecuteJobAsync(run, Cancellation).GetAwaiter().GetResult());
+            _started = true;
+            StartRequestedPump(allowCoalescing: true);
         }
-        return result;
+        private void StartRequestedPump(bool allowCoalescing)
+        {
+            Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+            DurableJobRunResult result;
+            _capturing = true;
+            try
+            {
+                result = feature.ExecuteJobAsync(run, Cancellation).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                _capturing = false;
+            }
+            if (!result.IsInProgress)
+            {
+                Result.TrySetResult(result);
+            }
+            else if (!allowCoalescing)
+            {
+                Assert.NotNull(_timer);
+            }
+        }
+        public void OnNext(GrainTimerEvents.TimerEvent item)
+        {
+            if (!ReferenceEquals(item.GrainContext, context) || Result.Task.IsCompleted) return;
+            try
+            {
+                if (item is GrainTimerEvents.Created && _capturing)
+                {
+                    Assert.Null(_timer);
+                    _timer = item.Timer;
+                }
+                else if (item is GrainTimerEvents.TickStop stop && _started)
+                {
+                    if (ReferenceEquals(stop.Timer, _timer))
+                    {
+                        Assert.Null(stop.Exception);
+                        Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+                        var result = feature.ExecuteJobAsync(run, Cancellation).GetAwaiter().GetResult();
+                        Assert.False(result.IsInProgress);
+                        Result.TrySetResult(result);
+                    }
+                    else if (_timer is null && IsInboxTimer(stop.Timer))
+                    {
+                        // The coalesced pump released its lease before this event; start the requested run on this turn.
+                        Assert.Null(stop.Exception);
+                        StartRequestedPump(allowCoalescing: false);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Result.TrySetException(exception);
+            }
+        }
+        public void OnError(Exception error) => Result.TrySetException(error);
+        public void OnCompleted() { }
     }
     private static Task OnTurnAsync(IGrainContext context, Action action)
     {
