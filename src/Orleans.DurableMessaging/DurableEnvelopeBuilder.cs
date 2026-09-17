@@ -64,9 +64,16 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// </summary>
     /// <param name="sessionPool">The serializer session pool used to encode the message.</param>
     /// <param name="senderId">The identity of the sending grain.</param>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="sessionPool"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="senderId"/> is the default grain id.</exception>
     public DurableEnvelopeBuilder(SerializerSessionPool sessionPool, GrainId senderId)
     {
         ArgumentNullException.ThrowIfNull(sessionPool);
+        if (senderId.IsDefault)
+        {
+            throw new ArgumentException("The sender grain id must not be the default value.", nameof(senderId));
+        }
+
         SessionPool = sessionPool;
         SenderId = senderId;
     }

@@ -24,6 +24,38 @@ public sealed class DurableEnvelopeContractTests : IDisposable
     }
 
     [Fact]
+    public void EnvelopeBuilder_Constructor_DefaultSender_ThrowsArgumentException()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new DurableEnvelopeBuilder(_sessions, default));
+
+        Assert.Equal("senderId", exception.ParamName);
+    }
+
+    [Fact]
+    public void EnvelopeBuilder_Constructor_NullSessionPool_ThrowsArgumentNullException()
+    {
+        var sender = GrainId.Create("sender", "constructor");
+
+        var exception = Assert.Throws<ArgumentNullException>(() => new DurableEnvelopeBuilder(null!, sender));
+
+        Assert.Equal("sessionPool", exception.ParamName);
+    }
+
+    [Fact]
+    public void EnvelopeBuilder_Constructor_ValidSender_PreservesIdentity()
+    {
+        var sender = GrainId.Create("sender", "constructor");
+        var envelope = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(GrainId.Create("receiver", "constructor"), "route")
+            .WithBody("payload")
+            .Build();
+
+        Assert.Equal(sender, envelope.SenderId);
+        Assert.True(envelope.Data.TryGetBody<string>(out var body));
+        Assert.Equal("payload", body);
+    }
+
+    [Fact]
     public void EnvelopeBuilder_Complete_RoundTripsAllEnvelopeFieldsIncludingGeneralReplyTo()
     {
         var sender = GrainId.Create("sender", "17");
