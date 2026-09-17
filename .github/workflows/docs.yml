@@ -85,6 +85,10 @@ jobs:
     name: Build documentation projects and samples
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Work around #11235 (dotnet/roslyn#85656). Remove when global.json's SDK carries
+      # .NET runtime 10.0.13 or later (dotnet/runtime#132631).
+      DOTNET_TieredPGO: '0'
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
