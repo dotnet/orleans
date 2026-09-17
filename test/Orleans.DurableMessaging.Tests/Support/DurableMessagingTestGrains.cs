@@ -22,6 +22,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync(DurableEnvelope envelope);
+    Task<DeliveryResult> DeleteJournalThenDeliverAsync(DurableEnvelope envelope);
     Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate);
 }
 
@@ -231,6 +232,13 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
+    public async Task<DeliveryResult> DeleteJournalThenDeliverAsync(DurableEnvelope envelope)
+    {
+        await StateManager.DeleteStateAsync(CancellationToken.None);
+        var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
+        return await extension.DeliverAsync(envelope);
+    }
+
     private DurableEnvelope? _controlEnvelope;
     internal TaskCompletionSource ControlDeliveryEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -287,6 +295,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     internal Exception? NextWriteRejection { get; set; }
+    internal Exception? NextDeleteRejection { get; set; }
+
+    public void OnDeleteRequested()
+    {
+        if (NextDeleteRejection is { } exception)
+        {
+            NextDeleteRejection = null;
+            throw exception;
+        }
+    }
     public void OnWriteRequested()
     {
         if (NextWriteRejection is { } exception)
