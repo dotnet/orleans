@@ -146,6 +146,50 @@ public sealed class EventHubActivationTests
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Shutdown_PreservesProducerAndConnectionFailures(bool failProducer, bool failConnection)
+    {
+        await using var connection = new TrackingConnection();
+        using var host = CreateHost(connection, false, true, true, null);
+        var factory = Assert.IsType<EventHubAdapterFactory>(
+            host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(ProviderName));
+        factory.Init();
+        var producerFailure = failProducer ? new InvalidOperationException("producer close failed") : null;
+        var connectionFailure = failConnection ? new InvalidOperationException("connection close failed") : null;
+        var producerField = typeof(EventHubAdapterFactory).GetField("producer", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var producer = new FailingProducer(
+            Assert.IsAssignableFrom<IEventHubProducer>(producerField.GetValue(factory)), producerFailure);
+        producerField.SetValue(factory, producer);
+        connection.CloseFailure = connectionFailure;
+        try
+        {
+            var failure = await Record.ExceptionAsync(
+                () => factory.ShutdownAsync(CancellationToken.None).WaitAsync(Timeout, TestContext.Current.CancellationToken));
+            if (failProducer && failConnection)
+            {
+                Assert.Equal(new[] { producerFailure, connectionFailure },
+                    Assert.IsType<AggregateException>(failure).InnerExceptions);
+            }
+            else
+            {
+                Assert.Same(producerFailure ?? connectionFailure, failure);
+            }
+
+            Assert.Same(failure, await Record.ExceptionAsync(
+                () => factory.ShutdownAsync(CancellationToken.None).WaitAsync(Timeout, TestContext.Current.CancellationToken)));
+            Assert.Equal(1, producer.CloseCount);
+            Assert.Equal(1, connection.CloseCount);
+        }
+        finally
+        {
+            connection.CloseFailure = null;
+        }
+    }
+
     private static Task Initialize(PersistentStreamProvider provider, CancellationToken cancellationToken)
         => (Task)typeof(PersistentStreamProvider)
             .GetMethod("Init", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -194,6 +238,7 @@ public sealed class EventHubActivationTests
         : EventHubConnection("Endpoint=sb://localhost;SharedAccessKeyName=test;SharedAccessKey=dGVzdA==", "events")
     {
         public Task CloseRelease { get; set; } = Task.CompletedTask;
+        public Exception? CloseFailure { get; set; }
         public TaskCompletionSource CloseCalled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int CloseCount { get; private set; }
         public override async Task CloseAsync(CancellationToken cancellationToken = default)
@@ -201,7 +246,28 @@ public sealed class EventHubActivationTests
             CloseCount++;
             CloseCalled.TrySetResult();
             await CloseRelease;
+            if (CloseFailure is { } failure)
+            {
+                throw failure;
+            }
+
             await base.CloseAsync(cancellationToken);
+        }
+    }
+
+    private sealed class FailingProducer(IEventHubProducer inner, Exception? failure) : IEventHubProducer
+    {
+        public int CloseCount { get; private set; }
+        public Task SendAsync(EventData eventData, string partitionKey) => inner.SendAsync(eventData, partitionKey);
+        public Task<string[]> GetPartitionIdsAsync() => inner.GetPartitionIdsAsync();
+        public async Task CloseAsync(CancellationToken cancellationToken)
+        {
+            CloseCount++;
+            await inner.CloseAsync(cancellationToken);
+            if (failure is not null)
+            {
+                throw failure;
+            }
         }
     }
 

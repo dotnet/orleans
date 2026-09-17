@@ -366,6 +366,7 @@ namespace Orleans.Streaming.EventHubs
 
         private async Task ShutdownCoreAsync()
         {
+            Exception? producerException = null;
             try
             {
                 // Derived factories can supply their own transport by overriding InitEventHubClient.
@@ -374,11 +375,23 @@ namespace Orleans.Streaming.EventHubs
                     await producer.CloseAsync(CancellationToken.None);
                 }
             }
+            catch (Exception exception)
+            {
+                producerException = exception;
+                throw;
+            }
             finally
             {
-                if (ownedConnection is not null)
+                try
                 {
-                    await ownedConnection.CloseAsync(CancellationToken.None);
+                    if (ownedConnection is not null)
+                    {
+                        await ownedConnection.CloseAsync(CancellationToken.None);
+                    }
+                }
+                catch (Exception exception) when (producerException is not null)
+                {
+                    throw new AggregateException(producerException, exception);
                 }
             }
         }
