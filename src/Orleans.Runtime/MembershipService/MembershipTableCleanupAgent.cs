@@ -193,7 +193,7 @@ namespace Orleans.Runtime.MembershipService
 
             foreach (var entry in membership.Entries.Values)
             {
-                if (entry.Status != SiloStatus.Active && entry.EffectiveIAmAliveTime < beforeDate.UtcDateTime)
+                if (entry.Status == SiloStatus.Dead && entry.EffectiveUpdateTime < beforeDate.UtcDateTime)
                 {
                     return true;
                 }

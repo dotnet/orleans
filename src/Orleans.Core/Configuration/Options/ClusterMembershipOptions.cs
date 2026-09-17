@@ -118,25 +118,26 @@ namespace Orleans.Configuration
         public int NumVotesForDeathDeclaration { get; set; } = 2;
 
         /// <summary>
-        /// Gets or sets the period of time after which membership entries for defunct silos are eligible for removal.
+        /// Gets or sets the retention period after which dead silo entries are eligible for removal.
+        /// Retention uses the latest startup, liveness, or suspect-vote timestamp.
         /// Valid only if <see cref="DefunctSiloCleanupPeriod"/> is not <see langword="null" />.
         /// </summary>
         /// <value>Defunct silos are eligible for removal from membership after one week by default.</value>
         public TimeSpan DefunctSiloExpiration { get; set; } = TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Gets or sets a value indicating whether defunct silo entries older than <see cref="DefunctSiloExpiration" /> are removed.
+        /// Gets or sets the cleanup period for dead silo entries older than <see cref="DefunctSiloExpiration" />.
         /// Cleanup is attempted when membership changes are observed and the current membership snapshot contains expired
-        /// non-active entries, or when this period has elapsed since the last cleanup call.
+        /// dead entries, or when this period has elapsed since the last cleanup call.
         /// Set this value to <see langword="null"/> to disable expiration-based cleanup.
         /// </summary>
         /// <value>Expiration-based cleanup is enabled by default.</value>
         public TimeSpan? DefunctSiloCleanupPeriod { get; set; } = TimeSpan.FromHours(1);
 
         /// <summary>
-        /// Gets or sets the maximum number of defunct silo entries to retain in the membership table.
+        /// Gets or sets the maximum number of dead silo entries to retain in the membership table.
         /// When this limit is exceeded, the first active silo, selected by natural <see cref="Orleans.Runtime.SiloAddress"/>
-        /// sort order, asynchronously removes the oldest excess defunct entries from the membership table.
+        /// sort order, asynchronously removes the oldest excess dead entries from the membership table.
         /// Set this value to <see langword="null"/> to retain all defunct entries and disable threshold-based cleanup.
         /// </summary>
         /// <value>Membership retains up to 25 defunct silo entries by default.</value>

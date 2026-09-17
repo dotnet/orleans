@@ -193,7 +193,13 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                     return false;
                 }
 
-                _table[entry.SiloAddress] = (entry.Copy(), _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                var updated = entry.Copy();
+                if (data.Entry.IAmAliveTime > updated.IAmAliveTime)
+                {
+                    updated.IAmAliveTime = data.Entry.IAmAliveTime;
+                }
+
+                _table[entry.SiloAddress] = (updated, _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
                 _tableVersion = new TableVersion(version.Version, NewETag());
                 return true;
             }
@@ -203,7 +209,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         {
             lock (_lock)
             {
-                if (!_table.TryGetValue(entry.SiloAddress, out var data))
+                if (!_table.TryGetValue(entry.SiloAddress, out var data) || data.Entry.IAmAliveTime >= entry.IAmAliveTime)
                 {
                     return;
                 }
@@ -220,8 +226,8 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 var entries = _table.Values.ToList();
                 foreach (var (entry, _) in entries)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                    if (entry.Status == SiloStatus.Dead
+                        && entry.EffectiveUpdateTime < beforeDate)
                     {
                         _table.Remove(entry.SiloAddress, out _);
                     }
