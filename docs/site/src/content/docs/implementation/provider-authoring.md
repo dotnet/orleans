@@ -97,3 +97,9 @@ Contract tests should cover more than successful round trips:
 - rolling-upgrade compatibility of stored or transmitted data.
 
 Use [TestingHost architecture](testing.md) to understand which runtime services a test cluster substitutes. Provider tests which depend on a real backend should state those preconditions and should not treat an emulator's weaker consistency as proof of the production contract.
+
+### Membership provider conformance
+
+`Microsoft.Orleans.Clustering.TestKit` supplies framework-neutral tests for <xref:Orleans.IMembershipTable>. Create a fresh fixture for each direct scenario, with independent provider handles sharing a backend and using the fixture's isolated cluster IDs. The fixture owns initialization and teardown.
+
+Expose the direct runner methods as individual tests and run the Accordant-generated suite with a fresh-fixture factory. The tests cover atomic conditional writes, coherent reads, maximum liveness timestamps, Dead-row cleanup, and cluster isolation. Retain failure diagnostics to reproduce generated histories. The [package README](https://github.com/dotnet/orleans/blob/main/src/Orleans.Clustering.TestKit/README.md) provides factory examples and the scenario inventory.

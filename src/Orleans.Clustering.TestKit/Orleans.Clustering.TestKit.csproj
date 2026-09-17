@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <AssemblyName>Orleans.Clustering.TestKit</AssemblyName>
+    <RootNamespace>Orleans.Clustering.TestKit</RootNamespace>
+    <PackageId>Microsoft.Orleans.Clustering.TestKit</PackageId>
+    <Title>Orleans clustering provider conformance tests</Title>
+    <Description>Framework-neutral direct and model-based conformance tests for Orleans membership table providers.</Description>
+    <PackageTags>$(PackageTags) Clustering TestKit</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <!-- First release: there is no prior package to compare against. Keep within-package validation enabled. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Accordant" />
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Pipelines" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" PrivateAssets="all" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+    <InternalsVisibleTo Include="Orleans.Clustering.TestKit.Tests" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

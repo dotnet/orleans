@@ -38,6 +38,7 @@
     <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
     <Project Path="src/Orleans.Client/Orleans.Client.csproj" />
+    <Project Path="src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" />
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
@@ -134,6 +135,7 @@
     <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
     <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
+    <Project Path="test\Orleans.Clustering.TestKit.Tests\Orleans.Clustering.TestKit.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />

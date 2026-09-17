@@ -1,0 +1,154 @@
+using Xunit;
+
+namespace Orleans.Clustering.TestKit.Tests;
+
+public sealed class MembershipTableTestFixtureTests
+{
+    [Fact]
+    public async Task Initialize_UsesOneServiceTwoClustersAndThreeDistinctHandles()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var calls = new List<(string Service, string Cluster)>();
+        var fixture = new MembershipTableTestFixture("factory", (service, cluster, _) =>
+        {
+            calls.Add((service, cluster));
+            return ValueTask.FromResult(new MembershipTableTestHandle(backend.Create(cluster)));
+        }, "shared-service");
+        await fixture.RunAsync((f, _) =>
+        {
+            Assert.NotSame(f.First, f.Second);
+            Assert.NotSame(f.First, f.OtherCluster);
+            Assert.Equal(new[] { (f.ServiceId, f.ClusterId), (f.ServiceId, f.ClusterId), (f.ServiceId, f.OtherClusterId) }, calls);
+            Assert.Equal("shared-service", f.ServiceId);
+            Assert.Equal(f.ClusterId + "-other", f.OtherClusterId);
+            return Task.CompletedTask;
+        }, TestContext.Current.CancellationToken);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
+    public async Task Initialize_SingletonFactory_IsRejectedAndAcquiredOwnerDisposedOnce()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var table = backend.Create("unused");
+        var disposed = 0;
+        var sharedHandle = new MembershipTableTestHandle(table, () => { disposed++; return ValueTask.CompletedTask; });
+        var fixture = new MembershipTableTestFixture("singleton", (_, _) => ValueTask.FromResult(sharedHandle));
+        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Contains("same provider instance", failure.Message);
+        Assert.Equal(1, disposed);
+        await fixture.DisposeAsync();
+        Assert.Equal(1, disposed);
+    }
+
+    [Fact]
+    public async Task Initialize_PartialFactoryFailure_CleansAcquiredHandlesAndPreservesPrimary()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var expected = new InvalidOperationException("second construction failed");
+        var created = 0;
+        var disposed = 0;
+        var fixture = new MembershipTableTestFixture("partial", (_, cluster, _) =>
+        {
+            if (++created == 2) throw expected;
+            return ValueTask.FromResult(new MembershipTableTestHandle(backend.Create(cluster), () =>
+            {
+                disposed++;
+                throw new InvalidOperationException("owner disposal failed");
+            }));
+        });
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(expected, actual);
+        Assert.Equal(1, disposed);
+        Assert.Equal(1, backend.Deletes);
+        Assert.IsType<AggregateException>(actual.Data[ClusteringTestKitDiagnostics.CleanupFailureKey]);
+    }
+
+    [Fact]
+    public async Task Run_CancelledPrimary_StillUsesIndependentTeardownAndDisposesAllOwners()
+    {
+        var backend = new IdealizedMembershipBackend();
+        using var cancelled = new CancellationTokenSource();
+        var primary = new OperationCanceledException(cancelled.Token);
+        var fixture = backend.Fixture();
+        var actual = await Assert.ThrowsAsync<OperationCanceledException>(() => fixture.RunAsync((_, _) =>
+        {
+            cancelled.Cancel();
+            throw primary;
+        }, cancelled.Token));
+        Assert.Same(primary, actual);
+        Assert.Equal(2, backend.Deletes);
+        Assert.Equal(3, backend.DisposedHandles);
+        await fixture.DisposeAsync();
+        Assert.Equal(3, backend.DisposedHandles);
+    }
+
+    [Fact]
+    public async Task Run_TeardownFailure_DoesNotReplaceAssertionAndDisposesRemainingOwners()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var disposed = 0;
+        var fixture = new MembershipTableTestFixture("cleanup", (_, cluster, _) =>
+            ValueTask.FromResult(new MembershipTableTestHandle(backend.Create(cluster), () =>
+            {
+                disposed++;
+                if (disposed == 1) throw new InvalidOperationException("owner failure");
+                return ValueTask.CompletedTask;
+            })));
+        var primary = new ClusteringConformanceException("original assertion");
+        var actual = await Assert.ThrowsAsync<ClusteringConformanceException>(() =>
+            fixture.RunAsync((_, _) => throw primary, TestContext.Current.CancellationToken));
+        Assert.Same(primary, actual);
+        Assert.IsType<AggregateException>(actual.Data[ClusteringTestKitDiagnostics.CleanupFailureKey]);
+        Assert.Equal(3, disposed);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
+    public async Task CreateAdditionalHandle_OwnedScopeHasExplicitInitializationAndLifetime()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var fixture = backend.Fixture();
+        await fixture.RunAsync(async (f, ct) =>
+        {
+            var handle = await f.CreateAdditionalHandleAsync(f.ClusterId, ct);
+            Assert.NotSame(f.First, handle.Table);
+            await handle.Table.InitializeMembershipTableAsync(false, ct);
+            var failure = await Assert.ThrowsAsync<ArgumentException>(() => f.CreateAdditionalHandleAsync("not-owned", ct).AsTask());
+            Assert.Equal("clusterId", failure.ParamName);
+            Assert.Equal(4, backend.CreatedHandles);
+        }, TestContext.Current.CancellationToken);
+        Assert.Equal(4, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
+    public async Task Handle_DisposeAsync_OwnsOnlyExplicitDisposerAndRunsOnce()
+    {
+        var table = new IdealizedMembershipBackend().Create("A");
+        var calls = 0;
+        var handle = new MembershipTableTestHandle(table, () => { calls++; return ValueTask.CompletedTask; });
+        Assert.Same(table, handle.Table);
+        await handle.DisposeAsync();
+        await handle.DisposeAsync();
+        Assert.Equal(1, calls);
+        Assert.Empty((await table.ReadAllAsync(TestContext.Current.CancellationToken)).Members);
+    }
+
+    [Fact]
+    public async Task PublicArguments_AreValidatedBeforeConstructingProviders()
+    {
+        var backend = new IdealizedMembershipBackend();
+        Assert.Throws<ArgumentNullException>(() => new MembershipTableTestHandle(null!));
+        Assert.Throws<ArgumentNullException>(() => new MembershipTableTestFixture("provider", (Func<string, IMembershipTable>)null!));
+        Assert.Throws<ArgumentException>(() => new MembershipTableTestFixture(" ", backend.Create));
+        var fixture = backend.Fixture();
+        Assert.Throws<ArgumentException>(() => new MembershipTableTestRunner(fixture));
+        await fixture.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MembershipTableTestRunner(fixture, concurrencyRowCount: 2));
+        Assert.Equal(3, backend.CreatedHandles);
+        await fixture.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal(3, backend.DisposedHandles);
+    }
+}
