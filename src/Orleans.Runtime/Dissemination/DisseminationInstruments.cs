@@ -36,30 +36,16 @@ internal static class DisseminationInstruments
 
     public static void OnBroadcastSent(DisseminationNamespace namespaceName, string kind, int itemCount, int byteCount)
     {
-        var broadcastSentEnabled = BroadcastSent.Enabled;
-        var valuesSentEnabled = ValuesSent.Enabled;
-        var bytesSentEnabled = BytesSent.Enabled;
-        if (!broadcastSentEnabled && !valuesSentEnabled && !bytesSentEnabled)
+        if (!BroadcastSent.Enabled && !ValuesSent.Enabled && !BytesSent.Enabled)
         {
             return;
         }
 
         var namespaceTag = Tag("namespace", namespaceName);
         var kindTag = Tag("kind", kind);
-        if (broadcastSentEnabled)
-        {
-            BroadcastSent.Add(1, namespaceTag, kindTag);
-        }
-
-        if (valuesSentEnabled)
-        {
-            ValuesSent.Add(itemCount, namespaceTag, kindTag);
-        }
-
-        if (bytesSentEnabled)
-        {
-            BytesSent.Add(byteCount, namespaceTag, kindTag);
-        }
+        BroadcastSent.Add(1, namespaceTag, kindTag);
+        ValuesSent.Add(itemCount, namespaceTag, kindTag);
+        BytesSent.Add(byteCount, namespaceTag, kindTag);
     }
 
     public static void OnBroadcastSent(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace, string kind)
@@ -77,23 +63,15 @@ internal static class DisseminationInstruments
 
     public static void OnBroadcastReceived(DisseminationNamespace namespaceName, string kind, int itemCount)
     {
-        var broadcastReceivedEnabled = BroadcastReceived.Enabled;
-        var valuesReceivedEnabled = ValuesReceived.Enabled;
-        if (!broadcastReceivedEnabled && !valuesReceivedEnabled)
+        if (!BroadcastReceived.Enabled && !ValuesReceived.Enabled)
         {
             return;
         }
 
         var namespaceTag = Tag("namespace", namespaceName);
-        if (broadcastReceivedEnabled)
-        {
-            BroadcastReceived.Add(1, namespaceTag, Tag("kind", kind));
-        }
-
-        if (valuesReceivedEnabled)
-        {
-            ValuesReceived.Add(itemCount, namespaceTag, Tag("kind", kind));
-        }
+        var kindTag = Tag("kind", kind);
+        BroadcastReceived.Add(1, namespaceTag, kindTag);
+        ValuesReceived.Add(itemCount, namespaceTag, kindTag);
     }
 
     public static void OnBroadcastSendFailure(DisseminationFailureReason reason)
@@ -124,29 +102,19 @@ internal static class DisseminationInstruments
 
     public static void OnAntiEntropyExchange(string direction, int digestCount, int itemCount, bool truncated)
     {
-        var antiEntropyExchangesEnabled = AntiEntropyExchanges.Enabled;
-        var antiEntropyDigestsEnabled = AntiEntropyDigests.Enabled;
-        var antiEntropyValuesEnabled = AntiEntropyValues.Enabled;
-        if (!antiEntropyExchangesEnabled && !antiEntropyDigestsEnabled && !antiEntropyValuesEnabled)
+        if (!AntiEntropyExchanges.Enabled && !AntiEntropyDigests.Enabled && !AntiEntropyValues.Enabled)
         {
             return;
         }
 
         var directionTag = Tag("direction", direction);
-        if (antiEntropyExchangesEnabled)
+        if (AntiEntropyExchanges.Enabled)
         {
             AntiEntropyExchanges.Add(1, directionTag, Tag("truncated", truncated));
         }
 
-        if (antiEntropyDigestsEnabled)
-        {
-            AntiEntropyDigests.Add(digestCount, directionTag);
-        }
-
-        if (antiEntropyValuesEnabled)
-        {
-            AntiEntropyValues.Add(itemCount, directionTag);
-        }
+        AntiEntropyDigests.Add(digestCount, directionTag);
+        AntiEntropyValues.Add(itemCount, directionTag);
     }
 
     public static void OnAntiEntropyFailure(DisseminationFailureReason reason, int count = 1)
@@ -213,9 +181,7 @@ internal static class DisseminationInstruments
     private static string GetScheduleReason(DisseminationBroadcastScheduleReason reason) => reason switch
     {
         DisseminationBroadcastScheduleReason.Immediate => "immediate",
-        DisseminationBroadcastScheduleReason.Coalesce => "coalesce",
         DisseminationBroadcastScheduleReason.Retry => "retry",
-        DisseminationBroadcastScheduleReason.Priority => "priority",
         _ => "unknown",
     };
 

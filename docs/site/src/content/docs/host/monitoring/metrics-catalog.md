@@ -74,7 +74,7 @@ Request latency covers the interval until the caller's callback completes, inclu
 | `orleans-dissemination-anti-entropy-failures` | C | `operations` | `reason` | Outbound anti-entropy peer operations which ended in `timeout` or `error`. |
 | `orleans-dissemination-anti-entropy-values` | C | `values` | `direction` | Repair values returned by successful anti-entropy exchanges. |
 | `orleans-dissemination-broadcast-received` | C | `messages` | `namespace`, `kind` | Broadcast batches received, counted once for each namespace represented in the batch. |
-| `orleans-dissemination-broadcast-scheduled` | C | `schedules` | `reason` | Per-peer pump schedules split into `immediate`, `coalesce`, `retry`, and `priority`. |
+| `orleans-dissemination-broadcast-scheduled` | C | `schedules` | `reason` | Per-peer pump schedules split into `immediate` and `retry`. |
 | `orleans-dissemination-broadcast-send-failures` | C | `attempts` | `reason` | Broadcast send attempts which ended in `timeout` or `error`. |
 | `orleans-dissemination-broadcast-sent` | C | `messages` | `namespace`, `kind` | Successfully completed broadcast sends, counted once for each namespace represented in the batch. |
 | `orleans-dissemination-bytes-sent` | C | `bytes` | `namespace`, `kind` | Serialized dissemination payload bytes in successful broadcasts. |

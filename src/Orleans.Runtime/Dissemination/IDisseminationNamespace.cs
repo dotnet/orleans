@@ -1,9 +1,8 @@
-using System.Collections.Immutable;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
-// A namespace owns current state plus any history and caching needed to repair a peer from an acknowledged version.
+// A namespace owns current state, serialized payload caching, and repair construction.
 internal interface IDisseminationNamespace
 {
     DisseminationNamespace Name { get; }
@@ -12,7 +11,7 @@ internal interface IDisseminationNamespace
 
     DisseminationRoutingMode RoutingMode => DisseminationRoutingMode.BroadcastTree;
 
-    TimeSpan AggregationPeriod => Options.MaxCoalescingDelay;
+    TimeSpan AggregationPeriod => TimeSpan.FromSeconds(1);
 
     // Full values can be authority-refresh hints even when their numeric version is older.
     bool ValidateOlderFullValues => false;
@@ -54,12 +53,10 @@ internal enum DisseminationRoutingMode
     AggregationTree,
 }
 
-// A null FromVersion means no known peer baseline; a null ToVersion asks for the highest repairable version.
+// A null FromVersion means no known peer baseline. Repairs materialize the current full value.
 internal readonly struct DisseminationRepairRequest(
     DisseminationKey key,
     long? fromVersion,
-    long? toVersion,
-    int maxItemCount,
     int maxBatchBytes,
     int maxPayloadBytes)
 {
@@ -67,55 +64,44 @@ internal readonly struct DisseminationRepairRequest(
 
     public long? FromVersion { get; } = fromVersion;
 
-    public long? ToVersion { get; } = toVersion;
-
-    public int MaxItemCount { get; } = maxItemCount;
-
     public int MaxBatchBytes { get; } = maxBatchBytes;
 
     public int MaxPayloadBytes { get; } = maxPayloadBytes;
 }
 
-// Version reports the namespace's resolved or current version.
-// For Produced results, IsComplete says whether Values reaches that version or only forms a prefix.
+// Version reports the current namespace version; a Produced result carries its full value.
 internal readonly struct DisseminationRepairResult(
     DisseminationRepairStatus status,
     long version,
-    ImmutableArray<DisseminationValue> values,
-    bool isComplete)
+    DisseminationValue value)
 {
     public DisseminationRepairStatus Status { get; } = status;
 
     public long Version { get; } = version;
 
-    public ImmutableArray<DisseminationValue> Values { get; } = values.IsDefault ? [] : values;
-
-    public bool IsComplete { get; } = isComplete;
+    public DisseminationValue Value { get; } = value;
 
     public static DisseminationRepairResult Current(long version) =>
-        new(DisseminationRepairStatus.Current, version, [], isComplete: true);
+        new(DisseminationRepairStatus.Current, version, default);
 
-    public static DisseminationRepairResult Produced(
-        long version,
-        ImmutableArray<DisseminationValue> values,
-        bool isComplete = true) =>
-        new(DisseminationRepairStatus.Produced, version, values, isComplete);
+    public static DisseminationRepairResult Produced(DisseminationValue value) =>
+        new(DisseminationRepairStatus.Produced, value.ToVersion, value);
 
     public static DisseminationRepairResult Unavailable(long version) =>
-        new(DisseminationRepairStatus.Unavailable, version, [], isComplete: false);
+        new(DisseminationRepairStatus.Unavailable, version, default);
 
     public static DisseminationRepairResult InsufficientCapacity(long version) =>
-        new(DisseminationRepairStatus.InsufficientCapacity, version, [], isComplete: false);
+        new(DisseminationRepairStatus.InsufficientCapacity, version, default);
 }
 
 internal enum DisseminationRepairStatus
 {
     // The peer is already at or beyond the resolved version.
     Current,
-    // Values contains a valid repair, possibly a prefix when IsComplete is false.
+    // Value contains the current full value.
     Produced,
-    // The key or requested target cannot currently be reconstructed.
+    // The key has no current value.
     Unavailable,
-    // No valid repair fits within the supplied item or byte budget.
+    // The current value exceeds the supplied byte budget.
     InsufficientCapacity,
 }

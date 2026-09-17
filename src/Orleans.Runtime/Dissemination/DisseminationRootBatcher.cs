@@ -29,7 +29,6 @@ internal sealed partial class DisseminationRootBatcher
     private Cohort? _cohort;
     private TaskCompletionSource? _drainCompletion;
     private Exception? _failure;
-    private long _generation;
     private long? _retryTimestamp;
     private TimeSpan _retryPeriod;
     private bool _dispatching;
@@ -93,7 +92,7 @@ internal sealed partial class DisseminationRootBatcher
                     }
                 }
 
-                wake = _ready.Count > 0 && (wasEmpty || settings.HighPriority);
+                wake = _ready.Count > 0 && wasEmpty;
             }
         }
 
@@ -135,16 +134,16 @@ internal sealed partial class DisseminationRootBatcher
                 // Force on a retry is not a new invalidation; independent invalidations use Notify.
                 if (_pending.TryGetValue(notification.Key, out var retained))
                 {
-                    retained.AdmissionGeneration = ++_generation;
+                    retained.AdmissionGeneration++;
                 }
 
-                if (notification.Version <= producer.CompletedVersion && producer.Outcome is { } outcome)
+                if (notification.Version <= producer.CompletedVersion)
                 {
-                    return new(CreateReceipt(outcome));
+                    return new(CreateReceipt(producer.Outcome));
                 }
 
                 completion = notification.Version <= producer.InFlightVersion && producer.InFlightReceipt is { } inFlight
-                    ? inFlight.Task : producer.Receipt!.Task;
+                    ? inFlight.Task : retained!.Receipt!.Task;
             }
             else
             {
@@ -159,10 +158,7 @@ internal sealed partial class DisseminationRootBatcher
                 producer.Version = notification.Version;
                 // All newer versions before sealing share one signal and occupy one producer slot.
                 pending.Receipt ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
-                producer.Receipt = pending.Receipt;
                 pending.Producer = producer;
-                pending.ProducerVersion = notification.Version;
-                _cohort!.HasPublications = true;
                 if (_cohort!.Membership.ContainsMember(silo))
                 {
                     _cohort.Contributors.Add(silo);
@@ -316,7 +312,7 @@ internal sealed partial class DisseminationRootBatcher
     {
         if (_pending.TryGetValue(notification.Key, out pending!))
         {
-            pending.AdmissionGeneration = ++_generation;
+            pending.AdmissionGeneration++;
             if (!notification.Force && notification.Version <= pending.Notification.Version
                 && (!contribution || pending.Node.List is not null))
             {
@@ -335,7 +331,7 @@ internal sealed partial class DisseminationRootBatcher
                 return false;
             }
 
-            pending = new(notification, ++_generation);
+            pending = new(notification);
             _pending.Add(notification.Key, pending);
         }
 
@@ -387,7 +383,7 @@ internal sealed partial class DisseminationRootBatcher
                             break;
                         }
 
-                        var delay = GetDelayUnsafe(settings.HighPriority);
+                        var delay = GetDelayUnsafe();
                         if (delay > TimeSpan.Zero)
                         {
                             _timer.Change(delay);
@@ -402,10 +398,10 @@ internal sealed partial class DisseminationRootBatcher
                             var pending = _ready.First!.Value;
                             _ready.RemoveFirst();
                             work[i] = new(pending, pending.Generation, pending.Notification,
-                                pending.Receipt, pending.Producer, pending.ProducerVersion);
+                                pending.Receipt, pending.Producer, pending.Producer?.Version ?? 0);
                             if (pending.Producer is { } producer)
                             {
-                                producer.InFlightVersion = pending.ProducerVersion;
+                                producer.InFlightVersion = producer.Version;
                                 producer.InFlightReceipt = pending.Receipt;
                             }
 
@@ -440,7 +436,7 @@ internal sealed partial class DisseminationRootBatcher
         }
     }
 
-    private TimeSpan GetDelayUnsafe(bool highPriority)
+    private TimeSpan GetDelayUnsafe()
     {
         var cohort = _cohort!;
         if (_handoff)
@@ -452,8 +448,7 @@ internal sealed partial class DisseminationRootBatcher
             ? _retryPeriod - _timeProvider.GetElapsedTime(retry) : TimeSpan.Zero;
         var complete = cohort.Membership.Members.Length > 0
             && cohort.Contributors.Count == cohort.Membership.Members.Length;
-        var collectionDelay = _stopping || _drainCompletion is not null
-            || highPriority && !cohort.HasPublications || complete
+        var collectionDelay = _stopping || _drainCompletion is not null || complete
             ? TimeSpan.Zero : cohort.Period - _timeProvider.GetElapsedTime(cohort.Started);
         return collectionDelay > retryDelay ? collectionDelay : retryDelay;
     }
@@ -612,7 +607,7 @@ internal sealed partial class DisseminationRootBatcher
     {
         var outcome = new ReceiptOutcome(false, _cohort?.Started ?? _timeProvider.GetTimestamp(), _cohort?.Period ?? TimeSpan.Zero);
         CompleteReceiptUnsafe(new(pending, pending.Generation, pending.Notification,
-            pending.Receipt, pending.Producer, pending.ProducerVersion), outcome);
+            pending.Receipt, pending.Producer, pending.Producer?.Version ?? 0), outcome);
         pending.InFlight?.TrySetResult(outcome);
         if (pending.Receipt is not null && pending.Notification.Key.Value is SiloAddress silo)
         {
@@ -638,7 +633,6 @@ internal sealed partial class DisseminationRootBatcher
         var period = _namespace.AggregationPeriod;
         return new(
             options.Enabled && namespaceOptions.Enabled,
-            namespaceOptions.Priority == DisseminationPriority.High,
             Math.Max(1, namespaceOptions.MaxPendingItemCount),
             Math.Max(1, options.MaxBatchItems),
             TimeSpan.FromMilliseconds(Math.Clamp(period.TotalMilliseconds, 1, uint.MaxValue - 1)));
@@ -767,19 +761,16 @@ internal sealed partial class DisseminationRootBatcher
     private sealed class PendingKey
     {
         public KeyNotification Notification;
-        public long Generation;
-        public long AdmissionGeneration;
-        public long ProducerVersion;
+        public long Generation = 1;
+        public long AdmissionGeneration = 1;
         public Producer? Producer;
         public TaskCompletionSource<ReceiptOutcome>? Receipt;
         public TaskCompletionSource<ReceiptOutcome>? InFlight;
         public LinkedListNode<PendingKey> Node { get; }
 
-        public PendingKey(KeyNotification notification, long generation)
+        public PendingKey(KeyNotification notification)
         {
             Notification = notification;
-            Generation = generation;
-            AdmissionGeneration = generation;
             Node = new(this);
         }
     }
@@ -787,10 +778,9 @@ internal sealed partial class DisseminationRootBatcher
     private sealed class Producer
     {
         public long Version;
-        public long CompletedVersion = long.MinValue;
+        public long CompletedVersion;
         public long InFlightVersion;
-        public ReceiptOutcome? Outcome;
-        public TaskCompletionSource<ReceiptOutcome>? Receipt;
+        public ReceiptOutcome Outcome;
         public TaskCompletionSource<ReceiptOutcome>? InFlightReceipt;
     }
 
@@ -800,14 +790,13 @@ internal sealed partial class DisseminationRootBatcher
         public long Started { get; } = started;
         public TimeSpan Period { get; } = period;
         public HashSet<SiloAddress> Contributors { get; } = [];
-        public bool HasPublications;
     }
 
     private readonly record struct ReceiptOutcome(bool Accepted, long Started, TimeSpan Period);
     private readonly record struct PendingDispatch(
         PendingKey Pending, long Generation, KeyNotification Notification,
         TaskCompletionSource<ReceiptOutcome>? Receipt, Producer? Producer, long ProducerVersion);
-    private readonly record struct Settings(bool Enabled, bool HighPriority, int MaxPendingItemCount, int MaxBatchItems, TimeSpan Period);
+    private readonly record struct Settings(bool Enabled, int MaxPendingItemCount, int MaxBatchItems, TimeSpan Period);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Dissemination root dispatch for {Namespace} failed. Receipts are rejected and retained hints will retry after the publication period.")]
     private static partial void LogDispatchFailed(ILogger logger, Exception exception, DisseminationNamespace @namespace);

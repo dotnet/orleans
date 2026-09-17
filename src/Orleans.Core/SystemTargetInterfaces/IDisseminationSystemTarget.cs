@@ -215,7 +215,7 @@ internal readonly struct DigestEntry
     public long Fingerprint { get; }
 }
 
-// FromVersion zero denotes a full value which can replace any baseline; nonzero ranges must form a chain.
+// Values carry full state. FromVersion remains zero on the wire.
 [GenerateSerializer, Immutable]
 internal readonly struct DisseminationValue
 {

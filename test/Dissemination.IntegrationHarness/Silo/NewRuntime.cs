@@ -47,7 +47,6 @@ internal static class NewRuntime
         if (fastRecovery)
         {
             options.ExpectedUpdateCadence = TimeSpan.FromMilliseconds(100);
-            options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(25);
             options.StaleItemTtl = TimeSpan.FromSeconds(1);
         }
     }
@@ -142,39 +141,34 @@ internal static class NewRuntime
             case "publish-membership":
                 await ns.PublishAsync(dissemination, manager.CurrentSnapshot, cancellationToken);
                 break;
-            case "membership-history":
+            case "membership-update":
             {
                 if (!services.GetRequiredService<GatedMembershipGossiper>().Suppressed)
                 {
-                    throw new InvalidOperationException("History injection requires legacy gossip isolation.");
+                    throw new InvalidOperationException("Membership injection requires legacy gossip isolation.");
                 }
 
                 var table = services.GetRequiredService<FileMembershipTable>();
                 await table.FreezeReads(false, cancellationToken);
-                for (var index = 0; index < command.Count; index++)
+                var current = await table.ReadAllAsync(cancellationToken);
+                var row = current.Members.Single(row => row.Item1.SiloAddress.Equals(local));
+                row.Item1.HostName = $"membership-update-{current.Version.Version + 1}";
+                if (!await table.UpdateRowAsync(row.Item1, row.Item2, current.Version.Next(), cancellationToken))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var current = await table.ReadAllAsync(cancellationToken);
-                    var row = current.Members.Single(row => row.Item1.SiloAddress.Equals(local));
-                    row.Item1.HostName = $"retained-history-{current.Version.Version + 1}";
-                    if (!await table.UpdateRowAsync(row.Item1, row.Item2, current.Version.Next(), cancellationToken))
-                    {
-                        throw new InvalidOperationException("Unexpected concurrent membership writer during isolated history test.");
-                    }
-
-                    await manager.Refresh(null, cancellationToken);
-                    await ns.PublishAsync(dissemination, manager.CurrentSnapshot, cancellationToken);
+                    throw new InvalidOperationException("Unexpected concurrent membership writer during isolated repair test.");
                 }
 
+                await manager.Refresh(null, cancellationToken);
+                await ns.PublishAsync(dissemination, manager.CurrentSnapshot, cancellationToken);
                 await table.FreezeReads(true, cancellationToken);
                 var repair = ns.CreateRepair(new(
-                    DisseminationKey.Default, command.Version, null, 100, 1024 * 1024, 1024 * 1024));
-                if (repair.Status != DisseminationRepairStatus.Produced || repair.Values.Length != 1)
+                    DisseminationKey.Default, command.Version, 1024 * 1024, 1024 * 1024));
+                if (repair.Status != DisseminationRepairStatus.Produced)
                 {
                     throw new InvalidOperationException($"Expected a production membership repair, got {repair.Status}.");
                 }
 
-                return Program.Snapshot(services) with { RepairFromVersion = repair.Values[0].FromVersion };
+                return Program.Snapshot(services) with { RepairFromVersion = repair.Value.FromVersion };
             }
             case "membership-heartbeat":
             {

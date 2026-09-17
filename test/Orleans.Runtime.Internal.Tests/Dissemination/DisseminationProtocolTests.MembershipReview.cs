@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -18,11 +17,15 @@ namespace UnitTests.Dissemination;
 public partial class DisseminationProtocolTests
 {
     [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    public async Task MembershipNamespaceFullSnapshotPreservesMixedLivenessInRealManager(long incomingVersion)
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public async Task MembershipNamespaceFullSnapshotPreservesMixedLivenessInRealManager(
+        long incomingVersion, bool complementaryPeers)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(39500);
         var newer = CreateSilo(39501);
         var stale = CreateSilo(39502);
         var previous = CreateMembershipSnapshot(
@@ -35,7 +38,7 @@ public partial class DisseminationProtocolTests
             previous.Entries[stale].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(5)));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer>();
-        using var manager = CreateMembershipReviewManager(CreateSilo(39500), out _);
+        using var manager = CreateMembershipReviewManager(local, out _);
         await ((IMembershipManager)manager).ProcessGossipSnapshot(previous, cancellationToken);
         var ns = CreateMembershipNamespace((IMembershipManager)manager, serializer);
         var value = new DisseminationValue(
@@ -45,18 +48,47 @@ public partial class DisseminationProtocolTests
             serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = incoming }));
 
         Assert.True(incoming.IsSuccessorTo(previous));
-        Assert.Equal(DisseminationApplyResult.Applied, await ns.ApplyValueAsync(value, cancellationToken));
+        if (complementaryPeers)
+        {
+            var complementary = CreateMembershipSnapshot(incomingVersion,
+                previous.Entries[newer].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(15)),
+                previous.Entries[stale].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(40)));
+            var otherValue = new DisseminationValue(DisseminationKey.Default, 0, incomingVersion,
+                serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = complementary }));
+            var transport = new FakeTransport(local, newer, stale);
+            transport.ExchangeAntiEntropyHandler = (peer, _, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+            {
+                Sender = peer,
+                Values = CreateValueGroups(ns.Name, CreateDisseminationValue(peer, peer.Equals(newer) ? value : otherValue)),
+            });
+            var protocol = CreateProtocol(transport, [ns], options => options.Overlay.AntiEntropyPeerCount = 2);
+            try
+            {
+                await protocol.RunAntiEntropyRound(cancellationToken);
+                Assert.Equal(2, transport.AntiEntropyRequests.Count);
+            }
+            finally
+            {
+                await protocol.StopAsync(cancellationToken);
+            }
+        }
+        else
+        {
+            Assert.Equal(DisseminationApplyResult.Applied, await ns.ApplyValueAsync(value, cancellationToken));
+        }
 
         var expected = CreateMembershipSnapshot(
             incomingVersion,
             incoming.Entries[newer],
-            previous.Entries[stale]);
+            complementaryPeers
+                ? previous.Entries[stale].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(40))
+                : previous.Entries[stale]);
         AssertMembershipState(expected, manager.MembershipTableSnapshot);
         Assert.Equal(DateTime.UnixEpoch.AddSeconds(5), incoming.Entries[stale].IAmAliveTime);
         Assert.Equal(DateTime.UnixEpoch.AddSeconds(10), previous.Entries[newer].IAmAliveTime);
 
         // Repairs must contain the manager's merged state, not the unmerged incoming snapshot.
-        var repair = Assert.Single(ns.CreateRepair(MembershipReviewRepairRequest(incomingVersion)).Values);
+        var repair = GetMembershipRepair(ns, incomingVersion);
         Assert.Equal(0, repair.FromVersion);
         var repaired = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(repair.Payload));
@@ -68,7 +100,7 @@ public partial class DisseminationProtocolTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MembershipNamespaceCompleteDiffPrunesDivergentInventoryAndRepairsDownstream(bool receiverAlreadyAtTargetVersion)
+    public async Task MembershipNamespaceFullSnapshotPrunesDivergentInventoryAndRepairsDownstream(bool receiverAlreadyAtTargetVersion)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var retired = CreateSilo(39511);
@@ -124,14 +156,13 @@ public partial class DisseminationProtocolTests
                 cancellationToken);
         }
 
-        var value = Assert.Single(source.CreateRepair(MembershipReviewRepairRequest(sourceBaseline.Version)).Values);
-        Assert.Equal((sourceBaseline.Version, target.Version.Value), (value.FromVersion, value.ToVersion));
+        var value = GetMembershipRepair(source, sourceBaseline.Version);
+        Assert.Equal((0L, target.Version.Value), (value.FromVersion, value.ToVersion));
         var update = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
-        var diff = Assert.IsType<MembershipTableSnapshotDiff>(update.Diff);
-        Assert.True(diff.IncludesAllEntries);
-        Assert.Empty(diff.RemovedSilos);
-        Assert.Equal(successor, Assert.Single(diff.UpdatedEntries).SiloAddress);
+        var snapshot = Assert.IsType<MembershipTableSnapshot>(update.Snapshot);
+        AssertMembershipState(target, snapshot);
+        Assert.Equal(successor, Assert.Single(snapshot.Entries).Key);
 
         Assert.Equal(DisseminationApplyResult.Applied, await receiver.ApplyValueAsync(value, cancellationToken));
         AssertMembershipState(target, receiverManager.MembershipTableSnapshot);
@@ -152,15 +183,15 @@ public partial class DisseminationProtocolTests
         using var downstreamManager = CreateMembershipReviewManager(CreateSilo(39513), out _);
         await ((IMembershipManager)downstreamManager).ProcessGossipSnapshot(beforeCleanup, cancellationToken);
         var downstream = CreateMembershipNamespace((IMembershipManager)downstreamManager, serializer);
-        var forwarded = Assert.Single(receiver.CreateRepair(MembershipReviewRepairRequest(sourceBaseline.Version)).Values);
-        Assert.True(forwarded.FromVersion == 0 || forwarded.FromVersion == sourceBaseline.Version);
+        var forwarded = GetMembershipRepair(receiver, sourceBaseline.Version);
+        Assert.Equal(0, forwarded.FromVersion);
         Assert.Equal(target.Version.Value, forwarded.ToVersion);
         Assert.Equal(DisseminationApplyResult.Applied, await downstream.ApplyValueAsync(forwarded, cancellationToken));
         AssertMembershipState(target, downstreamManager.MembershipTableSnapshot);
     }
 
     [Fact]
-    public async Task MembershipNamespaceCompleteDiffPreservesRealManagerLocalDeathEntry()
+    public async Task MembershipNamespaceFullSnapshotPreservesRealManagerLocalDeathEntry()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(39520);
@@ -177,14 +208,9 @@ public partial class DisseminationProtocolTests
         var ns = CreateMembershipNamespace((IMembershipManager)manager, serializer);
         var update = new MembershipTableSnapshotUpdate
         {
-            Diff = new MembershipTableSnapshotDiff(
-                previous.Version,
-                new MembershipVersion(2),
-                [previous.Entries[peer]],
-                [],
-                includesAllEntries: true),
+            Snapshot = CreateMembershipSnapshot(2, previous.Entries[peer]),
         };
-        var value = new DisseminationValue(DisseminationKey.Default, 1, 2, serializer.SerializeToArray(update));
+        var value = new DisseminationValue(DisseminationKey.Default, 0, 2, serializer.SerializeToArray(update));
 
         Assert.Equal(DisseminationApplyResult.Applied, await ns.ApplyValueAsync(value, cancellationToken));
 
@@ -192,7 +218,7 @@ public partial class DisseminationProtocolTests
         AssertMembershipState(expected, manager.MembershipTableSnapshot);
         Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
         fatalErrorHandler.Received(1).OnFatalException(manager, Arg.Any<string>(), null);
-        var repair = Assert.Single(ns.CreateRepair(MembershipReviewRepairRequest(2)).Values);
+        var repair = GetMembershipRepair(ns, 2);
         Assert.Equal(0, repair.FromVersion);
         var repaired = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(repair.Payload));
@@ -200,67 +226,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipNamespaceDiffWireCompatibilityPreservesLegacyPartialUpdates()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var retained = CreateSilo(39531);
-        var updated = CreateSilo(39532);
-        var removed = CreateSilo(39533);
-        var previous = CreateMembershipSnapshot(
-            1,
-            CreateMembershipEntry(retained, SiloStatus.Active, DateTime.UnixEpoch),
-            CreateMembershipEntry(updated, SiloStatus.Active, DateTime.UnixEpoch),
-            CreateMembershipEntry(removed, SiloStatus.Dead, DateTime.UnixEpoch));
-        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var serializer = services.GetRequiredService<Serializer>();
-        var legacy = new MembershipReviewLegacyDiff
-        {
-            BaseVersion = previous.Version,
-            Version = new MembershipVersion(2),
-            UpdatedEntries = [previous.Entries[updated].WithIAmAliveTime(DateTime.UnixEpoch.AddSeconds(10))],
-            RemovedSilos = [removed],
-        };
-
-        // Root codecs omit the type name when the expected and actual types agree, allowing
-        // these two schemas to exercise both missing-field and unknown-field wire compatibility.
-        var decoded = Assert.IsType<MembershipTableSnapshotDiff>(
-            serializer.Deserialize<MembershipTableSnapshotDiff>(serializer.SerializeToArray(legacy)));
-        Assert.False(decoded.IncludesAllEntries);
-        Assert.Equal(legacy.BaseVersion, decoded.BaseVersion);
-        Assert.Equal(legacy.Version, decoded.Version);
-        Assert.Equal(legacy.RemovedSilos, decoded.RemovedSilos);
-        Assert.Equal(updated, Assert.Single(decoded.UpdatedEntries).SiloAddress);
-        using var manager = CreateMembershipReviewManager(CreateSilo(39530), out _);
-        await ((IMembershipManager)manager).ProcessGossipSnapshot(previous, cancellationToken);
-        var ns = CreateMembershipNamespace((IMembershipManager)manager, serializer);
-        var value = new DisseminationValue(
-            DisseminationKey.Default,
-            1,
-            2,
-            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = decoded }));
-
-        Assert.Equal(DisseminationApplyResult.Applied, await ns.ApplyValueAsync(value, cancellationToken));
-        var expected = CreateMembershipSnapshot(2, previous.Entries[retained], legacy.UpdatedEntries[0]);
-        AssertMembershipState(expected, manager.MembershipTableSnapshot);
-
-        var complete = new MembershipTableSnapshotDiff(
-            legacy.BaseVersion,
-            legacy.Version,
-            [.. expected.Entries.Values],
-            legacy.RemovedSilos,
-            includesAllEntries: true);
-        var oldPeer = Assert.IsType<MembershipReviewLegacyDiff>(
-            serializer.Deserialize<MembershipReviewLegacyDiff>(serializer.SerializeToArray(complete)));
-        Assert.Equal(complete.BaseVersion, oldPeer.BaseVersion);
-        Assert.Equal(complete.Version, oldPeer.Version);
-        Assert.Equal(complete.RemovedSilos, oldPeer.RemovedSilos);
-        AssertMembershipState(
-            expected,
-            CreateMembershipSnapshot(oldPeer.Version.Value, [.. oldPeer.UpdatedEntries]));
-    }
-
-    [Fact]
-    public async Task MembershipNamespaceLegacyInventoryDivergenceConvergesWithoutHeartbeatWithFullRepair()
+    public async Task MembershipNamespaceInventoryDivergenceConvergesWithoutHeartbeatWithFullRepair()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var retired = CreateSilo(39541);
@@ -283,19 +249,8 @@ public partial class DisseminationProtocolTests
         var receiver = CreateMembershipNamespace((IMembershipManager)receiverManager, serializer);
         _ = Assert.Single(source.Digests);
         await ((IMembershipManager)sourceManager).ProcessGossipSnapshot(target, cancellationToken);
-        var delta = Assert.Single(source.CreateRepair(MembershipReviewRepairRequest(1)).Values);
-        Assert.Equal((1L, 2L), (delta.FromVersion, delta.ToVersion));
-        var update = Assert.IsType<MembershipTableSnapshotUpdate>(
-            serializer.Deserialize<MembershipTableSnapshotUpdate>(delta.Payload));
-        var legacy = Assert.IsType<MembershipReviewLegacyDiff>(
-            serializer.Deserialize<MembershipReviewLegacyDiff>(
-                serializer.SerializeToArray(Assert.IsType<MembershipTableSnapshotDiff>(update.Diff))));
-        var legacyUpdate = new MembershipTableSnapshotUpdate
-        {
-            Diff = new MembershipTableSnapshotDiff(legacy.BaseVersion, legacy.Version, legacy.UpdatedEntries, legacy.RemovedSilos),
-        };
-        var legacyValue = new DisseminationValue(DisseminationKey.Default, 1, 2, serializer.SerializeToArray(legacyUpdate));
-        Assert.Equal(DisseminationApplyResult.Applied, await receiver.ApplyValueAsync(legacyValue, cancellationToken));
+        await ((IMembershipManager)receiverManager).ProcessGossipSnapshot(
+            CreateMembershipSnapshot(2, receiverBaseline.Entries[retired], target.Entries[successor]), cancellationToken);
         Assert.Equal(SiloStatus.Dead, receiverManager.MembershipTableSnapshot.GetSiloStatus(retired));
         Assert.True(receiverManager.MembershipTableSnapshot.Entries.ContainsKey(retired));
         Assert.Equal(target.Version, receiverManager.MembershipTableSnapshot.Version);
@@ -379,22 +334,10 @@ public partial class DisseminationProtocolTests
         return new(manager, new TestOptionsMonitor<ClusterMembershipOptions>(options), serializer);
     }
 
-    private static DisseminationRepairRequest MembershipReviewRepairRequest(long? fromVersion) =>
-        new(DisseminationKey.Default, fromVersion, toVersion: null, maxItemCount: 1, maxBatchBytes: 1024 * 1024, maxPayloadBytes: 1024 * 1024);
-
-    [GenerateSerializer]
-    internal sealed class MembershipReviewLegacyDiff
+    private static DisseminationValue GetMembershipRepair(MembershipDisseminationNamespace ns, long? fromVersion)
     {
-        [Id(0)]
-        public MembershipVersion BaseVersion { get; init; }
-
-        [Id(1)]
-        public MembershipVersion Version { get; init; }
-
-        [Id(2)]
-        public ImmutableArray<MembershipEntry> UpdatedEntries { get; init; }
-
-        [Id(3)]
-        public ImmutableArray<SiloAddress> RemovedSilos { get; init; }
+        var repair = ns.CreateRepair(new(DisseminationKey.Default, fromVersion, 1024 * 1024, 1024 * 1024));
+        Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
+        return repair.Value;
     }
 }

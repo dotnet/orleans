@@ -143,9 +143,7 @@ internal sealed partial class DisseminationProtocol
         {
             foreach (var peer in membership.GetOriginatorTargets(disseminationNamespace.RoutingMode))
             {
-                accepted &= _broadcastQueue.Notify(
-                    peer, disseminationNamespace, key,
-                    immediate: disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree);
+                accepted &= _broadcastQueue.Notify(peer, disseminationNamespace, key);
             }
         }
 
@@ -211,23 +209,13 @@ internal sealed partial class DisseminationProtocol
                     namespaceName,
                     item.Value.Key,
                     item.Value.ToVersion);
-                DisseminationApplyResult result;
-                try
-                {
-                    result = await ApplyReceivedValue(
-                        disseminationNamespace,
-                        item,
-                        batch.Sender,
-                        options,
-                        receivedTimestamp,
-                        cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    throw;
-                }
-
+                var result = await ApplyReceivedValue(
+                    disseminationNamespace,
+                    item,
+                    batch.Sender,
+                    options,
+                    receivedTimestamp,
+                    cancellationToken);
                 namespaceKeys[item.Value.Key] = new(sentVersion, keyState.Applied || result is DisseminationApplyResult.Applied);
             }
         }
@@ -240,48 +228,28 @@ internal sealed partial class DisseminationProtocol
         foreach (var (disseminationNamespace, keys) in receivedKeys)
         {
             var membership = membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope);
-            if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree)
+            var notifications = new DisseminationBroadcastQueue.KeyNotification[keys.Count];
+            var notificationCount = 0;
+            foreach (var (key, state) in keys)
             {
-                var notifications = new DisseminationBroadcastQueue.KeyNotification[keys.Count];
-                var notificationCount = 0;
-                foreach (var (key, state) in keys)
+                var version = disseminationNamespace.GetVersion(key);
+                if (version > 0)
                 {
-                    var version = disseminationNamespace.GetVersion(key);
-                    if (version > 0)
-                    {
-                        notifications[notificationCount++] = new(key, version, state.Applied);
-                    }
+                    notifications[notificationCount++] = new(key, version, state.Applied);
                 }
+            }
 
-                if (membership.IsAggregationRoot)
-                {
-                    NotifyRoot(disseminationNamespace, notifications.AsSpan(0, notificationCount));
-                }
-                else
-                {
-                    foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode, batch.Sender))
-                    {
-                        _broadcastQueue.NotifyBatch(
-                            peer, disseminationNamespace, notifications.AsSpan(0, notificationCount), immediate: true);
-                    }
-                }
-
+            if (disseminationNamespace.RoutingMode == DisseminationRoutingMode.AggregationTree && membership.IsAggregationRoot)
+            {
+                NotifyRoot(disseminationNamespace, notifications.AsSpan(0, notificationCount));
                 continue;
             }
 
-            foreach (var (key, state) in keys)
+            foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode, batch.Sender))
             {
-                if (disseminationNamespace.GetVersion(key) <= 0)
+                if (!Equals(peer, batch.Sender))
                 {
-                    continue;
-                }
-
-                foreach (var peer in membership.GetForwardingTargets(disseminationNamespace.RoutingMode))
-                {
-                    if (!Equals(peer, batch.Sender))
-                    {
-                        _broadcastQueue.Notify(peer, disseminationNamespace, key, force: state.Applied);
-                    }
+                    _broadcastQueue.NotifyBatch(peer, disseminationNamespace, notifications.AsSpan(0, notificationCount));
                 }
             }
         }
@@ -451,42 +419,22 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options)
     {
         var result = new Dictionary<SiloAddress, DisseminationAntiEntropyRequest>();
-        var namespacesByScope = new Dictionary<DisseminationMembershipScope, IDisseminationNamespace[]>();
-        foreach (var scope in Enum.GetValues<DisseminationMembershipScope>())
-        {
-            var scopedNamespaces = _namespaces.Values
-                .Where(disseminationNamespace => disseminationNamespace.Options.Enabled
-                    && disseminationNamespace.MembershipScope == scope)
-                .ToArray();
-            if (scopedNamespaces.Length > 0)
-            {
-                namespacesByScope.Add(scope, scopedNamespaces);
-            }
-        }
-
-        if (namespacesByScope.Count == 0)
-        {
-            return result;
-        }
-
+        var enabledNamespaces = _namespaces.Values.Where(static ns => ns.Options.Enabled).ToArray();
         foreach (var peer in peers)
         {
             var peerDigests = new Dictionary<DisseminationNamespace, List<DigestEntry>>();
             var supportedNamespaces = new List<DisseminationNamespace>();
-            foreach (var (scope, scopedNamespaces) in namespacesByScope)
+            foreach (var disseminationNamespace in enabledNamespaces)
             {
-                if (!membershipSnapshots.GetSnapshot(scope).ContainsMember(peer))
+                if (!membershipSnapshots.GetSnapshot(disseminationNamespace.MembershipScope).ContainsMember(peer))
                 {
                     continue;
                 }
 
-                foreach (var disseminationNamespace in scopedNamespaces)
+                supportedNamespaces.Add(disseminationNamespace.Name);
+                if (requestDigests.TryGetValue(disseminationNamespace.Name, out var digest))
                 {
-                    supportedNamespaces.Add(disseminationNamespace.Name);
-                    if (requestDigests.TryGetValue(disseminationNamespace.Name, out var digest))
-                    {
-                        peerDigests.Add(disseminationNamespace.Name, digest);
-                    }
+                    peerDigests.Add(disseminationNamespace.Name, digest);
                 }
             }
 
@@ -647,8 +595,6 @@ internal sealed partial class DisseminationProtocol
         // Completed exchanges get a separate local application window, even if another peer used its whole
         // transport budget. No remote clock or transmission delay is inferred from a relative wire lifetime.
         var receivedTimestamp = _timeProvider.GetTimestamp();
-        // Keep each sender's chain intact and rank all repairs which completed within the round's hop lifetime.
-        Dictionary<DigestKey, List<AntiEntropyRepair>>? repairs = null;
         foreach (var response in responses)
         {
             if (response is null)
@@ -666,46 +612,19 @@ internal sealed partial class DisseminationProtocol
                 cancellationToken.ThrowIfCancellationRequested();
                 var disseminationNamespace = _namespaces[namespaceName];
 
-                foreach (var stream in values.GroupBy(static item => item.Value.Key))
+                foreach (var item in values)
                 {
-                    repairs ??= [];
-                    var items = stream.ToList();
-                    var key = new DigestKey(namespaceName, stream.Key);
-                    if (!repairs.TryGetValue(key, out var candidates))
-                    {
-                        candidates = [];
-                        repairs.Add(key, candidates);
-                    }
-
-                    var terminalVersion = items.Max(static item => item.Value.ToVersion);
                     _broadcastQueue.ObservePeerVersion(
                         response.Sender,
                         namespaceName,
-                        stream.Key,
-                        terminalVersion);
-                    candidates.Add(new(disseminationNamespace, items, response.Sender));
-                }
-            }
-        }
+                        item.Value.Key,
+                        item.Value.ToVersion);
 
-        if (repairs is null)
-        {
-            return;
-        }
-
-        foreach (var candidates in repairs.Values)
-        {
-            // Try the furthest-reaching repair first, preferring a full value when candidates tie.
-            candidates.Sort(CompareAntiEntropyRepairs);
-
-            foreach (var candidate in candidates)
-            {
-                foreach (var item in candidate.Items)
-                {
+                    // Equal-version membership snapshots can contain complementary heartbeat advances.
                     await ApplyReceivedValue(
-                        candidate.Namespace,
+                        disseminationNamespace,
                         item,
-                        candidate.Sender,
+                        response.Sender,
                         options,
                         receivedTimestamp,
                         cancellationToken);
@@ -791,7 +710,7 @@ internal sealed partial class DisseminationProtocol
 
                 if (payloadBytes > maxBytes - byteCount)
                 {
-                    // Preserve this candidate for a fresh budget instead of discarding a repair-chain suffix.
+                    // Preserve this candidate for a fresh budget instead of discarding it.
                     goto Complete;
                 }
 
@@ -814,8 +733,8 @@ Complete:
         var members = _membership.CurrentSnapshots.AllMembers;
         lock (_receivedBatchCursorLock)
         {
-            // Do not wrap within a batch: doing so would reorder a key's delta chain. Subsequent deliveries
-            // resume an ordered, bounded interval, allowing later keys past a repeatedly rejected/hot prefix.
+            // Inspect each item at most once per delivery. Repeated oversized batches resume later,
+            // allowing cold keys past a repeatedly rejected or hot prefix.
             if (position < totalCount)
             {
                 _receivedBatchCursors[cursorKey] = new(position, totalCount, ++_receivedBatchCursorAccess);
@@ -1002,6 +921,12 @@ Complete:
         for (var i = 0; i < candidates.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (valueCount >= maxResponseItems)
+            {
+                truncated = true;
+                break;
+            }
+
             var candidate = candidates[(start + i) % candidates.Count];
             examined++;
             var requestedNamespace = candidate.Namespace;
@@ -1010,46 +935,22 @@ Complete:
             var repairRequest = new DisseminationRepairRequest(
                 localDigest.Key,
                 peerDigest.Version,
-                toVersion: null,
-                maxResponseItems - valueCount,
-                maxResponseBytes - byteCount,
+                maxResponseBytes,
                 requestedNamespace.Options.MaxPayloadBytes);
             var repair = requestedNamespace.CreateRepair(repairRequest);
-            if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
-            {
-                if (valueCount > 0)
-                {
-                    // Probe with a fresh batch budget to distinguish truncation from a permanently oversized key.
-                    var emptyBatchRequest = new DisseminationRepairRequest(
-                        localDigest.Key,
-                        peerDigest.Version,
-                        toVersion: null,
-                        maxResponseItems,
-                        maxResponseBytes,
-                        requestedNamespace.Options.MaxPayloadBytes);
-                    var emptyBatchRepair = requestedNamespace.CreateRepair(emptyBatchRequest);
-                    if (emptyBatchRepair.Status is DisseminationRepairStatus.Produced
-                        && ValidateRepair(
-                            requestedNamespace,
-                            emptyBatchRequest,
-                            emptyBatchRepair,
-                            options))
-                    {
-                        // Resume with this candidate next round because the current response budget, not the
-                        // candidate itself, prevented it from being included.
-                        examined--;
-                        truncated = true;
-                        break;
-                    }
-                }
-
-                continue;
-            }
-
             if (repair.Status is not DisseminationRepairStatus.Produced
                 || !ValidateRepair(requestedNamespace, repairRequest, repair, options))
             {
                 continue;
+            }
+
+            var value = repair.Value;
+            if (value.Payload.Length > maxResponseBytes - byteCount)
+            {
+                // This value fits a fresh response, so resume here instead of discarding it.
+                examined--;
+                truncated = true;
+                break;
             }
 
             if (!valuesByNamespace.TryGetValue(requestedNamespace.Name, out var namespaceValues))
@@ -1058,19 +959,9 @@ Complete:
                 valuesByNamespace.Add(requestedNamespace.Name, namespaceValues);
             }
 
-            foreach (var value in repair.Values)
-            {
-                namespaceValues.Add(CreateBroadcastValue(requestedNamespace, value));
-                ++valueCount;
-                byteCount += value.Payload.Length;
-            }
-
-            if (!repair.IsComplete)
-            {
-                // A valid prefix consumes this response; the caller can continue in its next round.
-                truncated = true;
-                break;
-            }
+            namespaceValues.Add(CreateBroadcastValue(requestedNamespace, value));
+            ++valueCount;
+            byteCount += value.Payload.Length;
         }
 
         if (truncated)
@@ -1198,6 +1089,7 @@ Complete:
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             throw;
         }
         catch (Exception exception)
@@ -1239,7 +1131,7 @@ Complete:
             return DisseminationApplyResult.Obsolete;
         }
 
-        // Reject gaps before deserializing; full values from version zero can replace any baseline.
+        // Only full values are supported; obsolete values need no deserialization unless the owner validates authority.
         if (TryGetTerminalApplyResult(disseminationNamespace, item.Value, out var terminalResult))
         {
             EmitApplyResult(namespaceName, item, sender, terminalResult);
@@ -1508,14 +1400,14 @@ Complete:
         {
             // A departing root hands accepted state to the new root, even after leaving Active membership.
             return membership.Members.IsEmpty
-                || _broadcastQueue.NotifyBatch(membership.Members[0], disseminationNamespace, notifications, immediate: true);
+                || _broadcastQueue.NotifyBatch(membership.Members[0], disseminationNamespace, notifications);
         }
 
         var accepted = true;
         foreach (var child in membership.AggregationChildren)
         {
             // Include a child producer's own value so it reaches that child's descendants.
-            accepted &= _broadcastQueue.NotifyBatch(child, disseminationNamespace, notifications, immediate: true);
+            accepted &= _broadcastQueue.NotifyBatch(child, disseminationNamespace, notifications);
         }
 
         return accepted;
@@ -1648,14 +1540,11 @@ Complete:
             return false;
         }
 
-        // Validate the complete repair chain for an unknown peer. Individual values must fit a batch,
-        // while the chain can be delivered across multiple acknowledged batches.
+        // Validate a complete current value for an unknown peer before accepting the publication.
         var request = new DisseminationRepairRequest(
             key,
             fromVersion: null,
-            toVersion: null,
-            maxItemCount: int.MaxValue,
-            maxBatchBytes: int.MaxValue,
+            options.MaxBatchBytes,
             disseminationNamespace.Options.MaxPayloadBytes);
         var repair = disseminationNamespace.CreateRepair(request);
         if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
@@ -1666,7 +1555,6 @@ Complete:
         }
 
         if (repair.Status is not DisseminationRepairStatus.Produced
-            || !repair.IsComplete
             || repair.Version < version
             || !ValidateRepair(disseminationNamespace, request, repair, options))
         {
@@ -1686,77 +1574,37 @@ Complete:
         in DisseminationRepairResult repair,
         DisseminationOptions options)
     {
-        // Keep namespace-specific serialization behind one common range and budget contract.
-        if (repair.Status is not DisseminationRepairStatus.Produced
-            || repair.Values.IsDefaultOrEmpty
-            || repair.Version <= 0
-            || request.ToVersion is { } requestedToVersion && repair.Version > requestedToVersion
-            || repair.Values.Length > request.MaxItemCount)
-        {
-            return false;
-        }
-
-        var byteCount = 0;
-        var expectedFromVersion = request.FromVersion;
-        foreach (var value in repair.Values)
-        {
-            if (value.Key != request.Key
-                || !IsValidVersionRange(value)
-                || value.ToVersion > repair.Version
-                || !ValidatePayloadSize(disseminationNamespace, value, options.MaxBatchBytes))
-            {
-                return false;
-            }
-
-            if (expectedFromVersion is null && value.FromVersion != 0
-                || expectedFromVersion is { } fromVersion
-                && value.FromVersion != 0
-                && value.FromVersion != fromVersion)
-            {
-                return false;
-            }
-
-            expectedFromVersion = value.ToVersion;
-            byteCount += value.Payload.Length;
-            if (byteCount > request.MaxBatchBytes)
-            {
-                return false;
-            }
-        }
-
-        var lastVersion = repair.Values[^1].ToVersion;
-        return repair.IsComplete ? lastVersion == repair.Version : lastVersion < repair.Version;
+        var value = repair.Value;
+        return repair.Status is DisseminationRepairStatus.Produced
+            && repair.Version > 0
+            && value.Key == request.Key
+            && value.FromVersion == 0
+            && value.ToVersion == repair.Version
+            && ValidatePayloadSize(disseminationNamespace, value, options.MaxBatchBytes)
+            && value.Payload.Length <= request.MaxPayloadBytes
+            && value.Payload.Length <= request.MaxBatchBytes;
     }
-
-    private static bool IsValidVersionRange(DisseminationValue value) =>
-        value is { FromVersion: >= 0, ToVersion: > 0 } && value.ToVersion > value.FromVersion;
 
     private static bool TryGetTerminalApplyResult(
         IDisseminationNamespace disseminationNamespace,
         DisseminationValue value,
         out DisseminationApplyResult result)
     {
-        if (!IsValidVersionRange(value))
+        if (value.FromVersion != 0 || value.ToVersion <= 0)
         {
             result = DisseminationApplyResult.Rejected;
             return true;
         }
 
         var localVersion = disseminationNamespace.GetVersion(value.Key);
-        if (value.ToVersion < localVersion && !(value.FromVersion == 0 && disseminationNamespace.ValidateOlderFullValues))
+        if (value.ToVersion < localVersion && !disseminationNamespace.ValidateOlderFullValues)
         {
             result = DisseminationApplyResult.Obsolete;
             return true;
         }
 
-        if (value.ToVersion == localVersion || value.FromVersion == 0 || value.FromVersion == localVersion)
-        {
-            result = default;
-            return false;
-        }
-
-        result = DisseminationApplyResult.Rejected;
-        return true;
+        result = default;
+        return false;
     }
 
     private DisseminationBroadcastValue CreateBroadcastValue(
@@ -1840,25 +1688,6 @@ Complete:
 
     private static int GetValueCount(Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>> valuesByNamespace) => valuesByNamespace.Values.Sum(values => values.Count);
 
-    // Prefer the highest terminal version, then a universal full value, then stable peer order.
-    private static int CompareAntiEntropyRepairs(AntiEntropyRepair left, AntiEntropyRepair right)
-    {
-        var result = right.Items[^1].Value.ToVersion.CompareTo(left.Items[^1].Value.ToVersion);
-        if (result != 0)
-        {
-            return result;
-        }
-
-        var leftIsFullValue = left.Items[0].Value.FromVersion == 0;
-        var rightIsFullValue = right.Items[0].Value.FromVersion == 0;
-        if (leftIsFullValue != rightIsFullValue)
-        {
-            return leftIsFullValue ? -1 : 1;
-        }
-
-        return left.Sender.CompareTo(right.Sender);
-    }
-
     private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
 
     private readonly record struct ValueUpdate(long Version, long Timestamp);
@@ -1866,11 +1695,6 @@ Complete:
     private readonly record struct AntiEntropyResponseCursor(int Position, long LastAccess);
 
     private readonly record struct ReceivedBatchCursor(long Position, long TotalCount, long LastAccess);
-
-    private readonly record struct AntiEntropyRepair(
-        IDisseminationNamespace Namespace,
-        List<DisseminationBroadcastValue> Items,
-        SiloAddress Sender);
 
     private readonly record struct AntiEntropyResponseCandidate(
         IDisseminationNamespace Namespace,

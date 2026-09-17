@@ -47,19 +47,17 @@ internal sealed partial class DisseminationProtocol
             }
 
             var repairRequest = new DisseminationRepairRequest(
-                key, fromVersion: null, toVersion: null, maxItemCount: 1,
+                key, fromVersion: null,
                 options.MaxBatchBytes, disseminationNamespace.Options.MaxPayloadBytes);
             var repair = disseminationNamespace.CreateRepair(repairRequest);
             if (repair.Status != DisseminationRepairStatus.Produced
-                || !repair.IsComplete || repair.Values.Length != 1
                 || repair.Version < version
-                || repair.Values[0].FromVersion != 0
                 || !ValidateRepair(disseminationNamespace, repairRequest, repair, options))
             {
                 return Reject("invalid-repair");
             }
 
-            var value = repair.Values[0];
+            var value = repair.Value;
             RecordValueUpdate(disseminationNamespace.Name, key, value.ToVersion);
             DisseminationPublicationReceipt receipt;
             if (membership.IsAggregationRoot)

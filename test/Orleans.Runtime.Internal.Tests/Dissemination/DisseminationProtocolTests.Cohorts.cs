@@ -18,7 +18,6 @@ public partial class DisseminationProtocolTests
         var local = CreateSilo(41302);
         var load = CreateCohortNamespace(local);
         var membership = new FakeNamespace(local, new DisseminationNamespace("urgent-membership"));
-        membership.Options.Priority = DisseminationPriority.High;
         var transport = new FakeTransport(local, peer);
         var ingressStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var heldReceipt = new TaskCompletionSource<DisseminationPublicationReceipt>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -148,8 +147,10 @@ public partial class DisseminationProtocolTests
         }
     }
 
-    [Fact]
-    public async Task CanceledPublicationReleasesLocalAttemptBeforeNonCooperativeRpcReturns()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CanceledPublicationReleasesLocalAttemptBeforeNonCooperativeRpcReturns(bool stopProtocol)
     {
         var token = TestContext.Current.CancellationToken;
         var root = CreateSilo(41411);
@@ -170,12 +171,21 @@ public partial class DisseminationProtocolTests
             ns.SetValue(local, 1);
             var first = protocol.PublishAggregated(ns, local, 1, cancellation.Token).AsTask();
             await started.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
-            cancellation.Cancel();
-            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
-            Assert.Equal(cancellation.Token, exception.CancellationToken);
-            ns.SetValue(local, 2);
-            Assert.True((await protocol.PublishAggregated(ns, local, 2, token)).Accepted);
-            Assert.Equal(2, transport.PublicationRequests.Count);
+            if (stopProtocol)
+            {
+                await protocol.StopAsync(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+                Assert.False((await protocol.PublishAggregated(ns, local, 1, token)).Accepted);
+            }
+            else
+            {
+                cancellation.Cancel();
+                var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+                Assert.Equal(cancellation.Token, exception.CancellationToken);
+                ns.SetValue(local, 2);
+                Assert.True((await protocol.PublishAggregated(ns, local, 2, token)).Accepted);
+                Assert.Equal(2, transport.PublicationRequests.Count);
+            }
             Assert.False(late.Task.IsCompleted);
         }
         finally
@@ -215,39 +225,6 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task ShutdownCancelsHeldOutgoingReceiptAndDrainsItsAdmission()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var root = CreateSilo(41441);
-        var local = CreateSilo(41442);
-        var ns = CreateCohortNamespace(local);
-        var transport = new FakeTransport(local, root);
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var late = new TaskCompletionSource<DisseminationPublicationReceipt>(TaskCreationOptions.RunContinuationsAsynchronously);
-        transport.PublishAggregatedHandler = (_, _, _) =>
-        {
-            started.TrySetResult();
-            return late.Task;
-        };
-        var protocol = CreateProtocol(transport, ns);
-        try
-        {
-            ns.SetValue(local, 1);
-            var publication = protocol.PublishAggregated(ns, local, 1, token).AsTask();
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
-            await protocol.StopAsync(token).WaitAsync(TimeSpan.FromSeconds(5), token);
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => publication);
-            Assert.False(late.Task.IsCompleted);
-            Assert.False((await protocol.PublishAggregated(ns, local, 1, token)).Accepted);
-        }
-        finally
-        {
-            late.TrySetResult(default);
-            await protocol.StopAsync(token);
-        }
-    }
-
-    [Fact]
     public void CohortPublicationWireContractPreservesPayloadAndSchedulingReceipt()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -273,7 +250,6 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        result.Options.MaxCoalescingDelay = TimeSpan.FromSeconds(1);
         return result;
     }
 
@@ -290,7 +266,7 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(25);
+        ns.AggregationPeriod = TimeSpan.FromMilliseconds(25);
         var transport = new FakeTransport(local, peer);
         var handedOff = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.SendBroadcastResponseHandler = (target, batch, _) =>
@@ -335,7 +311,7 @@ public partial class DisseminationProtocolTests
         };
         var defaults = new DeploymentLoadPublisherOptions().Dissemination;
         ns.Options.MaxPendingItemCount = defaults.MaxPendingItemCount;
-        ns.Options.MaxCoalescingDelay = defaults.MaxCoalescingDelay;
+        ns.AggregationPeriod = new DeploymentLoadPublisherOptions().DeploymentLoadPublisherRefreshTime;
         var transport = new FakeTransport(local, members[1..]);
         var protocol = CreateProtocol(transport, ns, timeProvider: new FakeTimeProvider());
         try

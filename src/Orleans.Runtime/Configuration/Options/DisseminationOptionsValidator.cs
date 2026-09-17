@@ -73,20 +73,11 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
 
 internal sealed class DisseminationNamespaceOptionsValidator
 {
-    private static readonly TimeSpan MaxTimerPeriod = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
-
     public static ValidateOptionsResult Validate(string owner, DisseminationNamespaceOptions options)
     {
         if (options.MaxPendingItemCount <= 0)
         {
             return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxPendingItemCount)} must be greater than 0.");
-        }
-
-        if (options.MaxCoalescingDelay < TimeSpan.FromMilliseconds(1)
-            || options.MaxCoalescingDelay > MaxTimerPeriod)
-        {
-            return ValidateOptionsResult.Fail(
-                $"{owner}.{nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)} must be between 1 millisecond and {MaxTimerPeriod}.");
         }
 
         if (options.StaleItemTtl <= TimeSpan.Zero)

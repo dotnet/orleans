@@ -67,7 +67,7 @@ Retry scheduling metrics describe timer decisions. The send-gate diagnostic iden
 
 Identify the `namespace` and compare update cardinality with <xref:Orleans.Configuration.DisseminationNamespaceOptions.MaxPendingItemCount>. Increase the limit only after confirming the process has memory headroom and the destination can drain work. Broadcast item and byte limits still bound each transmission.
 
-Capacity planning must include all retained peer/namespace pairs: pending-key storage scales with their summed per-peer limits, and acknowledgment ledgers scale with known keys. Active local attempts materialize at most one batch per broadcast slot, bounded by <xref:Orleans.Configuration.DisseminationOptions.MaxBatchBytes>. Namespace history, metadata, and messaging buffers retained by pending RPCs remain additional costs.
+Capacity planning must include all retained peer/namespace pairs: pending-key storage scales with their summed per-peer limits, and acknowledgment ledgers scale with known keys. Active local attempts materialize at most one batch per broadcast slot, bounded by <xref:Orleans.Configuration.DisseminationOptions.MaxBatchBytes>. Cached namespace payloads, metadata, and messaging buffers retained by pending RPCs remain additional costs.
 
 ### Anti-entropy remains truncated
 
@@ -85,7 +85,7 @@ The `Microsoft.Orleans.Dissemination` diagnostic listener exposes detailed, opt-
 |---|---|
 | `Dissemination.ValueApply` | Inspect one value's namespace, key, version transition, peer, result, and payload size. |
 | `Dissemination.PayloadDrop` | Inspect a value rejected by a payload guard. |
-| `Dissemination.BroadcastScheduled` | Observe immediate, coalesced, priority, and retry scheduling with due time and attempt. |
+| `Dissemination.BroadcastScheduled` | Observe immediate and retry scheduling with due time and attempt. |
 | `Dissemination.SendGate` | Observe broadcast FIFO entry (`Kind=broadcast`, `Stage=queued`) or a local repair attempt releasing its admission (`Kind=repair`, `Stage=released`), including timeout and cancellation. |
 | `Dissemination.QueueAdmissionRejected` | Observe the peer, namespace, configured limit, and bounded rejection reason. |
 

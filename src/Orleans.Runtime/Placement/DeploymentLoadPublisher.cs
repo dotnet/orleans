@@ -37,7 +37,6 @@ namespace Orleans.Runtime
         private long _lastUpdateDateTimeTicks;
         private IGrainTimer? _publishTimer;
         private Task<StatisticsPublication>? _publicationTask;
-        private Task<StatisticsPublication>? _disseminationPublicationTask;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
 
@@ -127,7 +126,7 @@ namespace Orleans.Runtime
             // submitting another source publication while its cohort is still open.
             if (_publicationTask is { IsCompleted: false } pending)
             {
-                return await AwaitSharedPublication(pending, cancellationToken);
+                return await pending.WaitAsync(cancellationToken);
             }
 
             // Native operations own this caller's cancellation and may complete successfully
@@ -234,45 +233,7 @@ namespace Orleans.Runtime
         internal Dictionary<SiloAddress, SiloStatus> GetActiveSiloStatusesForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true);
 
-        internal async Task<bool> TryPublishStatisticsViaDissemination(
-            SiloRuntimeStatistics myStats,
-            CancellationToken cancellationToken) =>
-            (await PublishStatisticsViaDissemination(myStats, cancellationToken)).Receipt.Accepted;
-
         private async Task<StatisticsPublication> PublishStatisticsViaDissemination(
-            SiloRuntimeStatistics myStats,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (_disseminationPublicationTask is { IsCompleted: false } pending)
-            {
-                return await AwaitSharedPublication(pending, cancellationToken);
-            }
-
-            return await (_disseminationPublicationTask = PublishStatisticsViaDisseminationCore(myStats, cancellationToken));
-        }
-
-        private static async Task<StatisticsPublication> AwaitSharedPublication(
-            Task<StatisticsPublication> publication,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                return await publication.WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                if (publication.IsCompletedSuccessfully)
-                {
-                    return await publication;
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                throw;
-            }
-        }
-
-        private async Task<StatisticsPublication> PublishStatisticsViaDisseminationCore(
             SiloRuntimeStatistics myStats,
             CancellationToken cancellationToken)
         {

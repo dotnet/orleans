@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime.Dissemination;
 using Xunit;
 
@@ -22,9 +23,8 @@ public partial class DisseminationProtocolTests
         var healthy = CreateSilo(41023);
         var transport = operation == "repair-failure" ? new FakeTransport(local, peer, healthy) : new FakeTransport(local, peer);
         var ns = new FakeNamespace(local, new DisseminationNamespace("metric-boundary-" + operation));
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromHours(1);
         var logger = new Phase6ProtocolLogger();
-        var protocol = CreatePhase6Protocol(transport, ns, logger, options => options.Overlay.AntiEntropyPeerCount = 2);
+        var protocol = CreateProtocol(transport, [ns], options => options.Overlay.AntiEntropyPeerCount = 2, new FakeTimeProvider(), logger);
         var metric = operation switch
         {
             "broadcast-receive" => "orleans-dissemination-broadcast-received",

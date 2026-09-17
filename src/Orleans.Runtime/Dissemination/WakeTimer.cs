@@ -75,10 +75,6 @@ internal sealed class WakeTimer : IDisposable
             }
 
             waiter = CompleteWaitUnsafe();
-            if (waiter is null)
-            {
-                _signaled = true;
-            }
         }
 
         waiter?.TrySetResult(true);
@@ -153,14 +149,8 @@ internal sealed class WakeTimer : IDisposable
             _armed = false;
         }
 
-        try
-        {
-            waiter?.TrySetResult(false);
-        }
-        finally
-        {
-            _timer.Dispose();
-        }
+        waiter?.TrySetResult(false);
+        _timer.Dispose();
     }
 
     private TaskCompletionSource<bool>? CompleteWaitUnsafe()
@@ -169,6 +159,7 @@ internal sealed class WakeTimer : IDisposable
         _waiter = null;
         _armed = false;
         _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _signaled = waiter is null;
         return waiter;
     }
 
@@ -190,10 +181,6 @@ internal sealed class WakeTimer : IDisposable
             }
 
             waiter = CompleteWaitUnsafe();
-            if (waiter is null)
-            {
-                _signaled = true;
-            }
         }
 
         waiter?.TrySetResult(true);

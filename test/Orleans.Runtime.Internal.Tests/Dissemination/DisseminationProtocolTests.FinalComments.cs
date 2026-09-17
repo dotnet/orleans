@@ -20,10 +20,8 @@ namespace UnitTests.Dissemination;
 
 public partial class DisseminationProtocolTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipInventoryOnlyRepairConvergesWithoutHeartbeat(bool delta)
+    [Fact]
+    public async Task MembershipInventoryOnlyRepairConvergesWithoutHeartbeat()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(40301);
@@ -43,14 +41,8 @@ public partial class DisseminationProtocolTests
         var receiver = CreateMembershipNamespace((IMembershipManager)receiverManager, serializer);
         var source = CreateMembershipNamespace((IMembershipManager)sourceManager, serializer);
         var before = Assert.Single(receiver.Digests);
-        var update = delta
-            ? new MembershipTableSnapshotUpdate
-            {
-                Diff = new MembershipTableSnapshotDiff(
-                    new MembershipVersion(1), incoming.Version, [incoming.Entries[live.SiloAddress]], [], includesAllEntries: true),
-            }
-            : new MembershipTableSnapshotUpdate { Snapshot = incoming };
-        var value = new DisseminationValue(DisseminationKey.Default, delta ? 1 : 0, 2, serializer.SerializeToArray(update));
+        var update = new MembershipTableSnapshotUpdate { Snapshot = incoming };
+        var value = new DisseminationValue(DisseminationKey.Default, 0, 2, serializer.SerializeToArray(update));
 
         Assert.Equal(DisseminationApplyResult.Applied, await receiver.ApplyValueAsync(value, cancellationToken));
         AssertMembershipState(expected, receiverManager.MembershipTableSnapshot);

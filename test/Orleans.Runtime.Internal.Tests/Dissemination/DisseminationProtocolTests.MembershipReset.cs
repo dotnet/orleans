@@ -109,23 +109,22 @@ public partial class DisseminationProtocolTests
         var ns = CreateMembershipNamespace(new FakeMembershipManager(snapshot), serializer);
 
         var repair = ns.CreateRepair(new(
-            DisseminationKey.Default, 100, null, 1, 1024 * 1024, 1024 * 1024));
+            DisseminationKey.Default, 100, 1024 * 1024, 1024 * 1024));
 
         Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
         Assert.Equal(2, repair.Version);
-        var value = Assert.Single(repair.Values);
+        var value = repair.Value;
         Assert.Equal(0, value.FromVersion);
         Assert.Equal(2, value.ToVersion);
         var update = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
-        Assert.Null(update.Diff);
         var repaired = Assert.IsType<MembershipTableSnapshot>(update.Snapshot);
         Assert.Equal(snapshot.Version, repaired.Version);
         Assert.Equal(local, Assert.Single(repaired.Entries).Key);
     }
 
     [Fact]
-    public async Task MembershipHistoryResetDiscardsPriorIncarnationAndDelayedPublication()
+    public async Task MembershipResetSupersedesPriorIncarnationAndDelayedPublication()
     {
         var members = CreateSilos(20);
         var old = CreateMembershipSnapshot(1, members.Select(
@@ -146,19 +145,17 @@ public partial class DisseminationProtocolTests
         manager.CurrentSnapshot = reset;
         Assert.Equal(2, Assert.Single(ns.Digests).Version);
 
-        Assert.False(await ns.PublishAsync(new FakeDisseminationService(), old, TestContext.Current.CancellationToken));
-        var obsoleteBaseline = ns.CreateRepair(new(
-            DisseminationKey.Default, null, 1, 1, 1024 * 1024, 1024 * 1024));
-        Assert.Equal(DisseminationRepairStatus.Unavailable, obsoleteBaseline.Status);
+        var publications = new FakeDisseminationService();
+        Assert.True(await ns.PublishAsync(publications, old, TestContext.Current.CancellationToken));
+        Assert.Equal(2, Assert.Single(publications.Values).ToVersion);
         var repair = ns.CreateRepair(new(
-            DisseminationKey.Default, 1, null, 1, 1024 * 1024, 1024 * 1024));
+            DisseminationKey.Default, 1, 1024 * 1024, 1024 * 1024));
         Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
-        var value = Assert.Single(repair.Values);
+        var value = repair.Value;
         Assert.Equal(0, value.FromVersion);
         Assert.Equal(2, value.ToVersion);
         var payload = Assert.IsType<MembershipTableSnapshotUpdate>(
             serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
-        Assert.Null(payload.Diff);
         var repaired = Assert.IsType<MembershipTableSnapshot>(payload.Snapshot);
         Assert.Equal(members.Length, repaired.Entries.Count);
         Assert.All(repaired.Entries.Values, entry => Assert.Equal("new-table", entry.HostName));

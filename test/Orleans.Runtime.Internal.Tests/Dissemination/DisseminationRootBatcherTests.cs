@@ -316,7 +316,7 @@ public class DisseminationRootBatcherTests
         var queue = new DisseminationBroadcastQueue(
             rig.Clock, rig.Members[0], factory, new TestOptionsMonitor(rig.Options),
             [rig.Namespace], NullLogger<DisseminationBroadcastQueue>.Instance);
-        rig.OnDispatch = attempt => queue.NotifyBatch(rig.Members[1], rig.Namespace, attempt.Notifications, immediate: false);
+        rig.OnDispatch = attempt => queue.NotifyBatch(rig.Members[1], rig.Namespace, attempt.Notifications);
         try
         {
             var receipts = new List<Task<DisseminationPublicationReceipt>> { await rig.StartPublicationAsync(0) };
@@ -479,13 +479,15 @@ public class DisseminationRootBatcherTests
     }
 
     [Theory]
-    [InlineData(false, 1L)]
-    [InlineData(true, 1L)]
-    [InlineData(true, 2L)]
-    public async Task PartialAdmissionRejectsReceiptButRetriesNewestHintAndForce(bool newForce, long version)
+    [InlineData(false, false, 1L)]
+    [InlineData(false, true, 1L)]
+    [InlineData(false, true, 2L)]
+    [InlineData(true, false, 1L)]
+    public async Task RejectedDispatchCachesReceiptAndRetriesNewestHintAndForce(bool callbackThrows, bool newForce, long version)
     {
         await using var rig = new TestRig(2);
-        rig.OnDispatch = attempt => attempt.Number != 1;
+        var failure = new InvalidOperationException("The parent dispatcher failed.");
+        rig.OnDispatch = attempt => attempt.Number != 1 || (callbackThrows ? throw failure : false);
         var first = await rig.StartPublicationAsync(0, force: true);
         var scheduled = rig.Clock.WhenScheduled();
         rig.Clock.Advance(Period);
@@ -501,10 +503,21 @@ public class DisseminationRootBatcherTests
         Assert.Single(rig.Attempts);
         rig.Clock.Advance(Milliseconds(1));
         await Phase(rig.Batcher.FlushAsync(TestToken), "retained hint admitted on retry");
+        Assert.Equal(2, rig.Attempts.Count);
         Assert.Equal(new[] { rig.Notification(0, 1, true), rig.Notification(0, version, true) },
             rig.Attempts.SelectMany(attempt => attempt.Notifications));
         // A later hint retry is not another publication receipt or another producer contribution.
         Assert.Equal(new(false, TimeSpan.Zero), await rig.Publish(0));
+        if (callbackThrows)
+        {
+            var entry = Assert.Single(rig.Logger.Entries);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Same(failure, entry.Exception);
+        }
+        else
+        {
+            Assert.Empty(rig.Logger.Entries);
+        }
     }
 
     [Fact]
@@ -525,26 +538,6 @@ public class DisseminationRootBatcherTests
         await Phase(rig.Batcher.FlushAsync(TestToken), "one rejected chunk retried");
         Assert.Equal(new[] { rig.Notification(0), rig.Notification(1), rig.Notification(2), rig.Notification(1) },
             rig.Attempts.SelectMany(attempt => attempt.Notifications));
-    }
-
-    [Fact]
-    public async Task CallbackExceptionRejectsReceiptsRetriesHintsAndReportsFailure()
-    {
-        await using var rig = new TestRig();
-        var failure = new InvalidOperationException("The parent dispatcher failed.");
-        rig.OnDispatch = attempt => attempt.Number == 1 ? throw failure : true;
-        var publication = await rig.StartPublicationAsync(0, force: true);
-        var scheduled = rig.Clock.WhenScheduled();
-        rig.Clock.Advance(Period);
-        Assert.Equal(new(false, TimeSpan.Zero), await Phase(publication, "exception rejects the producer receipt"));
-        Assert.Equal(Period, await Phase(scheduled, "exception retry armed"));
-        var entry = Assert.Single(rig.Logger.Entries);
-        Assert.Equal(LogLevel.Warning, entry.Level);
-        Assert.Same(failure, entry.Exception);
-        rig.Clock.Advance(Period);
-        await Phase(rig.Batcher.FlushAsync(TestToken), "exception hint recovered");
-        Assert.Equal(rig.Notification(0, 1, true), Assert.Single(rig.Attempts.Last().Notifications));
-        Assert.Equal(2, rig.Attempts.Count);
     }
 
     [Fact]
@@ -985,37 +978,6 @@ public class DisseminationRootBatcherTests
     }
 
     [Fact]
-    public async Task HighPriorityHintsBypassCollectionButFailedRetriesUsePublicationPeriod()
-    {
-        await using var rig = new TestRig();
-        rig.Namespace.Options.Priority = DisseminationPriority.High;
-        rig.OnDispatch = attempt => attempt.Number != 1;
-        var started = rig.Clock.GetTimestamp();
-        var scheduled = rig.Clock.WhenScheduled();
-        Assert.True(rig.Batcher.Notify([new("a", 1, true)]));
-        Assert.Equal(started, (await rig.NextAttemptAsync()).Timestamp);
-        Assert.Equal(Period, await Phase(scheduled, "high priority retry bounded"));
-        rig.Clock.Advance(Period);
-        await Phase(rig.Batcher.FlushAsync(TestToken), "high priority retry accepted");
-        Assert.Equal(2, rig.Attempts.Count);
-    }
-
-    [Fact]
-    public async Task HighPriorityPublicationsStillRequireEveryProducerOrDeadline()
-    {
-        await using var rig = new TestRig(2);
-        rig.Namespace.Options.Priority = DisseminationPriority.High;
-        var first = await rig.StartPublicationAsync(0);
-        rig.Clock.Advance(Milliseconds(25));
-        Assert.False(first.IsCompleted);
-        Assert.Empty(rig.Attempts);
-        var second = rig.Publish(1);
-        Assert.All(await Phase(Task.WhenAll(first, second), "priority cannot bypass the publication cohort"),
-            receipt => Assert.Equal(new(true, Milliseconds(975)), receipt));
-        Assert.Equal(2, Assert.Single(rig.Attempts).Notifications.Length);
-    }
-
-    [Fact]
     public async Task StopSealsPartialCohortDrainsBoundedChunksAndRejectsFurtherAdmission()
     {
         await using var rig = new TestRig(6);
@@ -1244,7 +1206,6 @@ public class DisseminationRootBatcherTests
         private readonly DisseminationNamespaceOptions _options = new()
         {
             Enabled = true,
-            MaxCoalescingDelay = TimeSpan.FromMilliseconds(25),
             MaxPendingItemCount = 8192,
         };
 
@@ -1291,12 +1252,12 @@ public class DisseminationRootBatcherTests
                 return DisseminationRepairResult.Current(1);
             }
 
-            if (request.MaxBatchBytes < sizeof(long) || request.MaxPayloadBytes < sizeof(long) || request.MaxItemCount < 1)
+            if (request.MaxBatchBytes < sizeof(long) || request.MaxPayloadBytes < sizeof(long))
             {
                 return DisseminationRepairResult.InsufficientCapacity(1);
             }
 
-            return DisseminationRepairResult.Produced(1, [new(request.Key, 0, 1, BitConverter.GetBytes(1L))]);
+            return DisseminationRepairResult.Produced(new(request.Key, 0, 1, BitConverter.GetBytes(1L)));
         }
 
         public ValueTask<DisseminationApplyResult> ApplyValueAsync(DisseminationValue value, CancellationToken cancellationToken) =>

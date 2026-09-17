@@ -112,17 +112,11 @@ internal static class DisseminationEvents
 // Why a peer pump (re)armed its flush timer, exposed for deterministic tests and diagnostics.
 internal enum DisseminationBroadcastScheduleReason
 {
-    // A batch filled, so the pump flushes without further coalescing.
+    // New work is ready for admission.
     Immediate,
-
-    // The pump is coalescing and will flush after the namespace delay.
-    Coalesce,
 
     // A prior send failed and the pump re-armed after backoff.
     Retry,
-
-    // A high-priority namespace bypasses the coalescing window and flushes immediately.
-    Priority,
 }
 
 internal sealed class DisseminationBroadcastScheduledEvent

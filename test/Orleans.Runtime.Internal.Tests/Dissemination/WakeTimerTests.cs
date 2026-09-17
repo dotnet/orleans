@@ -12,14 +12,22 @@ namespace UnitTests.Dissemination;
 [TestArea("Dissemination")]
 public class WakeTimerTests
 {
-    [Fact]
-    public async Task ChangeCompletesWaitWhenDueTimeElapses()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ChangeCompletesWaitAtLatestDueTime(bool rearm)
     {
         var timeProvider = new FakeTimeProvider();
         using var timer = new WakeTimer(timeProvider);
         var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Change(TimeSpan.FromSeconds(1));
+        if (rearm)
+        {
+            timeProvider.Advance(TimeSpan.FromMilliseconds(500));
+            timer.Change(TimeSpan.FromSeconds(1));
+        }
+
         timeProvider.Advance(TimeSpan.FromMilliseconds(999));
         Assert.False(wait.IsCompleted);
         timeProvider.Advance(TimeSpan.FromMilliseconds(1));
@@ -35,23 +43,6 @@ public class WakeTimerTests
         timer.Wake();
 
         Assert.True(await timer.WaitAsync(TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task ChangeRearmsCurrentWait()
-    {
-        var timeProvider = new FakeTimeProvider();
-        using var timer = new WakeTimer(timeProvider);
-        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
-
-        timer.Change(TimeSpan.FromSeconds(1));
-        timeProvider.Advance(TimeSpan.FromMilliseconds(500));
-        timer.Change(TimeSpan.FromSeconds(1));
-        timeProvider.Advance(TimeSpan.FromMilliseconds(999));
-        Assert.False(wait.IsCompleted);
-        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
-
-        Assert.True(await wait);
     }
 
     [Fact]
@@ -120,29 +111,23 @@ public class WakeTimerTests
         Assert.True(await nextWait);
     }
 
-    [Fact]
-    public async Task DisposeCompletesCurrentAndFutureWaitsWithFalse()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisposeCompletesCurrentAndFutureWaitsWithoutChangingTimer(bool changeThrows)
     {
-        var timer = new WakeTimer(TimeProvider.System);
-        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
-
-        timer.Dispose();
-
-        Assert.False(await wait);
-        Assert.False(await timer.WaitAsync(TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task DisposeCompletesWaitAndDisposesTimerWithoutChangingIt()
-    {
-        var timeProvider = new ThrowingChangeTimeProvider();
+        TimeProvider timeProvider = changeThrows ? new ThrowingChangeTimeProvider() : TimeProvider.System;
         var timer = new WakeTimer(timeProvider);
         var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Dispose();
 
         Assert.False(await wait);
-        Assert.True(timeProvider.Timer.IsDisposed);
+        Assert.False(await timer.WaitAsync(TestContext.Current.CancellationToken));
+        if (timeProvider is ThrowingChangeTimeProvider throwingProvider)
+        {
+            Assert.True(throwingProvider.Timer.IsDisposed);
+        }
     }
 
     private sealed class QueuedSynchronizationContext : SynchronizationContext

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
@@ -6,20 +5,16 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Dissemination;
 
-// Membership retains a bounded snapshot history so each peer can receive either a compact diff
-// or a universal full snapshot.
+// Full snapshots preserve the complete inventory and same-version heartbeat advances.
 internal sealed class MembershipDisseminationNamespace(
     IMembershipManager membershipManager,
     IOptionsMonitor<ClusterMembershipOptions> options,
     Serializer serializer) : IDisseminationNamespace
 {
-    private const int MaxSnapshotHistory = 32;
     private static readonly DisseminationKey[] MembershipKeys = [DisseminationKey.Default];
-    private readonly object _historyLock = new();
-    private readonly SortedDictionary<long, MembershipTableSnapshot> _snapshotHistory = new();
-    private readonly Dictionary<long, ReadOnlyMemory<byte>> _snapshotPayloads = [];
-    private readonly Dictionary<(long FromVersion, long ToVersion), ReadOnlyMemory<byte>> _diffPayloads = [];
-    private MembershipTableSnapshot? _currentSnapshot;
+    private readonly object _cacheLock = new();
+    private MembershipTableSnapshot? _cachedSnapshot;
+    private byte[]? _cachedPayload;
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.Membership;
 
@@ -31,15 +26,13 @@ internal sealed class MembershipDisseminationNamespace(
 
     public IEnumerable<DisseminationKey> Keys => MembershipKeys;
 
-    public async ValueTask<bool> PublishAsync(
+    public ValueTask<bool> PublishAsync(
         IDisseminationService disseminationService,
         MembershipTableSnapshot snapshot,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // Capture authoritative state: a delayed publication can outlive the snapshot which caused it.
-        RememberCurrentSnapshot();
-        return await disseminationService.Publish(
+        return disseminationService.Publish(
             this,
             DisseminationKey.Default,
             snapshot.Version.Value,
@@ -50,7 +43,7 @@ internal sealed class MembershipDisseminationNamespace(
     {
         get
         {
-            var snapshot = RememberCurrentSnapshot();
+            var snapshot = membershipManager.CurrentSnapshot;
             // Version alone misses same-version liveness advances, so the digest fingerprints heartbeat state too.
             yield return new DigestEntry(
                 DisseminationKey.Default,
@@ -71,61 +64,21 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationRepairResult.Unavailable(version: 0);
         }
 
-        // Select history and cached bytes atomically because membership can change without advancing its version.
-        lock (_historyLock)
+        lock (_cacheLock)
         {
-            var currentSnapshot = RememberCurrentSnapshotUnsafe();
-            var targetVersion = request.ToVersion ?? currentSnapshot.Version.Value;
-            if (targetVersion > currentSnapshot.Version.Value
-                || !_snapshotHistory.TryGetValue(targetVersion, out var targetSnapshot))
+            // Re-read the owner under the cache lock: publication arguments can outlive the state they describe.
+            var snapshot = membershipManager.CurrentSnapshot;
+            var version = snapshot.Version.Value;
+            if (_cachedSnapshot is null || !MembershipSnapshotsEqual(_cachedSnapshot, snapshot))
             {
-                return DisseminationRepairResult.Unavailable(currentSnapshot.Version.Value);
+                _cachedPayload = null;
             }
 
-            // A numerically greater peer version can belong to an older table incarnation.
-            // Only a retained lower baseline is useful for a diff; all other peers receive a full snapshot.
-            MembershipTableSnapshot? baseSnapshot = null;
-            if (request.FromVersion is { } fromVersion
-                && fromVersion > 0
-                && fromVersion < targetVersion)
-            {
-                _snapshotHistory.TryGetValue(fromVersion, out baseSnapshot);
-            }
-
-            var resolvedVersion = targetSnapshot.Version.Value;
-            if (request.MaxItemCount <= 0)
-            {
-                return DisseminationRepairResult.InsufficientCapacity(resolvedVersion);
-            }
-
-            var snapshotValue = CreateSnapshotValue(targetSnapshot);
-            var selectedValue = snapshotValue;
-            if (baseSnapshot is not null)
-            {
-                // Use the smaller representation, retaining the full snapshot as the capacity fallback.
-                var diffValue = CreateDiffValue(baseSnapshot, targetSnapshot);
-                if (diffValue.Payload.Length < snapshotValue.Payload.Length)
-                {
-                    selectedValue = diffValue;
-                }
-            }
-
-            if (selectedValue.Payload.Length > request.MaxPayloadBytes
-                || selectedValue.Payload.Length > request.MaxBatchBytes)
-            {
-                if (selectedValue.FromVersion != 0
-                    && snapshotValue.Payload.Length <= request.MaxPayloadBytes
-                    && snapshotValue.Payload.Length <= request.MaxBatchBytes)
-                {
-                    selectedValue = snapshotValue;
-                }
-                else
-                {
-                    return DisseminationRepairResult.InsufficientCapacity(resolvedVersion);
-                }
-            }
-
-            return DisseminationRepairResult.Produced(resolvedVersion, [selectedValue]);
+            _cachedSnapshot = snapshot;
+            _cachedPayload ??= serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot });
+            return _cachedPayload.Length <= request.MaxPayloadBytes && _cachedPayload.Length <= request.MaxBatchBytes
+                ? DisseminationRepairResult.Produced(new DisseminationValue(DisseminationKey.Default, 0, version, _cachedPayload))
+                : DisseminationRepairResult.InsufficientCapacity(version);
         }
     }
 
@@ -139,26 +92,9 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Rejected;
         }
 
-        if (serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload) is not { } update)
-        {
-            return DisseminationApplyResult.Rejected;
-        }
-
-        if (update.Diff is { } diff)
-        {
-            return update.Snapshot is null
-                && value.FromVersion == diff.BaseVersion.Value
-                && value.ToVersion == diff.Version.Value
-                ? await ApplyDiff(diff, cancellationToken)
-                : DisseminationApplyResult.Rejected;
-        }
-
-        if (update.Snapshot is not { } snapshot)
-        {
-            return DisseminationApplyResult.Rejected;
-        }
-
-        if (value.FromVersion != 0 || value.ToVersion != snapshot.Version.Value)
+        if (value.FromVersion != 0
+            || serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload)?.Snapshot is not { } snapshot
+            || value.ToVersion != snapshot.Version.Value)
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -174,187 +110,13 @@ internal sealed class MembershipDisseminationNamespace(
             }
         }
 
-        var result = await ApplySnapshot(currentSnapshot, snapshot, cancellationToken);
+        await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
+        var result = MembershipSnapshotsEqual(currentSnapshot, membershipManager.CurrentSnapshot)
+            ? DisseminationApplyResult.Duplicate
+            : DisseminationApplyResult.Applied;
         return snapshot.Version < currentSnapshot.Version && result == DisseminationApplyResult.Duplicate
             ? DisseminationApplyResult.Obsolete
             : result;
-    }
-
-    private DisseminationValue CreateSnapshotValue(MembershipTableSnapshot snapshot) => new(
-        DisseminationKey.Default,
-        fromVersion: 0,
-        toVersion: snapshot.Version.Value,
-        GetSnapshotPayload(snapshot));
-
-    private DisseminationValue CreateDiffValue(
-        MembershipTableSnapshot baseSnapshot,
-        MembershipTableSnapshot snapshot) => new(
-        DisseminationKey.Default,
-        fromVersion: baseSnapshot.Version.Value,
-        toVersion: snapshot.Version.Value,
-        GetDiffPayload(baseSnapshot, snapshot));
-
-    private async ValueTask<DisseminationApplyResult> ApplyDiff(MembershipTableSnapshotDiff diff, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var current = membershipManager.CurrentSnapshot;
-        if (current.Version.Value > diff.Version.Value)
-        {
-            return DisseminationApplyResult.Obsolete;
-        }
-
-        if (current.Version.Value != diff.Version.Value
-            && current.Version.Value != diff.BaseVersion.Value)
-        {
-            return DisseminationApplyResult.Rejected;
-        }
-
-        // Table cleanup can change the inventory without changing its version, so a receiver's
-        // baseline can contain entries which the sender never saw and therefore could not remove.
-        var entries = diff.IncludesAllEntries
-            ? ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>()
-            : current.Entries.ToBuilder();
-        foreach (var silo in diff.RemovedSilos)
-        {
-            entries.Remove(silo);
-        }
-
-        foreach (var entry in diff.UpdatedEntries)
-        {
-            entries[entry.SiloAddress] = PreserveIAmAliveTime(current, entry);
-        }
-
-        var snapshot = new MembershipTableSnapshot(diff.Version, entries.ToImmutable());
-        if (current.Version.Value == diff.Version.Value && !snapshot.IsSuccessorTo(current))
-        {
-            return DisseminationApplyResult.Duplicate;
-        }
-
-        return await ApplySnapshot(current, snapshot, cancellationToken);
-    }
-
-    private async ValueTask<DisseminationApplyResult> ApplySnapshot(
-        MembershipTableSnapshot previous,
-        MembershipTableSnapshot snapshot,
-        CancellationToken cancellationToken)
-    {
-        await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        var current = RememberCurrentSnapshot();
-        return MembershipSnapshotsEqual(previous, current)
-            ? DisseminationApplyResult.Duplicate
-            : DisseminationApplyResult.Applied;
-    }
-
-    private MembershipTableSnapshot RememberCurrentSnapshot()
-    {
-        lock (_historyLock)
-        {
-            return RememberCurrentSnapshotUnsafe();
-        }
-    }
-
-    private MembershipTableSnapshot RememberCurrentSnapshotUnsafe()
-    {
-        var snapshot = membershipManager.CurrentSnapshot;
-        if (_currentSnapshot is { } previousCurrent && snapshot.Version < previousCurrent.Version)
-        {
-            _snapshotHistory.Clear();
-            _snapshotPayloads.Clear();
-            _diffPayloads.Clear();
-        }
-
-        _currentSnapshot = snapshot;
-        if (_snapshotHistory.TryGetValue(snapshot.Version.Value, out var previous)
-            && !MembershipSnapshotsEqual(previous, snapshot))
-        {
-            // Replacing a same-version snapshot invalidates bytes derived from the older liveness state.
-            InvalidatePayloads(snapshot.Version.Value);
-        }
-
-        _snapshotHistory[snapshot.Version.Value] = snapshot;
-        while (_snapshotHistory.Count > MaxSnapshotHistory)
-        {
-            using var enumerator = _snapshotHistory.Keys.GetEnumerator();
-            if (enumerator.MoveNext())
-            {
-                var removedVersion = enumerator.Current;
-                _snapshotHistory.Remove(removedVersion);
-                InvalidatePayloads(removedVersion);
-            }
-        }
-
-        return snapshot;
-    }
-
-    private void InvalidatePayloads(long version)
-    {
-        _snapshotPayloads.Remove(version);
-        foreach (var key in _diffPayloads.Keys
-            .Where(key => key.FromVersion == version || key.ToVersion == version)
-            .ToArray())
-        {
-            _diffPayloads.Remove(key);
-        }
-    }
-
-    private ReadOnlyMemory<byte> GetSnapshotPayload(MembershipTableSnapshot snapshot)
-    {
-        lock (_historyLock)
-        {
-            if (!_snapshotPayloads.TryGetValue(snapshot.Version.Value, out var payload))
-            {
-                payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = snapshot });
-                _snapshotPayloads.Add(snapshot.Version.Value, payload);
-            }
-
-            return payload;
-        }
-    }
-
-    private ReadOnlyMemory<byte> GetDiffPayload(
-        MembershipTableSnapshot baseSnapshot,
-        MembershipTableSnapshot snapshot)
-    {
-        var key = (baseSnapshot.Version.Value, snapshot.Version.Value);
-        lock (_historyLock)
-        {
-            if (!_diffPayloads.TryGetValue(key, out var payload))
-            {
-                payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate
-                {
-                    Diff = CreateDiff(baseSnapshot, snapshot),
-                });
-                _diffPayloads.Add(key, payload);
-            }
-
-            return payload;
-        }
-    }
-
-    private static MembershipTableSnapshotDiff CreateDiff(MembershipTableSnapshot baseSnapshot, MembershipTableSnapshot snapshot)
-    {
-        // Include every current entry: peers at the same table version can still have different liveness baselines.
-        var updated = ImmutableArray.CreateBuilder<MembershipEntry>();
-        foreach (var entry in snapshot.Entries)
-        {
-            updated.Add(entry.Value);
-        }
-
-        var removed = ImmutableArray.CreateBuilder<SiloAddress>();
-        foreach (var entry in baseSnapshot.Entries)
-        {
-            if (!snapshot.Entries.ContainsKey(entry.Key))
-            {
-                removed.Add(entry.Key);
-            }
-        }
-
-        return new MembershipTableSnapshotDiff(
-            baseSnapshot.Version,
-            snapshot.Version,
-            updated.ToImmutable(),
-            removed.ToImmutable(),
-            includesAllEntries: true);
     }
 
     private static long GetFingerprint(MembershipTableSnapshot snapshot)
@@ -371,33 +133,6 @@ internal sealed class MembershipDisseminationNamespace(
 
         return unchecked((long)hash);
     }
-
-    private static MembershipEntry PreserveIAmAliveTime(MembershipTableSnapshot previousSnapshot, MembershipEntry entry)
-    {
-        // A repair must not move locally observed liveness backward.
-        if (previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry)
-            && previousEntry.IAmAliveTime > entry.IAmAliveTime)
-        {
-            return CopyWithIAmAliveTime(entry, previousEntry.IAmAliveTime);
-        }
-
-        return entry;
-    }
-
-    private static MembershipEntry CopyWithIAmAliveTime(MembershipEntry entry, DateTime iAmAliveTime) => new()
-    {
-        SiloAddress = entry.SiloAddress,
-        Status = entry.Status,
-        SuspectTimes = entry.SuspectTimes is null ? null : new(entry.SuspectTimes),
-        ProxyPort = entry.ProxyPort,
-        HostName = entry.HostName,
-        SiloName = entry.SiloName,
-        RoleName = entry.RoleName,
-        UpdateZone = entry.UpdateZone,
-        FaultZone = entry.FaultZone,
-        StartTime = entry.StartTime,
-        IAmAliveTime = iAmAliveTime,
-    };
 
     private static bool MembershipEntriesEqual(MembershipEntry left, MembershipEntry right) =>
         MembershipTableSnapshot.AreVersionedFieldsEqual(left, right)
@@ -428,7 +163,6 @@ internal sealed class MembershipDisseminationNamespace(
 
         return true;
     }
-
 }
 
 [GenerateSerializer, Immutable]
@@ -436,41 +170,4 @@ internal sealed class MembershipTableSnapshotUpdate
 {
     [Id(0)]
     public MembershipTableSnapshot? Snapshot { get; init; }
-
-    [Id(1)]
-    public MembershipTableSnapshotDiff? Diff { get; init; }
-}
-
-[GenerateSerializer, Immutable]
-internal sealed class MembershipTableSnapshotDiff
-{
-    public MembershipTableSnapshotDiff(
-        MembershipVersion baseVersion,
-        MembershipVersion version,
-        ImmutableArray<MembershipEntry> updatedEntries,
-        ImmutableArray<SiloAddress> removedSilos,
-        bool includesAllEntries = false)
-    {
-        BaseVersion = baseVersion;
-        Version = version;
-        UpdatedEntries = updatedEntries;
-        RemovedSilos = removedSilos;
-        IncludesAllEntries = includesAllEntries;
-    }
-
-    [Id(0)]
-    public MembershipVersion BaseVersion { get; }
-
-    [Id(1)]
-    public MembershipVersion Version { get; }
-
-    [Id(2)]
-    public ImmutableArray<MembershipEntry> UpdatedEntries { get; }
-
-    [Id(3)]
-    public ImmutableArray<SiloAddress> RemovedSilos { get; }
-
-    // Absent on older payloads, where UpdatedEntries can be only a partial update.
-    [Id(4)]
-    public bool IncludesAllEntries { get; }
 }

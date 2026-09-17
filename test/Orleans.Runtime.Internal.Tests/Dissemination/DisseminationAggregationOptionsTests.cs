@@ -31,7 +31,6 @@ public class DisseminationAggregationOptionsTests
         Assert.Equal(1048576, options.Overlay.MaxAntiEntropyBatchBytes);
         Assert.Equal(options.MaxBatchItems, options.Overlay.MaxAntiEntropyBatchItems);
         Assert.Equal(options.MaxBatchBytes, options.Overlay.MaxAntiEntropyBatchBytes);
-        Assert.Equal(new DisseminationNamespaceOptions().MaxCoalescingDelay, load.Dissemination.MaxCoalescingDelay);
         Assert.Equal(8192, load.Dissemination.MaxPendingItemCount);
         Assert.Equal(TimeSpan.FromSeconds(5), load.Dissemination.ExpectedUpdateCadence);
         Assert.Equal(TimeSpan.FromSeconds(1), load.DeploymentLoadPublisherRefreshTime);
@@ -39,7 +38,6 @@ public class DisseminationAggregationOptionsTests
         Assert.False(new DisseminationNamespaceOptions().Enabled);
         Assert.False(load.Dissemination.Enabled);
         Assert.False(membership.Dissemination.Enabled);
-        Assert.Equal(DisseminationPriority.High, membership.Dissemination.Priority);
         Assert.Equal(ValidateOptionsResult.Success, Validate(options));
         Assert.Equal(ValidateOptionsResult.Success, new DeploymentLoadPublisherOptionsValidator().Validate(Options.DefaultName, load));
     }

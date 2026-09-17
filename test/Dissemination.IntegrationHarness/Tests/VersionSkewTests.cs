@@ -157,9 +157,9 @@ public sealed class VersionSkewTests
 
     [Fact]
     [Trait("Category", "DisseminationProcess")]
-    public async Task PartitionHistoryAndHeartbeat_RequireDisseminationProvenance()
+    public async Task PartitionSnapshotAndHeartbeat_RequireDisseminationProvenance()
     {
-        await using var cluster = new ProcessCluster("partition-history-heartbeat");
+        await using var cluster = new ProcessCluster("partition-snapshot-heartbeat");
         var origin = await cluster.Start("New", enabled: true);
         var relay = await cluster.Start("New", enabled: true);
         var receiver = await cluster.Start("New", enabled: true);
@@ -196,18 +196,16 @@ public sealed class VersionSkewTests
             var oldVersion = receiver.Last.MembershipVersion;
             await receiver.Send("partition", value: true);
             await relay.Send("partition", value: true);
-            var source = await origin.Send("membership-history", count: 40, version: oldVersion);
-            Assert.Equal(oldVersion + 40, source.MembershipVersion);
-            Assert.Equal(0, source.RepairFromVersion); // The actual production namespace evicted the old baseline.
+            var source = await origin.Send("membership-update", version: oldVersion);
+            Assert.Equal(oldVersion + 1, source.MembershipVersion);
+            Assert.Equal(0, source.RepairFromVersion);
             var blocked = await receiver.Send("snapshot");
             Assert.Equal(oldVersion, blocked.MembershipVersion);
             Assert.Equal(oldVersion, (await relay.Send("snapshot")).MembershipVersion);
             Assert.False(SameMembership(source, blocked));
             await receiver.Send("partition", value: false);
 
-            // Only the origin can repair this receiver until its full history-miss repair is observed.
-            // A relay which first learned the target could otherwise serve a valid retained-baseline delta.
-            await cluster.Eventually("anti-entropy-only full repair after a real transport partition and retained-history miss", async () =>
+            await cluster.Eventually("anti-entropy-only full snapshot repair after a real transport partition", async () =>
             {
                 await receiver.Send("snapshot");
                 return SameMembership(source, receiver.Last)
@@ -225,7 +223,7 @@ public sealed class VersionSkewTests
             await AssertNoTreeAdmissions(cluster, before);
             Assert.True(receiver.Last.MembershipReadsFrozen);
             Assert.True(receiver.Last.LegacyGossipSuppressed);
-            await cluster.Save("history-recovery.json", new { Before = before, After = cluster.Active.Select(node => node.Last) });
+            await cluster.Save("snapshot-recovery.json", new { Before = before, After = cluster.Active.Select(node => node.Last) });
 
             var priorHeartbeatApplications = receiver.Last.Applies.Count(evidence =>
                 evidence.Namespace == "membership" && evidence.Result == "Applied" && evidence.ToVersion == source.MembershipVersion);

@@ -101,14 +101,7 @@ namespace Orleans.Configuration
         /// best-effort accelerator. Direct membership gossip delivers shutdown-critical updates and reaches peers
         /// during mixed-version operation.
         /// </remarks>
-        public DisseminationNamespaceOptions Dissemination { get; set; } = new()
-        {
-            ExpectedUpdateCadence = TimeSpan.FromSeconds(10),
-
-            // Membership changes must propagate as quickly as possible, ahead of and without waiting to coalesce
-            // with other gossip.
-            Priority = DisseminationPriority.High,
-        };
+        public DisseminationNamespaceOptions Dissemination { get; set; } = new();
 
         /// <summary>
         /// Gets or sets the number of silos each silo probes for liveness.

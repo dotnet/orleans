@@ -51,9 +51,9 @@ public partial class DisseminationProtocolTests
 
         DisseminationValue Repair()
         {
-            var repair = ns.CreateRepair(new(value.Key, null, null, 1, 1024, 1024));
+            var repair = ns.CreateRepair(new(value.Key, null, 1024, 1024));
             Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
-            return Assert.Single(repair.Values);
+            return repair.Value;
         }
     }
 

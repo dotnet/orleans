@@ -272,9 +272,9 @@ public class DisseminationMembershipSnapshotTests
 
         static DisseminationMembershipSnapshots CreateProjections(MembershipEntry[] entries, SiloAddress local) =>
             new DisseminationMembership(
-                new CountingMembershipManager(new(
+                new MutableMembershipManager(new(
                     new MembershipVersion(42),
-                    entries.ToImmutableDictionary(static entry => entry.SiloAddress))),
+                    entries.ToImmutableDictionary(static entry => entry.SiloAddress)), TestContext.Current.CancellationToken),
                 new ScopeLocalSiloDetails(local),
                 Microsoft.Extensions.Options.Options.Create(new DisseminationOptions
                 {
@@ -551,7 +551,7 @@ public class DisseminationMembershipSnapshotTests
 
     private static (
         DisseminationMembershipSnapshots Snapshots,
-        CountingMembershipManager Manager,
+        MutableMembershipManager Manager,
         ScopeSilos Silos) CreateScopeProjections(bool reverseSourceEntries = false)
     {
         var silos = new ScopeSilos(
@@ -580,7 +580,7 @@ public class DisseminationMembershipSnapshotTests
         var source = new MembershipTableSnapshot(
             new MembershipVersion(42),
             entries.ToImmutableDictionary(static entry => entry.SiloAddress));
-        var manager = new CountingMembershipManager(source);
+        var manager = new MutableMembershipManager(source, TestContext.Current.CancellationToken);
         var membership = new DisseminationMembership(
             manager,
             new ScopeLocalSiloDetails(silos.Local),
@@ -642,62 +642,6 @@ public class DisseminationMembershipSnapshotTests
         public SiloAddress SiloAddress => siloAddress;
 
         public SiloAddress GatewayAddress => siloAddress;
-    }
-
-    private sealed class CountingMembershipManager(
-        MembershipTableSnapshot snapshot)
-        : Orleans.Runtime.MembershipService.IMembershipManager
-    {
-        public int SnapshotReadCount { get; private set; }
-
-        public MembershipTableSnapshot CurrentSnapshot
-        {
-            get
-            {
-                SnapshotReadCount++;
-                return snapshot;
-            }
-        }
-
-        public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates =>
-            EmptyUpdates(TestContext.Current.CancellationToken);
-
-        public SiloStatus LocalSiloStatus => SiloStatus.Active;
-
-        public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
-
-        public Task<bool> TrySuspectSilo(
-            SiloAddress silo,
-            SiloAddress? indirectProbingSilo,
-            CancellationToken cancellationToken) => Task.FromResult(false);
-
-        public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh = false) => Task.CompletedTask;
-
-        public Task ProcessGossipSnapshot(
-            MembershipTableSnapshot value,
-            CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public bool CheckHealth(DateTime lastCheckTime, out string reason)
-        {
-            reason = string.Empty;
-            return true;
-        }
-
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-        }
-
-        private static async IAsyncEnumerable<MembershipTableSnapshot> EmptyUpdates(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.CompletedTask;
-            yield break;
-        }
     }
 
     private sealed class MutableMembershipManager(

@@ -15,7 +15,7 @@ that checkout; Orleans runtime sources remain unchanged.
 - Rolling upgrades, mixed enablement, legacy fallback, and rollback.
 - Exact load-state convergence after three partition/heal cycles, at four and
   eight silos, using original, current-disabled, and current-enabled runtimes.
-- History-miss and same-version heartbeat repair with tree delivery, direct
+- Full-snapshot and same-version heartbeat repair with tree delivery, direct
   gossip, and membership-table reads independently isolated.
 - Cancellation of an entered remote RPC and bounded partitioned shutdown.
 - Harness guards for connection draining, exact inventory/value comparison,

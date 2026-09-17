@@ -122,7 +122,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task ChangedOversizedBatchCannotAcknowledgeOrApplyAMissingChainPrefix()
+    public async Task ChangedOversizedBatchRejectsNonFullValuesBeforeOwnerApplication()
     {
         var local = CreateSilo(39661);
         var peer = CreateSilo(39662);
@@ -159,10 +159,19 @@ public partial class DisseminationProtocolTests
 
             var prefix = await protocol.ReceiveBroadcast(changedBatch, TestContext.Current.CancellationToken);
             Assert.Equal(1, Assert.Single(prefix.Acknowledgments[second.Name]).Version);
-            var suffix = await protocol.ReceiveBroadcast(new DisseminationBroadcastBatch
+            var nonFull = await protocol.ReceiveBroadcast(new DisseminationBroadcastBatch
             {
                 Sender = peer,
                 Values = CreateValueGroups(second.Name, second.CreateItem(peer, "stream", 2, fromVersion: 1)),
+            }, TestContext.Current.CancellationToken);
+            Assert.Equal(1, Assert.Single(nonFull.Acknowledgments[second.Name]).Version);
+            Assert.Equal(1, second.GetVersion("stream"));
+            Assert.Equal(1, second.ApplyCounts["stream"]);
+
+            var suffix = await protocol.ReceiveBroadcast(new DisseminationBroadcastBatch
+            {
+                Sender = peer,
+                Values = CreateValueGroups(second.Name, second.CreateItem(peer, "stream", 2)),
             }, TestContext.Current.CancellationToken);
             Assert.Equal(2, Assert.Single(suffix.Acknowledgments[second.Name]).Version);
             Assert.Equal(1, first.GetVersion("other"));
@@ -201,14 +210,14 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task PublicationPagesCompleteRepairWithinActualSendBudgets()
+    public async Task PublicationUsesCurrentFullRepairWithinActualSendBudgets()
     {
         var local = CreateSilo(39681);
         var peer = CreateSilo(39682);
-        var ns = new FakeNamespace(local) { ReturnRepairChain = true };
+        var ns = new FakeNamespace(local);
         ns.PublishValue(ns.CreateValue("chain", 1));
-        ns.PublishValue(ns.CreateValue("chain", 2, fromVersion: 1));
-        ns.PublishValue(ns.CreateValue("chain", 3, fromVersion: 2));
+        ns.PublishValue(ns.CreateValue("chain", 2));
+        ns.PublishValue(ns.CreateValue("chain", 3));
         var transport = new FakeTransport(local, peer);
         var protocol = CreateProtocol(transport, ns, options =>
         {
@@ -219,10 +228,13 @@ public partial class DisseminationProtocolTests
         {
             Assert.True(await protocol.Publish(ns, "chain", 3, TestContext.Current.CancellationToken));
             await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken);
-            Assert.Equal(new long[] { 1, 2, 3 },
+            Assert.Equal(new long[] { 3 },
                 transport.BroadcastBatches.Select(batch => Assert.Single(GetBroadcastValues(batch.Batch)).Value.ToVersion));
             Assert.All(transport.BroadcastBatches, batch =>
-                Assert.Equal(8, Assert.Single(GetBroadcastValues(batch.Batch)).Value.Payload.Length));
+            {
+                Assert.Equal(8, Assert.Single(GetBroadcastValues(batch.Batch)).Value.Payload.Length);
+                Assert.Equal(0, Assert.Single(GetBroadcastValues(batch.Batch)).Value.FromVersion);
+            });
         }
         finally
         {

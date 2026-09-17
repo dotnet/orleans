@@ -334,9 +334,10 @@ public class DeploymentLoadPublisherTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RefreshClusterStatistics_Cancellation_CancelsNativeRequests(bool useLinkedReceiverToken)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task RefreshClusterStatistics_Cancellation_PreservesNativeOutcome(bool completeSuccessfully, bool useLinkedReceiverToken)
     {
         using var rig = CreateTestRig(TimeSpan.Zero);
         using var cancellation = new CancellationTokenSource();
@@ -347,11 +348,21 @@ public class DeploymentLoadPublisherTests
         var requestToken = await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Equal(cancellation.Token, requestToken);
         Assert.True(requestToken.IsCancellationRequested);
-        Assert.Empty(rig.Publisher.PeriodicStatistics);
+        if (completeSuccessfully)
+        {
+            await refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(refresh.IsCompletedSuccessfully);
+            Assert.Equal(2, rig.Publisher.PeriodicStatistics.Count);
+            Assert.All(rig.Publisher.PeriodicStatistics.Values, statistics => Assert.Same(rig.InitialStatistics, statistics));
+        }
+        else
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            Assert.Empty(rig.Publisher.PeriodicStatistics);
+        }
 
         async Task<SiloRuntimeStatistics> ReadStatistics(CancellationToken token)
         {
@@ -361,37 +372,17 @@ public class DeploymentLoadPublisherTests
                 requested.TrySetResult(token);
             }
 
-            await Task.Delay(Timeout.InfiniteTimeSpan, useLinkedReceiverToken ? receiverCancellation.Token : token);
-            return rig.InitialStatistics;
-        }
-    }
-
-    [Fact]
-    public async Task RefreshClusterStatistics_CompletedRequests_PreserveNativeResults()
-    {
-        using var rig = CreateTestRig(TimeSpan.Zero);
-        using var cancellation = new CancellationTokenSource();
-        var requested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var startedRequests = 0;
-        rig.Control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(async call =>
-        {
-            if (Interlocked.Increment(ref startedRequests) == 2)
+            if (completeSuccessfully)
             {
-                requested.TrySetResult();
+                await token.WhenCancelled();
+            }
+            else
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, useLinkedReceiverToken ? receiverCancellation.Token : token);
             }
 
-            await call.ArgAt<CancellationToken>(0).WhenCancelled();
             return rig.InitialStatistics;
-        });
-        var refresh = rig.Publisher.RefreshClusterStatistics(cancellation.Token);
-        await requested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        cancellation.Cancel();
-        await refresh.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        Assert.True(refresh.IsCompletedSuccessfully);
-        Assert.Equal(2, rig.Publisher.PeriodicStatistics.Count);
-        Assert.All(rig.Publisher.PeriodicStatistics.Values, statistics => Assert.Same(rig.InitialStatistics, statistics));
+        }
     }
 
     [Fact]

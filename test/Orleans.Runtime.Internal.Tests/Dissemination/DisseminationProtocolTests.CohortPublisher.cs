@@ -165,13 +165,7 @@ public partial class DisseminationProtocolTests
         await harness.StartAsync();
         harness.Dissemination.AutomaticReceipt = null;
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var publish = harness.Publisher.RunOrQueueTask(
-            async token =>
-            {
-                await harness.Publisher.PublishStatistics(token);
-                return true;
-            },
-            caller.Token);
+        var publish = harness.PublishAsync(caller.Token);
         var publication = await harness.Dissemination.NextPublicationAsync();
         caller.Cancel();
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -197,23 +191,11 @@ public partial class DisseminationProtocolTests
             directStarted.TrySetResult(token);
             await cancellationObserved.Task;
         };
-        var owning = harness.Publisher.RunOrQueueTask(
-            async token =>
-            {
-                await harness.Publisher.PublishStatistics(token);
-                return true;
-            },
-            caller.Token);
+        var owning = harness.PublishAsync(caller.Token);
         try
         {
             var nativeToken = await directStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-            var joining = harness.Publisher.RunOrQueueTask(
-                async token =>
-                {
-                    await harness.Publisher.PublishStatistics(token);
-                    return true;
-                },
-                TestContext.Current.CancellationToken);
+            var joining = harness.PublishAsync(TestContext.Current.CancellationToken);
             await harness.OwnerBarrierAsync();
             var nativeSample = harness.Publisher.LocalRuntimeStatistics;
             Assert.False(owning.IsCompleted);
@@ -245,13 +227,7 @@ public partial class DisseminationProtocolTests
         harness.Dissemination.AutomaticReceipt = null;
         harness.Dissemination.PreserveNativeCompletion = true;
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var owning = harness.Publisher.RunOrQueueTask(
-            async token =>
-            {
-                await harness.Publisher.PublishStatistics(token);
-                return true;
-            },
-            caller.Token);
+        var owning = harness.PublishAsync(caller.Token);
         var publication = await harness.Dissemination.NextPublicationAsync();
         caller.Cancel();
         publication.Receipt.SetResult(new(true, harness.Period));
@@ -303,13 +279,7 @@ public partial class DisseminationProtocolTests
         var tick = await harness.StartTickAsync();
         var publication = await harness.Dissemination.NextPublicationAsync();
         using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var overlapping = harness.Publisher.RunOrQueueTask(
-            async token =>
-            {
-                await harness.Publisher.PublishStatistics(token);
-                return true;
-            },
-            caller.Token);
+        var overlapping = harness.PublishAsync(caller.Token);
         await harness.OwnerBarrierAsync();
         caller.Cancel();
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -357,13 +327,7 @@ public partial class DisseminationProtocolTests
         var firstVersion = harness.Publisher.LocalRuntimeStatistics.DateTime.Ticks;
         await harness.Lifecycle.OnStop(TestContext.Current.CancellationToken);
 
-        await harness.Publisher.RunOrQueueTask(
-            async token =>
-            {
-                await harness.Publisher.PublishStatistics(token);
-                return true;
-            },
-            TestContext.Current.CancellationToken);
+        await harness.PublishAsync(TestContext.Current.CancellationToken);
         harness.Clock.Advance(harness.Period * 3);
 
         Assert.True(harness.Publisher.LocalRuntimeStatistics.DateTime.Ticks > firstVersion);
@@ -373,23 +337,6 @@ public partial class DisseminationProtocolTests
         Assert.Same(timer, typeof(DeploymentLoadPublisher).GetField(
             "_publishTimer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(harness.Publisher));
         Assert.Empty(harness.Timers.AllTicks);
-        Assert.Empty(harness.DirectUpdates);
-    }
-
-    [Fact]
-    public async Task CohortPublisherCompatibilityWrapperPublishesOneReceipt()
-    {
-        await using var harness = new CohortPublisherHarness();
-        await harness.StartAsync();
-        var result = await harness.Publisher.RunOrQueueTask(
-            token => harness.Publisher.TryPublishStatisticsViaDissemination(
-                harness.Publisher.LocalRuntimeStatistics, token),
-            TestContext.Current.CancellationToken);
-
-        Assert.True(result);
-        Assert.Equal(
-            harness.Publisher.LocalRuntimeStatistics.DateTime.Ticks,
-            Assert.Single(harness.Dissemination.Publications).Version);
         Assert.Empty(harness.DirectUpdates);
     }
 
@@ -507,6 +454,14 @@ public partial class DisseminationProtocolTests
         }
 
         public Task OwnerBarrierAsync() => Publisher.QueueTask(static () => Task.CompletedTask);
+
+        public Task PublishAsync(CancellationToken cancellationToken) => Publisher.RunOrQueueTask(
+            async token =>
+            {
+                await Publisher.PublishStatistics(token);
+                return true;
+            },
+            cancellationToken);
 
         public async ValueTask DisposeAsync()
         {

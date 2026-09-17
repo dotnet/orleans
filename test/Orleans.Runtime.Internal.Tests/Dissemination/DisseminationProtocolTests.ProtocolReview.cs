@@ -30,7 +30,7 @@ public partial class DisseminationProtocolTests
         ns.Inner.SetValue("healthy", 2);
         ns.Options.MaxPayloadBytes = 8;
         ns.RepairHandler = request => request.Key == new DisseminationKey("oversize")
-            ? DisseminationRepairResult.Produced(1, [new(request.Key, 0, 1, new byte[9])])
+            ? DisseminationRepairResult.Produced(new(request.Key, 0, 1, new byte[9]))
             : ns.Inner.CreateRepair(request);
         var logger = new Phase6ProtocolLogger();
         var protocol = CreatePhase6Protocol(new FakeTransport(local, peer), ns, logger);
@@ -77,7 +77,7 @@ public partial class DisseminationProtocolTests
         ns.Inner.SetValue("healthy", 2);
         ns.Options.MaxPayloadBytes = 8;
         ns.RepairHandler = request => request.Key == new DisseminationKey("oversize")
-            ? DisseminationRepairResult.Produced(1, [new(request.Key, 0, 1, new byte[9])])
+            ? DisseminationRepairResult.Produced(new(request.Key, 0, 1, new byte[9]))
             : ns.Inner.CreateRepair(request);
         var logger = new Phase6ProtocolLogger();
         var protocol = CreatePhase6Protocol(new FakeTransport(local, peer), ns, logger);
@@ -474,7 +474,7 @@ public partial class DisseminationProtocolTests
             Sender = peer,
             Values = new()
             {
-                [first.Name] = [first.Inner.CreateItem(peer, "chain", 1), first.Inner.CreateItem(peer, "chain", 2, 1)],
+                [first.Name] = [first.Inner.CreateItem(peer, "chain", 1), first.Inner.CreateItem(peer, "chain", 2)],
                 [second.Name] = [second.Inner.CreateItem(peer, "later", 3)],
             },
         };
@@ -505,7 +505,7 @@ public partial class DisseminationProtocolTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ProtocolReviewReceiveCursorPassesRejectedHeadAndPreservesChain(bool antiEntropy)
+    public async Task ProtocolReviewReceiveCursorPassesRejectedHeadAndAppliesFullUpdates(bool antiEntropy)
     {
         var local = CreateSilo(39551);
         var peer = CreateSilo(39552);
@@ -515,7 +515,7 @@ public partial class DisseminationProtocolTests
         var values = CreateValueGroups(
             CreateDisseminationValue(peer, new DisseminationValue("bad", 0, 1, new byte[9])),
             ns.Inner.CreateItem(peer, "chain", 1),
-            ns.Inner.CreateItem(peer, "chain", 2, 1));
+            ns.Inner.CreateItem(peer, "chain", 2));
         var transport = new FakeTransport(local, peer);
         transport.ExchangeAntiEntropyHandler = (_, _, _) => ValueTask.FromResult(
             new DisseminationAntiEntropyResponse { Sender = peer, Values = values });
@@ -552,7 +552,7 @@ public partial class DisseminationProtocolTests
 
             Assert.Equal(0, ns.GetVersion("bad"));
             Assert.Equal(new long[] { 1, 2 }, ns.Attempts.Select(static value => value.ToVersion));
-            Assert.Equal(new long[] { 0, 1 }, ns.Attempts.Select(static value => value.FromVersion));
+            Assert.Equal(new long[] { 0, 0 }, ns.Attempts.Select(static value => value.FromVersion));
         }
         finally
         {
@@ -564,7 +564,7 @@ public partial class DisseminationProtocolTests
     [InlineData(2, 1024)]
     [InlineData(10, 16)]
     [InlineData(2, 16)]
-    public async Task ProtocolReviewAntiEntropyCapsEachResponseBeforeGrouping(int maxItems, int maxBytes)
+    public async Task ProtocolReviewAntiEntropyCapsEachResponseBeforeApplication(int maxItems, int maxBytes)
     {
         var local = CreateSilo(39561);
         var badPeer = CreateSilo(39562);
@@ -582,7 +582,7 @@ public partial class DisseminationProtocolTests
                 Sender = peer,
                 Values = new()
                 {
-                    [ns.Name] = [first, ns.Inner.CreateItem(peer, "chain", 2, 1)],
+                    [ns.Name] = [first, ns.Inner.CreateItem(peer, "chain", 2)],
                     [other.Name] = [other.Inner.CreateItem(peer, "omitted", 3)],
                 },
             });
@@ -598,9 +598,9 @@ public partial class DisseminationProtocolTests
             await protocol.RunAntiEntropyRound(TestContext.Current.CancellationToken);
             Assert.Equal(2, transport.AntiEntropyRequests.Count);
             Assert.Equal(2, ns.GetVersion("chain"));
-            Assert.Equal(new long[] { 1, 1, 2 }, ns.Attempts.Select(static value => value.ToVersion));
+            Assert.Equal(new long[] { 1, 2, 2 }, ns.Attempts.Select(static value => value.ToVersion));
             Assert.Equal(24, ns.Attempts.Sum(static value => value.Payload.Length));
-            Assert.Equal(2, ns.Inner.ApplyCounts["chain"]);
+            Assert.Equal(1, ns.Inner.ApplyCounts["chain"]);
             Assert.Empty(other.Attempts);
             Assert.Equal(0, other.GetVersion("omitted"));
 
@@ -755,29 +755,33 @@ public partial class DisseminationProtocolTests
         var local = CreateSilo(39601);
         var peer = CreateSilo(39602);
         var ns = new FakeNamespace(local);
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromHours(1);
         ns.SetValue("pending", 1);
         var transport = new FakeTransport(local, peer);
         var protocol = CreateProtocol(transport, ns, timeProvider: new FakeTimeProvider());
         try
         {
-            Assert.True(await protocol.Publish(ns, "pending", 1, TestContext.Current.CancellationToken));
-            var repairRequests = ns.RepairRequestCount;
-            var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            var publication = BeforeBroadcastPumpsRun(() =>
             {
-                _ = protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+                var pending = protocol.Publish(ns, "pending", 1, TestContext.Current.CancellationToken);
+                var repairRequests = ns.RepairRequestCount;
+                var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
                 {
-                    Sender = peer,
-                    SupportedNamespaces = [ns.Name],
-                    Digests = CreateAntiEntropyRequestDigest(ns.Name, ("pending", 1)),
-                    MaxResponseItems = maxResponseItems,
-                    MaxResponseBytes = maxResponseBytes,
-                }, TestContext.Current.CancellationToken);
+                    _ = protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+                    {
+                        Sender = peer,
+                        SupportedNamespaces = [ns.Name],
+                        Digests = CreateAntiEntropyRequestDigest(ns.Name, ("pending", 1)),
+                        MaxResponseItems = maxResponseItems,
+                        MaxResponseBytes = maxResponseBytes,
+                    }, TestContext.Current.CancellationToken);
+                });
+                Assert.Equal(parameterName, exception.ParamName);
+                Assert.Equal(maxResponseItems ?? maxResponseBytes, Assert.IsType<int>(exception.ActualValue));
+                Assert.Equal(repairRequests, ns.RepairRequestCount);
+                Assert.Equal(peer, Assert.Single(protocol.GetUnconfirmedPeers(ns)));
+                return pending;
             });
-            Assert.Equal(parameterName, exception.ParamName);
-            Assert.Equal(maxResponseItems ?? maxResponseBytes, Assert.IsType<int>(exception.ActualValue));
-            Assert.Equal(repairRequests, ns.RepairRequestCount);
-            Assert.Equal(peer, Assert.Single(protocol.GetUnconfirmedPeers(ns)));
+            Assert.True(await publication);
 
             await protocol.FlushPendingBroadcast(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -846,17 +850,14 @@ public partial class DisseminationProtocolTests
             Assert.Equal(keys.Take(count), GetAntiEntropyResponseValues(response).Select(static item => item.Value.Key));
             Assert.Equal(count * sizeof(long), GetAntiEntropyResponseValues(response).Sum(static item => item.Value.Payload.Length));
             Assert.True(response.Truncated);
-            Assert.Equal(count + 2, requests.Count);
-            for (var index = 0; index <= count; index++)
+            var probes = count + (count < maxItems ? 1 : 0);
+            Assert.Equal(probes, requests.Count);
+            for (var index = 0; index < probes; index++)
             {
                 Assert.Equal(keys[index], requests[index].Key);
-                Assert.Equal(maxItems - index, requests[index].MaxItemCount);
-                Assert.Equal(maxBytes - index * sizeof(long), requests[index].MaxBatchBytes);
+                Assert.Equal(maxBytes, requests[index].MaxBatchBytes);
+                Assert.Equal(ns.Options.MaxPayloadBytes, requests[index].MaxPayloadBytes);
             }
-
-            Assert.Equal(keys[count], requests[^1].Key);
-            Assert.Equal(maxItems, requests[^1].MaxItemCount);
-            Assert.Equal(maxBytes, requests[^1].MaxBatchBytes);
         }
         finally
         {
@@ -867,16 +868,17 @@ public partial class DisseminationProtocolTests
     [Theory]
     [InlineData(1)]
     [InlineData(10)]
-    public async Task ProtocolReviewLargerBroadcastSenderContinuesFromAcknowledgedPrefix(int senderLimit)
+    public async Task LargerBroadcastSenderRetriesOnlyUnacknowledgedKeys(int senderLimit)
     {
         var sourceAddress = CreateSilo(39581);
         var receiverAddress = CreateSilo(39582);
         var clock = new FakeTimeProvider();
-        var source = new FakeNamespace(sourceAddress) { ReturnRepairChain = true };
-        source.Options.MaxCoalescingDelay = TimeSpan.FromHours(1);
-        source.PublishValue(source.CreateValue("chain", 1));
-        source.PublishValue(source.CreateValue("chain", 2, 1));
-        source.PublishValue(source.CreateValue("chain", 3, 2));
+        var source = new FakeNamespace(sourceAddress);
+        DisseminationKey[] keys = ["first", "second", "third"];
+        for (var index = 0; index < keys.Length; index++)
+        {
+            source.SetValue(keys[index], index + 1);
+        }
         var receiver = new ProtocolReviewNamespace(receiverAddress);
         var receivingProtocol = CreateProtocol(new FakeTransport(receiverAddress, sourceAddress), [receiver], options =>
         {
@@ -893,34 +895,54 @@ public partial class DisseminationProtocolTests
             var acknowledgment = await receivingProtocol.ReceiveBroadcast(batch, token);
             compactResponses.Add(acknowledgment.AllVersionsAcknowledged);
             acknowledgments.Add(acknowledgment.AllVersionsAcknowledged
-                ? receiver.GetVersion("chain")
+                ? GetBroadcastValues(batch).Max(static item => item.Value.ToVersion)
                 : Assert.Single(acknowledgment.Acknowledgments[source.Name]).Version);
             return acknowledgment;
         };
-        var sendingProtocol = CreateProtocol(transport, source, options =>
+        var sendingQueue = CreateBroadcastQueue(transport, [source], options =>
         {
             options.MaxBatchItems = senderLimit;
             options.MaxBatchBytes = 1024;
         }, clock);
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = senderLimit > 1 ? WaitForRetry() : null;
         try
         {
-            Assert.True(await sendingProtocol.Publish(source, "chain", 3, TestContext.Current.CancellationToken));
-            await sendingProtocol.FlushPendingBroadcast(TestContext.Current.CancellationToken)
+            Assert.True(sendingQueue.NotifyBatch(receiverAddress, source,
+                [.. keys.Select((key, index) => new DisseminationBroadcastQueue.KeyNotification(key, index + 1, true))]));
+            for (var round = 0; round < 2 && retry is not null; round++)
+            {
+                var scheduled = await retry;
+                Assert.Equal(TimeSpan.FromMilliseconds(100), scheduled.DueTime);
+                Assert.Equal(1, scheduled.Attempt);
+                Assert.Equal(Enumerable.Range(1, round + 1).Select(static version => (long)version), acknowledgments);
+                retry = round == 0 ? WaitForRetry() : null;
+                clock.Advance(scheduled.DueTime);
+            }
+
+            await sendingQueue.FlushPendingBroadcast(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(new long[] { 1, 2, 3 }, acknowledgments);
             int[] expectedCounts = senderLimit == 1 ? [1, 1, 1] : [3, 2, 1];
             bool[] expectedCompact = senderLimit == 1 ? [true, true, true] : [false, false, true];
             Assert.Equal(expectedCounts, sentItemCounts);
             Assert.Equal(expectedCompact, compactResponses);
-            Assert.Equal(new long[] { 0, 1, 2 }, receiver.Attempts.Select(static value => value.FromVersion));
+            Assert.Equal(new long[] { 0, 0, 0 }, receiver.Attempts.Select(static value => value.FromVersion));
             Assert.Equal(new long[] { 1, 2, 3 }, receiver.Attempts.Select(static value => value.ToVersion));
-            Assert.Equal(3, receiver.GetVersion("chain"));
+            Assert.Equal(keys, receiver.Attempts.Select(static value => value.Key));
+            Assert.Equal(new long[] { 1, 2, 3 }, keys.Select(receiver.GetVersion));
         }
         finally
         {
-            await sendingProtocol.StopAsync(TestContext.Current.CancellationToken);
+            source.Options.Enabled = false;
+            await sendingQueue.StopAsync(TestContext.Current.CancellationToken);
             await receivingProtocol.StopAsync(TestContext.Current.CancellationToken);
         }
+
+        Task<DisseminationBroadcastScheduledEvent> WaitForRetry() => schedules.WaitAsync(
+            scheduled => scheduled.LocalSilo.Equals(sourceAddress) && scheduled.Peer.Equals(receiverAddress)
+                && scheduled.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     private sealed class ProtocolReviewNamespace(SiloAddress local, DisseminationNamespace? name = null) : IDisseminationNamespace

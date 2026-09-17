@@ -82,7 +82,7 @@ public partial class DisseminationProtocolTests
                 RoutingMode = DisseminationRoutingMode.AggregationTree,
                 MembershipScope = DisseminationMembershipScope.ActiveMembers,
             };
-            ns.Options.MaxCoalescingDelay = TimeSpan.FromHours(1);
+            ns.AggregationPeriod = TimeSpan.FromHours(1);
             var transport = new FakeTransport(member, members.Where(peer => !peer.Equals(member)).ToArray());
             var protocol = CreateProtocol(transport, ns, options =>
             {
@@ -168,7 +168,7 @@ public partial class DisseminationProtocolTests
                 MembershipScope = DisseminationMembershipScope.ActiveMembers,
                 ApplyObserved = new(TaskCreationOptions.RunContinuationsAsynchronously),
             };
-            ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
+            ns.AggregationPeriod = TimeSpan.FromMilliseconds(500);
             var transport = new FakeTransport(member, members.Where(peer => !peer.Equals(member)).ToArray());
             var protocol = CreateProtocol(transport, ns, options =>
             {
@@ -226,6 +226,43 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task MembershipBroadcastsDrainAheadOfAggregatedValues()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(40821);
+        var peer = CreateSilo(40822);
+        var transport = new FakeTransport(local, peer);
+        var membership = new FakeNamespace(local, "membership");
+        var load = new FakeNamespace(local, "load", DisseminationMembershipScope.ActiveMembers)
+        {
+            RoutingMode = DisseminationRoutingMode.AggregationTree,
+        };
+        membership.SetValue("value", 1);
+        load.SetValue("value", 2);
+        var queue = CreateBroadcastQueue(transport, [load, membership], options => options.MaxBatchItems = 1);
+        try
+        {
+            var accepted = BeforeBroadcastPumpsRun(() => (
+                Load: queue.Notify(peer, load, "value"),
+                Membership: queue.Notify(peer, membership, "value")));
+            Assert.True(accepted.Load);
+            Assert.True(accepted.Membership);
+            await queue.FlushPendingBroadcast(cancellationToken);
+
+            Assert.Equal(
+                new[] { (membership.Name, 1L), (load.Name, 2L) },
+                transport.BroadcastBatches.Select(batch => (
+                    Assert.Single(batch.Batch.Values.Keys),
+                    Assert.Single(GetBroadcastValues(batch.Batch)).Value.ToVersion)));
+            Assert.All(transport.BroadcastBatches, batch => Assert.Equal(peer, batch.Peer));
+        }
+        finally
+        {
+            await queue.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task AggregationDistributionRequiresBroadcastAcknowledgmentBeforeSuppressingKnownValue()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -235,14 +272,19 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
+        ns.AggregationPeriod = TimeSpan.FromMilliseconds(500);
         var transport = new FakeTransport(members[0], members[1]);
         var queue = CreateBroadcastQueue(transport, [ns], timeProvider: new FakeTimeProvider());
         try
         {
             ns.SetValue("value", 1);
-            Assert.True(queue.Notify(members[1], ns, "value", force: false));
-            queue.ObservePeerVersion(members[1], ns.Name, "value", 1);
+            Assert.True(BeforeBroadcastPumpsRun(() =>
+            {
+                var accepted = queue.Notify(members[1], ns, "value", force: false);
+                queue.ObservePeerVersion(members[1], ns.Name, "value", 1);
+                Assert.Empty(transport.BroadcastBatches);
+                return accepted;
+            }));
             await queue.FlushPendingBroadcast(cancellationToken);
 
             var batch = Assert.Single(transport.BroadcastBatches).Batch;
@@ -272,7 +314,7 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
+        ns.AggregationPeriod = TimeSpan.FromMilliseconds(500);
         var transport = new FakeTransport(local, members.Where(peer => !peer.Equals(local)).ToArray());
         var forwarded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         transport.SendBroadcastResponseHandler = (peer, batch, _) =>
@@ -317,7 +359,7 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
+        ns.AggregationPeriod = TimeSpan.FromMilliseconds(500);
         var transport = new FakeTransport(local, members.Where(peer => !peer.Equals(local)).ToArray());
         var forwarded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var count = 0;
@@ -374,7 +416,7 @@ public partial class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task QueueCoalescingWindowBatchesStaggeredKeysAndPreservesNextWindow()
+    public async Task QueueBatchesAcceptedUpdatesAcrossInFlightSend()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var local = CreateSilo(40801);
@@ -385,7 +427,6 @@ public partial class DisseminationProtocolTests
             RoutingMode = DisseminationRoutingMode.AggregationTree,
             MembershipScope = DisseminationMembershipScope.ActiveMembers,
         };
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(500);
         var transport = new FakeTransport(local, peer);
         var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -416,31 +457,27 @@ public partial class DisseminationProtocolTests
             for (var key = 0; key < 100; key++)
             {
                 ns.SetValue($"key-{key}", 1);
-                Assert.True(queue.Notify(peer, ns, $"key-{key}"));
-                clock.Advance(TimeSpan.FromMilliseconds(1));
             }
-            clock.Advance(TimeSpan.FromMilliseconds(399));
-            Assert.Empty(transport.BroadcastBatches);
-            clock.Advance(TimeSpan.FromMilliseconds(1));
+            Assert.True(queue.NotifyBatch(peer, ns,
+                [.. Enumerable.Range(0, 100).Select(key => new DisseminationBroadcastQueue.KeyNotification($"key-{key}", 1, true))]));
             await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             var firstFlush = queue.FlushPendingBroadcast(cancellationToken);
             Assert.Equal(100, GetBroadcastValues(Assert.Single(transport.BroadcastBatches).Batch).Count());
-            Assert.Equal(TimeSpan.FromMilliseconds(500), clock.GetElapsedTime(start, timestamps[0]));
+            Assert.Equal(TimeSpan.Zero, clock.GetElapsedTime(start, timestamps[0]));
+            Assert.All(GetBroadcastValues(transport.BroadcastBatches[0].Batch), value => Assert.Equal(1, value.Value.ToVersion));
 
             for (var key = 0; key < 100; key++)
             {
                 ns.SetValue($"key-{key}", 2);
-                Assert.True(queue.Notify(peer, ns, $"key-{key}"));
-                clock.Advance(TimeSpan.FromMilliseconds(1));
             }
+            Assert.True(queue.NotifyBatch(peer, ns,
+                [.. Enumerable.Range(0, 100).Select(key => new DisseminationBroadcastQueue.KeyNotification($"key-{key}", 2, true))]));
+            Assert.Single(transport.BroadcastBatches);
             releaseFirst.SetResult();
             await firstFlush.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
-            clock.Advance(TimeSpan.FromMilliseconds(399));
-            Assert.Single(transport.BroadcastBatches);
-            clock.Advance(TimeSpan.FromMilliseconds(1));
             await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
 
-            Assert.Equal(TimeSpan.FromMilliseconds(1000), clock.GetElapsedTime(start, timestamps[1]));
+            Assert.Equal(TimeSpan.Zero, clock.GetElapsedTime(start, timestamps[1]));
             Assert.Equal(2, transport.BroadcastBatches.Count);
             Assert.Equal(100, GetBroadcastValues(transport.BroadcastBatches[1].Batch).Count());
             Assert.All(GetBroadcastValues(transport.BroadcastBatches[1].Batch), value => Assert.Equal(2, value.Value.ToVersion));

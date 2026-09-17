@@ -160,16 +160,6 @@ public sealed class DisseminationNamespaceOptions
     public bool Enabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the dissemination priority for this namespace.
-    /// </summary>
-    /// <remarks>
-    /// <see cref="DisseminationPriority.High"/> namespaces bypass the coalescing window and are placed ahead of
-    /// lower-priority namespaces within each per-peer batch, so their updates are disseminated as quickly as
-    /// possible. <see cref="MaxCoalescingDelay"/> is not applied to high-priority namespaces.
-    /// </remarks>
-    public DisseminationPriority Priority { get; set; } = DisseminationPriority.Normal;
-
-    /// <summary>
     /// Gets or sets the hard maximum number of distinct pending keys retained for this namespace by each peer.
     /// </summary>
     /// <remarks>
@@ -179,19 +169,6 @@ public sealed class DisseminationNamespaceOptions
     /// only when they are sent, so this bounds retained identities rather than serialized batch bytes.
     /// </remarks>
     public int MaxPendingItemCount { get; set; } = 1024;
-
-    /// <summary>
-    /// Gets or sets the maximum delay for namespace coalescing.
-    /// </summary>
-    /// <remarks>
-    /// Per-peer batches can contain values from multiple namespaces and use the shortest configured delay among
-    /// enabled namespaces. High-priority namespaces (see <see cref="Priority"/>) do not coalesce and are excluded
-    /// from this calculation.
-    /// Deployment-load aggregation uses its publisher's refresh interval as the cohort deadline.
-    /// Producer ingress and distribution relays send immediately. Batch limits can split a cohort into multiple wire messages.
-    /// </remarks>
-    /// <value>The delay is 100 milliseconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
-    public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Gets or sets the local transport and application budgets for a namespace value.
@@ -219,22 +196,4 @@ public sealed class DisseminationNamespaceOptions
     /// Gets or sets the maximum serialized payload size for this namespace.
     /// </summary>
     public int MaxPayloadBytes { get; set; } = 1024 * 1024;
-}
-
-/// <summary>
-/// Describes how urgently a dissemination namespace's updates are broadcast relative to other namespaces.
-/// </summary>
-public enum DisseminationPriority
-{
-    /// <summary>
-    /// Updates are coalesced within the namespace's <see cref="DisseminationNamespaceOptions.MaxCoalescingDelay"/>
-    /// and are sent after any higher-priority namespaces.
-    /// </summary>
-    Normal,
-
-    /// <summary>
-    /// Updates bypass the coalescing window, are sent immediately, and are placed ahead of normal-priority
-    /// namespaces within each per-peer batch.
-    /// </summary>
-    High,
 }

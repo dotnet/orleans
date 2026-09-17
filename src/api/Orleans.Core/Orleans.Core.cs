@@ -540,13 +540,9 @@ namespace Orleans.Configuration
 
         public System.TimeSpan ExpectedUpdateCadence { get { throw null; } set { } }
 
-        public System.TimeSpan MaxCoalescingDelay { get { throw null; } set { } }
-
         public int MaxPayloadBytes { get { throw null; } set { } }
 
         public int MaxPendingItemCount { get { throw null; } set { } }
-
-        public DisseminationPriority Priority { get { throw null; } set { } }
 
         public System.TimeSpan StaleItemTtl { get { throw null; } set { } }
     }
@@ -583,12 +579,6 @@ namespace Orleans.Configuration
         public int MinFanOutFactor { get { throw null; } set { } }
 
         public int TargetHopCount { get { throw null; } set { } }
-    }
-
-    public enum DisseminationPriority
-    {
-        Normal = 0,
-        High = 1
     }
 
     public partial class GatewayOptions

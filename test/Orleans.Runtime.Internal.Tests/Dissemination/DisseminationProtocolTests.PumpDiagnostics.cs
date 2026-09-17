@@ -45,7 +45,6 @@ public partial class DisseminationProtocolTests
         var logger = new PumpDiagnosticsLogger();
         var ns = new FakeNamespace(local);
         ns.Options.MaxPendingItemCount = 1;
-        ns.Options.MaxCoalescingDelay = TimeSpan.FromSeconds(1);
         ns.SetValue("original", 7);
         ns.SetValue("next", 9);
         var transport = new FakeTransport(local, peer);
@@ -154,11 +153,10 @@ public partial class DisseminationProtocolTests
                     && value.Reason == DisseminationBroadcastScheduleReason.Immediate,
                 TimeSpan.FromSeconds(5), cancellationToken);
             Assert.True(queue.Notify(peer, ns, "original"));
-            await WaitForPhase(initialSchedule, "initial timer armed");
+            await WaitForPhase(initialSchedule, "initial immediate send scheduled");
             var initial = await initialSchedule;
             Assert.Equal(TimeSpan.Zero, initial.DueTime);
             Assert.Equal(0, initial.Attempt);
-            clock.Advance(initial.DueTime);
             await WaitForPhase(started[0].Task, "original send in flight");
             Assert.False(queue.Notify(peer, ns, "next"));
 
@@ -219,7 +217,7 @@ public partial class DisseminationProtocolTests
                 await WaitForPhase(retrySchedule!, "recovered retry timer armed");
                 var retry = await retrySchedule!;
                 Assert.Equal(failedTimerChanges + 1, retry.Attempt);
-                Assert.Equal(TimeSpan.FromSeconds(failedTimerChanges + 1), retry.DueTime);
+                Assert.Equal(TimeSpan.FromMilliseconds(100 * (failedTimerChanges + 1)), retry.DueTime);
                 Assert.Equal(initial.Epoch, retry.Epoch);
                 Assert.Equal(1, Volatile.Read(ref sendCount));
 
@@ -242,9 +240,9 @@ public partial class DisseminationProtocolTests
                 Assert.True(queue.Notify(peer, ns, "next"));
                 await WaitForPhase(nextSchedule, "freed capacity schedules the next key");
                 var next = await nextSchedule;
+                Assert.Equal(TimeSpan.Zero, next.DueTime);
                 Assert.Equal(0, next.Attempt);
                 Assert.Equal(retry.Epoch + 1, next.Epoch);
-                clock.Advance(next.DueTime);
                 await WaitForPhase(started[2].Task, "next key admitted to transport");
                 var nextFlush = queue.FlushPendingBroadcast(cancellationToken);
                 Assert.False(nextFlush.IsCompleted);

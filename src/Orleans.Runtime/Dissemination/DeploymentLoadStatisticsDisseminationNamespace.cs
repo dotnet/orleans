@@ -85,26 +85,16 @@ internal sealed class DeploymentLoadStatisticsDisseminationNamespace(
         }
 
         var version = statistics.DateTime.Ticks;
-        if (request.ToVersion is { } targetVersion && targetVersion != version)
-        {
-            return DisseminationRepairResult.Unavailable(version);
-        }
-
         if (request.FromVersion is { } peerVersion && peerVersion >= version)
         {
             return DisseminationRepairResult.Current(version);
-        }
-
-        if (request.MaxItemCount <= 0)
-        {
-            return DisseminationRepairResult.InsufficientCapacity(version);
         }
 
         // Every repair is a full value from zero, making the peer's exact baseline irrelevant.
         var value = CreateValue(siloAddress, statistics);
         return value.Payload.Length <= request.MaxPayloadBytes
             && value.Payload.Length <= request.MaxBatchBytes
-                ? DisseminationRepairResult.Produced(version, [value])
+                ? DisseminationRepairResult.Produced(value)
                 : DisseminationRepairResult.InsufficientCapacity(version);
     }
 
