@@ -125,9 +125,6 @@ namespace Orleans.Hosting
                 {
                     configureOptions?.Invoke(services.AddOptions<DevelopmentClusterMembershipOptions>());
                     services.ConfigureFormatter<DevelopmentClusterMembershipOptions>();
-                    services.AddOptions<ClusterMembershipOptions>()
-                        .Configure<SystemTargetBasedMembershipTable, IMembershipTable>(
-                            (options, developmentProvider, selectedProvider) => developmentProvider.ConfigureMembershipOptions(options, selectedProvider));
                     services
                         .AddSingleton<SystemTargetBasedMembershipTable>()
                         .AddFromExisting<IMembershipTable, SystemTargetBasedMembershipTable>();

@@ -94,18 +94,6 @@ namespace Orleans.Configuration
         public bool UseLivenessGossip { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets whether gossip can supply membership snapshots directly.
-        /// Otherwise, gossip requests a fresh observation from the membership table.
-        /// </summary>
-        internal bool UseGossipSnapshots { get; set; } = true;
-
-        /// <summary>
-        /// Gets or sets the deadline for a single terminating-status update and its subsequent gossip notification.
-        /// A null value uses the normal membership-update retry policy.
-        /// </summary>
-        internal TimeSpan? TerminatingStatusUpdateTimeout { get; set; }
-
-        /// <summary>
         /// Gets or sets the number of silos each silo probes for liveness.
         /// </summary>
         /// <remarks>

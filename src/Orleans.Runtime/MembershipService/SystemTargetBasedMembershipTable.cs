@@ -15,22 +15,19 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly IServiceProvider serviceProvider;
         private readonly ILogger logger;
-        private MembershipTableManager? membershipTableManager;
+        private readonly IFatalErrorHandler fatalErrorHandler;
+        private IMembershipManager? membershipManager;
+        private int fatalErrorReported;
         private IMembershipTableSystemTarget grain = null!;
 
-        public SystemTargetBasedMembershipTable(IServiceProvider serviceProvider, ILogger<SystemTargetBasedMembershipTable> logger)
+        public SystemTargetBasedMembershipTable(
+            IServiceProvider serviceProvider,
+            ILogger<SystemTargetBasedMembershipTable> logger,
+            IFatalErrorHandler fatalErrorHandler)
         {
             this.serviceProvider = serviceProvider;
             this.logger = logger;
-        }
-
-        internal void ConfigureMembershipOptions(ClusterMembershipOptions options, IMembershipTable selectedProvider)
-        {
-            if (ReferenceEquals(this, selectedProvider))
-            {
-                options.UseGossipSnapshots = false;
-                options.TerminatingStatusUpdateTimeout = TimeSpan.FromMilliseconds(500);
-            }
+            this.fatalErrorHandler = fatalErrorHandler;
         }
 
         [Obsolete("Use InitializeMembershipTableAsync instead.")]
@@ -114,7 +111,15 @@ namespace Orleans.Runtime.MembershipService
         [Obsolete("Use ReadRowAsync instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default) => this.grain.ReadRowAsync(key, cancellationToken);
+        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var observedVersion = GetCurrentVersion();
+            var table = await this.grain.ReadRowAsync(key, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateVersion(observedVersion, table);
+            return table;
+        }
 
         [Obsolete("Use ReadAllAsync instead.")]
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
@@ -122,21 +127,35 @@ namespace Orleans.Runtime.MembershipService
         public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Resolve the owner after construction, since its constructor receives this provider.
-            var manager = this.membershipTableManager ??= this.serviceProvider.GetRequiredService<MembershipTableManager>();
-            // Capture before issuing the read: an older read completing after a newer one is not a reset.
-            var observedVersion = manager.MembershipTableSnapshot.Version;
+            var observedVersion = GetCurrentVersion();
             var table = await this.grain.ReadAllAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            ValidateVersion(observedVersion, table);
+            return table;
+        }
+
+        private MembershipVersion GetCurrentVersion()
+        {
+            // Resolve after owner construction, and include versions learned through committed writes and gossip.
+            var manager = this.membershipManager ??= this.serviceProvider.GetRequiredService<IMembershipManager>();
+            return manager.CurrentSnapshot.Version;
+        }
+
+        private void ValidateVersion(MembershipVersion observedVersion, MembershipTableData table)
+        {
+            // Compare with the version known before this read began so overlapping reads can finish out of order.
             if (table.Version.Version < observedVersion.Value)
             {
                 var reason = $"The development membership table version decreased from {observedVersion} to {table.Version.Version}. "
-                    + "Its previous incarnation is no longer authoritative. Restart this silo against the recreated table.";
-                manager.KillMyselfLocally(reason);
-                throw new OrleansException(reason);
-            }
+                    + "The cluster's membership state has been lost and this silo must terminate.";
+                var exception = new OrleansException(reason);
+                if (Interlocked.Exchange(ref this.fatalErrorReported, 1) == 0)
+                {
+                    this.fatalErrorHandler.OnFatalException(this, reason, exception);
+                }
 
-            return table;
+                throw exception;
+            }
         }
 
         [Obsolete("Use InsertRowAsync instead.")]

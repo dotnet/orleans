@@ -175,8 +175,7 @@ namespace Orleans.Hosting
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
 
-            services.TryAddSingleton<MembershipTableManager>();
-            services.TryAddFromExisting<IMembershipManager, MembershipTableManager>();
+            services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IMembershipManager>();
             services.AddSingleton<MembershipSystemTarget>();

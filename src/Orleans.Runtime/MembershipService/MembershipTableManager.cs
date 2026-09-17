@@ -177,21 +177,6 @@ namespace Orleans.Runtime.MembershipService
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!this.clusterMembershipOptions.UseGossipSnapshots)
-            {
-                try
-                {
-                    await this.Refresh(cancellationToken: cancellationToken, requireFresh: true);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    throw;
-                }
-
-                return;
-            }
-
             // Check if a refresh is underway
             var pending = this.pendingRefresh;
             if (pending != null && !pending.IsCompleted)
@@ -411,9 +396,11 @@ namespace Orleans.Runtime.MembershipService
                     return await TryUpdateMyStatusGlobalOnce(status, token);  // function to retry
                 }
 
-                if (status.IsTerminating() && this.clusterMembershipOptions.TerminatingStatusUpdateTimeout is { } updateTimeout)
+                if (status.IsTerminating() && this.membershipTableProvider is SystemTargetBasedMembershipTable)
                 {
-                    using var timeout = new CancellationTokenSource(updateTimeout, this.timeProvider);
+                    // SystemTarget-based membership may not be accessible at this stage, so allow for one quick attempt to update
+                    // the status before continuing regardless of the outcome.
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500), this.timeProvider);
                     using var updateCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
                     try
                     {
@@ -421,14 +408,14 @@ namespace Orleans.Runtime.MembershipService
                     }
                     catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                     {
-                        LogWarningFailedToUpdateMyStatusDueToFailures(this.log, new TimeoutException($"The terminal status update exceeded its {updateTimeout} deadline."), myAddress, status, numCalls);
+                        LogWarningFailedToUpdateMyStatusDueToFailures(this.log, new TimeoutException("The terminal status update exceeded its 500 millisecond deadline."), myAddress, status, numCalls);
                     }
                     catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                     {
                         LogWarningFailedToUpdateMyStatusDueToFailures(this.log, exception, myAddress, status, numCalls);
                     }
 
-                    await this.GossipToOthers(this.myAddress, status, updateTimeout, cancellationToken);
+                    await this.GossipToOthers(this.myAddress, status, TimeSpan.FromMilliseconds(500), cancellationToken);
 
                     return;
                 }
@@ -710,7 +697,7 @@ namespace Orleans.Runtime.MembershipService
             return true;
         }
 
-        internal void KillMyselfLocally(string reason)
+        private void KillMyselfLocally(string reason)
         {
             if (this.IsStopping || Interlocked.Exchange(ref _fatalTerminationTriggered, 1) != 0)
             {

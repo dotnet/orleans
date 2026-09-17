@@ -1,14 +1,12 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;
@@ -129,43 +127,6 @@ namespace NonSilo.Tests
                 .Build();
 
             var clusterClient = host.Services.GetRequiredService<IClusterClient>();
-        }
-
-        [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public void DevelopmentClusteringConfiguresSelectedProviderPolicyAndSharesOwner(bool developmentProvider)
-        {
-            using var host = new HostBuilder()
-                .UseOrleans(silo =>
-                {
-                    silo.UseLocalhostClustering();
-                    if (!developmentProvider)
-                    {
-                        silo.Services.AddSingleton<IMembershipTable, NoOpMembershipTable>();
-                    }
-                })
-                .UseDefaultServiceProvider(options =>
-                {
-                    options.ValidateScopes = true;
-                    options.ValidateOnBuild = true;
-                })
-                .Build();
-
-            var services = host.Services;
-            var options = services.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
-            Assert.Equal(!developmentProvider, options.UseGossipSnapshots);
-            Assert.Equal(developmentProvider ? TimeSpan.FromMilliseconds(500) : (TimeSpan?)null, options.TerminatingStatusUpdateTimeout);
-            if (developmentProvider)
-            {
-                Assert.Same(services.GetRequiredService<SystemTargetBasedMembershipTable>(), services.GetRequiredService<IMembershipTable>());
-            }
-            else
-            {
-                Assert.IsType<NoOpMembershipTable>(services.GetRequiredService<IMembershipTable>());
-            }
-
-            Assert.Same(services.GetRequiredService<MembershipTableManager>(), services.GetRequiredService<IMembershipManager>());
         }
 
         /// <summary>
