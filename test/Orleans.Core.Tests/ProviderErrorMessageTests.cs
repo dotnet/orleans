@@ -1,15 +1,19 @@
 #nullable enable
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans;
 using Orleans.Hosting;
+using Orleans.Providers;
 using Xunit;
+
+[assembly: RegisterProvider("TestGrainJournaling", "GrainJournaling", "Silo", typeof(NonSilo.Tests.ProviderErrorMessageTests.TestGrainJournalingProviderBuilder))]
 
 namespace NonSilo.Tests
 {
     /// <summary>
-    /// Tests for provider error messages to ensure they include helpful information about known/registered providers.
-    /// These tests verify that when a provider is not found, the error message includes a list of available providers
-    /// for the specified kind (e.g., Clustering, GrainStorage, etc.) to help users diagnose configuration issues.
+    /// Tests configuration-based provider activation and diagnostics which identify available providers
+    /// for the specified kind (e.g., Clustering, GrainStorage, etc.).
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("Providers")]
@@ -129,6 +133,35 @@ namespace NonSilo.Tests
             {
                 { "Orleans:ClusterId", "test-cluster" },
                 { "Orleans:ServiceId", "test-service" },
+                { "Orleans:GrainJournaling:ProviderType", "TestGrainJournaling" },
+                { "Orleans:GrainJournaling:ServiceKey", "journal-client" }
+            };
+
+            using var host = new HostBuilder()
+                .ConfigureAppConfiguration(configBuilder =>
+                {
+                    configBuilder.AddInMemoryCollection(configDict);
+                })
+                .UseOrleans(siloBuilder =>
+                {
+                    siloBuilder.UseLocalhostClustering();
+                })
+                .Build();
+
+            var invocation = Assert.Single(host.Services.GetServices<GrainJournalingProviderInvocation>());
+            Assert.Null(invocation.Name);
+            Assert.Equal("Orleans:GrainJournaling", invocation.ConfigurationSection.Path);
+            Assert.Equal("TestGrainJournaling", invocation.ConfigurationSection["ProviderType"]);
+            Assert.Equal("journal-client", invocation.ConfigurationSection["ServiceKey"]);
+        }
+
+        [Fact]
+        public void SiloBuilder_IncludesKnownGrainJournalingProvidersInErrorMessage()
+        {
+            var configDict = new Dictionary<string, string?>
+            {
+                { "Orleans:ClusterId", "test-cluster" },
+                { "Orleans:ServiceId", "test-service" },
                 { "Orleans:GrainJournaling:ProviderType", "InvalidJournalingProvider" }
             };
 
@@ -148,6 +181,18 @@ namespace NonSilo.Tests
 
             Assert.Contains("Could not find GrainJournaling provider named 'InvalidJournalingProvider'", exception.Message);
             Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
+            Assert.Contains("Known GrainJournaling providers:", exception.Message);
+            Assert.Contains("TestGrainJournaling", exception.Message);
         }
+
+        internal sealed class TestGrainJournalingProviderBuilder : IProviderBuilder<ISiloBuilder>
+        {
+            public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
+            {
+                builder.Services.AddSingleton(new GrainJournalingProviderInvocation(name, configurationSection));
+            }
+        }
+
+        private sealed record GrainJournalingProviderInvocation(string? Name, IConfigurationSection ConfigurationSection);
     }
 }
