@@ -83,6 +83,9 @@ inbox completion, and `(SenderId, MessageId)` deduplication are captured togethe
 other queued writes wait for that operation. Handlers complete fallible work using
 local values before staging safe application effects. Expected preparation failures
 produce bounded retry or dead-letter accounting in the admitted operation.
+An accepted message whose handler is absent on a later activation completes immediately
+into dead-letter storage. Its processed marker suppresses duplicates through the
+configured deduplication window.
 
 Acceptance and ownership repair retain local proposals until scheduling is acknowledged
 and a healthy journal operation admits them. Its finalizer applies the complete envelope
