@@ -85,10 +85,6 @@ jobs:
     name: Build documentation projects and samples
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      # Work around #11235 (dotnet/roslyn#85656). Remove when global.json's SDK carries
-      # .NET runtime 10.0.13 or later (dotnet/runtime#132631).
-      DOTNET_TieredPGO: '0'
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -113,14 +109,19 @@ jobs:
 
       - name: Build samples against local Orleans packages
         shell: pwsh
-        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets
+        # Keep sample compiler processes isolated through .NET runtime 10.0.12. After the
+        # SDK carries 10.0.13+, validate shared compilation in repeated runs before removal.
+        # See #11235, dotnet/roslyn#85656, and dotnet/runtime#132631.
+        run: ./samples/Build-Samples.ps1 -Configuration Release -NoIncremental -SkipExternalAssets -DisableSharedCompilation
 
       - name: Upload build diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: documentation-project-binlog
-          path: docs-projects.binlog
+          name: documentation-build-binlogs
+          path: |
+            docs-projects.binlog
+            Artifacts/Samples/Release/samples.binlog
           if-no-files-found: ignore
           retention-days: 3
 

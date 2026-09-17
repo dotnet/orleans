@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch] $NoBuild
+    [switch] $NoBuild,
+    [switch] $DisableSharedCompilation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -172,7 +173,7 @@ foreach ($projectPath in $projectFiles) {
 Write-Host "Validated $($entries.Count) gallery entries and $($projectFiles.Count) projects."
 
 if (-not $NoBuild) {
-    & (Join-Path $samplesRoot 'Build-Samples.ps1') -Configuration Release -NoIncremental
+    & (Join-Path $samplesRoot 'Build-Samples.ps1') -Configuration Release -NoIncremental -DisableSharedCompilation:$DisableSharedCompilation
     if ($LASTEXITCODE -ne 0) {
         throw "Sample build failed with exit code $LASTEXITCODE."
     }
