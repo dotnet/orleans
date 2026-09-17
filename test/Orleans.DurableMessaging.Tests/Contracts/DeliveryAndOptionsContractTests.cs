@@ -193,6 +193,8 @@ public sealed class DeliveryAndOptionsContractTests
         var coordinatorType = assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpCoordinator", throwOnError: true)!;
         var extension = (IDisposable)RuntimeHelpers.GetUninitializedObject(extensionType);
         var coordinator = Activator.CreateInstance(coordinatorType)!;
+        var results = Activator.CreateInstance(assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpResults", throwOnError: true)!, nonPublic: true)!;
+        extensionType.GetField("_pumpResults", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, results);
         using var shutdown = new CancellationTokenSource();
         var token = shutdown.Token;
         var cancellationCount = 0;

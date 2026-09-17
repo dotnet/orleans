@@ -187,6 +187,92 @@ public sealed class DurableMessagingPumpResultsTests
         Assert.Same(DurableJobRunResult.Completed, result);
     }
 
+    [Fact]
+    public void DiscardWaitingExecution_ReleasesRegistrationAndCapacity()
+    {
+        var results = new PumpResults(new FakeTimeProvider(), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), 1);
+        var key = results.CreateKey("inbox", "id", "run");
+        using var cancellation = new CancellationTokenSource();
+        Assert.True(results.TryStartWithCancellation(key, out var execution, cancellation.Token));
+        var entry = results.GetEntry(key);
+        Assert.True(results.HasCancellationRegistration(key));
+
+        results.Discard(execution);
+
+        Assert.Equal(0, results.Count);
+        Assert.Equal(default, PumpResults.GetRegistration(entry));
+        Assert.False(results.TryBegin(execution));
+        cancellation.Cancel();
+        Assert.False(results.TryTake(key, out _, out _));
+        Assert.True(results.TryStart(results.CreateKey("inbox", "other", "run"), out var next));
+        Assert.True(results.TryBegin(next));
+    }
+
+    [Fact]
+    public void DiscardOldExecution_PreservesNewGenerationWithSameKey()
+    {
+        var results = new PumpResults();
+        var key = results.CreateKey("inbox", "id", "run");
+        Assert.True(results.TryStart(key, out var previous));
+        results.Discard(previous);
+        using var cancellation = new CancellationTokenSource();
+        Assert.True(results.TryStartWithCancellation(key, out var current, cancellation.Token));
+
+        results.Discard(previous);
+
+        Assert.Equal(1, results.Count);
+        Assert.True(results.HasCancellationRegistration(key));
+        Assert.True(results.TryBegin(current));
+    }
+
+    [Fact]
+    public void DiscardRunningExecution_PreservesInFlightResult()
+    {
+        var results = new PumpResults();
+        var key = results.CreateKey("inbox", "id", "run");
+        Assert.True(results.TryStart(key, out var execution));
+        Assert.True(results.TryBegin(execution));
+
+        results.Discard(execution);
+
+        Assert.Equal(1, results.Count);
+        Assert.False(results.TryStart(key, out _));
+        results.Complete(execution);
+        Assert.True(results.TryTake(key, out var result, out var exception));
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Null(exception);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClearJob_ReleasesOnlyThatFeaturesEntriesAndFencesLateCompletion(bool running)
+    {
+        var results = new PumpResults();
+        var inbox = results.CreateKey("inbox", "id", "run");
+        var outbox = results.CreateKey("outbox", "id", "run");
+        using var cancellation = new CancellationTokenSource();
+        Assert.True(results.TryStartWithCancellation(inbox, out var oldInbox, cancellation.Token));
+        var removed = results.GetEntry(inbox);
+        if (running)
+        {
+            Assert.True(results.TryBegin(oldInbox));
+        }
+        Assert.True(results.TryStartWithCancellation(outbox, out var liveOutbox, cancellation.Token));
+
+        results.Clear("inbox");
+
+        Assert.Equal(1, results.Count);
+        Assert.Equal(default, PumpResults.GetRegistration(removed));
+        Assert.True(results.HasCancellationRegistration(outbox));
+        Assert.False(results.TryBegin(oldInbox));
+        Assert.True(results.TryStart(inbox, out var newInbox));
+        results.Complete(oldInbox);
+        Assert.False(results.TryTake(inbox, out _, out _));
+        Assert.True(results.TryBegin(newInbox));
+        Assert.True(results.TryBegin(liveOutbox));
+    }
+
     private sealed class PumpResults
     {
         private static readonly Assembly Assembly = typeof(IDurableOutbox).Assembly;
@@ -212,6 +298,16 @@ public sealed class DurableMessagingPumpResultsTests
         public int Count => ((IDictionary)ResultsType
             .GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(_instance)!).Count;
+
+        public object GetEntry(object key) => ((IDictionary)ResultsType
+            .GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(_instance)!)[key]!;
+
+        public static CancellationTokenRegistration GetRegistration(object entry) =>
+            (CancellationTokenRegistration)entry.GetType().GetProperty("CancellationRegistration")!.GetValue(entry)!;
+
+        public void Discard(object execution) => ResultsType.GetMethod("Discard")!.Invoke(_instance, [execution]);
+        public void Clear(string jobName) => ResultsType.GetMethod("Clear")!.Invoke(_instance, [jobName]);
 
         public bool HasCancellationRegistration(object key)
         {

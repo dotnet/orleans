@@ -68,6 +68,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly int _maxRetainedDeadLetters;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly CancellationToken _shutdownToken;
     private Task _activeDelivery = Task.CompletedTask;
     private int _disposed;
     private int _metricsActive;
@@ -149,6 +150,7 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(jobTimeProvider);
         ArgumentNullException.ThrowIfNull(options);
+        _shutdownToken = _shutdownCts.Token;
         _grainContext = grainContext;
         _timerRegistry = timerRegistry;
         _stateManager = stateManager;
@@ -686,6 +688,7 @@ internal sealed partial class DurableInboxExtension :
     {
         _failure ??= ExceptionDispatchInfo.Capture(exception);
         _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
         try
         {
             _shutdownCts.Cancel();
@@ -718,6 +721,7 @@ internal sealed partial class DurableInboxExtension :
     public void OnDeleteCompleted()
     {
         _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
         _stateGeneration++;
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _reservedSequence = _jobSequence.Value;
@@ -771,6 +775,7 @@ internal sealed partial class DurableInboxExtension :
     {
         _shutdownCts.Cancel();
         _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
         if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
         {
             _instruments.OnInboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
@@ -836,6 +841,8 @@ internal sealed partial class DurableInboxExtension :
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         _failure?.Throw();
+        _shutdownToken.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_recoveryCompleted)
         {
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
@@ -851,6 +858,11 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
 
+        var key = new DurableMessagingPumpExecutionKey(
+            JobName,
+            context.Job.Id,
+            context.RunId,
+            Volatile.Read(ref _stateGeneration));
         if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
         {
             var disposition = DurableMessagingJobOwnership.ResolveMismatch(
@@ -862,12 +874,12 @@ internal sealed partial class DurableInboxExtension :
             {
                 LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
                 _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
-                return DurableJobRunResult.Completed;
+                return CompleteObsoleteExecution(key);
             }
 
             if (disposition == OwnershipMismatchDisposition.CompleteStale)
             {
-                return DurableJobRunResult.Completed;
+                return CompleteObsoleteExecution(key);
             }
 
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
@@ -883,11 +895,6 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.Completed;
         }
 
-        var key = new DurableMessagingPumpExecutionKey(
-            JobName,
-            context.Job.Id,
-            context.RunId,
-            Volatile.Read(ref _stateGeneration));
         if (_pumpResults.TryTake(key, out var result, out var exception))
         {
             if (exception is not null)
@@ -937,6 +944,13 @@ internal sealed partial class DurableInboxExtension :
         return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
     }
 
+    private DurableJobRunResult CompleteObsoleteExecution(DurableMessagingPumpExecutionKey key)
+    {
+        // Committed ownership establishes retirement; this run's retained result will no longer be polled.
+        _pumpResults.TryTake(key, out _, out _);
+        return DurableJobRunResult.Completed;
+    }
+
     private async Task RunPumpTimerAsync(
         DurableMessagingPumpExecution execution,
         DurableMessagingPumpLease lease,
@@ -944,7 +958,13 @@ internal sealed partial class DurableInboxExtension :
         CancellationToken jobCancellation,
         CancellationToken timerCancellation)
     {
-        if (!_pumpCoordinator.IsCurrent(lease) || !_pumpResults.TryBegin(execution))
+        if (!_pumpCoordinator.IsCurrent(lease))
+        {
+            _pumpResults.Discard(execution);
+            return;
+        }
+
+        if (!_pumpResults.TryBegin(execution))
         {
             return;
         }
