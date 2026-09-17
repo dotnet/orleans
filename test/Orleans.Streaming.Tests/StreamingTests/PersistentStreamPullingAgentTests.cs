@@ -2775,8 +2775,8 @@ namespace UnitTests.StreamingTests
 
             await scenario.Read(batches);
 
-            Assert.True(scenario.Idle.IsCaughtUp);
-            Assert.True(scenario.Busy.IsCaughtUp);
+            Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
+            Assert.Equal(200, scenario.Busy.LastSafePartitionToken?.SequenceNumber);
             Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
             Assert.Equal(200, scenario.Busy.LastProcessedToken?.SequenceNumber);
             if (filtered)
@@ -2793,7 +2793,6 @@ namespace UnitTests.StreamingTests
         [InlineData("pending-batch", 200L)]
         [InlineData("handshake", null)]
         [InlineData("disposed", 200L)]
-        [InlineData("not-drained", 200L)]
         [InlineData("unknown-stream-read", 200L)]
         [InlineData("unregistered-producer", null)]
         [InlineData("unregistered-consumer", null)]
@@ -2817,9 +2816,6 @@ namespace UnitTests.StreamingTests
                     break;
                 case "disposed":
                     scenario.Idle.SafeDisposeCursor(NullLogger.Instance);
-                    break;
-                case "not-drained":
-                    scenario.Idle.IsCaughtUp = false;
                     break;
                 case "unknown-stream-read":
                     streams[scenario.Idle.StreamId].LastReadToken = null;
@@ -3624,7 +3620,7 @@ namespace UnitTests.StreamingTests
                     else
                     {
                         Assert.Equal(100, scenario.Idle.LastProcessedToken?.SequenceNumber);
-                        Assert.True(scenario.Idle.IsCaughtUp);
+                        Assert.Null(scenario.Idle.PendingBatch);
                         Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
                         timeProvider.Advance(inactivityPeriod + TimeSpan.FromTicks(1));
                         busyStream.RefreshActivity(timeProvider.GetUtcNow().UtcDateTime);
@@ -3673,7 +3669,7 @@ namespace UnitTests.StreamingTests
 
             Assert.Equal(3, scenario.Idle.LastProcessedToken?.SequenceNumber);
             Assert.Equal(200, scenario.Busy.LastProcessedToken?.SequenceNumber);
-            Assert.True(scenario.Idle.IsCaughtUp);
+            Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             await scenario.AssertCheckpoint(200);
         }
 
@@ -3750,7 +3746,7 @@ namespace UnitTests.StreamingTests
             await scenario.Accessor.RunConsumerCursor(scenario.Idle);
 
             Assert.Equal(3, scenario.Idle.LastProcessedToken?.SequenceNumber);
-            Assert.True(scenario.Idle.IsCaughtUp);
+            Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             await scenario.AssertCheckpoint(200);
         }
 
@@ -3798,7 +3794,7 @@ namespace UnitTests.StreamingTests
             try
             {
                 await errorStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                Assert.False(scenario.Idle.IsCaughtUp);
+                Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
                 Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
                 Assert.Same(failedCursor.Failure, Assert.Single(consumer.Errors));
                 Assert.Empty(replayed);
@@ -3810,7 +3806,7 @@ namespace UnitTests.StreamingTests
                 if (!filtered)
                 {
                     await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-                    Assert.False(scenario.Idle.IsCaughtUp);
+                    Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
                     Assert.Equal(StreamConsumerDataState.Active, scenario.Idle.State);
                     Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
                 }
@@ -3819,7 +3815,7 @@ namespace UnitTests.StreamingTests
                 await recovery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.Equal(filtered ? [] : new long[] { 3, 4 }, replayed);
                 Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
-                Assert.True(scenario.Idle.IsCaughtUp);
+                Assert.Equal(200, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
                 Assert.Equal(StreamConsumerDataState.Inactive, scenario.Idle.State);
                 Assert.Null(scenario.Idle.PendingBatch);
                 await scenario.AssertCheckpoint(200);
@@ -3856,7 +3852,7 @@ namespace UnitTests.StreamingTests
             await scenario.Read((scenario.Idle, 101), (scenario.Busy, 200));
             Assert.Empty(consumer.DeliveredTokens);
             Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
-            Assert.False(scenario.Idle.IsCaughtUp);
+            Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             await scenario.AssertCheckpoint(2);
         }
 
@@ -3871,7 +3867,7 @@ namespace UnitTests.StreamingTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => scenario.Read((scenario.Idle, 3), (scenario.Busy, 200)));
 
             Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
-            Assert.True(scenario.Idle.IsCaughtUp);
+            Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             var consumer = Assert.IsType<ImmediateRecordingConsumer>(scenario.Idle.StreamConsumer);
             Assert.Empty(consumer.Errors);
             Assert.Equal(new long[] { 1 }, consumer.DeliveredTokens.Select(token => token.SequenceNumber));
@@ -3916,7 +3912,7 @@ namespace UnitTests.StreamingTests
             Assert.Empty(acknowledged);
             Assert.Equal(2, consumer.Errors.Count);
             Assert.IsType<InvalidOperationException>(consumer.Errors[1]);
-            Assert.False(scenario.Idle.IsCaughtUp);
+            Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
             await scenario.AssertCheckpoint(2);
         }

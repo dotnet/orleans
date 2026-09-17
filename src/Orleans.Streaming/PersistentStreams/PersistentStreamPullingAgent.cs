@@ -424,7 +424,6 @@ namespace Orleans.Streams
                 StreamingEvents.EmitSubscriptionAdded(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
             }
 
-            data.IsCaughtUp = false;
             data.PendingHandshakes++;
             var handshakeRequestId = ++data.HandshakeRequestId;
             data.HasUnresolvedHandshake = true;
@@ -1516,7 +1515,6 @@ namespace Orleans.Streams
                     }
                     catch (Exception exception) when (consumerData.Cursor is IQueueCacheCursorProgress)
                     {
-                        consumerData.IsCaughtUp = false;
                         LogErrorRunConsumerCursor(exception);
                     }
                     if (consumerData.State == StreamConsumerDataState.Inactive)
@@ -1549,7 +1547,6 @@ namespace Orleans.Streams
                     consumerData.Cursor is null) return;
 
                 consumerData.State = StreamConsumerDataState.Active;
-                consumerData.IsCaughtUp = false;
                 var deliveredAny = false;
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
@@ -1585,12 +1582,7 @@ namespace Orleans.Streams
 
                         if (!nextBatch.HasProgress)
                         {
-                            if (nextBatch.CursorResult.Kind == QueueCacheCursorMoveResultKind.NoData)
-                            {
-                                consumerData.IsCaughtUp = consumerData.LastSafePartitionToken is not null
-                                    || consumerData.LastProcessedToken is not null;
-                            }
-                            else
+                            if (nextBatch.CursorResult.Kind != QueueCacheCursorMoveResultKind.NoData)
                             {
                                 throw new QueueCacheCursorContractException("A cursor returned an item without a progress token.");
                             }
