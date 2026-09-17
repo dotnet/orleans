@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 09/16/2026
+ms.date: 09/17/2026
 ms.topic: conceptual
 ---
 
@@ -112,8 +112,9 @@ queued write running through capture and acknowledgement. Feature completion tra
 both the triggering write and its admitted descriptor acknowledgement. A delivery
 caller can also cancel its wait while the owned delivery operation retains admission
 through completion. Activation shutdown drains that operation; late failures are
-observed and logged even after the caller has left. Deletion waits for completed
-delivery operations, released gates and idle pump leases. Durable attempts and timer
+observed and logged even after the caller has left. The owner keeps delivery operations,
+gates and pump leases quiescent through the full deletion task and resumes delivery
+after awaiting successful deletion. Durable attempts and timer
 turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
 durable attempt token across timer turns.
 
@@ -151,10 +152,33 @@ with <xref:Orleans.Hosting.DurableMessagingExtensions.AddDurableMessaging*> on t
 silo builder or service collection. The optional configuration callback supplies
 <xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions>. Registration
 preserves an application-supplied <xref:System.TimeProvider> and validates messaging
-options through the options contract. Grains which use Durable Messaging derive from
-<xref:Orleans.Journaling.DurableGrain>; its activation lifecycle initializes the
-journaled state manager and materializes the inbox and outbox participants before
-message recovery begins. Durable Messaging selects the built-in `orleans-binary`
+options through the options contract.
+
+For development, configure in-memory storage and enable messaging:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_registration" language="csharp":::
+
+Grains select messaging by implementing <xref:Orleans.DurableMessaging.IDurableMessagingGrain>
+on a concrete class, an application base class, or an application grain interface.
+Grains deriving from <xref:Orleans.Journaling.DurableGrain> receive the same setup
+automatically. The capability enables ordinary grains to use their application's
+inheritance model with scoped inbox and outbox services.
+
+The following grain selects messaging through its application interface and stages a
+validated notification count for the inbox's completion write:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
+
+Orleans caches messaging selection with each concrete grain type. After construction
+and grain-instance assignment, shared activation setup validates the execution model,
+resolves the activation's scoped endpoints, and registers one composite journal observer.
+Journal recovery then restores application and messaging state before activation completes.
+The standard <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> factory enrolls
+the manager in the grain lifecycle before returning it. Application-supplied grain-scoped
+factories own that enrollment, while explicit-<xref:Orleans.Journaling.JournalId> standalone
+managers have caller-owned initialization and disposal.
+
+Durable Messaging selects the built-in `orleans-binary`
 journal format so opaque envelope bodies and request-context slices recover exactly.
 Durable Messaging grains use non-reentrant execution. Activation validates the grain's
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,

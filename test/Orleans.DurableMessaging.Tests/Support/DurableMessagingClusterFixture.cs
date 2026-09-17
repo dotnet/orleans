@@ -22,7 +22,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     {
     }
 
-    protected DurableMessagingClusterFixture(int initialSilos, bool receiverOnly = false)
+    protected DurableMessagingClusterFixture(int initialSilos, bool receiverOnly = false, bool useServiceCollection = false)
     {
         Clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         Storage = new ControlledJournalStorageProvider();
@@ -57,6 +57,10 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             if (receiverOnly)
             {
                 ReceiverTestServices.Add(siloBuilder.Services, ConfigureOptions);
+            }
+            else if (useServiceCollection)
+            {
+                siloBuilder.Services.AddDurableMessaging(ConfigureOptions);
             }
             else
             {

@@ -3,9 +3,9 @@
 `Microsoft.Orleans.DurableMessaging` provides grain-scoped durable inboxes and
 outboxes built on Orleans Journaling and Durable Jobs. Configure their storage for
 the deployment, then call `AddDurableMessaging` on the silo builder. The
-`IServiceCollection` overload registers the same messaging services. Grains derive
-from `DurableGrain`, inject `IDurableInbox` to register handlers, and inject
-`IDurableOutbox` to enqueue envelopes.
+`IServiceCollection` overload registers the same messaging services. Grains implement
+`IDurableMessagingGrain` or derive from `DurableGrain`, inject `IDurableInbox` to
+register handlers, and inject `IDurableOutbox` to enqueue envelopes.
 
 `AddDurableMessaging` selects the built-in `orleans-binary` journal format from the
 default JSON format and preserves an explicit binary configuration. Another

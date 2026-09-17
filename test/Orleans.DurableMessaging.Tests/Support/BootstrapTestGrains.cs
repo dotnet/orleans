@@ -258,11 +258,16 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
 {
     public const string StatelessPlacementAlias = "bootstrap-worker-alias";
     public const string OrdinaryPlacementAlias = "bootstrap-directory-alias";
+
+    public BootstrapClusterFixture(bool useServiceCollection = false)
+        : base(1, receiverOnly: false, useServiceCollection: useServiceCollection)
+    {
+    }
+
     public BootstrapProbe Probe { get; } = new();
     public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
-        BootstrapOutboxServices.Add(services);
         services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
