@@ -144,6 +144,7 @@ namespace NonSilo.Tests.Membership
             var retained = Assert.Single(updated.Entries).Value;
             Assert.Equal(local.SiloAddress, retained.SiloAddress);
             Assert.Equal(SiloStatus.Dead, retained.Status);
+            Assert.NotNull(retained.SuspectTimes);
             var vote = Assert.Single(retained.SuspectTimes);
             Assert.Equal(suspector, vote.Item1);
             Assert.Equal(DateTime.UnixEpoch, vote.Item2);
