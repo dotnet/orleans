@@ -203,30 +203,16 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
-    public void ForwardedResponseBeforeUpdateCompletesWhenUpdateArrives()
+    public void ForwardedResponseBeforeUpdateCompletesImmediately()
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
         Assert.True(tracker.Track(request));
         var response = CreateResponse(request, Message.ResponseTypes.Success);
         response.SendingSilo = Silo2;
+        response.ForwardCount = 1;
 
-        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response));
-        Assert.Equal(1, tracker.Count);
-
-        Assert.Equal(
-            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
-            tracker.TryUpdateDestination(
-                request.Id,
-                Silo1,
-                Silo2,
-                forwardCount: 1,
-                request.GatewayRequestAttempt,
-                out var updatedTarget,
-                out var completedResponse));
-
-        Assert.Equal(Silo2, updatedTarget);
-        Assert.Same(response, completedResponse);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
         Assert.Equal(0, tracker.Count);
     }
 
@@ -392,6 +378,56 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Null(tracker.RemoveForSilo(Silo2));
         var updated = Assert.Single(tracker.RemoveForSilo(silo3)!);
         Assert.Equal(2, updated.ForwardCount);
+    }
+
+    [Fact]
+    public void DeferredResponseMatchesForwardingGeneration()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                request.GatewayRequestAttempt,
+                out _,
+                out var firstCompletion));
+        Assert.Null(firstCompletion);
+
+        var staleFirstHopResponse = CreateResponse(request, Message.ResponseTypes.Success);
+        staleFirstHopResponse.ForwardCount = 0;
+        staleFirstHopResponse.SendingSilo = Silo1;
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Deferred,
+            tracker.TryComplete(staleFirstHopResponse));
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo2,
+                Silo1,
+                forwardCount: 2,
+                request.GatewayRequestAttempt,
+                out var updatedTarget,
+                out var secondCompletion));
+
+        Assert.Equal(Silo1, updatedTarget);
+        Assert.Null(secondCompletion);
+        Assert.Equal(1, tracker.Count);
+
+        var currentResponse = CreateResponse(request, Message.ResponseTypes.Success);
+        currentResponse.SendingSilo = Silo1;
+        currentResponse.ForwardCount = 2;
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(currentResponse));
+        Assert.Equal(0, tracker.Count);
     }
 
     [Fact]
