@@ -2,7 +2,6 @@ using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -1224,7 +1223,6 @@ public sealed class DurableOutboxDeliveryBatchTests
                     Substitute.For<IDurableJobHandlerRegistry>(),
                     pumpResults,
                     jobTimeProvider ?? TimeProvider.System,
-                    _services.GetRequiredService<SerializerSessionPool>(),
                     Options.Create(
                         new DurableInboxOptions
                         {
@@ -1445,23 +1443,12 @@ public sealed class DurableOutboxDeliveryBatchTests
         private IDictionary GetPendingMessageIds() =>
             (IDictionary)_pendingMessageIdsField.GetValue(_outbox)!;
 
-        private static DurableEnvelopeData CreateEnvelopeData()
-        {
-            var result = (DurableEnvelopeData)RuntimeHelpers.GetUninitializedObject(typeof(DurableEnvelopeData));
-            typeof(DurableEnvelopeData)
-                .GetMethod("Initialize", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(
-                    result,
-                    [
-                        new byte[] { 1, 2 },
-                        (Offset: 0, Length: 1),
-                        new Dictionary<string, (int Offset, int Length)>
-                        {
-                            ["trace"] = (1, 1)
-                        }
-                    ]);
-            return result;
-        }
+        private DurableEnvelopeData CreateEnvelopeData() => new DurableEnvelopeBuilder(
+            _services.GetRequiredService<SerializerSessionPool>(), SenderId)
+            .To(ReceiverId, "test")
+            .WithBody(1)
+            .WithContextValue("trace", 2)
+            .Build().Data;
 
         private static UntypedDurableDictionary CreateInternalDictionary(string valueTypeName)
         {
