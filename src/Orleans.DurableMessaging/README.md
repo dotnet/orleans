@@ -46,6 +46,12 @@ throw during selection. Journal observers reject explicit write/delete requests
 inside selection and handling, preserving the runtime's completion commit.
 A route miss preserves the grain's staged state for its next journal write.
 
+Processed-record maintenance starts at the earliest tracked expiry and amortizes
+subsequent maintenance cycles to at most once per quarter of the deduplication window.
+It joins admitted writes while the inbox remains busy; durable pump maintenance and
+fresh activation also remove due records. A maintenance-only write requires expired
+records. Delivery still evaluates each duplicate against the exact retention boundary.
+
 Exact route registration retains the original handler instance and takes precedence
 over generic handler selection. Operational diagnostics expose retained dead letters
 and stage their removal for the next journal write.
