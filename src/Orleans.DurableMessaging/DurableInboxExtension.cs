@@ -31,6 +31,9 @@ internal sealed partial class DurableInboxExtension :
 {
     internal const string JobName = "orleans.messaging.inbox-drain";
 
+    // Nested handler requests and independent interleaved calls have different logical execution contexts.
+    private static readonly AsyncLocal<HandlerExecution?> _handlerExecution = new();
+
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
     private readonly IGrainContext _grainContext;
@@ -67,10 +70,8 @@ internal sealed partial class DurableInboxExtension :
     private readonly CancellationTokenSource _shutdownCts = new();
     private Task _activeDelivery = Task.CompletedTask;
     private int _disposed;
-    private int _handlerWriteRejected;
     private int _metricsActive;
     private int _reportedDepth;
-    private int _handlerExecutionDepth;
     private string? _committingOwnershipId;
     private DurableJob? _committingJob;
     private string? _durableOwnershipId;
@@ -185,23 +186,24 @@ internal sealed partial class DurableInboxExtension :
 
     private bool TryFindHandlerWithinMutationBoundary(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
     {
-        _handlerWriteRejected = 0;
-        _handlerExecutionDepth++;
+        var previous = _handlerExecution.Value;
+        var execution = new HandlerExecution(this);
+        _handlerExecution.Value = execution;
         try
         {
             var result = _durableInbox.TryFindHandler(context, out handler);
-            ThrowIfHandlerWriteRejected();
+            ThrowIfHandlerWriteRejected(execution);
             return result;
         }
         finally
         {
-            _handlerExecutionDepth--;
+            _handlerExecution.Value = previous;
         }
     }
 
-    private void ThrowIfHandlerWriteRejected()
+    private static void ThrowIfHandlerWriteRejected(HandlerExecution execution)
     {
-        if (_handlerWriteRejected != 0)
+        if (execution.WriteRejected)
         {
             throw CreateHandlerWriteException();
         }
@@ -441,9 +443,9 @@ internal sealed partial class DurableInboxExtension :
     public void OnWriteRequested()
     {
         _failure?.Throw();
-        if (_handlerExecutionDepth != 0)
+        if (_handlerExecution.Value is { } execution && ReferenceEquals(execution.Owner, this))
         {
-            _handlerWriteRejected = 1;
+            execution.WriteRejected = true;
             throw CreateHandlerWriteException();
         }
     }
@@ -451,7 +453,8 @@ internal sealed partial class DurableInboxExtension :
     public void OnDeleteRequested()
     {
         OnWriteRequested();
-        if (_pendingOwnershipIds.Count != 0 || _pendingWrites.Count != 0 || _admittedWrites.Length != 0)
+        if (!_activeDelivery.IsCompleted || _gate.CurrentCount == 0 || _pumpCoordinator.IsActive
+            || _pendingOwnershipIds.Count != 0 || _pendingWrites.Count != 0 || _admittedWrites.Length != 0)
         {
             throw new InvalidOperationException("Durable inbox operations must be quiescent before deleting journaled state.");
         }
@@ -495,35 +498,34 @@ internal sealed partial class DurableInboxExtension :
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, operation.Cancellation, _shutdownCts.Token);
+        var previous = _handlerExecution.Value;
+        var execution = new HandlerExecution(this);
+        _handlerExecution.Value = execution;
         try
         {
-            if (!TryFindHandlerWithinMutationBoundary(new InboxHandlerSelectionContext(operation.Envelope, _grainContext.GrainId), out var handler))
+            var found = _durableInbox.TryFindHandler(new InboxHandlerSelectionContext(operation.Envelope, _grainContext.GrainId), out var handler);
+            ThrowIfHandlerWriteRejected(execution);
+            if (!found)
             {
                 operation.Error = new InvalidOperationException("No compatible handler is registered.");
                 operation.DeadLetter = true;
                 return;
             }
 
-            _handlerWriteRejected = 0;
-            _handlerExecutionDepth++;
             operation.HandlerInvoked = true;
-            try
-            {
-                await handler.HandleAsync(new InboxHandlerContext(operation.Envelope, _grainContext.GrainId, _outbox, _sessionPool), cancellation.Token).ConfigureAwait(true);
-            }
-            finally
-            {
-                _handlerExecutionDepth--;
-            }
-
-            ThrowIfHandlerWriteRejected();
+            await handler!.HandleAsync(new InboxHandlerContext(operation.Envelope, _grainContext.GrainId, _outbox, _sessionPool), cancellation.Token).ConfigureAwait(true);
+            ThrowIfHandlerWriteRejected(execution);
         }
-        catch (Exception exception) when (!cancellation.IsCancellationRequested && _handlerWriteRejected == 0 && _failure is null)
+        catch (Exception exception) when (!cancellation.IsCancellationRequested && !execution.WriteRejected && _failure is null)
         {
             // Conforming handlers report business failures before staging application effects.
             operation.Error = exception;
             LogHandlerException(_logger, exception, operation.Envelope.MessageId, operation.Envelope.SenderId,
                 operation.Envelope.RouteKey, operation.Envelope.CorrelationKey?.ToString());
+        }
+        finally
+        {
+            _handlerExecution.Value = previous;
         }
 
         ValidateOwner(operation.Owner);
@@ -782,6 +784,12 @@ internal sealed partial class DurableInboxExtension :
             StopProcessing();
             _shutdownCts.Dispose();
         }
+    }
+
+    private sealed class HandlerExecution(DurableInboxExtension owner)
+    {
+        public DurableInboxExtension Owner { get; } = owner;
+        public bool WriteRejected { get; set; }
     }
 
     private readonly record struct PumpOwner(string Id, DurableJob Job, long Generation);

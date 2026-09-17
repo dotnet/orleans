@@ -13,6 +13,17 @@ internal sealed class DurableMessagingPumpCoordinator
     private CancellationToken _activeCancellationToken;
     private long _activeGeneration;
 
+    public bool IsActive
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _activeOwnershipId is not null;
+            }
+        }
+    }
+
     public bool TryAcquire(
         string ownershipId,
         CancellationToken cancellationToken,

@@ -81,7 +81,7 @@ public sealed record DurableDeadLetterSnapshot(
     [property: Id(4)] DateTimeOffset DeadLetteredAt);
 
 [GrainType("durable-messaging-inbox-test")]
-public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IJournaledStateObserver
+public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IJournaledStateObserver, IDurableJobHandler
 {
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
@@ -227,6 +227,25 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     {
         DeactivateOnIdle();
         return Task.CompletedTask;
+    }
+
+    internal TaskScheduler? JobScheduler { get; private set; }
+    internal IGrainContext? JobGrainContext { get; private set; }
+
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
+    {
+        JobScheduler = TaskScheduler.Current;
+        JobGrainContext = ReceiverTestServices.CurrentGrainContext;
+        switch (context.Job.Name)
+        {
+            case "test/delete-journal":
+                await StateManager.DeleteStateAsync(attemptCancellationToken);
+                break;
+            case "test/probe-scheduler":
+                break;
+            default:
+                throw new NotSupportedException($"Unknown test job '{context.Job.Name}'.");
+        }
     }
 
     internal Exception? NextWriteRejection { get; set; }
