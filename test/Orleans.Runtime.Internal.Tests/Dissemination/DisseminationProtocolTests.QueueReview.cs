@@ -141,14 +141,23 @@ public partial class DisseminationProtocolTests
     public async Task RedundantNotificationAndFlushWakesRespectRetryBoundary(bool transportFailure, bool publishNewVersion)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (_, peer, transport, ns) = CreatePeerFixture(41601, 41602);
+        var (local, peer, transport, ns) = CreatePeerFixture(41601, 41602);
         var clock = new FakeTimeProvider();
-        var context = new MembershipReviewContinuationContext();
         var versions = new List<long>();
+        var secondAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var schedules = new BroadcastScheduleObserver();
+        var retry = schedules.WaitAsync(
+            value => value.LocalSilo.Equals(local) && value.Peer.Equals(peer)
+                && value.Reason == DisseminationBroadcastScheduleReason.Retry);
         ns.SetValue("value", 1);
         transport.SendBroadcastResponseHandler = (_, batch, _) =>
         {
             versions.Add(Assert.Single(GetBroadcastValues(batch)).Value.ToVersion);
+            if (versions.Count == 2)
+            {
+                secondAttempt.TrySetResult();
+            }
+
             return versions.Count == 1
                 ? transportFailure
                     ? Task.FromException<DisseminationBroadcastResponse>(new InvalidOperationException("Initial send fails."))
@@ -161,26 +170,21 @@ public partial class DisseminationProtocolTests
         var queue = CreateBroadcastQueue(transport, [ns], timeProvider: clock);
         try
         {
-            Task initialFlush;
-            var previous = SynchronizationContext.Current;
-            SynchronizationContext.SetSynchronizationContext(context);
-            try
+            var initialFlush = BeforeBroadcastPumpsRun(() =>
             {
                 Assert.True(queue.Notify(peer, ns, "value"));
-                initialFlush = queue.FlushPendingBroadcast(cancellationToken);
-                Assert.False(initialFlush.IsCompleted);
-            }
-            finally
-            {
-                SynchronizationContext.SetSynchronizationContext(previous);
-            }
+                var flush = queue.FlushPendingBroadcast(cancellationToken);
+                Assert.False(flush.IsCompleted);
+                return flush;
+            });
 
-            context.RunAll();
             await initialFlush.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            var scheduled = await retry.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            Assert.Equal(TimeSpan.FromMilliseconds(100), scheduled.DueTime);
             Assert.Equal(new long[] { 1 }, versions);
             clock.Advance(TimeSpan.FromMilliseconds(99));
-            context.RunAll();
             Assert.Equal(new long[] { 1 }, versions);
+            Assert.False(secondAttempt.Task.IsCompleted);
             if (publishNewVersion)
             {
                 ns.SetValue("value", 2);
@@ -191,16 +195,14 @@ public partial class DisseminationProtocolTests
                 clock.Advance(TimeSpan.FromMilliseconds(1));
             }
 
-            context.RunAll();
+            await secondAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             Assert.Equal(new long[] { 1, publishNewVersion ? 2 : 1 }, versions);
             Assert.Equal(2, ns.RepairRequestCount);
         }
         finally
         {
             ns.Options.Enabled = false;
-            var stop = queue.StopAsync(cancellationToken);
-            context.RunAll();
-            await stop.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+            await queue.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         }
     }
 
