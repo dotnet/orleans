@@ -21,6 +21,8 @@ public interface IDurableInboxExtension : IGrainExtension
     /// <remarks>
     /// Once delivery owns inbox admission, it retains its gate and ownership reservation until
     /// its operation completes. Caller cancellation leaves that operation running to its durable outcome.
+    /// The grain owner keeps delivery quiescent during journal deletion and resumes delivery
+    /// after the deletion task completes successfully.
     /// </remarks>
     /// <returns>Result indicating delivery/processing status.</returns>
     /// <exception cref="ArgumentException">
