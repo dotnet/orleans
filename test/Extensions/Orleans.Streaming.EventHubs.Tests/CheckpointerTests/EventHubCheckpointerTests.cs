@@ -68,14 +68,7 @@ public class EventHubCheckpointerTests
     {
         public int DisposeCount { get; private set; }
         public int AddCount { get; private set; }
-        public virtual object Cursor { get; } = new();
-        public string? AppliedOffset { get; private set; }
-        public int CapabilityRequests { get; private set; }
-        public virtual bool TryEnableCertifiedDeliveryProgress()
-        {
-            CapabilityRequests++;
-            return false;
-        }
+        public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
         public Exception? CursorException { get; set; }
@@ -118,30 +111,9 @@ public class EventHubCheckpointerTests
         {
         }
 
-        public void UpdateDeliveryProgress(StreamSequenceToken safeToken, DateTime utcNow)
-            => AppliedOffset = ((IEventHubPartitionLocation)safeToken).EventHubOffset;
-
         public void Dispose()
         {
             DisposeCount++;
-        }
-    }
-
-    private sealed class TestCursorProgress : IQueueCacheCursorProgress
-    {
-        public StreamSequenceToken? SafeSequenceToken => null;
-        public void SetDeliveredThrough(StreamSequenceToken token) { }
-        public void RecordDeliverySuccess() { }
-        public void RecordDeliveryFailure() { }
-    }
-
-    private sealed class CertifiedEventHubTestCache : TestEventHubQueueCache
-    {
-        public override object Cursor { get; } = new TestCursorProgress();
-        public override bool TryEnableCertifiedDeliveryProgress()
-        {
-            base.TryEnableCertifiedDeliveryProgress();
-            return true;
         }
     }
 
@@ -171,29 +143,23 @@ public class EventHubCheckpointerTests
     }
 
     [Theory, TestCategory("BVT")]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task CertifiedProgressRequiresBothCacheAndTransportOptIn(bool certifiedCache, bool recoverableTransport)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CustomCacheKeepsLegacyCursorAndCallbackWithEitherTransport(bool recoverableTransport)
     {
-        TestEventHubQueueCache cache = certifiedCache ? new CertifiedEventHubTestCache() : new TestEventHubQueueCache();
+        var cache = new TestEventHubQueueCache();
         IEventHubReceiver transport = recoverableTransport ? new RecoverableEventHubTestReceiver() : new TestEventHubReceiver();
         var checkpointer = new TestCheckpointer();
         var receiver = await CreateReceiver(checkpointer, cache, transport);
-        Assert.Equal(certifiedCache && recoverableTransport, receiver.UsesCertifiedDeliveryProgress);
-        Assert.Equal(recoverableTransport ? 1 : 0, cache.CapabilityRequests);
+        Assert.False(receiver.UsesCertifiedDeliveryProgress);
         var cursor = ((IQueueCache)receiver).TryGetCacheCursor(StreamId.Create("compatibility", "stream"), null).Cursor!;
-        Assert.Equal(certifiedCache && recoverableTransport, cursor is IQueueCacheCursorProgress);
+        Assert.False(cursor is IQueueCacheCursorProgress);
 
         UpdateDeliveryProgress(receiver, MakeToken(50));
         Assert.Equal("50", checkpointer.LastOffset);
-        Assert.Equal(certifiedCache && recoverableTransport ? "50" : null, cache.AppliedOffset);
-        if (!receiver.UsesCertifiedDeliveryProgress)
-        {
-            receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
-            Assert.Equal("50", checkpointer.LastOffset);
-        }
+        receiver.UpdateDeliveryProgress(null, DateTime.UtcNow);
+        Assert.Equal("50", checkpointer.LastOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
@@ -825,18 +791,19 @@ public class EventHubCheckpointerTests
 
     [TestSuite("BVT")]
     [Fact, TestCategory("BVT")]
-    public async Task CachePurge_PreservesCheckpointUntilCertifiedProgress()
+    public async Task CustomCachePurge_PreservesLegacyCallbackCheckpointing()
     {
         var checkpointer = new TestCheckpointer();
         var cache = new TestEventHubQueueCache();
         var receiver = await CreateReceiver(checkpointer, cache);
 
+        Assert.False(receiver.UsesCertifiedDeliveryProgress);
         receiver.TryPurgeFromCache(out _);
 
         Assert.Null(checkpointer.LastOffset);
         UpdateDeliveryProgress(receiver, MakeToken(100));
         Assert.Equal("100", checkpointer.LastOffset);
-        Assert.Null(cache.AppliedOffset);
+        Assert.Equal(1, checkpointer.UpdateCount);
     }
 
     [TestSuite("BVT")]

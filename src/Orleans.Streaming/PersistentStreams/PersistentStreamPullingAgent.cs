@@ -211,39 +211,6 @@ namespace Orleans.Streams
 
             try
             {
-                ValidateCheckpointingProvider(queueCache, receiver);
-            }
-            catch (Exception exception)
-            {
-                LogErrorCheckpointProviderConfiguration(new(QueueId), exception);
-                try
-                {
-                    await receiver.Shutdown(options.InitQueueTimeout, CancellationToken.None);
-                }
-                catch (Exception cleanupException)
-                {
-                    LogWarningCheckpointProviderCleanup(new(QueueId), cleanupException);
-                }
-
-                if (!ReferenceEquals(queueCache, receiver) && queueCache is IDisposable disposable)
-                {
-                    try
-                    {
-                        disposable.Dispose();
-                    }
-                    catch (Exception cleanupException)
-                    {
-                        LogWarningCheckpointProviderCleanup(new(QueueId), cleanupException);
-                    }
-                }
-
-                receiver = null;
-                queueCache = null;
-                throw;
-            }
-
-            try
-            {
                 using var _ = new ExecutionContextSuppressor();
                 receiverInitTask = OrleansTaskExtentions.SafeExecute(InitializeReceiver)
                     .LogException(logger, ErrorCode.PersistentStreamPullingAgent_03, $"QueueAdapterReceiver {QueueId:H} failed to Initialize.");
@@ -279,19 +246,6 @@ namespace Orleans.Streams
                     StreamingEvents.EmitQueueReceiverInitializationFailed(streamProviderName, Silo, QueueId, exception);
                     throw;
                 }
-            }
-        }
-
-        internal static void ValidateCheckpointingProvider(IQueueCache? cache, IQueueAdapterReceiver receiver)
-        {
-            if (cache is ICheckpointingQueueCache { UsesCertifiedDeliveryProgress: true })
-            {
-                if (receiver is not IQueueAdapterReceiverReadRecovery)
-                {
-                    throw new OrleansConfigurationException(
-                        $"Checkpointing receiver {receiver.GetType().FullName} must implement {nameof(IQueueAdapterReceiverReadRecovery)}.");
-                }
-
             }
         }
 
@@ -1015,12 +969,7 @@ namespace Orleans.Streams
 
             if (_readRecoveryRequired)
             {
-                if (rcvr is not IQueueAdapterReceiverReadRecovery recovery)
-                {
-                    throw new NotSupportedException($"{rcvr.GetType().FullName} must reconcile failed reads before checkpoint progress can resume.");
-                }
-
-                await recovery.RecoverReadAsync(cancellationToken);
+                await CheckpointingCache!.RecoverReadAsync(cancellationToken);
                 _readRecoveryRequired = false;
             }
 
@@ -1228,21 +1177,12 @@ namespace Orleans.Streams
         private void NotifyDeliveryProgress()
         {
             if (queueCache is null) return;
-            var checkpointingCache = CheckpointingCache;
-
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-            if (TryGetDeliveryProgress(checkpointingCache is not null, out var earliest))
+            if (TryGetDeliveryProgress(CheckpointingCache is not null, out var earliest))
             {
                 try
                 {
-                    if (checkpointingCache is not null)
-                    {
-                        checkpointingCache.UpdateDeliveryProgress(earliest!, utcNow);
-                    }
-                    else
-                    {
-                        queueCache.UpdateDeliveryProgress(earliest, utcNow);
-                    }
+                    queueCache.UpdateDeliveryProgress(earliest, utcNow);
                 }
                 catch (Exception exception)
                 {
@@ -2128,14 +2068,6 @@ namespace Orleans.Streams
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "Failed to publish delivery progress for queue {QueueId}.")]
         private partial void LogWarningUpdatingDeliveryProgress(QueueIdLogRecord queueId, Exception exception);
-
-        [LoggerMessage(Level = LogLevel.Error,
-            Message = "Checkpoint provider configuration for queue {QueueId} does not satisfy the certified progress contract.")]
-        private partial void LogErrorCheckpointProviderConfiguration(QueueIdLogRecord queueId, Exception exception);
-
-        [LoggerMessage(Level = LogLevel.Warning,
-            Message = "Failed to clean up the provider for queue {QueueId} after checkpoint configuration failed.")]
-        private partial void LogWarningCheckpointProviderCleanup(QueueIdLogRecord queueId, Exception exception);
 
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "Incompatible tokens {Token} and {Other} for queue {QueueId}; checkpoint progress is awaiting token reconciliation.")]

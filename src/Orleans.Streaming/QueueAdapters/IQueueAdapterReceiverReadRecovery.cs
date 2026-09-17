@@ -6,7 +6,7 @@ namespace Orleans.Streams;
 /// <summary>
 /// Reconciles failed reads for a checkpointing receiver.
 /// </summary>
-public interface IQueueAdapterReceiverReadRecovery
+internal interface IQueueAdapterReceiverReadRecovery
 {
     /// <summary>
     /// Restores read continuity using the receiver's current ownership, source position, and staged records.

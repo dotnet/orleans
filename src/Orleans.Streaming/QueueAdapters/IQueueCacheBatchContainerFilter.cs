@@ -9,7 +9,7 @@ namespace Orleans.Streams;
 /// returned directly; a nonempty slice exposes the first remaining event's position through
 /// <see cref="IBatchContainer.SequenceToken"/>.
 /// </remarks>
-public interface IQueueCacheBatchContainerFilter
+internal interface IQueueCacheBatchContainerFilter
 {
     /// <summary>
     /// Returns the events at or after the inclusive start position.

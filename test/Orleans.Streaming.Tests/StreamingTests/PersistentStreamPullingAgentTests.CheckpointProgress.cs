@@ -228,7 +228,7 @@ public partial class PersistentStreamPullingAgentTests
         await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
         var queue = QueueId.GetQueueId("queue", 0u, 0u);
         var source = Substitute.For<IQueueAdapterReceiver>();
-        var receiver = new CheckpointRecoveryReceiver(source);
+        var receiver = new CheckpointRecovery();
         var readFailure = new InvalidOperationException("Injected uncertain source read");
         source.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IList<IBatchContainer>>(readFailure), Task.FromResult<IList<IBatchContainer>>([]));
@@ -241,7 +241,7 @@ public partial class PersistentStreamPullingAgentTests
         };
 
         Assert.Same(readFailure, await Assert.ThrowsAsync<InvalidOperationException>(
-            () => scenario.Accessor.ReadFromQueue(queue, receiver, 1000)));
+            () => scenario.Accessor.ReadFromQueue(queue, source, 1000)));
         await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
 
         var unrelatedReceiver = Substitute.For<IQueueAdapterReceiver>();
@@ -252,7 +252,8 @@ public partial class PersistentStreamPullingAgentTests
         await unrelatedReceiver.DidNotReceive().GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
         await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
 
-        var recoveringRead = scenario.Accessor.ReadFromQueue(queue, receiver, 1000);
+        ((ITestCheckpointingQueueCache)scenario.Cache).Recovery = receiver.RecoverReadAsync;
+        var recoveringRead = scenario.Accessor.ReadFromQueue(queue, source, 1000);
         try
         {
             await recoveryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -289,12 +290,12 @@ public partial class PersistentStreamPullingAgentTests
         await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
         var queue = QueueId.GetQueueId("queue", 0u, 0u);
         var source = Substitute.For<IQueueAdapterReceiver>();
-        var receiver = new CheckpointRecoveryReceiver(source);
+        var receiver = new CheckpointRecovery();
         var readFailure = new InvalidOperationException("Injected uncertain source read");
         source.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IList<IBatchContainer>>(readFailure), Task.FromResult<IList<IBatchContainer>>([]));
         Assert.Same(readFailure, await Assert.ThrowsAsync<InvalidOperationException>(
-            () => scenario.Accessor.ReadFromQueue(queue, receiver, 1000)));
+            () => scenario.Accessor.ReadFromQueue(queue, source, 1000)));
 
         using var cancellation = new CancellationTokenSource();
         var recoveryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -304,7 +305,8 @@ public partial class PersistentStreamPullingAgentTests
             recoveryStarted.TrySetResult();
             return releaseRecovery.Task.WaitAsync(token);
         };
-        var recoveringRead = scenario.Accessor.ReadFromQueueWithCancellation(queue, receiver, 1000, cancellation.Token);
+        ((ITestCheckpointingQueueCache)scenario.Cache).Recovery = receiver.RecoverReadAsync;
+        var recoveringRead = scenario.Accessor.ReadFromQueueWithCancellation(queue, source, 1000, cancellation.Token);
         try
         {
             await recoveryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
@@ -327,14 +329,8 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Equal(2, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
 
-            var unrelatedReceiver = Substitute.For<IQueueAdapterReceiver>();
-            await Assert.ThrowsAsync<NotSupportedException>(
-                () => scenario.Accessor.ReadFromQueue(queue, unrelatedReceiver, 1000));
-            await unrelatedReceiver.DidNotReceive().GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
-            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
-
             receiver.OnRecovery = _ => Task.CompletedTask;
-            Assert.False(await scenario.Accessor.ReadFromQueue(queue, receiver, 1000));
+            Assert.False(await scenario.Accessor.ReadFromQueue(queue, source, 1000));
             Assert.Equal(new[] { cancellation.Token, CancellationToken.None }, receiver.RecoveryTokens);
             await source.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
             await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
@@ -524,10 +520,7 @@ public partial class PersistentStreamPullingAgentTests
         }
     }
 
-    // The recovery contract is internal and is not exposed to DynamicProxyGenAssembly2.
-    // Forward provider calls to a substitute, keeping the certification callback explicit.
-    private sealed class CheckpointRecoveryReceiver(IQueueAdapterReceiver source)
-        : IQueueAdapterReceiver, IQueueAdapterReceiverReadRecovery
+    private sealed class CheckpointRecovery
     {
         public Func<CancellationToken, Task> OnRecovery { get; set; } = _ => Task.CompletedTask;
         public List<CancellationToken> RecoveryTokens { get; } = [];
@@ -537,21 +530,11 @@ public partial class PersistentStreamPullingAgentTests
             RecoveryTokens.Add(cancellationToken);
             return OnRecovery(cancellationToken);
         }
-
-        public Task Initialize(TimeSpan timeout) => source.Initialize(timeout);
-        public Task Shutdown(TimeSpan timeout) => source.Shutdown(timeout);
-        public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
-            => source.GetQueueMessagesAsync(maxCount);
-        public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, CancellationToken cancellationToken)
-            => source.GetQueueMessagesAsync(maxCount, cancellationToken);
-        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
-            => source.MessagesDeliveredAsync(messages);
-        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages, CancellationToken cancellationToken)
-            => source.MessagesDeliveredAsync(messages, cancellationToken);
     }
 
-    private sealed class CheckpointAdmissionCache : ICheckpointingQueueCache
+    private sealed class CheckpointAdmissionCache : ITestCheckpointingQueueCache
     {
+        public Func<CancellationToken, Task>? Recovery { get; set; }
         private readonly IQueueCache inner = new SimpleQueueCache(256, NullLogger.Instance);
 
         public InvalidOperationException Failure { get; } = new("Injected cache accounting failure");

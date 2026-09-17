@@ -327,7 +327,7 @@ namespace Orleans.Streaming.EventHubs
     }
 
     [GenerateSerializer]
-    public partial class EventHubBatchContainer : Streams.IBatchContainer, Streams.IQueueCacheBatchContainerFilter
+    public partial class EventHubBatchContainer : Streams.IBatchContainer
     {
         public EventHubBatchContainer(EventHubMessage eventHubMessage, Serialization.Serializer serializer) { }
 
@@ -338,10 +338,6 @@ namespace Orleans.Streaming.EventHubs
         public System.Collections.Generic.IEnumerable<System.Tuple<T, Streams.StreamSequenceToken>> GetEvents<T>() { throw null; }
 
         public bool ImportRequestContext() { throw null; }
-
-        Streams.IBatchContainer? Streams.IQueueCacheBatchContainerFilter.FilterAfter(Streams.StreamSequenceToken exclusiveStartToken) { throw null; }
-
-        Streams.IBatchContainer? Streams.IQueueCacheBatchContainerFilter.FilterFrom(Streams.StreamSequenceToken inclusiveStartToken) { throw null; }
 
         public static Azure.Messaging.EventHubs.EventData ToEventData<T>(Serialization.Serializer bodySerializer, Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
 
@@ -488,8 +484,6 @@ namespace Orleans.Streaming.EventHubs
 
         public void Dispose() { }
 
-        protected void EnableCertifiedDeliveryProgress() { }
-
         [System.Obsolete("Use TryGetCursor instead.")]
         public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
@@ -499,8 +493,6 @@ namespace Orleans.Streaming.EventHubs
 
         public void SignalPurge() { }
 
-        public virtual bool TryEnableCertifiedDeliveryProgress() { throw null; }
-
         public Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
         public Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
@@ -509,8 +501,6 @@ namespace Orleans.Streaming.EventHubs
         public bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
 
         public Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message) { throw null; }
-
-        public void UpdateDeliveryProgress(Streams.StreamSequenceToken safeToken, System.DateTime utcNow) { }
     }
 
     public partial class EventHubQueueCacheFactory : IEventHubQueueCacheFactory
@@ -601,13 +591,11 @@ namespace Orleans.Streaming.EventHubs
         object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
         void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken);
         void SignalPurge();
-        bool TryEnableCertifiedDeliveryProgress();
         Streams.QueueCacheCursorResult<object> TryGetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken);
         Streams.QueueCacheCursorResult<object> TryGetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition);
         [System.Obsolete("Use TryGetNextMessageWithResult instead.")]
         bool TryGetNextMessage(object cursorObj, out Streams.IBatchContainer? message);
         Streams.QueueCacheCursorMoveResult TryGetNextMessageWithResult(object cursorObj, out Streams.IBatchContainer? message);
-        void UpdateDeliveryProgress(Streams.StreamSequenceToken safeToken, System.DateTime utcNow);
     }
 
     public partial interface IEventHubQueueCacheFactory

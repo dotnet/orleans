@@ -467,8 +467,7 @@ namespace UnitTests.StreamingTests
             IStreamFilter? filter = null,
             IStreamFailureHandler? failureHandler = null,
             ILoggerFactory? loggerFactory = null,
-            IBackoffProvider? deliveryBackoff = null,
-            bool wrapCheckpointReceiver = true)
+            IBackoffProvider? deliveryBackoff = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -494,14 +493,12 @@ namespace UnitTests.StreamingTests
                 messagingInstruments: CreateMessagingInstruments(),
                 messagingProcessingInstruments: CreateMessagingProcessingInstruments());
 
-            receiver ??= Substitute.For<IQueueAdapterReceiver, IQueueAdapterReceiverReadRecovery>();
+            receiver ??= Substitute.For<IQueueAdapterReceiver>();
             receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueAdapter = Substitute.For<IQueueAdapter>();
             queueAdapter.Name.Returns("provider");
-            queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(
-                !wrapCheckpointReceiver || receiver is IQueueAdapterReceiverReadRecovery
-                    ? receiver : new FixtureReadRecoveryReceiver(receiver));
+            queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(receiver);
 
             return new PersistentStreamPullingAgent(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
@@ -519,26 +516,20 @@ namespace UnitTests.StreamingTests
                 shared);
         }
 
-        private sealed class FixtureReadRecoveryReceiver(IQueueAdapterReceiver receiver)
-            : IQueueAdapterReceiver, IQueueAdapterReceiverReadRecovery
+        private interface ITestCheckpointingQueueCache : ICheckpointingQueueCache
         {
-            public Task Initialize(TimeSpan timeout) => receiver.Initialize(timeout);
-            public Task Initialize(TimeSpan timeout, CancellationToken cancellationToken) => receiver.Initialize(timeout, cancellationToken);
-            public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int count) => receiver.GetQueueMessagesAsync(count);
-            public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int count, CancellationToken cancellationToken)
-                => receiver.GetQueueMessagesAsync(count, cancellationToken);
-            public Task MessagesDeliveredAsync(IList<IBatchContainer> messages) => receiver.MessagesDeliveredAsync(messages);
-            public Task MessagesDeliveredAsync(IList<IBatchContainer> messages, CancellationToken cancellationToken)
-                => receiver.MessagesDeliveredAsync(messages, cancellationToken);
-            public Task Shutdown(TimeSpan timeout) => receiver.Shutdown(timeout);
-            public Task Shutdown(TimeSpan timeout, CancellationToken cancellationToken) => receiver.Shutdown(timeout, cancellationToken);
-            public Task RecoverReadAsync(CancellationToken cancellationToken)
-                => Task.FromException(new NotSupportedException("This test receiver supplies no failed-read recovery certificate."));
+            Func<CancellationToken, Task>? Recovery { get; set; }
+
+            Task IQueueAdapterReceiverReadRecovery.RecoverReadAsync(CancellationToken cancellationToken)
+                => Recovery is { } recover
+                    ? recover(cancellationToken)
+                    : Task.FromException(new NotSupportedException("This test cache supplies no failed-read recovery certificate."));
         }
 
         private sealed class RecordingSimpleQueueCache()
-            : SimpleQueueCache(256, NullLogger.Instance), ICheckpointingQueueCache
+            : SimpleQueueCache(256, NullLogger.Instance), ITestCheckpointingQueueCache
         {
+            public Func<CancellationToken, Task>? Recovery { get; set; }
             public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = [];
 
             public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
@@ -559,8 +550,9 @@ namespace UnitTests.StreamingTests
                 => cache.TryGetCacheCursorAtPosition(streamId, position);
         }
 
-        private sealed class RecordingQueueCache : ICheckpointingQueueCache
+        private sealed class RecordingQueueCache : ITestCheckpointingQueueCache
         {
+            public Func<CancellationToken, Task>? Recovery { get; set; }
             public Exception? ProgressException { get; set; }
             public int DeliveryProgressCallCount { get; private set; }
             public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = new();
@@ -598,8 +590,9 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class ShutdownQueueCache : ICheckpointingQueueCache
+        private sealed class ShutdownQueueCache : ITestCheckpointingQueueCache
         {
+            public Func<CancellationToken, Task>? Recovery { get; set; }
             private readonly IQueueCache _cache = new SimpleQueueCache(256, NullLogger.Instance);
             public List<StreamSequenceToken?> Progress { get; } = [];
             public int OpenCursors { get; private set; }
@@ -1073,8 +1066,9 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private sealed class PurgeablePooledQueueCache : ICheckpointingQueueCache
+        private sealed class PurgeablePooledQueueCache : ITestCheckpointingQueueCache
         {
+            public Func<CancellationToken, Task>? Recovery { get; set; }
             private readonly PooledQueueCache cache;
             public List<StreamSequenceToken?> DeliveryProgressTokens { get; } = [];
 
