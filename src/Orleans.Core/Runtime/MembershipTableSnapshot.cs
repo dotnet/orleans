@@ -157,8 +157,8 @@ namespace Orleans.Runtime
         /// Determines whether this snapshot is a successor to another snapshot.
         /// </summary>
         /// <remarks>
-        /// At the same canonical membership version, progress consists of newer liveness timestamps
-        /// or completed defunct-entry cleanup.
+        /// At the same canonical membership version, the rowset is unchanged and progress consists
+        /// of newer liveness timestamps.
         /// </remarks>
         /// <param name="other">The snapshot to compare against.</param>
         /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
@@ -174,9 +174,9 @@ namespace Orleans.Runtime
                 return false;
             }
 
-            if (Entries.Count > other.Entries.Count)
+            if (Entries.Count != other.Entries.Count)
             {
-                // Something is amiss.
+                // Every rowset change requires a new canonical membership version.
                 return false;
             }
 
@@ -192,22 +192,7 @@ namespace Orleans.Runtime
                 heartbeatAdvanced |= entry.IAmAliveTime > otherEntry.IAmAliveTime;
             }
 
-            if (Entries.Count == other.Entries.Count)
-            {
-                return heartbeatAdvanced;
-            }
-
-            // Cleanup can remove inactive entries without advancing the table version or a heartbeat.
-            // Accept that inventory change while retaining every Active entry and the remaining statuses.
-            foreach (var (silo, previousEntry) in other.Entries)
-            {
-                if (previousEntry.Status == SiloStatus.Active && !Entries.ContainsKey(silo))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return heartbeatAdvanced;
         }
 
         public override string ToString()
