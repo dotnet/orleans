@@ -7,8 +7,12 @@ using System.Text;
 namespace Orleans.Runtime
 {
     /// <summary>
-    /// Represents an immutable snapshot of cluster membership state.
+    /// Represents an immutable snapshot of a canonical membership view and per-silo liveness timestamps.
     /// </summary>
+    /// <remarks>
+    /// A version identifies the same canonical membership view throughout the cluster.
+    /// Updates retain versioned fields at the same version and the maximum observed IAmAliveTime for each silo.
+    /// </remarks>
     [GenerateSerializer, Immutable]
     internal sealed class MembershipTableSnapshot : ISpanFormattable
     {
@@ -47,7 +51,7 @@ namespace Orleans.Runtime
             var version = (table.Version.Version == 0 && table.Version.VersionEtag == "0")
               ? MembershipVersion.MinValue
               : new MembershipVersion(table.Version.Version);
-            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1), preserveVersionedFields: true);
+            return Update(previousSnapshot, version, table.Members.Select(t => t.Item1));
         }
 
         /// <summary>
@@ -66,8 +70,7 @@ namespace Orleans.Runtime
         private static MembershipTableSnapshot Update(
             MembershipTableSnapshot previousSnapshot,
             MembershipVersion version,
-            IEnumerable<MembershipEntry> updatedEntries,
-            bool preserveVersionedFields = false)
+            IEnumerable<MembershipEntry> updatedEntries)
         {
             ArgumentNullException.ThrowIfNull(previousSnapshot);
             ArgumentNullException.ThrowIfNull(updatedEntries);
@@ -76,11 +79,10 @@ namespace Orleans.Runtime
             foreach (var item in updatedEntries)
             {
                 var entry = item;
-                if (preserveVersionedFields && version == previousSnapshot.Version
+                if (version == previousSnapshot.Version
                     && previousSnapshot.Entries.TryGetValue(entry.SiloAddress, out var previousEntry))
                 {
-                    // Provider reads can round fields from our committed write. Only liveness advances
-                    // at the same table version; retain the versioned fields we already accepted.
+                    // The same version identifies the same canonical membership view.
                     entry = entry.IAmAliveTime > previousEntry.IAmAliveTime
                         ? previousEntry.WithIAmAliveTime(entry.IAmAliveTime)
                         : previousEntry;

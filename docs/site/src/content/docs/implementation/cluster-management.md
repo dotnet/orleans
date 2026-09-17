@@ -11,9 +11,13 @@ Cluster membership answers one question for the rest of the runtime: which silo 
 
 ## Identity, status, and views
 
-A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its <xref:Orleans.Runtime.SiloStatus> progresses through `Created`, `Joining`, `Active`, and a terminating status (`ShuttingDown`, `Stopping`, or `Dead`).
+A silo identity includes its advertised endpoint and a generation value, so a restarted process at the same endpoint is a new identity. Its <xref:Orleans.Runtime.SiloStatus> progresses in one direction through `Created`, `Joining`, `Active`, and terminating states (`ShuttingDown`, `Stopping`, or `Dead`).
 
-Each successful versioned membership-table mutation, such as inserting a row or changing a status, advances the table version. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAlive*> writes leave the version unchanged. `MembershipTableManager` publishes immutable snapshots through `ClusterMembershipService`; consumers ignore older versions. Directory ownership, gateway discovery, and failure recovery therefore observe a monotonically ordered sequence of views even if notifications arrive out of order.
+The membership system provides a **canonical membership view**: a versioned view of silo identities and their states. Each successful versioned membership-table mutation advances the version by exactly one. A version uniquely identifies its canonical membership view throughout the cluster, so two hosts observing version N have the same canonical membership view. A host can advance directly from N to N + 2 when its next refresh observes two completed mutations.
+
+`MembershipTableManager` publishes snapshots through `ClusterMembershipService` with monotonically advancing canonical membership views. Directory ownership, gateway discovery, and failure recovery rely on this guarantee.
+
+Per-silo `IAmAliveTime` is tracked independently of the canonical membership view. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAlive*> writes leave the view version unchanged. Snapshot updates retain the maximum observed timestamp for each silo, so local liveness timestamps advance monotonically as table reads and peer snapshots arrive. At the same version, merging retains the accepted versioned fields.
 
 ```mermaid
 flowchart LR
