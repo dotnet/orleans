@@ -11,7 +11,7 @@ public abstract class DurableGrain : Grain, IGrainBase
     /// Initializes a new instance of the <see cref="DurableGrain"/> class and resolves its state manager.
     /// </summary>
     /// <remarks>
-    /// The grain-scoped service factory enrolls the state manager in the grain lifecycle before returning it.
+    /// The standard state manager enrolls in the grain lifecycle during grain-bound construction.
     /// </remarks>
     protected DurableGrain()
     {

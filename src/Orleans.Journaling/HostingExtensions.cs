@@ -31,23 +31,10 @@ public static class HostingExtensions
                 : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager>(static services =>
-        {
-            var context = services.GetRequiredService<IGrainContext>();
-            var manager = new JournaledStateManager(
+            new JournaledStateManager(
                 services.GetRequiredService<JournaledStateManagerShared>(),
                 services.GetRequiredService<IJournalStorageProvider>(),
-                context);
-            try
-            {
-                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(context.ObservableLifecycle);
-                return manager;
-            }
-            catch
-            {
-                ((IDisposable)manager).Dispose();
-                throw;
-            }
-        });
+                services.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
                 ?? ActivatorUtilities.CreateInstance<JournaledStateManagerFactory>(services));

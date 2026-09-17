@@ -377,6 +377,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         _ = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
 
         Assert.True(wasUsed);
+        Assert.Equal(1, Assert.IsType<CompositionTestLifecycle>(
+            scope.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle).Subscriptions);
     }
 
     [Fact]

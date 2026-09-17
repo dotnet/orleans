@@ -38,6 +38,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)))
     {
         _grainContext = grainContext;
+        try
+        {
+            ((ILifecycleParticipant<IGrainLifecycle>)this).Participate(grainContext.ObservableLifecycle);
+        }
+        catch
+        {
+            ((IDisposable)this).Dispose();
+            throw;
+        }
     }
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, JournalId journalId)

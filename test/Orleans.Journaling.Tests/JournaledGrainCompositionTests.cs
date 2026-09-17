@@ -185,9 +185,10 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HostingFactory_EnrollsExactlyOnceAndDurableGrainRetainsHelpers(bool overrideWithExplicitFactory)
+    [InlineData("hosting")]
+    [InlineData("implementation")]
+    [InlineData("explicit")]
+    public async Task ManagerResolution_EnrollsExactlyOnceAndDurableGrainRetainsHelpers(string registration)
     {
         var builder = CreateBuilder();
         var lifecycle = new CompositionTestLifecycle();
@@ -195,10 +196,14 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         context.GrainId.Returns(GrainId.Create("composition", "factory-enrollment"));
         context.ObservableLifecycle.Returns(lifecycle);
         builder.Services.AddScoped(_ => context);
-        var journalId = overrideWithExplicitFactory
+        var journalId = registration == "explicit"
             ? new JournalId("explicit/scoped-override")
             : JournalId.FromGrainId(context.GrainId);
-        if (overrideWithExplicitFactory)
+        if (registration == "implementation")
+        {
+            builder.Services.AddScoped<IJournaledStateManager, JournaledStateManager>();
+        }
+        else if (registration == "explicit")
         {
             builder.Services.AddScoped(services =>
             {
@@ -274,10 +279,16 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         ((ILifecycleParticipant<IGrainLifecycle>)manager).Received(1).Participate(lifecycle);
     }
 
-    [Fact]
-    public void HostingFactory_EnrollmentFailureDisposesManagerAndPreservesException()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GrainBoundConstruction_EnrollmentFailureDisposesManagerAndPreservesException(bool useImplementationRegistration)
     {
         var builder = CreateBuilder();
+        if (useImplementationRegistration)
+        {
+            builder.Services.AddScoped<IJournaledStateManager, JournaledStateManager>();
+        }
         builder.Services.AddSingleton<TrackingJournalFormat>();
         builder.Services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey,
             static (services, _) => services.GetRequiredService<TrackingJournalFormat>());
