@@ -43,7 +43,7 @@ namespace Orleans.DurableMessaging;
 public readonly struct DurableEnvelope
 {
     /// <summary>
-    /// Unique identifier for this message instance, used for deduplication.
+    /// Nonempty unique identifier for this message instance, used for deduplication.
     /// </summary>
     /// <remarks>
     /// Combined with <see cref="SenderId"/>, this forms the composite deduplication key
@@ -54,7 +54,7 @@ public readonly struct DurableEnvelope
     public required Guid MessageId { get; init; }
 
     /// <summary>
-    /// Identity of the sending grain.
+    /// Nondefault identity of the sending grain.
     /// </summary>
     /// <remarks>
     /// Used in combination with <see cref="MessageId"/> for deduplication tracking.
