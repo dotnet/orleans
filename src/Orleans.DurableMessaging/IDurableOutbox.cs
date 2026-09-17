@@ -38,7 +38,7 @@ namespace Orleans.DurableMessaging;
 ///
 /// context.Outbox.Send(envelope);
 ///
-/// // The message is now persisted and will be delivered by the outbox pump
+/// // The message is staged for persistence with the next journal write.
 /// </code>
 /// </example>
 public interface IDurableOutbox
@@ -62,11 +62,16 @@ public interface IDurableOutbox
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
-    /// Enqueues a fully-built envelope for delivery (non-generic).
+    /// Stages a fully built, safe-to-commit envelope for delivery.
     /// Use <see cref="DurableEnvelopeBuilder"/> to create the envelope.
     /// </summary>
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
+    /// <para>
+    /// Complete validation and failure-prone preparation before staging messages. Pending journal
+    /// changes are shared by all callers using the grain's state manager, so each message must be
+    /// safe to commit as soon as it is enqueued.
+    /// </para>
     /// <para>
     /// The message is persisted atomically with grain state when <c>IJournaledStateManager.WriteStateAsync()</c>
     /// is called. The message remains in the outbox until the infrastructure confirms durable inbox acceptance.
