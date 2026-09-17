@@ -197,8 +197,8 @@ namespace Orleans.Providers.Streams.Generator
             void IQueueCacheCursorProgress.SetDeliveredThrough(StreamSequenceToken token)
                 => cache.SetCursorDeliveredThrough(cursor, token);
 
-            void IQueueCacheCursorProgress.RecordDeliverySuccess()
-                => cache.RecordDeliverySuccess(cursor);
+            void IQueueCacheCursorProgress.RecordDeliveryCompletion()
+                => cache.RecordDeliveryCompletion(cursor);
 
             private static object GetCursorOrThrow(
                 PooledQueueCache cache,

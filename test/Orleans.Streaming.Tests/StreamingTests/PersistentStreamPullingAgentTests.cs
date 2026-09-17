@@ -652,7 +652,7 @@ namespace UnitTests.StreamingTests
                 public void RecordDeliveryFailure(IBatchContainer batch) => cursor.RecordDeliveryFailure();
                 public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)cursor).SafeSequenceToken;
                 public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)cursor).SetDeliveredThrough(token);
-                public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)cursor).RecordDeliverySuccess();
+                public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
                 public IDisposable ProtectDeliveryBatch()
                 {
                     cache.BatchProtections++;
@@ -760,7 +760,7 @@ namespace UnitTests.StreamingTests
         {
             public StreamSequenceToken? SafeSequenceToken => null;
             public void SetDeliveredThrough(StreamSequenceToken token) { }
-            public void RecordDeliverySuccess() { }
+            public void RecordDeliveryCompletion() { }
 
             public void Dispose()
             {
@@ -798,7 +798,7 @@ namespace UnitTests.StreamingTests
             void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
             public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
-            public void RecordDeliverySuccess() => ((IQueueCacheCursorProgress)inner).RecordDeliverySuccess();
+            public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
         }
 
         private sealed class ScriptedQueueCache : IQueueCache
@@ -1179,7 +1179,7 @@ namespace UnitTests.StreamingTests
                 public void RecordDeliveryFailure() => cache.RecordDeliveryFailure(cursor);
                 public StreamSequenceToken? SafeSequenceToken => cache.GetSafeSequenceToken(cursor);
                 public void SetDeliveredThrough(StreamSequenceToken token) => cache.SetCursorDeliveredThrough(cursor, token);
-                public void RecordDeliverySuccess() => cache.RecordDeliverySuccess(cursor);
+                public void RecordDeliveryCompletion() => cache.RecordDeliveryCompletion(cursor);
             }
         }
 
@@ -3874,7 +3874,7 @@ namespace UnitTests.StreamingTests
         {
             var backoff = Substitute.For<IBackoffProvider>();
             backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Delivery retry budget exhausted"));
-            await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff);
+            await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff, retryFailedDeliveries: true);
             await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
             var acknowledged = new List<long>();
             var consumer = new RecordingConsumer
@@ -4155,7 +4155,8 @@ namespace UnitTests.StreamingTests
         private static async Task<CheckpointScenario> CreateCheckpointScenario(
             bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null,
             TimeProvider? timeProvider = null, ILoggerFactory? loggerFactory = null, bool retainPurgeMetadata = false,
-            IBackoffProvider? deliveryBackoff = null, bool checkpointing = true)
+            IBackoffProvider? deliveryBackoff = null, bool checkpointing = true, bool retryFailedDeliveries = false,
+            IStreamFailureHandler? failureHandler = null)
         {
             IQueueCache cache;
             List<StreamSequenceToken?> checkpoints;
@@ -4181,9 +4182,9 @@ namespace UnitTests.StreamingTests
             var busyId = new QualifiedStreamId("provider", StreamId.Create("busy", Guid.NewGuid()));
             var (accessor, _, idleStream) = await CreateInitializedAgentWithStream(
                 idleId, new EventSequenceTokenV2(1), checkpointing ? cache : new ReceiptQueueCache(cache),
-                new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize },
+                new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize, RetryFailedDeliveries = retryFailedDeliveries },
                 filtered ? Substitute.For<IStreamFilter>() : null, timeProvider, loggerFactory: loggerFactory,
-                deliveryBackoff: deliveryBackoff);
+                deliveryBackoff: deliveryBackoff, failureHandler: failureHandler);
             await accessor.RegisterStream(busyId, new EventSequenceTokenV2(2), DateTime.UtcNow);
             var busyStream = (await accessor.GetPubSubCache())[busyId];
 

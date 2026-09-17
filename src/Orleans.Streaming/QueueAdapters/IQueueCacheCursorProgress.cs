@@ -6,7 +6,7 @@ namespace Orleans.Streams;
 /// <remarks>
 /// A checkpointing cache exposes this capability from each cursor. Scanned records outside
 /// the subscription can advance the prefix immediately. Matching records and subsequent
-/// scans remain pending until the owner acknowledges the entire selected delivery batch.
+/// scans remain pending until the owner resolves the entire selected delivery batch.
 /// Cursor selection and materialization failures preserve the position for retry.
 /// Checkpointing owners report failures through this interface. The legacy
 /// <see cref="IQueueCacheCursor.RecordDeliveryFailure"/> callback retains the provider's
@@ -39,13 +39,13 @@ internal interface IQueueCacheCursorProgress
     void SetDeliveredThrough(StreamSequenceToken token);
 
     /// <summary>
-    /// Acknowledges all currently selected matching records and advances the contiguous safe prefix.
+    /// Resolves all currently selected matching records and advances the contiguous safe prefix.
     /// </summary>
     /// <remarks>
-    /// Call only after all selected delivery and filtering work has completed successfully.
-    /// This acknowledgement does not resolve a previously observed cache miss.
+    /// Call after delivery succeeds, filtering completes, or the configured failure policy explicitly
+    /// skips the selected batch. An observed cache miss retains its independent recovery obligation.
     /// </remarks>
-    void RecordDeliverySuccess();
+    void RecordDeliveryCompletion();
 
     /// <summary>
     /// Rewinds to the first pending matching record while retaining the earlier safe prefix.

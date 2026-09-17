@@ -1491,7 +1491,8 @@ namespace Orleans.Streams
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
                     var handshakeGeneration = consumerData.HandshakeGeneration;
-                    var progressCursor = consumerData.Cursor as IQueueCacheCursorProgress;
+                    var deliveryCursor = consumerData.Cursor;
+                    var progressCursor = deliveryCursor as IQueueCacheCursorProgress;
                     var batchCursor = options.BatchContainerBatchSize > 1
                         ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
                         : null;
@@ -1499,6 +1500,7 @@ namespace Orleans.Streams
                     ConsumerBatch nextBatch = default;
                     Exception? exceptionOccured = null;
                     var forceFaultSubscription = false;
+                    var skipFailedDelivery = false;
                     try
                     {
                         nextBatch = GetBatchForConsumer(consumerData);
@@ -1559,7 +1561,7 @@ namespace Orleans.Streams
 
                         if (nextBatch.Batch is null)
                         {
-                            progressCursor?.RecordDeliverySuccess();
+                            progressCursor?.RecordDeliveryCompletion();
                             consumerData.LastProcessedToken = nextBatch.ProgressToken;
                             UpdateCursorProgress(consumerData, progressCursor);
                             continue;
@@ -1584,15 +1586,26 @@ namespace Orleans.Streams
                         {
                             var batch = nextBatch.Batch;
                             var handshakeToken = consumerData.StartPositionIsProviderDefault ? null : consumerData.LastToken;
-                            StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                i => DeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken),
-                                AsyncExecutorWithRetries.INFINITE_RETRIES,
-                                // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
-                                (exception, i) => exception is not ClientNotAvailableException && !IsShutdown
-                                    && handshakeGeneration == consumerData.HandshakeGeneration,
-                                this.options.MaxEventDeliveryTime,
-                                deliveryBackoffProvider,
-                                cancellationToken: cancellationToken);
+                            StreamHandshakeToken? newToken;
+                            try
+                            {
+                                newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                                    i => DeliverBatchToConsumer(consumerData, batch, handshakeToken, cancellationToken),
+                                    AsyncExecutorWithRetries.INFINITE_RETRIES,
+                                    // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
+                                    (exception, i) => exception is not ClientNotAvailableException && !IsShutdown
+                                        && handshakeGeneration == consumerData.HandshakeGeneration,
+                                    this.options.MaxEventDeliveryTime,
+                                    deliveryBackoffProvider,
+                                    cancellationToken: cancellationToken);
+                            }
+                            catch (Exception exception)
+                            {
+                                skipFailedDelivery = CheckpointingCache is not null && progressCursor is not null
+                                    && !options.RetryFailedDeliveries && !IsShutdown && !cancellationToken.IsCancellationRequested
+                                    && exception is not ClientNotAvailableException;
+                                throw;
+                            }
 
                             // A completed handshake owns its replacement position, including pending replay.
                             if (handshakeGeneration != consumerData.HandshakeGeneration)
@@ -1671,7 +1684,7 @@ namespace Orleans.Streams
                             }
                             else
                             {
-                                progressCursor?.RecordDeliverySuccess();
+                                progressCursor?.RecordDeliveryCompletion();
                                 consumerData.LastProcessedToken = nextBatch.ProgressToken;
                                 UpdateCursorProgress(consumerData, progressCursor);
                             }
@@ -1687,7 +1700,7 @@ namespace Orleans.Streams
 
                         if (CheckpointingCache is not null && progressCursor is not null)
                         {
-                            progressCursor.RecordDeliveryFailure();
+                            if (!skipFailedDelivery) progressCursor.RecordDeliveryFailure();
                         }
                         else if (batchCursor is not null && nextBatch.Batch is not null)
                         {
@@ -1706,16 +1719,40 @@ namespace Orleans.Streams
                     if (exceptionOccured is not null)
                     {
                         var batch = nextBatch.Batch;
-                        bool faultedSubscription = await ErrorProtocol(
-                            consumerData,
-                            exceptionOccured,
-                            true,
-                            batch,
-                            batch?.SequenceToken,
-                            handshakeGeneration,
-                            forceFaultSubscription,
-                            cancellationToken);
-                        if (faultedSubscription) return;
+                        try
+                        {
+                            bool faultedSubscription = await ErrorProtocol(
+                                consumerData,
+                                exceptionOccured,
+                                true,
+                                batch,
+                                batch?.SequenceToken,
+                                handshakeGeneration,
+                                forceFaultSubscription,
+                                cancellationToken);
+                            if (faultedSubscription) return;
+
+                            if (skipFailedDelivery && handshakeGeneration == consumerData.HandshakeGeneration
+                                && ReferenceEquals(deliveryCursor, consumerData.Cursor)
+                                && !cancellationToken.IsCancellationRequested
+                                && consumerData.PendingHandshakes == 0 && !consumerData.HasUnresolvedHandshake)
+                            {
+                                progressCursor!.RecordDeliveryCompletion();
+                                skipFailedDelivery = false;
+                                UpdateCursorProgress(consumerData, progressCursor);
+                                LogWarningSkippingFailedDelivery(consumerData.SubscriptionId, consumerData.StreamId, nextBatch.ProgressToken!);
+                                continue;
+                            }
+                        }
+                        finally
+                        {
+                            // Keep the selected batch replayable if error handling fails or a pending handshake defers the policy decision.
+                            if (skipFailedDelivery && handshakeGeneration == consumerData.HandshakeGeneration
+                                && ReferenceEquals(deliveryCursor, consumerData.Cursor))
+                            {
+                                progressCursor!.RecordDeliveryFailure();
+                            }
+                        }
                         if (CheckpointingCache is not null || nextBatch.Batch is null)
                         {
                             // Retry the retained cursor on the next pump, using the existing retry budget.
@@ -2068,6 +2105,10 @@ namespace Orleans.Streams
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "Failed to publish delivery progress for queue {QueueId}.")]
         private partial void LogWarningUpdatingDeliveryProgress(QueueIdLogRecord queueId, Exception exception);
+
+        [LoggerMessage(Level = LogLevel.Warning,
+            Message = "Skipping failed delivery through {Token} for subscription {SubscriptionId} on stream {StreamId} after retry exhaustion.")]
+        private partial void LogWarningSkippingFailedDelivery(GuidId subscriptionId, QualifiedStreamId streamId, StreamSequenceToken token);
 
         [LoggerMessage(Level = LogLevel.Warning,
             Message = "Incompatible tokens {Token} and {Other} for queue {QueueId}; checkpoint progress is awaiting token reconciliation.")]
