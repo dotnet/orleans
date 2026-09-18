@@ -415,7 +415,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
             completion = _disposalTask;
         }
 
-        if (started is not null) _ = CompleteDisposalAsync(pending, started);
+        if (started is not null) _ = Task.Run(() => CompleteDisposalAsync(pending, started));
         try
         {
             await completion.WaitAsync(waitTimeout);

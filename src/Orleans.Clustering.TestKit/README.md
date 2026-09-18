@@ -82,7 +82,8 @@ for these admitted operations before deleting scopes or disposing shared owners.
 Initialization of an additional handle is explicit. `RunAsync` initializes,
 executes, and tears down while preserving the primary failure. Cleanup deletes
 only the fixture's cluster partitions and attempts every owner after the actual
-delete operations complete. Its caller waits at most 30 seconds. A timeout
+delete operations complete. Cleanup dispatch runs off the caller thread so
+synchronously blocking callbacks also respect the caller's 30-second wait bound. A timeout
 retains the owners and shared cleanup task until the operations finish; later
 `DisposeAsync` calls await that same task. The timeout's exception data contains
 `ClusteringTestKit.CleanupCompletion`, and a late cleanup failure is attached as
@@ -92,6 +93,11 @@ for operation completion. Deleted
 scopes are retired; teardown disposes their owners directly. A deletion request
 which fails after invocation also retires its handles, since it may have
 committed. Subsequent histories use a new fixture with fresh owners.
+Ordinary membership operations receive their scenario cancellation token. The
+fixture's ownership tracking covers its lifecycle callbacks, rather than hidden
+work behind a provider's canceled compatibility adapter. Handle disposers release
+their declared resources according to the real SDK close, abort, or drain
+contract; any resulting infrastructure failures remain observable.
 Use non-secret provider labels: diagnostics include labels, cluster IDs, opaque
 tokens, identities, and mismatched persisted fields.
 

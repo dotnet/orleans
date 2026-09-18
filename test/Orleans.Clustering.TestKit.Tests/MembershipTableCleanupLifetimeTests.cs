@@ -8,6 +8,63 @@ public sealed class MembershipTableCleanupLifetimeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Dispose_SynchronouslyBlockedCallbackStillBoundsCallerWait(bool blockDisposer)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        var ct = timeout.Token;
+        var backend = new IdealizedMembershipBackend();
+        var callbackEntered = Gate();
+        var releaseCallback = Gate();
+        var invocationReturned = Gate();
+        var deletes = 0;
+        var disposers = 0;
+        void BlockCallback()
+        {
+            callbackEntered.TrySetResult();
+            releaseCallback.Task.WaitAsync(ct).GetAwaiter().GetResult();
+        }
+        var fixture = new MembershipTableTestFixture("synchronous-cleanup", (_, cluster, _) =>
+            ValueTask.FromResult(new MembershipTableTestHandle(new LegacyTable(backend.Create(cluster), () =>
+            {
+                if (Interlocked.Increment(ref deletes) == 1 && !blockDisposer) BlockCallback();
+                return Task.CompletedTask;
+            }), () =>
+            {
+                if (Interlocked.Increment(ref disposers) == 1 && blockDisposer) BlockCallback();
+                return backend.DisposeHandleAsync(cluster);
+            })), backend.IsDeletedAsync);
+        await fixture.InitializeAsync(ct);
+        var caller = Task.Run(async () =>
+        {
+            var operation = fixture.DisposeAsync(TimeSpan.Zero).AsTask();
+            invocationReturned.TrySetResult();
+            return await Assert.ThrowsAsync<TimeoutException>(() => operation);
+        }, ct);
+        try
+        {
+            await callbackEntered.Task.WaitAsync(ct);
+            await invocationReturned.Task.WaitAsync(ct);
+            var failure = await caller.WaitAsync(ct);
+            var completion = Assert.IsAssignableFrom<Task>(failure.Data[ClusteringTestKitDiagnostics.CleanupCompletionKey]);
+            Assert.False(completion.IsCompleted);
+            Assert.Equal(0, backend.DisposedHandles);
+            Assert.Equal(blockDisposer ? 2 : 1, Volatile.Read(ref deletes));
+        }
+        finally
+        {
+            releaseCallback.TrySetResult();
+            await fixture.DisposeAsync();
+        }
+        await caller;
+        Assert.Equal(2, deletes);
+        Assert.Equal(3, disposers);
+        Assert.Equal(3, backend.DisposedHandles);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Dispose_TimedOutLegacyDeleteRetainsOwnersAndRepeatedCallsJoinCompletion(bool failDelete)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
