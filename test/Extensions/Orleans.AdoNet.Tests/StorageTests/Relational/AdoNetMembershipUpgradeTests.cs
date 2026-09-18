@@ -171,7 +171,7 @@ public sealed class AdoNetMembershipUpgradeTests
                 var failure = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync(cancellationToken));
                 Assert.Equal(2627, failure.Number);
                 command.CommandText = "SELECT XACT_STATE();";
-                Assert.Equal(0, Assert.IsType<int>(await command.ExecuteScalarAsync(cancellationToken)));
+                Assert.Equal((short)0, Assert.IsType<short>(await command.ExecuteScalarAsync(cancellationToken)));
                 Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
                 AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
             }
