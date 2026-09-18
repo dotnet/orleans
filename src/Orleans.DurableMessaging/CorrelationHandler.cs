@@ -41,47 +41,17 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 /// <example>
 /// <code>
-/// public class OrderWorkflowHandler : CorrelationHandler
+/// protected override async ValueTask&lt;Action&gt; PrepareAsync(
+///     IInboxHandlerContext context, CancellationToken ct)
 /// {
-///     private readonly string _orderId;
-///
-///     public OrderWorkflowHandler(string orderId)
-///         : base(HierarchicalKey.Create($"workflow/order-{orderId}"))
+///     if (!context.Envelope.Data.TryGetBody&lt;WorkflowEvent&gt;(out var workflowEvent))
 ///     {
-///         _orderId = orderId;
+///         throw new InvalidOperationException("Failed to deserialize WorkflowEvent");
 ///     }
 ///
-///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
-///     {
-///         // This handler receives messages from:
-///         // - The main order workflow ("workflow/order-123")
-///         // - Child workflows like payment ("workflow/order-123/payment")
-///         // - Grandchild workflows like verification ("workflow/order-123/payment/verify")
-///
-///         // Deserialize the message
-///         if (!context.Envelope.Data.TryGetBody&lt;WorkflowEvent&gt;(out var workflowEvent))
-///         {
-///             throw new InvalidOperationException("Failed to deserialize WorkflowEvent");
-///         }
-///
-///         // Process based on correlation hierarchy
-///         if (CorrelationKey.Equals(context.Envelope.CorrelationKey))
-///         {
-///             // Main workflow message
-///             await HandleMainWorkflow(workflowEvent, ct);
-///         }
-///         else
-///         {
-///             // Child workflow message - use correlation key to identify which child
-///             await HandleChildWorkflow(context.Envelope.CorrelationKey, workflowEvent, ct);
-///         }
-///     }
+///     var prepared = await PrepareWorkflowAsync(context.Envelope.CorrelationKey, workflowEvent, ct);
+///     return () =&gt; ApplyWorkflow(prepared);
 /// }
-///
-/// // Registration
-/// var orderId = "123";
-/// var handler = new OrderWorkflowHandler(orderId);
-/// inbox.RegisterHandler(handler);
 /// </code>
 /// </example>
 public abstract class CorrelationHandler : IInboxHandler
@@ -133,11 +103,11 @@ public abstract class CorrelationHandler : IInboxHandler
     }
 
     /// <summary>
-    /// Handles a message that matches the configured correlation key or is a descendant.
+    /// Prepares a message that matches the configured correlation key or is a descendant.
     /// </summary>
     /// <param name="context">Handler context containing the envelope and methods for sending messages.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="cancellationToken">The cancellation token for preparation.</param>
+    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
     /// <remarks>
     /// <para>
     /// This method is only called when <see cref="CanHandle"/> returns <c>true</c>, meaning the
@@ -148,18 +118,17 @@ public abstract class CorrelationHandler : IInboxHandler
     /// <c>context.Envelope.CorrelationKey</c> to determine if this is an exact match or a child workflow.
     /// </para>
     /// <para>
-    /// Derived classes should handle business logic errors gracefully (e.g., log and send error
-    /// response) rather than throwing exceptions. Unhandled exceptions will be logged and may
-    /// prevent the message from being marked as processed.
+    /// Follow the preparation and synchronous application requirements of <see cref="IInboxHandler.PrepareAsync"/>.
+    /// The interface implementation forwards the returned action to Messaging for invocation.
     /// </para>
     /// </remarks>
-    protected abstract ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    protected abstract ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Explicit interface implementation that delegates to the protected <see cref="HandleAsync"/> method.
+    /// Explicit interface implementation that delegates to the protected <see cref="PrepareAsync"/> method.
     /// </summary>
-    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        return HandleAsync(context, cancellationToken);
+        return PrepareAsync(context, cancellationToken);
     }
 }

@@ -179,10 +179,10 @@ public readonly struct DurableEnvelope
     ///
     /// context.Send(request);
     ///
-    /// // Handler sends reply
-    /// public async ValueTask HandleAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
+    /// // Handler prepares a reply for synchronous application
+    /// public async ValueTask&lt;Action&gt; PrepareAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
-    ///     var result = await ProcessPayment(request);
+    ///     var result = await PreparePaymentAsync(request, ct);
     ///
     ///     if (context.Envelope.ReplyTo is { } replyTo)
     ///     {
@@ -192,8 +192,10 @@ public readonly struct DurableEnvelope
     ///             .WithCorrelationKey(context.Envelope.CorrelationKey)  // Preserve correlation
     ///             .Build();
     ///
-    ///         context.Send(response);
+    ///         return () => context.Send(response);
     ///     }
+    ///
+    ///     return static () => { };
     /// }
     /// </code>
     /// </example>

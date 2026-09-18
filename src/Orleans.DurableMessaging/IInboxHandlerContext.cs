@@ -18,17 +18,17 @@ namespace Orleans.DurableMessaging;
 /// messages are properly attributed and serialized without requiring handlers to manage infrastructure concerns.
 /// </para>
 /// <para>
-/// Prepare outbound envelopes in local variables, then stage safe-to-commit messages using <see cref="Send"/>.
-/// Handlers follow the preparation requirements described by <see cref="IInboxHandler.HandleAsync"/>.
+/// Prepare outbound envelopes in local variables, then call <see cref="Send"/> from the synchronous
+/// action returned by <see cref="IInboxHandler.PrepareAsync"/> to stage the prepared messages.
 /// </para>
 /// </remarks>
 /// <example>
 /// <code>
 /// public class OrderHandler : IInboxHandler&lt;OrderRequest&gt;
 /// {
-///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+///     public async ValueTask&lt;Action&gt; PrepareAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
 ///     {
-///         var result = await PrepareOrder(message);
+///         var result = await PrepareOrderAsync(message, ct);
 ///
 ///         // Prepare both envelopes before staging either message.
 ///         DurableEnvelope? confirmation = null;
@@ -51,11 +51,14 @@ namespace Orleans.DurableMessaging;
 ///             .WithContextValue("priority", message.Priority)
 ///             .Build();
 ///
-///         if (confirmation is { } response)
+///         return () =>
 ///         {
-///             context.Send(response);
-///         }
-///         context.Send(fulfillmentMessage);
+///             if (confirmation is { } response)
+///             {
+///                 context.Send(response);
+///             }
+///             context.Send(fulfillmentMessage);
+///         };
 ///     }
 /// }
 /// </code>
@@ -109,7 +112,7 @@ public interface IInboxHandlerContext
     ///     .WithReplyTo(context.GrainId)  // Responses come back to this grain
     ///     .Build();
     ///
-    /// context.Send(request);
+    /// return () => context.Send(request);
     /// </code>
     /// </example>
     GrainId GrainId { get; }
@@ -137,7 +140,7 @@ public interface IInboxHandlerContext
     /// <item><description>Call <c>.WithBody(value)</c> to serialize the message body</description></item>
     /// <item><description>Optionally call <c>.WithCorrelationKey()</c>, <c>.WithReplyTo()</c>, <c>.WithContextValue()</c></description></item>
     /// <item><description>Call <c>.Build()</c> to create the envelope</description></item>
-    /// <item><description>Pass the envelope to <see cref="Send"/> to enqueue for delivery</description></item>
+    /// <item><description>Call <see cref="Send"/> from the returned apply action to enqueue for delivery</description></item>
     /// </list>
     /// </remarks>
     /// <example>
@@ -147,7 +150,6 @@ public interface IInboxHandlerContext
     ///     .To(notificationGrain, "notification/send")
     ///     .WithBody(new NotificationMessage { Text = "Order complete" })
     ///     .Build();
-    /// context.Send(envelope);
     ///
     /// // Request with correlation and reply-to
     /// var requestBuilder = context.CreateEnvelope()
@@ -161,7 +163,11 @@ public interface IInboxHandlerContext
     /// }
     ///
     /// var request = requestBuilder.Build();
-    /// context.Send(request);
+    /// return () =>
+    /// {
+    ///     context.Send(envelope);
+    ///     context.Send(request);
+    /// };
     /// </code>
     /// </example>
     DurableEnvelopeBuilder CreateEnvelope();
@@ -173,9 +179,9 @@ public interface IInboxHandlerContext
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
     /// <para>
-    /// Complete validation and failure-prone preparation before calling this method. Each staged
-    /// message must be safe to commit with the grain's pending journal changes, which are shared by
-    /// all callers using its state manager.
+    /// Prepare the envelope during <see cref="IInboxHandler.PrepareAsync"/> and call this method from
+    /// its returned synchronous action. Each staged message must be safe to commit with the grain's
+    /// pending journal changes, which are shared by all callers using its state manager.
     /// </para>
     /// <para>
     /// The message is added to the grain's outbox and will be persisted atomically with grain state
@@ -196,8 +202,7 @@ public interface IInboxHandlerContext
     ///     .WithBody(orderData)
     ///     .Build();
     ///
-    /// context.Send(envelope);
-    /// // The message is staged for persistence with the next journal write.
+    /// return () => context.Send(envelope);
     /// </code>
     /// </example>
     void Send(DurableEnvelope envelope);

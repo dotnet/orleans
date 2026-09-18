@@ -90,8 +90,6 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///     .WithBody(new OrderConfirmation { OrderId = orderId })
     ///     .Build();
     ///
-    /// context.Send(envelope);
-    ///
     /// // Create multiple messages with the same context
     /// var notification = context.CreateEnvelope()
     ///     .To(notificationGrain, "notification/send")
@@ -103,8 +101,12 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///     .WithBody(new AuditEvent { Action = "OrderConfirmed", OrderId = orderId })
     ///     .Build();
     ///
-    /// context.Send(notification);
-    /// context.Send(audit);
+    /// return () =>
+    /// {
+    ///     context.Send(envelope);
+    ///     context.Send(notification);
+    ///     context.Send(audit);
+    /// };
     /// </code>
     /// </example>
     public DurableEnvelopeBuilder CreateEnvelope()
@@ -119,9 +121,9 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <inheritdoc />
     /// <example>
     /// <code>
-    /// public async ValueTask HandleAsync(OrderRequest request, IInboxHandlerContext context, CancellationToken ct)
+    /// public async ValueTask&lt;Action&gt; PrepareAsync(OrderRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
-    ///     var result = await PrepareOrder(request);
+    ///     var result = await PrepareOrderAsync(request, ct);
     ///
     ///     // Prepare both envelopes before staging either message.
     ///     var confirmation = context.CreateEnvelope()
@@ -134,8 +136,11 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///         .WithBody(result)
     ///         .Build();
     ///
-    ///     context.Send(confirmation);
-    ///     context.Send(fulfillment);
+    ///     return () =>
+    ///     {
+    ///         context.Send(confirmation);
+    ///         context.Send(fulfillment);
+    ///     };
     /// }
     /// </code>
     /// </example>
