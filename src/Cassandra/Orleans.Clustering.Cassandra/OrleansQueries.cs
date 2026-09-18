@@ -135,7 +135,7 @@ internal sealed class OrleansQueries
 
     public IStatement CheckIfClusterVersionExists(string clusterIdentifier, ConsistencyLevel consistencyLevel) =>
         new SimpleStatement(
-                $"SELECT version FROM membership WHERE partition_key = '{clusterIdentifier}';")
+                $"SELECT version FROM membership WHERE partition_key = '{clusterIdentifier}' LIMIT 1;")
             .SetConsistencyLevel(consistencyLevel);
 
     public IStatement CheckIfTableExists(string keyspace, ConsistencyLevel consistencyLevel) =>

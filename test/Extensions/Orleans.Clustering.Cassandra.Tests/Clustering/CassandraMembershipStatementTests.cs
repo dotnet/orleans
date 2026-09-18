@@ -71,6 +71,17 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Fact]
+    public async Task ClusterVersionProbe_BoundsTheStaticValueRead()
+    {
+        var queries = await OrleansQueries.CreateInstance(Substitute.For<ISession>());
+        var statement = Assert.IsType<SimpleStatement>(
+            queries.CheckIfClusterVersionExists("service-cluster", ConsistencyLevel.LocalOne));
+
+        Assert.Equal("SELECT version FROM membership WHERE partition_key = 'service-cluster' LIMIT 1;", statement.QueryString);
+        Assert.Equal(ConsistencyLevel.LocalOne, statement.ConsistencyLevel);
+    }
+
+    [Fact]
     public async Task GatewayQuery_UsesQuorum_WhileMembershipReadsRemainSerial()
     {
         var backend = new Backend();
