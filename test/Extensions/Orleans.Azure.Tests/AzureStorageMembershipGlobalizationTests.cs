@@ -137,7 +137,7 @@ public class AzureStorageMembershipGlobalizationTests
 
     [Theory]
     [MemberData(nameof(Cultures))]
-    public void MembershipSnapshot_UsesOpaqueCanonicalTokens_AcrossCultures(CultureInfo culture)
+    public void MembershipSnapshot_AcceptsLegacyVersionAndPreservesOpaqueEtags_AcrossCultures(CultureInfo culture)
     {
         using var cultureScope = new CultureScope(culture);
         var membershipTable = new AzureBasedMembershipTable(
@@ -160,7 +160,7 @@ public class AzureStorageMembershipGlobalizationTests
         Assert.Equal(7, result.Version.Version);
         Assert.Equal("opaque-version-etag", result.Version.VersionEtag, StringComparer.Ordinal);
         var member = Assert.Single(result.Members);
-        Assert.Equal("opaque-version-etag", member.Item2, StringComparer.Ordinal);
+        Assert.Equal("opaque-silo-etag", member.Item2, StringComparer.Ordinal);
         Assert.Equal("Legacy-Silo-Ii", member.Item1.SiloName, StringComparer.Ordinal);
         Assert.Equal("+0007", versionRow.MembershipVersion, StringComparer.Ordinal);
         Assert.Equal("entity-version-etag", versionRow.ETag.ToString(), StringComparer.Ordinal);

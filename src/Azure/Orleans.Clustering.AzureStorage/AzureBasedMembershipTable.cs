@@ -160,7 +160,7 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag, cancellationToken);
+                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
                 if (result == false)
                     LogWarningTableContentionEtag(entry, etag, tableVersion);
                 return result;
@@ -201,8 +201,6 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var memEntries = new List<Tuple<MembershipEntry, string>>(Math.Max(0, entries.Count - 1));
-                // Row tokens track canonical membership changes independently of heartbeat etags.
-                var versionEtag = entries.Find(static entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).ETag;
                 TableVersion? tableVersion = null;
                 foreach (var tuple in entries)
                 {
@@ -225,7 +223,7 @@ namespace Orleans.Runtime.MembershipService
                         {
 
                             MembershipEntry membershipEntry = Parse(tableEntry);
-                            memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, versionEtag));
+                            memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
                         }
                         catch (Exception exc)
                         {

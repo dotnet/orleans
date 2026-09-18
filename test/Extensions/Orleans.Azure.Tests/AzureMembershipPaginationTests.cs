@@ -480,7 +480,7 @@ public class AzureMembershipPaginationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OwnerHeartbeatPreservesCanonicalTokensForMembershipUpdate(bool readRow)
+    public async Task OwnerHeartbeatPreservesVersionConditionForMembershipUpdate(bool readRow)
     {
         var stored = StoredSilo();
         stored.Status = nameof(SiloStatus.Active);
@@ -509,7 +509,7 @@ public class AzureMembershipPaginationTests
         var address = ProposedEntry().SiloAddress;
         var original = await Read();
         var row = Assert.Single(original.Members);
-        Assert.Equal("v7", row.Item2);
+        Assert.Equal("s1", row.Item2);
         var heartbeat = new MembershipEntry
         {
             SiloAddress = address,
@@ -520,7 +520,7 @@ public class AzureMembershipPaginationTests
         var refreshed = await Read();
 
         Assert.Equal(original.Version, refreshed.Version);
-        Assert.Equal(row.Item2, Assert.Single(refreshed.Members).Item2);
+        Assert.Equal("heartbeat-2", Assert.Single(refreshed.Members).Item2);
         Assert.Equal(2, queryCount);
         var update = row.Item1;
         update.Status = SiloStatus.Dead;
@@ -585,7 +585,7 @@ public class AzureMembershipPaginationTests
 
         var result = insert
             ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
-            : await table.UpdateRowAsync(entry, "v7", version, TestContext.Current.CancellationToken);
+            : await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken);
 
         Assert.True(result);
         Assert.NotNull(transaction);
@@ -629,7 +629,7 @@ public class AzureMembershipPaginationTests
 
         var result = insert
             ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
-            : await table.UpdateRowAsync(entry, "v7", version, TestContext.Current.CancellationToken);
+            : await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken);
 
         Assert.False(result);
         var call = Assert.Single(client.ReceivedCalls());
@@ -640,15 +640,30 @@ public class AzureMembershipPaginationTests
         if (!insert) Assert.Equal(ETag.All, transaction[0].ETag);
     }
 
-    [Fact]
-    public async Task UpdateRejectsMismatchedCanonicalTokensBeforeWriting()
+    [Theory]
+    [InlineData("s1")]
+    [InlineData("heartbeat-2")]
+    public async Task UpdateUsesVersionConditionRegardlessOfRowEtag(string rowEtag)
     {
         var client = CreateHeartbeatClient();
+        TableTransactionAction[]? transaction = null;
+        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                transaction = call.Arg<IEnumerable<TableTransactionAction>>().ToArray();
+                return SuccessfulTransaction();
+            });
         var table = CreateTable(CreateManager(null, client));
 
-        Assert.False(await table.UpdateRowAsync(ProposedEntry(), "stale", new TableVersion(8, "v7"), TestContext.Current.CancellationToken));
+        Assert.True(await table.UpdateRowAsync(ProposedEntry(), rowEtag, new TableVersion(8, "v7"), TestContext.Current.CancellationToken));
 
-        Assert.Empty(client.ReceivedCalls());
+        Assert.NotNull(transaction);
+        Assert.Equal(4, transaction.Length);
+        Assert.Equal(TableTransactionActionType.UpdateReplace, transaction[0].ActionType);
+        Assert.Equal(ETag.All, transaction[0].ETag);
+        Assert.Equal(SiloInstanceTableEntry.TABLE_VERSION_ROW, transaction[1].Entity.RowKey);
+        Assert.Equal("v7", transaction[1].ETag.ToString());
+        Assert.Equal(nameof(TableClient.SubmitTransactionAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Theory]
@@ -673,13 +688,13 @@ public class AzureMembershipPaginationTests
         if (throws)
         {
             var exception = await Assert.ThrowsAsync<RequestFailedException>(
-                () => table.UpdateRowAsync(entry, "v7", version, TestContext.Current.CancellationToken));
+                () => table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken));
             Assert.Equal(404, exception.Status);
             Assert.Equal(errorCode, exception.ErrorCode);
         }
         else
         {
-            Assert.False(await table.UpdateRowAsync(entry, "v7", version, TestContext.Current.CancellationToken));
+            Assert.False(await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken));
         }
 
         Assert.Equal(1, handler.RequestCount);
@@ -703,7 +718,7 @@ public class AzureMembershipPaginationTests
         var exception = await Assert.ThrowsAsync<RequestFailedException>(() => operation switch
         {
             "Insert" => table.InsertRowAsync(entry, new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
-            "Update" => table.UpdateRowAsync(entry, "v7", new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
+            "Update" => table.UpdateRowAsync(entry, "s1", new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
             "Heartbeat" => table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -846,7 +861,7 @@ public class AzureMembershipPaginationTests
         {
             var member = Assert.Single(result.Members);
             Assert.Equal(address, member.Item1.SiloAddress);
-            Assert.Equal(result.Version.VersionEtag, member.Item2);
+            Assert.Equal("s1", member.Item2);
         }
         else
         {

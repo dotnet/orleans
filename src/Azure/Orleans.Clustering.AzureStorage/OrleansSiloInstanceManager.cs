@@ -475,20 +475,14 @@ namespace Orleans.AzureUtils
         /// Atomically replaces a membership row under the canonical table-version etag.
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        /// <param name="entryEtag">The row's canonical membership token.</param>
         /// <param name="tableVersionEntry">Version row to update</param>
         /// <param name="versionEtag">ETag value for the version row</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, string entryEtag, SiloInstanceTableEntry tableVersionEntry, string versionEtag, CancellationToken cancellationToken = default)
+        internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, CancellationToken cancellationToken = default)
         {
             try
             {
-                if (!string.Equals(entryEtag, versionEtag, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
                 await storage.UpdateTableEntriesAsync(
                     (siloEntry, AzureTableUtils.ANY_ETAG),
