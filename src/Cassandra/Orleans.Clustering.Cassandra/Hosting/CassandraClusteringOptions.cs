@@ -16,9 +16,11 @@ public class CassandraClusteringOptions
     /// <see cref="ClusterMembershipOptions.DefunctSiloExpiration"/>.
     /// </summary>
     /// <remarks>
-    /// Live membership rows and the table version remain persistent. Dead-row writes and advancing heartbeats
-    /// refresh the retention period for all row fields together. Expiration and explicit cleanup retire Dead
-    /// rows while preserving the table version. This applies to writes in both new and existing tables.
+    /// Live membership rows and the table version remain persistent. Full-row Dead writes assign the retention
+    /// period to all row fields together. Owner heartbeats persist only the heartbeat column. A late heartbeat
+    /// after a Dead write can leave a heartbeat-only fragment when the remaining fields expire; membership reads
+    /// retire that row when its start time expires. Explicit cleanup removes the whole row while preserving the
+    /// table version. This applies to writes in both new and existing tables.
     /// </remarks>
     public bool UseCassandraTtl { get; set; }
 

@@ -339,28 +339,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
     public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_ttlSeconds.HasValue)
-        {
-            await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry, cancellationToken), cancellationToken);
-            return;
-        }
-
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var current = await ReadRowForUpdateAsync(entry.SiloAddress, cancellationToken);
-            if (current is not { } row || row.Entry.IAmAliveTime >= entry.IAmAliveTime)
-            {
-                return;
-            }
-
-            var statement = await Queries.UpdateIAmAliveTimeWithTtl(_identifier, entry, row.Entry, row.Version, cancellationToken);
-            var result = await Queries.ExecuteAsync(statement, cancellationToken);
-            if ((bool)result.First()["[applied]"])
-            {
-                return;
-            }
-        }
+        await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry, cancellationToken), cancellationToken);
     }
 
     [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]

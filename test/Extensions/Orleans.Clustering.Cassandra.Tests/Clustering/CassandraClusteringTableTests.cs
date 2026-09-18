@@ -358,11 +358,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     }
 
     [Theory]
-    [InlineData(true, SiloStatus.Active)]
-    [InlineData(false, SiloStatus.Active)]
-    [InlineData(true, SiloStatus.Dead)]
-    [InlineData(false, SiloStatus.Dead)]
-    public async Task MembershipTable_UpdateIAmAlive(bool cassandraTtl, SiloStatus status)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MembershipTable_UpdateIAmAlive(bool cassandraTtl)
     {
         var testCancellationToken = TestContext.Current.CancellationToken;
 
@@ -381,7 +379,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         var newTableVersion = tableData.Version.Next();
         var newEntry = CreateMembershipEntryForTest();
-        newEntry.Status = status;
+        newEntry.Status = SiloStatus.Active;
         newEntry.SuspectTimes = [Tuple.Create(CreateSiloAddressForTest(), newEntry.StartTime)];
         var ok = await membershipTable.InsertRowAsync(newEntry, newTableVersion, testCancellationToken);
         Assert.True(ok);
@@ -421,31 +419,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Equal(originalMembershipEntry.StartTime, updatedMember.StartTime);
 
         await ValidateTtlValues();
-        foreach (var heartbeat in new[] { amAliveTime.AddSeconds(-1), amAliveTime })
-        {
-            await membershipTable.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = newEntry.SiloAddress,
-                IAmAliveTime = heartbeat
-            }, testCancellationToken);
-            var unchanged = await membershipTable.ReadRowAsync(newEntry.SiloAddress, testCancellationToken);
-            Assert.Equal(updatedMember.ToFullString(), Assert.Single(unchanged.Members).Item1.ToFullString());
-            Assert.Equal(tableData.Version, unchanged.Version);
-        }
-
         var beforeCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
         await membershipTable.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(amAliveTime.AddSeconds(1)), testCancellationToken);
         var afterCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
-        if (status == SiloStatus.Dead)
-        {
-            Assert.Empty(afterCleanup.Members);
-            await membershipTable.UpdateIAmAliveAsync(entry, testCancellationToken);
-            Assert.Empty((await membershipTable.ReadAllAsync(testCancellationToken)).Members);
-        }
-        else
-        {
-            Assert.Equal(updatedMember.ToFullString(), Assert.Single(afterCleanup.Members).Item1.ToFullString());
-        }
+        Assert.Equal(updatedMember.ToFullString(), Assert.Single(afterCleanup.Members).Item1.ToFullString());
 
         Assert.Equal(beforeCleanup.Version, afterCleanup.Version);
         await membershipTable.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(amAliveTime.AddSeconds(1)), testCancellationToken);
@@ -491,24 +468,19 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
             Assert.Null(versionTtl);
             var rowTtls = new[] { siloNameTtl, hostNameTtl, statusTtl, proxyPortTtl, suspectTimesTtl, startTimeTtl, iAmAliveTtl };
-            if (cassandraTtl && status == SiloStatus.Dead)
-            {
-                var ttl = Assert.IsType<int>(statusTtl);
-                Assert.InRange(ttl, 1, 20);
-                Assert.All(rowTtls, value => Assert.Equal(ttl, Assert.IsType<int>(value)));
-            }
-            else
-            {
-                Assert.All(rowTtls, Assert.Null);
-            }
+            Assert.All(rowTtls, Assert.Null);
         }
     }
 
-    [Fact]
-    public async Task MembershipTable_Ttl_ExpiresDeadRowsAndPreservesLiveRowsAndVersion()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipTable_Ttl_ExpiresDeadRowsAndPreservesLiveRowsAndVersion(bool lateHeartbeat)
     {
         var token = TestContext.Current.CancellationToken;
-        var (table, _) = await CreateNewMembershipTableAsync(token, cassandraTtl: true);
+        var serviceId = $"Service_{Guid.NewGuid():N}";
+        var clusterId = $"Cluster_{Guid.NewGuid():N}";
+        var (table, _) = await CreateNewMembershipTableAsync(serviceId, clusterId, token, cassandraTtl: true);
         var live = CreateMembershipEntryForTest();
         live.Status = SiloStatus.Active;
         var dead = CreateMembershipEntryForTest();
@@ -519,6 +491,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.True(await table.InsertRowAsync(dead, data.Version.Next(), token));
         var before = await table.ReadAllAsync(token);
         Assert.Equal(2, before.Members.Count);
+        var heartbeatTime = dead.IAmAliveTime.AddSeconds(1);
+        if (lateHeartbeat)
+        {
+            await table.UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = dead.SiloAddress,
+                IAmAliveTime = heartbeatTime
+            }, token);
+        }
 
         var deadline = DateTime.UtcNow.AddSeconds(45);
         do
@@ -530,73 +511,65 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         Assert.Equal(live.ToFullString(), Assert.Single(data.Members).Item1.ToFullString());
         Assert.Equal(before.Version, data.Version);
-        await table.UpdateIAmAliveAsync(new MembershipEntry
-        {
-            SiloAddress = dead.SiloAddress,
-            IAmAliveTime = DateTime.UtcNow
-        }, token);
         var retired = await table.ReadRowAsync(dead.SiloAddress, token);
         Assert.Empty(retired.Members);
         Assert.Equal(before.Version, retired.Version);
-    }
-
-    [Fact]
-    public async Task MembershipTable_NonTtlHeartbeat_AbsentRow_PreservesExistingRowsAndVersion()
-    {
-        var token = TestContext.Current.CancellationToken;
-        var (table, _) = await CreateNewMembershipTableAsync(token);
-        var entry = CreateMembershipEntryForTest();
-        var initial = await table.ReadAllAsync(token);
-        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
-        var before = await table.ReadAllAsync(token);
-        var absent = CreateMembershipEntryForTest();
-
-        await table.UpdateIAmAliveAsync(absent, token);
-
-        var after = await table.ReadAllAsync(token);
-        Assert.Equal(before.Version, after.Version);
-        Assert.Equal(entry.ToFullString(), Assert.Single(after.Members).Item1.ToFullString());
-        Assert.Empty((await table.ReadRowAsync(absent.SiloAddress, token)).Members);
+        if (lateHeartbeat)
+        {
+            var session = await CreateSession(token);
+            var fragment = Assert.Single(await session.ExecuteAsync(new SimpleStatement(
+                "SELECT start_time, status, i_am_alive_time FROM membership WHERE partition_key = ? AND address = ? AND port = ? AND generation = ?;",
+                $"{serviceId}-{clusterId}",
+                dead.SiloAddress.Endpoint.Address.ToString(),
+                dead.SiloAddress.Endpoint.Port,
+                dead.SiloAddress.Generation).SetConsistencyLevel(ConsistencyLevel.Quorum)));
+            Assert.Null(fragment["start_time"]);
+            Assert.Null(fragment["status"]);
+            Assert.Equal(heartbeatTime, ((DateTimeOffset)fragment["i_am_alive_time"]).UtcDateTime);
+        }
     }
 
     [Theory]
-    [InlineData(false, SiloStatus.Active)]
-    [InlineData(false, SiloStatus.Dead)]
-    [InlineData(true, SiloStatus.Active)]
-    [InlineData(true, SiloStatus.Dead)]
-    public async Task MembershipTable_ConcurrentHeartbeatsAndFullRowUpdate_PreserveMaximum(bool ttl, SiloStatus status)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipTable_OwnerHeartbeatsAndFullRowUpdate_PreserveFields(bool ttl)
     {
         var token = TestContext.Current.CancellationToken;
         var (table, _) = await CreateNewMembershipTableAsync(token, cassandraTtl: ttl);
         var entry = CreateMembershipEntryForTest();
-        entry.Status = status;
+        entry.Status = SiloStatus.Active;
         var initial = await table.ReadAllAsync(token);
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
         var before = await table.ReadRowAsync(entry.SiloAddress, token);
         var update = Assert.Single(before.Members);
         update.Item1.HostName += "-updated";
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var heartbeats = Enumerable.Range(1, 8).Reverse().Select(async offset =>
-        {
-            await start.Task.WaitAsync(token);
-            await table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = entry.SiloAddress,
-                IAmAliveTime = entry.IAmAliveTime.AddSeconds(offset)
-            }, token);
-        }).ToArray();
+        var heartbeats = PublishHeartbeatsAsync();
         var fullRowWrite = UpdateRowAsync();
         start.SetResult();
 
-        await Task.WhenAll(heartbeats.Append(fullRowWrite));
+        await Task.WhenAll(heartbeats, fullRowWrite);
         Assert.True(await fullRowWrite);
         var after = await table.ReadRowAsync(entry.SiloAddress, token);
         var result = Assert.Single(after.Members).Item1;
         Assert.Equal(entry.IAmAliveTime.AddSeconds(8), result.IAmAliveTime);
         Assert.Equal(update.Item1.HostName, result.HostName);
         Assert.Equal(entry.StartTime, result.StartTime);
-        Assert.Equal(status, result.Status);
+        Assert.Equal(SiloStatus.Active, result.Status);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
+
+        async Task PublishHeartbeatsAsync()
+        {
+            await start.Task.WaitAsync(token);
+            for (var offset = 1; offset <= 8; offset++)
+            {
+                await table.UpdateIAmAliveAsync(new MembershipEntry
+                {
+                    SiloAddress = entry.SiloAddress,
+                    IAmAliveTime = entry.IAmAliveTime.AddSeconds(offset)
+                }, token);
+            }
+        }
 
         async Task<bool> UpdateRowAsync()
         {

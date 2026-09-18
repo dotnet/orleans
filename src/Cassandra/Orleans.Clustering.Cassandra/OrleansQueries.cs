@@ -25,7 +25,6 @@ internal sealed class OrleansQueries
     private PreparedStatement? _membershipReadAllPreparedStatement;
     private PreparedStatement? _membershipReadVersionPreparedStatement;
     private PreparedStatement? _updateIAmAlivePreparedStatement;
-    private PreparedStatement? _updateIAmAliveWithTtlPreparedStatement;
     private PreparedStatement? _deleteMembershipEntryPreparedStatement;
     private PreparedStatement? _updateMembershipPreparedStatement;
     private PreparedStatement? _membershipReadRowPreparedStatement;
@@ -257,8 +256,7 @@ internal sealed class OrleansQueries
                 partition_key = :partition_key
                 AND address = :address
                 AND port = :port
-                AND generation = :generation
-             IF start_time != null AND i_am_alive_time < :i_am_alive_time;
+                AND generation = :generation;
              """,
             MembershipWriteConsistencyLevel, cancellationToken);
 
@@ -269,56 +267,7 @@ internal sealed class OrleansQueries
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
             generation = membershipEntry.SiloAddress.Generation
-        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
-    }
-
-    public async ValueTask<IStatement> UpdateIAmAliveTimeWithTtl(
-        string clusterIdentifier,
-        MembershipEntry heartbeat,
-        MembershipEntry existing,
-        int version,
-        CancellationToken cancellationToken = default)
-    {
-        // Renew every cell together, fencing full-row updates as well as concurrent heartbeats.
-        _updateIAmAliveWithTtlPreparedStatement ??= await PrepareStatementAsync("""
-            BEGIN BATCH
-            UPDATE membership USING TTL 0
-            SET version = :expected_version
-            WHERE partition_key = :partition_key
-            IF version = :expected_version;
-            UPDATE membership USING TTL :ttl
-            SET status = :status,
-                suspect_times = :suspect_times,
-                i_am_alive_time = :i_am_alive_time,
-                silo_name = :silo_name,
-                host_name = :host_name,
-                proxy_port = :proxy_port,
-                start_time = :start_time
-            WHERE partition_key = :partition_key
-                AND address = :address
-                AND port = :port
-                AND generation = :generation
-            IF i_am_alive_time = :previous_time
-                AND start_time != null;
-            APPLY BATCH;
-            """, MembershipWriteConsistencyLevel, cancellationToken);
-        return _updateIAmAliveWithTtlPreparedStatement.Bind(new
-        {
-            partition_key = clusterIdentifier,
-            ttl = GetRowTtl(existing),
-            status = (int)existing.Status,
-            suspect_times = GetSuspectTimesString(existing),
-            i_am_alive_time = new DateTime(Math.Max(heartbeat.IAmAliveTime.Ticks, existing.IAmAliveTime.Ticks), DateTimeKind.Utc),
-            silo_name = existing.SiloName,
-            host_name = existing.HostName,
-            proxy_port = existing.ProxyPort,
-            start_time = existing.StartTime,
-            expected_version = version,
-            previous_time = existing.IAmAliveTime,
-            address = existing.SiloAddress.Endpoint.Address.ToString(),
-            port = existing.SiloAddress.Endpoint.Port,
-            generation = existing.SiloAddress.Generation
-        }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
+        });
     }
 
     public async ValueTask<IStatement> DeleteMembershipEntry(string clusterIdentifier, MembershipEntry membershipEntry, CancellationToken cancellationToken = default)

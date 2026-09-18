@@ -23,30 +23,31 @@ public sealed class CassandraMembershipStatementTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task NonTtlHeartbeat_UsesOneMonotonicConditionalWrite(bool applied)
+    public async Task OwnerHeartbeat_UsesOneBlindColumnWrite(bool ttl)
     {
-        var backend = new Backend { OnExecute = _ => Task.FromResult<RowSet>(Rows.Applied(applied)) };
-        using var table = await backend.CreateTable();
+        var backend = new Backend { OnExecute = _ => Task.FromResult<RowSet>(new Rows()) };
+        using var table = await backend.CreateTable(ttl);
         var entry = Entry(SiloStatus.Active);
 
         await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
         var command = Assert.Single(backend.Executed);
-        Assert.StartsWith("UPDATE membership USING TTL 0 SET i_am_alive_time = :i_am_alive_time", command.Cql);
-        Assert.EndsWith("IF start_time != null AND i_am_alive_time < :i_am_alive_time;", command.Cql);
+        Assert.Equal(
+            "UPDATE membership USING TTL 0 SET i_am_alive_time = :i_am_alive_time WHERE partition_key = :partition_key AND address = :address AND port = :port AND generation = :generation;",
+            command.Cql);
+        Assert.Equal(5, command.Values.Count);
+        Assert.Equal("service-cluster", command.Values["partition_key"]);
         Assert.Equal(entry.IAmAliveTime, command.Values["i_am_alive_time"]);
         Assert.Equal(entry.SiloAddress.Endpoint.Address.ToString(), command.Values["address"]);
         Assert.Equal(entry.SiloAddress.Endpoint.Port, command.Values["port"]);
         Assert.Equal(entry.SiloAddress.Generation, command.Values["generation"]);
-        Assert.DoesNotContain("version", command.Cql);
-        Assert.Equal(ConsistencyLevel.Serial, command.Statement.SerialConsistencyLevel);
         Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task GuardedUpdate_UsesOneSerialRowReadAndOneConditionalWrite(bool heartbeat)
+    public async Task GuardedUpdate_UsesOneSerialRowReadAndOneConditionalWrite(bool ttl)
     {
         var backend = new Backend { Version = 5 };
         var existing = Entry(SiloStatus.Active);
@@ -54,19 +55,12 @@ public sealed class CassandraMembershipStatementTests
         backend.OnExecute = command => command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal)
             ? Task.FromResult<RowSet>(Rows.Applied(true))
             : null;
-        using var table = await backend.CreateTable(ttl: true);
+        using var table = await backend.CreateTable(ttl);
         var entry = Entry(SiloStatus.Active);
         entry.IAmAliveTime = Timestamp.AddSeconds(1);
         var token = TestContext.Current.CancellationToken;
 
-        if (heartbeat)
-        {
-            await table.UpdateIAmAliveAsync(entry, token);
-        }
-        else
-        {
-            Assert.True(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
-        }
+        Assert.True(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
 
         Assert.Collection(backend.Executed,
             AssertSingleRowRead,
@@ -84,21 +78,14 @@ public sealed class CassandraMembershipStatementTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task GuardedUpdate_AbsentRow_UsesOnlyOneSerialRead(bool heartbeat)
+    public async Task GuardedUpdate_AbsentRow_UsesOnlyOneSerialRead(bool ttl)
     {
         var backend = new Backend { Version = 5 };
-        using var table = await backend.CreateTable(ttl: true);
+        using var table = await backend.CreateTable(ttl);
         var entry = Entry(SiloStatus.Active);
         var token = TestContext.Current.CancellationToken;
 
-        if (heartbeat)
-        {
-            await table.UpdateIAmAliveAsync(entry, token);
-        }
-        else
-        {
-            Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
-        }
+        Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
 
         AssertSingleRowRead(Assert.Single(backend.Executed));
     }
@@ -106,7 +93,7 @@ public sealed class CassandraMembershipStatementTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task GuardedUpdate_RetiredAfterRead_StopsAfterFailedCasAndOneReread(bool heartbeat)
+    public async Task GuardedUpdate_RetiredAfterRead_StopsAfterFailedCasAndOneReread(bool ttl)
     {
         var backend = new Backend { Version = 5 };
         backend.Entries.Add(Entry(SiloStatus.Dead));
@@ -120,19 +107,12 @@ public sealed class CassandraMembershipStatementTests
             backend.Entries.Clear();
             return Task.FromResult<RowSet>(Rows.Applied(false));
         };
-        using var table = await backend.CreateTable(ttl: true);
+        using var table = await backend.CreateTable(ttl);
         var entry = Entry(SiloStatus.Dead);
         entry.IAmAliveTime = Timestamp.AddSeconds(1);
         var token = TestContext.Current.CancellationToken;
 
-        if (heartbeat)
-        {
-            await table.UpdateIAmAliveAsync(entry, token);
-        }
-        else
-        {
-            Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
-        }
+        Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
 
         Assert.Collection(backend.Executed,
             AssertSingleRowRead,
@@ -192,30 +172,6 @@ public sealed class CassandraMembershipStatementTests
         var version = backend.Get(await queries.InsertMembershipVersion("service-cluster", TestContext.Current.CancellationToken));
         Assert.EndsWith("IF NOT EXISTS USING TTL 0;", version.Cql);
         Assert.Equal(ConsistencyLevel.Serial, version.Statement.SerialConsistencyLevel);
-    }
-
-    [Theory]
-    [InlineData(SiloStatus.Dead, 60)]
-    [InlineData(SiloStatus.Active, 0)]
-    public async Task TtlHeartbeat_RefreshesEveryFieldTogether_WithoutAdvancingVersion(SiloStatus status, int ttl)
-    {
-        var backend = new Backend();
-        var queries = await OrleansQueries.CreateInstance(backend.Session, 60);
-        var existing = Entry(status);
-        var heartbeat = new MembershipEntry { SiloAddress = existing.SiloAddress, IAmAliveTime = Timestamp.AddMinutes(1) };
-        var command = backend.Get(await queries.UpdateIAmAliveTimeWithTtl("service-cluster", heartbeat, existing, 7, TestContext.Current.CancellationToken));
-
-        Assert.StartsWith("BEGIN BATCH UPDATE membership USING TTL 0 SET version = :expected_version", command.Cql);
-        Assert.Contains("IF version = :expected_version;", command.Cql);
-        Assert.Contains("UPDATE membership USING TTL :ttl SET status = :status", command.Cql);
-        Assert.Contains("IF i_am_alive_time = :previous_time AND start_time != null;", command.Cql);
-        Assert.Equal(ttl, command.Values["ttl"]);
-        Assert.Equal(7, command.Values["expected_version"]);
-        Assert.Equal(Timestamp, command.Values["previous_time"]);
-        Assert.Equal(heartbeat.IAmAliveTime, command.Values["i_am_alive_time"]);
-        AssertFullRow(command, existing);
-        Assert.DoesNotContain("new_version", command.Values.Keys);
-        Assert.Equal(ConsistencyLevel.Serial, command.Statement.SerialConsistencyLevel);
     }
 
     [Fact]
@@ -340,127 +296,35 @@ public sealed class CassandraMembershipStatementTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Heartbeat_RetiredRowIsNoOp_AndStorageFailuresPropagate(bool ttl)
+    public async Task OwnerHeartbeat_StorageFailurePropagatesAfterOneExecute(bool ttl)
     {
-        var backend = new Backend { Version = 17 };
-        var entry = Entry(SiloStatus.Dead);
-        backend.Entries.Add(entry);
-        using var table = await backend.CreateTable(ttl);
-        var token = TestContext.Current.CancellationToken;
-        Assert.Single((await table.ReadRowAsync(entry.SiloAddress, token)).Members);
-        backend.OnExecute = command =>
-        {
-            if (command.Cql.StartsWith("DELETE FROM", StringComparison.Ordinal))
-            {
-                backend.Entries.Clear();
-                return Task.FromResult<RowSet>(Rows.Applied(true));
-            }
-
-            if (command.Cql.StartsWith("UPDATE membership", StringComparison.Ordinal))
-            {
-                Assert.Empty(backend.Entries);
-                return Task.FromResult<RowSet>(Rows.Applied(false));
-            }
-
-            return null;
-        };
-        await table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(Timestamp.AddTicks(1)), token);
-        backend.Executed.Clear();
-        entry.IAmAliveTime = Timestamp.AddMinutes(1);
-        await table.UpdateIAmAliveAsync(entry, token);
-        var operation = Assert.Single(backend.Executed);
-        Assert.StartsWith(ttl ? "SELECT" : "UPDATE membership", operation.Cql);
-        var retired = await table.ReadRowAsync(entry.SiloAddress, token);
-        Assert.Empty(retired.Members);
-        Assert.Equal(new TableVersion(17, "17"), retired.Version);
-
         var error = new InvalidOperationException("Cassandra operation failed.");
-        backend.OnExecute = _ => Task.FromException<RowSet>(error);
-        Assert.Same(error, await Assert.ThrowsAsync<InvalidOperationException>(() => table.UpdateIAmAliveAsync(entry, token)));
+        var backend = new Backend { OnExecute = _ => Task.FromException<RowSet>(error) };
+        using var table = await backend.CreateTable(ttl);
+        Assert.Same(error, await Assert.ThrowsAsync<InvalidOperationException>(
+            () => table.UpdateIAmAliveAsync(Entry(SiloStatus.Active), TestContext.Current.CancellationToken)));
+        Assert.StartsWith("UPDATE membership", Assert.Single(backend.Executed).Cql);
     }
 
     [Theory]
-    [InlineData(SiloStatus.Active)]
-    [InlineData(SiloStatus.Dead)]
-    public async Task TtlHeartbeat_RetriesRaces_AndKeepsNewerStoredTime(SiloStatus status)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnerHeartbeat_CanceledDuringExecute_PreservesCancellationAndIssuesOneWrite(bool ttl)
     {
-        var backend = new Backend { Version = 5 };
-        var existing = Entry(status);
-        backend.Entries.Add(existing);
-        var writes = 0;
-        backend.OnExecute = command =>
-        {
-            if (!command.Cql.StartsWith("UPDATE membership", StringComparison.Ordinal)
-                && !command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal))
-            {
-                return null;
-            }
+        var execution = new TaskCompletionSource<RowSet>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var backend = new Backend { OnExecute = _ => execution.Task };
+        using var table = await backend.CreateTable(ttl);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var heartbeat = table.UpdateIAmAliveAsync(Entry(SiloStatus.Active), cancellation.Token);
+        Assert.False(heartbeat.IsCompleted);
+        Assert.StartsWith("UPDATE membership", Assert.Single(backend.Executed).Cql);
+        cancellation.Cancel();
 
-            writes++;
-            Assert.Equal(Timestamp, command.Values["previous_time"]);
-            existing.IAmAliveTime = Timestamp.AddMinutes(2);
-            return Task.FromResult<RowSet>(Rows.Applied(false));
-        };
-        using var table = await backend.CreateTable(ttl: true);
-        await table.UpdateIAmAliveAsync(new MembershipEntry
-        {
-            SiloAddress = existing.SiloAddress,
-            IAmAliveTime = Timestamp.AddMinutes(1)
-        }, TestContext.Current.CancellationToken);
-        Assert.Equal(1, writes);
-        Assert.Equal(Timestamp.AddMinutes(2), existing.IAmAliveTime);
-        Assert.Equal(5, backend.Version);
-        Assert.Collection(backend.Executed,
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql),
-            AssertSingleRowRead);
-    }
-
-    [Fact]
-    public async Task TtlHeartbeat_RetriesFullRowRace_WithUpdatedFieldsAndVersion()
-    {
-        var backend = new Backend { Version = 5 };
-        var existing = Entry(SiloStatus.Active);
-        backend.Entries.Add(existing);
-        var writes = 0;
-        backend.OnExecute = command =>
-        {
-            if (!command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal))
-            {
-                return null;
-            }
-
-            writes++;
-            if (writes == 1)
-            {
-                Assert.Equal(5, command.Values["expected_version"]);
-                backend.Version++;
-                existing.Status = SiloStatus.Dead;
-                existing.HostName = "updated-host";
-                return Task.FromResult<RowSet>(Rows.Applied(false));
-            }
-
-            Assert.Equal(6, command.Values["expected_version"]);
-            Assert.Equal(60, command.Values["ttl"]);
-            Assert.Equal("updated-host", command.Values["host_name"]);
-            Assert.Equal((int)SiloStatus.Dead, command.Values["status"]);
-            Assert.Equal(Timestamp.AddSeconds(1), command.Values["i_am_alive_time"]);
-            return Task.FromResult<RowSet>(Rows.Applied(true));
-        };
-        using var table = await backend.CreateTable(ttl: true);
-        await table.UpdateIAmAliveAsync(new MembershipEntry
-        {
-            SiloAddress = existing.SiloAddress,
-            IAmAliveTime = Timestamp.AddSeconds(1)
-        }, TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, writes);
-        Assert.Collection(backend.Executed,
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql),
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql));
-        Assert.Equal(6, backend.Version);
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => heartbeat);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Single(backend.Executed);
+        Assert.False(execution.Task.IsCompleted);
+        execution.SetResult(new Rows());
     }
 
     [Theory]
