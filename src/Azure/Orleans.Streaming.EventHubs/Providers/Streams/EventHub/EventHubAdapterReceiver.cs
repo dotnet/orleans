@@ -139,13 +139,21 @@ namespace Orleans.Streaming.EventHubs
             using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCancellation.CancelAfter(timeout);
             LogInfoInitializingEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
-            lock (this.cacheLock)
-            {
-                this.receiverState = ReceiverRunning;
-            }
-
             try
             {
+                await this.shutdownLock.WaitAsync(timeoutCancellation.Token);
+                try
+                {
+                    lock (this.cacheLock)
+                    {
+                        this.receiverState = ReceiverRunning;
+                    }
+                }
+                finally
+                {
+                    this.shutdownLock.Release();
+                }
+
                 await EnsureInitialized(timeoutCancellation.Token);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
