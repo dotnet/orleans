@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using Azure;
+using Azure.Core.Pipeline;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -534,6 +536,69 @@ public class AzureMembershipPaginationTests
         Assert.Single(client.ReceivedCalls());
     }
 
+    [Theory]
+    [InlineData(false, 403, "AuthorizationFailure")]
+    [InlineData(true, 403, "AuthorizationFailure")]
+    [InlineData(false, 503, "ServerBusy")]
+    [InlineData(true, 503, "ServerBusy")]
+    public async Task CleanupPropagatesMixedBatchFailures(bool infrastructureFirst, int status, string code)
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(FencedQuery(7, DeadSilo("silo-0", "s0"), DeadSilo("silo-1", "s1")));
+        storage.AddQuery(FencedQuery(7));
+        var client = Substitute.For<TableClient>();
+        var first = new TaskCompletionSource<Response<IReadOnlyList<Response>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new TaskCompletionSource<Response<IReadOnlyList<Response>>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var batchCount = 0;
+        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                Assert.Single(call.Arg<IEnumerable<TableTransactionAction>>());
+                if (++batchCount == 1) return first.Task;
+                started.SetResult();
+                return second.Task;
+            });
+        var conflict = new RequestFailedException(412, "Concurrent heartbeat.");
+        var infrastructure = new RequestFailedException(status, "Storage failure.", code, null);
+        var cleanup = CreateManager(storage, client, maximumRows: 1)
+            .CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        first.SetException(infrastructureFirst ? infrastructure : conflict);
+        Assert.False(cleanup.IsCompleted);
+        second.SetException(infrastructureFirst ? conflict : infrastructure);
+
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => cleanup);
+
+        Assert.Equal(2, exception.InnerExceptions.Count);
+        Assert.Contains(conflict, exception.InnerExceptions);
+        Assert.Contains(infrastructure, exception.InnerExceptions);
+        Assert.Equal(2, batchCount);
+        Assert.Equal(1, storage.QueryCount);
+        Assert.Equal(2, storage.VersionReadCount);
+    }
+
+    [Fact]
+    public async Task CleanupRetriesWhenEveryBatchFailureIsContention()
+    {
+        var storage = new ScriptedMembershipTableReadStorage();
+        storage.AddQuery(FencedQuery(7, DeadSilo("silo-0", "s0"), DeadSilo("silo-1", "s1")));
+        storage.AddQuery(FencedQuery(7));
+        var client = Substitute.For<TableClient>();
+        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
+            .Returns(call => Task.FromException<Response<IReadOnlyList<Response>>>(
+                Assert.Single(call.Arg<IEnumerable<TableTransactionAction>>()).Entity.RowKey == "silo-0"
+                    ? new RequestFailedException(412, "Concurrent heartbeat.")
+                    : new RequestFailedException(404, "Concurrent cleanup.", "ResourceNotFound", null)));
+
+        await CreateManager(storage, client, maximumRows: 1)
+            .CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, client.ReceivedCalls().Count());
+        Assert.Equal(2, storage.QueryCount);
+        Assert.Equal(4, storage.VersionReadCount);
+    }
+
     [Fact]
     public async Task CleanupCancellationStopsConflictRetries()
     {
@@ -647,8 +712,42 @@ public class AzureMembershipPaginationTests
 
         Assert.False(await table.UpdateRowAsync(ProposedEntry(), "stale", new TableVersion(8, "v7"), TestContext.Current.CancellationToken));
 
-        Assert.Equal(nameof(TableClient.GetEntityIfExistsAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
+        Assert.Equal(nameof(TableClient.GetEntityAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
         Assert.Equal("s1", current.ETag.ToString());
+    }
+
+    [Theory]
+    [InlineData("ResourceNotFound", false)]
+    [InlineData("EntityNotFound", false)]
+    [InlineData("TableNotFound", true)]
+    public async Task UpdateDistinguishesMissingRowFromMissingTableThroughSdk(string errorCode, bool throws)
+    {
+        using var handler = new NotFoundTableHandler(errorCode);
+        using var httpClient = new HttpClient(handler);
+        var options = new TableClientOptions
+        {
+            Transport = new HttpClientTransport(httpClient),
+            Retry = { MaxRetries = 0 }
+        };
+        var client = new TableClient(new Uri("https://unit.test"), TableName,
+            new TableSharedKeyCredential("unitaccount", Convert.ToBase64String(new byte[32])), options);
+        var table = CreateTable(CreateManager(null, client));
+        var entry = ProposedEntry();
+        var version = new TableVersion(8, "v7");
+
+        if (throws)
+        {
+            var exception = await Assert.ThrowsAsync<RequestFailedException>(
+                () => table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken));
+            Assert.Equal(404, exception.Status);
+            Assert.Equal(errorCode, exception.ErrorCode);
+        }
+        else
+        {
+            Assert.False(await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken));
+        }
+
+        Assert.Equal(1, handler.RequestCount);
     }
 
     [Theory]
@@ -957,6 +1056,11 @@ public class AzureMembershipPaginationTests
         var client = CreateHeartbeatClient();
         _ = client.GetEntityIfExistsAsync<SiloInstanceTableEntry>(string.Empty, string.Empty, null, TestContext.Current.CancellationToken)
             .ReturnsForAnyArgs(current is null ? new MissingSiloResponse() : Response.FromValue(current, Substitute.For<Response>()));
+        _ = client.GetEntityAsync<SiloInstanceTableEntry>(
+            ClusterId, SiloInstanceTableEntry.ConstructRowKey(ProposedEntry().SiloAddress), null, TestContext.Current.CancellationToken)
+            .Returns(current is null
+                ? Task.FromException<Response<SiloInstanceTableEntry>>(new RequestFailedException(404, "Missing row.", "ResourceNotFound", null))
+                : Task.FromResult(Response.FromValue(current, Substitute.For<Response>())));
         return client;
     }
 
@@ -1021,6 +1125,27 @@ public class AzureMembershipPaginationTests
         public override bool HasValue => false;
         public override SiloInstanceTableEntry Value => throw new InvalidOperationException("The silo row is absent.");
         public override Response GetRawResponse() => Substitute.For<Response>();
+    }
+
+    private sealed class NotFoundTableHandler(string errorCode) : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequestCount++;
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.Contains(SiloInstanceTableEntry.ConstructRowKey(ProposedEntry().SiloAddress), request.RequestUri!.AbsoluteUri);
+            var response = new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent(
+                    $$$$"""{"odata.error":{"code":"{{{{errorCode}}}}","message":{"lang":"en-US","value":"Missing resource."}}}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            };
+            response.Headers.Add("x-ms-error-code", errorCode);
+            return Task.FromResult(response);
+        }
     }
 
     private static TableClient CreateHeartbeatClient()

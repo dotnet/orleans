@@ -281,7 +281,7 @@ namespace Orleans.AzureUtils
                     await DeleteEntriesBatch(defunct, cancellationToken);
                     return;
                 }
-                catch (RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.PreconditionFailed || IsRowNotFound(exception))
+                catch (Exception exception) when (IsCleanupContention(exception))
                 {
                     // Re-select recency and row etags after a concurrent update or deletion.
                 }
@@ -318,10 +318,26 @@ namespace Orleans.AzureUtils
             }
             else
             {
-                await Task.WhenAll(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
+                var deletions = Task.WhenAll(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
                     .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
+                try
+                {
+                    await deletions;
+                }
+                catch when (deletions.Exception is { InnerExceptions.Count: > 1 })
+                {
+                    // Preserve every failed batch so cleanup only retries pure contention.
+                    throw deletions.Exception;
+                }
             }
         }
+
+        private static bool IsCleanupContention(Exception exception) => exception switch
+        {
+            RequestFailedException request => request.Status == (int)HttpStatusCode.PreconditionFailed || IsRowNotFound(request),
+            AggregateException aggregate => aggregate.InnerExceptions.All(IsCleanupContention),
+            _ => false
+        };
 
         internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
@@ -496,14 +512,14 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                var current = await storage.Table.GetEntityIfExistsAsync<SiloInstanceTableEntry>(
+                var current = await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
                     siloEntry.PartitionKey, siloEntry.RowKey, cancellationToken: cancellationToken);
-                if (!current.HasValue || !string.Equals(current.Value!.ETag.ToString(), entryEtag, StringComparison.Ordinal))
+                if (!string.Equals(current.Value.ETag.ToString(), entryEtag, StringComparison.Ordinal))
                 {
                     return false;
                 }
 
-                var currentEntry = current.Value!;
+                var currentEntry = current.Value;
                 if (!string.IsNullOrEmpty(currentEntry.IAmAliveTime)
                     && (string.IsNullOrEmpty(siloEntry.IAmAliveTime)
                         || LogFormatter.ParseDate(currentEntry.IAmAliveTime) > LogFormatter.ParseDate(siloEntry.IAmAliveTime)))
