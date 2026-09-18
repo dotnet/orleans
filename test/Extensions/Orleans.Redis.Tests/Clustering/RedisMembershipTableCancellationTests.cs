@@ -741,7 +741,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(entry.SuspectTimes, persisted.SuspectTimes);
         Assert.Equal(original, JsonConvert.SerializeObject(entry, JsonSettings.JsonSerializerSettings));
         Assert.Equal((RedisValue)"2", backend.Rows["Version"]);
-        Assert.Equal(concurrentHeartbeat ? [true, true, false, true] : [true, true, true], backend.Commits);
+        Assert.Equal(concurrentHeartbeat ? [true, false, true] : [true, true], backend.Commits);
     }
 
     [Fact]
@@ -770,96 +770,53 @@ public sealed class RedisMembershipTableCancellationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task UpdateIAmAlive_ConcurrentWriter_PreservesStatusVotesAndMaximumHeartbeat(bool newerHeartbeat)
+    public async Task UpdateIAmAlive_UsesOneWriteCommandAndOnlyChangesHeartbeat(bool hasVersion)
     {
         var backend = new MembershipBackend();
         using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
         var token = TestContext.Current.CancellationToken;
-        await table.InitializeMembershipTableAsync(true, token);
+        await table.InitializeMembershipTableAsync(hasVersion, token);
         var entry = CreateEntry();
-        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), token));
-        var heartbeat = CreateEntry();
-        heartbeat.IAmAliveTime = entry.IAmAliveTime.AddTicks(10);
-        var competing = CreateEntry();
-        competing.Status = SiloStatus.Dead;
-        competing.SuspectTimes = [Tuple.Create(competing.SiloAddress, competing.IAmAliveTime.AddTicks(1))];
-        if (newerHeartbeat)
+        entry.HostName = "host,\"IAmAliveTime\":\"not-a-timestamp\"";
+        entry.SiloName = "silo";
+        entry.SuspectTimes = [Tuple.Create(entry.SiloAddress, entry.StartTime.AddTicks(1))];
+        backend.Store(entry);
+        var before = backend.Rows[entry.SiloAddress.ToString()].ToString();
+        var heartbeat = new MembershipEntry
         {
-            competing.IAmAliveTime = heartbeat.IAmAliveTime.AddTicks(10);
-        }
-
-        backend.BeforeExecute = async () => Assert.True(await table.UpdateRowAsync(competing, "1", new TableVersion(2, "1"), token));
+            SiloAddress = entry.SiloAddress,
+            IAmAliveTime = entry.IAmAliveTime.AddTicks(1234567)
+        };
+        backend.Database.ClearReceivedCalls();
 
         await table.UpdateIAmAliveAsync(heartbeat, token);
 
-        var persisted = backend.Read(entry);
-        Assert.Equal(SiloStatus.Dead, persisted.Status);
-        Assert.Equal(competing.SuspectTimes, persisted.SuspectTimes);
-        Assert.Equal(newerHeartbeat ? competing.IAmAliveTime : heartbeat.IAmAliveTime, persisted.IAmAliveTime);
-        Assert.Equal((RedisValue)"2", backend.Rows["Version"]);
-        Assert.Equal(newerHeartbeat ? [true, true, false] : [true, true, false, true], backend.Commits);
-    }
-
-    [Fact]
-    public async Task UpdateIAmAlive_ConcurrentHeartbeat_KeepsMaximumWithoutVersionChange()
-    {
-        var backend = new MembershipBackend();
-        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
-        var token = TestContext.Current.CancellationToken;
-        await table.InitializeMembershipTableAsync(true, token);
-        var entry = CreateEntry();
-        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), token));
-        var newest = CreateEntry();
-        newest.IAmAliveTime = entry.IAmAliveTime.AddTicks(20);
-        entry.IAmAliveTime = entry.IAmAliveTime.AddTicks(10);
-        backend.BeforeExecute = () => table.UpdateIAmAliveAsync(newest, token);
-
-        await table.UpdateIAmAliveAsync(entry, token);
-        await table.UpdateIAmAliveAsync(newest, token);
-
-        Assert.Equal(newest.IAmAliveTime, backend.Read(entry).IAmAliveTime);
-        Assert.Equal(SiloStatus.Active, backend.Read(entry).Status);
-        Assert.Equal((RedisValue)"1", backend.Rows["Version"]);
-        Assert.Equal([true, true, false], backend.Commits);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task UpdateIAmAlive_RetiredRow_CompletesWithoutResurrection(bool cleanupWinsRace)
-    {
-        var backend = new MembershipBackend();
-        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
-        var token = TestContext.Current.CancellationToken;
-        await table.InitializeMembershipTableAsync(true, token);
-        var entry = CreateEntry();
-        entry.Status = SiloStatus.Dead;
-        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), token));
-        var cutoff = entry.IAmAliveTime.AddTicks(1);
-        if (cleanupWinsRace)
+        var timestamp = JsonConvert.SerializeObject(heartbeat.IAmAliveTime, JsonSettings.JsonSerializerSettings);
+        var command = Assert.Single(backend.Database.ReceivedCalls());
+        Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), command.GetMethodInfo().Name);
+        var arguments = command.GetArguments();
+        Assert.Equal(MembershipBackend.ClusterKey, Assert.Single(Assert.IsType<RedisKey[]>(arguments[1])));
+        Assert.Equal(new RedisValue[] { entry.SiloAddress.ToString(), timestamp }, Assert.IsType<RedisValue[]>(arguments[2]));
+        Assert.Equal(CommandFlags.NoScriptCache, Assert.IsType<CommandFlags>(arguments[3]));
+        var expected = before.Replace(
+            "\"IAmAliveTime\":" + JsonConvert.SerializeObject(entry.IAmAliveTime, JsonSettings.JsonSerializerSettings),
+            "\"IAmAliveTime\":" + timestamp, StringComparison.Ordinal);
+        Assert.NotEqual(before, expected);
+        Assert.Equal(expected, backend.Rows[entry.SiloAddress.ToString()].ToString());
+        Assert.Equal(heartbeat.IAmAliveTime, backend.Read(entry).IAmAliveTime);
+        Assert.Equal(hasVersion, backend.Rows.ContainsKey("Version"));
+        if (hasVersion)
         {
-            backend.BeforeExecute = () => table.CleanupDefunctSiloEntriesAsync(cutoff, token);
-        }
-        else
-        {
-            await table.CleanupDefunctSiloEntriesAsync(cutoff, token);
+            Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
         }
 
-        entry.IAmAliveTime = cutoff;
-        await table.UpdateIAmAliveAsync(entry, token);
-
-        Assert.Equal((RedisValue)"1", Assert.Single(backend.Rows).Value);
-        var view = await table.ReadRowAsync(entry.SiloAddress, token);
-        Assert.Empty(view.Members);
-        Assert.Equal(1, view.Version.Version);
-        Assert.Equal(cleanupWinsRace ? [true, true, false] : [true, true], backend.Commits);
+        Assert.Empty(backend.Transactions);
     }
 
     [Theory]
     [InlineData("ReadAll")]
     [InlineData("ReadRow")]
     [InlineData("Update")]
-    [InlineData("Heartbeat")]
     [InlineData("Cleanup")]
     public async Task Operations_LostHistory_ReportsMissingVersion(string operation)
     {
@@ -876,7 +833,6 @@ public sealed class RedisMembershipTableCancellationTests
             "ReadAll" => table.ReadAllAsync(token),
             "ReadRow" => table.ReadRowAsync(entry.SiloAddress, token),
             "Update" => table.UpdateRowAsync(entry, "1", new TableVersion(2, "1"), token),
-            "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
             "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -884,29 +840,6 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Contains("version is missing", error.Message);
         Assert.Empty(backend.Rows);
         Assert.Single(backend.Transactions);
-    }
-
-    [Fact]
-    public async Task UpdateIAmAlive_HistoryExpiresDuringWrite_ReportsMissingVersion()
-    {
-        var backend = new MembershipBackend();
-        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
-        var token = TestContext.Current.CancellationToken;
-        await table.InitializeMembershipTableAsync(true, token);
-        var entry = CreateEntry();
-        backend.Store(entry);
-        backend.BeforeExecute = () =>
-        {
-            backend.Rows.Clear();
-            return Task.CompletedTask;
-        };
-        entry.IAmAliveTime = entry.IAmAliveTime.AddTicks(1);
-
-        var error = await Assert.ThrowsAsync<RedisClusteringException>(() => table.UpdateIAmAliveAsync(entry, token));
-
-        Assert.Contains("version is missing", error.Message);
-        Assert.Empty(backend.Rows);
-        Assert.Equal([false], backend.Commits);
     }
 
     [Theory]
@@ -935,11 +868,9 @@ public sealed class RedisMembershipTableCancellationTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task UpdateIAmAlive_InfrastructureFailure_PropagatesSameException(bool duringWrite, bool permissions)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UpdateIAmAlive_InfrastructureFailure_PropagatesSameException(bool permissions)
     {
         var backend = new MembershipBackend();
         using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
@@ -951,15 +882,9 @@ public sealed class RedisMembershipTableCancellationTests
         Exception failure = permissions
             ? new RedisServerException("NOPERM this user has no permissions to access the key")
             : new RedisConnectionException(ConnectionFailureType.UnableToConnect, "Connection unavailable.");
-        if (duringWrite)
-        {
-            backend.BeforeExecute = () => Task.FromException(failure);
-        }
-        else
-        {
-            backend.Database.HashGetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue[]>())
-                .Returns(Task.FromException<RedisValue[]>(failure));
-        }
+        backend.Database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache)
+            .Returns(Task.FromException<RedisResult>(failure));
+        backend.Database.ClearReceivedCalls();
 
         entry.IAmAliveTime = entry.IAmAliveTime.AddTicks(1);
         Assert.Same(failure, await Record.ExceptionAsync(() => table.UpdateIAmAliveAsync(entry, token)));
@@ -967,14 +892,40 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(2, backend.Rows.Count);
         Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
         Assert.Equal(persisted, backend.Rows[entry.SiloAddress.ToString()]);
-        Assert.Equal(duringWrite ? 1 : 0, backend.Transactions.Count);
+        Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), Assert.Single(backend.Database.ReceivedCalls()).GetMethodInfo().Name);
+        Assert.Empty(backend.Transactions);
         Assert.Empty(backend.Commits);
+    }
+
+    [Fact]
+    public async Task UpdateIAmAlive_CanceledDuringCommand_PreservesCancellation()
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var execution = new TaskCompletionSource<RedisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache)
+            .Returns(execution.Task);
+        backend.Database.ClearReceivedCalls();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+
+        var pending = table.UpdateIAmAliveAsync(CreateEntry(), cancellation.Token);
+        Assert.False(pending.IsCompleted);
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending.WaitAsync(token));
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(execution.Task.IsCompleted);
+        Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), Assert.Single(backend.Database.ReceivedCalls()).GetMethodInfo().Name);
+        Assert.Empty(backend.Transactions);
+        execution.SetResult(RedisResult.Create(0));
     }
 
     [Theory]
     [InlineData("Insert")]
     [InlineData("Update")]
-    [InlineData("Heartbeat")]
     [InlineData("Cleanup")]
     public async Task Writes_CanceledDuringTransaction_ReturnCancellation(string operation)
     {
@@ -997,7 +948,6 @@ public sealed class RedisMembershipTableCancellationTests
         {
             "Insert" => table.InsertRowAsync(entry, new TableVersion(1, "0"), cancellation.Token),
             "Update" => table.UpdateRowAsync(entry, "0", new TableVersion(1, "0"), cancellation.Token),
-            "Heartbeat" => table.UpdateIAmAliveAsync(entry, cancellation.Token),
             "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, cancellation.Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         };
@@ -1012,10 +962,8 @@ public sealed class RedisMembershipTableCancellationTests
         await backend.Executions.Single().WaitAsync(token);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Writes_CanceledAfterConflict_StopRetrying(bool heartbeat)
+    [Fact]
+    public async Task Update_CanceledAfterConflict_StopsRetrying()
     {
         var backend = new MembershipBackend();
         using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
@@ -1034,12 +982,11 @@ public sealed class RedisMembershipTableCancellationTests
         entry.IAmAliveTime = entry.IAmAliveTime.AddTicks(2);
         entry.Status = SiloStatus.Dead;
 
-        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => heartbeat
-            ? table.UpdateIAmAliveAsync(entry, cancellation.Token)
-            : table.UpdateRowAsync(entry, "0", new TableVersion(1, "0"), cancellation.Token));
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            table.UpdateRowAsync(entry, "0", new TableVersion(1, "0"), cancellation.Token));
 
         Assert.Equal(cancellation.Token, error.CancellationToken);
-        Assert.Equal([true, false], backend.Commits);
+        Assert.Equal([false], backend.Commits);
         Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
         Assert.Equal(SiloStatus.Active, backend.Read(entry).Status);
         Assert.Equal(competitor.IAmAliveTime, backend.Read(entry).IAmAliveTime);
@@ -1156,7 +1103,7 @@ public sealed class RedisMembershipTableCancellationTests
 
         Assert.Equal(JsonConvert.SerializeObject(entry, JsonSettings.JsonSerializerSettings), backend.Rows[entry.SiloAddress.ToString()].ToString());
         Assert.Equal((RedisValue)(updateVote ? "1" : "0"), backend.Rows["Version"]);
-        Assert.Equal([true, false], backend.Commits);
+        Assert.Equal(updateVote ? [true, false] : [false], backend.Commits);
     }
 
     private static MembershipEntry CreateEntry() => new()
@@ -1215,6 +1162,17 @@ public sealed class RedisMembershipTableCancellationTests
                 AfterRead = null;
                 afterRead?.Invoke();
                 return Task.FromResult(result);
+            });
+            Database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Is<RedisKey[]>(keys => keys.Length == 1 && keys[0] == ClusterKey),
+                Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache).Returns(call =>
+            {
+                var values = call.ArgAt<RedisValue[]>(2);
+                var row = Rows[values[0]].ToString();
+                var entry = JsonConvert.DeserializeObject<MembershipEntry>(row, JsonSettings.JsonSerializerSettings)!;
+                Rows[values[0]] = row.Replace(
+                    "\"IAmAliveTime\":" + JsonConvert.SerializeObject(entry.IAmAliveTime, JsonSettings.JsonSerializerSettings),
+                    "\"IAmAliveTime\":" + values[1], StringComparison.Ordinal);
+                return Task.FromResult(RedisResult.Create(0));
             });
             Database.CreateTransaction().Returns(_ => CreateTransaction());
             Multiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(Database);

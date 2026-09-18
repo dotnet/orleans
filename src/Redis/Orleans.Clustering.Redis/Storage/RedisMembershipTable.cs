@@ -295,33 +295,21 @@ namespace Orleans.Clustering.Redis
 
         public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
-            var key = entry.SiloAddress.ToString();
-            while (true)
-            {
-                var rows = await ReadEntryAsync(key, cancellationToken);
-                _ = GetTableVersionFromRow(rows[0]);
-                var current = rows[1];
-                if (!current.HasValue)
-                {
-                    return;
-                }
-
-                var existingEntry = Deserialize(current.ToString());
-                if (existingEntry.IAmAliveTime >= entry.IAmAliveTime)
-                {
-                    return;
-                }
-
-                existingEntry.IAmAliveTime = entry.IAmAliveTime;
-                var tx = _db.CreateTransaction();
-                tx.AddCondition(Condition.HashEqual(_clusterKey, key, current));
-                tx.HashSetAsync(_clusterKey, key, Serialize(existingEntry)).Ignore();
-                cancellationToken.ThrowIfCancellationRequested();
-                if (await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
-                {
-                    return;
-                }
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            // JsonSettings always emits this ISO timestamp. Patch its bytes to preserve all other fields verbatim.
+            const string script =
+                """
+                local row = redis.call('HGET', KEYS[1], ARGV[1])
+                local first, last = string.find(row, '"IAmAliveTime":"[^"]*"')
+                local updated = string.sub(row, 1, first - 1) .. '"IAmAliveTime":' .. ARGV[2] .. string.sub(row, last + 1)
+                return redis.call('HSET', KEYS[1], ARGV[1], updated)
+                """;
+            var timestamp = JsonConvert.SerializeObject(entry.IAmAliveTime, _jsonSerializerSettings);
+            await AwaitAsync(_db.ScriptEvaluateAsync(
+                script,
+                [_clusterKey],
+                [entry.SiloAddress.ToString(), timestamp],
+                CommandFlags.NoScriptCache), cancellationToken);
         }
 
         [Obsolete("Use UpdateRowAsync instead.")]
