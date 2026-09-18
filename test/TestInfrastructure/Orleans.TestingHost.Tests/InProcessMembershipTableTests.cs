@@ -81,8 +81,50 @@ public sealed class InProcessMembershipTableTests
         Assert.Equal(Tuple.Create(suspector, DateTime.UnixEpoch), Assert.Single(stored.SuspectTimes!));
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task UpdateIAmAlive_OwnerReport_ChangesOnlyTimestampAndRowEtag(int clockOffsetMinutes)
+    {
+        var entry = CreateEntry(SiloStatus.Active);
+        entry.IAmAliveTime = entry.StartTime.AddHours(1);
+        entry.RoleName = "worker";
+        entry.UpdateZone = 3;
+        entry.FaultZone = 5;
+        entry.ProxyPort = 20000;
+        entry.AddSuspector(SiloAddress.FromParsableString("127.0.0.1:20001@1"), DateTime.UnixEpoch);
+        await Insert(entry);
+        var before = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        // The owning silo can report the same time or a clock adjustment.
+        var heartbeat = new MembershipEntry
+        {
+            SiloAddress = entry.SiloAddress,
+            IAmAliveTime = entry.IAmAliveTime.AddMinutes(clockOffsetMinutes)
+        };
+
+        await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
+
+        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var stored = Assert.Single(after.Members);
+        Assert.Equal(before.Version, after.Version);
+        Assert.NotEqual(Assert.Single(before.Members).Item2, stored.Item2);
+        Assert.Equal(heartbeat.IAmAliveTime, stored.Item1.IAmAliveTime);
+        Assert.Equal(entry.SiloAddress, stored.Item1.SiloAddress);
+        Assert.Equal(entry.Status, stored.Item1.Status);
+        Assert.Equal(entry.StartTime, stored.Item1.StartTime);
+        Assert.Equal(entry.SiloName, stored.Item1.SiloName);
+        Assert.Equal(entry.HostName, stored.Item1.HostName);
+        Assert.Equal(entry.RoleName, stored.Item1.RoleName);
+        Assert.Equal(entry.UpdateZone, stored.Item1.UpdateZone);
+        Assert.Equal(entry.FaultZone, stored.Item1.FaultZone);
+        Assert.Equal(entry.ProxyPort, stored.Item1.ProxyPort);
+        Assert.Equal(entry.SuspectTimes, stored.Item1.SuspectTimes);
+        Assert.Equal(entry.IAmAliveTime, Assert.Single(before.Members).Item1.IAmAliveTime);
+    }
+
     [Fact]
-    public async Task Updates_PreserveMaximumHeartbeatAcrossDelayedHeartbeatAndStatusChange()
+    public async Task Update_WithCurrentTokens_PreservesMaximumHeartbeat()
     {
         var entry = CreateEntry(SiloStatus.Joining);
         var originalHeartbeat = entry.IAmAliveTime;
@@ -94,8 +136,6 @@ public sealed class InProcessMembershipTableTests
             IAmAliveTime = entry.IAmAliveTime.AddHours(2)
         };
         var maximum = heartbeat.IAmAliveTime;
-        await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
-        heartbeat.IAmAliveTime = entry.IAmAliveTime.AddHours(1);
         await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
         var beforeUpdate = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
         Assert.Equal(initial.Version, beforeUpdate.Version);

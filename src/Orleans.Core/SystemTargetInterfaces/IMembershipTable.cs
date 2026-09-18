@@ -210,6 +210,7 @@ namespace Orleans
         /// Updates the IAmAliveTime column of the MembershipEntry for this silo.
         /// </summary>
         /// <remarks>
+        /// Each silo owns its heartbeat and writes the supplied timestamp directly to its IAmAliveTime column.
         /// Preserves the other membership fields and the table version, including its ETag.
         /// The row ETag may change.
         /// </remarks>

@@ -209,7 +209,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
         {
             lock (_lock)
             {
-                if (!_table.TryGetValue(entry.SiloAddress, out var data) || data.Entry.IAmAliveTime >= entry.IAmAliveTime)
+                if (!_table.TryGetValue(entry.SiloAddress, out var data))
                 {
                     return;
                 }

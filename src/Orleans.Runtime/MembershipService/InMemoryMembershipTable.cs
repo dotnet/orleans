@@ -76,7 +76,7 @@ namespace Orleans.Runtime.MembershipService
         public void UpdateIAmAlive(MembershipEntry entry)
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
-            if (data == null || data.Item1.IAmAliveTime >= entry.IAmAliveTime) return;
+            if (data == null) return;
 
             data.Item1.IAmAliveTime = entry.IAmAliveTime;
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
