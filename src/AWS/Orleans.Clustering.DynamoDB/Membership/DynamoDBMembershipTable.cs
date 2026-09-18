@@ -232,12 +232,12 @@ namespace Orleans.Clustering.DynamoDB
 
                     var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", ParseRecord, cancellationToken);
 
-                    var versionAfter = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
-                        ParseRecord, cancellationToken)
+                    var queriedVersion = records.Find(record => record.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
                         ?? throw new KeyNotFoundException("No version row found for membership table");
-                    if (versionAfter.ETag != versionRow.ETag
-                        || !records.Exists(record => record.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW
-                            && record.ETag == versionRow.ETag))
+                    // Each canonical write stamps its row and advances the table version atomically.
+                    // Reject pages containing changes newer than the opening strongly consistent read.
+                    if (queriedVersion.ETag != versionRow.ETag
+                        || records.Exists(record => record.MembershipVersion > versionRow.MembershipVersion))
                     {
                         LogWarningFoundInconsistencyReadingAllSiloEntries();
                         await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
@@ -410,12 +410,9 @@ namespace Orleans.Clustering.DynamoDB
         private static SiloInstanceRecord ParseRecord(Dictionary<string, AttributeValue> fields)
         {
             var siloIdentity = fields[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S;
-            if (siloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
-            {
-                ValidateVersionAttribute(SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME);
-                ValidateVersionAttribute(SiloInstanceRecord.ETAG_PROPERTY_NAME);
-            }
-            else
+            ValidateVersionAttribute(SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME);
+            ValidateVersionAttribute(SiloInstanceRecord.ETAG_PROPERTY_NAME);
+            if (siloIdentity != SiloInstanceRecord.TABLE_VERSION_ROW)
             {
                 ValidateTimestampAttribute(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME);
                 ValidateTimestampAttribute(SiloInstanceRecord.START_TIME_PROPERTY_NAME);
@@ -448,7 +445,10 @@ namespace Orleans.Clustering.DynamoDB
                 if (!fields.TryGetValue(attribute, out var value)
                     || !int.TryParse(value.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                 {
-                    throw new FormatException($"Membership table version row has a missing or invalid {attribute} attribute.");
+                    var rowDescription = siloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW
+                        ? "Membership table version row"
+                        : $"Membership row for silo '{siloIdentity}'";
+                    throw new FormatException($"{rowDescription} has a missing or invalid {attribute} attribute.");
                 }
             }
         }
@@ -622,33 +622,20 @@ namespace Orleans.Clustering.DynamoDB
                 async Task DeleteDefunctEntry(Dictionary<string, AttributeValue> fields)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var conditions = new List<string>();
-                    var values = new Dictionary<string, AttributeValue>();
-                    foreach (var attribute in new[]
+                    var condition = $"{SiloInstanceRecord.STATUS_PROPERTY_NAME} = :{SiloInstanceRecord.STATUS_PROPERTY_NAME}"
+                        + $" AND {SiloInstanceRecord.ETAG_PROPERTY_NAME} = :{SiloInstanceRecord.ETAG_PROPERTY_NAME}"
+                        + $" AND {SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} = :{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME}";
+                    var values = new Dictionary<string, AttributeValue>
                     {
-                        SiloInstanceRecord.STATUS_PROPERTY_NAME,
-                        SiloInstanceRecord.ETAG_PROPERTY_NAME,
-                        SiloInstanceRecord.START_TIME_PROPERTY_NAME,
-                        SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME,
-                        SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME,
-                        SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME
-                    })
-                    {
-                        if (fields.TryGetValue(attribute, out var value))
-                        {
-                            conditions.Add($"{attribute} = :{attribute}");
-                            values.Add($":{attribute}", value);
-                        }
-                        else
-                        {
-                            conditions.Add($"attribute_not_exists({attribute})");
-                        }
-                    }
+                        [$":{SiloInstanceRecord.STATUS_PROPERTY_NAME}"] = fields[SiloInstanceRecord.STATUS_PROPERTY_NAME],
+                        [$":{SiloInstanceRecord.ETAG_PROPERTY_NAME}"] = fields[SiloInstanceRecord.ETAG_PROPERTY_NAME],
+                        [$":{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME}"] = fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME]
+                    };
 
                     try
                     {
                         await this.storage.DeleteEntryAsync(this.options.TableName, new SiloInstanceRecord(fields).GetKeys(),
-                            cancellationToken, string.Join(" AND ", conditions), values);
+                            cancellationToken, condition, values);
                     }
                     catch (ConditionalCheckFailedException)
                     {

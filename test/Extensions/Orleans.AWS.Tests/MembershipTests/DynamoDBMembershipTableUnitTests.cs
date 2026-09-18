@@ -81,8 +81,7 @@ namespace AWSUtils.Tests.MembershipTests
                         Assert.Equal("cluster", delete.Key[SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME].S);
                         Assert.Equal($"silo-{index}", delete.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
                         Assert.Equal(
-                            "SiloStatus = :SiloStatus AND ETag = :ETag AND attribute_not_exists(StartTime)"
-                                + " AND IAmAliveTime = :IAmAliveTime AND attribute_not_exists(SuspectingSilos) AND attribute_not_exists(SuspectingTimes)",
+                            "SiloStatus = :SiloStatus AND ETag = :ETag AND IAmAliveTime = :IAmAliveTime",
                             delete.ConditionExpression);
                         Assert.Equal(3, delete.ExpressionAttributeValues.Count);
                         Assert.Equal(((int)SiloStatus.Dead).ToString(CultureInfo.InvariantCulture), delete.ExpressionAttributeValues[":SiloStatus"].N);
@@ -256,6 +255,11 @@ namespace AWSUtils.Tests.MembershipTests
             {
                 var row = client.Records["silo-0"];
                 const string recent = "2026-01-03 00:00:00.000 GMT";
+                if (field != nameof(SiloInstanceRecord.IAmAliveTime))
+                {
+                    row.ETag++;
+                    row.MembershipVersion++;
+                }
                 switch (field)
                 {
                     case nameof(SiloInstanceRecord.IAmAliveTime): row.IAmAliveTime = recent; break;
@@ -264,7 +268,6 @@ namespace AWSUtils.Tests.MembershipTests
                         row.SuspectingSilos = "127.0.0.1:11112@1";
                         row.SuspectingTimes = recent;
                         break;
-                    case nameof(SiloInstanceRecord.ETag): row.ETag++; break;
                     case nameof(SiloInstanceRecord.Status): row.Status = (int)SiloStatus.Active; break;
                 }
             };
@@ -891,7 +894,6 @@ namespace AWSUtils.Tests.MembershipTests
             entry.Status = SiloStatus.ShuttingDown;
             Assert.True(await table.UpdateRowAsync(entry, etag, snapshot.Version.Next(), TestContext.Current.CancellationToken));
             Assert.Equal(((int)SiloStatus.ShuttingDown).ToString(CultureInfo.InvariantCulture), row[SiloInstanceRecord.STATUS_PROPERTY_NAME].N);
-            Assert.Equal(LogFormatter.PrintDate(entry.IAmAliveTime), row[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
             Assert.Equal("4", row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
             Assert.Equal("8", version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
             Assert.Equal("8", version[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
@@ -941,19 +943,29 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Equal(1, client.WriteCount);
         }
 
-        [Fact]
-        public async Task ReadAllRetriesWhenVersionChangesAcrossPages()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task ReadAllRetriesWhenCanonicalMutationCrossesPages(bool versionFirst)
         {
             var reads = 0;
             var queries = 0;
-            var continuation = CreateRecord().GetKeys();
+            var currentVersion = 7;
+            var member = CreateRecord();
+            if (versionFirst)
+            {
+                member.Address = "aaaa::1";
+                member.SiloIdentity = SiloInstanceRecord.ConstructSiloIdentity(SiloAddress.New(IPAddress.Parse(member.Address), 11111, 1));
+            }
+            var continuation = versionFirst ? CreateVersion(7).GetKeys() : member.GetKeys();
             using var client = new RequestClient
             {
                 Read = request =>
                 {
+                    Assert.True(++reads <= 2);
                     Assert.True(request.ConsistentRead);
                     Assert.Equal("VersionRow", request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
-                    return new GetItemResponse { Item = CreateVersion(++reads == 1 ? 7 : 8).GetFields(true) };
+                    return new GetItemResponse { Item = CreateVersion(currentVersion).GetFields(true) };
                 },
                 Query = request =>
                 {
@@ -970,25 +982,60 @@ namespace AWSUtils.Tests.MembershipTests
                     {
                         Assert.Equal(continuation, request.ExclusiveStartKey);
                     }
-                    var row = CreateRecord();
-                    row.MembershipVersion = queries <= 2 ? 7 : 8;
-                    row.HostName = queries <= 2 ? "old" : "current";
-                    return new QueryResponse
+                    member.MembershipVersion = currentVersion;
+                    member.ETag = currentVersion - 4;
+                    member.HostName = $"host-{currentVersion}";
+                    var response = new QueryResponse
                     {
-                        Items = [firstPage ? CreateVersion(row.MembershipVersion).GetFields(true) : row.GetFields(true)],
+                        Items = [firstPage == versionFirst ? CreateVersion(currentVersion).GetFields(true) : member.GetFields(true)],
                         LastEvaluatedKey = firstPage ? continuation : []
                     };
+                    currentVersion = 8;
+                    return response;
                 }
             };
             var table = CreateTable(client);
 
             var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
-            Assert.Equal(4, reads);
+            Assert.Equal(2, reads);
             Assert.Equal(4, queries);
             Assert.Equal(8, result.Version.Version);
             Assert.Equal("8", result.Version.VersionEtag);
-            Assert.Equal("current", Assert.Single(result.Members).Item1.HostName);
+            Assert.Equal("host-8", Assert.Single(result.Members).Item1.HostName);
+        }
+
+        [Fact]
+        public async Task ReadAllReturnsCompleteViewWhenMutationFollowsQuery()
+        {
+            var reads = 0;
+            var queries = 0;
+            var currentVersion = 7;
+            using var client = new RequestClient
+            {
+                Read = request =>
+                {
+                    Assert.Equal(1, ++reads);
+                    Assert.True(request.ConsistentRead);
+                    return new GetItemResponse { Item = CreateVersion(currentVersion).GetFields(true) };
+                },
+                Query = request =>
+                {
+                    Assert.Equal(1, ++queries);
+                    Assert.True(request.ConsistentRead);
+                    var response = new QueryResponse { Items = [CreateRecord().GetFields(true), CreateVersion(7).GetFields(true)], LastEvaluatedKey = [] };
+                    currentVersion = 8;
+                    return response;
+                }
+            };
+
+            var result = await CreateTable(client).ReadAllAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(7, result.Version.Version);
+            Assert.Equal("7", result.Version.VersionEtag);
+            Assert.Equal("host", Assert.Single(result.Members).Item1.HostName);
+            Assert.Equal(1, reads);
+            Assert.Equal(1, queries);
         }
 
         [Fact]
@@ -1003,16 +1050,13 @@ namespace AWSUtils.Tests.MembershipTests
                 Read = _ =>
                 {
                     reads++;
-                    if (reads == 2)
-                    {
-                        cancellation.Cancel();
-                    }
-                    return new GetItemResponse { Item = CreateVersion(reads == 1 ? 7 : 8).GetFields(true) };
+                    return new GetItemResponse { Item = CreateVersion(7).GetFields(true) };
                 },
                 Query = _ =>
                 {
                     queries++;
-                    return new QueryResponse { Items = [CreateVersion(7).GetFields(true)], LastEvaluatedKey = [] };
+                    cancellation.Cancel();
+                    return new QueryResponse { Items = [CreateVersion(8).GetFields(true)], LastEvaluatedKey = [] };
                 }
             };
 
@@ -1020,12 +1064,12 @@ namespace AWSUtils.Tests.MembershipTests
                 () => CreateTable(client).ReadAllAsync(cancellation.Token));
 
             Assert.Equal(cancellation.Token, exception.CancellationToken);
-            Assert.Equal(2, reads);
+            Assert.Equal(1, reads);
             Assert.Equal(1, queries);
         }
 
         [Fact]
-        public async Task ReadAllFailsWhenVersionRowDisappearsAfterQuery()
+        public async Task ReadAllFailsWhenQueryOmitsVersionRow()
         {
             var reads = 0;
             var queries = 0;
@@ -1033,15 +1077,13 @@ namespace AWSUtils.Tests.MembershipTests
             {
                 Read = _ =>
                 {
-                    Assert.True(++reads <= 2);
-                    return reads == 1
-                        ? new GetItemResponse { Item = CreateVersion(7).GetFields(true) }
-                        : new GetItemResponse();
+                    Assert.Equal(1, ++reads);
+                    return new GetItemResponse { Item = CreateVersion(7).GetFields(true) };
                 },
                 Query = _ =>
                 {
                     queries++;
-                    return new QueryResponse { Items = [CreateVersion(7).GetFields(true)], LastEvaluatedKey = [] };
+                    return new QueryResponse { Items = [CreateRecord().GetFields(true)], LastEvaluatedKey = [] };
                 }
             };
 
@@ -1049,7 +1091,7 @@ namespace AWSUtils.Tests.MembershipTests
                 () => CreateTable(client).ReadAllAsync(TestContext.Current.CancellationToken));
 
             Assert.Equal("No version row found for membership table", exception.Message);
-            Assert.Equal(2, reads);
+            Assert.Equal(1, reads);
             Assert.Equal(1, queries);
         }
 
@@ -1108,9 +1150,9 @@ namespace AWSUtils.Tests.MembershipTests
             await Assert.ThrowsAsync<FormatException>(() => CreateTable(corrupt).ReadAllAsync(TestContext.Current.CancellationToken));
         }
 
-        public static IEnumerable<object[]> MalformedVersionRows()
+        public static IEnumerable<object[]> MalformedMembershipTokens()
         {
-            foreach (var operation in new[] { "ReadRow", "ReadAllBefore", "ReadAllQuery", "ReadAllAfter" })
+            foreach (var operation in new[] { "ReadRow", "ReadRowMember", "ReadAllBefore", "ReadAllQuery", "ReadAllMember", "CleanupMember" })
             {
                 foreach (var attribute in new[] { SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME, SiloInstanceRecord.ETAG_PROPERTY_NAME })
                 {
@@ -1123,10 +1165,11 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
-        [MemberData(nameof(MalformedVersionRows))]
-        public async Task MembershipReadsRejectMalformedVersionAttributes(string operation, string attribute, string corruption)
+        [MemberData(nameof(MalformedMembershipTokens))]
+        public async Task MembershipOperationsRejectMalformedTokens(string operation, string attribute, string corruption)
         {
-            var fields = CreateVersion(7).GetFields(includeKeys: true);
+            var member = operation.EndsWith("Member", StringComparison.Ordinal);
+            var fields = member ? CreateRecord().GetFields(true) : CreateVersion(7).GetFields(true);
             if (corruption == "missing")
             {
                 fields.Remove(attribute);
@@ -1143,7 +1186,6 @@ namespace AWSUtils.Tests.MembershipTests
                 };
             }
 
-            var reads = 0;
             using var client = new RequestClient
             {
                 Read = request =>
@@ -1153,19 +1195,18 @@ namespace AWSUtils.Tests.MembershipTests
                         return new GetItemResponse();
                     }
 
-                    reads++;
-                    var malformed = operation == "ReadAllBefore"
-                        || (operation == "ReadAllAfter" && reads == 2);
-                    return new GetItemResponse { Item = malformed ? fields : CreateVersion(7).GetFields(true) };
+                    return new GetItemResponse { Item = operation == "ReadAllBefore" ? fields : CreateVersion(7).GetFields(true) };
                 },
                 Query = _ => new QueryResponse
                 {
-                    Items = [operation == "ReadAllQuery" ? fields : CreateVersion(7).GetFields(true)],
+                    Items = member ? [fields, CreateVersion(7).GetFields(true)] : [fields],
                     LastEvaluatedKey = []
                 },
                 ReadTransaction = _ => new TransactGetItemsResponse
                 {
-                    Responses = [new ItemResponse(), new ItemResponse { Item = fields }]
+                    Responses = member
+                        ? [new ItemResponse { Item = fields }, new ItemResponse { Item = CreateVersion(7).GetFields(true) }]
+                        : [new ItemResponse(), new ItemResponse { Item = fields }]
                 }
             };
             var table = CreateTable(client);
@@ -1173,13 +1214,15 @@ namespace AWSUtils.Tests.MembershipTests
 
             var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
             {
-                "ReadRow" => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
+                "ReadRow" or "ReadRowMember" => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
+                "CleanupMember" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
                 _ => table.ReadAllAsync(TestContext.Current.CancellationToken)
             });
 
-            Assert.Contains("Membership table version row", exception.Message);
+            Assert.Contains(member ? "Membership row for silo" : "Membership table version row", exception.Message);
             Assert.Contains(attribute, exception.Message);
             Assert.Equal(0, client.WriteCount);
+            Assert.Equal(0, client.DeleteCount);
         }
 
         [Theory]
