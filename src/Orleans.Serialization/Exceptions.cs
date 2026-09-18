@@ -593,4 +593,15 @@ namespace Orleans.Serialization
         {
         }
     }
+
+    internal sealed class UnresolvedInvokableAliasException : TypeLoadException
+    {
+        public UnresolvedInvokableAliasException(string alias)
+            : base($"Unable to resolve invokable type alias \"{alias}\" on this host.")
+        {
+            Alias = alias;
+        }
+
+        public string Alias { get; }
+    }
 }

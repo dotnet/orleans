@@ -138,6 +138,11 @@ namespace Orleans.Runtime.Messaging
             return connection.RunInternal();
         }
 
+        protected NetworkProtocolVersion NetworkProtocolVersion { get; private set; } = NetworkProtocolVersion.Version1;
+
+        protected void NegotiateProtocolVersion(NetworkProtocolVersion offered, NetworkProtocolVersion remote)
+            => NetworkProtocolVersion = (NetworkProtocolVersion)Math.Min((byte)offered, (byte)remote);
+
         protected virtual async Task RunInternal()
         {
             _transport = this.Context.Transport;
@@ -311,6 +316,7 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             using var serializerScope = this.shared.ServiceProvider.CreateScope();
             var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion);
             var prevBufferLength = 0L;
             try
             {
@@ -387,6 +393,7 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             using var serializerScope = this.shared.ServiceProvider.CreateScope();
             var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion);
             var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {
@@ -419,6 +426,8 @@ namespace Orleans.Runtime.Messaging
                         {
                             throw;
                         }
+
+                        inflight.Remove(message!);
                     }
 
                     var flushResult = await output.FlushAsync();
@@ -513,7 +522,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private bool HandleSendMessageFailure(Message? message, Exception exception)
+        protected bool HandleSendMessageFailure(Message? message, Exception exception)
         {
             // We get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
@@ -534,7 +543,14 @@ namespace Orleans.Runtime.Messaging
                 response.Result = Message.ResponseTypes.Error;
                 response.BodyObject = Response.FromException(exception);
 
-                this.MessageCenter.DispatchLocalMessage(response);
+                if (response.TargetSilo is null)
+                {
+                    this.MessageCenter.DispatchLocalMessage(response);
+                }
+                else
+                {
+                    this.MessageCenter.SendMessage(response);
+                }
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
