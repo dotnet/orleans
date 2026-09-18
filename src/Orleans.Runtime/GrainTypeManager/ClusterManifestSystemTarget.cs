@@ -8,7 +8,6 @@ namespace Orleans.Runtime
 {
     internal sealed class ClusterManifestSystemTarget : SystemTarget, IClusterManifestSystemTarget, ISiloManifestSystemTarget, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly GrainManifest _siloManifest;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly ClusterManifestUpdate? _noUpdate = default;
@@ -23,7 +22,6 @@ namespace Orleans.Runtime
             SystemTargetShared shared)
             : base(Constants.ManifestProviderType, shared)
         {
-            _siloManifest = clusterManifestProvider.LocalGrainManifest;
             _clusterMembershipService = clusterMembershipService;
             _clusterManifestProvider = clusterManifestProvider;
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -61,13 +59,14 @@ namespace Orleans.Runtime
         public ValueTask<ManifestHash> GetSiloManifestHash(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(ManifestHashCalculator.ComputeHash(_siloManifest));
+            return new(ManifestHashCalculator.ComputeHash(_clusterManifestProvider.LocalGrainManifest));
         }
 
         public ValueTask<GrainManifest?> GetSiloManifestByHash(ManifestHash hash, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(hash == ManifestHashCalculator.ComputeHash(_siloManifest) ? _siloManifest : null);
+            var localManifest = _clusterManifestProvider.LocalGrainManifest;
+            return new(hash == ManifestHashCalculator.ComputeHash(localManifest) ? localManifest : null);
         }
 
         public ValueTask<ClusterManifestUpdate?> GetClusterManifestUpdate(
@@ -113,8 +112,9 @@ namespace Orleans.Runtime
         public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new(_siloManifest);
+            return new(_clusterManifestProvider.LocalGrainManifest);
         }
+
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             // We don't participate in any lifecycle stages: activating this instance is all that is necessary.
