@@ -159,7 +159,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
-        grain.Captures.Clear();
+        grain.ClearCaptures();
         await OnTurnAsync(context, () => context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "capture-cutoff");
         var preceding = Fixture.WriteStateAsync(receiver).AsTask();
         await storage.WaitUntilEnteredAsync();
