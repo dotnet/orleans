@@ -337,7 +337,7 @@ namespace Orleans.Clustering.DynamoDB
                 siloEntry.ETag = currentEtag + 1;
 
                 var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                    fields => new SiloInstanceRecord(fields), cancellationToken);
+                    ParseRecord, cancellationToken);
                 if (current is null || current.ETag != currentEtag)
                 {
                     return false;
@@ -434,7 +434,7 @@ namespace Orleans.Clustering.DynamoDB
                     catch (ConditionalCheckFailedException)
                     {
                         var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                            values => values, cancellationToken);
+                            ParseRecord, cancellationToken);
                         if (current is null)
                         {
                             var versionKeys = new Dictionary<string, AttributeValue>
@@ -448,18 +448,10 @@ namespace Orleans.Clustering.DynamoDB
                             break;
                         }
 
-                        if (current.TryGetValue(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, out var heartbeat))
+                        if (current.IAmAliveTime is { } heartbeat
+                            && LogFormatter.ParseDate(heartbeat) >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
                         {
-                            if (!DateTime.TryParseExact(heartbeat.S, MEMBERSHIP_DATE_FORMAT, CultureInfo.InvariantCulture,
-                                DateTimeStyles.None, out var currentHeartbeat))
-                            {
-                                throw new FormatException($"Membership row for silo '{siloEntry.SiloIdentity}' has an invalid {SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} attribute.");
-                            }
-
-                            if (currentHeartbeat >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
-                            {
-                                break;
-                            }
+                            break;
                         }
                     }
                 }
@@ -473,13 +465,39 @@ namespace Orleans.Clustering.DynamoDB
 
         private static SiloInstanceRecord ParseRecord(Dictionary<string, AttributeValue> fields)
         {
-            if (fields[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == SiloInstanceRecord.TABLE_VERSION_ROW)
+            var siloIdentity = fields[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S;
+            if (siloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
             {
                 ValidateVersionAttribute(SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME);
                 ValidateVersionAttribute(SiloInstanceRecord.ETAG_PROPERTY_NAME);
             }
+            else
+            {
+                ValidateTimestampAttribute(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME);
+                ValidateTimestampAttribute(SiloInstanceRecord.START_TIME_PROPERTY_NAME);
+                ValidateStringAttribute(SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME);
+                ValidateStringAttribute(SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME);
+            }
 
             return new SiloInstanceRecord(fields);
+
+            void ValidateTimestampAttribute(string attribute)
+            {
+                if (fields.TryGetValue(attribute, out var value)
+                    && !DateTime.TryParseExact(value.S, MEMBERSHIP_DATE_FORMAT, CultureInfo.InvariantCulture,
+                        DateTimeStyles.None, out _))
+                {
+                    throw new FormatException($"Membership row for silo '{siloIdentity}' has an invalid {attribute} attribute.");
+                }
+            }
+
+            void ValidateStringAttribute(string attribute)
+            {
+                if (fields.TryGetValue(attribute, out var value) && value.S is null)
+                {
+                    throw new FormatException($"Membership row for silo '{siloIdentity}' has an invalid {attribute} attribute.");
+                }
+            }
 
             void ValidateVersionAttribute(string attribute)
             {
@@ -651,7 +669,7 @@ namespace Orleans.Clustering.DynamoDB
                 var filter = $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}";
 
                 var records = await this.storage.QueryAllAsync(this.options.TableName, keys, filter, item => item, cancellationToken);
-                foreach (var batch in records.Where(fields => SiloIsDefunct(new SiloInstanceRecord(fields), beforeDate))
+                foreach (var batch in records.Where(fields => SiloIsDefunct(ParseRecord(fields), beforeDate))
                     .BatchIEnumerable(MAX_CONCURRENT_CLEANUP_DELETES))
                 {
                     await Task.WhenAll(batch.Select(DeleteDefunctEntry));

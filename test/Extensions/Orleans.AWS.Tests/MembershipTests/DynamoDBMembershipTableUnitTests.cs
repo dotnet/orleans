@@ -728,6 +728,176 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Equal(7, client.Current.MembershipVersion);
         }
 
+        public static IEnumerable<object[]> MalformedRecencyAttributes()
+        {
+            foreach (var operation in new[] { "UpdateRow", "ReadRow", "ReadAll", "Cleanup", "Heartbeat" })
+            {
+                foreach (var attribute in new[]
+                {
+                    SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME,
+                    SiloInstanceRecord.START_TIME_PROPERTY_NAME,
+                    SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME,
+                    SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME
+                })
+                {
+                    yield return [operation, attribute, "number"];
+                    yield return [operation, attribute, "null"];
+                    if (attribute is SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME or SiloInstanceRecord.START_TIME_PROPERTY_NAME)
+                    {
+                        yield return [operation, attribute, "invalid-date"];
+                        yield return [operation, attribute, "empty-date"];
+                    }
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(MalformedRecencyAttributes))]
+        public async Task MembershipOperationsRejectMalformedPresentRecencyAttributes(string operation, string attribute, string corruption)
+        {
+            var row = CreateRecord();
+            row.Status = (int)SiloStatus.Dead;
+            var fields = row.GetFields(includeKeys: true);
+            var invalid = corruption switch
+            {
+                "number" => new AttributeValue { N = "123" },
+                "null" => new AttributeValue { NULL = true },
+                "invalid-date" => new AttributeValue("not-a-date"),
+                "empty-date" => new AttributeValue(string.Empty),
+                _ => throw new ArgumentOutOfRangeException(nameof(corruption))
+            };
+            fields[attribute] = invalid;
+            var updates = 0;
+            using var client = new RequestClient
+            {
+                Read = request => new GetItemResponse
+                {
+                    Item = request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == SiloInstanceRecord.TABLE_VERSION_ROW
+                        ? CreateVersion(7).GetFields(true)
+                        : fields
+                },
+                ReadTransaction = _ => new TransactGetItemsResponse
+                {
+                    Responses = [new ItemResponse { Item = fields }, new ItemResponse { Item = CreateVersion(7).GetFields(true) }]
+                },
+                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] },
+                Update = _ =>
+                {
+                    Assert.Equal(1, ++updates);
+                    throw new ConditionalCheckFailedException("Row requires verification.");
+                }
+            };
+            var table = CreateTable(client);
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = DateTime.UnixEpoch
+            };
+
+            var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
+            {
+                "UpdateRow" => table.UpdateRowAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken),
+                "ReadRow" => table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken),
+                "ReadAll" => table.ReadAllAsync(TestContext.Current.CancellationToken),
+                "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
+                "Heartbeat" => table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            });
+
+            Assert.Contains(attribute, exception.Message);
+            Assert.Contains(row.SiloIdentity, exception.Message);
+            Assert.Equal(0, client.WriteCount);
+            Assert.Equal(0, client.DeleteCount);
+            Assert.Equal(operation == "Heartbeat" ? 1 : 0, updates);
+            Assert.Same(invalid, fields[attribute]);
+        }
+
+        [Theory]
+        [InlineData("UpdateRow")]
+        [InlineData("ReadRow")]
+        [InlineData("ReadAll")]
+        [InlineData("Cleanup")]
+        [InlineData("Heartbeat")]
+        public async Task MembershipOperationsPreserveAbsentLegacyRecencyAttributes(string operation)
+        {
+            var row = CreateRecord();
+            row.Status = (int)SiloStatus.Dead;
+            row.IAmAliveTime = null;
+            row.StartTime = null;
+            var fields = row.GetFields(includeKeys: true);
+            var updates = 0;
+            using var client = new RequestClient
+            {
+                Read = request => new GetItemResponse
+                {
+                    Item = request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == SiloInstanceRecord.TABLE_VERSION_ROW
+                        ? CreateVersion(7).GetFields(true)
+                        : fields
+                },
+                ReadTransaction = _ => new TransactGetItemsResponse
+                {
+                    Responses = [new ItemResponse { Item = fields }, new ItemResponse { Item = CreateVersion(7).GetFields(true) }]
+                },
+                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] },
+                Write = request =>
+                {
+                    var put = Assert.IsType<Put>(request.TransactItems[0].Put);
+                    Assert.Equal("ETag = :currentETag AND attribute_not_exists(IAmAliveTime)", put.ConditionExpression);
+                    Assert.Equal("1970-01-01 00:00:00.000 GMT", put.Item[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+                    Assert.False(put.ExpressionAttributeValues.ContainsKey(":currentHeartbeat"));
+                    return new TransactWriteItemsResponse();
+                },
+                Update = request =>
+                {
+                    Assert.True(++updates <= 2);
+                    if (updates == 1)
+                    {
+                        throw new ConditionalCheckFailedException("Row changed before verification.");
+                    }
+                    Assert.False(fields.ContainsKey(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME));
+                    var heartbeat = request.ExpressionAttributeValues[":IAmAliveTime"];
+                    fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat;
+                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat } };
+                }
+            };
+            var table = CreateTable(client);
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = DateTime.UnixEpoch
+            };
+
+            switch (operation)
+            {
+                case "UpdateRow":
+                    Assert.True(await table.UpdateRowAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken));
+                    break;
+                case "ReadRow":
+                case "ReadAll":
+                    var result = operation == "ReadRow"
+                        ? await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken)
+                        : await table.ReadAllAsync(TestContext.Current.CancellationToken);
+                    var member = Assert.Single(result.Members).Item1;
+                    Assert.Equal(default, member.IAmAliveTime);
+                    Assert.Equal(default, member.StartTime);
+                    Assert.True(member.SuspectTimes is null || member.SuspectTimes.Count == 0);
+                    Assert.Equal(7, result.Version.Version);
+                    break;
+                case "Cleanup":
+                    await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken);
+                    Assert.False(fields.ContainsKey(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME));
+                    break;
+                case "Heartbeat":
+                    await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
+                    Assert.Equal("1970-01-01 00:00:00.000 GMT", fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+                    break;
+            }
+
+            Assert.Equal(operation == "UpdateRow" ? 1 : 0, client.WriteCount);
+            Assert.Equal(operation == "Heartbeat" ? 2 : 0, updates);
+            Assert.Equal(0, client.DeleteCount);
+        }
+
         [Theory]
         [InlineData(false, false)]
         [InlineData(true, false)]
@@ -1265,6 +1435,7 @@ namespace AWSUtils.Tests.MembershipTests
             public Func<UpdateItemRequest, UpdateItemResponse> Update { get; init; } = _ => throw new InvalidOperationException("Unexpected update.");
             public int ReadCount { get; private set; }
             public int WriteCount { get; private set; }
+            public int DeleteCount { get; private set; }
 
             public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default)
             {
@@ -1296,6 +1467,13 @@ namespace AWSUtils.Tests.MembershipTests
             {
                 Assert.Equal(Token, cancellationToken);
                 return Task.FromResult(Update(request));
+            }
+
+            public override Task<DeleteItemResponse> DeleteItemAsync(DeleteItemRequest request, CancellationToken cancellationToken = default)
+            {
+                Assert.Equal(Token, cancellationToken);
+                DeleteCount++;
+                throw new InvalidOperationException("Unexpected delete.");
             }
         }
 
