@@ -160,12 +160,12 @@ PRAGMA AUTONOMOUS_TRANSACTION;
 BEGIN
     UPDATE OrleansMembershipTable
         SET
-            IAmAliveTime = GREATEST(IAmAliveTime, PARAM_IAMALIVE)
+            IAmAliveTime = PARAM_IAMALIVE
         WHERE
-            DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-            AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
-            AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
-            AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL;
+            DeploymentId = PARAM_DEPLOYMENTID
+            AND Address = PARAM_ADDRESS
+            AND Port = PARAM_PORT
+            AND Generation = PARAM_GENERATION;
       COMMIT;
       RETURN(0);
 END;

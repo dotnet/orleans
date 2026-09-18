@@ -1195,13 +1195,15 @@ public sealed class RelationalOrleansQueriesUnitTests
         storage.VerifyComplete();
     }
 
-    [Fact]
-    public async Task UpdateIAmAliveTimeAsync_ExecutesSentinelQueryAndCapturesUtcValue()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task UpdateIAmAliveTimeAsync_ExecutesOneBlindWriteWithKeyAndTimestamp(int affectedRows)
     {
         var address = SiloAddress.New(IPAddress.Parse("10.50.60.70"), 12_345, 9);
         var aliveTime = new DateTime(2026, 8, 27, 22, 31, 45, DateTimeKind.Utc);
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
-            .ExpectExecute(Sql("UpdateIAmAlivetimeKey"), affectedRows: 1);
+            .ExpectExecute(Sql("UpdateIAmAlivetimeKey"), affectedRows);
         var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
 
         await queries.UpdateIAmAliveTimeAsync("cluster-alive", address, aliveTime, TestContext.Current.CancellationToken);

@@ -17,12 +17,12 @@ BEGIN
     -- is not needed nor is it checked.
     UPDATE OrleansMembershipTable as d
     SET
-        IAmAliveTime = GREATEST(d.IAmAliveTime, i_am_alive_time)
+        IAmAliveTime = i_am_alive_time
     WHERE
-        d.DeploymentId = deployment_id AND deployment_id IS NOT NULL
-        AND d.Address = address_arg AND address_arg IS NOT NULL
-        AND d.Port = port_arg AND port_arg IS NOT NULL
-        AND d.Generation = generation_arg AND generation_arg IS NOT NULL;
+        d.DeploymentId = deployment_id
+        AND d.Address = address_arg
+        AND d.Port = port_arg
+        AND d.Generation = generation_arg;
 END
 $func$ LANGUAGE plpgsql;
 

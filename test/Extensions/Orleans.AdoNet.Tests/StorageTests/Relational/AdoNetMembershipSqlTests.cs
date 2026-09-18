@@ -70,7 +70,7 @@ public sealed class AdoNetMembershipSqlTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void MembershipWrites_PreserveMaximumHeartbeat(string engine)
+    public void Heartbeat_IsOneBlindColumnWriteByPrimaryKey(string engine)
     {
         var script = ReadScript(engine);
         var queries = Queries(script);
@@ -81,17 +81,31 @@ public sealed class AdoNetMembershipSqlTests
             "Oracle" => routines["UpdateIAmAlivetime"],
             _ => queries["UpdateIAmAlivetimeKey"],
         };
-        var update = UpdateBody(engine, queries, routines);
-        foreach (var body in new[] { heartbeat, update })
+        Assert.Single(Regex.Matches(heartbeat, @"\bUPDATE\b", RegexOptions.IgnoreCase));
+        Assert.DoesNotMatch(@"(?i)\b(?:SELECT|JOIN|IF|CASE|GREATEST|Status|Version)\b", heartbeat);
+        var statement = Regex.Match(heartbeat, @"UPDATE OrleansMembershipTable.*?;", RegexOptions.Singleline).Value;
+        var expected = engine switch
         {
-            if (engine == "SQLServer")
-            {
-                Assert.Contains("IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END", body, StringComparison.Ordinal);
-            }
-            else
-            {
-                Assert.Matches(@"IAmAliveTime = GREATEST\((?:[dm]\.)?IAmAliveTime, ", body);
-            }
+            "PostgreSQL" => "UPDATE OrleansMembershipTable as d SET IAmAliveTime = i_am_alive_time WHERE d.DeploymentId = deployment_id AND d.Address = address_arg AND d.Port = port_arg AND d.Generation = generation_arg;",
+            "Oracle" => "UPDATE OrleansMembershipTable SET IAmAliveTime = PARAM_IAMALIVE WHERE DeploymentId = PARAM_DEPLOYMENTID AND Address = PARAM_ADDRESS AND Port = PARAM_PORT AND Generation = PARAM_GENERATION;",
+            _ => "UPDATE OrleansMembershipTable SET IAmAliveTime = @IAmAliveTime WHERE DeploymentId = @DeploymentId AND Address = @Address AND Port = @Port AND Generation = @Generation;",
+        };
+        Assert.Equal(expected, Regex.Replace(statement, @"\s+", " "));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void FullMembershipUpdate_PreservesMaximumHeartbeat(string engine)
+    {
+        var script = ReadScript(engine);
+        var update = UpdateBody(engine, Queries(script), Routines(script));
+        if (engine == "SQLServer")
+        {
+            Assert.Contains("IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END", update, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Matches(@"IAmAliveTime = GREATEST\((?:[dm]\.)?IAmAliveTime, ", update);
         }
     }
 

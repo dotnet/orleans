@@ -96,12 +96,12 @@ UPDATE OrleansQuery SET QueryText = '
     -- is not needed nor is it checked.
     UPDATE OrleansMembershipTable
     SET
-        IAmAliveTime = GREATEST(IAmAliveTime, @IAmAliveTime)
+        IAmAliveTime = @IAmAliveTime
     WHERE
-        DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND Address = @Address AND @Address IS NOT NULL
-        AND Port = @Port AND @Port IS NOT NULL
-        AND Generation = @Generation AND @Generation IS NOT NULL;
+        DeploymentId = @DeploymentId
+        AND Address = @Address
+        AND Port = @Port
+        AND Generation = @Generation;
 '
 WHERE QueryKey = 'UpdateIAmAlivetimeKey';
 

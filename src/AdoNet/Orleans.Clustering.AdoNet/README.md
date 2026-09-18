@@ -125,6 +125,8 @@ namespace ExampleGrains;
 
 ### Upgrading membership queries
 
+Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment to `IAmAliveTime`, sent as a single database command. Full membership updates preserve the latest stored heartbeat when applying row and table-version changes.
+
 For an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` update before upgrading **silos or ADO.NET gateway-discovery clients**. The update preserves membership tables and stored rows, updates membership writes, and adds `CleanupDefunctSiloEntryKey` for conditional Dead-row cleanup. Updated providers require this query at initialization and report its absence as an error.
 
 Use a database migration account with permission to update `OrleansQuery` and create or replace the routines in the selected script. Configure the script runner to stop on the first error. Verify the update completed before deploying the provider package.

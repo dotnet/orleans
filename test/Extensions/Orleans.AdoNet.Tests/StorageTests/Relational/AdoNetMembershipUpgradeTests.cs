@@ -179,12 +179,17 @@ public sealed class AdoNetMembershipUpgradeTests
 
         active.IAmAliveTime = StartTime.AddMinutes(3);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
-        AssertUnchanged(afterUpdate, await ReadSnapshotAsync(storage, cancellationToken));
+        var afterBlindHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
+        AssertStored(afterBlindHeartbeat, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
+        Assert.Equal(afterUpdate.VersionTimestamp, afterBlindHeartbeat.VersionTimestamp);
         active.IAmAliveTime = StartTime.AddMinutes(20);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
         var afterNewHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(afterNewHeartbeat, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
         Assert.Equal(afterUpdate.VersionTimestamp, afterNewHeartbeat.VersionTimestamp);
+
+        await current.UpdateIAmAliveAsync(Entry(10, SiloStatus.Active), cancellationToken);
+        AssertUnchanged(afterNewHeartbeat, await ReadSnapshotAsync(storage, cancellationToken));
 
         duringUpgrade.IAmAliveTime = StartTime.AddMinutes(4);
         await legacy.HeartbeatAsync(duringUpgrade);

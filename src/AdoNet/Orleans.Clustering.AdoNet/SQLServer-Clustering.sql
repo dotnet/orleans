@@ -37,12 +37,12 @@ SELECT
 	SET NOCOUNT ON;
 	UPDATE OrleansMembershipTable
 	SET
-		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
+		IAmAliveTime = @IAmAliveTime
 	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Address = @Address AND @Address IS NOT NULL
-		AND Port = @Port AND @Port IS NOT NULL
-		AND Generation = @Generation AND @Generation IS NOT NULL;
+		DeploymentId = @DeploymentId
+		AND Address = @Address
+		AND Port = @Port
+		AND Generation = @Generation;
 	'
 WHERE NOT EXISTS 
 ( 
