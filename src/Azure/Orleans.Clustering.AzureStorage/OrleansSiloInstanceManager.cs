@@ -205,18 +205,9 @@ namespace Orleans.AzureUtils
             return sb.ToString();
         }
 
-        internal async Task<string?> MergeTableEntryAsync(SiloInstanceTableEntry data, CancellationToken cancellationToken = default)
+        internal Task<string> MergeTableEntryAsync(SiloInstanceTableEntry data, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                return await storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, cancellationToken);
-            }
-            catch (RequestFailedException exception) when (IsRowNotFound(exception))
-            {
-                await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
-                    data.PartitionKey, SiloInstanceTableEntry.TABLE_VERSION_ROW, cancellationToken: cancellationToken);
-                return null;
-            }
+            return storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, cancellationToken);
         }
 
         internal Task<(SiloInstanceTableEntry? Entity, string? ETag)> ReadSingleTableEntryAsync(string partitionKey, string rowKey)

@@ -424,25 +424,6 @@ public class AzureMembershipPaginationTests
         Assert.Equal(4, storage.VersionReadCount);
     }
 
-    [Fact]
-    public async Task HeartbeatAfterCompactionPreservesAbsenceAndVersion()
-    {
-        var client = CreateHeartbeatClient();
-        var version = Version(7, "v7").Entity;
-        _ = client.GetEntityAsync<SiloInstanceTableEntry>(
-            ClusterId, SiloInstanceTableEntry.TABLE_VERSION_ROW, null, TestContext.Current.CancellationToken)
-            .ReturnsForAnyArgs(Task.FromResult(Response.FromValue(version, Substitute.For<Response>())));
-        _ = client.UpdateEntityAsync(
-            Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<Response>(new RequestFailedException(404, "Retired silo.", "ResourceNotFound", null)));
-        var table = CreateTable(CreateManager(null, client));
-
-        await table.UpdateIAmAliveAsync(ProposedEntry(), TestContext.Current.CancellationToken);
-
-        Assert.Equal("7", version.MembershipVersion);
-        Assert.Equal(["UpdateEntityAsync", "GetEntityAsync"], client.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
-    }
-
     [Theory]
     [InlineData(nameof(SiloInstanceTableEntry.StartTime))]
     [InlineData(nameof(SiloInstanceTableEntry.IAmAliveTime))]
@@ -826,43 +807,29 @@ public class AzureMembershipPaginationTests
     }
 
     [Theory]
-    [InlineData("Merge", 404, null)]
-    [InlineData("Merge", 403, null)]
-    [InlineData("Merge", 503, null)]
-    [InlineData("Merge", 412, "UpdateConditionNotSatisfied")]
-    [InlineData("Merge", 0, null)]
-    [InlineData("History", 404, "ResourceNotFound")]
-    [InlineData("History", 404, "TableNotFound")]
-    [InlineData("History", 403, "AuthorizationFailure")]
-    [InlineData("History", 503, "ServerBusy")]
-    public async Task HeartbeatFailuresRemainVisible(string phase, int status, string? code)
+    [InlineData(404, null)]
+    [InlineData(404, "ResourceNotFound")]
+    [InlineData(404, "EntityNotFound")]
+    [InlineData(404, "TableNotFound")]
+    [InlineData(403, "AuthorizationFailure")]
+    [InlineData(503, "ServerBusy")]
+    [InlineData(412, "UpdateConditionNotSatisfied")]
+    [InlineData(0, null)]
+    public async Task HeartbeatFailuresPropagateFromSingleMerge(int status, string? code)
     {
         var client = CreateHeartbeatClient();
         Exception failure = status == 0
             ? new System.Net.Http.HttpRequestException("Connection interrupted.")
             : new RequestFailedException(status, "Storage failure.", code, null);
-        switch (phase)
-        {
-            case "Merge":
-                _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
-                    .Returns(Task.FromException<Response>(failure));
-                break;
-            case "History":
-                _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
-                    .Returns(Task.FromException<Response>(new RequestFailedException(404, "Retired silo.", "ResourceNotFound", null)));
-                _ = client.GetEntityAsync<SiloInstanceTableEntry>(ClusterId, SiloInstanceTableEntry.TABLE_VERSION_ROW, null, TestContext.Current.CancellationToken)
-                    .Returns(Task.FromException<Response<SiloInstanceTableEntry>>(failure));
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(phase));
-        }
+        _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Response>(failure));
         var table = CreateTable(CreateManager(null, client));
 
         var exception = await Record.ExceptionAsync(
             () => table.UpdateIAmAliveAsync(ProposedEntry(), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
-        Assert.Equal(phase == "Merge" ? 1 : 2, client.ReceivedCalls().Count());
+        Assert.Equal(nameof(TableClient.UpdateEntityAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Fact]
