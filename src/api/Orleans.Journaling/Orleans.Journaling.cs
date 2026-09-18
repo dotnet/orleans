@@ -217,13 +217,20 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledState
     {
+        bool IsWritePrepared { get; }
+
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
         IJournaledState DeepCopy();
+        void OnDeleteStarted();
+        void OnFaulted(System.Exception exception);
         void OnRecoveryCompleted();
         void OnWriteCompleted();
+        System.Threading.Tasks.ValueTask PrepareWriteAsync(System.Threading.CancellationToken cancellationToken);
         void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         void Reset(JournalStreamWriter writer);
+        void ValidateDelete();
+        void ValidateWrite();
     }
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
@@ -231,6 +238,7 @@ namespace Orleans.Journaling
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
+        TCodec GetRequiredCommandCodec<TCodec>();
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
         void RegisterState(string name, IJournaledState state);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();

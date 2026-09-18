@@ -97,6 +97,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal IServiceProvider ServiceProvider => _shared.ServiceProvider;
 
+    public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull
+        => JournalFormatServices.GetRequiredCommandCodec<TCodec>(_shared.ServiceProvider, _shared.JournalFormatKey);
+
     public void RegisterState(string name, IJournaledState state)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(name);
@@ -243,6 +246,31 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             case AppendJournalWorkItem:
                             case WriteSnapshotWorkItem:
                                 {
+                                    // Keep the final readiness pass and synchronous capture in this continuation.
+                                    bool prepared;
+                                    do
+                                    {
+                                        prepared = true;
+                                        foreach (var (name, state) in _states)
+                                        {
+                                            if (state.IsWritePrepared)
+                                            {
+                                                continue;
+                                            }
+
+                                            await state.PrepareWriteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                            if (!state.IsWritePrepared)
+                                            {
+                                                throw new InvalidOperationException(
+                                                    $"Journaled state '{name}' completed write preparation without becoming prepared.");
+                                            }
+
+                                            prepared = false;
+                                            break;
+                                        }
+                                    }
+                                    while (!prepared);
+
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
                                     var isSnapshot = workItem is WriteSnapshotWorkItem
@@ -437,6 +465,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                             case DeleteStateWorkItem:
                                 {
+                                    foreach (var state in _states.Values)
+                                    {
+                                        state.ValidateDelete();
+                                    }
+
+                                    foreach (var state in _states.Values)
+                                    {
+                                        state.OnDeleteStarted();
+                                    }
+
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -538,6 +576,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     }
                 }
             }
+            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+            {
+                return;
+            }
             catch (Exception exception)
             {
                 Fence(exception);
@@ -550,8 +592,25 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         lock (_lock)
         {
+            if (_state is ManagerState.Fenced)
+            {
+                return;
+            }
+
             _state = ManagerState.Fenced;
             _failure = exception;
+
+            foreach (var (name, state) in _states)
+            {
+                try
+                {
+                    state.OnFaulted(exception);
+                }
+                catch (Exception notificationException)
+                {
+                    LogErrorNotifyingFaultedState(_shared.Logger, notificationException, name);
+                }
+            }
         }
 
         try
@@ -650,6 +709,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
+            foreach (var state in _states.Values)
+            {
+                state.ValidateDelete();
+            }
+
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -839,6 +903,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
+            foreach (var state in _states.Values)
+            {
+                state.ValidateWrite();
+            }
+
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -1294,6 +1363,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error notifying journaled state \"{Name}\" of a terminal failure.")]
+    private static partial void LogErrorNotifyingFaultedState(ILogger logger, Exception exception, string name);
 
     [LoggerMessage(
         Level = LogLevel.Information,

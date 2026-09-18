@@ -35,6 +35,19 @@ public interface IJournaledStateManager : IAsyncDisposable
     bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state);
 
     /// <summary>
+    /// Resolves a command codec for this manager's configured write journal format.
+    /// </summary>
+    /// <typeparam name="TCodec">The command codec service type.</typeparam>
+    /// <returns>The codec registered for this manager's write format.</returns>
+    /// <remarks>
+    /// Codecs are available before recovery, including for an empty journal. Delegating managers forward
+    /// this call to their owning manager. The default implementation throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    /// <exception cref="NotSupportedException">The manager does not support command codec resolution.</exception>
+    TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull
+        => throw new NotSupportedException("This journaled state manager does not support write command codec resolution.");
+
+    /// <summary>
     /// Prepares and persists an update to the journal.
     /// </summary>
     /// <remarks>
