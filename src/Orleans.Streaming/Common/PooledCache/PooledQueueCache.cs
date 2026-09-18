@@ -570,7 +570,7 @@ namespace Orleans.Providers.Streams.Common
                 && (cursor.CurrentBlock?.List != messageBlocks
                     || !cursor.CurrentBlock.Value.Contains(cursor.Index, cursor.BlockGeneration)))
             {
-                if (cursor.SafeSequenceToken is not null || cursor.PendingStartToken is not null)
+                if (cursor.HasScanned)
                 {
                     // EarliestAvailable only tolerates eviction before its initial scan.
                     // Once scanning begins, losing the unread position is an explicit gap.
@@ -624,6 +624,7 @@ namespace Orleans.Providers.Streams.Common
             // is confirmed by the owner.
             while (cursor.State is CursorStates.Set or CursorStates.EarliestAvailableSet)
             {
+                cursor.HasScanned = true;
                 CachedMessage currentMessage = cursor.Message;
                 var currentToken = cacheDataAdapter.GetSequenceToken(ref currentMessage);
 
@@ -634,7 +635,7 @@ namespace Orleans.Providers.Streams.Common
                         && cacheDataAdapter.Compare(ref currentMessage, deliveredThrough) < 0)
                     {
                         MoveCursorForward(cursor, currentToken);
-                        cursor.RecordScanned(currentToken);
+                        if (cursor.TrackDeliveryProgress) cursor.RecordScanned(currentToken);
                         continue;
                     }
 
@@ -648,7 +649,7 @@ namespace Orleans.Providers.Streams.Common
                                 || exclusiveFilter.FilterAfter(exclusiveStartToken) is not { } filtered)
                             {
                                 MoveCursorForward(cursor, currentToken);
-                                cursor.RecordScanned(exclusiveStartToken);
+                                if (cursor.TrackDeliveryProgress) cursor.RecordScanned(exclusiveStartToken);
                                 message = null;
                                 continue;
                             }
@@ -664,19 +665,19 @@ namespace Orleans.Providers.Streams.Common
                                 if (message is null)
                                 {
                                     MoveCursorForward(cursor, currentToken);
-                                    cursor.RecordScanned(currentToken);
+                                    if (cursor.TrackDeliveryProgress) cursor.RecordScanned(currentToken);
                                     continue;
                                 }
                             }
                         }
 
-                        cursor.RecordPending(message.SequenceToken, currentToken);
+                        if (cursor.TrackDeliveryProgress) cursor.RecordPending(message.SequenceToken, currentToken);
                     }
                     catch
                     {
                         // Materialization and provider slicing must leave the first selected
                         // record recoverable, even before a batch is returned to the owner.
-                        cursor.RecordPending(currentToken);
+                        if (cursor.TrackDeliveryProgress) cursor.RecordPending(currentToken);
                         throw;
                     }
 
@@ -685,7 +686,7 @@ namespace Orleans.Providers.Streams.Common
                 }
 
                 MoveCursorForward(cursor, currentToken);
-                cursor.RecordScanned(currentToken);
+                if (cursor.TrackDeliveryProgress) cursor.RecordScanned(currentToken);
             }
 
             return QueueCacheCursorMoveResult.NoData;
@@ -707,6 +708,9 @@ namespace Orleans.Providers.Streams.Common
 
         internal StreamSequenceToken? GetSafeSequenceToken(object cursorObj)
             => GetCursor(cursorObj).SafeSequenceToken;
+
+        internal void EnableDeliveryProgress(object cursorObj)
+            => GetCursor(cursorObj).TrackDeliveryProgress = true;
 
         internal void SetCursorDeliveredThrough(object cursorObj, StreamSequenceToken token)
         {
@@ -907,6 +911,10 @@ namespace Orleans.Providers.Streams.Common
             }
 
             public CursorStates State;
+            public bool TrackDeliveryProgress;
+            public bool HasScanned;
+
+            void IQueueCacheCursorProgress.EnableDeliveryProgress() => TrackDeliveryProgress = true;
 
             StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken => SafeSequenceToken;
 

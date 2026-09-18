@@ -195,6 +195,8 @@ namespace Orleans.Providers
                 cache.RecordDeliveryFailure(cursor);
             }
 
+            void IQueueCacheCursorProgress.EnableDeliveryProgress() => cache.EnableDeliveryProgress(cursor);
+
             StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken
                 => cache.GetSafeSequenceToken(cursor);
 

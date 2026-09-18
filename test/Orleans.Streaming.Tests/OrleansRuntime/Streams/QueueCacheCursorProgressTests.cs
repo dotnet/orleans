@@ -87,6 +87,7 @@ public class QueueCacheCursorProgressTests
         Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
         var cursor = Assert.IsAssignableFrom<object>(result.Cursor);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        progress.EnableDeliveryProgress();
 
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var first).Kind);
         Assert.Equal(2, first!.SequenceToken.SequenceNumber);
@@ -444,6 +445,7 @@ public class QueueCacheCursorProgressTests
         using var cursor = new ThrowingCurrentCursor(cache);
         Assert.Null(cache.InitializeCursor(cursor, new EventSequenceTokenV2(1)));
         var progress = (IQueueCacheCursorProgress)cursor;
+        progress.EnableDeliveryProgress();
         var delivery = (IQueueCacheCursorBatchDelivery)cursor;
         using (delivery.ProtectDeliveryBatch())
         {
@@ -493,6 +495,56 @@ public class QueueCacheCursorProgressTests
         ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
         Assert.True(cache.Simple!.TryPurgeFromCache(out var purged));
         Assert.Empty(purged);
+    }
+
+    [Fact]
+    public void ReceiptPooledCursorPreservesObservedLossWithoutCertifiedTracking()
+    {
+        var cache = new CacheHarness(pooled: true);
+        cache.Add(new(Other, 1), new(Target, 2), new(Target, 3), new(Other, 4));
+        using var cursor = cache.GetCursor(StreamSubscriptionStartPosition.EarliestAvailable, trackProgress: false);
+        Read(cursor, 2);
+        Assert.Null(((IQueueCacheCursorProgress)cursor).SafeSequenceToken);
+        for (var i = 0; i < 3; i++) cache.Pooled!.RemoveOldestMessage();
+
+        var miss = cursor.MoveNextWithResult();
+        Assert.Equal(QueueCacheCursorMoveResultKind.CacheMiss, miss.Kind);
+        Assert.Equal(3, miss.CacheMiss!.Value.RequestedToken!.SequenceNumber);
+        cache.Add(new TestBatch(Target, 5));
+        AssertSameCacheMiss(miss, cursor.MoveNextWithResult());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReceiptSimpleCursorReleasesPinsAndMarksOnlyFailedReceipts(bool grouped)
+    {
+        var cache = new CacheHarness(pooled: false);
+        var unrelated = new TestBatch(Other, 2);
+        cache.Add(new(Target, 1), unrelated, new(Target, 3));
+        using var cursor = cache.GetCursor(new EventSequenceTokenV2(1), trackProgress: false);
+        var delivery = (IQueueCacheCursorBatchDelivery)cursor;
+        using (grouped ? delivery.ProtectDeliveryBatch() : null)
+        {
+            var first = Read(cursor, 1);
+            if (grouped)
+            {
+                var last = Read(cursor, 3);
+                Assert.Throws<InvalidOperationException>(() => delivery.RecordDeliveryFailure(unrelated));
+                delivery.RecordDeliveryFailure(new BatchContainerBatch([first, last]));
+            }
+            else
+            {
+                cursor.RecordDeliveryFailure();
+                Read(cursor, 3);
+            }
+            Assert.Equal(QueueCacheCursorMoveResultKind.NoData, cursor.MoveNextWithResult().Kind);
+        }
+
+        Assert.Null(((IQueueCacheCursorProgress)cursor).SafeSequenceToken);
+        Assert.True(cache.Simple!.TryPurgeFromCache(out var purged));
+        Assert.Equal(grouped ? new long[] { 2 } : [2, 3], purged.Select(batch => batch.SequenceToken.SequenceNumber));
+        Assert.Equal(0, cache.Simple.Size);
     }
 
     private static void AssertSameCacheMiss(QueueCacheCursorMoveResult expected, QueueCacheCursorMoveResult actual)
@@ -558,21 +610,28 @@ public class QueueCacheCursorProgressTests
             }).ToList(), DateTime.UnixEpoch);
         }
 
-        public IQueueCacheCursor GetCursor(StreamSubscriptionStartPosition position)
-            => Simple is { } simple
+        public IQueueCacheCursor GetCursor(StreamSubscriptionStartPosition position, bool trackProgress = true)
+            => ConfigureProgress(Simple is { } simple
                 ? ((IQueueCache)simple).TryGetCacheCursorAtPosition(Target, position).Cursor!
-                : new PooledCursor(Pooled!, Pooled!.TryGetCursorAtPosition(Target, position).Cursor!);
+                : new PooledCursor(Pooled!, Pooled!.TryGetCursorAtPosition(Target, position).Cursor!), trackProgress);
 
-        public IQueueCacheCursor GetCursor(StreamSequenceToken token)
-            => Simple is { } simple
+        public IQueueCacheCursor GetCursor(StreamSequenceToken token, bool trackProgress = true)
+            => ConfigureProgress(Simple is { } simple
                 ? ((IQueueCache)simple).TryGetCacheCursor(Target, token).Cursor!
-                : new PooledCursor(Pooled!, Pooled!.TryGetCursor(Target, token).Cursor!);
+                : new PooledCursor(Pooled!, Pooled!.TryGetCursor(Target, token).Cursor!), trackProgress);
+
+        private static IQueueCacheCursor ConfigureProgress(IQueueCacheCursor cursor, bool trackProgress)
+        {
+            if (trackProgress) ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
+            return cursor;
+        }
     }
 
     private sealed class PooledCursor(PooledQueueCache cache, object cursor) : IQueueCacheCursor, IQueueCacheCursorProgress
     {
         private IBatchContainer? current;
         public StreamSequenceToken? SafeSequenceToken => cache.GetSafeSequenceToken(cursor);
+        public void EnableDeliveryProgress() => cache.EnableDeliveryProgress(cursor);
         public void SetDeliveredThrough(StreamSequenceToken token) => cache.SetCursorDeliveredThrough(cursor, token);
         public void RecordDeliveryCompletion() => cache.RecordDeliveryCompletion(cursor);
         public void RecordDeliveryFailure() => cache.RecordDeliveryFailure(cursor);
