@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.ZooKeeper\Orleans.Clustering.ZooKeeper.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
 </Project>

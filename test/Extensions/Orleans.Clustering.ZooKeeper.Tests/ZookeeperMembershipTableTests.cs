@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Clustering.TestKit;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Configuration;
+using org.apache.zookeeper;
 using TestExtensions;
 using Xunit;
 using Tester.ZooKeeperUtils;
@@ -47,13 +49,35 @@ namespace UnitTests.MembershipTests
         /// table that uses ZooKeeper's hierarchical namespace for storage.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
 
             var typedLogger = this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>();
             Assert.NotNull(typedLogger);
-            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), this._clusterOptions);
+            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), clusterOptions);
+        }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await ZooKeeper.Using(connectionString, 10_000, new ConformanceWatcher(), async client =>
+            {
+                await client.sync("/");
+                cancellationToken.ThrowIfCancellationRequested();
+                return await client.existsAsync("/" + clusterId, false) is null;
+            }).WaitAsync(cancellationToken);
+        }
+
+        private sealed class ConformanceWatcher : Watcher
+        {
+            public override Task process(WatchedEvent @event) => Task.CompletedTask;
         }
 
         /// <summary>

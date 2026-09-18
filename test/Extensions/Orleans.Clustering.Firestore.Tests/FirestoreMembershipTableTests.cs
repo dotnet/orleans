@@ -1,4 +1,5 @@
 using System.Net;
+using Google.Cloud.Firestore;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,11 +9,13 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using UnitTests.MembershipTests;
 using Orleans.Clustering.Firestore;
+using Orleans.Clustering.TestKit;
 
 namespace Orleans.Clustering.Firestore.Tests;
 
 [TestSuite("Functional")]
 [TestProvider("GoogleCloud")]
+[TestArea("Membership")]
 [TestCategory("Functional"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFixture<TestEnvironmentFixture>
 {
@@ -32,14 +35,54 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     }
 
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
+        => CreateMembershipTable(logger, _clusterOptions);
+
+    protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
     {
-        var options = new FirestoreOptions
+        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(CreateClusteringOptions()), clusterOptions);
+    }
+
+    // RunQuery streams a document per response message.
+    protected override int ConformanceConcurrencyRowCount => 17;
+
+    protected override MembershipTableTestFixture CreateConformanceFixture()
+    {
+        var options = CreateClusteringOptions();
+        var probe = new FirestoreDbBuilder
         {
-            ProjectId = "orleans-test",
+            ProjectId = options.ProjectId,
+            Endpoint = new Uri(options.EmulatorHost!).Authority,
+            ChannelCredentials = ChannelCredentials.Insecure
+        }.Build();
+        return new MembershipTableTestFixture(
+            GetType().Name,
+            (serviceId, clusterId, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(new MembershipTableTestHandle(new FirestoreMembershipTable(
+                    loggerFactory,
+                    Options.Create(options),
+                    Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }))));
+            },
+            async (clusterId, cancellationToken) =>
+            {
+                // GetSnapshotAsync consumes the complete RunQuery stream, including the cluster version document.
+                // The parent "Cluster" document is a shared header, not cluster-owned membership metadata.
+                var snapshot = await probe.Collection(options.RootCollectionName)
+                    .Document("Cluster")
+                    .Collection(Utils.SanitizeId(clusterId))
+                    .GetSnapshotAsync(cancellationToken);
+                return snapshot.Count == 0;
+            });
+    }
+
+    private static FirestoreOptions CreateClusteringOptions()
+    {
+        return new FirestoreOptions
+        {
+            ProjectId = GoogleEmulatorHost.ProjectId,
             EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint
         };
-
-        return new FirestoreMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
     }
 
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
