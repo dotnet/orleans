@@ -19,7 +19,6 @@ env:
   # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
-  COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:2.14.28@sha256:9a4f69121f20c1d6502db84625c71ebb441ab61b01880a7b2d3d8031c6dac429
   CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
@@ -424,7 +423,9 @@ jobs:
       run: docker rm -f azurite || true
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
-    runs-on: ubuntu-latest
+    runs-on: windows-2025
+    env:
+      COSMOSDB_EMULATOR_VERSION: 2.14.28.0
     strategy:
       fail-fast: false
       matrix:
@@ -432,35 +433,35 @@ jobs:
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azure Cosmos DB emulator
+      id: cosmos-emulator
+      shell: powershell
       run: |
-        set -euo pipefail
-
-        bash .github/scripts/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
-
-        docker run -d --pull=never --name cosmosdb-emulator \
-          -p 8081:8081 \
-          -e AZURE_COSMOS_EMULATOR_ARGS="/Consistency=Strong" \
-          -e AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE=127.0.0.1 \
-          "$COSMOSDB_EMULATOR_IMAGE"
+        $emulator = Get-Item "$env:ProgramFiles\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"
+        $version = $emulator.VersionInfo.FileVersion
+        Write-Host "Runner image: $env:ImageOS $env:ImageVersion; Cosmos emulator: $version"
+        if ($version -ne $env:COSMOSDB_EMULATOR_VERSION) {
+          throw "Expected Cosmos emulator $env:COSMOSDB_EMULATOR_VERSION, found $version."
+        }
+        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
+        Start-CosmosDbEmulator -Consistency Strong -NoUI -NoTelemetry -NoWait
     - name: Wait for Azure Cosmos DB emulator
+      shell: powershell
       run: |
-        endpoint="https://localhost:8081/"
-        echo "Waiting for Azure Cosmos DB emulator to be ready..."
-        for i in {1..60}; do
-          if curl --fail --silent --show-error --insecure "${endpoint}_explorer/emulator.pem" > /dev/null; then
-            echo "Azure Cosmos DB emulator is ready"
-            echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=${endpoint}" >> "$GITHUB_ENV"
-            exit 0
-          fi
-
-          if [ "$i" -eq 60 ]; then
-            docker logs --tail 200 cosmosdb-emulator
-            echo "Azure Cosmos DB emulator did not become ready in time."
-            exit 1
-          fi
-
-          sleep 2
-        done
+        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
+        $endpoint = "https://localhost:8081/"
+        foreach ($attempt in 1..60) {
+          $status = Get-CosmosDbEmulatorStatus
+          Write-Host "Cosmos emulator status: $status"
+          if ($status -eq "Running") {
+            curl.exe --fail --silent --show-error --insecure "${endpoint}_explorer/emulator.pem" > $null
+            if ($LASTEXITCODE -eq 0) {
+              "ORLEANSCOSMOSDBACCOUNTENDPOINT=$endpoint" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              exit 0
+            }
+          }
+          Start-Sleep -Seconds 2
+        }
+        throw "Azure Cosmos DB emulator did not become ready."
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -474,11 +475,12 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     - name: Clean up Azure Cosmos DB emulator
-      if: always()
+      if: always() && steps.cosmos-emulator.outcome == 'success'
+      shell: powershell
       run: |
-        docker inspect --format '{{json .State}}' cosmosdb-emulator
-        docker logs --tail 200 cosmosdb-emulator
-        docker rm -f cosmosdb-emulator
+        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
+        Get-CosmosDbEmulatorStatus | Write-Host
+        Stop-CosmosDbEmulator
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
