@@ -49,8 +49,13 @@ so direct interleaved delivery proceeds after the clear's durable outcome.
 Handlers prepare local values asynchronously and return a non-null synchronous action.
 Messaging invokes the action once for its prepared attempt and stages inbox completion
 and `(SenderId, MessageId)` deduplication in the same uninterrupted activation turn.
-The action can stage outgoing messages using `Send`. The registered outbox state prepares
-durable wakeup prerequisites inside the serialized journal operation before capture.
+The action can stage outgoing messages using `Send`. The handler context and its
+outbox view permit sending only during that attempt's synchronous action. Preparation
+can build envelopes and inspect pending output. A preparation-time send violation
+retains the original error and prevents the returned action from running, even when
+the handler catches the rejection. An action-time violation stops capture and recovers
+through a fresh activation. The registered outbox state prepares durable wakeup
+prerequisites inside the serialized journal operation before capture.
 Readiness is rechecked after asynchronous preparation, so late staged work joins a
 capture only when its prerequisites are ready. Expected handler preparation failures
 produce bounded retry or dead-letter accounting.

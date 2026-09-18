@@ -198,7 +198,7 @@ internal sealed partial class DurableInboxExtension :
         try
         {
             var result = _durableInbox.TryFindHandler(context, out handler);
-            ThrowIfHandlerWriteRejected(execution);
+            ThrowIfHandlerOperationRejected(execution);
             return result;
         }
         finally
@@ -207,8 +207,9 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private static void ThrowIfHandlerWriteRejected(HandlerExecution execution)
+    private static void ThrowIfHandlerOperationRejected(HandlerExecution execution)
     {
+        execution.SendFailure?.Throw();
         if (execution.WriteRejected)
         {
             throw CreateHandlerWriteException();
@@ -546,12 +547,12 @@ internal sealed partial class DurableInboxExtension :
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, operation.Cancellation, _shutdownCts.Token);
         var previous = _handlerExecution.Value;
-        var execution = new HandlerExecution(this);
+        var execution = operation.Execution = new HandlerExecution(this);
         _handlerExecution.Value = execution;
         try
         {
             var found = _durableInbox.TryFindHandler(new InboxHandlerSelectionContext(operation.Envelope, _grainContext.GrainId), out var handler);
-            ThrowIfHandlerWriteRejected(execution);
+            ThrowIfHandlerOperationRejected(execution);
             if (!found)
             {
                 operation.Error = new InvalidOperationException("No compatible handler is registered.");
@@ -560,8 +561,13 @@ internal sealed partial class DurableInboxExtension :
             }
 
             operation.HandlerInvoked = true;
-            operation.Apply = await handler!.PrepareAsync(new InboxHandlerContext(operation.Envelope, _grainContext.GrainId, _outbox, _sessionPool), cancellation.Token).ConfigureAwait(true);
-            ThrowIfHandlerWriteRejected(execution);
+            operation.Apply = await handler!.PrepareAsync(new InboxHandlerContext(operation.Envelope, _grainContext.GrainId, execution, _sessionPool), cancellation.Token).ConfigureAwait(true);
+            ThrowIfHandlerOperationRejected(execution);
+        }
+        catch (Exception) when (execution.SendFailure is not null)
+        {
+            execution.SendFailure.Throw();
+            throw;
         }
         catch (Exception exception) when (!cancellation.IsCancellationRequested && !execution.WriteRejected && _failure is null)
         {
@@ -703,15 +709,23 @@ internal sealed partial class DurableInboxExtension :
     private void ApplyHandler(HandlerWrite operation)
     {
         var previous = _handlerExecution.Value;
-        var execution = new HandlerExecution(this);
+        var execution = operation.Execution!;
+        ThrowIfHandlerOperationRejected(execution);
+        execution.IsApplying = true;
         _handlerExecution.Value = execution;
         try
         {
             operation.Apply!();
-            ThrowIfHandlerWriteRejected(execution);
+            ThrowIfHandlerOperationRejected(execution);
+        }
+        catch (Exception) when (execution.SendFailure is not null)
+        {
+            execution.SendFailure.Throw();
+            throw;
         }
         finally
         {
+            execution.IsApplying = false;
             _handlerExecution.Value = previous;
         }
     }
@@ -894,10 +908,33 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private sealed class HandlerExecution(DurableInboxExtension owner)
+    private sealed class HandlerExecution(DurableInboxExtension owner) : IDurableOutbox
     {
         public DurableInboxExtension Owner { get; } = owner;
         public bool WriteRejected { get; set; }
+        public bool IsApplying { get; set; }
+        public ExceptionDispatchInfo? SendFailure { get; private set; }
+        public int Count => Owner._outbox.Count;
+        public IEnumerable<DurableEnvelope> Messages => Owner._outbox.Messages;
+        public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
+            Owner._outbox.TryGetMessage(messageId, out envelope);
+
+        public void Send(DurableEnvelope envelope)
+        {
+            if (!IsApplying || !ReferenceEquals(_handlerExecution.Value, this))
+            {
+                SendFailure ??= ExceptionDispatchInfo.Capture(new InvalidOperationException(
+                    "Handler messages can be sent only from that attempt's synchronous apply action."));
+                if (_handlerExecution.Value is { } current && ReferenceEquals(current.Owner, Owner))
+                {
+                    current.SendFailure ??= SendFailure;
+                }
+                SendFailure.Throw();
+            }
+
+            ThrowIfHandlerOperationRejected(this);
+            Owner._outbox.Send(envelope);
+        }
     }
 
     private readonly record struct PumpOwner(string Id, DurableJob Job, long Generation);
@@ -928,6 +965,7 @@ internal sealed partial class DurableInboxExtension :
         public (GrainId, Guid) Key => (Envelope.SenderId, Envelope.MessageId);
         public CancellationToken Cancellation { get; } = cancellation;
         public Action? Apply { get; set; }
+        public HandlerExecution? Execution { get; set; }
         public bool HandlerInvoked { get; set; }
         public bool Skipped { get; set; }
         public bool DeadLetter { get; set; }
