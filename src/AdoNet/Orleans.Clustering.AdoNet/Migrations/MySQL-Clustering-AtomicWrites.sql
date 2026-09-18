@@ -28,12 +28,7 @@ BEGIN
     END;
     START TRANSACTION;
 
-    UPDATE OrleansMembershipVersionTable
-    SET Version = Version + 1
-    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
-        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647;
-    SET _ROWCOUNT = ROW_COUNT();
-
+    -- Preserve the row-then-version statement order used by cached legacy inserts.
     INSERT INTO OrleansMembershipTable
     (
         DeploymentId,
@@ -58,7 +53,7 @@ BEGIN
         _ProxyPort,
         _StartTime,
         _IAmAliveTime) AS TMP
-    WHERE _ROWCOUNT > 0 AND NOT EXISTS
+    WHERE NOT EXISTS
     (
     SELECT 1
     FROM
@@ -69,6 +64,12 @@ BEGIN
         AND Port = _Port AND _Port IS NOT NULL
         AND Generation = _Generation AND _Generation IS NOT NULL
     );
+
+    UPDATE OrleansMembershipVersionTable
+    SET Version = Version + 1
+    WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
+        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647
+        AND ROW_COUNT() > 0;
 
     SET _ROWCOUNT = ROW_COUNT();
 

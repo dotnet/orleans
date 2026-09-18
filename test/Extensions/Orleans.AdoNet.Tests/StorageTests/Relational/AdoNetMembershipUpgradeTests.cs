@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -286,6 +287,99 @@ public sealed class AdoNetMembershipUpgradeTests
             Assert.Equal(
                 afterCachedFailure.Members.Where(member => member.Status == SiloStatus.Active || member.IAmAliveTime >= cutoff),
                 afterCachedCleanup.Members);
+        }
+
+        if (engine == "MySQL")
+        {
+            var beforeOverlap = await ReadSnapshotAsync(storage, cancellationToken);
+            var overlappingEntry = Entry(11, SiloStatus.Joining);
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var oldInsert = InsertAfterBarrierAsync(legacy);
+            var newInsert = InsertAfterBarrierAsync(reloadedLegacy);
+            start.SetResult();
+            var outcomes = await Task.WhenAll(oldInsert, newInsert);
+            Assert.Single(outcomes, outcome => outcome.Inserted);
+            foreach (var outcome in outcomes)
+            {
+                if (outcome.Error is not null)
+                {
+                    Assert.Equal(1213, Assert.IsType<MySqlException>(outcome.Error).Number);
+                }
+            }
+
+            var afterOverlap = await ReadSnapshotAsync(storage, cancellationToken);
+            Assert.Equal(beforeOverlap.Version + 1, afterOverlap.Version);
+            Assert.Equal(beforeOverlap.Members.Append(StoredMember.FromEntry(overlappingEntry)), afterOverlap.Members);
+            Assert.False(await reloadedLegacy.InsertAsync(overlappingEntry, beforeOverlap.Etag));
+            AssertUnchanged(afterOverlap, await ReadSnapshotAsync(storage, cancellationToken));
+
+            async Task<(bool Inserted, Exception? Error)> InsertAfterBarrierAsync(CachedLegacyClient client)
+            {
+                await start.Task.WaitAsync(cancellationToken);
+                var inserted = false;
+                var error = await Record.ExceptionAsync(async () => inserted = await client.InsertAsync(overlappingEntry, beforeOverlap.Etag));
+                return (inserted, error);
+            }
+        }
+
+        if (engine == "SQLServer")
+        {
+            var beforeOverlap = await ReadSnapshotAsync(storage, cancellationToken);
+            var overlappingEntry = Entry(12, SiloStatus.Joining);
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var insertion = InsertAfterBarrierAsync();
+            var reading = ReadAfterBarrierAsync();
+            start.SetResult();
+            await Task.WhenAll(insertion, reading);
+            var (inserted, insertError) = await insertion;
+            var (observed, readError) = await reading;
+            if (insertError is not null)
+            {
+                Assert.Equal(1205, Assert.IsType<SqlException>(insertError).Number);
+                AssertUnchanged(beforeOverlap, await ReadSnapshotAsync(storage, cancellationToken));
+                var refreshed = await legacy.ReadAllAsync();
+                Assert.True(await legacy.InsertAsync(overlappingEntry, refreshed.Version.VersionEtag));
+            }
+            else
+            {
+                Assert.True(inserted);
+            }
+
+            var afterOverlap = await ReadSnapshotAsync(storage, cancellationToken);
+            Assert.Equal(beforeOverlap.Version + 1, afterOverlap.Version);
+            Assert.Equal(beforeOverlap.Members.Append(StoredMember.FromEntry(overlappingEntry)), afterOverlap.Members);
+            if (readError is not null)
+            {
+                Assert.Equal(1205, Assert.IsType<SqlException>(readError).Number);
+                observed = await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken);
+            }
+
+            Assert.NotNull(observed);
+            if (observed.Version.Version == beforeOverlap.Version)
+            {
+                Assert.Empty(observed.Members);
+            }
+            else
+            {
+                Assert.Equal(afterOverlap.Version, observed.Version.Version);
+                Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(Assert.Single(observed.Members).Item1));
+            }
+
+            async Task<(bool Inserted, Exception? Error)> InsertAfterBarrierAsync()
+            {
+                await start.Task.WaitAsync(cancellationToken);
+                var inserted = false;
+                var error = await Record.ExceptionAsync(async () => inserted = await legacy.InsertAsync(overlappingEntry, beforeOverlap.Etag));
+                return (inserted, error);
+            }
+
+            async Task<(MembershipTableData? Snapshot, Exception? Error)> ReadAfterBarrierAsync()
+            {
+                await start.Task.WaitAsync(cancellationToken);
+                MembershipTableData? snapshot = null;
+                var error = await Record.ExceptionAsync(async () => snapshot = await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken));
+                return (snapshot, error);
+            }
         }
 
         async Task AssertRejectedAsync(Func<Task<bool>> write)

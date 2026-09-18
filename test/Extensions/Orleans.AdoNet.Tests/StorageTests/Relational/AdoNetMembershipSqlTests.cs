@@ -126,10 +126,10 @@ public sealed class AdoNetMembershipSqlTests
 
         var versionWrite = insert.IndexOf("UPDATE OrleansMembershipVersionTable", StringComparison.Ordinal);
         var rowWrite = insert.IndexOf("INSERT INTO OrleansMembershipTable", StringComparison.Ordinal);
-        if (engine == "SQLServer")
+        if (engine is "SQLServer" or "MySQL")
         {
             Assert.True(rowWrite >= 0 && versionWrite > rowWrite, insert);
-            Assert.Contains("AND @@ROWCOUNT > 0;", insert[versionWrite..], StringComparison.Ordinal);
+            Assert.Contains(engine == "SQLServer" ? "AND @@ROWCOUNT > 0;" : "AND ROW_COUNT() > 0;", insert[versionWrite..], StringComparison.Ordinal);
         }
         else
         {
