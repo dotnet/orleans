@@ -44,9 +44,9 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         handler.Release();
         await preparation.WaitAsync();
         Assert.Equal(42, first.Value!.Value);
-        Assert.Equal(1, first.Inbox!.Count);
+        Assert.Equal(0, first.Inbox!.Count);
         Assert.Equal(1, first.Outbox!.Count);
-        Assert.Empty(GetProcessed(first.Context));
+        Assert.Single(GetProcessed(first.Context));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         preparation.Release();
         await state.Handled.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
@@ -203,7 +203,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     {
         var grain = Control<UnselectedEndpointBootstrapGrain>();
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => grain.PingAsync());
-        Assert.Contains("Durable inbox initialization has not completed", exception.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Durable inbox activation requires IDurableMessagingGrain or DurableGrain", exception.ToString(), StringComparison.Ordinal);
         var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
         await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(1, observation.Disposals);
