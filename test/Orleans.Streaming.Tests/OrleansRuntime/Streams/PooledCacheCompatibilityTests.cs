@@ -65,9 +65,10 @@ public class PooledCacheCompatibilityTests
         Assert.Equal(QueueCacheCursorResultKind.Success, result.Kind);
         using var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(result.Cursor);
         var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        if (certifiedReplay) progress.EnableDeliveryProgress();
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cursor.MoveNextWithResult().Kind);
         Assert.Equal(2, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
-        Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
+        Assert.Equal(certifiedReplay ? 1 : (long?)null, progress.SafeSequenceToken?.SequenceNumber);
         if (!certifiedReplay)
         {
             cursor.RecordDeliveryFailure();

@@ -568,6 +568,8 @@ namespace Orleans.Streaming.EventHubs
         {
             private readonly IQueueCacheCursorProgress progress = (IQueueCacheCursorProgress)cursor;
 
+            public void EnableDeliveryProgress() => progress.EnableDeliveryProgress();
+
             public StreamSequenceToken? SafeSequenceToken => progress.SafeSequenceToken;
             public void SetDeliveredThrough(StreamSequenceToken token) => progress.SetDeliveredThrough(token);
             public void RecordDeliveryCompletion() => progress.RecordDeliveryCompletion();

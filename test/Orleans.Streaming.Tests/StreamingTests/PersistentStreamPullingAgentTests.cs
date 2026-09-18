@@ -651,6 +651,7 @@ namespace UnitTests.StreamingTests
                 void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)cursor).RecordDeliveryFailure();
                 public void RecordDeliveryFailure(IBatchContainer batch) => cursor.RecordDeliveryFailure();
                 public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)cursor).SafeSequenceToken;
+                public void EnableDeliveryProgress() => ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
                 public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)cursor).SetDeliveredThrough(token);
                 public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
                 public IDisposable ProtectDeliveryBatch()
@@ -758,6 +759,7 @@ namespace UnitTests.StreamingTests
 
         private sealed class EmptyQueueCacheCursor : IQueueCacheCursor, IQueueCacheCursorProgress
         {
+            public void EnableDeliveryProgress() { }
             public StreamSequenceToken? SafeSequenceToken => null;
             public void SetDeliveredThrough(StreamSequenceToken token) { }
             public void RecordDeliveryCompletion() { }
@@ -797,6 +799,7 @@ namespace UnitTests.StreamingTests
             public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
             void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
             public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+            public void EnableDeliveryProgress() => ((IQueueCacheCursorProgress)inner).EnableDeliveryProgress();
             public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
             public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
         }
@@ -1178,6 +1181,7 @@ namespace UnitTests.StreamingTests
 
                 public void RecordDeliveryFailure() => cache.RecordDeliveryFailure(cursor);
                 public StreamSequenceToken? SafeSequenceToken => cache.GetSafeSequenceToken(cursor);
+                public void EnableDeliveryProgress() => cache.EnableDeliveryProgress(cursor);
                 public void SetDeliveredThrough(StreamSequenceToken token) => cache.SetCursorDeliveredThrough(cursor, token);
                 public void RecordDeliveryCompletion() => cache.RecordDeliveryCompletion(cursor);
             }
