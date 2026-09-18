@@ -212,14 +212,17 @@ namespace Orleans.Runtime.MembershipService
     {
         private InMemoryMembershipTable table;
         private readonly ILogger logger;
+        private readonly string clusterId;
 
         public MembershipTableSystemTarget(
             ILogger<MembershipTableSystemTarget> logger,
             DeepCopier deepCopier,
-            SystemTargetShared shared)
+            SystemTargetShared shared,
+            IOptions<ClusterOptions> clusterOptions)
             : base(CreateId(shared.SiloAddress), shared)
         {
             this.logger = logger;
+            clusterId = clusterOptions.Value.ClusterId;
             table = new InMemoryMembershipTable(deepCopier);
             LogInformationGrainBasedMembershipTableActivated(logger);
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -246,6 +249,11 @@ namespace Orleans.Runtime.MembershipService
         public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(this.clusterId, clusterId, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("The cluster ID must match the cluster served by this membership table.", nameof(clusterId));
+            }
+
             LogInformationDeleteMembershipTableEntries(logger, clusterId);
             table = null!;
             return Task.CompletedTask;
