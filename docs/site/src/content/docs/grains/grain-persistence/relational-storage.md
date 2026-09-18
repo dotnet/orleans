@@ -54,11 +54,3 @@ The provider supplies the common identity parameters `GrainIdHash`, `GrainIdN0`,
 Each provider instance reads `OrleansQuery` during silo startup and doesn't poll it afterward. Changing the table therefore affects newly initialized providers only. A rolling silo restart is appropriate when old and new queries and schemas can coexist; coordinate an outage or staged migration when they can't.
 
 Database-specific customization can use features such as [partitioned tables and indexes](https://learn.microsoft.com/sql/relational-databases/partitions/partitioned-tables-and-indexes), [memory-optimized tables](https://learn.microsoft.com/sql/relational-databases/in-memory-oltp/overview-and-usage-scenarios), [natively compiled modules](https://learn.microsoft.com/sql/relational-databases/in-memory-oltp/native-compilation-of-tables-and-stored-procedures), [PolyBase](https://learn.microsoft.com/sql/relational-databases/polybase/overview), or [linked servers](https://learn.microsoft.com/sql/relational-databases/linked-servers/linked-servers-database-engine) when those capabilities fit the deployment.
-
-### Update SQLite persistence queries
-
-SQLite reports a successful first write as version `1` and a successful version-matched write or clear as `GrainStateVersion + 1`. Both results are scalars computed from the mutation.
-
-Existing databases use the query text installed in `OrleansQuery`. To deploy updated SQLite persistence queries, back up the database, then update `QueryText` for `WriteToStorageKey` and `ClearStorageKey` in one transaction using the corresponding query values from the updated `Sqlite-Persistence.sql`. Preserve any deployment-specific customizations and the existing `OrleansStorage` data. Use the script's table and index creation statements when initializing a new database. Restart the silos after updating the stored queries so that each provider loads the new text.
-
-The storage contract expects one row per full grain identity: `ServiceId`, `GrainTypeString`, `GrainIdN0`, `GrainIdN1`, and `GrainIdExtensionString`. The non-unique hash index supports distinct identities with colliding hashes, which the query's remaining identity predicates distinguish. If duplicate full identities exist, investigate their origin and reconcile their payloads and versions through a separate data-maintenance operation.
