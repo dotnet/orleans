@@ -180,21 +180,21 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!TryGetExpectedVersion(tableVersion, out _) || !string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+        if (!TryGetExpectedVersion(tableVersion, out var expectedVersion) || !string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
         {
             return false;
         }
 
         while (true)
         {
-            var current = await ReadRowAsync(entry.SiloAddress, cancellationToken);
-            if (current.Members.Count == 0 || current.Version.VersionEtag != tableVersion.VersionEtag)
+            var current = await ReadRowForUpdateAsync(entry.SiloAddress, cancellationToken);
+            if (current is not { } row || row.Version != expectedVersion)
             {
                 return false;
             }
 
             var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(
-                _identifier, entry, current.Version.Version, current.Members[0].Item1.IAmAliveTime, cancellationToken), cancellationToken);
+                _identifier, entry, row.Version, row.Entry.IAmAliveTime, cancellationToken), cancellationToken);
             if ((bool)query.First()["[applied]"])
             {
                 return true;
@@ -320,24 +320,41 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         return row is null ? 0 : (int)row["version"];
     }
 
+    private async Task<(MembershipEntry Entry, int Version)?> ReadRowForUpdateAsync(SiloAddress key, CancellationToken cancellationToken)
+    {
+        // A single-row serial read supplies the row/version pair; the subsequent CAS fences concurrent changes.
+        var rows = await Queries.ExecuteAsync(await Queries.MembershipReadRow(_identifier, key, cancellationToken), cancellationToken);
+        var row = await OrleansQueries.ReadFirstRowAsync(rows, cancellationToken);
+        if (row is null || GetMembershipEntry(row) is not { } entry)
+        {
+            return null;
+        }
+
+        return (entry, (int)row["version"]);
+    }
+
     [Obsolete("Use UpdateIAmAliveAsync instead.")]
     Task IMembershipTable.UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
 
     public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_ttlSeconds.HasValue)
+        {
+            await Queries.ExecuteAsync(await Queries.UpdateIAmAliveTime(_identifier, entry, cancellationToken), cancellationToken);
+            return;
+        }
+
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var current = await ReadRowAsync(entry.SiloAddress, cancellationToken);
-            if (current.Members.Count == 0 || current.Members[0].Item1.IAmAliveTime >= entry.IAmAliveTime)
+            var current = await ReadRowForUpdateAsync(entry.SiloAddress, cancellationToken);
+            if (current is not { } row || row.Entry.IAmAliveTime >= entry.IAmAliveTime)
             {
                 return;
             }
 
-            var existing = current.Members[0].Item1;
-            var statement = _ttlSeconds.HasValue
-                ? await Queries.UpdateIAmAliveTimeWithTtl(_identifier, entry, existing, current.Version.Version, cancellationToken)
-                : await Queries.UpdateIAmAliveTime(_identifier, entry, existing.IAmAliveTime, existing.Status, cancellationToken);
+            var statement = await Queries.UpdateIAmAliveTimeWithTtl(_identifier, entry, row.Entry, row.Version, cancellationToken);
             var result = await Queries.ExecuteAsync(statement, cancellationToken);
             if ((bool)result.First()["[applied]"])
             {

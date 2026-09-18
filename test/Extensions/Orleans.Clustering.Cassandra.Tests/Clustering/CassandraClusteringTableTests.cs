@@ -421,6 +421,18 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Equal(originalMembershipEntry.StartTime, updatedMember.StartTime);
 
         await ValidateTtlValues();
+        foreach (var heartbeat in new[] { amAliveTime.AddSeconds(-1), amAliveTime })
+        {
+            await membershipTable.UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = newEntry.SiloAddress,
+                IAmAliveTime = heartbeat
+            }, testCancellationToken);
+            var unchanged = await membershipTable.ReadRowAsync(newEntry.SiloAddress, testCancellationToken);
+            Assert.Equal(updatedMember.ToFullString(), Assert.Single(unchanged.Members).Item1.ToFullString());
+            Assert.Equal(tableData.Version, unchanged.Version);
+        }
+
         var beforeCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
         await membershipTable.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(amAliveTime.AddSeconds(1)), testCancellationToken);
         var afterCleanup = await membershipTable.ReadAllAsync(testCancellationToken);
@@ -526,6 +538,71 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var retired = await table.ReadRowAsync(dead.SiloAddress, token);
         Assert.Empty(retired.Members);
         Assert.Equal(before.Version, retired.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTable_NonTtlHeartbeat_AbsentRow_PreservesExistingRowsAndVersion()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var (table, _) = await CreateNewMembershipTableAsync(token);
+        var entry = CreateMembershipEntryForTest();
+        var initial = await table.ReadAllAsync(token);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
+        var before = await table.ReadAllAsync(token);
+        var absent = CreateMembershipEntryForTest();
+
+        await table.UpdateIAmAliveAsync(absent, token);
+
+        var after = await table.ReadAllAsync(token);
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(entry.ToFullString(), Assert.Single(after.Members).Item1.ToFullString());
+        Assert.Empty((await table.ReadRowAsync(absent.SiloAddress, token)).Members);
+    }
+
+    [Theory]
+    [InlineData(false, SiloStatus.Active)]
+    [InlineData(false, SiloStatus.Dead)]
+    [InlineData(true, SiloStatus.Active)]
+    [InlineData(true, SiloStatus.Dead)]
+    public async Task MembershipTable_ConcurrentHeartbeatsAndFullRowUpdate_PreserveMaximum(bool ttl, SiloStatus status)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var (table, _) = await CreateNewMembershipTableAsync(token, cassandraTtl: ttl);
+        var entry = CreateMembershipEntryForTest();
+        entry.Status = status;
+        var initial = await table.ReadAllAsync(token);
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
+        var before = await table.ReadRowAsync(entry.SiloAddress, token);
+        var update = Assert.Single(before.Members);
+        update.Item1.HostName += "-updated";
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var heartbeats = Enumerable.Range(1, 8).Reverse().Select(async offset =>
+        {
+            await start.Task.WaitAsync(token);
+            await table.UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = entry.SiloAddress,
+                IAmAliveTime = entry.IAmAliveTime.AddSeconds(offset)
+            }, token);
+        }).ToArray();
+        var fullRowWrite = UpdateRowAsync();
+        start.SetResult();
+
+        await Task.WhenAll(heartbeats.Append(fullRowWrite));
+        Assert.True(await fullRowWrite);
+        var after = await table.ReadRowAsync(entry.SiloAddress, token);
+        var result = Assert.Single(after.Members).Item1;
+        Assert.Equal(entry.IAmAliveTime.AddSeconds(8), result.IAmAliveTime);
+        Assert.Equal(update.Item1.HostName, result.HostName);
+        Assert.Equal(entry.StartTime, result.StartTime);
+        Assert.Equal(status, result.Status);
+        Assert.Equal(before.Version.Version + 1, after.Version.Version);
+
+        async Task<bool> UpdateRowAsync()
+        {
+            await start.Task.WaitAsync(token);
+            return await table.UpdateRowAsync(update.Item1, update.Item2, before.Version.Next(), token);
+        }
     }
 
     [Fact]
