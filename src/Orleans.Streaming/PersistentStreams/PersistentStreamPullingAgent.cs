@@ -907,7 +907,8 @@ namespace Orleans.Streams
                 {
                     if (CheckpointingCache is not null) NotifyDeliveryProgress();
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
-                    if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
+                    if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0
+                        && CheckpointingCache is null)
                         return;
 
                     // If read succeeds and there is more data, we continue reading.
@@ -1048,6 +1049,12 @@ namespace Orleans.Streams
 
             // Keep the first read pinned through discovery and every registration retry.
             if (RetryPendingRegistrations(now))
+            {
+                return false;
+            }
+
+            if (CheckpointingCache is not null && _pendingRead is null
+                && maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
             {
                 return false;
             }

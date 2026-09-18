@@ -924,8 +924,10 @@ public partial class PersistentStreamPullingAgentTests
         }
     }
 
-    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public async Task CheckpointProgress_EmptySubscriptionDiscoveryRetainsPinAcrossRegistrationRetry()
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_EmptySubscriptionDiscoveryRetainsPinAcrossRegistrationRetry(bool fullCache)
     {
         var cache = new CheckpointAdmissionCache();
         var firstDiscovery = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -980,7 +982,15 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Same(pin, registeredStream.RegistrationCursor);
             await AssertReportedPartitionPrefix(accessor, cache.Progress, null);
 
-            Assert.False(await accessor.ReadFromQueue(queue, receiver, 1000));
+            if (fullCache)
+            {
+                cache.MaxAddCount = 0;
+                await accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                Assert.False(await accessor.ReadFromQueue(queue, receiver, 1000));
+            }
             await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             var secondRegistration = Assert.IsAssignableFrom<Task>(registeredStream.RegistrationTask);
             Assert.Same(pin, registeredStream.RegistrationCursor);
@@ -998,6 +1008,12 @@ public partial class PersistentStreamPullingAgentTests
             Assert.Null(registeredStream.RegistrationTask);
             backoff.Received(1).Next(Arg.Any<int>());
             await AssertReportedPartitionPrefix(accessor, cache.Progress, 2);
+            if (fullCache)
+            {
+                await accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+                await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+                cache.MaxAddCount = null;
+            }
             Assert.False(await accessor.ReadFromQueue(queue, receiver, 1000));
             await receiver.Received(2).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
             Assert.Equal(2, registrationCalls);
@@ -1007,6 +1023,59 @@ public partial class PersistentStreamPullingAgentTests
         {
             firstDiscovery.TrySetResult(new HashSet<PubSubSubscriptionState>());
             secondDiscovery.TrySetResult(new HashSet<PubSubSubscriptionState>());
+            await accessor.Shutdown();
+        }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_FullCacheRetriesRetainedReadWithoutReceivingAgain(bool failAfterAdmission)
+    {
+        var cache = new CheckpointAdmissionCache
+        {
+            FailNextAdmission = !failAfterAdmission,
+            FailNextRegistrationCursor = failAfterAdmission,
+        };
+        var receiver = Substitute.For<IQueueAdapterReceiver>();
+        var stream = new QualifiedStreamId("provider", StreamId.Create("accounting", Guid.NewGuid()));
+        var pubSub = Substitute.For<IStreamPubSub>();
+        pubSub.RegisterProducer(Arg.Any<QualifiedStreamId>(), Arg.Any<GrainId>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+        var adapterCache = Substitute.For<IQueueAdapterCache>();
+        adapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(cache);
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+        var agent = CreateAgent(pubSub, queue, receiver, adapterCache);
+        var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+        await InitializeAgent(agent);
+        receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IList<IBatchContainer>>(
+            [
+                new TestBatchContainer(stream.StreamId, new EventSequenceTokenV2(1)),
+                new TestBatchContainer(stream.StreamId, new EventSequenceTokenV2(2)),
+            ]));
+        try
+        {
+            Assert.Same(cache.Failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                () => accessor.ReadFromQueue(queue, receiver, 1000)));
+            cache.MaxAddCount = 0;
+            await AssertReportedPartitionPrefix(accessor, cache.Progress, null);
+
+            await accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+            var registered = Assert.Single(await accessor.GetPubSubCache()).Value;
+            if (registered.RegistrationTask is { } registration)
+                await registration.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+
+            Assert.True(registered.StreamRegistered);
+            Assert.Null(registered.RegistrationCursor);
+            Assert.Equal(failAfterAdmission ? 1 : 2, cache.AdmissionAttempts);
+            Assert.Equal(2, cache.Size);
+            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+            await AssertReportedPartitionPrefix(accessor, cache.Progress, 2);
+        }
+        finally
+        {
             await accessor.Shutdown();
         }
     }
@@ -1053,11 +1122,12 @@ public partial class PersistentStreamPullingAgentTests
         public bool FailNextAdmission { get; init; }
         public bool FailNextRegistrationCursor { get; set; }
         public int AdmissionAttempts { get; private set; }
+        public int? MaxAddCount { get; set; }
         public int Size => ((SimpleQueueCache)inner).Size;
         public List<IList<IBatchContainer>> AdmittedLists { get; } = [];
         public List<StreamSequenceToken?> Progress { get; } = [];
 
-        public int GetMaxAddCount() => inner.GetMaxAddCount();
+        public int GetMaxAddCount() => MaxAddCount ?? inner.GetMaxAddCount();
         public bool IsUnderPressure() => inner.IsUnderPressure();
         public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems)
             => inner.TryPurgeFromCache(out purgedItems!);
