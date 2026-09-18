@@ -580,6 +580,155 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
+        [InlineData("number")]
+        [InlineData("null")]
+        [InlineData("boolean")]
+        [InlineData("map")]
+        [InlineData("list")]
+        [InlineData("string-set")]
+        [InlineData("invalid-date")]
+        public async Task HeartbeatRejectsMalformedPresentAttributeWithoutRetrying(string kind)
+        {
+            var heartbeat = kind switch
+            {
+                "number" => new AttributeValue { N = "123" },
+                "null" => new AttributeValue { NULL = true },
+                "boolean" => new AttributeValue { BOOL = true },
+                "map" => new AttributeValue { M = new() { ["value"] = new AttributeValue("timestamp") } },
+                "list" => new AttributeValue { L = [new AttributeValue("timestamp")] },
+                "string-set" => new AttributeValue { SS = ["timestamp"] },
+                "invalid-date" => new AttributeValue("not-a-date"),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+            var fields = CreateRecord().GetFields(includeKeys: true);
+            fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat;
+            var updates = 0;
+            using var client = new RequestClient
+            {
+                Update = request =>
+                {
+                    Assert.Equal(1, ++updates);
+                    Assert.Contains("attribute_not_exists(IAmAliveTime)", request.ConditionExpression);
+                    Assert.Contains("IAmAliveTime < :IAmAliveTime", request.ConditionExpression);
+                    throw new ConditionalCheckFailedException("Present heartbeat fails the string comparison.");
+                },
+                Read = request =>
+                {
+                    Assert.True(request.ConsistentRead);
+                    Assert.Equal("127.0.0.1-11111-1", request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
+                    return new GetItemResponse { Item = fields };
+                }
+            };
+
+            var exception = await Assert.ThrowsAsync<FormatException>(() => CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = DateTime.UnixEpoch
+            }, TestContext.Current.CancellationToken));
+
+            Assert.Contains("IAmAliveTime", exception.Message);
+            Assert.Equal(1, updates);
+            Assert.Equal(1, client.ReadCount);
+            Assert.Same(heartbeat, fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME]);
+        }
+
+        [Theory]
+        [InlineData(null, 2)]
+        [InlineData("2025-12-31 00:00:00.000 GMT", 2)]
+        [InlineData("2026-01-01 00:00:00.000 GMT", 1)]
+        [InlineData("2026-01-02 00:00:00.000 GMT", 1)]
+        public async Task HeartbeatRechecksAbsentOrValidAttributeAfterContention(string? heartbeat, int expectedUpdates)
+        {
+            var row = CreateRecord();
+            row.IAmAliveTime = heartbeat;
+            var fields = row.GetFields(includeKeys: true);
+            var updates = 0;
+            using var client = new RequestClient
+            {
+                Update = request =>
+                {
+                    Assert.True(++updates <= expectedUpdates);
+                    if (updates == 1)
+                    {
+                        throw new ConditionalCheckFailedException("Row changed before the verification read.");
+                    }
+
+                    var next = request.ExpressionAttributeValues[":IAmAliveTime"];
+                    Assert.True(!fields.TryGetValue(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, out var current)
+                        || string.CompareOrdinal(current.S, next.S) < 0);
+                    fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = next;
+                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = next } };
+                },
+                Read = _ => new GetItemResponse { Item = fields }
+            };
+
+            await CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            }, TestContext.Current.CancellationToken);
+
+            Assert.Equal(expectedUpdates, updates);
+            Assert.Equal(1, client.ReadCount);
+            Assert.Equal(expectedUpdates == 2 ? "2026-01-01 00:00:00.000 GMT" : heartbeat,
+                fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+            Assert.Equal("3", fields[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            Assert.Equal("7", fields[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
+        }
+
+        [Fact]
+        public async Task HeartbeatRetryHonorsCancellationAfterVerificationRead()
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var row = CreateRecord();
+            row.IAmAliveTime = null;
+            var updates = 0;
+            using var client = new RequestClient
+            {
+                Token = cancellation.Token,
+                Update = _ =>
+                {
+                    Assert.Equal(1, ++updates);
+                    throw new ConditionalCheckFailedException("Row changed before the verification read.");
+                },
+                Read = _ =>
+                {
+                    cancellation.Cancel();
+                    return new GetItemResponse { Item = row.GetFields(includeKeys: true) };
+                }
+            };
+
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = DateTime.UnixEpoch
+            }, cancellation.Token));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Equal(1, updates);
+            Assert.Equal(1, client.ReadCount);
+        }
+
+        [Fact]
+        public async Task HeartbeatInitializesAbsentAttribute()
+        {
+            using var client = new HeartbeatClient { Current = CreateRecord() };
+            client.Current.IAmAliveTime = null;
+
+            await CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                IAmAliveTime = DateTime.UnixEpoch
+            }, TestContext.Current.CancellationToken);
+
+            Assert.Equal("1970-01-01 00:00:00.000 GMT", client.Current.IAmAliveTime);
+            Assert.Single(client.Updates);
+            Assert.Empty(client.Reads);
+            Assert.Equal(3, client.Current.ETag);
+            Assert.Equal(7, client.Current.MembershipVersion);
+        }
+
+        [Theory]
         [InlineData(false, false)]
         [InlineData(true, false)]
         [InlineData(true, true)]

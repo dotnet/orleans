@@ -434,7 +434,7 @@ namespace Orleans.Clustering.DynamoDB
                     catch (ConditionalCheckFailedException)
                     {
                         var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                            values => new SiloInstanceRecord(values), cancellationToken);
+                            values => values, cancellationToken);
                         if (current is null)
                         {
                             var versionKeys = new Dictionary<string, AttributeValue>
@@ -448,10 +448,18 @@ namespace Orleans.Clustering.DynamoDB
                             break;
                         }
 
-                        if (!string.IsNullOrEmpty(current.IAmAliveTime)
-                            && LogFormatter.ParseDate(current.IAmAliveTime) >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
+                        if (current.TryGetValue(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, out var heartbeat))
                         {
-                            break;
+                            if (!DateTime.TryParseExact(heartbeat.S, MEMBERSHIP_DATE_FORMAT, CultureInfo.InvariantCulture,
+                                DateTimeStyles.None, out var currentHeartbeat))
+                            {
+                                throw new FormatException($"Membership row for silo '{siloEntry.SiloIdentity}' has an invalid {SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} attribute.");
+                            }
+
+                            if (currentHeartbeat >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
+                            {
+                                break;
+                            }
                         }
                     }
                 }
