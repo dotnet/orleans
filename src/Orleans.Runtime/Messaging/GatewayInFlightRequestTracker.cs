@@ -41,7 +41,8 @@ namespace Orleans.Runtime.Messaging
                 request.GatewayRequestAttempt = Interlocked.Increment(ref _nextAttempt);
             }
             else if (!_requests.TryGetValue(request.Id, out var current)
-                || current.Attempt != request.GatewayRequestAttempt)
+                || current.Attempt != request.GatewayRequestAttempt
+                || request.ForwardCount <= current.ForwardCount)
             {
                 return false;
             }

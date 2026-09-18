@@ -569,11 +569,6 @@ namespace Orleans.Runtime.Messaging
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {
-            if (!MayForward(message, this.messagingOptions)) return false;
-
-            message.ForwardCount = message.ForwardCount + 1;
-            _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
-
             Action<Message, Connection?, Exception?>? sendMessage = null;
             if (Gateway?.TryGetClientState(message, out var client) is true)
             {
@@ -583,6 +578,23 @@ namespace Orleans.Runtime.Messaging
             {
                 sendMessage = SendForwardedClientRequest;
             }
+
+            if (!MayForward(message, this.messagingOptions))
+            {
+                if (sendMessage is null)
+                {
+                    return false;
+                }
+
+                sendMessage(
+                    message,
+                    null,
+                    new SiloUnavailableException($"The maximum forwarding count of {messagingOptions.MaxForwardCount} was reached."));
+                return true;
+            }
+
+            message.ForwardCount = message.ForwardCount + 1;
+            _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
             ResendMessageImpl(message, forwardingAddress, sendMessage);
             return true;
@@ -627,32 +639,34 @@ namespace Orleans.Runtime.Messaging
             update.ForwardCount = message.ForwardCount;
             update.CacheInvalidationHeader = null;
             update.RequestContextData = null;
-            var ingressConnectionTask = connectionManager.GetConnection(update.TargetSilo!);
-            if (ingressConnectionTask.IsCompletedSuccessfully)
-            {
-                ingressConnectionTask.Result.Send(update);
-            }
-            else
-            {
-                _ = SendForwardingUpdateAsync(this, ingressConnectionTask, update);
-            }
+            update.TimeToLive ??= messagingOptions.ResponseTimeout;
+            SendForwardingUpdate(update);
 
             destination.Send(message);
+        }
 
-            static async Task SendForwardingUpdateAsync(
-                MessageCenter messageCenter,
-                ValueTask<Connection> ingressConnectionTask,
-                Message update)
+        internal void SendForwardingUpdate(Message update)
+        {
+            _ = SendForwardingUpdateAsync(this, update);
+
+            static async Task SendForwardingUpdateAsync(MessageCenter messageCenter, Message update)
             {
-                try
+                while (!update.IsExpired
+                    && !messageCenter.stopped
+                    && update.TargetSilo is { } targetSilo
+                    && !messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
                 {
-                    var ingressConnection = await ingressConnectionTask;
-                    ingressConnection.Send(update);
-                }
-                catch (Exception exception)
-                {
-                    // The terminal response carries the attempt token and forward count, so it can complete without the marker.
-                    LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                    try
+                    {
+                        var ingressConnection = await messageCenter.connectionManager.GetConnection(targetSilo);
+                        ingressConnection.Send(update);
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                        await Task.Delay(TimeSpan.FromMilliseconds(100));
+                    }
                 }
             }
         }
