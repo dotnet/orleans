@@ -33,7 +33,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         var scheduler = outbox.PreparationScheduler;
         Assert.NotSame(TaskScheduler.Default, scheduler);
         Assert.Same(context, outbox.PreparationContext);
-        var admitted = GetAdmitted(context);
+        var admitted = GetStaged(context);
         Assert.Equal("ClearOwnerWrite", Assert.Single(admitted.Cast<object>()).GetType().Name);
 
         Assert.Equal(DurableJobRunStatus.Completed, (await InvokeJobAsync(receiver, CreateJob(receiver, "test/probe-scheduler"))).Status);
@@ -42,7 +42,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         for (var attempt = 2; attempt <= 4; attempt++)
         {
             Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner, attempt)).Status);
-            Assert.Same(admitted, GetAdmitted(context));
+            Assert.Same(admitted, GetStaged(context));
         }
         Assert.Single(events.Events, item => item.Payload is GrainTimerEvents.Created created && ReferenceEquals(created.GrainContext, context));
         barrier.Release();
@@ -50,7 +50,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         Assert.Same(scheduler, outbox.ContinuationScheduler);
         Assert.Same(context, outbox.ContinuationContext);
-        Assert.Empty(GetAdmitted(context));
+        Assert.Empty(GetStaged(context));
         Assert.Equal(DurableJobRunStatus.Completed, (await InvokeJobAsync(receiver, owner, 5)).Status);
         Assert.False(grain.Faulted.Task.IsCompleted);
     }
@@ -76,7 +76,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
             try
             {
                 Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
-                Assert.Empty(GetAdmitted(context));
+                Assert.Empty(GetStaged(context));
                 attempted.SetResult(manager.DeleteStateAsync(cancellation).AsTask());
             }
             catch (Exception exception)
@@ -189,7 +189,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         using var preparation = GetOutbox(context).BlockNextPreparation();
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner)).Status);
         await preparation.WaitAsync();
-        Assert.Equal("ClearOwnerWrite", Assert.Single(GetAdmitted(context).Cast<object>()).GetType().Name);
+        Assert.Equal("ClearOwnerWrite", Assert.Single(GetStaged(context).Cast<object>()).GetType().Name);
         Task delivery;
         if (interleaved)
         {
@@ -257,6 +257,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         };
         var journalId = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
+        context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "delete-overlap";
         await receiver.RetryWriteStateAsync();
         var operations = await started.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
         if (scheduling is not null)
@@ -267,9 +268,9 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         Assert.Contains("quiescent", failure.Message, StringComparison.Ordinal);
         Assert.Same(failure, await grain.Faulted.Task);
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => operations.Delivery));
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journalId));
         Assert.Empty(grain.GetSnapshotForTest().Effects);
-        Assert.Equal(existingOwner ? 1 : 0, grain.GetSnapshotForTest().InboxCount);
+        Assert.Equal(existingOwner ? 2 : 0, grain.GetSnapshotForTest().InboxCount);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), token);
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
@@ -324,10 +325,10 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
     private static JournaledTestOutbox GetOutbox(IGrainContext context) =>
         (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
 
-    private static Array GetAdmitted(IGrainContext context)
+    private static IList GetStaged(IGrainContext context)
     {
         var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
-        return (Array)type.GetField("_admittedWrites", BindingFlags.Instance | BindingFlags.NonPublic)!
+        return (IList)type.GetField("_stagedWrites", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(context.ActivationServices.GetRequiredService(type))!;
     }
 

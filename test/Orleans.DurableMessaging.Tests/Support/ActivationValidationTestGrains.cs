@@ -41,7 +41,7 @@ public interface IAlwaysInterleaveValidationTestGrain : IActivationValidationTes
     Task InterleaveAsync();
 }
 
-public abstract class ActivationValidationTestGrain : DurableGrain, IActivationValidationTestGrain, IJournaledStateObserver
+public abstract class ActivationValidationTestGrain : DurableGrain, IActivationValidationTestGrain
 {
     private readonly IDurableValue<int> _value;
     private readonly ActivationValidationProbe.Observation _observation;
@@ -51,7 +51,9 @@ public abstract class ActivationValidationTestGrain : DurableGrain, IActivationV
     {
         _value = value;
         _observation = probe.Track(context);
-        StateManager.RegisterObserver(this);
+        var journal = (ObservedJournalValue<int>)value;
+        journal.Initializing = OnRecoveryStarted;
+        journal.Recovered = OnRecoveryCompleted;
     }
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
