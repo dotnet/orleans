@@ -234,6 +234,7 @@ public class EventHubCheckpointRecoveryTests
             var certified = !derivedCache && !customDataAdapter && !customEviction && !legacyTransport;
             Assert.Equal(certified, receiver.UsesCertifiedDeliveryProgress);
             cache.Add([CreateEvent(adapter, stream, 1), CreateEvent(adapter, stream, 2)], Now.UtcDateTime);
+            Assert.Equal(certified ? 999 : 1000, cache.GetMaxAddCount());
             var cursor = ((IQueueCache)receiver).TryGetCacheCursor(stream, Token(1)).Cursor!;
             Assert.Equal(certified, cursor is IQueueCacheCursorProgress);
             cache.SignalPurge();
@@ -529,6 +530,259 @@ public class EventHubCheckpointRecoveryTests
         secondLease.Dispose();
     }
 
+    [Fact]
+    public void CertifiedAdmission_HealthyConsumersCannotOutweighPinnedSelection()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("admission", "weighted");
+        var messages = Enumerable.Range(1000, 256).Select(sequence => CreateEvent(adapter, stream, sequence)).ToList();
+        var segmentSize = GetEncodedSize(adapter, messages[0]);
+        Assert.All(messages, message => Assert.Equal(segmentSize, GetEncodedSize(adapter, message)));
+        const int bufferLimit = 4;
+        const int messagesPerBuffer = 16;
+        var allocated = 0;
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            allocated++;
+            return new FixedSizeBuffer(messagesPerBuffer * segmentSize);
+        });
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        using var cache = CreateCache(pool, adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null),
+            checkpointer, bufferLimit);
+        var pressure = new AveragingCachePressureMonitor(NullLogger.Instance);
+        cache.AddCachePressureMonitor(pressure);
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
+
+        var admitted = 0;
+        var healthyConsumers = new object[12];
+        while (admitted < messages.Count)
+        {
+            var allowance = cache.GetMaxAddCount();
+            if (allowance == 0)
+            {
+                break;
+            }
+
+            var count = Math.Min(allowance, messages.Count - admitted);
+            cache.Add(messages.GetRange(admitted, count), Now.UtcDateTime);
+            for (var consumer = 0; consumer < healthyConsumers.Length; consumer++)
+            {
+                if (healthyConsumers[consumer] is null)
+                {
+                    healthyConsumers[consumer] = cache.TryGetCursor(stream, Token(1000)).Cursor!;
+                    ((IQueueCacheCursorProgress)healthyConsumers[consumer]).EnableDeliveryProgress();
+                }
+
+                var healthy = healthyConsumers[consumer];
+                for (var index = 0; index < count; index++)
+                {
+                    Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(healthy, out var delivered).Kind);
+                    Assert.Equal(1000 + admitted + index, Assert.Single(delivered!.GetEvents<int>()).Item1);
+                    ((IQueueCacheCursorProgress)healthy).RecordDeliveryCompletion();
+                }
+            }
+
+            admitted += count;
+        }
+
+        Assert.Equal(bufferLimit, allocated);
+        Assert.Equal((bufferLimit - 1) * messagesPerBuffer + 1, admitted);
+        var pinned = cache.TryGetCursor(stream, Token(1000)).Cursor!;
+        var pinnedProgress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(pinned);
+        pinnedProgress.EnableDeliveryProgress();
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(pinned, out var selected).Kind);
+        Assert.Null(pinnedProgress.SafeSequenceToken);
+        for (var consumer = 0; consumer < 12; consumer++)
+        {
+            var healthy = cache.TryGetCursor(stream, Token(1000 + admitted - 1)).Cursor!;
+            var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(healthy);
+            progress.EnableDeliveryProgress();
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(healthy, out var delivered).Kind);
+            Assert.Equal(1000 + admitted - 1, Assert.Single(delivered!.GetEvents<int>()).Item1);
+            progress.RecordDeliveryCompletion();
+        }
+
+        // Evaluate the default weighted monitor deterministically, after all contributions.
+        Assert.False(pressure.IsUnderPressure(new DateTime(9999, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+        for (var pausedRead = 0; pausedRead < 10; pausedRead++)
+        {
+            cache.SignalPurge();
+            Assert.Equal(0, cache.GetMaxAddCount());
+            Assert.Equal(1000, Assert.Single(selected!.GetEvents<int>()).Item1);
+            Assert.Equal(bufferLimit, allocated);
+        }
+        Assert.DoesNotContain(checkpointer.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(IStreamQueueCheckpointer<string>.Update));
+
+        pinnedProgress.RecordDeliveryCompletion();
+        cache.UpdateDeliveryProgress(Token(1000), Now.UtcDateTime);
+        Assert.Equal(0, cache.GetMaxAddCount()); // The certified record still shares its buffer with retained records.
+        cache.UpdateDeliveryProgress(Token(1000 + messagesPerBuffer - 1), Now.UtcDateTime);
+        Assert.Equal(1, cache.GetMaxAddCount());
+        cache.Add([messages[admitted]], Now.UtcDateTime);
+        Assert.Equal(bufferLimit, allocated);
+        cache.UpdateDeliveryProgress(Token(1000 + admitted), Now.UtcDateTime);
+        Assert.Equal(bufferLimit, cache.GetMaxAddCount());
+    }
+
+    [Fact]
+    public void CertifiedAdmission_LargeRecordsReserveTheWholeReadWithoutOvershoot()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("admission", "large");
+        var messages = Enumerable.Range(1000, 4).Select(sequence => CreateEvent(adapter, stream, sequence)).ToList();
+        var bufferSize = GetEncodedSize(adapter, messages[0]);
+        Assert.All(messages, message => Assert.Equal(bufferSize, GetEncodedSize(adapter, message)));
+        var allocated = 0;
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            allocated++;
+            return new FixedSizeBuffer(bufferSize);
+        });
+        using var cache = CreateCache(pool, adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null),
+            Substitute.For<IStreamQueueCheckpointer<string>>(), defaultMaxAddCount: 3);
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
+
+        Assert.Equal(3, cache.GetMaxAddCount());
+        cache.Add([messages[0]], Now.UtcDateTime);
+        Assert.Equal(2, cache.GetMaxAddCount());
+        cache.Add(messages.GetRange(1, cache.GetMaxAddCount()), Now.UtcDateTime);
+        Assert.Equal(3, allocated);
+        Assert.Equal(0, cache.GetMaxAddCount());
+        cache.SignalPurge();
+        Assert.Equal(0, cache.GetMaxAddCount());
+
+        cache.UpdateDeliveryProgress(Token(1000), Now.UtcDateTime);
+        Assert.Equal(1, cache.GetMaxAddCount());
+        cache.Add([messages[3]], Now.UtcDateTime);
+        Assert.Equal(3, allocated);
+        Assert.Equal(0, cache.GetMaxAddCount());
+        var cursor = cache.TryGetCursor(stream, Token(1001)).Cursor!;
+        foreach (var sequence in new[] { 1001, 1002, 1003 })
+        {
+            Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var message).Kind);
+            Assert.Equal(sequence, Assert.Single(message!.GetEvents<int>()).Item1);
+        }
+    }
+
+    [Fact]
+    public void CertifiedAdmission_FailedPackingRestoresBufferReservation()
+    {
+        using var services = CreateServices();
+        var adapter = new ThrowingDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("admission", "rollback");
+        var messages = Enumerable.Range(1000, 2).Select(sequence => CreateEvent(adapter, stream, sequence)).ToList();
+        var bufferSize = GetEncodedSize(adapter, messages[0]);
+        using var cache = CreateCache(new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(bufferSize)), adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null),
+            Substitute.For<IStreamQueueCheckpointer<string>>(), defaultMaxAddCount: 2);
+        cache.EnableCertifiedDeliveryProgress();
+        adapter.FailAtSequence = 1001;
+
+        Assert.Throws<InvalidOperationException>(() => cache.Add(messages, Now.UtcDateTime));
+        Assert.Equal(2, cache.GetMaxAddCount());
+        cache.Add(messages, Now.UtcDateTime);
+        Assert.Equal(0, cache.GetMaxAddCount());
+        cache.UpdateDeliveryProgress(Token(1001), Now.UtcDateTime);
+        Assert.Equal(2, cache.GetMaxAddCount());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void CertifiedAdmission_PurgeObserverFailureReleasesOwnedBuffers(int failureStage)
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("admission", "purge-observer");
+        var messages = Enumerable.Range(1000, 2).Select(sequence => CreateEvent(adapter, stream, sequence)).ToList();
+        var buffers = new List<FixedSizeBuffer>();
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            var buffer = new FixedSizeBuffer(2 * GetEncodedSize(adapter, messages[0]));
+            buffers.Add(buffer);
+            return buffer;
+        });
+        var monitor = Substitute.For<ICacheMonitor>();
+        var failure = new InvalidOperationException("Purge observer failed");
+        if (failureStage == 0)
+            monitor.WhenForAnyArgs(value => value.TrackMessagesPurged(default)).Do(_ => throw failure);
+        if (failureStage == 1)
+            monitor.WhenForAnyArgs(value => value.TrackMemoryReleased(default)).Do(_ => throw failure);
+        var eviction = new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), monitor, null);
+        using var cache = CreateCache(pool, adapter, eviction, Substitute.For<IStreamQueueCheckpointer<string>>(), defaultMaxAddCount: 2);
+        if (failureStage == 2) eviction.OnPurged = (_, _) => throw failure;
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
+        cache.Add([messages[0]], Now.UtcDateTime);
+        Assert.Equal(1, cache.GetMaxAddCount());
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => cache.UpdateDeliveryProgress(Token(1000), Now.UtcDateTime)));
+
+        Assert.Equal(2, cache.GetMaxAddCount());
+        using var reclaimed = pool.Allocate();
+        Assert.Same(Assert.Single(buffers), reclaimed);
+        cache.Add([messages[1]], Now.UtcDateTime);
+        Assert.Equal(2, buffers.Count);
+        Assert.Equal(1, cache.GetMaxAddCount());
+        var cursor = cache.TryGetCursor(stream, Token(1001)).Cursor!;
+        Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var message).Kind);
+        Assert.Equal(1001, Assert.Single(message!.GetEvents<int>()).Item1);
+    }
+
+    [Fact]
+    public async Task CertifiedAdmission_FullCacheCanRetryPendingHandoffWithoutReceivingAgain()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var stream = StreamId.Create("admission", "handoff");
+        var messages = Enumerable.Range(1000, 2).Select(sequence => CreateEvent(adapter, stream, sequence)).ToArray();
+        var monitor = Substitute.For<ICacheMonitor>();
+        monitor.WhenForAnyArgs(value => value.TrackMemoryAllocated(default))
+            .Do(_ => throw new InvalidOperationException("Allocation observer failed after ownership transfer"));
+        var checkpointer = Substitute.For<IStreamQueueCheckpointer<string>>();
+        using var cache = CreateCache(new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(GetEncodedSize(adapter, messages[0]))), adapter,
+            new ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), monitor, null),
+            checkpointer, defaultMaxAddCount: 1);
+        var transport = new PartitionTransport(messages, EventHubConstants.StartOfStream);
+        var receiver = new EventHubAdapterReceiver(
+            new EventHubPartitionSettings { Hub = new(), Partition = "0", ReceiverOptions = new() },
+            cacheFactory: (_, _, _) => cache,
+            checkpointerFactory: _ => Task.FromResult(checkpointer),
+            loggerFactory: NullLoggerFactory.Instance,
+            monitor: new DefaultEventHubReceiverMonitor(new(), services.GetRequiredService<OrleansInstruments>()),
+            loadSheddingOptions: new(),
+            environmentStatisticsProvider: new EnvironmentStatisticsProvider(),
+            eventHubReceiverFactory: (_, _, _) => transport);
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        try
+        {
+            Assert.True(receiver.UsesCertifiedDeliveryProgress);
+            Assert.Equal(1, receiver.GetMaxAddCount());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => receiver.GetQueueMessagesAsync(
+                receiver.GetMaxAddCount(), TestContext.Current.CancellationToken));
+            Assert.Equal(0, cache.GetMaxAddCount());
+            Assert.Equal(1, receiver.GetMaxAddCount());
+            Assert.Equal([1000L], transport.ReceivedSequences);
+            await receiver.RecoverReadAsync(TestContext.Current.CancellationToken);
+            Assert.Single(await receiver.GetQueueMessagesAsync(receiver.GetMaxAddCount(), TestContext.Current.CancellationToken));
+            Assert.Equal([1000L], transport.ReceivedSequences);
+            Assert.True(receiver.UsesCertifiedDeliveryProgress);
+            Assert.Equal(0, receiver.GetMaxAddCount());
+        }
+        finally
+        {
+            await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private static int GetEncodedSize(EventHubDataAdapter adapter, EventData message)
+        => adapter.FromQueueMessage(adapter.GetStreamPosition("0", message), message, Now.UtcDateTime,
+            size => new ArraySegment<byte>(new byte[size])).Segment.Count;
+
     private sealed class ThrowingEvictionStrategy()
         : ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null!, null)
     {
@@ -554,8 +808,9 @@ public class EventHubCheckpointRecoveryTests
         IObjectPool<FixedSizeBuffer> pool,
         IEventHubDataAdapter adapter,
         IEvictionStrategy eviction,
-        IStreamQueueCheckpointer<string> checkpointer)
-        => new("0", 1000, pool, adapter, eviction, checkpointer, NullLogger.Instance, null!, null, null);
+        IStreamQueueCheckpointer<string> checkpointer,
+        int defaultMaxAddCount = 1000)
+        => new("0", defaultMaxAddCount, pool, adapter, eviction, checkpointer, NullLogger.Instance, null!, null, null);
 
     private sealed class ThrowingDataAdapter(Serializer serializer) : EventHubDataAdapter(serializer)
     {

@@ -74,6 +74,13 @@ namespace Orleans.Streaming.EventHubs
 
         public int GetMaxAddCount()
         {
+            // Finishing a failed handoff does not receive or allocate another batch. In
+            // particular, a batch which filled the cache must still be able to finish.
+            if (_pendingMessages is { Count: > 0 })
+            {
+                return _pendingMessages.Count;
+            }
+
             return this.flowController.GetMaxAddCount();
         }
 

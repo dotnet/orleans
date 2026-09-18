@@ -26,9 +26,11 @@ Backpressure on the consumer side doesn't imply producer completion. `OnNextAsyn
 
 The Event Hubs provider maintains an independent cache cursor for each subscription, so a fast subscription can continue while another subscription falls behind. All cursors for an Event Hubs partition share the same silo-side cache, however. By default, the provider uses a weighted average of the pressure contributions from those cursors: contributions at or above the flow-control threshold receive three times the weight of lower-pressure contributions. Repeated contributions from faster subscriptions can still outweigh a small number of lagging subscriptions.
 
-<xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMinTimeInCache> and <xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMaxAgeInCache> control time-based cache eviction; they don't guarantee that every subscription remains within the cache. If eviction advances past a lagging cursor, delivery reports `Item not found in cache`.
+For the built-in certified Event Hubs components, <xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMinTimeInCache> and <xref:Orleans.Configuration.StreamCacheEvictionOptions.DataMaxAgeInCache> determine eviction eligibility within the completed partition prefix. Unresolved deliveries and handshakes keep later records retained beyond those ages. Custom or derived components retain their existing eviction policy; when that policy evicts an unread position, delivery reports `Item not found in cache`.
 
-The slow-consuming monitor lets a single observed lagging cursor apply cache pressure instead of averaging that pressure with faster cursors:
+Certified ingestion also reserves one possible new pool buffer per requested record and pauses new reads when its owned-buffer budget is exhausted, independently of sampled consumer pressure. The native factory allows 1,000 buffers of 1 MiB each per partition. Size deployments for that raw-data ceiling plus cache metadata, SDK prefetch, pooled free buffers, and the number of owned partitions. A factory returning the native <xref:Orleans.Streaming.EventHubs.EventHubQueueCache> can choose a smaller `defaultMaxAddCount` constructor value, which controls both maximum read size and the certified buffer budget. Completed, age-eligible records release capacity on subsequent pump ticks; staged read handoffs can finish while new reception is paused.
+
+The slow-consuming monitor lets a single observed lagging cursor apply cache pressure earlier instead of averaging that pressure with faster cursors:
 
 :::code source="snippets/streaming/EventHubCachePressure.cs" id="event_hub_slow_consumer_pressure":::
 
