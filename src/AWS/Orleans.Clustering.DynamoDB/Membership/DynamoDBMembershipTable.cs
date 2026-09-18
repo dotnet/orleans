@@ -233,9 +233,9 @@ namespace Orleans.Clustering.DynamoDB
                     var records = await this.storage.QueryAllAsync(this.options.TableName, keys, $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME} = :{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", ParseRecord, cancellationToken);
 
                     var versionAfter = await this.storage.ReadSingleEntryAsync(this.options.TableName, versionEntryKeys,
-                        ParseRecord, cancellationToken);
-                    if (versionAfter is null
-                        || versionAfter.ETag != versionRow.ETag
+                        ParseRecord, cancellationToken)
+                        ?? throw new KeyNotFoundException("No version row found for membership table");
+                    if (versionAfter.ETag != versionRow.ETag
                         || !records.Exists(record => record.SiloIdentity == SiloInstanceRecord.TABLE_VERSION_ROW
                             && record.ETag == versionRow.ETag))
                     {
@@ -336,19 +336,6 @@ namespace Orleans.Clustering.DynamoDB
 
                 siloEntry.ETag = currentEtag + 1;
 
-                var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                    ParseRecord, cancellationToken);
-                if (current is null || current.ETag != currentEtag)
-                {
-                    return false;
-                }
-
-                if (!string.IsNullOrEmpty(current.IAmAliveTime)
-                    && LogFormatter.ParseDate(current.IAmAliveTime) > entry.IAmAliveTime)
-                {
-                    siloEntry.IAmAliveTime = current.IAmAliveTime;
-                }
-
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, tableVersion.VersionEtag);
@@ -364,19 +351,11 @@ namespace Orleans.Clustering.DynamoDB
                     var etagConditionalExpression = $"{SiloInstanceRecord.ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
 
                     var siloConditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = etag } } };
-                    var heartbeatCondition = $"attribute_not_exists({SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})";
-                    if (current.IAmAliveTime is not null)
-                    {
-                        heartbeatCondition = $"{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} = :currentHeartbeat";
-                        siloConditionalValues.Add(":currentHeartbeat", new AttributeValue(current.IAmAliveTime));
-                    }
-
-                    // Compare the independently updated heartbeat to preserve its maximum when replacing the row.
                     var siloEntryUpdate = new Put
                     {
                         TableName = this.options.TableName,
                         Item = siloEntry.GetFields(includeKeys: true),
-                        ConditionExpression = $"{etagConditionalExpression} AND {heartbeatCondition}",
+                        ConditionExpression = etagConditionalExpression,
                         ExpressionAttributeValues = siloConditionalValues
                     };
 

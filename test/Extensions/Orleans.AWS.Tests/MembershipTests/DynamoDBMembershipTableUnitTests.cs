@@ -585,7 +585,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         public static IEnumerable<object[]> MalformedRecencyAttributes()
         {
-            foreach (var operation in new[] { "UpdateRow", "ReadRow", "ReadAll", "Cleanup" })
+            foreach (var operation in new[] { "ReadRow", "ReadAll", "Cleanup" })
             {
                 foreach (var attribute in new[]
                 {
@@ -645,7 +645,6 @@ namespace AWSUtils.Tests.MembershipTests
 
             var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
             {
-                "UpdateRow" => table.UpdateRowAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken),
                 "ReadRow" => table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken),
                 "ReadAll" => table.ReadAllAsync(TestContext.Current.CancellationToken),
                 "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
@@ -660,7 +659,6 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
-        [InlineData("UpdateRow")]
         [InlineData("ReadRow")]
         [InlineData("ReadAll")]
         [InlineData("Cleanup")]
@@ -683,15 +681,7 @@ namespace AWSUtils.Tests.MembershipTests
                 {
                     Responses = [new ItemResponse { Item = fields }, new ItemResponse { Item = CreateVersion(7).GetFields(true) }]
                 },
-                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] },
-                Write = request =>
-                {
-                    var put = Assert.IsType<Put>(request.TransactItems[0].Put);
-                    Assert.Equal("ETag = :currentETag AND attribute_not_exists(IAmAliveTime)", put.ConditionExpression);
-                    Assert.Equal("1970-01-01 00:00:00.000 GMT", put.Item[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
-                    Assert.False(put.ExpressionAttributeValues.ContainsKey(":currentHeartbeat"));
-                    return new TransactWriteItemsResponse();
-                }
+                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] }
             };
             var table = CreateTable(client);
             var entry = new MembershipEntry
@@ -702,9 +692,6 @@ namespace AWSUtils.Tests.MembershipTests
 
             switch (operation)
             {
-                case "UpdateRow":
-                    Assert.True(await table.UpdateRowAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken));
-                    break;
                 case "ReadRow":
                 case "ReadAll":
                     var result = operation == "ReadRow"
@@ -722,32 +709,20 @@ namespace AWSUtils.Tests.MembershipTests
                     break;
             }
 
-            Assert.Equal(operation == "UpdateRow" ? 1 : 0, client.WriteCount);
+            Assert.Equal(0, client.WriteCount);
             Assert.Equal(0, client.DeleteCount);
         }
 
         [Theory]
-        [InlineData(false, false)]
-        [InlineData(true, false)]
-        [InlineData(true, true)]
-        public async Task MembershipWritesAtomicallyConditionRowAndTableVersion(bool update, bool newerHeartbeat)
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task MembershipWritesAtomicallyConditionRowAndTableVersion(bool update)
         {
             var current = CreateRecord();
             current.SuspectingSilos = "127.0.0.1:11112@1";
             current.SuspectingTimes = current.IAmAliveTime;
-            if (newerHeartbeat)
-            {
-                current.IAmAliveTime = "2026-01-01 00:00:10.000 GMT";
-            }
-
             using var client = new RequestClient
             {
-                Read = request =>
-                {
-                    Assert.True(request.ConsistentRead);
-                    Assert.Equal(current.SiloIdentity, request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
-                    return new GetItemResponse { Item = current.GetFields(includeKeys: true) };
-                },
                 Write = request =>
                 {
                     Assert.Equal(2, request.TransactItems.Count);
@@ -763,15 +738,14 @@ namespace AWSUtils.Tests.MembershipTests
                     Assert.Equal(((int)SiloStatus.Dead).ToString(CultureInfo.InvariantCulture), put.Item[SiloInstanceRecord.STATUS_PROPERTY_NAME].N);
                     Assert.Equal("8", put.Item[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
                     Assert.Equal(update ? "4" : "0", put.Item[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
-                    Assert.Equal(newerHeartbeat ? current.IAmAliveTime : "2026-01-01 00:00:01.000 GMT",
-                        put.Item[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+                    Assert.Equal("2026-01-01 00:00:01.000 GMT", put.Item[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
                     Assert.False(put.Item.ContainsKey(SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME));
                     Assert.False(put.Item.ContainsKey(SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME));
                     if (update)
                     {
-                        Assert.Equal("ETag = :currentETag AND IAmAliveTime = :currentHeartbeat", put.ConditionExpression);
+                        Assert.Equal("ETag = :currentETag", put.ConditionExpression);
+                        Assert.Single(put.ExpressionAttributeValues);
                         Assert.Equal("3", put.ExpressionAttributeValues[":currentETag"].N);
-                        Assert.Equal(current.IAmAliveTime, put.ExpressionAttributeValues[":currentHeartbeat"].S);
                     }
                     else
                     {
@@ -805,44 +779,36 @@ namespace AWSUtils.Tests.MembershipTests
                 ? await table.UpdateRowAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken)
                 : await table.InsertRowAsync(entry, new TableVersion(8, "7"), TestContext.Current.CancellationToken));
             Assert.Equal(1, client.WriteCount);
-            Assert.Equal(update ? 1 : 0, client.ReadCount);
+            Assert.Equal(0, client.ReadCount);
         }
 
         [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task UpdateRejectsMissingOrStaleRowsBeforeWriting(bool missing)
+        [InlineData("missing-row")]
+        [InlineData("stale-row")]
+        [InlineData("stale-table")]
+        public async Task UpdateRejectsCanonicalConflictsAtomically(string conflict)
         {
+            var row = conflict == "missing-row" ? null : CreateRecord().GetFields(true);
+            var version = CreateVersion(7).GetFields(true);
             using var client = new RequestClient
             {
-                Read = _ => missing ? new GetItemResponse() : new GetItemResponse { Item = CreateRecord().GetFields(true) }
-            };
-            var table = CreateTable(client);
-
-            Assert.False(await table.UpdateRowAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1)
-            }, "2", new TableVersion(8, "7"), TestContext.Current.CancellationToken));
-            Assert.Equal(1, client.ReadCount);
-            Assert.Equal(0, client.WriteCount);
-        }
-
-        [Fact]
-        public async Task UpdateRejectsConcurrentHeartbeatWithoutOverwritingIt()
-        {
-            var row = CreateRecord();
-            using var client = new RequestClient
-            {
-                Read = _ => new GetItemResponse { Item = row.GetFields(includeKeys: true) },
                 Write = request =>
                 {
-                    row.IAmAliveTime = "2026-01-01 00:00:10.000 GMT";
+                    Assert.Equal(2, request.TransactItems.Count);
                     var put = Assert.IsType<Put>(request.TransactItems[0].Put);
-                    Assert.Equal("ETag = :currentETag AND IAmAliveTime = :currentHeartbeat", put.ConditionExpression);
-                    Assert.NotEqual(row.IAmAliveTime, put.ExpressionAttributeValues[":currentHeartbeat"].S);
-                    throw new TransactionCanceledException("Row condition failed.")
+                    var update = Assert.IsType<Update>(request.TransactItems[1].Update);
+                    Assert.Equal("ETag = :currentETag", put.ConditionExpression);
+                    Assert.Equal("ETag = :currentETag", update.ConditionExpression);
+                    var rowMatches = row is not null && row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N == put.ExpressionAttributeValues[":currentETag"].N;
+                    var versionMatches = version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N == update.ExpressionAttributeValues[":currentETag"].N;
+                    Assert.False(rowMatches && versionMatches);
+                    throw new TransactionCanceledException("Canonical condition failed.")
                     {
-                        CancellationReasons = [new() { Code = "ConditionalCheckFailed" }, new() { Code = "None" }]
+                        CancellationReasons =
+                        [
+                            new() { Code = rowMatches ? "None" : "ConditionalCheckFailed" },
+                            new() { Code = versionMatches ? "None" : "ConditionalCheckFailed" }
+                        ]
                     };
                 }
             };
@@ -850,13 +816,89 @@ namespace AWSUtils.Tests.MembershipTests
 
             Assert.False(await table.UpdateRowAsync(new MembershipEntry
             {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = new DateTime(2026, 1, 1, 0, 0, 1, DateTimeKind.Utc)
-            }, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken));
-            Assert.Equal("2026-01-01 00:00:10.000 GMT", row.IAmAliveTime);
-            Assert.Equal(3, row.ETag);
-            Assert.Equal(7, row.MembershipVersion);
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1)
+            }, conflict == "stale-row" ? "2" : "3", new TableVersion(8, conflict == "stale-table" ? "6" : "7"),
+                TestContext.Current.CancellationToken));
+            Assert.Equal(0, client.ReadCount);
             Assert.Equal(1, client.WriteCount);
+            Assert.Equal("7", version[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
+            Assert.Equal("7", version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            if (row is not null)
+            {
+                Assert.Equal("3", row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+                Assert.Equal("7", row[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
+            }
+        }
+
+        [Fact]
+        public async Task OwnerHeartbeatPreservesCanonicalTokensForFullRowReplacement()
+        {
+            var row = CreateRecord().GetFields(true);
+            var version = CreateVersion(7).GetFields(true);
+            var reads = 0;
+            var heartbeats = 0;
+            using var client = new RequestClient
+            {
+                ReadTransaction = _ =>
+                {
+                    reads++;
+                    return new TransactGetItemsResponse
+                    {
+                        Responses = [new ItemResponse { Item = row }, new ItemResponse { Item = version }]
+                    };
+                },
+                Update = request =>
+                {
+                    heartbeats++;
+                    Assert.Null(request.ConditionExpression);
+                    Assert.Equal("SET IAmAliveTime = :IAmAliveTime", request.UpdateExpression);
+                    var heartbeat = Assert.Single(request.ExpressionAttributeValues).Value;
+                    row[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat;
+                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat } };
+                },
+                Write = request =>
+                {
+                    Assert.Equal(2, request.TransactItems.Count);
+                    var put = Assert.IsType<Put>(request.TransactItems[0].Put);
+                    var update = Assert.IsType<Update>(request.TransactItems[1].Update);
+                    Assert.Equal("ETag = :currentETag", put.ConditionExpression);
+                    Assert.Single(put.ExpressionAttributeValues);
+                    Assert.Equal(row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N, put.ExpressionAttributeValues[":currentETag"].N);
+                    Assert.Equal("ETag = :currentETag", update.ConditionExpression);
+                    Assert.Equal(version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N, update.ExpressionAttributeValues[":currentETag"].N);
+                    row = put.Item;
+                    foreach (var attribute in new[] { SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME, SiloInstanceRecord.ETAG_PROPERTY_NAME })
+                    {
+                        version[attribute] = update.ExpressionAttributeValues[$":{attribute}"];
+                    }
+                    return new TransactWriteItemsResponse();
+                }
+            };
+            var table = CreateTable(client);
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+            var snapshot = await table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+            var (entry, etag) = Assert.Single(snapshot.Members);
+
+            await table.UpdateIAmAliveAsync(new MembershipEntry
+            {
+                SiloAddress = address,
+                IAmAliveTime = entry.IAmAliveTime.AddSeconds(10)
+            }, TestContext.Current.CancellationToken);
+
+            Assert.Equal("2026-01-01 00:00:10.000 GMT", row[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+            Assert.Equal(etag, row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            Assert.Equal(snapshot.Version.VersionEtag, version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            entry.Status = SiloStatus.ShuttingDown;
+            Assert.True(await table.UpdateRowAsync(entry, etag, snapshot.Version.Next(), TestContext.Current.CancellationToken));
+            Assert.Equal(((int)SiloStatus.ShuttingDown).ToString(CultureInfo.InvariantCulture), row[SiloInstanceRecord.STATUS_PROPERTY_NAME].N);
+            Assert.Equal(LogFormatter.PrintDate(entry.IAmAliveTime), row[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+            Assert.Equal("4", row[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            Assert.Equal("8", version[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
+            Assert.Equal("8", version[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
+            Assert.Equal(1, reads);
+            Assert.Equal(1, heartbeats);
+            Assert.Equal(1, client.WriteCount);
+            Assert.Equal(0, client.ReadCount);
         }
 
         [Theory]
@@ -876,7 +918,6 @@ namespace AWSUtils.Tests.MembershipTests
             };
             using var client = new RequestClient
             {
-                Read = _ => new GetItemResponse { Item = CreateRecord().GetFields(true) },
                 Write = _ => throw failure
             };
             var table = CreateTable(client);
@@ -979,6 +1020,35 @@ namespace AWSUtils.Tests.MembershipTests
                 () => CreateTable(client).ReadAllAsync(cancellation.Token));
 
             Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Equal(2, reads);
+            Assert.Equal(1, queries);
+        }
+
+        [Fact]
+        public async Task ReadAllFailsWhenVersionRowDisappearsAfterQuery()
+        {
+            var reads = 0;
+            var queries = 0;
+            using var client = new RequestClient
+            {
+                Read = _ =>
+                {
+                    Assert.True(++reads <= 2);
+                    return reads == 1
+                        ? new GetItemResponse { Item = CreateVersion(7).GetFields(true) }
+                        : new GetItemResponse();
+                },
+                Query = _ =>
+                {
+                    queries++;
+                    return new QueryResponse { Items = [CreateVersion(7).GetFields(true)], LastEvaluatedKey = [] };
+                }
+            };
+
+            var exception = await Assert.ThrowsAsync<KeyNotFoundException>(
+                () => CreateTable(client).ReadAllAsync(TestContext.Current.CancellationToken));
+
+            Assert.Equal("No version row found for membership table", exception.Message);
             Assert.Equal(2, reads);
             Assert.Equal(1, queries);
         }
