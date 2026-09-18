@@ -108,10 +108,9 @@ and stage their removal for the next journal write.
 
 The builder encodes the body and request context into an envelope buffer which the
 outbox reuses as a local pending intent with the owning grain as sender. Journal
-codecs serialize envelopes and framework records during admitted application and
-capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
+codecs serialize pending outbox commands during state capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
 journaled messages once per ID. `Count` and depth metrics combine the journaled count
-with the number of local intents awaiting finalization in constant time. Finalized
+with the number of local intents awaiting capture in constant time. Captured
 intents remain delivery-fenced until their exact capture is acknowledged. Repeated
 equivalent enqueues preserve their original message, enqueue time, and commit status.
 Direct envelopes require a nonempty message ID, an owning sender, a nondefault receiver,
@@ -120,14 +119,16 @@ Serialized null bodies remain valid; route selection supplies delivery and dead-
 outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
 context bytes, and declared type metadata.
 
-The selected activation setup installs one messaging observer with explicit inbox and outbox
-endpoints. After inbox handler preparation, outbox preparation seals the capture's
-intent set and obtains scheduler acknowledgement for any required owner. This also
-repairs an absent owner for already-nonempty recovered work before capture. Healthy
-owners retain their exact handles. Synchronous finalization applies the complete
-ownership generation, returned DurableJob, and prepared envelopes. Acknowledgement
-releases exactly that capture's messages; later intents remain pending for the next
-admitted operation.
+The outbox owns seven journaled state facets under the existing stream names.
+Ordinary journal writes prepare durable wakeup ownership before capturing pending
+commands. Readiness is rechecked after every state preparation await, so late sends
+join the final capture cohort with an acknowledged owner. Healthy owners retain
+their exact handles. The first facet captured seals the complete cohort, including
+the ownership generation, returned DurableJob, envelopes, retry state and dead letters.
+Every facet writes that cohort to its own stream. Storage acknowledgement releases
+exactly that cohort's delivery fences after all seven facets acknowledge; mutations
+staged during the storage await remain pending for the next write. Capture and
+acknowledgement work independently of facet registration order.
 
 Delivery computes outcomes locally across awaits. Its admitted operation validates
 the physical owner, activation generation, and message eligibility before applying
