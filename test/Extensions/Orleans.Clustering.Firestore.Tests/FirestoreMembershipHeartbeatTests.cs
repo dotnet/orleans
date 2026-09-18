@@ -24,122 +24,125 @@ public sealed class FirestoreMembershipHeartbeatTests
     private static readonly string VersionPath = $"{CollectionPath}/{Partition}";
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatAfterCompactionPreservesAbsenceAndVersion(bool deletionRacesCommit)
-    {
-        var client = new MembershipClient();
-        var entry = Entry();
-        var path = RowPath(entry);
-        if (deletionRacesCommit)
-        {
-            client.AddRow(entry, DateTime.UnixEpoch);
-            client.BeforeCommit = () => client.Documents.Remove(path);
-        }
-
-        var table = CreateTable(client);
-        var version = client.Documents[VersionPath].Clone();
-
-        await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
-
-        Assert.Equal(deletionRacesCommit ? 2 : 1, client.Transactions);
-        Assert.Equal(deletionRacesCommit ? 3 : 2, client.Reads.Count);
-        Assert.Equal(VersionPath, Assert.Single(client.Reads[^1].Documents));
-        Assert.Equal(deletionRacesCommit ? 1 : 0, client.AttemptedWrites.Count);
-        Assert.Empty(client.CommittedWrites);
-        Assert.False(client.Documents.ContainsKey(path));
-        Assert.Equal(version, Assert.Single(client.Documents).Value);
-    }
-
-    [Theory]
-    [InlineData(StatusCode.NotFound, false)]
-    [InlineData(StatusCode.PermissionDenied, false)]
-    [InlineData(StatusCode.Unavailable, false)]
-    [InlineData(StatusCode.NotFound, true)]
-    [InlineData(StatusCode.PermissionDenied, true)]
-    [InlineData(StatusCode.Unavailable, true)]
-    public async Task HeartbeatInfrastructureFailuresRemainVisible(StatusCode status, bool versionRead)
-    {
-        var failure = new RpcException(new Status(status, "infrastructure-failure"));
-        var client = new MembershipClient { ReadFailure = failure, FailVersionRead = versionRead };
-        var table = CreateTable(client);
-
-        var exception = await Assert.ThrowsAsync<RpcException>(
-            () => table.UpdateIAmAliveAsync(Entry(), TestContext.Current.CancellationToken));
-
-        Assert.Same(failure, exception);
-        Assert.Equal(
-            versionRead ? new[] { RowPath(Entry()), VersionPath } : new[] { RowPath(Entry()) },
-            client.Reads.Select(read => Assert.Single(read.Documents)).Distinct());
-        Assert.Empty(client.AttemptedWrites);
-        Assert.Empty(client.CommittedWrites);
-    }
-
-    [Fact]
-    public async Task HeartbeatMissingMembershipHistoryFailsClosed()
-    {
-        var client = new MembershipClient();
-        client.Documents.Clear();
-        var table = CreateTable(client);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => table.UpdateIAmAliveAsync(Entry(), TestContext.Current.CancellationToken));
-
-        Assert.Equal(2, client.Reads.Count);
-        Assert.Empty(client.AttemptedWrites);
-        Assert.Empty(client.CommittedWrites);
-        Assert.Empty(client.Documents);
-    }
-
-    [Theory]
-    [InlineData(-1)]
     [InlineData(0)]
     [InlineData(1)]
-    public async Task HeartbeatPreservesMaximumAndOtherFields(int hours)
+    public async Task HeartbeatUsesOneTimestampOnlyWrite(int hours)
     {
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, Now).Clone();
         var version = client.Documents[VersionPath].Clone();
+        var other = client.AddRow(Entry(2), Now).Clone();
         entry.IAmAliveTime = Now.AddHours(hours);
+        entry.HostName = "stale-host";
+        entry.SiloName = "stale-silo";
+        entry.Status = SiloStatus.Joining;
+        entry.StartTime = Now;
+        entry.AddSuspector(SiloAddress.New(IPAddress.Loopback, 11112, 1), Now);
+
+        await CreateTable(client).UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
+
+        AssertSingleHeartbeatWrite(client, entry);
+        Assert.Single(client.CommittedWrites);
+        original.Fields[nameof(SiloInstanceEntity.IAmAliveTime)] = Time(entry.IAmAliveTime);
+        original.UpdateTime = client.Documents[original.Name].UpdateTime;
+        Assert.Equal(original, client.Documents[original.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+        Assert.Equal(other, client.Documents[other.Name]);
+    }
+
+    [Theory]
+    [InlineData(StatusCode.NotFound)]
+    [InlineData(StatusCode.PermissionDenied)]
+    [InlineData(StatusCode.Unavailable)]
+    [InlineData(StatusCode.Aborted)]
+    [InlineData(StatusCode.FailedPrecondition)]
+    [InlineData(StatusCode.Cancelled)]
+    public async Task HeartbeatNativeWriteFailuresPropagate(StatusCode status)
+    {
+        var failure = new RpcException(new Status(status, "write-failure"));
+        var client = new MembershipClient { CommitFailure = failure };
+        var entry = Entry();
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
         var table = CreateTable(client);
 
-        await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<RpcException>(
+            () => table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken));
 
-        if (hours > 0)
-        {
-            var write = Assert.Single(client.CommittedWrites);
-            Assert.Equal(nameof(SiloInstanceEntity.IAmAliveTime), Assert.Single(write.UpdateMask.FieldPaths));
-            original.Fields[nameof(SiloInstanceEntity.IAmAliveTime)] = Time(entry.IAmAliveTime);
-            original.UpdateTime = client.Documents[original.Name].UpdateTime;
-        }
-        else
-        {
-            Assert.Empty(client.CommittedWrites);
-        }
-
+        Assert.Same(failure, exception);
+        AssertSingleHeartbeatWrite(client, entry);
+        Assert.Empty(client.CommittedWrites);
         Assert.Equal(original, client.Documents[original.Name]);
         Assert.Equal(version, client.Documents[VersionPath]);
     }
 
     [Fact]
-    public async Task HeartbeatRechecksConcurrentNewerHeartbeat()
+    public async Task HeartbeatPreCancellationIssuesNoRequests()
+    {
+        var client = new MembershipClient();
+        var table = CreateTable(client);
+        var cancellationToken = new CancellationToken(canceled: true);
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => table.UpdateIAmAliveAsync(Entry(), cancellationToken));
+
+        Assert.Equal(cancellationToken, exception.CancellationToken);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        Assert.Empty(client.Commits);
+        Assert.Empty(client.AttemptedWrites);
+    }
+
+    [Fact]
+    public async Task HeartbeatPassesCancellationToNativeWrite()
     {
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
         var version = client.Documents[VersionPath].Clone();
-        client.BeforeCommit = () => client.Change(original.Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        client.BeforeCommit = cancellation.Cancel;
+        var table = CreateTable(client);
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => table.UpdateIAmAliveAsync(entry, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(cancellation.Token, client.CommitCancellationToken);
+        AssertSingleHeartbeatWrite(client, entry);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(original, client.Documents[original.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Fact]
+    public async Task HeartbeatPreservesConcurrentVersionedFields()
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        Dictionary<string, Document>? concurrentState = null;
+        client.BeforeCommit = () =>
+        {
+            client.Change(original.Name, nameof(SiloInstanceEntity.Status), new Value { IntegerValue = (int)SiloStatus.ShuttingDown });
+            client.Change(original.Name, nameof(SiloInstanceEntity.SuspectingTimes), new Value { ArrayValue = new ArrayValue { Values = { Time(Now) } } });
+            client.Change(original.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            concurrentState = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        };
 
         await CreateTable(client).UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, client.Transactions);
-        Assert.Single(client.AttemptedWrites);
-        Assert.Empty(client.CommittedWrites);
-        original.Fields[nameof(SiloInstanceEntity.IAmAliveTime)] = Time(Now);
-        original.UpdateTime = client.Documents[original.Name].UpdateTime;
-        Assert.Equal(original, client.Documents[original.Name]);
-        Assert.Equal(version, client.Documents[VersionPath]);
+        AssertSingleHeartbeatWrite(client, entry);
+        Assert.Single(client.CommittedWrites);
+        Assert.NotNull(concurrentState);
+        var expectedRow = concurrentState[original.Name];
+        expectedRow.Fields[nameof(SiloInstanceEntity.IAmAliveTime)] = Time(entry.IAmAliveTime);
+        expectedRow.UpdateTime = client.Documents[original.Name].UpdateTime;
+        Assert.Equal(concurrentState.Count, client.Documents.Count);
+        Assert.All(concurrentState, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
     }
 
     [Theory]
@@ -511,6 +514,26 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.All(client.CommittedWrites, write => Assert.StartsWith($"{CollectionPath}/", write.Delete));
     }
 
+    private static void AssertSingleHeartbeatWrite(MembershipClient client, MembershipEntry entry)
+    {
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        var commit = Assert.Single(client.Commits);
+        Assert.True(commit.Transaction.IsEmpty);
+        var write = Assert.Single(commit.Writes);
+        Assert.Single(client.AttemptedWrites);
+        Assert.Equal(Write.OperationOneofCase.Update, write.OperationCase);
+        Assert.Equal(RowPath(entry), write.Update.Name);
+        Assert.Equal(nameof(SiloInstanceEntity.IAmAliveTime), Assert.Single(write.UpdateMask.FieldPaths));
+        var field = Assert.Single(write.Update.Fields);
+        Assert.Equal(nameof(SiloInstanceEntity.IAmAliveTime), field.Key);
+        Assert.Equal(Time(entry.IAmAliveTime), field.Value);
+        Assert.Empty(write.UpdateTransforms);
+        Assert.Equal(Google.Cloud.Firestore.V1.Precondition.ConditionTypeOneofCase.Exists, write.CurrentDocument.ConditionTypeCase);
+        Assert.True(write.CurrentDocument.Exists);
+    }
+
     private static void AssertTransactionalQueries(MembershipClient client)
     {
         Assert.NotEmpty(client.Queries);
@@ -559,7 +582,8 @@ public sealed class FirestoreMembershipHeartbeatTests
         public Dictionary<string, Document> Documents { get; } = [];
         public Action? BeforeCommit { get; set; }
         public RpcException? ReadFailure { get; init; }
-        public bool FailVersionRead { get; init; }
+        public RpcException? CommitFailure { get; init; }
+        public CancellationToken? CommitCancellationToken { get; private set; }
         public int Transactions { get; private set; }
         public List<BatchGetDocumentsRequest> Reads { get; } = [];
         public List<RunQueryRequest> Queries { get; } = [];
@@ -608,7 +632,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         {
             Reads.Add(request.Clone());
             var name = Assert.Single(request.Documents);
-            if (ReadFailure is { } failure && (name == VersionPath) == FailVersionRead)
+            if (ReadFailure is { } failure)
             {
                 throw failure;
             }
@@ -655,9 +679,16 @@ public sealed class FirestoreMembershipHeartbeatTests
         {
             Commits.Add(request.Clone());
             AttemptedWrites.AddRange(request.Writes.Select(write => write.Clone()));
+            CommitCancellationToken = callSettings?.CancellationToken;
             var beforeCommit = BeforeCommit;
             BeforeCommit = null;
             beforeCommit?.Invoke();
+            CommitCancellationToken?.ThrowIfCancellationRequested();
+            if (CommitFailure is { } failure)
+            {
+                return Task.FromException<CommitResponse>(failure);
+            }
+
             if (!request.Transaction.IsEmpty && _readSets[request.Transaction].Any(name =>
                 !Equals(_snapshots[request.Transaction].GetValueOrDefault(name), Documents.GetValueOrDefault(name))))
             {

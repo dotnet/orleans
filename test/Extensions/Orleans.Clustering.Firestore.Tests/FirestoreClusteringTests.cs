@@ -95,23 +95,24 @@ public class FirestoreClusteringTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UpdateIAmAliveDoesNotOverwriteNewerHeartbeat()
+    public async Task UpdateIAmAlivePreservesMembershipFieldsAndVersion()
     {
         var current = TestStartTime.AddMinutes(2);
         await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken, current);
 
+        var before = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
+        var expected = Assert.Single(before.Members).Item1;
+        expected.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
         var entry = this._entity.ToMembershipEntry();
-        entry.IAmAliveTime = current.AddMinutes(-1).UtcDateTime;
+        entry.IAmAliveTime = expected.IAmAliveTime;
+        entry.HostName = "stale-host";
+        entry.Status = SiloStatus.Joining;
         await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        var row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        Assert.Equal(current.UtcDateTime, Assert.Single(row.Members).Item1.IAmAliveTime);
-
-        entry.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
-        await this._membershipTable.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
-
-        row = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        Assert.Equal(entry.IAmAliveTime, Assert.Single(row.Members).Item1.IAmAliveTime);
+        var after = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+        Assert.Equal(expected.ToFullString(), Assert.Single(after.Members).Item1.ToFullString());
+        Assert.Equal(before.Version.Version, after.Version.Version);
+        Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
     }
 
     [Fact]

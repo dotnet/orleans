@@ -283,30 +283,8 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var id = entry.SiloAddress.ToParsableString();
             var iAmAliveTime = new DateTimeOffset(DateTime.SpecifyKind(entry.IAmAliveTime, DateTimeKind.Utc));
             var document = this._storage.GetCollection().Document(id);
-            await this._storage.ExecuteTransaction(async transaction =>
-            {
-                var snapshot = await transaction.GetSnapshotAsync(document, transaction.CancellationToken);
-                if (!snapshot.Exists)
-                {
-                    var version = await transaction.GetSnapshotAsync(
-                        this._storage.GetCollection().Document(this._partitionId), transaction.CancellationToken);
-                    if (!version.Exists)
-                        throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
-
-                    return false;
-                }
-
-                if (snapshot.ConvertTo<SiloInstanceEntity>().IAmAliveTime >= iAmAliveTime)
-                {
-                    return false;
-                }
-
-                transaction.Update(document, new Dictionary<string, object?>
-                {
-                    [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
-                });
-                return true;
-            }, cancellationToken);
+            await document.UpdateAsync(
+                nameof(SiloInstanceEntity.IAmAliveTime), iAmAliveTime, cancellationToken: cancellationToken);
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
