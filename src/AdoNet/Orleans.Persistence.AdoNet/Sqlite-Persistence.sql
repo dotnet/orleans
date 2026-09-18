@@ -114,13 +114,8 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND ServiceId = @ServiceId
     );
 
-    SELECT Version AS NewGrainStateVersion FROM OrleansStorage
-    WHERE total_changes() > (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1)
-        AND GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
-        AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
-        AND GrainTypeString = @GrainTypeString
-        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
-        AND ServiceId = @ServiceId;
+    SELECT CASE WHEN @GrainStateVersion IS NULL THEN 1 ELSE @GrainStateVersion + 1 END AS NewGrainStateVersion
+    WHERE total_changes() > (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1);
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
     WHERE total_changes() = (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1)
@@ -162,13 +157,8 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND ServiceId = @ServiceId
         AND Version = @GrainStateVersion;
 
-    SELECT Version AS NewGrainStateVersion FROM OrleansStorage
-    WHERE changes() > 0
-        AND GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
-        AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
-        AND GrainTypeString = @GrainTypeString
-        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
-        AND ServiceId = @ServiceId;
+    SELECT @GrainStateVersion + 1 AS NewGrainStateVersion
+    WHERE changes() > 0;
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
     WHERE changes() = 0
