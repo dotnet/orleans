@@ -436,7 +436,7 @@ internal partial class FirestoreDataManager
         }
     }
 
-    private static async Task<TResult> ExecuteWithCancellation<TResult>(
+    internal static async Task<TResult> ExecuteWithCancellation<TResult>(
         Task<TResult> task,
         CancellationToken cancellationToken)
     {
