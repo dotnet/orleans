@@ -11,8 +11,8 @@ namespace Orleans.DurableMessaging;
 /// <para>
 /// <see cref="RouteKeyHandler"/> simplifies implementing handlers that only respond to messages
 /// with a specific <see cref="DurableEnvelope.RouteKey"/>. Derived classes override
-/// <see cref="HandleAsync(IInboxHandlerContext, CancellationToken)"/> to implement
-/// the message processing logic.
+/// <see cref="PrepareAsync(IInboxHandlerContext, CancellationToken)"/> to implement
+/// asynchronous preparation and return the synchronous apply action.
 /// </para>
 /// <para>
 /// For prefix-based routing (e.g., "orders/" matches "orders/create" and "orders/update"), derive
@@ -26,43 +26,17 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 /// <example>
 /// <code>
-/// public class OrderProcessingHandler : RouteKeyHandler
+/// protected override async ValueTask&lt;Action&gt; PrepareAsync(
+///     IInboxHandlerContext context, CancellationToken ct)
 /// {
-///     private readonly IOrderService _orderService;
-///
-///     public OrderProcessingHandler(IOrderService orderService)
-///         : base("order/process")
+///     if (!context.Envelope.Data.TryGetBody&lt;OrderRequest&gt;(out var request))
 ///     {
-///         _orderService = orderService;
+///         throw new InvalidOperationException("Failed to deserialize OrderRequest");
 ///     }
 ///
-///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
-///     {
-///         // Deserialize the message
-///         if (!context.Envelope.Data.TryGetBody&lt;OrderRequest&gt;(out var request))
-///         {
-///             throw new InvalidOperationException("Failed to deserialize OrderRequest");
-///         }
-///
-///         // Process the order
-///         var result = await _orderService.ProcessOrder(request, ct);
-///
-///         // Send reply if requested
-///         if (context.Envelope.ReplyTo is { } replyTo)
-///         {
-///             var response = context.CreateEnvelope()
-///                 .To(replyTo, "order/response")
-///                 .WithBody(result)
-///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
-///                 .Build();
-///
-///             context.Send(response);
-///         }
-///     }
+///     var prepared = await PrepareOrderAsync(request, ct);
+///     return () =&gt; ApplyOrder(prepared);
 /// }
-///
-/// // Registration
-/// inbox.RegisterHandler("order/process", new OrderProcessingHandler(orderService));
 /// </code>
 /// </example>
 public abstract class RouteKeyHandler : IInboxHandler
@@ -105,29 +79,28 @@ public abstract class RouteKeyHandler : IInboxHandler
     }
 
     /// <summary>
-    /// Handles a message that matches the configured route key.
+    /// Prepares a message that matches the configured route key.
     /// </summary>
     /// <param name="context">Handler context containing the envelope and methods for sending messages.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="cancellationToken">The cancellation token for preparation.</param>
+    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
     /// <remarks>
     /// <para>
     /// This method is only called when <see cref="CanHandle"/> returns <c>true</c>, meaning the
     /// envelope's route key matches the configured route key.
     /// </para>
     /// <para>
-    /// Derived classes should handle business logic errors gracefully (e.g., log and send error
-    /// response) rather than throwing exceptions. Unhandled exceptions will be logged and may
-    /// prevent the message from being marked as processed.
+    /// Follow the preparation and synchronous application requirements of <see cref="IInboxHandler.PrepareAsync"/>.
+    /// The interface implementation forwards the returned action to Messaging for invocation.
     /// </para>
     /// </remarks>
-    protected abstract ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    protected abstract ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Explicit interface implementation that delegates to the protected <see cref="HandleAsync"/> method.
+    /// Explicit interface implementation that delegates to the protected <see cref="PrepareAsync"/> method.
     /// </summary>
-    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        return HandleAsync(context, cancellationToken);
+        return PrepareAsync(context, cancellationToken);
     }
 }
