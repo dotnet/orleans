@@ -117,6 +117,49 @@ namespace AWSUtils.Tests.MembershipTests
                 Assert.Equal(7, client.VersionEtag);
                 Assert.Empty(client.Records);
             }
+            else
+            {
+                Assert.Empty(client.Records);
+                Assert.False(client.VersionExists);
+            }
+        }
+
+        [Theory]
+        [InlineData("silo-0")]
+        [InlineData(SiloInstanceRecord.TABLE_VERSION_ROW)]
+        public async Task AdministrativeDeleteSurfacesUnprocessedItemsAfterStartedBatchesComplete(string unprocessedIdentity)
+        {
+            using var client = new BatchDeleteClient { UnprocessedIdentity = unprocessedIdentity };
+            var pending = CreateTable(client).DeleteMembershipTableEntriesAsync("cluster", TestContext.Current.CancellationToken);
+            try
+            {
+                Assert.Equal(3, client.Requests.Count);
+                var partialBatch = client.Requests.FindIndex(request => request.RequestItems["membership"]
+                    .Any(item => item.DeleteRequest.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == unprocessedIdentity));
+                Assert.True(partialBatch >= 0);
+                client.CompleteBatch(partialBatch);
+                Assert.False(pending.IsCompleted);
+            }
+            finally
+            {
+                client.CompleteAll();
+            }
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => pending);
+            Assert.Contains("membership", exception.Message);
+            Assert.Contains("1", exception.Message);
+            Assert.Equal(3, client.Requests.Count);
+            Assert.All(client.Tokens, token => Assert.Equal(TestContext.Current.CancellationToken, token));
+            if (unprocessedIdentity == SiloInstanceRecord.TABLE_VERSION_ROW)
+            {
+                Assert.Empty(client.Records);
+                Assert.True(client.VersionExists);
+            }
+            else
+            {
+                Assert.Equal(unprocessedIdentity, Assert.Single(client.Records).Key);
+                Assert.False(client.VersionExists);
+            }
         }
 
         [Fact]
@@ -1363,9 +1406,11 @@ namespace AWSUtils.Tests.MembershipTests
             public Action<int>? OnDeleteRequest { get; init; }
             public Action<SiloInstanceRecord>? CustomizeVersion { get; init; }
             public Exception? DeleteFailure { get; set; }
+            public string? UnprocessedIdentity { get; init; }
             public int RowCount { get; init; } = 51;
             public int Version { get; } = 7;
             public int VersionEtag { get; } = 7;
+            public bool VersionExists { get; private set; } = true;
             public int QueryCount { get; private set; }
             public Dictionary<string, SiloInstanceRecord> Records => _records ??= Enumerable.Range(0, RowCount).Select(i => new SiloInstanceRecord
             {
@@ -1399,7 +1444,8 @@ namespace AWSUtils.Tests.MembershipTests
                 CustomizeVersion?.Invoke(version);
                 return Task.FromResult(new QueryResponse
                 {
-                    Items = Records.Values.Append(version).Select(record => record.GetFields(includeKeys: true)).ToList(),
+                    Items = (VersionExists ? Records.Values.Append(version) : Records.Values)
+                        .Select(record => record.GetFields(includeKeys: true)).ToList(),
                     LastEvaluatedKey = [],
                 });
             }
@@ -1412,7 +1458,7 @@ namespace AWSUtils.Tests.MembershipTests
                 _completions.Add(completion);
                 if (_released)
                 {
-                    completion.SetResult(new BatchWriteItemResponse { UnprocessedItems = [] });
+                    CompleteBatch(_completions.Count - 1);
                 }
 
                 if (Tokens.Count == 1)
@@ -1461,12 +1507,43 @@ namespace AWSUtils.Tests.MembershipTests
             public void CompleteAll()
             {
                 _released = true;
-                foreach (var completion in _completions.ToArray())
+                for (var index = 0; index < _completions.Count; index++)
                 {
-                    completion.TrySetResult(new BatchWriteItemResponse { UnprocessedItems = [] });
+                    CompleteBatch(index);
                 }
 
                 CompletePendingDeletes();
+            }
+
+            public void CompleteBatch(int index)
+            {
+                if (_completions[index].Task.IsCompleted)
+                {
+                    return;
+                }
+
+                var unprocessed = new List<WriteRequest>();
+                foreach (var item in Requests[index].RequestItems["membership"])
+                {
+                    var identity = item.DeleteRequest.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S;
+                    if (identity == UnprocessedIdentity)
+                    {
+                        unprocessed.Add(item);
+                    }
+                    else if (identity == SiloInstanceRecord.TABLE_VERSION_ROW)
+                    {
+                        VersionExists = false;
+                    }
+                    else
+                    {
+                        Records.Remove(identity);
+                    }
+                }
+
+                _completions[index].SetResult(new BatchWriteItemResponse
+                {
+                    UnprocessedItems = unprocessed.Count == 0 ? [] : new() { ["membership"] = unprocessed }
+                });
             }
 
             public void CompletePendingDeletes()
