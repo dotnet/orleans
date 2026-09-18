@@ -29,14 +29,14 @@ public partial class InMemoryMembershipTableTests
     }
 
     [Fact]
-    public void Update_WithCurrentTokens_PreservesMaximumHeartbeat()
+    public void Update_WithPreHeartbeatTokens_SucceedsAndPreservesMaximumHeartbeat()
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
+        var before = table.Read(entry.SiloAddress);
         var heartbeat = entry.Copy();
         heartbeat.IAmAliveTime = entry.IAmAliveTime.AddMinutes(2);
         table.UpdateIAmAlive(heartbeat);
-        var before = table.Read(entry.SiloAddress);
         entry.Status = SiloStatus.Active;
         entry.HostName = "updated-host";
         var inputHeartbeat = entry.IAmAliveTime;
@@ -114,7 +114,7 @@ public partial class InMemoryMembershipTableTests
     [InlineData(-1)]
     [InlineData(0)]
     [InlineData(1)]
-    public void UpdateIAmAlive_OwnerReport_ChangesOnlyTimestampAndRowEtag(int clockOffsetMinutes)
+    public void UpdateIAmAlive_OwnerReport_ChangesOnlyTimestamp(int clockOffsetMinutes)
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
@@ -132,7 +132,7 @@ public partial class InMemoryMembershipTableTests
         var expected = entry.Copy();
         expected.IAmAliveTime = heartbeat.IAmAliveTime;
         Assert.Equal(before.Version, after.Version);
-        Assert.NotEqual(Assert.Single(before.Members).Item2, Assert.Single(after.Members).Item2);
+        Assert.Equal(Assert.Single(before.Members).Item2, Assert.Single(after.Members).Item2);
         AssertConformanceEntry(expected, Assert.Single(after.Members).Item1);
         AssertConformanceEntry(entry, Assert.Single(before.Members).Item1);
     }

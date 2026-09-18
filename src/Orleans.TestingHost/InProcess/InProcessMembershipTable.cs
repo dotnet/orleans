@@ -215,7 +215,6 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 }
 
                 data.Entry.IAmAliveTime = entry.IAmAliveTime;
-                _table[entry.SiloAddress] = (data.Entry, NewETag());
             }
         }
 

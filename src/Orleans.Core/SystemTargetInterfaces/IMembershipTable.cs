@@ -211,8 +211,8 @@ namespace Orleans
         /// </summary>
         /// <remarks>
         /// Each silo owns its heartbeat and writes the supplied timestamp directly to its IAmAliveTime column.
-        /// Preserves the other membership fields and the table version, including its ETag.
-        /// The row ETag may change.
+        /// Preserves the other membership fields, the table version, and the row and table ETags used for membership concurrency.
+        /// Backend-managed metadata may change independently of those concurrency tokens.
         /// </remarks>
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>

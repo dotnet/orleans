@@ -85,7 +85,7 @@ public sealed class InProcessMembershipTableTests
     [InlineData(-1)]
     [InlineData(0)]
     [InlineData(1)]
-    public async Task UpdateIAmAlive_OwnerReport_ChangesOnlyTimestampAndRowEtag(int clockOffsetMinutes)
+    public async Task UpdateIAmAlive_OwnerReport_ChangesOnlyTimestamp(int clockOffsetMinutes)
     {
         var entry = CreateEntry(SiloStatus.Active);
         entry.IAmAliveTime = entry.StartTime.AddHours(1);
@@ -108,7 +108,7 @@ public sealed class InProcessMembershipTableTests
         var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
         var stored = Assert.Single(after.Members);
         Assert.Equal(before.Version, after.Version);
-        Assert.NotEqual(Assert.Single(before.Members).Item2, stored.Item2);
+        Assert.Equal(Assert.Single(before.Members).Item2, stored.Item2);
         Assert.Equal(heartbeat.IAmAliveTime, stored.Item1.IAmAliveTime);
         Assert.Equal(entry.SiloAddress, stored.Item1.SiloAddress);
         Assert.Equal(entry.Status, stored.Item1.Status);
@@ -124,7 +124,7 @@ public sealed class InProcessMembershipTableTests
     }
 
     [Fact]
-    public async Task Update_WithCurrentTokens_PreservesMaximumHeartbeat()
+    public async Task Update_WithPreHeartbeatTokens_SucceedsAndPreservesMaximumHeartbeat()
     {
         var entry = CreateEntry(SiloStatus.Joining);
         var originalHeartbeat = entry.IAmAliveTime;
@@ -137,18 +137,21 @@ public sealed class InProcessMembershipTableTests
         };
         var maximum = heartbeat.IAmAliveTime;
         await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
-        var beforeUpdate = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
-        Assert.Equal(initial.Version, beforeUpdate.Version);
-        Assert.Equal(maximum, Assert.Single(beforeUpdate.Members).Item1.IAmAliveTime);
 
         entry.Status = SiloStatus.Active;
-        Assert.True(await _table.UpdateRowAsync(entry, Assert.Single(beforeUpdate.Members).Item2, beforeUpdate.Version.Next(), _cancellationToken));
+        Assert.True(await _table.UpdateRowAsync(entry, Assert.Single(initial.Members).Item2, initial.Version.Next(), _cancellationToken));
 
         var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
-        var stored = Assert.Single(after.Members).Item1;
-        Assert.Equal(beforeUpdate.Version.Version + 1, after.Version.Version);
-        Assert.Equal(SiloStatus.Active, stored.Status);
-        Assert.Equal(maximum, stored.IAmAliveTime);
+        var stored = Assert.Single(after.Members);
+        Assert.Equal(initial.Version.Version + 1, after.Version.Version);
+        Assert.NotEqual(initial.Version.VersionEtag, after.Version.VersionEtag);
+        Assert.NotEqual(Assert.Single(initial.Members).Item2, stored.Item2);
+        Assert.Equal(entry.SiloAddress, stored.Item1.SiloAddress);
+        Assert.Equal(entry.HostName, stored.Item1.HostName);
+        Assert.Equal(entry.SiloName, stored.Item1.SiloName);
+        Assert.Equal(entry.StartTime, stored.Item1.StartTime);
+        Assert.Equal(SiloStatus.Active, stored.Item1.Status);
+        Assert.Equal(maximum, stored.Item1.IAmAliveTime);
         Assert.Equal(originalHeartbeat, entry.IAmAliveTime);
     }
 

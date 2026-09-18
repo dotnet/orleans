@@ -79,7 +79,6 @@ namespace Orleans.Runtime.MembershipService
             if (data == null) return;
 
             data.Item1.IAmAliveTime = entry.IAmAliveTime;
-            siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
         }
 
         public override string ToString() => $"Table = {ReadAll()}, ETagCounter={lastETagCounter}";
