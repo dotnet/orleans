@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.IO;
@@ -891,22 +892,7 @@ namespace Orleans.Streams
 
                 if (IsShutdown || cancellationToken.IsCancellationRequested) return; // timer was already removed, last tick
 
-                foreach (var stream in pubSubCache.Values.ToArray())
-                {
-                    foreach (var consumer in stream.AllConsumers().ToArray())
-                    {
-                        if (consumer.PendingHandshakes == 0 && consumer.HasUnresolvedHandshake)
-                        {
-                            AddSubscriber_Impl(consumer.SubscriptionId, consumer.StreamId, default, consumer.FilterData, consumer.PendingStartToken).Ignore();
-                        }
-                        else if (CheckpointingCache is not null && consumer.IsRegistered && consumer.PendingHandshakes == 0 && !consumer.HasUnresolvedHandshake
-                            && consumer.State == StreamConsumerDataState.Inactive && consumer.Cursor is IQueueCacheCursorProgress)
-                        {
-                            RunConsumerCursor(consumer, cancellationToken).Ignore();
-                        }
-                    }
-                }
-
+                RetryPendingConsumers(cancellationToken);
                 if (CheckpointingCache is not null) NotifyDeliveryProgress();
 
                 // loop through the queue until it is empty.
@@ -948,6 +934,82 @@ namespace Orleans.Streams
             }
         }
 
+        private void RetryPendingConsumers(CancellationToken cancellationToken)
+        {
+            using var streams = new PooledSnapshot<StreamConsumerCollection>(pubSubCache.Values);
+            for (var i = 0; i < streams.Count; i++)
+            {
+                using var consumers = new PooledSnapshot<StreamConsumerData>(streams[i].AllConsumers());
+                for (var j = 0; j < consumers.Count; j++)
+                {
+                    var consumer = consumers[j];
+                    if (consumer.PendingHandshakes == 0 && consumer.HasUnresolvedHandshake)
+                    {
+                        AddSubscriber_Impl(consumer.SubscriptionId, consumer.StreamId, default, consumer.FilterData, consumer.PendingStartToken).Ignore();
+                    }
+                    else if (CheckpointingCache is not null && consumer.IsRegistered && consumer.PendingHandshakes == 0
+                        && consumer.State == StreamConsumerDataState.Inactive && consumer.Cursor is IQueueCacheCursorProgress
+                        && NeedsCursorProgress(consumer))
+                    {
+                        RunConsumerCursor(consumer, cancellationToken).Ignore();
+                    }
+                }
+            }
+        }
+
+        private bool NeedsCursorProgress(StreamConsumerData consumer)
+            => consumer.PendingBatch is not null || _pendingRead is not null || _readRecoveryRequired
+                || consumer.LastSafePartitionToken is not { } safe || _lastReadToken is not { } read
+                || !TryCompareQueueProgress(safe, read, out var comparison) || comparison < 0;
+
+        private bool RetryPendingRegistrations(DateTime now)
+        {
+            if (!HasPendingRegistrations()) return false;
+
+            using var streams = new PooledSnapshot<KeyValuePair<QualifiedStreamId, StreamConsumerCollection>>(pubSubCache);
+            for (var i = 0; i < streams.Count; i++)
+            {
+                var stream = streams[i];
+                if (!stream.Value.StreamRegistered && stream.Value.RegistrationTask is null)
+                {
+                    RegisterStream(stream.Key, stream.Value.RegistrationToken!, now, CancellationToken.None);
+                }
+            }
+
+            return HasPendingRegistrations();
+        }
+
+        private bool HasPendingRegistrations()
+        {
+            foreach (var stream in pubSubCache.Values)
+            {
+                if (!stream.StreamRegistered || stream.RegistrationTask is not null) return true;
+            }
+
+            return false;
+        }
+
+        // Callbacks can mutate the source collections synchronously. Each traversal owns its
+        // snapshot until disposal and releases every reference before returning storage to the pool.
+        private readonly struct PooledSnapshot<T> : IDisposable
+        {
+            private readonly T[] _items;
+            public int Count { get; }
+            public T this[int index] => _items[index];
+
+            public PooledSnapshot(ICollection<T> source)
+            {
+                Count = source.Count;
+                _items = Count == 0 ? [] : ArrayPool<T>.Shared.Rent(Count);
+                source.CopyTo(_items, 0);
+            }
+
+            public void Dispose()
+            {
+                if (Count > 0) ArrayPool<T>.Shared.Return(_items, clearArray: true);
+            }
+        }
+
         /// <summary>
         /// Read from queue.
         /// Returns true, if data was read, false if it was not
@@ -976,16 +1038,8 @@ namespace Orleans.Streams
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             TagList? tags = null;
 
-            foreach (var stream in pubSubCache.ToArray())
-            {
-                if (!stream.Value.StreamRegistered && stream.Value.RegistrationTask is null)
-                {
-                    RegisterStream(stream.Key, stream.Value.RegistrationToken!, now, CancellationToken.None);
-                }
-            }
-
             // Keep the first read pinned through discovery and every registration retry.
-            if (pubSubCache.Values.Any(static stream => !stream.StreamRegistered || stream.RegistrationTask is not null))
+            if (RetryPendingRegistrations(now))
             {
                 return false;
             }
@@ -1072,11 +1126,16 @@ namespace Orleans.Streams
                 }
 
                 var groups = multiBatch.ToLookup(static container => container.StreamId);
-                foreach (var stream in pubSubCache.ToArray())
+                if (CheckpointingCache is not null)
                 {
-                    if (CheckpointingCache is not null && !groups.Contains(stream.Key.StreamId))
+                    using var streams = new PooledSnapshot<KeyValuePair<QualifiedStreamId, StreamConsumerCollection>>(pubSubCache);
+                    for (var i = 0; i < streams.Count; i++)
                     {
-                        StartInactiveCursors(stream.Value, multiBatch[0].SequenceToken, CancellationToken.None, onlyProgressAware: true);
+                        var stream = streams[i];
+                        if (!groups.Contains(stream.Key.StreamId))
+                        {
+                            StartInactiveCursors(stream.Value, multiBatch[0].SequenceToken, CancellationToken.None, onlyProgressAware: true);
+                        }
                     }
                 }
 
@@ -1437,8 +1496,10 @@ namespace Orleans.Streams
             CancellationToken cancellationToken,
             bool onlyProgressAware = false)
         {
-            foreach (StreamConsumerData consumerData in streamData.AllConsumers().ToArray())
+            using var consumers = new PooledSnapshot<StreamConsumerData>(streamData.AllConsumers());
+            for (var i = 0; i < consumers.Count; i++)
             {
+                var consumerData = consumers[i];
                 if (IsShutdown)
                 {
                     return;

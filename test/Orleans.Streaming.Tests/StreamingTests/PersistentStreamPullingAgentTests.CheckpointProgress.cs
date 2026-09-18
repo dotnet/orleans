@@ -21,6 +21,112 @@ public partial class PersistentStreamPullingAgentTests
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task CheckpointProgress_IdlePumpLeavesAccountedCursorsIdle(bool pooled)
+    {
+        await using var scenario = await CreateCheckpointScenario(pooled);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 200));
+        var idle = new ObservedQueueCursor(scenario.Idle.Cursor!);
+        var busy = new ObservedQueueCursor(scenario.Busy.Cursor!);
+        scenario.Idle.Cursor = idle;
+        scenario.Busy.Cursor = busy;
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+
+        await scenario.Accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+        await scenario.Accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, idle.Moves);
+        Assert.Equal(0, busy.Moves);
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
+
+        await scenario.Read((scenario.Busy, 201));
+        Assert.Equal(1, idle.Moves);
+        Assert.Equal(2, busy.Moves);
+        Assert.Equal(201, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
+        Assert.Equal(201, scenario.Busy.LastSafePartitionToken?.SequenceNumber);
+        await scenario.Accessor.RunQueuePump(queue, TestContext.Current.CancellationToken);
+        Assert.Equal(1, idle.Moves);
+        Assert.Equal(2, busy.Moves);
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 201);
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CheckpointProgress_SnapshotsIsolateSynchronousSubscriptionChanges(bool pooled, bool usePump)
+    {
+        await using var scenario = await CreateCheckpointScenario(pooled);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        var stream = (await scenario.Accessor.GetPubSubCache())[scenario.Idle.StreamId];
+        var second = AddCheckpointConsumer(stream, scenario.Idle.StreamId, scenario.Cache);
+        var lateConsumer = new ImmediateRecordingConsumer();
+        StreamConsumerData? late = null;
+        var removed = false;
+        void OnMove()
+        {
+            if (removed) return;
+            removed = true;
+            var agent = (PersistentStreamPullingAgent)scenario.Accessor;
+            agent.RemoveSubscriber_Impl(second.SubscriptionId, second.StreamId);
+            agent.RemoveSubscriber_Impl(scenario.Busy.SubscriptionId, scenario.Busy.StreamId);
+            late = stream.AddConsumer(GuidId.GetGuidId(Guid.NewGuid()), scenario.Idle.StreamId, lateConsumer, null, DateTime.UtcNow);
+            late.IsRegistered = true;
+            late.Cursor = scenario.Cache.GetCacheCursor(late.StreamId, new EventSequenceTokenV2(3));
+        }
+
+        var cursor = new ObservedQueueCursor(scenario.Idle.Cursor!) { OnMove = OnMove };
+        scenario.Idle.Cursor = cursor;
+        if (usePump)
+        {
+            scenario.Idle.State = second.State = scenario.Busy.State = StreamConsumerDataState.Active;
+        }
+        await scenario.Read((scenario.Idle, 3));
+        if (usePump)
+        {
+            scenario.Idle.State = second.State = scenario.Busy.State = StreamConsumerDataState.Inactive;
+            await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+        }
+
+        Assert.True(removed);
+        Assert.NotNull(late);
+        Assert.Equal(2, stream.Count);
+        Assert.Null(second.Cursor);
+        Assert.Null(scenario.Busy.Cursor);
+        Assert.Single(await scenario.Accessor.GetPubSubCache());
+        Assert.Empty(lateConsumer.DeliveredTokens);
+        Assert.Equal(3, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, null);
+
+        await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+        Assert.Equal(3, Assert.Single(lateConsumer.DeliveredTokens).SequenceNumber);
+        await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 3);
+    }
+
+    private sealed class ObservedQueueCursor(IQueueCacheCursor inner) : IQueueCacheCursor, IQueueCacheCursorProgress
+    {
+        public int Moves { get; private set; }
+        public Action? OnMove { get; init; }
+        public void Dispose() => inner.Dispose();
+        public IBatchContainer? GetCurrent(out Exception? exception) => inner.GetCurrent(out exception);
+        public bool MoveNext() => MoveNextWithResult().Kind == QueueCacheCursorMoveResultKind.Success;
+        public QueueCacheCursorMoveResult MoveNextWithResult()
+        {
+            Moves++;
+            OnMove?.Invoke();
+            return inner.MoveNextWithResult();
+        }
+        public void Refresh(StreamSequenceToken token) => inner.Refresh(token);
+        public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
+        void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
+        public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+        public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
+        public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task ReceiptProvider_ExhaustedDeliveryPreservesItsSkipPolicy(bool retry)
     {
         var backoff = Substitute.For<IBackoffProvider>();

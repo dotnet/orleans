@@ -65,7 +65,7 @@ namespace Orleans.Streams
             return queueData.TryGetValue(subscriptionId, out data);
         }
 
-        public IEnumerable<StreamConsumerData> AllConsumers()
+        public Dictionary<GuidId, StreamConsumerData>.ValueCollection AllConsumers()
         {
             return queueData.Values;
         }
