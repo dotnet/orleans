@@ -1919,7 +1919,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
         var metadata = await storage.GetMetadataAsync(CancellationToken.None);
         Assert.NotNull(metadata);
-        Assert.Equal("json-lines", metadata.Format);
+        Assert.Equal("json-lines", metadata.FormatKey);
         Assert.Equal("open", metadata.Properties["catalog"]);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1, 2]), CancellationToken.None);
@@ -1961,7 +1961,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             cancellationToken: CancellationToken.None);
 
         Assert.NotNull(updated);
-        Assert.Equal("json-lines", updated.Format);
+        Assert.Equal("json-lines", updated.FormatKey);
         Assert.Equal("closed", updated.Properties["catalog"]);
         Assert.NotEqual(before.ETag, updated.ETag);
 
@@ -2178,7 +2178,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
 
         public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
-            JournalFormatKey = metadata?.Format;
+            JournalFormatKey = metadata?.FormatKey;
             while (buffer.Length > 0)
             {
                 var chunk = new byte[buffer.Length];

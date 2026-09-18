@@ -34,7 +34,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         Assert.Equal(1, fixture.Storage.Get(first.Context.GrainId).Reads);
         Assert.Equal(grainClass == typeof(InjectedJournalGrain) ? 0 : 1, first.SetupCount);
         Assert.Equal(first.SetupCount, first.Feature?.ParticipationCount ?? 0);
-        Assert.True(first.Manager!.TryGetState("one", out var state));
+        Assert.True(first.Manager!.TryGetStateMachine("one", out var state));
         Assert.Same(first.First, state);
 
         await grain.SetValues("one", "two");
@@ -146,12 +146,12 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         var probe = await fixture.ReadProbe(grain);
         var id = new JournalId($"standalone/{Guid.NewGuid():N}");
         var factory = fixture.Services.GetRequiredService<IJournaledStateManagerFactory>();
-        var codec = fixture.Services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonJournalExtensions.JournalFormatKey);
+        var codec = fixture.Services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonLinesJournalFormat.JournalFormatKey);
         IJournaledStateManager manager;
         RuntimeContext.SetExecutionContext(probe.Context, out var previous);
         try
         {
-            manager = factory.Create(id);
+            manager = factory.CreateStandalone(id);
         }
         finally
         {
@@ -172,7 +172,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
             Assert.Equal(new[] { "grain one", "grain two" }, await grain.GetValues());
         }
 
-        await using (var recovered = factory.Create(id))
+        await using (var recovered = factory.CreateStandalone(id))
         {
             var value = new DurableValue<string>("value", recovered, codec);
             await recovered.InitializeAsync(Cancellation);
@@ -187,7 +187,6 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     [Theory]
     [InlineData("hosting")]
     [InlineData("implementation")]
-    [InlineData("explicit")]
     public async Task ManagerResolution_EnrollsExactlyOnceAndDurableGrainRetainsHelpers(string registration)
     {
         var builder = CreateBuilder();
@@ -196,22 +195,10 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         context.GrainId.Returns(GrainId.Create("composition", "factory-enrollment"));
         context.ObservableLifecycle.Returns(lifecycle);
         builder.Services.AddScoped(_ => context);
-        var journalId = registration == "explicit"
-            ? new JournalId("explicit/scoped-override")
-            : JournalId.FromGrainId(context.GrainId);
+        var journalId = JournalId.FromGrainId(context.GrainId);
         if (registration == "implementation")
         {
-            builder.Services.AddScoped<IJournaledStateManager, JournaledStateManager>();
-        }
-        else if (registration == "explicit")
-        {
-            builder.Services.AddScoped(services =>
-            {
-                var manager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
-                ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(
-                    services.GetRequiredService<IGrainContext>().ObservableLifecycle);
-                return manager;
-            });
+            builder.Services.AddScoped<IJournaledStateManager, DurableStateManager>();
         }
 
         await using var services = builder.Services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
@@ -240,8 +227,34 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         await grain.Commit();
         await lifecycle.OnStop(Cancellation);
 
-        await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
-        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonJournalExtensions.JournalFormatKey);
+        await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonLinesJournalFormat.JournalFormatKey);
+        var recoveredValue = new DurableValue<string>("helper", recovered, codec);
+        await recovered.InitializeAsync(Cancellation);
+        Assert.Equal("helper", recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task ExplicitFactory_WithManualLifecycle_PersistsProvidedState()
+    {
+        var builder = CreateBuilder();
+        await using var services = builder.Services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonLinesJournalFormat.JournalFormatKey);
+        var journalId = new JournalId("explicit/manual-lifecycle");
+        var lifecycle = new CompositionTestLifecycle();
+        await using var owner = factory.CreateStandalone(journalId);
+        Assert.False(owner is IDurableStateManager);
+        var value = new DurableValue<string>("helper", owner, codec);
+
+        ((ILifecycleParticipant<IGrainLifecycle>)owner).Participate(lifecycle);
+        Assert.Equal(1, lifecycle.Subscriptions);
+        await lifecycle.OnStart(Cancellation);
+        value.Value = "helper";
+        await owner.WriteStateAsync(Cancellation);
+        await lifecycle.OnStop(Cancellation);
+
+        await using var recovered = factory.CreateStandalone(journalId);
         var recoveredValue = new DurableValue<string>("helper", recovered, codec);
         await recovered.InitializeAsync(Cancellation);
         Assert.Equal("helper", recoveredValue.Value);
@@ -250,7 +263,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     [Fact]
     public async Task DurableGrain_UsesFactoryEnrolledCustomManager()
     {
-        var manager = Substitute.For<IJournaledStateManager, ILifecycleParticipant<IGrainLifecycle>>();
+        var manager = Substitute.For<IJournaledStateManager, IDurableStateManager, ILifecycleParticipant<IGrainLifecycle>>();
         var context = Substitute.For<IGrainContext>();
         var lifecycle = new CompositionTestLifecycle();
         await using var services = new ServiceCollection()
@@ -259,6 +272,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
                 ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(lifecycle);
                 return manager;
             })
+            .AddScoped<IDurableStateManager>(services => (IDurableStateManager)services.GetRequiredService<IJournaledStateManager>())
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         await using var scope = services.CreateAsyncScope();
         context.ActivationServices.Returns(scope.ServiceProvider);
@@ -287,10 +301,10 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         var builder = CreateBuilder();
         if (useImplementationRegistration)
         {
-            builder.Services.AddScoped<IJournaledStateManager, JournaledStateManager>();
+            builder.Services.AddScoped<IJournaledStateManager, DurableStateManager>();
         }
         builder.Services.AddSingleton<TrackingJournalFormat>();
-        builder.Services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey,
+        builder.Services.AddKeyedSingleton<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey,
             static (services, _) => services.GetRequiredService<TrackingJournalFormat>());
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("composition", "enrollment-failure"));
@@ -302,6 +316,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         builder.Services.AddScoped(_ => context);
         using var services = builder.Services.BuildServiceProvider();
         using var scope = services.CreateScope();
+        context.ActivationServices.Returns(scope.ServiceProvider);
         var error = Assert.Throws<InvalidOperationException>(() => scope.ServiceProvider.GetRequiredService<IJournaledStateManager>());
         Assert.Same(expected, error);
         var writer = Assert.Single(services.GetRequiredService<TrackingJournalFormat>().Writers);
@@ -321,6 +336,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<TimeProvider>());
         builder.AddVolatileJournalStorage().UseJsonJournalFormat(JournalingTestsJsonContext.Default);
+        builder.Services.AddStateMachine<IStateMachine, IStateMachine>(static (_, _) => Substitute.For<IStateMachine>());
         return builder;
     }
 
@@ -346,9 +362,9 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
 
     private sealed class HelperJournalGrain : DurableGrain
     {
-        public IJournaledStateManager Manager => StateManager;
-        public IDurableValue<string> Value => ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>("helper");
-        public IJournaledState State => GetOrCreateState("helper-state", static _ => Substitute.For<IJournaledState>(), 0);
+        public IDurableStateManager Manager => StateManager;
+        public IDurableValue<string> Value => StateManager.GetOrAddValue<string>("helper");
+        public IStateMachine State => StateManager.GetOrAddState<IStateMachine>("helper-state");
         public ValueTask Commit() => WriteStateAsync();
     }
 }
@@ -495,8 +511,8 @@ public sealed class JournalCompositionFeature : ILifecycleParticipant<IGrainLife
         ParticipationCount++;
         lifecycle.Subscribe<JournalCompositionFeature>(GrainLifecycleStage.SetupState - 1, _ =>
         {
-            Assert.True(_probe.Manager!.TryGetState("one", out var first));
-            Assert.True(_probe.Manager.TryGetState("two", out var second));
+            Assert.True(_probe.Manager!.TryGetStateMachine("one", out var first));
+            Assert.True(_probe.Manager.TryGetStateMachine("two", out var second));
             Assert.Same(_probe.First, first);
             Assert.Same(_probe.Second, second);
             _probe.Events.Add("before recovery");
@@ -622,7 +638,7 @@ public sealed class JournalCompositionStorageProvider : IJournalStorageProvider
 public sealed class JournalCompositionStorage : IJournalStorage
 {
     public const string FailureMessage = "Expected journal commit acknowledgement failure.";
-    private readonly VolatileJournalStorage _inner = new(JsonJournalExtensions.JournalFormatKey);
+    private readonly VolatileJournalStorage _inner = new(JsonLinesJournalFormat.JournalFormatKey);
     public int Managers;
     public int Reads;
     public int Writes;

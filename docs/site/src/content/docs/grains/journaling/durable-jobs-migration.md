@@ -34,8 +34,8 @@ Keep one authoritative location for each shard throughout its lifetime.
    availability and access still need operational checks.
 
 Named journal providers resolve storage, catalog, and state-manager factory
-from the same binding. The default provider used by
-<xref:Orleans.Journaling.DurableGrain> remains independent of explicitly named
+from the same binding. The default provider used by grain-owned
+<xref:Orleans.Journaling.IDurableStateManager> instances remains independent of explicitly named
 Durable Jobs providers. The in-memory and Azure Durable Jobs convenience
 methods compose the same common registration path for the default binding.
 

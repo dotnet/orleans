@@ -226,13 +226,13 @@ public sealed class JournalStorageCatalogTests
         foreach (var entry in entries)
         {
             var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
-            Assert.Equal("test", metadata.Format);
+            Assert.Equal("test", metadata.FormatKey);
             Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
             Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
 
             var current = await context.Provider.CreateStorage(entry.Id).GetMetadataAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(current);
-            Assert.Equal(current.Format, metadata.Format);
+            Assert.Equal(current.FormatKey, metadata.FormatKey);
             Assert.Equal(current.ETag, metadata.ETag);
             Assert.Equal(current.Properties, metadata.Properties);
         }
@@ -248,7 +248,7 @@ public sealed class JournalStorageCatalogTests
     public async Task AzureListAsync_IncludeMetadataIsSnapshottedAcrossPages(string kind, bool includeMetadata)
     {
         await using var context = await CreateAsync(kind, ["tenant/a", "tenant/b", "tenant/c"]);
-        var options = new ListOptions { IncludeMetadata = !includeMetadata };
+        var options = new JournalCatalogListOptions { IncludeMetadata = !includeMetadata };
         var listing = context.Catalog.ListAsync(options, TestContext.Current.CancellationToken);
         options.IncludeMetadata = includeMetadata;
         await using (var enumerator = listing.GetAsyncEnumerator(TestContext.Current.CancellationToken))
@@ -315,7 +315,7 @@ public sealed class JournalStorageCatalogTests
 
         Assert.Equal(new JournalId("tenant/a"), entry.Id);
         var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
-        Assert.Null(metadata.Format);
+        Assert.Null(metadata.FormatKey);
         Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
         Assert.Empty(metadata.Properties);
         Assert.Equal(0, context.Native.MetadataRequests);
@@ -341,7 +341,7 @@ public sealed class JournalStorageCatalogTests
         Assert.NotNull(current);
         Assert.Equal("bob", current.Properties["owner"]);
         Assert.Equal(new ETag("changed").ToString(), current.ETag);
-        Assert.Equal("test", metadata.Format);
+        Assert.Equal("test", metadata.FormatKey);
         Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
         Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
         Assert.Equal(1, context.Native.MetadataRequests);
@@ -452,7 +452,7 @@ public sealed class JournalStorageCatalogTests
     public async Task ListAsync_OptionsAreReadAtEnumerationStartAndRemainStable(string kind)
     {
         await using var context = await CreateAsync(kind, ["tenant/z", "tenant/a", "tenant/b", "other/q"]);
-        var options = new ListOptions { Prefix = new("other"), MinId = new("other"), MaxId = new("other") };
+        var options = new JournalCatalogListOptions { Prefix = new("other"), MinId = new("other"), MaxId = new("other") };
         var listing = context.Catalog.ListAsync(options, TestContext.Current.CancellationToken);
         options.Prefix = new("tenant");
         options.MinId = new("tenant/a");
@@ -912,7 +912,7 @@ public sealed class JournalStorageCatalogTests
         Assert.All(entries, entry =>
         {
             var metadata = Assert.IsAssignableFrom<IJournalMetadata>(entry.Metadata);
-            Assert.Equal("test", metadata.Format);
+            Assert.Equal("test", metadata.FormatKey);
             Assert.Equal(new ETag("listed").ToString(), metadata.ETag);
             Assert.Equal(new Dictionary<string, string> { ["owner"] = "alice" }, metadata.Properties);
         });

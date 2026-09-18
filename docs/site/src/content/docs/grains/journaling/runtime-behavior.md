@@ -11,9 +11,11 @@ Orleans Journaling assigns one <xref:Orleans.Journaling.JournalId> to each grain
 
 ## Activation and recovery
 
-The standard grain-scoped <xref:Orleans.Journaling.IJournaledStateManager> registered by <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>. Resolving a keyed durable state also resolves this manager. Each activation shares one manager across its injected states and features.
+The standard grain-scoped <xref:Orleans.Journaling.IDurableStateManager> registered by <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> enrolls itself in the grain lifecycle when constructed with the activation's <xref:Orleans.Runtime.IGrainContext>, before resolution returns. Resolving a keyed durable state also resolves this manager. Each activation shares one manager across its injected states and features. Its registry owns state creation and binding, so compatible requests through <xref:Orleans.Journaling.IDurableStateManager.GetOrAddState*>, its typed extension helpers, or keyed injection return the same instance.
 
-Constructor injection registers durable states before lifecycle startup. Orleans completes the grain constructor and assigns <xref:Orleans.Runtime.IGrainContext.GrainInstance>, then runs any shared activation setup actions before calling the grain object's `Participate` method and starting the lifecycle. A feature can resolve additional activation-scoped states and enroll its own participant in those actions. All subscriptions are established before lifecycle startup.
+Constructor injection registers durable states before lifecycle startup. Orleans completes the grain constructor and assigns <xref:Orleans.Runtime.IGrainContext.GrainInstance>, then runs any shared activation setup actions before calling the grain object's `Participate` method and starting the lifecycle. A feature can first resolve the manager, declare additional activation-scoped states, and enroll its own participant in those synchronous actions. All subscriptions are established before lifecycle startup.
+
+The standard manager participates once, supporting ordinary <xref:Orleans.Grain> subclasses, application-owned bases, <xref:Orleans.IGrainBase> implementations, and the <xref:Orleans.Journaling.DurableGrain> convenience base. Its grain-bound constructor subscribes through the existing lifecycle participation mechanism. Resolve grain-owned managers and declare their states during construction or synchronous activation setup so subscriptions are established before lifecycle startup. If lifecycle subscription fails, the constructor disposes the failed manager and its writer, then propagates the failure.
 
 During <xref:Orleans.Runtime.GrainLifecycleStage.SetupState>, the manager:
 
@@ -29,19 +31,25 @@ Provider registration makes Journaling services available. Per-grain journal I/O
 
 Lifecycle stages execute in order, with callbacks at the same stage eligible to run concurrently. A feature which reads recovered state subscribes after `SetupState`; a feature which must finish before `OnActivateAsync` subscribes before <xref:Orleans.Runtime.GrainLifecycleStage.Activate>. Shared setup actions execute after construction and are reused concurrently across activations, so they resolve scoped state through the supplied context. See [Shared activation setup](../grain-lifecycle.md#shared-activation-setup).
 
+State creation belongs to setup before initialization. After initialization begins, `GetOrAddState` can resolve existing registrations; adding a missing name fails immediately before changing the registry. <xref:Orleans.Journaling.IDurableStateManager.TryGetState*> provides lookup without creation. Application reads and mutations use the reconstructed state after initialization succeeds.
+
 Storage providers can split reads at arbitrary byte boundaries. The journal format buffers incomplete entries and only applies complete ordered records.
 
 ### Custom and caller-owned managers
 
-Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor. Custom managers establish it in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
+Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor and implements both the grain-facing `IDurableStateManager` and the independent journal-owner <xref:Orleans.Journaling.IJournaledStateManager>. Custom grain manager replacements provide both contracts and their registrations as appropriate. They establish enrollment in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
 
-Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory> with an explicit <xref:Orleans.Journaling.JournalId>, and managers constructed directly from storage without a grain context, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Register their states, await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with the operation's cancellation token, and dispose the manager when processing ends. A caller can deliberately assign lifecycle ownership by enrolling the manager in a grain-scoped registration factory. Creation through the explicit-journal factory keeps failure handling independent of the ambient activation, including after the caller enrolls that manager in a lifecycle.
+Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> with an explicit <xref:Orleans.Journaling.JournalId>, and managers constructed directly from storage without a grain context, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Construct state machine components with their dependencies, register them with <xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, and await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with the operation's cancellation token before using recovered state. Look up registered components with <xref:Orleans.Journaling.IJournaledStateManager.TryGetStateMachine*>. A caller can deliberately assign lifecycle ownership by enrolling the owner in a grain-scoped registration factory. Standalone creation keeps failure handling independent of the ambient activation, including after such enrollment.
+
+Grain-owned managers use the existing activation scope for `GetOrAddState` and keyed component resolution. The runtime-owned scope controls disposal of the DI-created state components, their dependencies, and the manager. <xref:Orleans.Journaling.JournalingHostingExtensions.AddStateMachine*> registers application state components for this grain-facing path.
+
+Standalone journal owners orchestrate manually registered components and never create or dispose DI scopes. Their callers supply component dependencies and manage their lifetimes, including any caller-owned scopes. Replay uses the configured shared journal services when it needs a codec for a stored format. Disposing the owner stops journal processing and releases journal resources; component and dependency disposal remains the caller's responsibility. Durable Jobs shards use this ownership model for their explicitly supplied state.
 
 ## Mutation and write acknowledgement
 
 Durable collections encode their operation before applying it to the in-memory collection. A codec failure therefore leaves both the journal buffer and collection unchanged.
 
-<xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> gathers pending entries from all named states and queues one storage operation:
+<xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> gathers pending entries from all named states and queues one storage operation. The protected `DurableGrain.WriteStateAsync` helper forwards to that same manager:
 
 - **Append** adds the encoded operation batch atomically.
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
@@ -49,7 +57,7 @@ Durable collections encode their operation before applying it to the in-memory c
 Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
 
 > [!IMPORTANT]
-> In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> completes. Recovery reconstructs durable state in a new activation.
+> In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
 
 ## Safe-to-commit staging
 
@@ -82,8 +90,11 @@ application outcome and reconcile in a new activation using an operation identif
 mechanism.
 
 Owners of standalone managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory>
-dispose the failed manager and create a new one for the same <xref:Orleans.Journaling.JournalId>. Register
-new durable state instances and initialize them before resuming processing.
+dispose the failed manager and create a new one for the same <xref:Orleans.Journaling.JournalId>.
+Construct fresh state machine components with caller-supplied dependencies and register them using
+<xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, then initialize before resuming
+processing. The caller also retires the failed components and their dependencies according to their
+assigned lifetimes.
 
 Cancelling a write's cancellation token stops the caller's wait. An already queued write continues to its
 storage outcome, so the caller reconciles that outcome before retrying the command.
@@ -93,7 +104,7 @@ or repair the backing data before creating a fresh manager or retrying activatio
 
 ## Compaction
 
-Each provider reports when its journal crosses a configured storage threshold. The next <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*>:
+Each provider reports when its journal crosses a configured storage threshold. The next `WriteStateAsync`:
 
 1. Builds a snapshot containing the state directory and every active durable state.
 1. Atomically replaces the published journal with the snapshot.
@@ -108,6 +119,8 @@ Recovery preserves streams whose names are no longer registered by the current g
 Reintroducing the same state name during the grace period replays its preserved entries into the new state instance. After the grace period has elapsed, a later compaction removes the retired stream. Permanent removal can therefore occur later than the configured period.
 
 This behavior supports staged deployments and rollback. Keep the previous format codecs available while retired streams remain. A format migration pauses when an unregistered stream can't be decoded into a snapshot.
+
+Declare every state to retain on each activation, even when that activation never accesses its contents. Setup declarations determine which streams remain active. Omitting a declaration starts retirement; register that same name during setup on a later activation to recover it within the grace period.
 
 ## Deactivation and shutdown
 

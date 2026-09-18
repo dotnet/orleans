@@ -3048,7 +3048,7 @@ public class LocalDurableJobManagerTests
     private static ServiceProvider CreateJournaledServices(VolatileJournalStorageProvider storageProvider, TimeProvider timeProvider)
     {
         var builder = new TestSiloBuilder();
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(timeProvider);

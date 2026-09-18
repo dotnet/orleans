@@ -16,29 +16,30 @@ public interface IShoppingCartGrain : IGrainWithStringKey
     ValueTask<Dictionary<string, int>> GetItems(CancellationToken cancellationToken);
 }
 
-public sealed class ShoppingCartGrain(
-    IJournaledStateManager stateManager,
-    [FromKeyedServices("cart")] IDurableDictionary<string, int> cart)
+public sealed class ShoppingCartGrain(IDurableStateManager stateManager)
     : Grain, IShoppingCartGrain
 {
+    private readonly IDurableDictionary<string, int> _cart =
+        stateManager.GetOrAddDictionary<string, int>("cart");
+
     public async ValueTask AddItem(string itemId, int quantity, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        cart[itemId] = quantity;
+        _cart[itemId] = quantity;
         await stateManager.WriteStateAsync(cancellationToken);
     }
 
     public ValueTask<Dictionary<string, int>> GetItems(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new(cart.ToDictionary());
+        return new(_cart.ToDictionary());
     }
 }
 // </composed_shopping_cart>
 
 // <journaled_feature>
 public sealed class CartActivationCounter(
-    IJournaledStateManager stateManager,
+    IDurableStateManager stateManager,
     [FromKeyedServices("activation-count")] IDurableValue<int> count)
     : ILifecycleParticipant<IGrainLifecycle>
 {

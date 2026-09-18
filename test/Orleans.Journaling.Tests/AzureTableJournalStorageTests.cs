@@ -331,7 +331,7 @@ public sealed class AzureTableJournalStorageTests
         Assert.Empty(consumer.Bytes.ToArray());
         Assert.True(consumer.IsCompleted);
         Assert.NotNull(consumer.Metadata);
-        Assert.Null(consumer.Metadata.Format);
+        Assert.Null(consumer.Metadata.FormatKey);
         Assert.Empty(consumer.Metadata.Properties);
         Assert.Empty(store.QueryCalls);
     }
@@ -904,7 +904,7 @@ public sealed class AzureTableJournalStorageTests
 
         public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
-            JournalFormatKey = metadata?.Format;
+            JournalFormatKey = metadata?.FormatKey;
             Metadata = metadata;
             IsCompleted |= buffer.IsCompleted;
             while (buffer.Length > 0)
@@ -1574,7 +1574,7 @@ public sealed class AzureTableJournalStorageTests
         var metadata = await CreateStorage(store).GetMetadataAsync(CancellationToken.None);
 
         Assert.NotNull(metadata);
-        Assert.Null(metadata.Format);
+        Assert.Null(metadata.FormatKey);
         Assert.Empty(metadata.Properties);
         Assert.Equal("put-1", metadata.ETag);
     }

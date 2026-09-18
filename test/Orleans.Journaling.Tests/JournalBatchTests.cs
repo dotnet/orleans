@@ -118,7 +118,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
     {
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var grainContext = new TestGrainContext(grainId); // Use provided GrainId
+        var grainContext = new TestGrainContext(grainId, _serviceProvider);
         var storage = CreateStorage(_serviceProvider, grainContext);
         var manager = new JournaledStateManager(CreateShared(), storage);
         var list = new DurableList<T>(listName, manager, new OrleansBinaryDurableListCommandCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
@@ -401,14 +401,16 @@ public abstract class JournalBatchTests : IAsyncLifetime
         public int Age { get; init; }
     }
 
-    internal sealed class TestGrainContext(GrainId grainId) : IGrainContext
+    internal sealed class TestGrainContext(GrainId grainId, IServiceProvider services) : IGrainContext
     {
+        private readonly Dictionary<Type, object> _components = [];
+
         public GrainReference GrainReference => throw new NotImplementedException();
         public GrainId GrainId => grainId;
         public object? GrainInstance => throw new NotImplementedException();
         public ActivationId ActivationId => throw new NotImplementedException();
         public GrainAddress Address => throw new NotImplementedException();
-        public IServiceProvider ActivationServices => throw new NotImplementedException();
+        public IServiceProvider ActivationServices => services;
         public IGrainLifecycle ObservableLifecycle { get; } = new CompositionTestLifecycle();
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public Task Deactivated => throw new NotImplementedException();
@@ -416,13 +418,23 @@ public abstract class JournalBatchTests : IAsyncLifetime
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public bool Equals(IGrainContext? other) => throw new NotImplementedException();
-        public TComponent? GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
-        public object? GetComponent(Type componentType) => throw new NotImplementedException();
+        public TComponent? GetComponent<TComponent>() where TComponent : class => (TComponent?)GetComponent(typeof(TComponent));
+        public object? GetComponent(Type componentType) => _components.GetValueOrDefault(componentType);
         public TTarget? GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
         public object? GetTarget() => throw new NotImplementedException();
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
         public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
-        public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class
+        {
+            if (value is null)
+            {
+                _components.Remove(typeof(TComponent));
+            }
+            else
+            {
+                _components[typeof(TComponent)] = value;
+            }
+        }
     }
 }

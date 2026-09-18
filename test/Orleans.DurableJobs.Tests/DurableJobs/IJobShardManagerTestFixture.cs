@@ -43,7 +43,7 @@ public sealed class VolatileJobShardManagerTestFixture : IJobShardManagerTestFix
     {
         cancellationToken.ThrowIfCancellationRequested();
         var builder = new TestSiloBuilder();
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);

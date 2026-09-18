@@ -38,7 +38,7 @@ public partial class JournaledJobShardManagerTests
         var snapshot = await storage.GetMetadataAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(snapshot);
         Assert.NotNull(snapshot.ETag);
-        fixture.Catalog.Metadata.Add(id, new JournalMetadata(snapshot.Format, properties: snapshot.Properties));
+        fixture.Catalog.Metadata.Add(id, new JournalMetadata(snapshot.FormatKey, properties: snapshot.Properties));
         fixture.Catalog.Ids.Add(id);
         fixture.Storage.MetadataReads.Clear();
 
@@ -62,7 +62,7 @@ public partial class JournaledJobShardManagerTests
         Assert.NotNull(original);
         if (includeProjectedMetadata)
         {
-            fixture.Catalog.Metadata.Add(id, new JournalMetadata(original.Format, properties: original.Properties));
+            fixture.Catalog.Metadata.Add(id, new JournalMetadata(original.FormatKey, properties: original.Properties));
         }
 
         fixture.Catalog.Ids.Add(id);
@@ -91,7 +91,7 @@ public partial class JournaledJobShardManagerTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var snapshot = await storage.GetMetadataAsync(cancellationToken);
         Assert.NotNull(snapshot);
-        fixture.Catalog.Metadata.Add(id, includeETag ? snapshot : new JournalMetadata(snapshot.Format, properties: snapshot.Properties));
+        fixture.Catalog.Metadata.Add(id, includeETag ? snapshot : new JournalMetadata(snapshot.FormatKey, properties: snapshot.Properties));
         fixture.Catalog.Ids.Add(id);
 
         var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5101), 0);
@@ -718,9 +718,9 @@ public partial class JournaledJobShardManagerTests
     {
         public List<TrackingJournaledStateManager> Managers { get; } = [];
 
-        public IJournaledStateManager Create(JournalId journalId)
+        public IJournaledStateManager CreateStandalone(JournalId journalId)
         {
-            var manager = new TrackingJournaledStateManager(inner.Create(journalId));
+            var manager = new TrackingJournaledStateManager(inner.CreateStandalone(journalId));
             Managers.Add(manager);
             return manager;
         }
@@ -731,8 +731,8 @@ public partial class JournaledJobShardManagerTests
         public int DisposeCalls { get; private set; }
         public long PendingWriteByteCount => inner.PendingWriteByteCount;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
-        public void RegisterState(string name, IJournaledState state) => inner.RegisterState(name, state);
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => inner.TryGetState(name, out state);
+        public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine) => inner.TryGetStateMachine(name, out stateMachine);
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
 

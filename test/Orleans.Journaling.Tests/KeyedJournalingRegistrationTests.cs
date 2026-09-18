@@ -41,6 +41,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         {
             var context = Substitute.For<IGrainContext>();
             context.GrainId.Returns(grainId);
+            context.ActivationServices.Returns(services);
             context.ObservableLifecycle.Returns(services.GetRequiredService<CompositionTestLifecycle>());
             return context;
         });
@@ -72,8 +73,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
         var keyedFactory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
         Assert.Same(factory, keyedFactory);
-        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonJournalExtensions.JournalFormatKey);
-        await using (var manager = keyedFactory.Create(journalId))
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
+        await using (var manager = keyedFactory.CreateStandalone(journalId))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -137,10 +138,10 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         Assert.Same(storageA, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-A"));
         Assert.Same(storageB, services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-B"));
         var id = new JournalId("jobs/shards/isolated");
-        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonJournalExtensions.JournalFormatKey);
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
         var factoryA = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-A");
         var factoryB = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-B");
-        await using (var manager = factoryA.Create(id))
+        await using (var manager = factoryA.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -148,7 +149,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             await manager.WriteStateAsync(token);
         }
 
-        await using (var manager = factoryB.Create(id))
+        await using (var manager = factoryB.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -158,7 +159,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         }
 
         // Same identity in two physical namespaces must not share factory storage.
-        await using (var manager = factoryA.Create(id))
+        await using (var manager = factoryA.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -167,7 +168,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             Assert.Equal(42, value.Value);
         }
 
-        await using (var manager = factoryB.Create(id))
+        await using (var manager = factoryB.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -177,7 +178,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         Assert.Null(await defaultStorage.CreateStorage(id).GetMetadataAsync(token));
         var catalogA = new List<JournalId>();
         await foreach (var entry in services.GetRequiredKeyedService<IJournalStorageCatalog>("jobs-A")
-            .ListAsync(new ListOptions { Prefix = new JournalId("jobs/shards/") }, token))
+            .ListAsync(new JournalCatalogListOptions { Prefix = new JournalId("jobs/shards/") }, token))
         {
             catalogA.Add(entry.Id);
         }
@@ -307,13 +308,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var builder = new TestSiloBuilder();
         builder.Services.AddSerializer();
 
-        builder.AddJournalStorage();
+        builder.AddJournaling();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey));
         Assert.Same(jsonFormat, serviceProvider.GetRequiredService<IJournalFormat>());
         Assert.Equal("application/jsonl", jsonFormat.MimeType);
-        CodecTestHelpers.AssertCommandCodecServiceRegistrations(serviceProvider, JsonJournalExtensions.JournalFormatKey);
+        CodecTestHelpers.AssertCommandCodecServiceRegistrations(serviceProvider, JsonLinesJournalFormat.JournalFormatKey);
 
         var binaryFormat = Assert.IsType<OrleansBinaryJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
         Assert.Equal("application/octet-stream", binaryFormat.MimeType);
@@ -356,7 +357,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
         services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
-        services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed")));
+        services.AddScoped<IGrainContext>(sp => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed"), sp));
         services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
         services.AddScoped<JournaledStateManagerShared>();
@@ -390,14 +391,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         builder.Services.AddLogging();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (sp, _) => sp.GetRequiredService<TimeProvider>());
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         builder.Services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         using var scope = serviceProvider.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManagerFactory>()
-            .Create(new JournalId("on-demand-journal"));
+            .CreateStandalone(new JournalId("on-demand-journal"));
         await using (manager.ConfigureAwait(false))
         {
             var codecProvider = scope.ServiceProvider.GetRequiredService<ICodecProvider>();
@@ -428,7 +429,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public IJournalStorage CreateStorage(JournalId journalId) => _storage.CreateStorage(journalId);
 
-        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
             => _storage.ListAsync(options, cancellationToken);
 
         public void Participate(ISiloLifecycle lifecycle) => ParticipationCount++;

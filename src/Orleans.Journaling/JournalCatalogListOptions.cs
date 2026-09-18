@@ -6,7 +6,7 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// All constraints apply using ordinal comparisons. Providers snapshot these options when enumeration begins.
 /// </remarks>
-public sealed class ListOptions
+public sealed class JournalCatalogListOptions
 {
     /// <summary>
     /// Gets or sets the raw prefix of <see cref="JournalId.Value"/>. The default value matches all ids.

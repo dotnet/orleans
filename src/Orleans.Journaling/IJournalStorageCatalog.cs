@@ -18,7 +18,7 @@ public interface IJournalStorageCatalog
     /// <remarks>
     /// Options are snapshotted when enumeration begins. The raw prefix and inclusive lower and upper bounds all apply.
     /// Results are not guaranteed to be sorted; callers requiring ordering must sort the selected ids.
-    /// <see cref="ListOptions.IncludeMetadata"/> requests complete metadata snapshots available from the listing.
+    /// <see cref="JournalCatalogListOptions.IncludeMetadata"/> requests complete metadata snapshots available from the listing.
     /// Entries carry <see langword="null"/> metadata when the provider cannot project it or it was not requested.
     /// Providers fetch storage pages internally and yield matching entries
     /// as they are discovered. Advancing the enumerator can traverse multiple empty or filtered storage pages.
@@ -31,6 +31,6 @@ public interface IJournalStorageCatalog
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> is canceled.</exception>
     IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
+        JournalCatalogListOptions? options = null,
         CancellationToken cancellationToken = default);
 }

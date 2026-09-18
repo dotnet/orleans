@@ -597,7 +597,7 @@ public partial class JournaledJobShardManagerTests
     private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider, TimeProvider? timeProvider = null, IJournalStorageCatalog? catalog = null)
     {
         var builder = new TestSiloBuilder();
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         builder.Services.AddLogging();
         builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
@@ -630,8 +630,8 @@ public partial class JournaledJobShardManagerTests
         public ConcurrentQueue<JournalId> JournalAppends { get; } = new();
         public ConcurrentQueue<JournalId> JournalDeletes { get; } = new();
         public ConcurrentQueue<JournalId> JournalReplacements { get; } = new();
-        public List<ListOptions?> ListRequests { get; } = [];
-        public Func<ListOptions?, CancellationToken, IAsyncEnumerable<JournalCatalogEntry>>? ListOverride { get; set; }
+        public List<JournalCatalogListOptions?> ListRequests { get; } = [];
+        public Func<JournalCatalogListOptions?, CancellationToken, IAsyncEnumerable<JournalCatalogEntry>>? ListOverride { get; set; }
         public Func<JournalId, CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
         public Func<JournalId, IJournalMetadata?, CancellationToken, ValueTask>? AfterMetadataUpdate { get; set; }
         public bool OmitMetadataETags { get; set; }
@@ -690,7 +690,7 @@ public partial class JournaledJobShardManagerTests
             return new CountingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
         }
 
-        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
         {
             ListRequests.Add(options);
             LastListPrefix = options?.Prefix ?? default;
@@ -735,7 +735,7 @@ public partial class JournaledJobShardManagerTests
 
                 var metadata = await inner.GetMetadataAsync(cancellationToken);
                 return owner.OmitMetadataETags && metadata is not null
-                    ? new JournalMetadata(metadata.Format, properties: metadata.Properties)
+                    ? new JournalMetadata(metadata.FormatKey, properties: metadata.Properties)
                     : metadata;
             }
 
@@ -882,7 +882,7 @@ public partial class JournaledJobShardManagerTests
         public List<(JournalId Prefix, JournalId MaxId)> Requests { get; } = [];
         public bool ExpectUnbounded { get; set; }
 
-        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(ListOptions? options = null, CancellationToken cancellationToken = default)
+        public IAsyncEnumerable<JournalCatalogEntry> ListAsync(JournalCatalogListOptions? options = null, CancellationToken cancellationToken = default)
         {
             Assert.NotNull(options);
             Assert.Equal(JobShardId.StoragePrefix.Value + "/", options.Prefix.Value);
