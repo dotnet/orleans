@@ -58,15 +58,15 @@ metadata semantics.
 setup. Implement it on a grain class, an application base class, or an application grain
 interface. Existing `DurableGrain` implementations receive the same setup automatically.
 Selection is cached with the concrete grain type, and each activation reuses its scoped
-inbox, outbox, and single journal observer.
+inbox, outbox, and registered journaled messaging states.
 
 Setup validates the grain's execution model after the runtime assigns the constructed
 grain instance and before lifecycle startup, journal initialization, or replay. Supported
 activations use a single, noninterleaving grain execution model. Grain construction and
 local state registration precede validation. The standard state manager enrolls in the
-grain lifecycle during grain-bound construction; messaging attaches its observer to
-that enrolled manager. A scoped factory using an explicit `JournalId` enrolls its
-manager in the grain lifecycle before returning it. Standalone managers have
+grain lifecycle during grain-bound construction; messaging registers its actual
+persisted states with that enrolled manager. A scoped factory using an explicit
+`JournalId` enrolls its manager in the grain lifecycle before returning it. Standalone managers have
 caller-owned initialization and disposal.
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
@@ -80,22 +80,29 @@ container before duplicate lookup or admission. Serialized null message bodies r
 valid payloads. Empty-owner clearing shares the inbox admission gate with delivery,
 so direct interleaved delivery proceeds after the clear's durable outcome.
 
-Handlers execute sequentially inside an admitted journal operation's preparation.
-The messaging observer prepares the inbox handler before the outbox prerequisites,
-then synchronously finalizes their state. Journaled handler effects, outgoing intents,
-inbox completion, and `(SenderId, MessageId)` deduplication are captured together;
-other queued writes wait for that operation. Handlers complete fallible work using
-local values before staging safe application effects. Expected preparation failures
-produce bounded retry or dead-letter accounting in the admitted operation.
+Handlers prepare local values asynchronously and return a non-null synchronous action.
+Messaging invokes the action once for its prepared attempt and stages inbox completion
+and `(SenderId, MessageId)` deduplication in the same uninterrupted activation turn.
+The action can stage outgoing messages using `Send`. The registered outbox state prepares
+durable wakeup prerequisites inside the serialized journal operation before capture.
+Readiness is rechecked after asynchronous preparation, so late staged work joins a
+capture only when its prerequisites are ready. Expected handler preparation failures
+produce bounded retry or dead-letter accounting.
 An accepted message whose handler is absent on a later activation completes immediately
 into dead-letter storage. Its processed marker suppresses duplicates through the
 configured deduplication window.
 
 Acceptance and ownership repair retain local proposals until scheduling is acknowledged
-and a healthy journal operation admits them. Its finalizer applies the complete envelope
-and ownership pair. A journal failure permanently fences the activation, signals pending
+before synchronously staging the complete envelope and ownership pair. Journaled
+state callbacks encode the staged changes and acknowledge only the captured cohort.
+An unexpected apply failure is latched before yielding; journal readiness raises the
+original failure before capture. A journal failure permanently fences the activation,
+signals pending
 preparations and callbacks, and faults its waiters. A fresh activation replays the actual
-durable outcome, including commits whose acknowledgement failed.
+durable outcome, including commits whose acknowledgement failed. A persistence-request
+rejection after staging stops inbox admission and requests a fresh activation. The
+manager can remain healthy after rejecting a request; a later admitted write observes
+the inbox's latched failure before capture.
 A delivery caller can cancel its wait while the owned operation retains admission
 through completion. Activation shutdown drains that operation, and delivery failures
 are logged and observed even after the caller has left.
@@ -103,14 +110,15 @@ are logged and observed even after the caller has left.
 Retained duplicates return `Duplicate`; expiry permits
 acceptance again. Capacity limits return `Backpressured` before persistence.
 `CanHandle` implementations are pure metadata predicates: the handler keeps grain
-state and injected durable state unchanged until `HandleAsync`. The selection
-context enforces access to metadata and grain identity; its outbound-message APIs
-throw during selection. Journal observers reject explicit write/delete requests
-inside selection and handling, preserving the runtime's completion commit.
+state and injected durable state unchanged until the action returned by `PrepareAsync`
+runs. The selection context enforces access to metadata and grain identity; its outbound-message APIs
+throw during selection. The inbox state rejects explicit write/delete requests
+inside selection, preparation and apply, preserving the runtime's completion commit.
 A route miss preserves the grain's staged state for its next journal write.
 The grain owner quiesces delivery and pumping for the full journal deletion operation,
-and resumes delivery after awaiting successful deletion. Journal deletion requires
-completed delivery operations, released inbox gates, and idle pump leases.
+and resumes delivery after awaiting successful deletion. Journal deletion validates
+completed delivery operations, released inbox gates, and idle pump leases. Once deletion starts, admission stays closed until the persisted
+states reset. Recovery and deletion bookkeeping use the existing state streams.
 Interleaved control calls observe that quiescence boundary; the
 active handler retains its own logical persistence-request guard.
 Superseded queued pump executions release their retained result and cancellation

@@ -21,11 +21,10 @@ internal sealed class DurableMessagingGrainTypeConfigurator(GrainClassMap grainC
             {
                 DurableMessagingActivationValidator.Validate(context);
                 var services = context.ActivationServices;
-                var manager = services.GetRequiredService<IJournaledStateManager>();
+                _ = services.GetRequiredService<IJournaledStateManager>();
                 _ = services.GetRequiredService<IDurableInbox>();
                 _ = services.GetRequiredService<IDurableOutbox>();
-                var observer = services.GetRequiredService<DurableMessagingJournalObserver>();
-                DurableMessagingStateManagerCapabilities.RegisterObserver(manager, observer);
+                _ = services.GetRequiredService<DurableInboxExtension>();
             });
         }
     }
