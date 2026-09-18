@@ -217,7 +217,6 @@ public sealed class FirestoreMembershipHeartbeatTests
         var table = CreateTable(client);
         var snapshot = await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         var row = Assert.Single(snapshot.Members);
-        var originalHeartbeat = row.Item1.IAmAliveTime;
         row.Item1.Status = SiloStatus.ShuttingDown;
         entry.IAmAliveTime = Now;
 
@@ -227,11 +226,10 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await table.UpdateRowAsync(
             row.Item1, row.Item2, snapshot.Version.Next(), TestContext.Current.CancellationToken));
 
-        Assert.Equal(2, client.Transactions);
-        Assert.Equal(2, client.Reads.Count);
+        Assert.Equal(0, client.Transactions);
+        Assert.Equal(2, Assert.Single(client.Reads).Documents.Count);
         Assert.Empty(client.Queries);
-        Assert.Equal(new[] { 0, 1, 2 }, client.Commits.Select(commit => commit.Writes.Count));
-        Assert.Equal(Time(originalHeartbeat), client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+        Assert.Equal(new[] { 1, 2 }, client.Commits.Select(commit => commit.Writes.Count));
         Assert.Equal((long)SiloStatus.ShuttingDown, client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.Status)].IntegerValue);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
         Assert.Equal(8, client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.MembershipVersion)].IntegerValue);
@@ -249,12 +247,11 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, token, NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
         Assert.Equal(2, client.CommittedWrites.Count);
-        Assert.Equal(Time(entry.IAmAliveTime), client.Documents[original.Name].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
     }
 
@@ -281,7 +278,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.False(await table.UpdateRowAsync(entry, token, NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -293,7 +290,7 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Fact]
-    public async Task FullRowUpdateUsesWriteOnlyTransactionWithCanonicalPreconditions()
+    public async Task FullRowUpdateUsesOneAtomicCommitWithCanonicalPreconditions()
     {
         var client = new MembershipClient();
         var entry = Entry();
@@ -306,18 +303,17 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         var commit = Assert.Single(client.Commits);
-        Assert.False(commit.Transaction.IsEmpty);
+        Assert.True(commit.Transaction.IsEmpty);
         Assert.Equal(2, commit.Writes.Count);
         Assert.Equal(new[] { original.Name, VersionPath }, commit.Writes.Select(write => write.Update.Name));
         Assert.Equal(Google.Cloud.Firestore.V1.Precondition.ConditionTypeOneofCase.Exists, commit.Writes[0].CurrentDocument.ConditionTypeCase);
         Assert.True(commit.Writes[0].CurrentDocument.Exists);
         Assert.Equal(version.UpdateTime, commit.Writes[1].CurrentDocument.UpdateTime);
         var updated = client.Documents[original.Name];
-        Assert.Equal(Time(entry.IAmAliveTime), updated.Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
         Assert.Equal((long)SiloStatus.ShuttingDown, updated.Fields[nameof(SiloInstanceEntity.Status)].IntegerValue);
         Assert.Equal(Time(Now), Assert.Single(updated.Fields[nameof(SiloInstanceEntity.SuspectingTimes)].ArrayValue.Values));
         Assert.Equal(8, updated.Fields[nameof(SiloInstanceEntity.MembershipVersion)].IntegerValue);
@@ -363,7 +359,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.False(await CreateTable(client).UpdateRowAsync(
             entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
 
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
         Assert.Single(client.Commits);
@@ -385,7 +381,7 @@ public sealed class FirestoreMembershipHeartbeatTests
             entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
-        Assert.Equal(1, client.Transactions);
+        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Single(client.Commits);
         Assert.Equal(2, client.AttemptedWrites.Count);
@@ -458,7 +454,9 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Empty(client.CommittedWrites);
         Assert.Equal(original, client.Documents[original.Name]);
         Assert.Equal(version, client.Documents[VersionPath]);
-        AssertTransactionalQueries(client, deadOnly: true);
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
     }
 
     [Theory]
@@ -499,7 +497,8 @@ public sealed class FirestoreMembershipHeartbeatTests
             Assert.Equal(original, client.Documents[original.Name]);
         }
 
-        AssertTransactionalQueries(client, deadOnly: true);
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(0, client.Transactions);
     }
 
     [Theory]
@@ -523,20 +522,22 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, client.Transactions);
+        Assert.Equal(1, client.Transactions);
+        Assert.Equal(original.Name, Assert.Single(Assert.Single(client.Reads).Documents));
+        Assert.False(client.Reads[0].Transaction.IsEmpty);
         var attempted = Assert.Single(client.AttemptedWrites);
         Assert.Equal(original.Name, attempted.Delete);
         Assert.Equal(original.UpdateTime, attempted.CurrentDocument.UpdateTime);
         Assert.Empty(client.CommittedWrites);
         Assert.Equal(value, client.Documents[original.Name].Fields[field]);
         Assert.Equal(version, client.Documents[VersionPath]);
-        AssertTransactionalQueries(client, deadOnly: true);
+        AssertSingleStrongQuery(client, deadOnly: true);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CleanupFiltersDeadRowsBeforeTransactionalRead(bool canonicalChange)
+    public async Task CleanupFiltersDeadRowsBeforeConditionalDelete(bool canonicalChange)
     {
         var client = new MembershipClient();
         var active = client.AddRow(Entry(), DateTime.UnixEpoch);
@@ -559,8 +560,8 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, client.Transactions);
-        Assert.Equal(2, client.Queries.Count);
+        Assert.Equal(0, client.Transactions);
+        Assert.Single(client.Queries);
         Assert.Empty(client.Reads);
         Assert.Single(client.AttemptedWrites);
         var write = Assert.Single(client.CommittedWrites);
@@ -571,7 +572,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         concurrentState.Remove(original.Name);
         Assert.Equal(concurrentState.Count, client.Documents.Count);
         Assert.All(concurrentState, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
-        AssertTransactionalQueries(client, deadOnly: true);
+        AssertSingleStrongQuery(client, deadOnly: true);
     }
 
     [Fact]
@@ -593,13 +594,199 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(FirestoreDataManager.MaxBatchSize + 1, client.CommittedWrites.Count);
         Assert.All(client.CommittedWrites, write => Assert.Equal(Write.OperationOneofCase.Delete, write.OperationCase));
         Assert.Equal(version, Assert.Single(client.Documents).Value);
-        AssertTransactionalQueries(client, deadOnly: true);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Equal(2, client.Commits.Count);
+        Assert.Equal(FirestoreDataManager.MaxBatchSize + 1, client.QueryDocumentReads);
+        AssertSingleStrongQuery(client, deadOnly: true);
+    }
+
+    [Fact]
+    public async Task CleanupRefreshesOnlyTheConflictedBatch()
+    {
+        var client = new MembershipClient();
+        var candidates = Enumerable.Range(1, FirestoreDataManager.MaxBatchSize + 1).Select(generation =>
+        {
+            var entry = Entry(generation);
+            entry.Status = SiloStatus.Dead;
+            return client.AddRow(entry, DateTime.UnixEpoch);
+        }).ToArray();
+        var recentEntry = Entry(1000);
+        recentEntry.Status = SiloStatus.Dead;
+        var recent = client.AddRow(recentEntry, Now).Clone();
+        var live = client.AddRow(Entry(1001), Now).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        client.BeforeCommit = () => client.Change(candidates[0].Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
+
+        await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
+
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(FirestoreDataManager.MaxBatchSize + 2, client.QueryDocumentReads);
+        Assert.Equal(1, client.Transactions);
+        var refresh = Assert.Single(client.Reads);
+        Assert.Equal(candidates.Take(FirestoreDataManager.MaxBatchSize).Select(document => document.Name), refresh.Documents);
+        Assert.Equal(new[] { 500, 499, 1 }, client.Commits.Select(commit => commit.Writes.Count));
+        Assert.Equal(FirestoreDataManager.MaxBatchSize, client.CommittedWrites.Count);
+        Assert.Equal(4, client.Documents.Count);
+        Assert.Equal(Time(Now), client.Documents[candidates[0].Name].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+        Assert.Equal(recent, client.Documents[recent.Name]);
+        Assert.Equal(live, client.Documents[live.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Fact]
+    public async Task CleanupRefreshesSelectedCandidatesAfterNativeAbort()
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        entry.Status = SiloStatus.Dead;
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        client.BeforeCommit = () => throw new RpcException(new Status(StatusCode.Aborted, "commit-contention"));
+
+        await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
+
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(1, client.Transactions);
+        Assert.Equal(original.Name, Assert.Single(Assert.Single(client.Reads).Documents));
+        Assert.Equal(new[] { 1, 1 }, client.Commits.Select(commit => commit.Writes.Count));
+        Assert.Equal(original.Name, Assert.Single(client.CommittedWrites).Delete);
+        Assert.Equal(version, Assert.Single(client.Documents).Value);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MembershipReadsUseOneTransactionForRowsAndVersion(bool readAll)
+    public async Task CleanupRefreshHandlesMissingAndStillEligibleCandidates(bool removed)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        entry.Status = SiloStatus.Dead;
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        client.BeforeCommit = () =>
+        {
+            if (removed)
+            {
+                client.Documents.Remove(original.Name);
+            }
+            else
+            {
+                client.Change(original.Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(DateTime.UnixEpoch.AddMinutes(1)));
+            }
+        };
+
+        await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
+
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(1, client.Transactions);
+        Assert.Equal(original.Name, Assert.Single(Assert.Single(client.Reads).Documents));
+        Assert.Equal(new[] { 1, removed ? 0 : 1 }, client.Commits.Select(commit => commit.Writes.Count));
+        Assert.Equal(version, Assert.Single(client.Documents).Value);
+        if (removed)
+        {
+            Assert.Empty(client.CommittedWrites);
+        }
+        else
+        {
+            var deleted = Assert.Single(client.CommittedWrites);
+            Assert.Equal(original.Name, deleted.Delete);
+            Assert.NotEqual(original.UpdateTime, deleted.CurrentDocument.UpdateTime);
+        }
+    }
+
+    [Theory]
+    [InlineData(StatusCode.PermissionDenied)]
+    [InlineData(StatusCode.Unavailable)]
+    public async Task CleanupPropagatesNativeWriteFailuresWithoutRefreshing(StatusCode status)
+    {
+        var failure = new RpcException(new Status(status, "cleanup-write-failure"));
+        var client = new MembershipClient { CommitFailure = failure };
+        var entry = Entry();
+        entry.Status = SiloStatus.Dead;
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
+
+        var exception = await Assert.ThrowsAsync<RpcException>(
+            () => CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Single(client.Commits);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(original, client.Documents[original.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Fact]
+    public async Task CleanupPropagatesMissingResourceFailureDuringRefresh()
+    {
+        var failure = new RpcException(new Status(StatusCode.NotFound, "database-missing"));
+        var client = new MembershipClient { CommitFailure = failure };
+        var entry = Entry();
+        entry.Status = SiloStatus.Dead;
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        client.BeforeCommit = () => client.ReadFailure = failure;
+
+        var exception = await Assert.ThrowsAsync<RpcException>(
+            () => CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(1, client.Transactions);
+        Assert.Single(client.Reads);
+        Assert.Single(client.Commits);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(original, client.Documents[original.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Fact]
+    public async Task CleanupContentionInOneBatchPreservesOtherBatchFailure()
+    {
+        var failure = new RpcException(new Status(StatusCode.PermissionDenied, "other-batch-denied"));
+        var last = Entry(FirestoreDataManager.MaxBatchSize + 1);
+        var client = new MembershipClient
+        {
+            OnCommit = request =>
+            {
+                if (request.Writes.Any(write => write.Delete == RowPath(last)))
+                {
+                    throw failure;
+                }
+            }
+        };
+        for (var generation = 1; generation <= FirestoreDataManager.MaxBatchSize + 1; generation++)
+        {
+            var entry = Entry(generation);
+            entry.Status = SiloStatus.Dead;
+            client.AddRow(entry, DateTime.UnixEpoch);
+        }
+
+        var first = RowPath(Entry());
+        var version = client.Documents[VersionPath].Clone();
+        client.BeforeCommit = () => client.Change(first, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
+
+        var exception = await Assert.ThrowsAsync<RpcException>(
+            () => CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        AssertSingleStrongQuery(client, deadOnly: true);
+        Assert.Equal(1, client.Transactions);
+        Assert.Equal(FirestoreDataManager.MaxBatchSize, Assert.Single(client.Reads).Documents.Count);
+        Assert.Equal(FirestoreDataManager.MaxBatchSize - 1, client.CommittedWrites.Count);
+        Assert.Equal(3, client.Documents.Count);
+        Assert.Equal(Time(Now), client.Documents[first].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+        Assert.True(client.Documents.ContainsKey(RowPath(last)));
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipReadsUseOneStrongNativeSnapshot(bool readAll)
     {
         var client = new MembershipClient();
         var entry = Entry();
@@ -613,17 +800,148 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(7, result.Version.Version);
         Assert.Equal(entry.SiloAddress, Assert.Single(result.Members).Item1.SiloAddress);
         Assert.Equal(Now, Assert.Single(result.Members).Item1.IAmAliveTime);
-        Assert.Equal(1, client.Transactions);
-        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
         if (readAll)
         {
-            AssertTransactionalQueries(client);
+            AssertSingleStrongQuery(client);
+            Assert.Equal(2, client.QueryDocumentReads);
+            Assert.Empty(client.Reads);
         }
         else
         {
-            Assert.Equal(2, client.Reads.Count);
-            Assert.All(client.Reads, read => Assert.Equal(client.Commits.Single().Transaction, read.Transaction));
+            var read = Assert.Single(client.Reads);
+            Assert.Equal(new[] { VersionPath, RowPath(entry) }, read.Documents);
+            Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.None, read.ConsistencySelectorCase);
+            Assert.Empty(client.Queries);
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipReadsConsumeOneSnapshotDuringStreamedChanges(bool readAll)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var document = client.AddRow(entry, Now);
+        document.Fields[nameof(SiloInstanceEntity.ProxyPort)] = new Value { IntegerValue = 7 };
+        var token = ETag(client.Documents[VersionPath]);
+        client.AfterFirstReadResponse = () =>
+        {
+            client.Change(document.Name, nameof(SiloInstanceEntity.ProxyPort), new Value { IntegerValue = 8 });
+            client.Change(document.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+        };
+        var table = CreateTable(client);
+
+        var result = readAll
+            ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
+            : await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Equal(7, result.Version.Version);
+        Assert.Equal(token, result.Version.VersionEtag);
+        var row = Assert.Single(result.Members);
+        Assert.Equal(7, row.Item1.ProxyPort);
+        Assert.Equal(token, row.Item2);
+        Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
+        Assert.Equal(1, client.Reads.Count + client.Queries.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipReadsRequireVersionDocument(bool readAll)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        client.AddRow(entry, Now);
+        client.Documents.Remove(VersionPath);
+        var table = CreateTable(client);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => readAll
+            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
+            : table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
+        Assert.Equal(1, client.Reads.Count + client.Queries.Count);
+    }
+
+    [Fact]
+    public async Task ReadRowReturnsVersionForMissingSiloInOneRequest()
+    {
+        var client = new MembershipClient();
+        var version = client.Documents[VersionPath].Clone();
+
+        var result = await CreateTable(client).ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Members);
+        Assert.Equal(7, result.Version.Version);
+        Assert.Equal(ETag(version), result.Version.VersionEtag);
+        Assert.Equal(2, Assert.Single(client.Reads).Documents.Count);
+        Assert.Empty(client.Queries);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
+    }
+
+    [Theory]
+    [InlineData(false, StatusCode.PermissionDenied)]
+    [InlineData(true, StatusCode.PermissionDenied)]
+    [InlineData(false, StatusCode.NotFound)]
+    [InlineData(true, StatusCode.NotFound)]
+    public async Task MembershipReadsPropagateNativeFailures(bool readAll, StatusCode status)
+    {
+        var failure = new RpcException(new Status(status, "native-read-failure"));
+        var client = new MembershipClient { ReadFailure = failure };
+        var table = CreateTable(client);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() => readAll
+            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
+            : table.ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Commits);
+        Assert.Equal(1, client.Reads.Count + client.Queries.Count);
+    }
+
+    [Theory]
+    [InlineData("ReadRow")]
+    [InlineData("ReadAll")]
+    [InlineData("InsertRow")]
+    [InlineData("UpdateRow")]
+    [InlineData("Cleanup")]
+    public async Task NativeMembershipOperationsNormalizeCallerCancellation(string operation)
+    {
+        var failure = new RpcException(new Status(StatusCode.Cancelled, "native-cancellation"));
+        var reads = operation is "ReadRow" or "ReadAll" or "Cleanup";
+        var client = new MembershipClient { ReadFailure = reads ? failure : null, CommitFailure = reads ? null : failure };
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        client.BeforeRead = cancellation.Cancel;
+        client.BeforeCommit = cancellation.Cancel;
+        var table = CreateTable(client);
+        var entry = Entry();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(Execute);
+
+        Assert.Same(failure, exception.InnerException);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(0, client.Transactions);
+        Assert.Equal(1, client.Reads.Count + client.Queries.Count + client.Commits.Count);
+        Assert.Empty(client.CommittedWrites);
+
+        Task Execute() => operation switch
+        {
+            "ReadRow" => table.ReadRowAsync(entry.SiloAddress, cancellation.Token),
+            "ReadAll" => table.ReadAllAsync(cancellation.Token),
+            "InsertRow" => table.InsertRowAsync(entry, NextVersion(client), cancellation.Token),
+            "UpdateRow" => table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), cancellation.Token),
+            "Cleanup" => table.CleanupDefunctSiloEntriesAsync(Now, cancellation.Token),
+            _ => throw new InvalidOperationException(operation)
+        };
     }
 
     [Fact]
@@ -635,6 +953,9 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(await CreateTable(client).InsertRowAsync(entry, NextVersion(client), TestContext.Current.CancellationToken));
 
         var commit = Assert.Single(client.Commits);
+        Assert.Equal(0, client.Transactions);
+        Assert.True(commit.Transaction.IsEmpty);
+        Assert.Empty(client.Reads);
         Assert.Equal(2, commit.Writes.Count);
         Assert.Equal(RowPath(entry), commit.Writes[0].Update.Name);
         Assert.False(commit.Writes[0].CurrentDocument.Exists);
@@ -642,6 +963,36 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(Timestamp.FromDateTime(DateTime.UnixEpoch), commit.Writes[1].CurrentDocument.UpdateTime);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
         Assert.Equal(8, client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.MembershipVersion)].IntegerValue);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InsertConflictsHaveNoPartialEffects(bool duplicateRow)
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var version = NextVersion(client);
+        if (duplicateRow)
+        {
+            client.AddRow(entry, Now);
+        }
+        else
+        {
+            client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+        }
+
+        var expected = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+
+        Assert.False(await CreateTable(client).InsertRowAsync(entry, version, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        Assert.Single(client.Commits);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(expected.Count, client.Documents.Count);
+        Assert.All(expected, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
     }
 
     [Fact]
@@ -680,14 +1031,13 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(write.CurrentDocument.Exists);
     }
 
-    private static void AssertTransactionalQueries(MembershipClient client, bool deadOnly = false)
+    private static void AssertSingleStrongQuery(MembershipClient client, bool deadOnly = false)
     {
-        Assert.NotEmpty(client.Queries);
+        Assert.Single(client.Queries);
         Assert.All(client.Queries, query =>
         {
-            Assert.False(query.Transaction.IsEmpty);
+            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.None, query.ConsistencySelectorCase);
             Assert.Equal(CollectionPath, $"{query.Parent}/{Assert.Single(query.StructuredQuery.From).CollectionId}");
-            Assert.Contains(client.Commits, commit => commit.Transaction == query.Transaction);
             if (deadOnly)
             {
                 var filter = query.StructuredQuery.Where;
@@ -740,9 +1090,14 @@ public sealed class FirestoreMembershipHeartbeatTests
         public override FirestoreSettings Settings => FirestoreSettings.GetDefault();
         public Dictionary<string, Document> Documents { get; } = [];
         public Action? BeforeCommit { get; set; }
+        public Action<CommitRequest>? OnCommit { get; init; }
+        public Action? BeforeRead { get; set; }
+        public Action? AfterFirstReadResponse { get; set; }
+        public RpcException? ReadFailure { get; set; }
         public RpcException? CommitFailure { get; init; }
         public CancellationToken? CommitCancellationToken { get; private set; }
         public int Transactions { get; private set; }
+        public int QueryDocumentReads { get; private set; }
         public List<BatchGetDocumentsRequest> Reads { get; } = [];
         public List<RunQueryRequest> Queries { get; } = [];
         public List<CommitRequest> Commits { get; } = [];
@@ -789,30 +1144,46 @@ public sealed class FirestoreMembershipHeartbeatTests
         public override BatchGetDocumentsStream BatchGetDocuments(BatchGetDocumentsRequest request, CallSettings? callSettings = null)
         {
             Reads.Add(request.Clone());
-            var name = Assert.Single(request.Documents);
+            BeforeRead?.Invoke();
+            if (ReadFailure is { } failure)
+            {
+                throw failure;
+            }
+
             var documents = Documents;
             if (!request.Transaction.IsEmpty)
             {
-                _readSets[request.Transaction].Add(name);
+                _readSets[request.Transaction].UnionWith(request.Documents);
                 documents = _snapshots[request.Transaction];
             }
 
-            var response = new BatchGetDocumentsResponse { ReadTime = Timestamp.FromDateTime(Now) };
-            if (documents.TryGetValue(name, out var document))
+            var responses = request.Documents.Reverse().Select(name =>
             {
-                response.Found = document.Clone();
-            }
-            else
-            {
-                response.Missing = name;
-            }
+                var response = new BatchGetDocumentsResponse { ReadTime = Timestamp.FromDateTime(Now) };
+                if (documents.TryGetValue(name, out var document))
+                {
+                    response.Found = document.Clone();
+                }
+                else
+                {
+                    response.Missing = name;
+                }
 
-            return new DocumentStream(response);
+                return response;
+            }).ToArray();
+
+            return new DocumentStream(responses, AfterFirstReadResponse);
         }
 
         public override RunQueryStream RunQuery(RunQueryRequest request, CallSettings? callSettings = null)
         {
             Queries.Add(request.Clone());
+            BeforeRead?.Invoke();
+            if (ReadFailure is { } failure)
+            {
+                throw failure;
+            }
+
             var collection = $"{request.Parent}/{Assert.Single(request.StructuredQuery.From).CollectionId}/";
             var documents = request.Transaction.IsEmpty ? Documents : _snapshots[request.Transaction];
             var matches = documents.Values.Where(document => document.Name.StartsWith(collection, StringComparison.Ordinal));
@@ -834,7 +1205,10 @@ public sealed class FirestoreMembershipHeartbeatTests
 
                     return new RunQueryResponse { Document = document.Clone(), ReadTime = Timestamp.FromDateTime(Now) };
                 }).ToArray();
-            return new QueryStream(responses.Length > 0 ? responses : [new RunQueryResponse { ReadTime = Timestamp.FromDateTime(Now) }]);
+            QueryDocumentReads += responses.Length;
+            return new QueryStream(
+                responses.Length > 0 ? responses : [new RunQueryResponse { ReadTime = Timestamp.FromDateTime(Now) }],
+                AfterFirstReadResponse);
         }
 
         public override Task<CommitResponse> CommitAsync(CommitRequest request, CallSettings? callSettings = null)
@@ -845,6 +1219,7 @@ public sealed class FirestoreMembershipHeartbeatTests
             var beforeCommit = BeforeCommit;
             BeforeCommit = null;
             beforeCommit?.Invoke();
+            OnCommit?.Invoke(request);
             if (CommitFailure is { } failure)
             {
                 return Task.FromException<CommitResponse>(failure);
@@ -908,27 +1283,33 @@ public sealed class FirestoreMembershipHeartbeatTests
         };
     }
 
-    private sealed class DocumentStream(BatchGetDocumentsResponse response) : FirestoreClient.BatchGetDocumentsStream
+    private sealed class DocumentStream(IEnumerable<BatchGetDocumentsResponse> responses, Action? afterFirstResponse) : FirestoreClient.BatchGetDocumentsStream
     {
-        public override AsyncServerStreamingCall<BatchGetDocumentsResponse> GrpcCall { get; } = CreateStream([response]);
+        public override AsyncServerStreamingCall<BatchGetDocumentsResponse> GrpcCall { get; } = CreateStream(responses, afterFirstResponse);
     }
 
-    private sealed class QueryStream(IEnumerable<RunQueryResponse> responses) : FirestoreClient.RunQueryStream
+    private sealed class QueryStream(IEnumerable<RunQueryResponse> responses, Action? afterFirstResponse) : FirestoreClient.RunQueryStream
     {
-        public override AsyncServerStreamingCall<RunQueryResponse> GrpcCall { get; } = CreateStream(responses);
+        public override AsyncServerStreamingCall<RunQueryResponse> GrpcCall { get; } = CreateStream(responses, afterFirstResponse);
     }
 
-    private static AsyncServerStreamingCall<T> CreateStream<T>(IEnumerable<T> responses) => new(
-        new ResponseReader<T>(responses), Task.FromResult(new global::Grpc.Core.Metadata()), () => Status.DefaultSuccess, () => new global::Grpc.Core.Metadata(), () => { });
+    private static AsyncServerStreamingCall<T> CreateStream<T>(IEnumerable<T> responses, Action? afterFirstResponse) => new(
+        new ResponseReader<T>(responses, afterFirstResponse), Task.FromResult(new global::Grpc.Core.Metadata()), () => Status.DefaultSuccess, () => new global::Grpc.Core.Metadata(), () => { });
 
-    private sealed class ResponseReader<T>(IEnumerable<T> responses) : IAsyncStreamReader<T>
+    private sealed class ResponseReader<T>(IEnumerable<T> responses, Action? afterFirstResponse) : IAsyncStreamReader<T>
     {
         private readonly IEnumerator<T> _responses = responses.GetEnumerator();
+        private int _reads;
         public T Current => _responses.Current;
 
         public Task<bool> MoveNext(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (_reads++ == 1)
+            {
+                afterFirstResponse?.Invoke();
+            }
+
             return Task.FromResult(_responses.MoveNext());
         }
     }

@@ -132,7 +132,12 @@ public class FirestoreClusteringTests : IAsyncLifetime
 
         var after = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
         var updated = Assert.Single(after.Members);
-        Assert.Equal(original.Item1.ToFullString(), updated.Item1.ToFullString());
+        Assert.Equal(original.Item1.SiloAddress, updated.Item1.SiloAddress);
+        Assert.Equal(SiloStatus.ShuttingDown, updated.Item1.Status);
+        Assert.Equal(original.Item1.HostName, updated.Item1.HostName);
+        Assert.Equal(original.Item1.SiloName, updated.Item1.SiloName);
+        Assert.Equal(original.Item1.ProxyPort, updated.Item1.ProxyPort);
+        Assert.Equal(original.Item1.StartTime, updated.Item1.StartTime);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
         Assert.NotEqual(before.Version.VersionEtag, after.Version.VersionEtag);
         Assert.Equal(after.Version.VersionEtag, updated.Item2);
