@@ -1,3 +1,4 @@
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
@@ -26,8 +27,6 @@ namespace Tester.Cosmos.Clustering;
 [TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
-    private const string CosmosEmulatorTransactionalBatchConditionSkipReason = "The Cosmos DB emulator does not enforce the transactional batch ETag conditions required by this test.";
-
     public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
     {
     }
@@ -76,6 +75,17 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task MembershipTable_Cosmos_AccountUsesStrongConsistency()
+    {
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        using var client = await options.CreateClient(Services);
+        var account = await client.ReadAccountAsync();
+
+        Assert.Equal(ConsistencyLevel.Strong, account.Consistency.DefaultConsistencyLevel);
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_GetGateways()
     {
         await MembershipTable_GetGateways();
@@ -101,8 +111,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_ReadRow_Insert_Read();
     }
 
@@ -115,8 +123,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRow()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRow();
     }
 
@@ -128,8 +134,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRowInParallel()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRowInParallel();
     }
 

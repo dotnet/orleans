@@ -478,6 +478,47 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Fact]
+    public async Task HeartbeatContentionObservesCancellation()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        storage.SetSilo(Silo());
+        storage.Container.ReplaceItemAsync(new SiloEntity(), "", null, null, Token).ReturnsForAnyArgs(call =>
+        {
+            Assert.Equal(cancellation.Token, call.Arg<CancellationToken>());
+            cancellation.Cancel();
+            return Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.PreconditionFailed));
+        });
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => storage.Table.UpdateIAmAliveAsync(Entry(), cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(new[] { "ReadItemAsync", "ReplaceItemAsync" },
+            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+    }
+
+    [Fact]
+    public async Task HeartbeatContentionCompletesWhenConcurrentHeartbeatAdvances()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        var concurrent = Silo();
+        concurrent.ETag = "advanced-heartbeat";
+        concurrent.IAmAliveTime = DateTime.UnixEpoch.AddHours(2);
+        storage.Container.ReadItemAsync<SiloEntity>("", default, null, Token)
+            .ReturnsForAnyArgs(Item(Silo()), Item(concurrent));
+        storage.Container.ReplaceItemAsync(new SiloEntity(), "", null, null, Token)
+            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.PreconditionFailed)));
+
+        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
+
+        Assert.Equal(new[] { "ReadItemAsync", "ReplaceItemAsync", "ReadItemAsync" },
+            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+        Assert.Equal(DateTime.UnixEpoch.AddHours(2), concurrent.IAmAliveTime);
+        Assert.Equal("advanced-heartbeat", concurrent.ETag);
+    }
+
+    [Fact]
     public async Task CleanupUsesDeadStatusAndMaximumTimestampWithExclusiveUtcCutoff()
     {
         using var storage = new CosmosMembershipTestStorage();
