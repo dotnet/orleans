@@ -84,6 +84,30 @@ public sealed class FaultyMembershipTableTests
         Assert.Empty(control.Backend.Partitions);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Heartbeat_ProviderCancellationWithActiveCaller_PropagatesUnchanged(bool providerTokenCancelled)
+    {
+        var providerToken = new CancellationToken(providerTokenCancelled);
+        var expected = new OperationCanceledException("provider request cancelled", providerToken);
+        var control = new MembershipFaultController(MembershipFault.HeartbeatCancellation)
+        {
+            HeartbeatCancellation = expected
+        };
+        using var caller = new CancellationTokenSource();
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => control.Fixture().RunAsync(
+            (fixture, ct) => new MembershipTableTestRunner(fixture)
+                .UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(ct),
+            caller.Token));
+
+        Assert.Same(expected, failure);
+        Assert.Equal(providerToken, failure.CancellationToken);
+        Assert.False(caller.IsCancellationRequested);
+        Assert.Equal(control.Backend.CreatedHandles, control.Backend.DisposedHandles);
+        Assert.Empty(control.Backend.Partitions);
+    }
+
     [Fact]
     public async Task CrossRowRace_IgnoredTableCondition_DetectsTwoWinners()
     {

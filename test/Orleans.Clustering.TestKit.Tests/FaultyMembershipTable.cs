@@ -10,7 +10,7 @@ internal enum MembershipFault
     IgnoreNewUpdateHeartbeat, IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatResurrectsCompactedRow, HeartbeatStorageFailure,
     CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow,
-    DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign
+    DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation
 }
 
 internal sealed class MembershipFaultController(MembershipFault fault)
@@ -29,6 +29,7 @@ internal sealed class MembershipFaultController(MembershipFault fault)
     internal bool CleanupCompleted;
     internal int ReadsWithDeadTarget;
     internal readonly InvalidOperationException HeartbeatFailure = new("heartbeat-backend-failure");
+    internal OperationCanceledException HeartbeatCancellation { get; init; } = new("heartbeat-backend-cancellation");
     internal readonly InvalidOperationException DeletionFailure = new("deletion-backend-failure");
 
     internal MembershipTableTestFixture Fixture()
@@ -259,6 +260,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
         if (Fault == MembershipFault.HeartbeatStorageFailure) throw control.HeartbeatFailure;
+        if (Fault == MembershipFault.HeartbeatCancellation) throw control.HeartbeatCancellation;
         await inner.UpdateIAmAliveAsync(entry, cancellationToken);
         if (Fault == MembershipFault.HeartbeatResurrectsCompactedRow && control.CleanupCompleted)
         {

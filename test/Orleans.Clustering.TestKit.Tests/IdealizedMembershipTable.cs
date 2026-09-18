@@ -184,9 +184,15 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     internal static MembershipEntry Clone(MembershipEntry entry) => new()
     {
         SiloAddress = SiloAddress.New(entry.SiloAddress.Endpoint.Address, entry.SiloAddress.Endpoint.Port, entry.SiloAddress.Generation),
-        Status = entry.Status, HostName = entry.HostName, SiloName = entry.SiloName, ProxyPort = entry.ProxyPort,
-        RoleName = entry.RoleName, UpdateZone = entry.UpdateZone, FaultZone = entry.FaultZone,
-        StartTime = entry.StartTime, IAmAliveTime = entry.IAmAliveTime,
+        Status = entry.Status,
+        HostName = entry.HostName,
+        SiloName = entry.SiloName,
+        ProxyPort = entry.ProxyPort,
+        RoleName = entry.RoleName,
+        UpdateZone = entry.UpdateZone,
+        FaultZone = entry.FaultZone,
+        StartTime = entry.StartTime,
+        IAmAliveTime = entry.IAmAliveTime,
         SuspectTimes = entry.SuspectTimes?.Select(t => Tuple.Create(
             SiloAddress.New(t.Item1.Endpoint.Address, t.Item1.Endpoint.Port, t.Item1.Generation), t.Item2)).ToList()
     };

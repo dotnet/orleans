@@ -64,7 +64,11 @@ internal partial class MembershipModelRecord : State
 
     internal static MembershipModelRecord New(int key, int generationOffset = 0) => new()
     {
-        Key = key, GenerationOffset = generationOffset, Revision = 1, HostName = $"host-{key}", SiloName = $"silo-{key}",
+        Key = key,
+        GenerationOffset = generationOffset,
+        Revision = 1,
+        HostName = $"host-{key}",
+        SiloName = $"silo-{key}",
         ProxyPort = 22000 + key,
         Suspects = new()
         {
@@ -172,14 +176,26 @@ internal static class MembershipModel
 
     internal static MembershipModelState CopyState(MembershipModelState state) => new()
     {
-        Version = state.Version, LastChangedKey = state.LastChangedKey, Steps = state.Steps, Deleted = state.Deleted,
+        Version = state.Version,
+        LastChangedKey = state.LastChangedKey,
+        Steps = state.Steps,
+        Deleted = state.Deleted,
         TerminalGenerations = new(state.TerminalGenerations),
         Rows = state.Rows.ToDictionary(p => p.Key, p => new MembershipModelRecord
         {
-            Key = p.Value.Key, GenerationOffset = p.Value.GenerationOffset, Status = p.Value.Status, Revision = p.Value.Revision,
-            HeartbeatTicks = p.Value.HeartbeatTicks, StartTicks = p.Value.StartTicks, HostName = p.Value.HostName,
-            SiloName = p.Value.SiloName, ProxyPort = p.Value.ProxyPort, RoleName = p.Value.RoleName,
-            UpdateZone = p.Value.UpdateZone, FaultZone = p.Value.FaultZone, Suspects = new(p.Value.Suspects)
+            Key = p.Value.Key,
+            GenerationOffset = p.Value.GenerationOffset,
+            Status = p.Value.Status,
+            Revision = p.Value.Revision,
+            HeartbeatTicks = p.Value.HeartbeatTicks,
+            StartTicks = p.Value.StartTicks,
+            HostName = p.Value.HostName,
+            SiloName = p.Value.SiloName,
+            ProxyPort = p.Value.ProxyPort,
+            RoleName = p.Value.RoleName,
+            UpdateZone = p.Value.UpdateZone,
+            FaultZone = p.Value.FaultZone,
+            Suspects = new(p.Value.Suspects)
         })
     };
 }

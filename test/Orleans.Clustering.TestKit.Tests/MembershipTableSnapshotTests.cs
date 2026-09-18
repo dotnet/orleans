@@ -203,12 +203,18 @@ public sealed class MembershipTableSnapshotTests
         var rollback = intermediate with { Version = before.Version - 1, TableEtag = before.TableEtag };
         Assert.Contains("cleanup version", Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertCleanup(before, rollback, T1, requireAllEligible: false)).Message);
-        var changed = intermediate with { Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
-            intermediate.Row(live.SiloAddress) with { Entry = intermediate.Row(live.SiloAddress).Entry with { HostName = "drift" } }) };
+        var changed = intermediate with
+        {
+            Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
+            intermediate.Row(live.SiloAddress) with { Entry = intermediate.Row(live.SiloAddress).Entry with { HostName = "drift" } })
+        };
         Assert.Contains("HostName", Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertCleanup(before, changed, T1, requireAllEligible: false)).Message);
-        var regressed = intermediate with { Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
-            intermediate.Row(live.SiloAddress) with { Entry = intermediate.Row(live.SiloAddress).Entry with { IAmAliveTime = T0.AddSeconds(-1) } }) };
+        var regressed = intermediate with
+        {
+            Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
+            intermediate.Row(live.SiloAddress) with { Entry = intermediate.Row(live.SiloAddress).Entry with { IAmAliveTime = T0.AddSeconds(-1) } })
+        };
         Assert.Contains("IAmAliveTime", Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertCleanup(before, regressed, T1, requireAllEligible: false)).Message);
         Assert.Throws<ClusteringConformanceException>(() =>

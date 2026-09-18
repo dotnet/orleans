@@ -20,9 +20,16 @@ internal sealed record MembershipEntrySnapshot(
 
     internal MembershipEntry ToEntry() => new()
     {
-        SiloAddress = SiloAddress.FromParsableString(Identity), Status = Status, ProxyPort = ProxyPort,
-        HostName = HostName, SiloName = SiloName, RoleName = RoleName, UpdateZone = UpdateZone,
-        FaultZone = FaultZone, StartTime = StartTime, IAmAliveTime = IAmAliveTime,
+        SiloAddress = SiloAddress.FromParsableString(Identity),
+        Status = Status,
+        ProxyPort = ProxyPort,
+        HostName = HostName,
+        SiloName = SiloName,
+        RoleName = RoleName,
+        UpdateZone = UpdateZone,
+        FaultZone = FaultZone,
+        StartTime = StartTime,
+        IAmAliveTime = IAmAliveTime,
         SuspectTimes = Suspects.Select(v => Tuple.Create(SiloAddress.FromParsableString(v.Identity), v.Time)).ToList()
     };
 

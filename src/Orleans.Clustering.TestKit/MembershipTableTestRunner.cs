@@ -496,7 +496,7 @@ public sealed class MembershipTableTestRunner
             _output?.Invoke(failure.Message);
             throw failure;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             throw ClusteringTestKitDiagnostics.CreateFailure(_fixture.ProviderName, guarantee, _fixture.ClusterId, "A1/A2/B1", _seed,
                 "bounded scenario timed out; required operation/readiness/completion evidence is missing");
@@ -574,7 +574,8 @@ public sealed class MembershipTableTestRunner
             expectedEntry = expectedEntry with { IAmAliveTime = before.Rows[id].Entry.IAmAliveTime };
         EqualAllowingRefreshedRowEtags(before with
         {
-            Version = before.Version + 1, TableEtag = after.TableEtag,
+            Version = before.Version + 1,
+            TableEtag = after.TableEtag,
             Rows = before.Rows.SetItem(id, new(expectedEntry, row.Etag))
         }, after);
     }
@@ -696,10 +697,13 @@ public sealed class MembershipTableTestRunner
         var id = entry.SiloAddress.ToParsableString();
         Check(after.Rows.ContainsKey(id), $"heartbeat removed identity={id}");
         var row = before.Rows[id];
-        var expected = before with { Rows = before.Rows.SetItem(id, new(row.Entry with
+        var expected = before with
         {
-            IAmAliveTime = time > row.Entry.IAmAliveTime ? time : row.Entry.IAmAliveTime
-        }, after.Rows[id].Etag)) };
+            Rows = before.Rows.SetItem(id, new(row.Entry with
+            {
+                IAmAliveTime = time > row.Entry.IAmAliveTime ? time : row.Entry.IAmAliveTime
+            }, after.Rows[id].Etag))
+        };
         Equal(expected, after);
     }
 
@@ -763,9 +767,13 @@ public sealed class MembershipTableTestRunner
                 {
                     Check(sample.Version == before.Version + 1 && sample.TableEtag != before.TableEtag && !string.IsNullOrEmpty(sample.TableEtag),
                         $"round={round}, reader={index}: invalid atomic version/token pair, expected={before.Version} or {before.Version + 1}, observed={sample.Version}/{sample.TableEtag}");
-                    var expectedAfter = before with { Version = before.Version + 1, TableEtag = sample.TableEtag,
+                    var expectedAfter = before with
+                    {
+                        Version = before.Version + 1,
+                        TableEtag = sample.TableEtag,
                         Rows = cleanup ? before.Rows.Remove(id)
-                            : before.Rows.SetItem(id, new(MembershipEntrySnapshot.Capture(target), before.Rows[id].Etag)) };
+                            : before.Rows.SetItem(id, new(MembershipEntrySnapshot.Capture(target), before.Rows[id].Etag))
+                    };
                     if (cleanup)
                     {
                         Check(!sample.Rows.ContainsKey(id), "atomic cleanup still returned the removed identity");

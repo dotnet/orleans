@@ -12,10 +12,16 @@ internal static class MembershipTableTestData
     internal static MembershipEntry CreateEntry(int index, int seed = 0, SiloStatus status = SiloStatus.Created) => new()
     {
         SiloAddress = SiloAddress.New(IPAddress.Loopback, 12000 + index, 100 + (seed & 0x7fff)),
-        Status = status, ProxyPort = 22000 + index, HostName = $"host-{index}", SiloName = $"silo-{index}",
+        Status = status,
+        ProxyPort = 22000 + index,
+        HostName = $"host-{index}",
+        SiloName = $"silo-{index}",
         // Explicit defaults round-trip across providers which do not store Azure deployment metadata.
-        RoleName = string.Empty, UpdateZone = 0, FaultZone = 0,
-        StartTime = T0.AddMinutes(-1), IAmAliveTime = T0,
+        RoleName = string.Empty,
+        UpdateZone = 0,
+        FaultZone = 0,
+        StartTime = T0.AddMinutes(-1),
+        IAmAliveTime = T0,
         SuspectTimes = [Tuple.Create(SiloAddress.New(IPAddress.Loopback, 11001, 10), T0.AddSeconds(-10)),
             Tuple.Create(SiloAddress.New(IPAddress.Loopback, 11002, 11), T0.AddSeconds(-5))]
     };

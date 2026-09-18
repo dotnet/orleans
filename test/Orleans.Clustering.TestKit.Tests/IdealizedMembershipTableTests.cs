@@ -12,9 +12,16 @@ public sealed class IdealizedMembershipTableTests
     // Hand-authored provider expectations, not the conformance runner or its snapshot oracle.
     private static MembershipEntry Entry(int port = 13001) => new()
     {
-        SiloAddress = SiloAddress.New(IPAddress.Loopback, port, 20), Status = SiloStatus.Joining,
-        HostName = "worker", SiloName = "worker-a", ProxyPort = 30001, RoleName = "role",
-        UpdateZone = 2, FaultZone = 3, StartTime = Start, IAmAliveTime = Start.AddSeconds(1),
+        SiloAddress = SiloAddress.New(IPAddress.Loopback, port, 20),
+        Status = SiloStatus.Joining,
+        HostName = "worker",
+        SiloName = "worker-a",
+        ProxyPort = 30001,
+        RoleName = "role",
+        UpdateZone = 2,
+        FaultZone = 3,
+        StartTime = Start,
+        IAmAliveTime = Start.AddSeconds(1),
         SuspectTimes = [Tuple.Create(SiloAddress.New(IPAddress.Loopback, 13002, 21), Start.AddSeconds(2))]
     };
 
