@@ -258,7 +258,7 @@ public class AzureMembershipPaginationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CleanupConflictReselectsHeartbeatAndVoteRecency(bool refreshVote)
+    public async Task CleanupConflictPropagatesAndNextInvocationUsesFreshRecency(bool refreshVote)
     {
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(0, DeadSilo("silo-0", "deleted"), DeadSilo("silo-1", "old")));
@@ -284,8 +284,14 @@ public class AzureMembershipPaginationTests
                     : Task.FromException<Response<IReadOnlyList<Response>>>(new RequestFailedException(412, "Changed row etag."));
             });
 
-        await CreateManager(storage, client, maximumRows: 1).CleanupDefunctSiloEntries(
-            new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        var manager = CreateManager(storage, client, maximumRows: 1);
+        var cutoff = new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero);
+        var exception = await Assert.ThrowsAsync<RequestFailedException>(
+            () => manager.CleanupDefunctSiloEntries(cutoff, TestContext.Current.CancellationToken));
+        Assert.Equal(412, exception.Status);
+        Assert.Equal(1, storage.QueryCount);
+
+        await manager.CleanupDefunctSiloEntries(cutoff, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, batches.Count);
         var deletions = batches.Select(batch => Assert.Single(batch)).ToArray();
@@ -426,7 +432,7 @@ public class AzureMembershipPaginationTests
     }
 
     [Fact]
-    public async Task CleanupRetriesWhenEveryBatchFailureIsContention()
+    public async Task CleanupPropagatesAllContentionFailuresAfterOneAttempt()
     {
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(7, DeadSilo("silo-0", "s0"), DeadSilo("silo-1", "s1")));
@@ -438,15 +444,18 @@ public class AzureMembershipPaginationTests
                     ? new RequestFailedException(412, "Concurrent heartbeat.")
                     : new RequestFailedException(404, "Concurrent cleanup.", "ResourceNotFound", null)));
 
-        await CreateManager(storage, client, maximumRows: 1)
-            .CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<AggregateException>(() => CreateManager(storage, client, maximumRows: 1)
+            .CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken));
 
+        Assert.Equal(2, exception.InnerExceptions.Count);
+        Assert.Contains(exception.InnerExceptions, failure => failure is RequestFailedException { Status: 412 });
+        Assert.Contains(exception.InnerExceptions, failure => failure is RequestFailedException { Status: 404 });
         Assert.Equal(2, client.ReceivedCalls().Count());
-        Assert.Equal(2, storage.QueryCount);
+        Assert.Equal(1, storage.QueryCount);
     }
 
     [Fact]
-    public async Task CleanupCancellationStopsConflictRetries()
+    public async Task CleanupPropagatesNativeCancellation()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var storage = new ScriptedMembershipTableReadStorage();
@@ -456,7 +465,7 @@ public class AzureMembershipPaginationTests
             .Returns(_ =>
             {
                 cancellation.Cancel();
-                return Task.FromException<Response<IReadOnlyList<Response>>>(new RequestFailedException(412, "Concurrent heartbeat."));
+                return Task.FromCanceled<Response<IReadOnlyList<Response>>>(cancellation.Token);
             });
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateManager(storage, client)

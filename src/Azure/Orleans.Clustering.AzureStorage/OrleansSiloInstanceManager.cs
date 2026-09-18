@@ -229,26 +229,14 @@ namespace Orleans.AzureUtils
         /// </summary>
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var entries = await FindAllSiloEntries(cancellationToken);
-                var defunct = entries
-                    .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)
-                        && entry.Entity.Status == INSTANCE_STATUS_DEAD
-                        && GetEffectiveUpdateTime(entry.Entity) < beforeDate.UtcDateTime)
-                    .ToList();
+            var entries = await FindAllSiloEntries(cancellationToken);
+            var defunct = entries
+                .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)
+                    && entry.Entity.Status == INSTANCE_STATUS_DEAD
+                    && GetEffectiveUpdateTime(entry.Entity) < beforeDate.UtcDateTime)
+                .ToList();
 
-                try
-                {
-                    await DeleteEntriesBatch(defunct, cancellationToken);
-                    return;
-                }
-                catch (Exception exception) when (IsCleanupContention(exception))
-                {
-                    // Re-select recency and row etags after a concurrent update or deletion.
-                }
-            }
+            await DeleteEntriesBatch(defunct, cancellationToken);
         }
 
         private static DateTime GetEffectiveUpdateTime(SiloInstanceTableEntry entry)
@@ -289,18 +277,11 @@ namespace Orleans.AzureUtils
                 }
                 catch when (deletions.Exception is { InnerExceptions.Count: > 1 })
                 {
-                    // Preserve every failed batch so cleanup only retries pure contention.
+                    // Preserve every failed batch for the caller.
                     throw deletions.Exception;
                 }
             }
         }
-
-        private static bool IsCleanupContention(Exception exception) => exception switch
-        {
-            RequestFailedException request => request.Status == (int)HttpStatusCode.PreconditionFailed || IsRowNotFound(request),
-            AggregateException aggregate => aggregate.InnerExceptions.All(IsCleanupContention),
-            _ => false
-        };
 
         internal async Task<List<(SiloInstanceTableEntry, string)>> FindSiloEntryAndTableVersionRow(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
