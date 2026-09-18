@@ -73,7 +73,7 @@ namespace AWSUtils.Tests.MembershipTests
                 if (cleanup)
                 {
                     Assert.Empty(client.Requests);
-                    Assert.Equal(51, client.Deletes.Count);
+                    Assert.Equal(25, client.Deletes.Count);
                     for (var index = 0; index < client.Deletes.Count; index++)
                     {
                         var delete = client.Deletes[index];
@@ -100,7 +100,7 @@ namespace AWSUtils.Tests.MembershipTests
                         item => item.DeleteRequest.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == SiloInstanceRecord.TABLE_VERSION_ROW);
                 }
 
-                Assert.Equal(cleanup ? 51 : 3, client.Tokens.Count);
+                Assert.Equal(cleanup ? 25 : 3, client.Tokens.Count);
                 Assert.All(client.Tokens, token => Assert.Equal(cancellation.Token, token));
                 Assert.False(pending.IsCompleted);
             }
@@ -112,10 +112,94 @@ namespace AWSUtils.Tests.MembershipTests
 
             if (cleanup)
             {
+                Assert.Equal(51, client.Deletes.Count);
+                Assert.All(client.Tokens, token => Assert.Equal(cancellation.Token, token));
                 Assert.Equal(7, client.Version);
                 Assert.Equal(7, client.VersionEtag);
                 Assert.Empty(client.Records);
             }
+        }
+
+        [Fact]
+        public async Task CleanupBoundsConcurrentDeletesAcrossBatches()
+        {
+            var secondBatch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thirdBatch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var client = new BatchDeleteClient
+            {
+                OnDeleteRequest = count =>
+                {
+                    if (count == 50)
+                    {
+                        secondBatch.SetResult();
+                    }
+                    else if (count == 51)
+                    {
+                        thirdBatch.SetResult();
+                    }
+                }
+            };
+            var pending = DeleteEntries(CreateTable(client), cleanup: true, TestContext.Current.CancellationToken);
+            try
+            {
+                Assert.Equal(25, client.Deletes.Count);
+                Assert.Equal(25, client.PendingDeletes);
+                Assert.False(pending.IsCompleted);
+
+                client.CompletePendingDeletes();
+                await secondBatch.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.Equal(50, client.Deletes.Count);
+                Assert.Equal(25, client.PendingDeletes);
+                Assert.False(pending.IsCompleted);
+
+                client.CompletePendingDeletes();
+                await thirdBatch.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.Equal(51, client.Deletes.Count);
+                Assert.Equal(1, client.PendingDeletes);
+                Assert.False(pending.IsCompleted);
+            }
+            finally
+            {
+                client.CompleteAll();
+                await pending;
+            }
+
+            Assert.Equal(25, client.PeakPendingDeletes);
+            Assert.Empty(client.Records);
+            Assert.Equal(7, client.Version);
+            Assert.Equal(7, client.VersionEtag);
+        }
+
+        [Fact]
+        public async Task CleanupCancellationDrainsCurrentBatchBeforeCompleting()
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            using var client = new BatchDeleteClient
+            {
+                OnDeleteRequest = count =>
+                {
+                    if (count == 25)
+                    {
+                        cancellation.Cancel();
+                    }
+                }
+            };
+            var pending = DeleteEntries(CreateTable(client), cleanup: true, cancellation.Token);
+            try
+            {
+                Assert.Equal(25, client.Deletes.Count);
+                Assert.Equal(25, client.PendingDeletes);
+                Assert.False(pending.IsCompleted);
+            }
+            finally
+            {
+                client.CompleteAll();
+                var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+                Assert.Equal(cancellation.Token, exception.CancellationToken);
+            }
+
+            Assert.Equal(25, client.Deletes.Count);
+            Assert.Equal(26, client.Records.Count);
         }
 
         [Theory]
@@ -164,6 +248,7 @@ namespace AWSUtils.Tests.MembershipTests
             using var client = new BatchDeleteClient();
             if (existingVote)
             {
+                client.Records["silo-0"].SuspectingSilos = "127.0.0.1:11112@1";
                 client.Records["silo-0"].SuspectingTimes = "2026-01-01 00:00:00.000 GMT";
             }
 
@@ -175,7 +260,10 @@ namespace AWSUtils.Tests.MembershipTests
                 {
                     case nameof(SiloInstanceRecord.IAmAliveTime): row.IAmAliveTime = recent; break;
                     case nameof(SiloInstanceRecord.StartTime): row.StartTime = recent; break;
-                    case nameof(SiloInstanceRecord.SuspectingTimes): row.SuspectingTimes = recent; break;
+                    case nameof(SiloInstanceRecord.SuspectingTimes):
+                        row.SuspectingSilos = "127.0.0.1:11112@1";
+                        row.SuspectingTimes = recent;
+                        break;
                     case nameof(SiloInstanceRecord.ETag): row.ETag++; break;
                     case nameof(SiloInstanceRecord.Status): row.Status = (int)SiloStatus.Active; break;
                 }
@@ -207,7 +295,7 @@ namespace AWSUtils.Tests.MembershipTests
             try
             {
                 Assert.False(pending.IsCompleted);
-                Assert.Equal(51, client.Deletes.Count);
+                Assert.Equal(25, client.Deletes.Count);
             }
             finally
             {
@@ -218,7 +306,10 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Same(failure, exception);
             Assert.Empty(client.Requests);
             Assert.Equal(7, client.Version);
-            Assert.Equal("silo-0", Assert.Single(client.Records).Key);
+            Assert.Equal(
+                new[] { "silo-0" }.Concat(Enumerable.Range(25, 26).Select(i => $"silo-{i}")).Order(),
+                client.Records.Keys.Order());
+            Assert.Equal(25, client.Deletes.Count);
         }
 
         [Fact]
@@ -269,6 +360,7 @@ namespace AWSUtils.Tests.MembershipTests
                 case nameof(SiloInstanceRecord.StartTime): row.StartTime = timestamp; break;
                 case nameof(SiloInstanceRecord.IAmAliveTime): row.IAmAliveTime = timestamp; break;
                 case nameof(SiloInstanceRecord.SuspectingTimes):
+                    row.SuspectingSilos = "127.0.0.1:11112@1|127.0.0.1:11113@1";
                     row.SuspectingTimes = $"{timestamp}|2026-01-01 00:00:00.000 GMT";
                     break;
             }
@@ -285,6 +377,68 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Empty(client.Records);
             Assert.Equal(7, client.Version);
             Assert.Equal(7, client.VersionEtag);
+        }
+
+        [Theory]
+        [InlineData("127.0.0.1:11112@1", null)]
+        [InlineData(null, "2026-01-01 00:00:00.000 GMT")]
+        [InlineData("127.0.0.1:11112@1|127.0.0.1:11113@1", "2026-01-01 00:00:00.000 GMT")]
+        [InlineData("127.0.0.1:11112@1", "2026-01-01 00:00:00.000 GMT|2026-01-01 00:00:00.000 GMT")]
+        public async Task CleanupRejectsMismatchedSuspicionLists(string? silos, string? times)
+        {
+            using var client = new BatchDeleteClient { RowCount = 1 };
+            client.Records["silo-0"].SuspectingSilos = silos;
+            client.Records["silo-0"].SuspectingTimes = times;
+
+            var exception = await Assert.ThrowsAsync<OrleansException>(() =>
+                DeleteEntries(CreateTable(client), cleanup: true, TestContext.Current.CancellationToken));
+
+            Assert.Contains("SuspectingSilos.Length", exception.Message);
+            Assert.Contains("SuspectingTimes.Length", exception.Message);
+            Assert.Contains("silo-0", exception.Message);
+            Assert.Empty(client.Deletes);
+            Assert.Single(client.Records);
+        }
+
+        [Theory]
+        [InlineData("invalid-address", "2026-01-01 00:00:00.000 GMT")]
+        [InlineData("127.0.0.1:11112@1|", "2026-01-01 00:00:00.000 GMT|2026-01-01 00:00:00.000 GMT")]
+        [InlineData("127.0.0.1:11112@1", "invalid-time")]
+        [InlineData("127.0.0.1:11112@1|127.0.0.1:11113@1", "2026-01-01 00:00:00.000 GMT|")]
+        public async Task CleanupRejectsMalformedSuspicionValues(string silos, string times)
+        {
+            using var client = new BatchDeleteClient { RowCount = 1 };
+            client.Records["silo-0"].SuspectingSilos = silos;
+            client.Records["silo-0"].SuspectingTimes = times;
+
+            await Assert.ThrowsAsync<FormatException>(() =>
+                DeleteEntries(CreateTable(client), cleanup: true, TestContext.Current.CancellationToken));
+
+            Assert.Empty(client.Deletes);
+            Assert.Single(client.Records);
+        }
+
+        [Fact]
+        public async Task CleanupDrainsStartedBatchBeforeSurfacingMalformedLaterRow()
+        {
+            using var client = new BatchDeleteClient();
+            client.Records["silo-25"].SuspectingSilos = "127.0.0.1:11112@1";
+            var pending = DeleteEntries(CreateTable(client), cleanup: true, TestContext.Current.CancellationToken);
+            try
+            {
+                Assert.Equal(25, client.Deletes.Count);
+                Assert.Equal(25, client.PendingDeletes);
+                Assert.False(pending.IsCompleted);
+            }
+            finally
+            {
+                client.CompleteAll();
+                await Assert.ThrowsAsync<OrleansException>(() => pending);
+            }
+
+            Assert.Equal(25, client.Deletes.Count);
+            Assert.Equal(26, client.Records.Count);
+            Assert.Contains("silo-25", client.Records.Keys);
         }
 
         [Theory]
@@ -737,6 +891,114 @@ namespace AWSUtils.Tests.MembershipTests
             await Assert.ThrowsAsync<FormatException>(() => CreateTable(corrupt).ReadAllAsync(TestContext.Current.CancellationToken));
         }
 
+        public static IEnumerable<object[]> MalformedVersionRows()
+        {
+            foreach (var operation in new[] { "ReadRow", "ReadAllBefore", "ReadAllQuery", "ReadAllAfter", "HeartbeatHistory" })
+            {
+                foreach (var attribute in new[] { SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME, SiloInstanceRecord.ETAG_PROPERTY_NAME })
+                {
+                    foreach (var corruption in new[] { "missing", "string", "null", "fractional", "overflow" })
+                    {
+                        yield return [operation, attribute, corruption];
+                    }
+                }
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(MalformedVersionRows))]
+        public async Task MembershipReadsRejectMalformedVersionAttributes(string operation, string attribute, string corruption)
+        {
+            var fields = CreateVersion(7).GetFields(includeKeys: true);
+            if (corruption == "missing")
+            {
+                fields.Remove(attribute);
+            }
+            else
+            {
+                fields[attribute] = corruption switch
+                {
+                    "string" => new AttributeValue("not-a-number"),
+                    "null" => new AttributeValue { NULL = true },
+                    "fractional" => new AttributeValue { N = "1.5" },
+                    "overflow" => new AttributeValue { N = "2147483648" },
+                    _ => throw new ArgumentOutOfRangeException(nameof(corruption))
+                };
+            }
+
+            var reads = 0;
+            using var client = new RequestClient
+            {
+                Read = request =>
+                {
+                    if (request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S != SiloInstanceRecord.TABLE_VERSION_ROW)
+                    {
+                        return new GetItemResponse();
+                    }
+
+                    reads++;
+                    var malformed = operation is "ReadAllBefore" or "HeartbeatHistory"
+                        || (operation == "ReadAllAfter" && reads == 2);
+                    return new GetItemResponse { Item = malformed ? fields : CreateVersion(7).GetFields(true) };
+                },
+                Query = _ => new QueryResponse
+                {
+                    Items = [operation == "ReadAllQuery" ? fields : CreateVersion(7).GetFields(true)],
+                    LastEvaluatedKey = []
+                },
+                ReadTransaction = _ => new TransactGetItemsResponse
+                {
+                    Responses = [new ItemResponse(), new ItemResponse { Item = fields }]
+                },
+                Update = _ => throw new ConditionalCheckFailedException("Silo row absent.")
+            };
+            var table = CreateTable(client);
+            var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+
+            var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
+            {
+                "ReadRow" => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
+                "HeartbeatHistory" => table.UpdateIAmAliveAsync(new MembershipEntry
+                {
+                    SiloAddress = address,
+                    IAmAliveTime = DateTime.UnixEpoch
+                }, TestContext.Current.CancellationToken),
+                _ => table.ReadAllAsync(TestContext.Current.CancellationToken)
+            });
+
+            Assert.Contains("Membership table version row", exception.Message);
+            Assert.Contains(attribute, exception.Message);
+            Assert.Equal(0, client.WriteCount);
+        }
+
+        [Theory]
+        [InlineData(false, 0)]
+        [InlineData(true, 0)]
+        [InlineData(false, int.MaxValue)]
+        [InlineData(true, int.MaxValue)]
+        public async Task MembershipReadsAcceptValidVersionAttributes(bool readAll, int version)
+        {
+            var fields = CreateVersion(version).GetFields(includeKeys: true);
+            using var client = new RequestClient
+            {
+                Read = _ => new GetItemResponse { Item = fields },
+                Query = _ => new QueryResponse { Items = [fields], LastEvaluatedKey = [] },
+                ReadTransaction = _ => new TransactGetItemsResponse
+                {
+                    Responses = [new ItemResponse(), new ItemResponse { Item = fields }]
+                }
+            };
+            var table = CreateTable(client);
+
+            var result = readAll
+                ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
+                : await table.ReadRowAsync(SiloAddress.New(IPAddress.Loopback, 11111, 1), TestContext.Current.CancellationToken);
+
+            Assert.Equal(version, result.Version.Version);
+            Assert.Equal(version.ToString(CultureInfo.InvariantCulture), result.Version.VersionEtag);
+            Assert.Empty(result.Members);
+        }
+
         private static SiloInstanceRecord CreateRecord() => new()
         {
             DeploymentId = "cluster",
@@ -851,6 +1113,7 @@ namespace AWSUtils.Tests.MembershipTests
             public Func<QueryRequest, QueryResponse> Query { get; init; } = _ => throw new InvalidOperationException("Unexpected query.");
             public Func<TransactWriteItemsRequest, TransactWriteItemsResponse> Write { get; init; } = _ => throw new InvalidOperationException("Unexpected write.");
             public Func<TransactGetItemsRequest, TransactGetItemsResponse> ReadTransaction { get; init; } = _ => throw new InvalidOperationException("Unexpected transactional read.");
+            public Func<UpdateItemRequest, UpdateItemResponse> Update { get; init; } = _ => throw new InvalidOperationException("Unexpected update.");
             public int ReadCount { get; private set; }
             public int WriteCount { get; private set; }
 
@@ -879,6 +1142,12 @@ namespace AWSUtils.Tests.MembershipTests
                 Assert.Equal(Token, cancellationToken);
                 return Task.FromResult(ReadTransaction(request));
             }
+
+            public override Task<UpdateItemResponse> UpdateItemAsync(UpdateItemRequest request, CancellationToken cancellationToken = default)
+            {
+                Assert.Equal(Token, cancellationToken);
+                return Task.FromResult(Update(request));
+            }
         }
 
         private sealed class BatchDeleteClient() : AmazonDynamoDBClient(
@@ -890,6 +1159,7 @@ namespace AWSUtils.Tests.MembershipTests
             private bool _released;
 
             public Action? OnFirstDeleteRequest { get; set; }
+            public Action<int>? OnDeleteRequest { get; init; }
             public Exception? DeleteFailure { get; set; }
             public int RowCount { get; init; } = 51;
             public int Version { get; } = 7;
@@ -906,6 +1176,8 @@ namespace AWSUtils.Tests.MembershipTests
             public List<BatchWriteItemRequest> Requests { get; } = [];
             public List<DeleteItemRequest> Deletes { get; } = [];
             public List<CancellationToken> Tokens { get; } = [];
+            public int PendingDeletes => _deleteCompletions.Count;
+            public int PeakPendingDeletes { get; private set; }
 
             public override Task<QueryResponse> QueryAsync(QueryRequest request, CancellationToken cancellationToken = default)
             {
@@ -972,8 +1244,10 @@ namespace AWSUtils.Tests.MembershipTests
                 else
                 {
                     _deleteCompletions.Add((request, completion));
+                    PeakPendingDeletes = Math.Max(PeakPendingDeletes, _deleteCompletions.Count);
                 }
 
+                OnDeleteRequest?.Invoke(Deletes.Count);
                 return completion.Task;
             }
 
@@ -989,11 +1263,17 @@ namespace AWSUtils.Tests.MembershipTests
                     completion.TrySetResult(new BatchWriteItemResponse { UnprocessedItems = [] });
                 }
 
-                foreach (var (request, completion) in _deleteCompletions.ToArray())
+                CompletePendingDeletes();
+            }
+
+            public void CompletePendingDeletes()
+            {
+                var pending = _deleteCompletions.ToArray();
+                _deleteCompletions.Clear();
+                foreach (var (request, completion) in pending)
                 {
                     CompleteDelete(request, completion);
                 }
-                _deleteCompletions.Clear();
             }
 
             private void CompleteDelete(DeleteItemRequest request, TaskCompletionSource<DeleteItemResponse> completion)
