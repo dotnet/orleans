@@ -16,6 +16,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly ILogger logger;
         private IBatchContainer? current; // this is a pointer to the current element in the cache. It is what will be returned by GetCurrent().
         private DeliveryBatch? deliveryBatch;
+        private bool trackDeliveryProgress;
         private StreamSequenceToken? safeSequenceToken;
         private StreamSequenceToken? pendingSequenceToken;
         private StreamSequenceToken? deliveredThroughToken;
@@ -117,7 +118,7 @@ namespace Orleans.Providers.Streams.Common
                             {
                                 if (exclusiveFilter.FilterAfter(deliveredThrough) is not { } filtered)
                                 {
-                                    RecordScanned(token);
+                                    if (trackDeliveryProgress) RecordScanned(token);
                                     cache.TryGetNextMessage(this, out _);
                                     continue;
                                 }
@@ -126,7 +127,7 @@ namespace Orleans.Providers.Streams.Common
                             }
                             else if (comparison <= 0)
                             {
-                                RecordScanned(token);
+                                if (trackDeliveryProgress) RecordScanned(token);
                                 cache.TryGetNextMessage(this, out _);
                                 continue;
                             }
@@ -137,14 +138,14 @@ namespace Orleans.Providers.Streams.Common
                         {
                             if (filter.FilterFrom(inclusiveStartToken) is not { } filtered)
                             {
-                                RecordScanned(token);
+                                if (trackDeliveryProgress) RecordScanned(token);
                                 cache.TryGetNextMessage(this, out _);
                                 continue;
                             }
                             batch = filtered;
                         }
 
-                        RecordPending(item, batch.SequenceToken);
+                        if (trackDeliveryProgress) RecordPending(item, batch.SequenceToken);
                         deliveryBatch?.Track(item, batch);
                         current = batch;
                         return true;
@@ -153,12 +154,12 @@ namespace Orleans.Providers.Streams.Common
                     {
                         // Filtering can throw before GetCurrent. Retain the original receipt
                         // and position so the same selection can be attempted again.
-                        RecordPending(item, token);
+                        if (trackDeliveryProgress) RecordPending(item, token);
                         throw;
                     }
                 }
 
-                RecordScanned(token);
+                if (trackDeliveryProgress) RecordScanned(token);
                 cache.TryGetNextMessage(this, out _);
             }
 
@@ -218,6 +219,12 @@ namespace Orleans.Providers.Streams.Common
                 throw observedMiss.ToException();
             }
 
+            if (!trackDeliveryProgress)
+            {
+                if (Element is { } item && current is not null) item.Value.DeliveryFailure = true;
+                return;
+            }
+
             for (var item = firstPendingElement; item is not null; item = item.Previous)
             {
                 if (IsInStream(item.Value.Batch))
@@ -252,6 +259,8 @@ namespace Orleans.Providers.Streams.Common
             deliveryBatch.RecordDeliveryFailure(batch);
             ClearPendingDelivery();
         }
+
+        void IQueueCacheCursorProgress.EnableDeliveryProgress() => trackDeliveryProgress = true;
 
         StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken => safeSequenceToken;
 
@@ -366,7 +375,9 @@ namespace Orleans.Providers.Streams.Common
         {
             private readonly SimpleQueueCacheCursor owner;
             private CacheBucket? pinnedBucket;
-            private readonly List<(LinkedListNode<SimpleQueueCacheItem> Item, IBatchContainer Batch)> batches = [];
+            private LinkedListNode<SimpleQueueCacheItem>? firstElement;
+            private LinkedListNode<SimpleQueueCacheItem>? lastElement;
+            private List<(LinkedListNode<SimpleQueueCacheItem> Item, IBatchContainer Batch)>? filteredBatches;
             private bool disposed;
 
             public DeliveryBatch(SimpleQueueCacheCursor owner)
@@ -385,7 +396,12 @@ namespace Orleans.Providers.Streams.Common
                     pinnedBucket.UpdateNumCursors(1);
                 }
 
-                batches.Add((item, batch));
+                firstElement ??= item;
+                lastElement = item;
+                if (!ReferenceEquals(item.Value.Batch, batch))
+                {
+                    (filteredBatches ??= []).Add((item, batch));
+                }
             }
 
             public void RecordDeliveryFailure(IBatchContainer batch)
@@ -401,13 +417,26 @@ namespace Orleans.Providers.Streams.Common
                 }
                 else
                 {
-                    foreach (var (item, selectedBatch) in batches)
+                    if (filteredBatches is { } filtered)
                     {
-                        if (ReferenceEquals(selectedBatch, batch) || ReferenceEquals(item.Value.Batch, batch))
+                        foreach (var (item, selectedBatch) in filtered)
+                        {
+                            if (ReferenceEquals(selectedBatch, batch))
+                            {
+                                item.Value.DeliveryFailure = true;
+                                return;
+                            }
+                        }
+                    }
+
+                    for (var item = firstElement; item is not null; item = item.Previous)
+                    {
+                        if (ReferenceEquals(item.Value.Batch, batch) && owner.IsInStream(batch))
                         {
                             item.Value.DeliveryFailure = true;
                             return;
                         }
+                        if (ReferenceEquals(item, lastElement)) break;
                     }
 
                     throw new InvalidOperationException("The failed delivery was not read by this cursor.");
@@ -424,6 +453,9 @@ namespace Orleans.Providers.Streams.Common
                 disposed = true;
                 owner.deliveryBatch = null;
                 pinnedBucket?.UpdateNumCursors(-1);
+                pinnedBucket = null;
+                firstElement = lastElement = null;
+                filteredBatches = null;
             }
         }
 

@@ -60,6 +60,7 @@ public class PooledQueueCacheAdmissionTests
         var acquisition = cache.TryGetCursor(Stream, new EventSequenceTokenV2(existingCount + 1));
         Assert.Equal(QueueCacheCursorResultKind.Success, acquisition.Kind);
         var cursor = acquisition.Cursor!;
+        ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
         foreach (var expected in incoming)
         {
             Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);

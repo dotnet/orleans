@@ -446,6 +446,7 @@ public class EventHubCheckpointRecoveryTests
 
         cache.SignalPurge();
         var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var first).Kind);
         Assert.Equal(1, Assert.Single(first!.GetEvents<int>()).Item1);
         ((IQueueCacheCursorProgress)cursor).RecordDeliveryCompletion();
@@ -475,6 +476,7 @@ public class EventHubCheckpointRecoveryTests
 
         cache.SignalPurge();
         var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
         Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);
         Assert.Equal(1, Assert.Single(batch!.GetEvents<int>()).Item1);
     }
@@ -509,6 +511,7 @@ public class EventHubCheckpointRecoveryTests
         Assert.Equal(2, cache.Add(messages, Now.UtcDateTime).Count);
         Assert.Equal(1, notificationCount);
         var cursor = cache.TryGetCursor(streamId, Token(1)).Cursor!;
+        ((IQueueCacheCursorProgress)cursor).EnableDeliveryProgress();
         foreach (var expected in new[] { 1, 2 })
         {
             Assert.Equal(QueueCacheCursorMoveResultKind.Success, cache.TryGetNextMessageWithResult(cursor, out var batch).Kind);
@@ -590,6 +593,7 @@ public class EventHubCheckpointRecoveryTests
         public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
         void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
         public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+        public void EnableDeliveryProgress() => ((IQueueCacheCursorProgress)inner).EnableDeliveryProgress();
         public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
         public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
     }

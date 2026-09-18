@@ -18,6 +18,12 @@ namespace Orleans.Streams;
 internal interface IQueueCacheCursorProgress
 {
     /// <summary>
+    /// Enables certified prefix and pending-delivery tracking before this cursor is first advanced.
+    /// </summary>
+    /// <remarks>The owner selects this once for a checkpointing provider. Repeated calls are idempotent.</remarks>
+    void EnableDeliveryProgress();
+
+    /// <summary>
     /// Gets the last fully accounted provider record, or <see langword="null"/> while the prefix is unknown.
     /// </summary>
     /// <remarks>

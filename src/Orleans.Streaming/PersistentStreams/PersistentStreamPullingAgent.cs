@@ -564,7 +564,7 @@ namespace Orleans.Streams
             {
                 consumerData.LastSafePartitionToken = null;
             }
-            UpdateCursorProgress(consumerData, consumerData.Cursor as IQueueCacheCursorProgress);
+            if (CheckpointingCache is not null) UpdateCursorProgress(consumerData, consumerData.Cursor as IQueueCacheCursorProgress);
             consumerData.HandshakeGeneration++;
             return true;
         }
@@ -709,19 +709,26 @@ namespace Orleans.Streams
 
         private IQueueCacheCursor ValidateCheckpointCursor(IQueueCacheCursor cursor)
         {
-            if (CheckpointingCache is not null && cursor is not IQueueCacheCursorProgress)
+            if (CheckpointingCache is not null)
             {
-                try
+                if (cursor is IQueueCacheCursorProgress progress)
                 {
-                    cursor.Dispose();
+                    progress.EnableDeliveryProgress();
                 }
-                catch (Exception exception)
+                else
                 {
-                    LogErrorRunConsumerCursor(exception);
-                }
+                    try
+                    {
+                        cursor.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorRunConsumerCursor(exception);
+                    }
 
-                throw new OrleansConfigurationException(
-                    $"Checkpointing cursor {cursor.GetType().FullName} must implement {nameof(IQueueCacheCursorProgress)}.");
+                    throw new OrleansConfigurationException(
+                        $"Checkpointing cursor {cursor.GetType().FullName} must implement {nameof(IQueueCacheCursorProgress)}.");
+                }
             }
 
             return cursor;
@@ -1325,6 +1332,7 @@ namespace Orleans.Streams
         private static void UpdateCursorProgress(StreamConsumerData consumer, IQueueCacheCursorProgress? cursor)
         {
             if (cursor?.SafeSequenceToken is { } safeToken
+                && !ReferenceEquals(consumer.LastSafePartitionToken, safeToken)
                 && (consumer.LastSafePartitionToken is null || IsBefore(consumer.LastSafePartitionToken, safeToken)))
             {
                 consumer.LastSafePartitionToken = safeToken;
@@ -1540,6 +1548,7 @@ namespace Orleans.Streams
             using var admission = _workAdmission.TryEnter();
             if (!admission.Entered || IsShutdown) return;
 
+            var checkpointing = CheckpointingCache is not null;
             TagList? tags = null;
             try
             {
@@ -1547,13 +1556,18 @@ namespace Orleans.Streams
                 if (consumerData.State == StreamConsumerDataState.Active ||
                     consumerData.Cursor is null) return;
 
+                if (checkpointing && consumerData.Cursor is IQueueCacheCursorProgress initialProgress)
+                {
+                    initialProgress.EnableDeliveryProgress();
+                }
+
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested && consumerData.Cursor is not null)
                 {
                     var handshakeGeneration = consumerData.HandshakeGeneration;
                     var deliveryCursor = consumerData.Cursor;
-                    var progressCursor = deliveryCursor as IQueueCacheCursorProgress;
+                    var progressCursor = checkpointing ? deliveryCursor as IQueueCacheCursorProgress : null;
                     var batchCursor = options.BatchContainerBatchSize > 1
                         ? consumerData.Cursor as IQueueCacheCursorBatchDelivery
                         : null;
@@ -1741,7 +1755,7 @@ namespace Orleans.Streams
                                 consumerData.SafeDisposeCursor(logger);
                                 consumerData.Cursor = newCursor;
                                 consumerData.PendingBatch = pendingBatch;
-                                UpdateCursorProgress(consumerData, newCursor as IQueueCacheCursorProgress);
+                                if (checkpointing) UpdateCursorProgress(consumerData, newCursor as IQueueCacheCursorProgress);
                             }
                             else
                             {

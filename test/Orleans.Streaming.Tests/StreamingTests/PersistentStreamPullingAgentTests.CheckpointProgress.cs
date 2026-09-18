@@ -21,6 +21,28 @@ public partial class PersistentStreamPullingAgentTests
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task ReceiptProvider_SkipsCertifiedCursorBookkeeping(bool pooled)
+    {
+        await using var scenario = await CreateCheckpointScenario(pooled, checkpointing: false);
+        var cursor = new ObservedQueueCursor(scenario.Idle.Cursor!);
+        scenario.Idle.Cursor = cursor;
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+
+        Assert.Equal(0, cursor.ProgressEnables);
+        Assert.Equal(0, cursor.ProgressReads);
+        Assert.Equal(0, cursor.ProgressCompletions);
+        Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
+        Assert.Null(scenario.Idle.LastSafePartitionToken);
+        if (!pooled)
+        {
+            Assert.True(scenario.Cache.TryPurgeFromCache(out var purged));
+            Assert.Equal(new long[] { 1, 2 }, purged.Select(batch => batch.SequenceToken.SequenceNumber));
+        }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task CheckpointProgress_IdlePumpLeavesAccountedCursorsIdle(bool pooled)
     {
         await using var scenario = await CreateCheckpointScenario(pooled);
@@ -106,6 +128,9 @@ public partial class PersistentStreamPullingAgentTests
     private sealed class ObservedQueueCursor(IQueueCacheCursor inner) : IQueueCacheCursor, IQueueCacheCursorProgress
     {
         public int Moves { get; private set; }
+        public int ProgressEnables { get; private set; }
+        public int ProgressReads { get; private set; }
+        public int ProgressCompletions { get; private set; }
         public Action? OnMove { get; init; }
         public void Dispose() => inner.Dispose();
         public IBatchContainer? GetCurrent(out Exception? exception) => inner.GetCurrent(out exception);
@@ -119,9 +144,25 @@ public partial class PersistentStreamPullingAgentTests
         public void Refresh(StreamSequenceToken token) => inner.Refresh(token);
         public void RecordDeliveryFailure() => inner.RecordDeliveryFailure();
         void IQueueCacheCursorProgress.RecordDeliveryFailure() => ((IQueueCacheCursorProgress)inner).RecordDeliveryFailure();
-        public StreamSequenceToken? SafeSequenceToken => ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+        public StreamSequenceToken? SafeSequenceToken
+        {
+            get
+            {
+                ProgressReads++;
+                return ((IQueueCacheCursorProgress)inner).SafeSequenceToken;
+            }
+        }
+        public void EnableDeliveryProgress()
+        {
+            ProgressEnables++;
+            ((IQueueCacheCursorProgress)inner).EnableDeliveryProgress();
+        }
         public void SetDeliveredThrough(StreamSequenceToken token) => ((IQueueCacheCursorProgress)inner).SetDeliveredThrough(token);
-        public void RecordDeliveryCompletion() => ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
+        public void RecordDeliveryCompletion()
+        {
+            ProgressCompletions++;
+            ((IQueueCacheCursorProgress)inner).RecordDeliveryCompletion();
+        }
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
