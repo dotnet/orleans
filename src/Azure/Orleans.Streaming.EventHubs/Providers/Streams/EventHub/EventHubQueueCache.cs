@@ -47,7 +47,9 @@ namespace Orleans.Streaming.EventHubs
         /// EventHub queue cache.
         /// </summary>
         /// <param name="partition">Partition this instance is caching.</param>
-        /// <param name="defaultMaxAddCount">Default max number of items that can be added to the cache between purge calls.</param>
+        /// <param name="defaultMaxAddCount">
+        /// Maximum read size. Certified processing also uses this value as the maximum number of owned raw-data pool buffers.
+        /// </param>
         /// <param name="bufferPool">The raw data block pool.</param>
         /// <param name="dataAdapter">The adapter used to convert Event Hubs data into cached messages.</param>
         /// <param name="evictionStrategy">The strategy used to evict cached messages.</param>
@@ -85,10 +87,13 @@ namespace Orleans.Streaming.EventHubs
         /// <inheritdoc />
         public void SignalPurge()
         {
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
-            if (this.cache.IsEmpty)
+            try
             {
-                this.currentBuffer = null;
+                this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+            }
+            finally
+            {
+                if (this.cache.IsEmpty) this.currentBuffer = null;
             }
         }
 
@@ -99,10 +104,10 @@ namespace Orleans.Streaming.EventHubs
             try
             {
                 evictionStrategy.PerformPurge(utcNow);
-                if (cache.IsEmpty) currentBuffer = null;
             }
             finally
             {
+                if (cache.IsEmpty) currentBuffer = null;
                 deliveryBoundary = null;
             }
         }
@@ -174,9 +179,23 @@ namespace Orleans.Streaming.EventHubs
         /// The limit of the maximum number of items that can be added
         /// </summary>
         /// <returns>The maximum number of items which can currently be added.</returns>
+        /// <remarks>
+        /// Certified processing reserves one possible new pool buffer per record and resumes admission as completed buffers are reclaimed.
+        /// </remarks>
         public int GetMaxAddCount()
         {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
+            if (cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
+            {
+                return 0;
+            }
+
+            // A native record uses at most one new pool buffer. Reserve that worst case for
+            // each read, bounding certified retention by the buffers one full read can allocate.
+            // Unlike averaged pressure, this limit cannot be diluted by healthy consumers.
+            return certifiedDeliveryProgress
+                ? Math.Max(0, defaultMaxAddCount - ((ChronologicalEvictionStrategy)evictionStrategy).BufferCount
+                    - (pendingBuffers.Count - pendingBufferNotification))
+                : defaultMaxAddCount;
         }
 
         /// <summary>

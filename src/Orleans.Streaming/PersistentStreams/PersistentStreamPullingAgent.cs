@@ -861,6 +861,7 @@ namespace Orleans.Streams
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
             {
+                streamData.ReleaseRegistrationCursorIfSettled();
                 StreamingEvents.EmitSubscriptionDetached(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 StreamingEvents.EmitSubscriptionRemoved(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 LogDebugRemovedConsumer(subscriptionId, streamId);
@@ -900,11 +901,11 @@ namespace Orleans.Streams
                 if (IsShutdown || cancellationToken.IsCancellationRequested) return; // timer was already removed, last tick
 
                 RetryPendingConsumers(cancellationToken);
-                if (CheckpointingCache is not null) NotifyDeliveryProgress();
 
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
+                    if (CheckpointingCache is not null) NotifyDeliveryProgress();
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
@@ -1621,7 +1622,7 @@ namespace Orleans.Streams
                         exceptionOccured = exc;
                         if (CheckpointingCache is not null && progressCursor is not null)
                         {
-                            progressCursor.RecordDeliveryFailure();
+                            RewindDeliveryCursor(progressCursor);
                         }
                         else
                         {
@@ -1685,6 +1686,11 @@ namespace Orleans.Streams
                             // A completed handshake owns its replacement position, including pending replay.
                             if (handshakeGeneration != consumerData.HandshakeGeneration)
                             {
+                                if (progressCursor is not null && ReferenceEquals(deliveryCursor, consumerData.Cursor))
+                                {
+                                    RewindDeliveryCursor(progressCursor);
+                                    break;
+                                }
                                 continue;
                             }
 
@@ -1770,12 +1776,17 @@ namespace Orleans.Streams
                         LogErrorDeliveringMessages(consumerData.StreamId, exc);
                         if (handshakeGeneration != consumerData.HandshakeGeneration)
                         {
+                            if (progressCursor is not null && ReferenceEquals(deliveryCursor, consumerData.Cursor))
+                            {
+                                RewindDeliveryCursor(progressCursor);
+                                break;
+                            }
                             continue;
                         }
 
                         if (CheckpointingCache is not null && progressCursor is not null)
                         {
-                            if (!skipFailedDelivery) progressCursor.RecordDeliveryFailure();
+                            if (!skipFailedDelivery) RewindDeliveryCursor(progressCursor);
                         }
                         else if (batchCursor is not null && nextBatch.Batch is not null)
                         {
@@ -1822,10 +1833,9 @@ namespace Orleans.Streams
                         finally
                         {
                             // Keep the selected batch replayable if error handling fails or a pending handshake defers the policy decision.
-                            if (skipFailedDelivery && handshakeGeneration == consumerData.HandshakeGeneration
-                                && ReferenceEquals(deliveryCursor, consumerData.Cursor))
+                            if (skipFailedDelivery && ReferenceEquals(deliveryCursor, consumerData.Cursor))
                             {
-                                progressCursor!.RecordDeliveryFailure();
+                                RewindDeliveryCursor(progressCursor!);
                             }
                         }
                         if (CheckpointingCache is not null || nextBatch.Batch is null)
@@ -1847,6 +1857,19 @@ namespace Orleans.Streams
                 LogErrorRunConsumerCursor(exc);
                 consumerData.State = StreamConsumerDataState.Inactive;
                 throw;
+            }
+        }
+
+        private void RewindDeliveryCursor(IQueueCacheCursorProgress cursor)
+        {
+            try
+            {
+                cursor.RecordDeliveryFailure();
+            }
+            catch (QueueCacheMissException exception)
+            {
+                // The cursor retains the loss. Reporting the delivery failure still follows the error protocol.
+                LogErrorRunConsumerCursor(exception);
             }
         }
 

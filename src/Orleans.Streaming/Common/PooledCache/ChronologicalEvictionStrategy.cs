@@ -17,6 +17,7 @@ namespace Orleans.Providers.Streams.Common
         /// Protected for test purposes
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
+        internal int BufferCount => inUseBuffers.Count;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly PeriodicAction? periodicMonitoring;
         private long cacheSizeInByte;
@@ -117,9 +118,15 @@ namespace Orleans.Providers.Streams.Common
                 return;
 
             //items got purged, time to conduct follow up actions
-            this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
-            OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
-            FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
+            try
+            {
+                this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
+                OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
+            }
+            finally
+            {
+                FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
+            }
             ReportPurge(this.logger, this.PurgeObservable, itemsPurged);
         }
 

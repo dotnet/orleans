@@ -4160,7 +4160,7 @@ namespace UnitTests.StreamingTests
             bool pooled = false, int batchSize = 1, bool filtered = false, RecordingQueueCache? emptyCache = null,
             TimeProvider? timeProvider = null, ILoggerFactory? loggerFactory = null, bool retainPurgeMetadata = false,
             IBackoffProvider? deliveryBackoff = null, bool checkpointing = true, bool retryFailedDeliveries = false,
-            IStreamFailureHandler? failureHandler = null)
+            IStreamFailureHandler? failureHandler = null, IQueueAdapterReceiver? receiver = null)
         {
             IQueueCache cache;
             List<StreamSequenceToken?> checkpoints;
@@ -4188,7 +4188,7 @@ namespace UnitTests.StreamingTests
                 idleId, new EventSequenceTokenV2(1), checkpointing ? cache : new ReceiptQueueCache(cache),
                 new StreamPullingAgentOptions { BatchContainerBatchSize = batchSize, RetryFailedDeliveries = retryFailedDeliveries },
                 filtered ? Substitute.For<IStreamFilter>() : null, timeProvider, loggerFactory: loggerFactory,
-                deliveryBackoff: deliveryBackoff, failureHandler: failureHandler);
+                deliveryBackoff: deliveryBackoff, failureHandler: failureHandler, receiver: receiver);
             await accessor.RegisterStream(busyId, new EventSequenceTokenV2(2), DateTime.UtcNow);
             var busyStream = (await accessor.GetPubSubCache())[busyId];
 
@@ -4200,7 +4200,8 @@ namespace UnitTests.StreamingTests
             StreamConsumerCollection stream, QualifiedStreamId id, IQueueCache cache)
         {
             var consumer = stream.AddConsumer(
-                GuidId.GetGuidId(Guid.NewGuid()), id, new ImmediateRecordingConsumer(), null, DateTime.UtcNow);
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
+                id, new ImmediateRecordingConsumer(), null, DateTime.UtcNow);
             consumer.IsRegistered = true;
             consumer.Cursor = cache.GetCacheCursor(id, null);
             return consumer;
