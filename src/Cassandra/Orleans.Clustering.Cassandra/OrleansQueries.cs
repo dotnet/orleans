@@ -336,7 +336,10 @@ internal sealed class OrleansQueries
             IF status = :status
                 AND i_am_alive_time = :i_am_alive_time
                 AND start_time = :start_time
-                AND suspect_times = :suspect_times;
+                AND suspect_times = :suspect_times
+                AND silo_name = :silo_name
+                AND host_name = :host_name
+                AND proxy_port = :proxy_port;
             """, MembershipWriteConsistencyLevel, cancellationToken);
         return _deleteMembershipEntryPreparedStatement.Bind(new
         {
@@ -347,7 +350,10 @@ internal sealed class OrleansQueries
             status = (int)SiloStatus.Dead,
             i_am_alive_time = membershipEntry.IAmAliveTime,
             start_time = membershipEntry.StartTime,
-            suspect_times = GetSuspectTimesString(membershipEntry)
+            suspect_times = GetSuspectTimesString(membershipEntry),
+            silo_name = membershipEntry.SiloName,
+            host_name = membershipEntry.HostName,
+            proxy_port = membershipEntry.ProxyPort
         }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 

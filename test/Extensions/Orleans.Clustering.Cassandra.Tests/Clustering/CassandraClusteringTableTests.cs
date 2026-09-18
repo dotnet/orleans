@@ -557,6 +557,9 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [InlineData("start")]
     [InlineData("heartbeat")]
     [InlineData("vote")]
+    [InlineData("silo_name")]
+    [InlineData("host_name")]
+    [InlineData("proxy_port")]
     public async Task MembershipTable_Cleanup_CapturedRowProtectsConcurrentUpdates(string field)
     {
         var token = TestContext.Current.CancellationToken;
@@ -585,6 +588,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             case "vote":
                 updated.Item1.SuspectTimes = [Tuple.Create(CreateSiloAddressForTest(), updated.Item1.IAmAliveTime.AddMinutes(1))];
                 break;
+            case "silo_name":
+                updated.Item1.SiloName += "-updated";
+                break;
+            case "host_name":
+                updated.Item1.HostName += "-updated";
+                break;
+            case "proxy_port":
+                updated.Item1.ProxyPort++;
+                break;
         }
 
         if (field == "heartbeat")
@@ -604,6 +616,19 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var afterCleanup = await table.ReadRowAsync(entry.SiloAddress, token);
         Assert.Equal(beforeCleanup.Version, afterCleanup.Version);
         Assert.Equal(updated.Item1.ToFullString(), Assert.Single(afterCleanup.Members).Item1.ToFullString());
+        Assert.Equal(updated.Item1.SiloName, afterCleanup.Members[0].Item1.SiloName);
+        Assert.Equal(updated.Item1.HostName, afterCleanup.Members[0].Item1.HostName);
+        Assert.Equal(updated.Item1.ProxyPort, afterCleanup.Members[0].Item1.ProxyPort);
+
+        if (updated.Item1.Status == SiloStatus.Dead)
+        {
+            result = await queries.ExecuteAsync(
+                await queries.DeleteMembershipEntry($"{serviceId}-{clusterId}", afterCleanup.Members[0].Item1, token), token);
+            Assert.True((bool)result.First()["[applied]"]);
+            var retired = await table.ReadRowAsync(entry.SiloAddress, token);
+            Assert.Empty(retired.Members);
+            Assert.Equal(afterCleanup.Version, retired.Version);
+        }
     }
 
     [Fact]

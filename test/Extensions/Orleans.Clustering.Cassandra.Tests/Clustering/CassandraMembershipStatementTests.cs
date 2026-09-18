@@ -82,7 +82,7 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Fact]
-    public async Task Cleanup_CapturesEveryRetentionField_WithoutWritingVersion()
+    public async Task Cleanup_CapturesEveryMutableField_WithoutWritingVersion()
     {
         var backend = new Backend();
         var queries = await OrleansQueries.CreateInstance(backend.Session);
@@ -90,10 +90,13 @@ public sealed class CassandraMembershipStatementTests
         var command = backend.Get(await queries.DeleteMembershipEntry("service-cluster", entry, TestContext.Current.CancellationToken));
 
         Assert.StartsWith("DELETE FROM membership WHERE partition_key", command.Cql);
-        Assert.EndsWith("IF status = :status AND i_am_alive_time = :i_am_alive_time AND start_time = :start_time AND suspect_times = :suspect_times;", command.Cql);
+        Assert.EndsWith("IF status = :status AND i_am_alive_time = :i_am_alive_time AND start_time = :start_time AND suspect_times = :suspect_times AND silo_name = :silo_name AND host_name = :host_name AND proxy_port = :proxy_port;", command.Cql);
         Assert.Equal((int)SiloStatus.Dead, command.Values["status"]);
         Assert.Equal(entry.StartTime, command.Values["start_time"]);
         Assert.Equal(entry.IAmAliveTime, command.Values["i_am_alive_time"]);
+        Assert.Equal(entry.SiloName, command.Values["silo_name"]);
+        Assert.Equal(entry.HostName, command.Values["host_name"]);
+        Assert.Equal(entry.ProxyPort, command.Values["proxy_port"]);
         var vote = Assert.Single(entry.SuspectTimes!);
         Assert.Equal($"{vote.Item1.ToParsableString()},{LogFormatter.PrintDate(vote.Item2)}", command.Values["suspect_times"]);
         Assert.DoesNotContain("version", command.Cql);
