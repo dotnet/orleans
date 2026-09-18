@@ -466,10 +466,10 @@ namespace Orleans.AzureUtils
         }
 
         /// <summary>
-        /// Conditionally update the row for this entry, but only if the eTag matches with the current record in data store
+        /// Atomically replaces a membership row under the canonical table-version etag.
         /// </summary>
         /// <param name="siloEntry">Silo Entry to be written</param>
-        /// <param name="entryEtag">ETag value for the entry being updated</param>
+        /// <param name="entryEtag">The row's canonical membership token.</param>
         /// <param name="tableVersionEntry">Version row to update</param>
         /// <param name="versionEtag">ETag value for the version row</param>
         /// <param name="cancellationToken">The cancellation token.</param>
@@ -478,24 +478,14 @@ namespace Orleans.AzureUtils
         {
             try
             {
-                var current = await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
-                    siloEntry.PartitionKey, siloEntry.RowKey, cancellationToken: cancellationToken);
-                if (!string.Equals(current.Value.ETag.ToString(), entryEtag, StringComparison.Ordinal))
+                if (!string.Equals(entryEtag, versionEtag, StringComparison.Ordinal))
                 {
                     return false;
                 }
 
-                var currentEntry = current.Value;
-                if (!string.IsNullOrEmpty(currentEntry.IAmAliveTime)
-                    && (string.IsNullOrEmpty(siloEntry.IAmAliveTime)
-                        || LogFormatter.ParseDate(currentEntry.IAmAliveTime) > LogFormatter.ParseDate(siloEntry.IAmAliveTime)))
-                {
-                    siloEntry.IAmAliveTime = currentEntry.IAmAliveTime;
-                }
-
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
                 await storage.UpdateTableEntriesAsync(
-                    (siloEntry, entryEtag),
+                    (siloEntry, AzureTableUtils.ANY_ETAG),
                     (tableVersionEntry, versionEtag),
                     (boundaryEntries.Min, boundaryEntries.Max),
                     cancellationToken);

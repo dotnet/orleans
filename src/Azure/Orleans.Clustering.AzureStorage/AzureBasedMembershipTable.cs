@@ -201,6 +201,8 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var memEntries = new List<Tuple<MembershipEntry, string>>(Math.Max(0, entries.Count - 1));
+                // Row tokens track canonical membership changes independently of heartbeat etags.
+                var versionEtag = entries.Find(static entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).ETag;
                 TableVersion? tableVersion = null;
                 foreach (var tuple in entries)
                 {
@@ -223,7 +225,7 @@ namespace Orleans.Runtime.MembershipService
                         {
 
                             MembershipEntry membershipEntry = Parse(tableEntry);
-                            memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
+                            memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, versionEtag));
                         }
                         catch (Exception exc)
                         {
