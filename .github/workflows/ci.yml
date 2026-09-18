@@ -475,7 +475,10 @@ jobs:
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     - name: Clean up Azure Cosmos DB emulator
       if: always()
-      run: docker rm -f cosmosdb-emulator || true
+      run: |
+        docker inspect --format '{{json .State}}' cosmosdb-emulator
+        docker logs --tail 200 cosmosdb-emulator
+        docker rm -f cosmosdb-emulator
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
