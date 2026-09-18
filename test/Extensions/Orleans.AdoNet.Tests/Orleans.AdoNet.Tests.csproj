@@ -43,6 +43,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="StorageTests\Relational\MembershipUpgradeFixtures\*.sql"
+          TargetPath="MembershipUpgradeFixtures\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SourceRoot)src\AdoNet\**\*.sql" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

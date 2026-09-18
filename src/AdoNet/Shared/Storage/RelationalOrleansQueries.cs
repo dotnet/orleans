@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -294,17 +295,48 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// deletes all membership entries for inactive silos where the IAmAliveTime is before the beforeDate parameter
-        /// and the silo status is <seealso cref="SiloStatus.Dead"/>.
+        /// Runs the installed cleanup query, using captured-row eligibility when the optional query is available.
         /// </summary>
         /// <param name="beforeDate"></param>
         /// <param name="deploymentId"></param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
+        internal async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
         {
-            return ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
-                new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime }, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (dbStoredQueries.GetCleanupDefunctSiloEntryQuery() is not { } cleanupQuery)
+            {
+                await ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
+                    new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime }, cancellationToken);
+                return;
+            }
+
+            var table = await MembershipReadAllAsync(deploymentId, cancellationToken);
+            var cutoff = beforeDate.UtcDateTime;
+            foreach (var (entry, _) in table.Members)
+            {
+                if (entry.Status == SiloStatus.Dead
+                    && entry.StartTime < cutoff
+                    && entry.IAmAliveTime < cutoff
+                    && entry.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) != true)
+                {
+                    // Evaluate the cutoff in .NET and match the original storage values in SQL.
+                    await ExecuteAsync(cleanupQuery, command =>
+                    {
+                        var columns = new DbStoredQueries.Columns(command)
+                        {
+                            DeploymentId = deploymentId,
+                            SiloAddress = entry.SiloAddress,
+                            SuspectTimes = entry.SuspectTimes
+                        };
+                        // SQL Server's DateTime binding rounds values read from the DateTime2 columns.
+                        var timestampType = storage.InvariantName == AdoNetInvariants.InvariantNameSqlServer ? DbType.DateTime2 : DbType.DateTime;
+                        command.AddParameter(nameof(DbStoredQueries.Columns.StartTime), entry.StartTime, dbType: timestampType);
+                        command.AddParameter(nameof(DbStoredQueries.Columns.IAmAliveTime), entry.IAmAliveTime, dbType: timestampType);
+                        return columns;
+                    }, cancellationToken);
+                }
+            }
         }
 
         /// <summary>
@@ -349,6 +381,12 @@ namespace Orleans.Tests.SqlUtils
         internal Task<bool> InsertMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
             string etag, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsMembershipVersionEtag(etag))
+            {
+                return Task.FromResult(false);
+            }
+
             return ReadAsync(dbStoredQueries.InsertMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
                 {
@@ -375,6 +413,12 @@ namespace Orleans.Tests.SqlUtils
         internal Task<bool> UpdateMembershipRowAsync(string deploymentId, MembershipEntry membershipEntry,
             string etag, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsMembershipVersionEtag(etag))
+            {
+                return Task.FromResult(false);
+            }
+
             return ReadAsync(dbStoredQueries.UpdateMembershipKey, DbStoredQueries.Converters.GetSingleBooleanValue, command =>
                 new DbStoredQueries.Columns(command)
                 {
@@ -387,16 +431,21 @@ namespace Orleans.Tests.SqlUtils
                 }, ret => ret.First(), cancellationToken);
         }
 
+        private static bool IsMembershipVersionEtag(string etag) =>
+            int.TryParse(etag, NumberStyles.None, CultureInfo.InvariantCulture, out var version)
+            && string.Equals(etag, version.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+
         private static MembershipTableData ConvertToMembershipTableData(IEnumerable<Tuple<MembershipEntry?, int>> ret)
         {
             var retList = ret.ToList();
             var tableVersionEtag = retList[0].Item2;
+            var etag = tableVersionEtag.ToString(CultureInfo.InvariantCulture);
             var membershipEntries = new List<Tuple<MembershipEntry, string>>();
             if (retList[0].Item1 != null)
             {
-                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, string.Empty)));
+                membershipEntries.AddRange(retList.Select(i => new Tuple<MembershipEntry, string>(i.Item1!, etag)));
             }
-            return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, tableVersionEtag.ToString()));
+            return new MembershipTableData(membershipEntries, new TableVersion(tableVersionEtag, etag));
         }
 
 #endif

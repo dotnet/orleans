@@ -99,6 +99,11 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         internal string CleanupDefunctSiloEntriesKey => queries[nameof(CleanupDefunctSiloEntriesKey)];
 
+        /// <summary>
+        /// Gets the optional query for deleting a dead row whose captured activity values still match.
+        /// </summary>
+        internal string? GetCleanupDefunctSiloEntryQuery() => queries.GetValueOrDefault("CleanupDefunctSiloEntryKey");
+
 #endif
 
 #if REMINDERS_ADONET || TESTER_SQLUTILS || ORLEANS_REMINDERS_PROVIDER
