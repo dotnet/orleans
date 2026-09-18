@@ -111,8 +111,31 @@ public class FirestoreClusteringTests : IAsyncLifetime
 
         var after = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.Equal(expected.ToFullString(), Assert.Single(after.Members).Item1.ToFullString());
+        Assert.Equal(Assert.Single(before.Members).Item2, Assert.Single(after.Members).Item2);
         Assert.Equal(before.Version.Version, after.Version.Version);
         Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
+    }
+
+    [Fact]
+    public async Task UpdateRowUsesOriginalCanonicalTokensAfterHeartbeat()
+    {
+        await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken);
+        var before = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
+        var original = Assert.Single(before.Members);
+        var heartbeat = this._entity.ToMembershipEntry();
+        heartbeat.IAmAliveTime = TestStartTime.AddMinutes(1).UtcDateTime;
+        await this._membershipTable.UpdateIAmAliveAsync(heartbeat, TestContext.Current.CancellationToken);
+
+        original.Item1.Status = SiloStatus.ShuttingDown;
+        Assert.True(await this._membershipTable.UpdateRowAsync(
+            original.Item1, original.Item2, before.Version.Next(), TestContext.Current.CancellationToken));
+
+        var after = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
+        var updated = Assert.Single(after.Members);
+        Assert.Equal(original.Item1.ToFullString(), updated.Item1.ToFullString());
+        Assert.Equal(before.Version.Version + 1, after.Version.Version);
+        Assert.NotEqual(before.Version.VersionEtag, after.Version.VersionEtag);
+        Assert.Equal(after.Version.VersionEtag, updated.Item2);
     }
 
     [Fact]
