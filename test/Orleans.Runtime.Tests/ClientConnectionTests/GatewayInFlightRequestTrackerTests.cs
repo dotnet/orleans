@@ -203,6 +203,18 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void TokenizedResponseWithoutTrackedAttemptIsSuperseded()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        tracker.Clear();
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
+    }
+
+    [Fact]
     public void ForwardedResponseBeforeUpdateCompletesImmediately()
     {
         var tracker = CreateTracker();
@@ -403,7 +415,7 @@ public class GatewayInFlightRequestTrackerTests
         staleFirstHopResponse.ForwardCount = 0;
         staleFirstHopResponse.SendingSilo = Silo1;
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.Deferred,
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
             tracker.TryComplete(staleFirstHopResponse));
 
         Assert.Equal(
@@ -428,6 +440,42 @@ public class GatewayInFlightRequestTrackerTests
             GatewayInFlightRequestTracker.CompletionResult.Completed,
             tracker.TryComplete(currentResponse));
         Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void OldGenerationResponseIsSupersededAfterReturningToSameSilo()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                request.GatewayRequestAttempt,
+                out _,
+                out _));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo2,
+                Silo1,
+                forwardCount: 2,
+                request.GatewayRequestAttempt,
+                out _,
+                out _));
+        var oldResponse = CreateResponse(request, Message.ResponseTypes.Success);
+        oldResponse.SendingSilo = Silo1;
+        oldResponse.ForwardCount = 0;
+
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            tracker.TryComplete(oldResponse));
+        Assert.Equal(1, tracker.Count);
     }
 
     [Fact]
@@ -482,6 +530,7 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Null(completedResponse);
         var retryResponse = CreateResponse(retry, Message.ResponseTypes.Success);
         retryResponse.SendingSilo = Silo1;
+        retryResponse.ForwardCount = 1;
         Assert.Equal(
             GatewayInFlightRequestTracker.CompletionResult.Completed,
             tracker.TryComplete(retryResponse));
@@ -620,10 +669,10 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(0, tracker.Count);
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
             tracker.TryComplete(CreateResponse(request1, Message.ResponseTypes.Success)));
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
             tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
     }
 
@@ -754,7 +803,7 @@ public class GatewayInFlightRequestTrackerTests
         if (clearFirst)
         {
             tracker.Clear();
-            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
+            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
         }
         else
         {
