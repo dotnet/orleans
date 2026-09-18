@@ -1663,6 +1663,77 @@ public class EventHubCheckpointerTests
     }
 
     [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_ConcurrentWithShutdown_StartsAfterShutdownCompletes()
+    {
+        var firstCheckpointer = new BlockingFlushCheckpointer();
+        var secondCheckpointer = new TestCheckpointer();
+        var checkpointers = new Queue<IStreamQueueCheckpointer<string>>(
+            [firstCheckpointer, secondCheckpointer]);
+        var caches = new Queue<TestEventHubQueueCache>(
+            [new TestEventHubQueueCache(), new TestEventHubQueueCache()]);
+        var eventHubReceivers = new Queue<TestEventHubReceiver>(
+            [new TestEventHubReceiver(), new TestEventHubReceiver()]);
+        var receiver = await CreateReceiver(
+            firstCheckpointer,
+            cacheFactory: () => caches.Dequeue(),
+            receiverFactory: _ => eventHubReceivers.Dequeue(),
+            checkpointerFactory: _ => Task.FromResult(checkpointers.Dequeue()));
+
+        var shutdown = receiver.Shutdown(TimeSpan.FromSeconds(5));
+        await firstCheckpointer.FlushStarted.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
+        var initialization = receiver.Initialize(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(initialization.IsCompleted);
+        Assert.Single(checkpointers);
+        Assert.Single(caches);
+        Assert.Single(eventHubReceivers);
+
+        firstCheckpointer.ReleaseFlush.TrySetResult();
+        await shutdown;
+        await initialization;
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken));
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.Empty(checkpointers);
+        Assert.Empty(caches);
+        Assert.Empty(eventHubReceivers);
+        Assert.Equal(1, firstCheckpointer.FlushCount);
+        Assert.Equal(1, secondCheckpointer.FlushCount);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task Initialize_CanceledWhileWaitingForShutdown_PreservesCallerToken()
+    {
+        var checkpointer = new BlockingFlushCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
+        var shutdown = receiver.Shutdown(TimeSpan.FromSeconds(5));
+        await checkpointer.FlushStarted.Task.WaitAsync(
+            TestContext.Current.CancellationToken);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+
+        var initialization = receiver.Initialize(
+            TimeSpan.FromSeconds(30),
+            cancellation.Token);
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => initialization);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+
+        checkpointer.ReleaseFlush.TrySetResult();
+        await shutdown;
+    }
+
+    [TestSuite("BVT")]
     [Theory, TestCategory("BVT")]
     [InlineData(false)]
     [InlineData(true)]
