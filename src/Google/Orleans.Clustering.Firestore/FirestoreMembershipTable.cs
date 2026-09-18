@@ -73,17 +73,13 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var collection = this._storage.GetCollection();
+        var query = this._storage.GetCollection()
+            .WhereEqualTo(nameof(SiloInstanceEntity.Status), (int)SiloStatus.Dead);
         while (await this._storage.ExecuteTransaction(async transaction =>
         {
-            var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
+            var snapshot = await transaction.GetSnapshotAsync(query, transaction.CancellationToken);
             var defunct = snapshot.Documents
-                .Where(document => document.Id != this._partitionId)
-                .Where(document =>
-                {
-                    var entity = document.ConvertTo<SiloInstanceEntity>();
-                    return entity.Status == (int)SiloStatus.Dead && GetEffectiveUpdateTime(entity) < beforeDate;
-                })
+                .Where(document => GetEffectiveUpdateTime(document.ConvertTo<SiloInstanceEntity>()) < beforeDate)
                 .Take(FirestoreDataManager.MaxBatchSize)
                 .ToArray();
             if (defunct.Length == 0)

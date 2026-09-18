@@ -458,7 +458,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Empty(client.CommittedWrites);
         Assert.Equal(original, client.Documents[original.Name]);
         Assert.Equal(version, client.Documents[VersionPath]);
-        AssertTransactionalQueries(client);
+        AssertTransactionalQueries(client, deadOnly: true);
     }
 
     [Theory]
@@ -499,7 +499,7 @@ public sealed class FirestoreMembershipHeartbeatTests
             Assert.Equal(original, client.Documents[original.Name]);
         }
 
-        AssertTransactionalQueries(client);
+        AssertTransactionalQueries(client, deadOnly: true);
     }
 
     [Theory]
@@ -530,7 +530,48 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Empty(client.CommittedWrites);
         Assert.Equal(value, client.Documents[original.Name].Fields[field]);
         Assert.Equal(version, client.Documents[VersionPath]);
-        AssertTransactionalQueries(client);
+        AssertTransactionalQueries(client, deadOnly: true);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CleanupFiltersDeadRowsBeforeTransactionalRead(bool canonicalChange)
+    {
+        var client = new MembershipClient();
+        var active = client.AddRow(Entry(), DateTime.UnixEpoch);
+        var dead = Entry(2);
+        dead.Status = SiloStatus.Dead;
+        var original = client.AddRow(dead, DateTime.UnixEpoch).Clone();
+        Dictionary<string, Document>? concurrentState = null;
+        client.BeforeCommit = () =>
+        {
+            client.Change(active.Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
+            if (canonicalChange)
+            {
+                client.Change(active.Name, nameof(SiloInstanceEntity.Status), new Value { IntegerValue = (int)SiloStatus.ShuttingDown });
+                client.Change(active.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
+                client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+            }
+
+            concurrentState = client.Documents.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+        };
+
+        await CreateTable(client).CleanupDefunctSiloEntriesAsync(Now, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, client.Transactions);
+        Assert.Equal(2, client.Queries.Count);
+        Assert.Empty(client.Reads);
+        Assert.Single(client.AttemptedWrites);
+        var write = Assert.Single(client.CommittedWrites);
+        Assert.Equal(original.Name, write.Delete);
+        Assert.Equal(original.UpdateTime, write.CurrentDocument.UpdateTime);
+        Assert.False(client.Documents.ContainsKey(original.Name));
+        Assert.NotNull(concurrentState);
+        concurrentState.Remove(original.Name);
+        Assert.Equal(concurrentState.Count, client.Documents.Count);
+        Assert.All(concurrentState, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
+        AssertTransactionalQueries(client, deadOnly: true);
     }
 
     [Fact]
@@ -552,7 +593,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(FirestoreDataManager.MaxBatchSize + 1, client.CommittedWrites.Count);
         Assert.All(client.CommittedWrites, write => Assert.Equal(Write.OperationOneofCase.Delete, write.OperationCase));
         Assert.Equal(version, Assert.Single(client.Documents).Value);
-        AssertTransactionalQueries(client);
+        AssertTransactionalQueries(client, deadOnly: true);
     }
 
     [Theory]
@@ -639,7 +680,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.True(write.CurrentDocument.Exists);
     }
 
-    private static void AssertTransactionalQueries(MembershipClient client)
+    private static void AssertTransactionalQueries(MembershipClient client, bool deadOnly = false)
     {
         Assert.NotEmpty(client.Queries);
         Assert.All(client.Queries, query =>
@@ -647,6 +688,19 @@ public sealed class FirestoreMembershipHeartbeatTests
             Assert.False(query.Transaction.IsEmpty);
             Assert.Equal(CollectionPath, $"{query.Parent}/{Assert.Single(query.StructuredQuery.From).CollectionId}");
             Assert.Contains(client.Commits, commit => commit.Transaction == query.Transaction);
+            if (deadOnly)
+            {
+                var filter = query.StructuredQuery.Where;
+                Assert.NotNull(filter);
+                Assert.Equal(StructuredQuery.Types.Filter.FilterTypeOneofCase.FieldFilter, filter.FilterTypeCase);
+                Assert.Equal(StructuredQuery.Types.FieldFilter.Types.Operator.Equal, filter.FieldFilter.Op);
+                Assert.Equal(nameof(SiloInstanceEntity.Status), filter.FieldFilter.Field.FieldPath);
+                Assert.Equal(new Value { IntegerValue = (int)SiloStatus.Dead }, filter.FieldFilter.Value);
+            }
+            else
+            {
+                Assert.Null(query.StructuredQuery.Where);
+            }
         });
     }
 
@@ -761,8 +815,17 @@ public sealed class FirestoreMembershipHeartbeatTests
             Queries.Add(request.Clone());
             var collection = $"{request.Parent}/{Assert.Single(request.StructuredQuery.From).CollectionId}/";
             var documents = request.Transaction.IsEmpty ? Documents : _snapshots[request.Transaction];
-            var responses = documents.Values.Where(document => document.Name.StartsWith(collection, StringComparison.Ordinal))
-                .Select(document =>
+            var matches = documents.Values.Where(document => document.Name.StartsWith(collection, StringComparison.Ordinal));
+            if (request.StructuredQuery.Where is { } filter)
+            {
+                Assert.Equal(StructuredQuery.Types.Filter.FilterTypeOneofCase.FieldFilter, filter.FilterTypeCase);
+                Assert.Equal(StructuredQuery.Types.FieldFilter.Types.Operator.Equal, filter.FieldFilter.Op);
+                matches = matches.Where(document =>
+                    document.Fields.TryGetValue(filter.FieldFilter.Field.FieldPath, out var value)
+                    && value.Equals(filter.FieldFilter.Value));
+            }
+
+            var responses = matches.Select(document =>
                 {
                     if (!request.Transaction.IsEmpty)
                     {
@@ -771,7 +834,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
                     return new RunQueryResponse { Document = document.Clone(), ReadTime = Timestamp.FromDateTime(Now) };
                 }).ToArray();
-            return new QueryStream(responses);
+            return new QueryStream(responses.Length > 0 ? responses : [new RunQueryResponse { ReadTime = Timestamp.FromDateTime(Now) }]);
         }
 
         public override Task<CommitResponse> CommitAsync(CommitRequest request, CallSettings? callSettings = null)
