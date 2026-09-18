@@ -1099,7 +1099,7 @@ exit 0
         Assert-Equal 23 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
         Assert-Equal 23 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
         Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -notmatch 'net10\.0$' })).Count 'Coverage artifacts must target .NET 10.'
-        Assert-Equal $true ($expectedArtifacts -contains 'test_output_test-azure-cosmosdb_net10.0') 'The Cosmos partition must retain its expected coverage artifact.'
+        Assert-Equal 0 (@($expectedArtifacts | Where-Object { $_ -match 'macos|windows' })).Count 'Coverage artifacts must target Linux.'
     }
 
     Invoke-Test 'rejects missing and unexpected coverage artifacts' {
@@ -1515,7 +1515,7 @@ exit 0
             'Coverage upload must retry under a distinct immutable name and keep the retry gating.'
     }
 
-    Invoke-Test 'defaults GitHub coverage to Linux .NET 10 with explicit Cosmos selection' {
+    Invoke-Test 'collects GitHub coverage only on Linux .NET 10' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
@@ -1526,19 +1526,7 @@ exit 0
         $wrappedTestCommands = ([regex]::Matches($dotnetTestAction, 'invoke-test\.ps1')).Count
         $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
         Assert-Equal 2 ($wrappedTestCommands + $coveredTestCommands) 'Native test command count differs.'
-        Assert-Matches `
-            $runTestsAction `
-            "(?ms)^  coverage:\r?\n    description: [^\r\n]+\r?\n    required: false\r?\n    default: 'auto'" `
-            'Coverage selection must preserve the default Linux .NET 10 policy when no override is supplied.'
-        $coverageSelection = '${{ inputs.coverage == ''true'' || (inputs.coverage == ''auto'' && runner.os == ''Linux'' && inputs.framework == ''net10.0'') }}'
-        Assert-Equal 4 ([regex]::Matches($runTestsAction, [regex]::Escape("coverage: $coverageSelection"))).Count 'Setup, test, retry, and archive must all honor the same coverage override.'
-        $cosmosJob = [regex]::Match($workflow, '(?ms)^  test-azure-cosmosdb:\r?\n.*?(?=^  [A-Za-z0-9_-]+:|\z)').Value
-        Assert-Matches $cosmosJob '(?m)^    runs-on: ubuntu-latest\r?$' 'The Cosmos partition must use the native Linux backend.'
-        Assert-Matches `
-            $cosmosJob `
-            'coverage: \$\{\{ matrix\.framework == ''net10\.0'' \}\}' `
-            'The Cosmos job must select coverage only for .NET 10.'
-        Assert-Equal 1 ([regex]::Matches($workflow, '(?m)^        coverage:')).Count 'Only the Cosmos partition should override the default collection policy.'
+        Assert-Equal 4 ([regex]::Matches($runTestsAction, "runner\.os == 'Linux' && inputs\.framework == 'net10\.0'")).Count 'Coverage selection boundary count differs.'
         Assert-Equal 0 ([regex]::Matches($workflow + $runTestsAction + $dotnetTestAction, 'static-instrumentation|coverage\.static\.config\.xml|IncludeFiles')).Count 'GitHub coverage must not use static instrumentation.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
