@@ -58,8 +58,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(
                 CLUSTER_VERSION_ID, _partitionKey,
-                new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
-                cancellationToken).ConfigureAwait(false)).Resource;
+                cancellationToken: cancellationToken).ConfigureAwait(false)).Resource;
         }
         catch (CosmosException ce) when (IsMissingItem(ce))
         {
@@ -318,8 +317,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 {
                     var response = await _container.ReadItemAsync<SiloEntity>(
                         siloId, _partitionKey,
-                        new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
-                        cancellationToken).ConfigureAwait(false);
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
                     silos.Add(response.Resource);
                 }
                 catch (CosmosException exception) when (IsMissingItem(exception))
@@ -331,8 +329,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             {
                 var queryOptions = new QueryRequestOptions
                 {
-                    PartitionKey = _partitionKey,
-                    ConsistencyLevel = ConsistencyLevel.Strong
+                    PartitionKey = _partitionKey
                 };
                 // Heartbeats patch documents without changing the version fence; immutable
                 // ordering keeps those updates from moving rows across continuation pages.
@@ -345,7 +342,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 } while (iterator.HasMoreResults);
             }
 
-            // Strong reads can straddle a membership update; matching version etags fence the view.
+            // Separate reads can straddle a membership update; matching version etags fence the view.
             var after = await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
             if (string.Equals(before.ETag, after.ETag, StringComparison.Ordinal))
             {
@@ -466,7 +463,6 @@ internal partial class CosmosMembershipTable : IMembershipTable
             return await _container.ReadItemAsync<ClusterVersionEntity>(
                 CLUSTER_VERSION_ID,
                 _partitionKey,
-                new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -483,7 +479,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             using var iterator = _container.GetItemQueryIterator<SiloEntity>(
                 CreateSiloQuery(status),
-                requestOptions: new QueryRequestOptions { PartitionKey = _partitionKey, ConsistencyLevel = ConsistencyLevel.Strong });
+                requestOptions: new QueryRequestOptions { PartitionKey = _partitionKey });
 
             var silos = new List<SiloEntity>();
             do

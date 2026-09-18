@@ -168,7 +168,7 @@ public class CosmosMembershipTableCancellationTests
     [InlineData("ReadAll", 2, 1)]
     [InlineData("Cleanup", 0, 1)]
     [InlineData("Delete", 2, 1)]
-    public async Task MembershipOperationsRequestStrongConsistency(string operation, int expectedItemReads, int expectedQueries)
+    public async Task MembershipOperationsInheritConfiguredConsistency(string operation, int expectedItemReads, int expectedQueries)
     {
         using var storage = new CosmosMembershipTestStorage();
         using var services = new ServiceCollection().BuildServiceProvider();
@@ -198,9 +198,7 @@ public class CosmosMembershipTableCancellationTests
         Assert.All(reads, call =>
         {
             Assert.Equal(Partition, call.GetArguments()[1]);
-            var request = Assert.IsType<ItemRequestOptions>(call.GetArguments()[2]);
-            Assert.Equal(ConsistencyLevel.Strong, request.ConsistencyLevel);
-            Assert.Null(request.SessionToken);
+            Assert.Null(call.GetArguments()[2]);
             Assert.Equal(Token, call.GetArguments()[3]);
         });
         var queries = storage.Container.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "GetItemQueryIterator").ToArray();
@@ -209,13 +207,13 @@ public class CosmosMembershipTableCancellationTests
         {
             var request = Assert.IsType<QueryRequestOptions>(call.GetArguments()[2]);
             Assert.Equal(Partition, request.PartitionKey);
-            Assert.Equal(ConsistencyLevel.Strong, request.ConsistencyLevel);
+            Assert.Null(request.ConsistencyLevel);
             Assert.Null(request.SessionToken);
         });
     }
 
     [Fact]
-    public async Task StrongConsistencyRejectionRemainsVisible()
+    public async Task NativeReadFailureRemainsVisibleWithoutRetry()
     {
         using var storage = new CosmosMembershipTestStorage();
         storage.Container.ReadItemAsync<ClusterVersionEntity>("", default, null, Token)
@@ -231,7 +229,7 @@ public class CosmosMembershipTableCancellationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task StrongMembershipReadsRetryChangedVersion(bool pointRead)
+    public async Task MembershipReadsRetryChangedVersion(bool pointRead)
     {
         using var storage = new CosmosMembershipTestStorage();
         var oldSilo = Silo();
@@ -259,17 +257,12 @@ public class CosmosMembershipTableCancellationTests
                 call.GetMethodInfo().Name == "ReadItemAsync"
                 && call.GetMethodInfo().GetGenericArguments().Contains(typeof(SiloEntity))).ToArray();
             Assert.Equal(2, reads.Length);
-            Assert.All(reads, call =>
-            {
-                var options = Assert.IsType<ItemRequestOptions>(call.GetArguments()[2]);
-                Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
-                Assert.Null(options.SessionToken);
-            });
+            Assert.All(reads, call => Assert.Null(call.GetArguments()[2]));
         }
     }
 
     [Fact]
-    public async Task ReadAllUsesStrongConsistencyAcrossEmptyPagesInImmutableIdOrder()
+    public async Task ReadAllInheritsConsistencyAcrossEmptyPagesInImmutableIdOrder()
     {
         using var storage = new CosmosMembershipTestStorage();
         storage.SetVersion();
@@ -288,7 +281,7 @@ public class CosmosMembershipTableCancellationTests
         Assert.Equal(nameof(SiloEntity), Assert.Single(query.GetQueryParameters()).Value);
         var options = Assert.IsType<QueryRequestOptions>(queryCall.GetArguments()[2]);
         Assert.Equal(Partition, options.PartitionKey);
-        Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
+        Assert.Null(options.ConsistencyLevel);
         Assert.Null(options.SessionToken);
         storage.AssertVersionReads(2);
     }
@@ -648,7 +641,7 @@ public class CosmosMembershipTableCancellationTests
         }
 
         var query = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "GetItemQueryIterator");
-        Assert.Equal(ConsistencyLevel.Strong, Assert.IsType<QueryRequestOptions>(query.GetArguments()[2]).ConsistencyLevel);
+        Assert.Null(Assert.IsType<QueryRequestOptions>(query.GetArguments()[2]).ConsistencyLevel);
         storage.Container.Received(2).CreateTransactionalBatch(Partition);
         var deletion = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItemAsync");
         Assert.Equal(typeof(ClusterVersionEntity), Assert.Single(deletion.GetMethodInfo().GetGenericArguments()));

@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
@@ -74,17 +73,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public void MembershipTable_Cosmos_Init()
     {
-    }
-
-    [Fact, TestCategory("Functional")]
-    public async Task MembershipTable_Cosmos_AccountUsesStrongConsistency()
-    {
-        var options = new CosmosClusteringOptions();
-        options.ConfigureTestDefaults();
-        using var client = await options.CreateClient(Services);
-        var account = await client.ReadAccountAsync();
-
-        Assert.Equal(ConsistencyLevel.Strong, account.Consistency.DefaultConsistencyLevel);
     }
 
     [Fact, TestCategory("Functional")]

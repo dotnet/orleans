@@ -154,9 +154,7 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
         {
             Assert.Equal("ClusterVersion", call.GetArguments()[0]);
             Assert.Equal(Partition, call.GetArguments()[1]);
-            var options = Assert.IsType<ItemRequestOptions>(call.GetArguments()[2]);
-            Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
-            Assert.Null(options.SessionToken);
+            Assert.Null(call.GetArguments()[2]);
             Assert.Equal(Token, call.GetArguments()[3]);
         });
     }
