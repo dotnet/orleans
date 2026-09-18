@@ -25,6 +25,7 @@ internal sealed class ZooKeeperNativeFake
 
     internal List<string> Calls { get; } = [];
     internal List<List<Request>> Transactions { get; } = [];
+    internal List<SetDataRequest> Writes { get; } = [];
     internal Func<string, Task>? BeforeRead { get; set; }
     internal Func<string, Task>? AfterRead { get; set; }
     internal Func<List<Request>, Task>? BeforeMulti { get; set; }
@@ -122,6 +123,7 @@ internal sealed class ZooKeeperNativeFake
     internal async Task<Stat> SetData(string path, byte[] data, int version)
     {
         Calls.Add("write " + path);
+        Writes.Add(new(path, data, version));
         if (BeforeWrite is { } before)
         {
             await before(path);

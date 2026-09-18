@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Membership
     /// Every Orleans deployment has a node   /UniqueDeploymentId
     /// Every Silo's state is saved in        /UniqueDeploymentId/IP:Port@Gen
     /// Every Silo's IAmAlive is saved in     /UniqueDeploymentId/IP:Port@Gen/IAmAlive
-    /// IAmAlive is saved in a separate node so compare-and-set heartbeat updates preserve the membership row's version.
+    /// IAmAlive is saved in a separate node so owner heartbeat writes preserve the membership row's version.
     /// 
     /// a node's ZK version is its ETag:
     /// the table version is the version of /UniqueDeploymentId
@@ -368,16 +368,10 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive column and not change other columns.
-        /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
-        /// With regards to eTags update:
-        /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
-        /// With regards to TableVersion:
-        /// this operation should not change the TableVersion of the table. It should leave it untouched.
-        /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
+        /// Writes the owning silo's IAmAlive timestamp to its heartbeat node using one unconditional native update.
+        /// The membership row and table version are preserved. Native storage failures propagate to the caller.
         /// </summary>
-        /// <param name="entry">The target MembershipEntry tp update</param>
+        /// <param name="entry">The owning silo's membership entry containing its heartbeat timestamp.</param>
         /// <returns>Task representing the successful execution of this operation. </returns>
         /// <exception cref="ArgumentNullException"><paramref name="entry"/> is <see langword="null"/>.</exception>
         [Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -389,43 +383,17 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(entry);
             cancellationToken.ThrowIfCancellationRequested();
 
-            return UsingZookeeper(zk => UpdateIAmAliveCoreAsync(entry, zk.GetData, zk.SetData, cancellationToken),
+            return UsingZookeeper(zk => UpdateIAmAliveCoreAsync(entry, zk.SetData, cancellationToken),
                 this.deploymentConnectionString, this.watcher, cancellationToken);
         }
 
-        internal static async Task<bool> UpdateIAmAliveCoreAsync(
+        internal static Task<Stat> UpdateIAmAliveCoreAsync(
             MembershipEntry entry,
-            Func<string, Task<DataResult>> getData,
             Func<string, byte[], int, Task<Stat>> setData,
             CancellationToken cancellationToken)
         {
-            var path = ConvertToRowIAmAlivePath(entry.SiloAddress);
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    var heartbeat = await getData(path);
-                    if (Deserialize<DateTime>(heartbeat.Data) >= entry.IAmAliveTime)
-                    {
-                        return true;
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await setData(path, Serialize(entry.IAmAliveTime), heartbeat.Stat.getVersion());
-                    return true;
-                }
-                catch (KeeperException.NoNodeException)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await getData("/");
-                    return true;
-                }
-                catch (KeeperException.BadVersionException)
-                {
-                    // Preserve the maximum when another heartbeat or status update wins the race.
-                }
-            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return setData(ConvertToRowIAmAlivePath(entry.SiloAddress), Serialize(entry.IAmAliveTime), -1);
         }
 
         /// <summary>
