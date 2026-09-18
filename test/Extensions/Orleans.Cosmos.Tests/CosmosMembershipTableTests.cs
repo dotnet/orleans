@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -5,6 +6,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Runtime;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -83,6 +85,40 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         var account = await client.ReadAccountAsync();
 
         Assert.Equal(ConsistencyLevel.Strong, account.Consistency.DefaultConsistencyLevel);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task MembershipTable_Cosmos_HeartbeatPreservesMembershipTokens()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var table = CreateMembershipTable(loggerFactory.CreateLogger<CosmosMembershipTableTests>());
+        await table.InitializeMembershipTableAsync(false, token);
+        var initial = await table.ReadAllAsync(token);
+        var entry = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Active,
+            StartTime = DateTime.UnixEpoch,
+            IAmAliveTime = DateTime.UnixEpoch
+        };
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
+        var before = await table.ReadRowAsync(entry.SiloAddress, token);
+        var (membershipEntry, rowToken) = Assert.Single(before.Members);
+
+        entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+        await table.UpdateIAmAliveAsync(entry, token);
+        membershipEntry.Status = SiloStatus.Dead;
+        membershipEntry.AddSuspector(entry.SiloAddress, DateTime.UnixEpoch.AddMinutes(2));
+        Assert.True(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
+        Assert.False(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
+
+        var after = await table.ReadRowAsync(entry.SiloAddress, token);
+        var updated = Assert.Single(after.Members).Item1;
+        Assert.Equal(SiloStatus.Dead, updated.Status);
+        Assert.Equal(membershipEntry.SuspectTimes, updated.SuspectTimes);
+        Assert.Equal(before.Version.Version + 1, after.Version.Version);
     }
 
     [Fact, TestCategory("Functional")]

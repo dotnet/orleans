@@ -127,7 +127,6 @@ public class CosmosMembershipTableCancellationTests
     [InlineData("Initialize", 1, 0)]
     [InlineData("ReadRow", 3, 0)]
     [InlineData("ReadAll", 2, 1)]
-    [InlineData("Update", 1, 0)]
     [InlineData("Cleanup", 0, 1)]
     [InlineData("Delete", 2, 1)]
     public async Task MembershipOperationsRequestStrongConsistency(string operation, int expectedItemReads, int expectedQueries)
@@ -150,7 +149,6 @@ public class CosmosMembershipTableCancellationTests
             "Initialize" => CreateTable(services, options).InitializeMembershipTableAsync(true, Token),
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
-            "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
             "Cleanup" => storage.Table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), Token),
             "Delete" => storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
@@ -214,6 +212,7 @@ public class CosmosMembershipTableCancellationTests
         Assert.Equal(SiloStatus.Dead, Assert.Single(result.Members).Item1.Status);
         Assert.Equal(8, result.Version.Version);
         Assert.Equal("v8", result.Version.VersionEtag);
+        Assert.Equal("v8", Assert.Single(result.Members).Item2);
         storage.AssertVersionReads(4);
         if (pointRead)
         {
@@ -241,6 +240,7 @@ public class CosmosMembershipTableCancellationTests
 
         Assert.Equal(new[] { 1, 2 }, result.Members.Select(row => row.Item1.SiloAddress.Generation));
         Assert.Equal(7, result.Version.Version);
+        Assert.All(result.Members, row => Assert.Equal("v7", row.Item2));
         var queries = storage.Container.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "GetItemQueryIterator").ToArray();
         Assert.Equal(new string?[] { null, "page2", "page3" }, queries.Select(call => call.GetArguments()[1]));
         Assert.All(queries, call =>
@@ -292,18 +292,15 @@ public class CosmosMembershipTableCancellationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MembershipWritesConditionBothRowsAndPreserveMaximumHeartbeat(bool update)
+    public async Task MembershipWritesUseAtomicCanonicalVersionConditions(bool update)
     {
         using var storage = new CosmosMembershipTestStorage();
-        var current = Silo();
-        current.IAmAliveTime = DateTime.UnixEpoch.AddHours(2);
-        storage.SetSilo(current);
         var batch = storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.OK);
         var entry = Entry();
         var version = new TableVersion(8, "v7");
 
         var result = update
-            ? await storage.Table.UpdateRowAsync(entry, "s1", version, Token)
+            ? await storage.Table.UpdateRowAsync(entry, "v7", version, Token)
             : await storage.Table.InsertRowAsync(entry, version, Token);
 
         Assert.True(result);
@@ -314,17 +311,18 @@ public class CosmosMembershipTableCancellationTests
         if (update)
         {
             batch.Received(1).ReplaceItem(
-                current.Id, Arg.Is<SiloEntity>(value => value.IAmAliveTime == current.IAmAliveTime && value.Status == (int)entry.Status),
-                Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == "s1"));
+                Silo().Id, Arg.Is<SiloEntity>(value => value.IAmAliveTime == entry.IAmAliveTime && value.Status == (int)entry.Status),
+                null);
         }
         else
         {
             batch.Received(1).CreateItem(Arg.Is<SiloEntity>(value =>
-                value.Id == current.Id && value.ClusterId == "cluster" && value.IAmAliveTime == entry.IAmAliveTime));
+                value.Id == Silo().Id && value.ClusterId == "cluster" && value.IAmAliveTime == entry.IAmAliveTime));
         }
 
         await batch.Received(1).ExecuteAsync(Token);
         Assert.Equal(DateTime.UnixEpoch.AddHours(1), entry.IAmAliveTime);
+        Assert.Equal("CreateTransactionalBatch", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Theory]
@@ -334,49 +332,86 @@ public class CosmosMembershipTableCancellationTests
     public async Task MembershipWriteContentionReturnsFalse(bool update, HttpStatusCode status)
     {
         using var storage = new CosmosMembershipTestStorage();
-        storage.SetSilo(Silo());
-        storage.SetBatch(HttpStatusCode.FailedDependency, status);
+        storage.SetBatch(status == HttpStatusCode.Conflict
+            ? [HttpStatusCode.FailedDependency, status]
+            : [status, HttpStatusCode.FailedDependency]);
 
         var result = update
-            ? await storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token)
+            ? await storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
             : await storage.Table.InsertRowAsync(Entry(), new TableVersion(8, "v7"), Token);
 
         Assert.False(result);
     }
 
-    [Fact]
-    public async Task UpdateWithStaleRowEtagDoesNotSubmitBatch()
-    {
-        using var storage = new CosmosMembershipTestStorage();
-        storage.SetSilo(Silo());
-
-        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "stale", new TableVersion(8, "v7"), Token));
-
-        storage.Container.DidNotReceive().CreateTransactionalBatch(Arg.Any<PartitionKey>());
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task UpdateOfRetiredRowReturnsFalseWithSurvivingVersion(bool deletionRacesBatch)
+    public async Task HeartbeatPreservesCanonicalTokensForMembershipUpdate(bool pointRead)
     {
         using var storage = new CosmosMembershipTestStorage();
+        var silo = Silo();
         storage.SetVersion();
-        if (deletionRacesBatch)
-        {
-            storage.SetSilo(Silo());
-            storage.SetBatch(HttpStatusCode.FailedDependency, HttpStatusCode.NotFound);
-        }
-        else
-        {
-            storage.Container.ReadItemAsync<SiloEntity>(
-                "", default, null, Token)
-                .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.NotFound)));
-        }
+        storage.SetSilo(silo);
+        storage.SetPages(Page("0:8", null, Clone(silo)));
+        var before = pointRead
+            ? await storage.Table.ReadRowAsync(Entry().SiloAddress, Token)
+            : await storage.Table.ReadAllAsync(Token);
+        var (entry, rowToken) = Assert.Single(before.Members);
+        Assert.Equal(before.Version.VersionEtag, rowToken);
+        Assert.NotEqual(silo.ETag, rowToken);
 
-        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token));
+        using var response = new ResponseMessage(HttpStatusCode.OK);
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var patch = Assert.IsAssignableFrom<PatchOperation<DateTimeOffset>>(Assert.Single(call.Arg<IReadOnlyList<PatchOperation>>()));
+            silo.IAmAliveTime = patch.Value;
+            silo.ETag = "heartbeat-physical-etag";
+            return response;
+        });
+        var batch = storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.OK);
+        storage.Container.ClearReceivedCalls();
 
-        storage.AssertVersionReads();
+        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
+        entry.Status = SiloStatus.Dead;
+        entry.AddSuspector(Entry(2).SiloAddress, DateTime.UnixEpoch.AddHours(2));
+        var updated = await storage.Table.UpdateRowAsync(entry, rowToken, before.Version.Next(), Token);
+
+        Assert.True(updated);
+        Assert.Equal("heartbeat-physical-etag", silo.ETag);
+        Assert.Equal(new[] { "PatchItemStreamAsync", "CreateTransactionalBatch" },
+            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+        batch.Received(1).ReplaceItem(
+            "ClusterVersion", Arg.Is<ClusterVersionEntity>(version => version.ClusterVersion == 8),
+            Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == before.Version.VersionEtag));
+        batch.Received(1).ReplaceItem(
+            silo.Id, Arg.Is<SiloEntity>(value => value.Status == (int)SiloStatus.Dead
+                && value.SuspectingSilos.Count == 1 && value.SuspectingTimes.Count == 1
+                && value.IAmAliveTime == entry.IAmAliveTime),
+            null);
+        await batch.Received(1).ExecuteAsync(Token);
+    }
+
+    [Fact]
+    public async Task UpdateWithStaleCanonicalRowTokenDoesNotAccessStorage()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+
+        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "stale", new TableVersion(8, "v7"), Token));
+
+        Assert.Empty(storage.Container.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task UpdateOfMissingRowReturnsFalseWithoutAdditionalRequests()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        storage.SetBatch(HttpStatusCode.FailedDependency, HttpStatusCode.NotFound);
+
+        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token));
+
+        Assert.Equal("CreateTransactionalBatch", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Theory]
@@ -387,11 +422,10 @@ public class CosmosMembershipTableCancellationTests
     public async Task MembershipBatchInfrastructureFailuresRemainVisible(bool update, HttpStatusCode status)
     {
         using var storage = new CosmosMembershipTestStorage();
-        storage.SetSilo(Silo());
         storage.SetBatch(status, HttpStatusCode.FailedDependency);
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => update
-            ? storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token)
+            ? storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
             : storage.Table.InsertRowAsync(Entry(), new TableVersion(8, "v7"), Token));
 
         Assert.Contains("native batch failure", exception.ToString());
@@ -737,7 +771,6 @@ public class CosmosMembershipTableCancellationTests
     [InlineData("ReadRow", HttpStatusCode.NotFound, 0)]
     [InlineData("ReadRow", HttpStatusCode.NotFound, 1002)]
     [InlineData("ReadAll", HttpStatusCode.NotFound, 0)]
-    [InlineData("Update", HttpStatusCode.NotFound, 0)]
     [InlineData("Cleanup", HttpStatusCode.NotFound, 0)]
     [InlineData("Cleanup", HttpStatusCode.Forbidden, 0)]
     public async Task MissingHistoryAndInfrastructureFailuresRemainVisible(string operation, HttpStatusCode status, int substatus)
@@ -759,7 +792,6 @@ public class CosmosMembershipTableCancellationTests
         {
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
-            "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
             "Cleanup" => storage.Table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -808,7 +840,6 @@ public class CosmosMembershipTableCancellationTests
 
     [Theory]
     [InlineData("ReadRow")]
-    [InlineData("Update")]
     public async Task SessionUnavailableRemainsVisibleWithSurvivingVersion(string operation)
     {
         using var storage = new CosmosMembershipTestStorage();
@@ -819,7 +850,6 @@ public class CosmosMembershipTableCancellationTests
         var exception = await Assert.ThrowsAsync<WrappedException>(() => operation switch
         {
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
-            "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
 
