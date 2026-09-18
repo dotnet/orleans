@@ -102,4 +102,6 @@ Use [TestingHost architecture](testing.md) to understand which runtime services 
 
 `Microsoft.Orleans.Clustering.TestKit` supplies framework-neutral tests for <xref:Orleans.IMembershipTable>. Create a fresh fixture for each direct scenario, with independent provider handles sharing a backend and using the fixture's isolated cluster IDs. The fixture owns initialization and teardown.
 
+Supply the fixture's read-only deletion probe over the original backing scope. The kit checks populated data before deletion and verifies native deletion or store invalidation before owner disposal. Deletion ends that history; subsequent generated cases use fresh fixtures and owners.
+
 Expose the direct runner methods as individual tests and run the Accordant-generated suite with a fresh-fixture factory. The tests cover atomic conditional writes, coherent reads, maximum liveness timestamps, Dead-row cleanup, and cluster isolation. Retain failure diagnostics to reproduce generated histories. The [package README](https://github.com/dotnet/orleans/blob/main/src/Orleans.Clustering.TestKit/README.md) provides factory examples and the scenario inventory.

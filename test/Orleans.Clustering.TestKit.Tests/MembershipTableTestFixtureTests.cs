@@ -13,7 +13,7 @@ public sealed class MembershipTableTestFixtureTests
         {
             calls.Add((service, cluster));
             return ValueTask.FromResult(new MembershipTableTestHandle(backend.Create(cluster)));
-        }, "shared-service");
+        }, backend.IsDeletedAsync, "shared-service");
         await fixture.RunAsync((f, _) =>
         {
             Assert.NotSame(f.First, f.Second);
@@ -33,7 +33,7 @@ public sealed class MembershipTableTestFixtureTests
         var table = backend.Create("unused");
         var disposed = 0;
         var sharedHandle = new MembershipTableTestHandle(table, () => { disposed++; return ValueTask.CompletedTask; });
-        var fixture = new MembershipTableTestFixture("singleton", (_, _) => ValueTask.FromResult(sharedHandle));
+        var fixture = new MembershipTableTestFixture("singleton", (_, _) => ValueTask.FromResult(sharedHandle), backend.IsDeletedAsync);
         var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("same provider instance", failure.Message);
         Assert.Equal(1, disposed);
@@ -56,7 +56,7 @@ public sealed class MembershipTableTestFixtureTests
                 disposed++;
                 throw new InvalidOperationException("owner disposal failed");
             }));
-        });
+        }, backend.IsDeletedAsync);
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, actual);
         Assert.Equal(1, disposed);
@@ -94,7 +94,7 @@ public sealed class MembershipTableTestFixtureTests
                 disposed++;
                 if (disposed == 1) throw new InvalidOperationException("owner failure");
                 return ValueTask.CompletedTask;
-            })));
+            })), backend.IsDeletedAsync);
         var primary = new ClusteringConformanceException("original assertion");
         var actual = await Assert.ThrowsAsync<ClusteringConformanceException>(() =>
             fixture.RunAsync((_, _) => throw primary, TestContext.Current.CancellationToken));
@@ -140,8 +140,10 @@ public sealed class MembershipTableTestFixtureTests
     {
         var backend = new IdealizedMembershipBackend();
         Assert.Throws<ArgumentNullException>(() => new MembershipTableTestHandle(null!));
-        Assert.Throws<ArgumentNullException>(() => new MembershipTableTestFixture("provider", (Func<string, IMembershipTable>)null!));
-        Assert.Throws<ArgumentException>(() => new MembershipTableTestFixture(" ", backend.Create));
+        Assert.Throws<ArgumentNullException>(() => new MembershipTableTestFixture("provider", (Func<string, IMembershipTable>)null!, backend.IsDeletedAsync));
+        Assert.Throws<ArgumentException>(() => new MembershipTableTestFixture(" ", backend.Create, backend.IsDeletedAsync));
+        Assert.Equal("isDeletedAsync", Assert.Throws<ArgumentNullException>(() =>
+            new MembershipTableTestFixture("provider", backend.Create, null!)).ParamName);
         var fixture = backend.Fixture();
         Assert.Throws<ArgumentException>(() => new MembershipTableTestRunner(fixture));
         await fixture.InitializeAsync(TestContext.Current.CancellationToken);

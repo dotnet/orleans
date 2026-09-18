@@ -83,7 +83,7 @@ public sealed class MembershipTableConformanceTests
     [InlineData(true)]
     public Task MembershipTable_ModelBased_GeneratedConformance(bool versionedCleanup)
     {
-        var backend = new IdealizedMembershipBackend { RequireInitializationAfterDeletion = true, VersionedCleanup = versionedCleanup, CleanupBatchSize = 1 };
+        var backend = new IdealizedMembershipBackend { TerminalDeletion = true, VersionedCleanup = versionedCleanup, CleanupBatchSize = 1 };
         return new MembershipTableModelBasedTestRunner(() => backend.Fixture(), "Idealized").RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
@@ -113,30 +113,38 @@ public sealed class MembershipTableConformanceTests
     }
 
     [Fact]
-    public async Task AdministrativeDeletion_InitializesNewHistoryBeforeReading()
+    public async Task AdministrativeDeletion_UsesFreshOwnersForSubsequentHistories()
     {
-        var backend = new IdealizedMembershipBackend { RequireInitializationAfterDeletion = true };
-        await backend.Fixture().RunAsync(
+        var firstOwner = new IdealizedMembershipBackend { TerminalDeletion = true };
+        await firstOwner.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
                 .DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(ct),
             TestContext.Current.CancellationToken);
-        await backend.Fixture().RunAsync(
+        Assert.Empty(firstOwner.Partitions);
+        Assert.Equal(2, firstOwner.Deletes);
+        Assert.Equal(0, firstOwner.OperationsAfterDeletion);
+        var secondOwner = new IdealizedMembershipBackend { TerminalDeletion = true };
+        await secondOwner.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
                 .DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct),
             TestContext.Current.CancellationToken);
-        Assert.Empty(backend.Partitions);
-        Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
+        Assert.Empty(secondOwner.Partitions);
+        Assert.Equal(3, secondOwner.Deletes);
+        Assert.Equal(0, secondOwner.OperationsAfterDeletion);
+        Assert.Equal(firstOwner.CreatedHandles, firstOwner.DisposedHandles);
+        Assert.Equal(secondOwner.CreatedHandles, secondOwner.DisposedHandles);
     }
 
     [Fact]
     public async Task ForeignClusterDeletion_ExplicitScopeRejection_PreservesBothClusters()
     {
-        var backend = new IdealizedMembershipBackend { RejectForeignClusterDeletion = true };
+        var backend = new IdealizedMembershipBackend { RejectForeignClusterDeletion = true, TerminalDeletion = true };
         await backend.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
                 .DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct),
             TestContext.Current.CancellationToken);
         Assert.Equal(2, backend.ForeignClusterDeletionRejections);
+        Assert.Equal(0, backend.OperationsAfterDeletion);
         Assert.Empty(backend.Partitions);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
     }

@@ -145,20 +145,27 @@ public sealed class MembershipTableModelTests
     }
 
     [Fact]
-    public void Apply_AdministrativeDeletionRequiresInitializationForFreshHistory()
+    public void Apply_AdministrativeDeletionEndsEveryOperationInThatHistory()
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
         for (var i = 0; i < 5; i++) Apply(state, MembershipOperationKind.UpdateForward);
         Apply(state, MembershipOperationKind.DeleteCluster);
         Assert.Empty(state.Rows);
-        Assert.Equal(0, state.Version);
-        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.InsertNew), state));
-        Apply(state, MembershipOperationKind.Initialize);
-        Assert.Empty(state.TerminalGenerations);
-        Apply(state, MembershipOperationKind.InsertNew);
-        Assert.Equal(1, state.Version);
-        Assert.Equal((int)SiloStatus.Created, Assert.Single(state.Rows).Value.Status);
+        Assert.Equal(6, state.Version);
+        Assert.True(state.Deleted);
+        Assert.Equal(0, state.TerminalGenerations[1]);
+        foreach (var kind in Enum.GetValues<MembershipOperationKind>())
+        {
+            Assert.False(MembershipModel.CanApply(new(kind), state));
+            Assert.Contains("history ended", Assert.Throws<ClusteringConformanceException>(() =>
+                MembershipModel.Apply(new(kind), state)).Message);
+        }
+        var fresh = new MembershipModelState();
+        Apply(fresh, MembershipOperationKind.InsertNew);
+        Assert.Equal(1, fresh.Version);
+        Assert.Equal((int)SiloStatus.Created, Assert.Single(fresh.Rows).Value.Status);
+        Assert.True(state.Deleted);
     }
 
     [Fact]

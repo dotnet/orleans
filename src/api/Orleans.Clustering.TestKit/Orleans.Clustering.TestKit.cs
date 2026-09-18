@@ -37,11 +37,11 @@ namespace Orleans.Clustering.TestKit
 
     public sealed partial class MembershipTableTestFixture : System.IAsyncDisposable
     {
-        public MembershipTableTestFixture(string providerName, System.Func<string, IMembershipTable> factory, string? serviceId = null) { }
+        public MembershipTableTestFixture(string providerName, System.Func<string, IMembershipTable> factory, System.Func<string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>> isDeletedAsync, string? serviceId = null) { }
 
-        public MembershipTableTestFixture(string providerName, System.Func<string, string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<MembershipTableTestHandle>> factory, string? serviceId = null) { }
+        public MembershipTableTestFixture(string providerName, System.Func<string, string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<MembershipTableTestHandle>> factory, System.Func<string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>> isDeletedAsync, string? serviceId = null) { }
 
-        public MembershipTableTestFixture(string providerName, System.Func<string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<MembershipTableTestHandle>> factory, string? serviceId = null) { }
+        public MembershipTableTestFixture(string providerName, System.Func<string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<MembershipTableTestHandle>> factory, System.Func<string, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>> isDeletedAsync, string? serviceId = null) { }
 
         public string ClusterId { get { throw null; } }
 

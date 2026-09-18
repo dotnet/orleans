@@ -88,9 +88,7 @@ internal static class MembershipModel
 
     internal static bool CanApply(MembershipRequest request, MembershipModelState state)
     {
-        if (state.Deleted)
-            return request.Kind is MembershipOperationKind.Initialize or MembershipOperationKind.ReadAll
-                or MembershipOperationKind.ReadAbsentRow or MembershipOperationKind.ReadOtherCluster;
+        if (state.Deleted) return false;
         var exists = state.Rows.TryGetValue(request.Key, out var row);
         var forward = exists && row!.Status is >= (int)SiloStatus.Created and < (int)SiloStatus.Dead;
         return request.Kind switch
@@ -116,16 +114,10 @@ internal static class MembershipModel
     // This transition never reads provider output or provider tokens.
     internal static void Apply(MembershipRequest request, MembershipModelState next, int cleanupVersionDelta = 0)
     {
+        ClusteringTestKitDiagnostics.Require(!next.Deleted, "model history ended at DeleteCluster");
         if (IsRead(request.Kind) || IsRejected(request.Kind)) return;
         switch (request.Kind)
         {
-            case MembershipOperationKind.Initialize:
-                if (next.Deleted)
-                {
-                    next.TerminalGenerations.Clear();
-                    next.Deleted = false;
-                }
-                break;
             case MembershipOperationKind.InsertNew:
                 next.Rows.Add(request.Key, MembershipModelRecord.New(request.Key));
                 break;
@@ -166,8 +158,6 @@ internal static class MembershipModel
                 break;
             case MembershipOperationKind.DeleteCluster:
                 next.Rows.Clear();
-                next.Version = 0;
-                next.LastChangedKey = 0;
                 next.Deleted = true;
                 break;
         }
@@ -194,9 +184,9 @@ internal static class MembershipModel
     };
 }
 
-internal sealed record MembershipModelResult(string? Failure, ClusteringMembershipSnapshot? Observation = null, int Seed = 0, int VersionOrigin = 0, int CleanupVersionDelta = 0)
+internal sealed record MembershipModelResult(string? Failure, ClusteringMembershipSnapshot? Observation = null, int Seed = 0, int VersionOrigin = 0, int CleanupVersionDelta = 0, bool HistoryDeleted = false)
 {
-    public override string ToString() => Failure ?? "validated complete expected model view";
+    public override string ToString() => Failure ?? (HistoryDeleted ? "native deletion verified; history ended" : "validated complete expected model view");
 }
 
 internal sealed class MembershipBehavioralSpec : Spec<MembershipModelState>
@@ -257,6 +247,11 @@ internal sealed class MembershipModelOperation(MembershipOperationKind kind)
     private static ValidationResult Validate(MembershipModelState expected, MembershipModelResult result)
     {
         if (result.Failure is { } failure) return ValidationResult.Invalid(failure);
+        if (expected.Deleted)
+            return result.HistoryDeleted && result.Observation is null
+                ? ValidationResult.Valid()
+                : ValidationResult.Invalid("expected verified terminal deletion, without a replacement history");
+        if (result.HistoryDeleted) return ValidationResult.Invalid("unexpected terminal deletion");
         if (result.Observation is not { } actual) return ValidationResult.Invalid("missing actual provider observation");
         if (actual.Version != expected.Version + result.VersionOrigin)
             return ValidationResult.Invalid($"Accordant expected integer={expected.Version + result.VersionOrigin}, observed={actual.Version}");
@@ -280,7 +275,7 @@ internal sealed class MembershipModelExecutionContext
     private readonly CancellationToken _ct;
     private readonly Action<MembershipOperationKind> _executed;
     private MembershipModelState _model = new();
-    private MembershipHistory _history = new();
+    private readonly MembershipHistory _history = new();
     private readonly List<string> _prefix = [];
     private readonly Dictionary<string, string> _previousRows = new(StringComparer.Ordinal);
     private TableVersion? _previousTable;
@@ -365,10 +360,12 @@ internal sealed class MembershipModelExecutionContext
                     await writer.CleanupDefunctSiloEntriesAsync(new(T1), _ct);
                     break;
                 case MembershipOperationKind.DeleteCluster:
-                    await writer.DeleteMembershipTableEntriesAsync(_fixture.ClusterId, _ct);
-                    await writer.InitializeMembershipTableAsync(true, _ct);
-                    await reader.InitializeMembershipTableAsync(false, _ct);
-                    break;
+                    await _fixture.DeleteClusterAsync(writer, _fixture.ClusterId, allowRetained: false, _ct);
+                    await _fixture.AssertHistoryPresentAsync(_fixture.OtherClusterId, _ct);
+                    MembershipTableTestRunner.Equal(_otherBaseline, await MembershipTableTestRunner.Read(_fixture.OtherCluster, _ct));
+                    _model = next;
+                    _executed(request.Kind);
+                    return new(null, HistoryDeleted: true);
                 case MembershipOperationKind.ReadOtherCluster:
                     MembershipTableTestRunner.Equal(_otherBaseline, await MembershipTableTestRunner.Read(_fixture.OtherCluster, _ct));
                     break;
@@ -389,14 +386,6 @@ internal sealed class MembershipModelExecutionContext
                 _previousTable = before.Next();
                 if (before.Rows.TryGetValue(input.SiloAddress.ToParsableString(), out var previousRow))
                     _previousRows[input.SiloAddress.ToParsableString()] = previousRow.Etag;
-            }
-            else if (request.Kind == MembershipOperationKind.DeleteCluster)
-            {
-                ClusteringTestKitDiagnostics.Require(after.Rows.Count == 0, "DeleteCluster left rows");
-                _versionOrigin = after.Version;
-                _previousTable = null;
-                _previousRows.Clear();
-                _history = new();
             }
             else if (request.Kind is MembershipOperationKind.HeartbeatNewer or MembershipOperationKind.HeartbeatOlder)
             {

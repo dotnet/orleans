@@ -14,7 +14,11 @@ internal sealed class IdealizedMembershipBackend
     internal bool VersionedCleanup { get; init; } = true;
     internal int CleanupBatches;
     internal bool RejectForeignClusterDeletion { get; init; }
-    internal bool RequireInitializationAfterDeletion { get; init; }
+    internal bool TerminalDeletion { get; init; }
+    internal bool DestructiveDisposal { get; init; }
+    internal readonly HashSet<string> DeletedScopes = new(StringComparer.Ordinal);
+    internal int OperationsAfterDeletion;
+    internal int DeletionProbes;
     internal int ForeignClusterDeletionRejections;
     internal int CreatedHandles;
     internal int DisposedHandles;
@@ -31,20 +35,48 @@ internal sealed class IdealizedMembershipBackend
 
     internal IdealizedMembershipTable Create(string cluster)
     {
+        lock (Sync) AssertUsable(cluster);
         Interlocked.Increment(ref CreatedHandles);
         return new(this, cluster);
+    }
+
+    internal void AssertUsable(string cluster)
+    {
+        if (DeletedScopes.Contains(cluster))
+        {
+            OperationsAfterDeletion++;
+            throw new InvalidOperationException("The provider owner was terminally invalidated.");
+        }
+    }
+
+    internal ValueTask<bool> IsDeletedAsync(string cluster, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (Sync)
+        {
+            DeletionProbes++;
+            return ValueTask.FromResult(TerminalDeletion
+                ? DeletedScopes.Contains(cluster)
+                : !Partitions.TryGetValue(cluster, out var partition) || partition.Rows.Count == 0);
+        }
+    }
+
+    internal ValueTask DisposeHandleAsync(string cluster)
+    {
+        lock (Sync)
+        {
+            DisposedHandles++;
+            if (DestructiveDisposal) Partitions.Remove(cluster);
+        }
+        return ValueTask.CompletedTask;
     }
 
     internal MembershipTableTestFixture Fixture(string name = "Idealized")
         => new(name, (_, cluster, _) =>
         {
             var table = Create(cluster);
-            return ValueTask.FromResult(new MembershipTableTestHandle(table, () =>
-            {
-                Interlocked.Increment(ref DisposedHandles);
-                return ValueTask.CompletedTask;
-            }));
-        });
+            return ValueTask.FromResult(new MembershipTableTestHandle(table, () => DisposeHandleAsync(cluster)));
+        }, IsDeletedAsync);
 }
 
 internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backend, string scopeClusterId) : IMembershipTable
@@ -55,11 +87,6 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
         {
             if (!backend.Partitions.TryGetValue(scopeClusterId, out var value))
             {
-                if (backend.RequireInitializationAfterDeletion)
-                {
-                    throw new InvalidOperationException("The membership table must be initialized before reading its history.");
-                }
-
                 backend.Partitions.Add(scopeClusterId, value = new(backend.Token()));
             }
 
@@ -86,6 +113,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             }
 
             backend.Partitions.Remove(clusterId);
+            if (backend.TerminalDeletion) backend.DeletedScopes.Add(clusterId);
             backend.Deletes++;
         }, cancellationToken);
 
@@ -182,14 +210,22 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     private Task Locked(Action action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        lock (backend.Sync) action();
+        lock (backend.Sync)
+        {
+            backend.AssertUsable(scopeClusterId);
+            action();
+        }
         return Task.CompletedTask;
     }
 
     private Task<T> Locked<T>(Func<T> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        lock (backend.Sync) return Task.FromResult(action());
+        lock (backend.Sync)
+        {
+            backend.AssertUsable(scopeClusterId);
+            return Task.FromResult(action());
+        }
     }
 
     // The interface retains these members for compatibility. Tests call only the Async APIs above.

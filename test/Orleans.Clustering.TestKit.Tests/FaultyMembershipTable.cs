@@ -9,13 +9,14 @@ internal enum MembershipFault
     CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, TornReadRow, RefuseStatusWrite,
     IgnoreNewUpdateHeartbeat, IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatResurrectsCompactedRow, HeartbeatStorageFailure,
-    CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow
+    CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow,
+    DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign
 }
 
 internal sealed class MembershipFaultController(MembershipFault fault)
 {
     internal MembershipFault Fault { get; } = fault;
-    internal IdealizedMembershipBackend Backend { get; } = new();
+    internal IdealizedMembershipBackend Backend { get; init; } = new();
     internal int Injected;
     internal int UpdateCalls;
     internal readonly Dictionary<string, List<MembershipEntry>> Retained = new(StringComparer.Ordinal);
@@ -28,10 +29,12 @@ internal sealed class MembershipFaultController(MembershipFault fault)
     internal bool CleanupCompleted;
     internal int ReadsWithDeadTarget;
     internal readonly InvalidOperationException HeartbeatFailure = new("heartbeat-backend-failure");
+    internal readonly InvalidOperationException DeletionFailure = new("deletion-backend-failure");
 
     internal MembershipTableTestFixture Fixture()
         => new("Deliberate-" + Fault, (_, cluster, _) =>
-            ValueTask.FromResult(new MembershipTableTestHandle(new FaultyMembershipTable(this, cluster, Backend.Create(cluster)))));
+            ValueTask.FromResult(new MembershipTableTestHandle(new FaultyMembershipTable(this, cluster, Backend.Create(cluster)),
+                () => Backend.DisposeHandleAsync(cluster))), Backend.IsDeletedAsync);
 }
 
 internal sealed class FaultyMembershipTable(MembershipFaultController control, string cluster, IMembershipTable inner) : IMembershipTable
@@ -47,6 +50,24 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
 
     public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
     {
+        if (Fault == MembershipFault.DeleteStorageFailure) throw control.DeletionFailure;
+        if (Fault == MembershipFault.DeleteNoOp)
+        {
+            control.Injected++;
+            return Task.CompletedTask;
+        }
+        if (Fault == MembershipFault.DeletePartial)
+        {
+            lock (control.Backend.Sync)
+            {
+                if (control.Backend.Partitions.TryGetValue(clusterId, out var partition) && partition.Rows.Count > 1)
+                    partition.Rows.Remove(partition.Rows.Keys.First());
+                control.Injected++;
+            }
+            return Task.CompletedTask;
+        }
+        if (Fault is MembershipFault.DeleteCommitThenFailure or MembershipFault.DeleteThenRejectForeign)
+            return DeleteThenFail();
         if (Fault == MembershipFault.DeletePrefixScopes)
         {
             lock (control.Backend.Sync)
@@ -65,6 +86,15 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             return inner.DeleteMembershipTableEntriesAsync(cluster, cancellationToken);
         }
         return inner.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
+
+        async Task DeleteThenFail()
+        {
+            await inner.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
+            control.Injected++;
+            if (Fault == MembershipFault.DeleteThenRejectForeign && clusterId != cluster)
+                throw new ArgumentException("Scope rejection after destructive side effect.", nameof(clusterId));
+            if (Fault == MembershipFault.DeleteCommitThenFailure) throw control.DeletionFailure;
+        }
     }
 
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)

@@ -26,26 +26,42 @@ public sealed class MembershipTableTestHandle : IAsyncDisposable
 public sealed class MembershipTableTestFixture : IAsyncDisposable
 {
     private readonly Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> _factory;
+    private readonly Func<string, CancellationToken, ValueTask<bool>> _isDeleted;
     private readonly List<MembershipTableTestHandle> _handles = [];
     private readonly Dictionary<string, IMembershipTable> _clusters = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _endedClusters = new(StringComparer.Ordinal);
     private bool _initialized;
     private int _disposed;
 
     /// <summary>Creates a fixture from a synchronous factory accepting each requested cluster ID.</summary>
-    public MembershipTableTestFixture(string providerName, Func<string, IMembershipTable> factory, string? serviceId = null)
-        : this(providerName, Wrap(factory), serviceId) { }
+    public MembershipTableTestFixture(string providerName, Func<string, IMembershipTable> factory,
+        Func<string, CancellationToken, ValueTask<bool>> isDeletedAsync, string? serviceId = null)
+        : this(providerName, Wrap(factory), isDeletedAsync, serviceId) { }
 
     /// <summary>Creates a fixture from an asynchronous cluster-aware factory with explicit ownership.</summary>
     public MembershipTableTestFixture(string providerName,
-        Func<string, CancellationToken, ValueTask<MembershipTableTestHandle>> factory, string? serviceId = null)
-        : this(providerName, Wrap(factory), serviceId) { }
+        Func<string, CancellationToken, ValueTask<MembershipTableTestHandle>> factory,
+        Func<string, CancellationToken, ValueTask<bool>> isDeletedAsync, string? serviceId = null)
+        : this(providerName, Wrap(factory), isDeletedAsync, serviceId) { }
 
     /// <summary>Creates a fixture. All handles use the same service ID and backend, but the supplied cluster ID.</summary>
+    /// <param name="providerName">The non-secret provider label used in diagnostics.</param>
+    /// <param name="factory">Creates an independently owned handle over the requested scope's current backend.</param>
+    /// <param name="isDeletedAsync">
+    /// Read-only native probe of the specified cluster's original backing state. Returns true when its membership
+    /// data is deleted or its owner has terminally invalidated the store; returns false while seeded data remains.
+    /// The probe runs before owner disposal, must preserve backend identity, and must propagate infrastructure failures.
+    /// Persistent providers can inspect the same scope through independent backend access; terminal providers inspect
+    /// native invalidation. The suite checks the probe against populated data before invoking deletion.
+    /// </param>
+    /// <param name="serviceId">The shared service ID.</param>
     public MembershipTableTestFixture(string providerName,
-        Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> factory, string? serviceId = null)
+        Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> factory,
+        Func<string, CancellationToken, ValueTask<bool>> isDeletedAsync, string? serviceId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(providerName);
         _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        _isDeleted = isDeletedAsync ?? throw new ArgumentNullException(nameof(isDeletedAsync));
         ProviderName = providerName;
         ServiceId = serviceId ?? "clustering-testkit";
         ArgumentException.ThrowIfNullOrWhiteSpace(ServiceId);
@@ -74,6 +90,8 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         cancellationToken.ThrowIfCancellationRequested();
+        if (_endedClusters.Count > 0)
+            throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
         if (_initialized) return;
         try
         {
@@ -98,6 +116,8 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         if (clusterId != ClusterId && clusterId != OtherClusterId)
             throw new ArgumentException("Additional handles must belong to a fixture-owned cluster.", nameof(clusterId));
+        if (_endedClusters.Contains(clusterId))
+            throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
         cancellationToken.ThrowIfCancellationRequested();
         var handle = await _factory(ServiceId, clusterId, cancellationToken)
             ?? throw new InvalidOperationException("The membership handle factory returned null.");
@@ -113,6 +133,45 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
         ClusteringTestKitDiagnostics.Require(!duplicate,
             $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
         return handle;
+    }
+
+    internal async Task AssertHistoryPresentAsync(string clusterId, CancellationToken cancellationToken)
+    {
+        ClusteringTestKitDiagnostics.Require(!await ObserveDeletionAsync(clusterId, cancellationToken),
+            $"deletion probe reported deleted populated history: cluster={clusterId}");
+    }
+
+    internal async Task<bool> DeleteClusterAsync(IMembershipTable table, string clusterId, bool allowRetained, CancellationToken cancellationToken)
+    {
+        await AssertHistoryPresentAsync(clusterId, cancellationToken);
+        // A failed request can have committed. Retire these handles until native evidence proves retention.
+        _endedClusters.Add(clusterId);
+        var rejected = false;
+        try
+        {
+            await table.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
+        }
+        catch (ArgumentException exception) when (allowRetained && exception.ParamName == nameof(clusterId))
+        {
+            rejected = true;
+        }
+
+        var deleted = await ObserveDeletionAsync(clusterId, cancellationToken);
+        ClusteringTestKitDiagnostics.Require(!rejected || !deleted,
+            $"rejected foreign deletion changed its target scope: cluster={clusterId}");
+        ClusteringTestKitDiagnostics.Require(allowRetained || deleted,
+            $"deletion left populated history: cluster={clusterId}");
+        return deleted;
+    }
+
+    private async ValueTask<bool> ObserveDeletionAsync(string clusterId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _endedClusters.Add(clusterId);
+        var deleted = await _isDeleted(clusterId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!deleted) _endedClusters.Remove(clusterId);
+        return deleted;
     }
 
     /// <summary>Runs a complete isolated case and preserves its primary failure if teardown also fails.</summary>
@@ -143,6 +202,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
         var failures = new List<Exception>();
         foreach (var (cluster, table) in _clusters)
         {
+            if (_endedClusters.Contains(cluster)) continue;
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try { await table.DeleteMembershipTableEntriesAsync(cluster, timeout.Token).WaitAsync(timeout.Token); }
             catch (Exception exception) { failures.Add(new InvalidOperationException($"cleanup cluster={cluster}", exception)); }

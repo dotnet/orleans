@@ -439,15 +439,13 @@ public sealed class MembershipTableTestRunner
         Equal(other, await Read(Other, ct));
     }, cancellationToken);
 
-    /// <summary>G26: deleting A removes its rows through the peer without altering B.</summary>
+    /// <summary>G26: native verification confirms deletion before owner disposal, while the other cluster remains intact.</summary>
     public Task DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         var other = await Insert(Other, Entry(1), ct);
-        await A.DeleteMembershipTableEntriesAsync(_fixture.ClusterId, ct);
-        await A.InitializeMembershipTableAsync(true, ct);
-        await B.InitializeMembershipTableAsync(false, ct);
-        Check((await Read(B, ct)).Rows.Count == 0, "own-cluster deletion left rows");
+        await _fixture.DeleteClusterAsync(A, _fixture.ClusterId, allowRetained: false, ct);
+        await _fixture.AssertHistoryPresentAsync(_fixture.OtherClusterId, ct);
         Equal(other, await Read(Other, ct));
     }, cancellationToken);
 
@@ -457,32 +455,30 @@ public sealed class MembershipTableTestRunner
         await Seed(ct);
         var baseline = await SameHandles(ct);
         var otherBefore = await Insert(Other, Entry(1), ct);
-        var completed = await DeleteForeignCluster(A, _fixture.OtherClusterId);
-        Equal(baseline, await SameHandles(ct));
-        await Other.InitializeMembershipTableAsync(true, ct);
-        var otherAfter = await Read(Other, ct);
-        // A remote backend can address the supplied cluster, whereas an isolated system target
-        // only owns its configured table. In either case it must not delete the configured scope
-        // or partially mutate a different scope. Its own-scope deletion is required by G26.
-        if (!completed || otherAfter.Rows.Count != 0) Equal(otherBefore, otherAfter);
-        await Other.DeleteMembershipTableEntriesAsync(_fixture.OtherClusterId, ct);
-        await Other.InitializeMembershipTableAsync(true, ct);
-        var other = await Insert(Other, Entry(3), ct);
         await DeleteForeignCluster(B, $"ctk-unused-{Guid.NewGuid():N}");
+        await _fixture.AssertHistoryPresentAsync(_fixture.ClusterId, ct);
+        await _fixture.AssertHistoryPresentAsync(_fixture.OtherClusterId, ct);
         Equal(baseline, await SameHandles(ct));
-        Equal(other, await Read(Other, ct));
+        Equal(otherBefore, await Read(Other, ct));
+        var deleted = await _fixture.DeleteClusterAsync(A, _fixture.OtherClusterId, allowRetained: true, ct);
+        await _fixture.AssertHistoryPresentAsync(_fixture.ClusterId, ct);
+        if (!deleted)
+        {
+            Equal(otherBefore, await Read(Other, ct));
+            await _fixture.DeleteClusterAsync(Other, _fixture.OtherClusterId, allowRetained: false, ct);
+            await _fixture.AssertHistoryPresentAsync(_fixture.ClusterId, ct);
+        }
+        Equal(baseline, await SameHandles(ct));
 
-        async Task<bool> DeleteForeignCluster(IMembershipTable table, string clusterId)
+        async Task DeleteForeignCluster(IMembershipTable table, string clusterId)
         {
             try
             {
                 await table.DeleteMembershipTableEntriesAsync(clusterId, ct);
-                return true;
             }
             catch (ArgumentException exception) when (exception.ParamName == nameof(clusterId))
             {
                 _output?.Invoke("The provider rejected deletion outside its configured cluster scope.");
-                return false;
             }
         }
     }, cancellationToken);

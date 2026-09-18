@@ -136,8 +136,7 @@ public sealed class MembershipTableModelBasedTestRunner
         yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.UpdateForward), new(MembershipOperationKind.UpdateStaleRow)];
         yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.HeartbeatNewer), new(MembershipOperationKind.HeartbeatOlder)];
         yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.HeartbeatNewer), new(MembershipOperationKind.UpdateWithOldHeartbeat)];
-        yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.DeleteCluster),
-            new(MembershipOperationKind.Initialize), new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.ReadPresentRow)];
+        yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.UpdateForward), new(MembershipOperationKind.DeleteCluster)];
         yield return [new(MembershipOperationKind.InsertNew), new(MembershipOperationKind.UpdateForward),
             new(MembershipOperationKind.UpdateForward), new(MembershipOperationKind.UpdateForward),
             new(MembershipOperationKind.UpdateForward), new(MembershipOperationKind.UpdateForward),
