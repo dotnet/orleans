@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using org.apache.zookeeper;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Membership;
@@ -245,6 +248,1150 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal("/127.0.0.1:11111@12345/IAmAlive", result);
             Assert.Equal(InvokePrivatePathMethod("ConvertToRowPath", address) + "/IAmAlive", result);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Read_ConcurrentStatusUpdate_RetriesWithCoherentVersion(bool pointRead)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            fake.AfterRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(entry.SiloAddress))
+                {
+                    fake.AfterRead = null;
+                    entry.Status = SiloStatus.Dead;
+                    Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                        fake.Operations, entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+                }
+            };
+
+            var result = await Read(fake, pointRead ? entry.SiloAddress : null);
+
+            var row = Assert.Single(result.Members);
+            Assert.Equal(SiloStatus.Dead, row.Item1.Status);
+            Assert.Equal("1", row.Item2);
+            Assert.Equal(2, result.Version.Version);
+            Assert.Equal("2", result.Version.VersionEtag);
+            Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
+            Assert.Equal(2, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.Equal("sync /", fake.Calls[0]);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Read_ConcurrentUnversionedCleanup_RetriesChildVersion(bool pointRead)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            fake.AfterRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(entry.SiloAddress))
+                {
+                    fake.AfterRead = null;
+                    await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                        fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+                }
+            };
+
+            var result = await Read(fake, pointRead ? entry.SiloAddress : null);
+
+            Assert.Empty(result.Members);
+            Assert.Equal(1, result.Version.Version);
+            Assert.Equal("1", result.Version.VersionEtag);
+            Assert.Single(fake.Nodes);
+            Assert.Equal(2, fake.Nodes["/"].ChildrenVersion);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Read_CleanupAfterHeartbeatRead_FencesCompletedRows(bool pointRead)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            fake.AfterRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress))
+                {
+                    fake.AfterRead = null;
+                    await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                        fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+                }
+            };
+
+            var result = await Read(fake, pointRead ? entry.SiloAddress : null);
+
+            Assert.Empty(result.Members);
+            Assert.Equal(1, result.Version.Version);
+            Assert.Single(fake.Nodes);
+        }
+
+        [Fact]
+        public async Task Read_MissingPointRow_ReturnsEmptyViewWithCurrentVersion()
+        {
+            var fake = new ZooKeeperNativeFake();
+            fake.Nodes["/"] = new([], 17);
+
+            var result = await Read(fake, CreateSiloAddress());
+
+            Assert.Empty(result.Members);
+            Assert.Equal(17, result.Version.Version);
+            Assert.Equal("17", result.Version.VersionEtag);
+            Assert.Equal(["sync /", "read /", "read /127.0.0.1:11111@12345", "read /"], fake.Calls);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task Read_ConcurrentHeartbeat_PreservesCanonicalFence(bool pointRead, bool afterHeartbeatRead)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var originalTime = entry.IAmAliveTime;
+            var root = fake.Nodes["/"];
+            var row = fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)];
+            var interleavingPath = afterHeartbeatRead
+                ? ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)
+                : ZooKeeperNativeFake.RowPath(entry.SiloAddress);
+            fake.AfterRead = async path =>
+            {
+                if (path == interleavingPath)
+                {
+                    fake.AfterRead = null;
+                    entry.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
+                    await Heartbeat(fake, entry);
+                }
+            };
+
+            var result = await Read(fake, pointRead ? entry.SiloAddress : null);
+
+            Assert.Equal(afterHeartbeatRead ? originalTime : entry.IAmAliveTime, Assert.Single(result.Members).Item1.IAmAliveTime);
+            Assert.Equal(1, result.Version.Version);
+            Assert.Equal("1", result.Version.VersionEtag);
+            Assert.Equal("0", result.Members[0].Item2);
+            Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            Assert.Same(root, fake.Nodes["/"]);
+            Assert.Same(row, fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)]);
+            Assert.Equal(entry.IAmAliveTime, ZooKeeperBasedMembershipTable.Deserialize<DateTime>(
+                fake.Nodes[ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)].Data));
+        }
+
+        [Fact]
+        public async Task Read_ParallelMissingRowAndAuthorizationFailure_PropagatesAuthorizationFailure()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var second = CreateTimedEntry(12346);
+            Assert.True(await Insert(fake, second, 1));
+            var failure = new KeeperException.NoAuthException();
+            fake.BeforeRead = path => path == ZooKeeperNativeFake.RowPath(entry.SiloAddress)
+                ? Task.FromException(new KeeperException.NoNodeException(path))
+                : path == ZooKeeperNativeFake.RowPath(second.SiloAddress)
+                    ? Task.FromException(failure) : Task.CompletedTask;
+
+            var actual = await Record.ExceptionAsync(() => Read(fake));
+
+            Assert.Same(failure, actual);
+            Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
+        }
+
+        [Fact]
+        public async Task Read_StableMissingHeartbeat_PropagatesFailure()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var path = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            fake.Nodes.Remove(path);
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(() => Read(fake));
+
+            Assert.Equal(path, failure.getPath());
+            Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
+        }
+
+        [Fact]
+        public async Task Insert_PersistentNodesAndVersion_CommitAtomically()
+        {
+            var fake = new ZooKeeperNativeFake();
+            var entry = CreateTimedEntry();
+
+            Assert.True(await Insert(fake, entry, 0));
+
+            Assert.Collection(Assert.Single(fake.Transactions),
+                operation => AssertSet(operation, "/", 0),
+                operation => AssertCreate(operation, ZooKeeperNativeFake.RowPath(entry.SiloAddress)),
+                operation => AssertCreate(operation, ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            var result = await Read(fake);
+            Assert.Equal(1, result.Version.Version);
+            Assert.Equal("0", Assert.Single(result.Members).Item2);
+            Assert.Equal(entry.SiloName, result.Members[0].Item1.SiloName);
+            Assert.Equal(entry.IAmAliveTime, result.Members[0].Item1.IAmAliveTime);
+            Assert.All(fake.Nodes.Values, node => Assert.Equal(0, node.Flags));
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task Insert_DuplicateOrStaleVersion_RollsBackTransaction(bool duplicate)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var original = fake.Nodes.ToArray();
+
+            Assert.False(await Insert(fake, duplicate ? entry : CreateTimedEntry(12346), duplicate ? 1 : 0));
+
+            Assert.Equal(original, fake.Nodes.ToArray());
+            Assert.Single(fake.Transactions);
+        }
+
+        [Theory]
+        [InlineData("0", 1)]
+        [InlineData("1", 1)]
+        [InlineData("0", 0)]
+        public async Task UpdateRow_OptimisticPreconditions_ControlAtomicMutation(string etag, int tableVersion)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var original = fake.Nodes.ToArray();
+            entry.Status = SiloStatus.Dead;
+
+            var updated = await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                fake.Operations, entry, etag, new TableVersion(tableVersion + 1, tableVersion.ToString()),
+                TestContext.Current.CancellationToken);
+
+            var expected = etag == "0" && tableVersion == 1;
+            Assert.Equal(expected, updated);
+            Assert.Equal("multi", Assert.Single(fake.Calls));
+            Assert.Collection(Assert.Single(fake.Transactions),
+                operation => AssertSet(operation, "/", tableVersion),
+                operation => AssertSet(operation, ZooKeeperNativeFake.RowPath(entry.SiloAddress), int.Parse(etag)));
+            if (!expected)
+            {
+                Assert.Equal(original, fake.Nodes.ToArray());
+            }
+
+            var result = await Read(fake);
+            Assert.Equal(expected ? SiloStatus.Dead : SiloStatus.Active, Assert.Single(result.Members).Item1.Status);
+            Assert.Equal(expected ? "1" : "0", result.Members[0].Item2);
+            Assert.Equal(expected ? 2 : 1, result.Version.Version);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task UpdateRow_HeartbeatPreservesOriginalTokens_ForStatusAndVotes(bool voteUpdate, bool concurrentHeartbeat)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var snapshot = await Read(fake);
+            var (update, etag) = Assert.Single(snapshot.Members);
+            var next = snapshot.Version.Next();
+            var heartbeat = CreateTimedEntry();
+            heartbeat.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
+            if (concurrentHeartbeat)
+            {
+                fake.BeforeMulti = async _ =>
+                {
+                    fake.BeforeMulti = null;
+                    await Heartbeat(fake, heartbeat);
+                };
+            }
+            else
+            {
+                await Heartbeat(fake, heartbeat);
+            }
+
+            if (voteUpdate)
+            {
+                update.SuspectTimes = [Tuple.Create(CreateTimedEntry(12346).SiloAddress, heartbeat.IAmAliveTime)];
+            }
+            else
+            {
+                update.Status = SiloStatus.Dead;
+            }
+
+            fake.Calls.Clear();
+
+            Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                fake.Operations, update, etag, next, TestContext.Current.CancellationToken));
+
+            Assert.Equal(concurrentHeartbeat ? ["multi", "write " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)] : ["multi"], fake.Calls);
+            Assert.Collection(Assert.Single(fake.Transactions),
+                operation => AssertSet(operation, "/", snapshot.Version.Version),
+                operation => AssertSet(operation, ZooKeeperNativeFake.RowPath(entry.SiloAddress), int.Parse(etag)));
+            Assert.Equal(1, fake.Nodes[ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)].Version);
+
+            var result = await Read(fake);
+            var row = Assert.Single(result.Members);
+            Assert.Equal(update.Status, row.Item1.Status);
+            Assert.Equal(update.SuspectTimes, row.Item1.SuspectTimes);
+            Assert.Equal(heartbeat.IAmAliveTime, row.Item1.IAmAliveTime);
+            Assert.Equal("1", row.Item2);
+            Assert.Equal(2, result.Version.Version);
+        }
+
+        [Fact]
+        public async Task UpdateRow_PreservesSeparateHeartbeatNode()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var heartbeat = fake.Nodes[ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)];
+            entry.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
+            entry.Status = SiloStatus.Dead;
+
+            Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                fake.Operations, entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+
+            Assert.Equal("multi", Assert.Single(fake.Calls));
+            Assert.Same(heartbeat, fake.Nodes[ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)]);
+            var result = await Read(fake);
+            var row = Assert.Single(result.Members);
+            Assert.Equal(ZooKeeperBasedMembershipTable.Deserialize<DateTime>(heartbeat.Data), row.Item1.IAmAliveTime);
+            Assert.Equal(SiloStatus.Dead, row.Item1.Status);
+            Assert.Equal("1", row.Item2);
+            Assert.Equal(2, result.Version.Version);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task UpdateRow_ConcurrentMembershipMutation_ReturnsConflictWithoutPartialWrite(bool sameRow)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            fake.BeforeMulti = async _ =>
+            {
+                fake.BeforeMulti = null;
+                if (sameRow)
+                {
+                    var winner = CreateTimedEntry();
+                    winner.Status = SiloStatus.ShuttingDown;
+                    Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                        fake.Operations, winner, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+                }
+                else
+                {
+                    Assert.True(await Insert(fake, CreateTimedEntry(12346), 1));
+                }
+            };
+            entry.Status = SiloStatus.Dead;
+            entry.IAmAliveTime = entry.IAmAliveTime.AddDays(3);
+
+            Assert.False(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                fake.Operations, entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+
+            var result = await Read(fake, entry.SiloAddress);
+            Assert.Equal(sameRow ? SiloStatus.ShuttingDown : SiloStatus.Active, Assert.Single(result.Members).Item1.Status);
+            Assert.Equal(DateTime.UnixEpoch.AddDays(1), result.Members[0].Item1.IAmAliveTime);
+            Assert.Equal(2, result.Version.Version);
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        public async Task UpdateIAmAlive_OwnerTimestamp_PerformsOneBlindColumnWrite(int seconds)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var rowPath = ZooKeeperNativeFake.RowPath(entry.SiloAddress);
+            var heartbeatPath = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            var row = fake.Nodes[rowPath];
+            var table = fake.Nodes["/"];
+            var heartbeat = fake.Nodes[heartbeatPath];
+            entry.IAmAliveTime = entry.IAmAliveTime.AddSeconds(seconds);
+            entry.Status = SiloStatus.Dead;
+            entry.HostName = "changed-host";
+            entry.SiloName = "changed-silo";
+            entry.ProxyPort = 123;
+            entry.StartTime = entry.StartTime.AddDays(1);
+            entry.SuspectTimes = [Tuple.Create(CreateTimedEntry(12346).SiloAddress, entry.IAmAliveTime)];
+
+            await Heartbeat(fake, entry);
+
+            AssertSingleHeartbeatWrite(fake, entry);
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.Same(table, fake.Nodes["/"]);
+            Assert.Same(row, fake.Nodes[rowPath]);
+            Assert.Equal(entry.IAmAliveTime, ZooKeeperBasedMembershipTable.Deserialize<DateTime>(fake.Nodes[heartbeatPath].Data));
+            Assert.Equal(heartbeat.Version + 1, fake.Nodes[heartbeatPath].Version);
+            Assert.Equal(heartbeat.ChildrenVersion, fake.Nodes[heartbeatPath].ChildrenVersion);
+            Assert.Equal(heartbeat.Flags, fake.Nodes[heartbeatPath].Flags);
+        }
+
+        [Theory]
+        [InlineData("auth")]
+        [InlineData("connection")]
+        [InlineData("session")]
+        [InlineData("version")]
+        public async Task UpdateIAmAlive_NativeFailure_PropagatesAfterOneBlindWrite(string kind)
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var original = fake.Nodes.ToArray();
+            Exception failure = kind switch
+            {
+                "auth" => new KeeperException.NoAuthException(),
+                "connection" => new KeeperException.ConnectionLossException(),
+                "session" => new KeeperException.SessionExpiredException(),
+                "version" => new KeeperException.BadVersionException(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            };
+            fake.BeforeWrite = _ => Task.FromException(failure);
+
+            var actual = await Record.ExceptionAsync(() => Heartbeat(fake, entry));
+
+            Assert.Same(failure, actual);
+            AssertSingleHeartbeatWrite(fake, entry);
+            Assert.Equal(original, fake.Nodes.ToArray());
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task UpdateIAmAlive_MissingNode_PropagatesNativeFailure(bool missingCluster)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            if (missingCluster)
+            {
+                fake.Nodes.Clear();
+            }
+            else
+            {
+                await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                    fake.Operations, entry.IAmAliveTime.AddDays(1), TestContext.Current.CancellationToken);
+            }
+
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+            var original = fake.Nodes.ToArray();
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(() => Heartbeat(fake, entry));
+
+            Assert.Equal(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress), failure.getPath());
+            AssertSingleHeartbeatWrite(fake, entry);
+            Assert.Equal(original, fake.Nodes.ToArray());
+        }
+
+        [Fact]
+        public async Task UpdateIAmAlive_CanceledCaller_PreservesPendingNativeWrite()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var writing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completeWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fake.BeforeWrite = _ =>
+            {
+                writing.SetResult();
+                return completeWrite.Task;
+            };
+            var heartbeatPath = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            var originalHeartbeat = fake.Nodes[heartbeatPath];
+            entry.IAmAliveTime = entry.IAmAliveTime.AddSeconds(1);
+            var operation = ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(entry, fake.SetData, cancellation.Token);
+            var caller = ZooKeeperBasedMembershipTable.AwaitOperationAsync(operation, cancellation.Token);
+            try
+            {
+                await writing.Task.WaitAsync(TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+
+                var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller);
+
+                Assert.Equal(cancellation.Token, failure.CancellationToken);
+                AssertSingleHeartbeatWrite(fake, entry);
+                Assert.False(operation.IsCompleted);
+                Assert.Same(originalHeartbeat, fake.Nodes[heartbeatPath]);
+            }
+            finally
+            {
+                completeWrite.SetResult();
+                await operation;
+            }
+
+            AssertSingleHeartbeatWrite(fake, entry);
+            Assert.Equal(entry.IAmAliveTime, ZooKeeperBasedMembershipTable.Deserialize<DateTime>(fake.Nodes[heartbeatPath].Data));
+            Assert.Equal(originalHeartbeat.Version + 1, fake.Nodes[heartbeatPath].Version);
+        }
+
+        [Theory]
+        [InlineData(SiloStatus.None)]
+        [InlineData(SiloStatus.Created)]
+        [InlineData(SiloStatus.Joining)]
+        [InlineData(SiloStatus.Active)]
+        [InlineData(SiloStatus.ShuttingDown)]
+        [InlineData(SiloStatus.Stopping)]
+        [InlineData(SiloStatus.Dead)]
+        public async Task Cleanup_OnlyEligibleDeadRows_DeletesWithNativeVersionChecks(SiloStatus status)
+        {
+            var (fake, entry) = await CreateNativeTable(status);
+            var root = fake.Nodes["/"];
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Equal(root.Version, fake.Nodes["/"].Version);
+            if (status == SiloStatus.Dead)
+            {
+                Assert.Equal("/", Assert.Single(fake.Nodes).Key);
+                Assert.Collection(Assert.Single(fake.Transactions),
+                    operation => AssertDelete(operation, ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress), 0),
+                    operation => AssertDelete(operation, ZooKeeperNativeFake.RowPath(entry.SiloAddress), 0));
+            }
+            else
+            {
+                Assert.Equal(3, fake.Nodes.Count);
+                Assert.Empty(fake.Transactions);
+                Assert.Equal(["children /", "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)], fake.Calls);
+                Assert.Equal(status, Assert.Single((await Read(fake)).Members).Item1.Status);
+            }
+        }
+
+        [Theory]
+        [InlineData("start", -1)]
+        [InlineData("start", 0)]
+        [InlineData("start", 1)]
+        [InlineData("heartbeat", -1)]
+        [InlineData("heartbeat", 0)]
+        [InlineData("heartbeat", 1)]
+        [InlineData("vote", -1)]
+        [InlineData("vote", 0)]
+        [InlineData("vote", 1)]
+        public async Task Cleanup_UsesLatestEvidenceAndExactUtcCutoff(string evidence, int ticks)
+        {
+            var fake = new ZooKeeperNativeFake();
+            var entry = CreateTimedEntry();
+            entry.Status = SiloStatus.Dead;
+            var cutoff = new DateTimeOffset(1970, 1, 3, 7, 0, 0, TimeSpan.FromHours(7));
+            var time = cutoff.UtcDateTime.AddTicks(ticks);
+            if (evidence == "start")
+            {
+                entry.StartTime = time;
+            }
+            else if (evidence == "heartbeat")
+            {
+                entry.IAmAliveTime = time;
+            }
+            else
+            {
+                entry.SuspectTimes =
+                [
+                    Tuple.Create(CreateSiloAddress(), time),
+                    Tuple.Create(CreateTimedEntry(12346).SiloAddress, DateTime.UnixEpoch)
+                ];
+            }
+
+            Assert.True(await Insert(fake, entry, 0));
+            fake.Transactions.Clear();
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, cutoff, TestContext.Current.CancellationToken);
+
+            Assert.Equal(ticks >= 0, fake.Nodes.ContainsKey(ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.Equal(ticks >= 0, fake.Nodes.ContainsKey(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            Assert.Equal(1, fake.Nodes["/"].Version);
+            Assert.Equal(ticks < 0 ? 1 : 0, fake.Transactions.Count);
+        }
+
+        [Theory]
+        [InlineData("heartbeat")]
+        [InlineData("start")]
+        [InlineData("vote")]
+        [InlineData("status")]
+        public async Task Cleanup_ConcurrentEvidenceUpdate_PreservesBothNodes(string evidence)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            var cutoff = DateTime.UnixEpoch.AddDays(2);
+            fake.BeforeMulti = async _ =>
+            {
+                fake.BeforeMulti = null;
+                if (evidence == "heartbeat")
+                {
+                    entry.IAmAliveTime = cutoff;
+                    await Heartbeat(fake, entry);
+                }
+                else
+                {
+                    if (evidence == "start")
+                    {
+                        entry.StartTime = cutoff;
+                    }
+                    else if (evidence == "vote")
+                    {
+                        entry.SuspectTimes = [Tuple.Create(CreateSiloAddress(), cutoff)];
+                    }
+                    else
+                    {
+                        entry.Status = SiloStatus.Active;
+                    }
+
+                    Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                        fake.Operations, entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+                }
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, cutoff, TestContext.Current.CancellationToken);
+
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.Equal(evidence == "heartbeat" ? 1 : 2, fake.Nodes["/"].Version);
+            var row = Assert.Single((await Read(fake)).Members).Item1;
+            Assert.Equal(entry.Status, row.Status);
+            Assert.Equal(entry.StartTime, row.StartTime);
+            Assert.Equal(entry.IAmAliveTime, row.IAmAliveTime);
+            Assert.Equal(entry.SuspectTimes, row.SuspectTimes);
+            Assert.Collection(fake.Transactions[0],
+                operation => AssertDelete(operation, ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress), 0),
+                operation => AssertDelete(operation, ZooKeeperNativeFake.RowPath(entry.SiloAddress), 0));
+        }
+
+        [Fact]
+        public async Task Cleanup_ConcurrentCleaners_CompleteWithUnchangedTableVersion()
+        {
+            var (fake, _) = await CreateNativeTable(SiloStatus.Dead);
+            var cutoff = DateTime.UnixEpoch.AddDays(2);
+            fake.BeforeMulti = async _ =>
+            {
+                fake.BeforeMulti = null;
+                await ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, cutoff, TestContext.Current.CancellationToken);
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, cutoff, TestContext.Current.CancellationToken);
+
+            Assert.Single(fake.Nodes);
+            Assert.Equal(1, fake.Nodes["/"].Version);
+            Assert.Equal(2, fake.Transactions.Count);
+        }
+
+        [Fact]
+        public async Task Cleanup_RowRetiredBeforeHeartbeatRead_CompletesWithUnchangedVersion()
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            fake.AfterRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(entry.SiloAddress))
+                {
+                    fake.AfterRead = null;
+                    await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                        fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+                }
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Single(fake.Nodes);
+            Assert.Equal(1, fake.Nodes["/"].Version);
+            Assert.Single(fake.Transactions);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Cleanup_MissingHeartbeatWithSurvivingRow_PropagatesNoNode(bool duringMulti)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            var heartbeatPath = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            var rowPath = ZooKeeperNativeFake.RowPath(entry.SiloAddress);
+            var row = fake.Nodes[rowPath];
+            var root = fake.Nodes["/"];
+            if (duringMulti)
+            {
+                fake.BeforeMulti = _ =>
+                {
+                    fake.Nodes.Remove(heartbeatPath);
+                    return Task.CompletedTask;
+                };
+            }
+            else
+            {
+                fake.Nodes.Remove(heartbeatPath);
+            }
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(() =>
+                ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                    fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken));
+
+            Assert.Equal(heartbeatPath, failure.getPath());
+            Assert.Same(row, fake.Nodes[rowPath]);
+            Assert.Same(root, fake.Nodes["/"]);
+            Assert.False(fake.Nodes.ContainsKey(heartbeatPath));
+            Assert.Equal(2, fake.Calls.Count(call => call == "read " + rowPath));
+            Assert.DoesNotContain("read /", fake.Calls);
+            Assert.Equal(duringMulti ? 1 : 0, fake.Transactions.Count);
+        }
+
+        [Fact]
+        public async Task Cleanup_SelectedBatch_ReadsEachCandidateOnce()
+        {
+            var (fake, first) = await CreateNativeTable(SiloStatus.Dead);
+            var second = CreateTimedEntry(12346);
+            second.Status = SiloStatus.Dead;
+            var active = CreateTimedEntry(12347);
+            Assert.True(await Insert(fake, second, 1));
+            Assert.True(await Insert(fake, active, 2));
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Equal(8, fake.Calls.Count);
+            Assert.Equal(1, fake.Calls.Count(call => call == "children /"));
+            foreach (var entry in new[] { first, second, active })
+            {
+                Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+                Assert.Equal(entry.Status == SiloStatus.Dead ? 1 : 0,
+                    fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            }
+
+            Assert.Equal(2, fake.Transactions.Count);
+            Assert.All(fake.Transactions, transaction => Assert.Equal(2, transaction.Count));
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.Equal(3, fake.Nodes["/"].Version);
+            Assert.True(fake.Nodes.ContainsKey(ZooKeeperNativeFake.RowPath(active.SiloAddress)));
+            Assert.True(fake.Nodes.ContainsKey(ZooKeeperNativeFake.HeartbeatPath(active.SiloAddress)));
+        }
+
+        [Fact]
+        public async Task Cleanup_Conflict_RechecksOnlyContestedRow()
+        {
+            var (fake, first) = await CreateNativeTable(SiloStatus.Dead);
+            var second = CreateTimedEntry(12346);
+            second.Status = SiloStatus.Dead;
+            Assert.True(await Insert(fake, second, 1));
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+            fake.BeforeMulti = async requests =>
+            {
+                if (requests[^1].Path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
+                {
+                    fake.BeforeMulti = null;
+                    first.IAmAliveTime = first.IAmAliveTime.AddHours(1);
+                    await Heartbeat(fake, first);
+                }
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, fake.Calls.Count(call => call == "children /"));
+            Assert.Equal(2, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress)));
+            Assert.Equal(2, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress)));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress)));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress)));
+            Assert.Equal(3, fake.Transactions.Count);
+            Assert.Equal(11, fake.Calls.Count);
+            Assert.Single(fake.Nodes);
+            Assert.Equal(2, fake.Nodes["/"].Version);
+        }
+
+        [Fact]
+        public async Task Cleanup_UnrelatedCanonicalUpdate_PreservesSelectedBatch()
+        {
+            var (fake, dead) = await CreateNativeTable(SiloStatus.Dead);
+            var active = CreateTimedEntry(12346);
+            Assert.True(await Insert(fake, active, 1));
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+            fake.BeforeRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(dead.SiloAddress))
+                {
+                    fake.BeforeRead = null;
+                    active.SuspectTimes = [Tuple.Create(dead.SiloAddress, DateTime.UnixEpoch.AddDays(2))];
+                    Assert.True(await ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(
+                        fake.Operations, active, "0", new TableVersion(3, "2"), TestContext.Current.CancellationToken));
+                }
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Equal(6, fake.Calls.Count);
+            Assert.Equal(1, fake.Calls.Count(call => call == "children /"));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(dead.SiloAddress)));
+            Assert.Equal(1, fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(active.SiloAddress)));
+            Assert.Equal(2, fake.Transactions.Count);
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.Equal(3, fake.Nodes["/"].Version);
+            var surviving = ZooKeeperBasedMembershipTable.Deserialize<MembershipEntry>(
+                fake.Nodes[ZooKeeperNativeFake.RowPath(active.SiloAddress)].Data);
+            Assert.Equal(SiloStatus.Active, surviving.Status);
+            Assert.Equal(active.SuspectTimes, surviving.SuspectTimes);
+        }
+
+        [Fact]
+        public async Task Cleanup_ParallelFailure_WaitsForOutstandingRequests()
+        {
+            var (fake, first) = await CreateNativeTable();
+            var second = CreateTimedEntry(12346);
+            Assert.True(await Insert(fake, second, 1));
+            var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completeFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var failure = new KeeperException.NoAuthException();
+            fake.BeforeRead = path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
+                {
+                    firstStarted.SetResult();
+                    return completeFirst.Task;
+                }
+
+                if (path == ZooKeeperNativeFake.RowPath(second.SiloAddress))
+                {
+                    failed.SetResult();
+                    return Task.FromException(failure);
+                }
+
+                return Task.CompletedTask;
+            };
+
+            var operation = ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+            try
+            {
+                await Task.WhenAll(firstStarted.Task, failed.Task).WaitAsync(TestContext.Current.CancellationToken);
+                Assert.False(operation.IsCompleted);
+            }
+            finally
+            {
+                completeFirst.SetResult();
+            }
+
+            Assert.Same(failure, await Record.ExceptionAsync(() => operation));
+            Assert.Equal(5, fake.Nodes.Count);
+        }
+
+        [Fact]
+        public async Task Cleanup_ConcurrentRetirement_PreservesOtherRowsAuthorizationFailure()
+        {
+            var (fake, first) = await CreateNativeTable(SiloStatus.Dead);
+            var second = CreateTimedEntry(12346);
+            Assert.True(await Insert(fake, second, 1));
+            var failure = new KeeperException.NoAuthException();
+            fake.BeforeRead = path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
+                {
+                    fake.Nodes.Remove(ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress));
+                    fake.Nodes.Remove(path);
+                    fake.Nodes["/"] = fake.Nodes["/"] with { ChildrenVersion = fake.Nodes["/"].ChildrenVersion + 1 };
+                }
+                else if (path == ZooKeeperNativeFake.RowPath(second.SiloAddress))
+                {
+                    return Task.FromException(failure);
+                }
+
+                return Task.CompletedTask;
+            };
+
+            var actual = await Record.ExceptionAsync(() => ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken));
+
+            Assert.Same(failure, actual);
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.True(fake.Nodes.ContainsKey(ZooKeeperNativeFake.RowPath(second.SiloAddress)));
+        }
+
+        [Theory]
+        [InlineData("read")]
+        [InlineData("point")]
+        [InlineData("insert")]
+        [InlineData("update")]
+        [InlineData("cleanup")]
+        public async Task MembershipOperations_MissingClusterHistory_PropagatesNoNode(string operation)
+        {
+            var fake = new ZooKeeperNativeFake();
+            fake.Nodes.Clear();
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(
+                () => InvokeNative(operation, fake, CreateTimedEntry(), TestContext.Current.CancellationToken));
+
+            Assert.Equal("/", failure.getPath());
+            Assert.Empty(fake.Nodes);
+            if (operation == "insert")
+            {
+                Assert.Equal("multi", Assert.Single(fake.Calls));
+            }
+        }
+
+        [Theory]
+        [InlineData("read", "auth", false)]
+        [InlineData("point", "connection", false)]
+        [InlineData("insert", "session", true)]
+        [InlineData("update", "auth", true)]
+        [InlineData("update", "connection", true)]
+        [InlineData("update", "session", true)]
+        [InlineData("cleanup", "session", false)]
+        [InlineData("cleanup", "auth", true)]
+        [InlineData("cleanup", "connection", true)]
+        [InlineData("cleanup", "session", true)]
+        public async Task MembershipOperations_InfrastructureFailure_PropagatesSameException(string operation, string kind, bool duringWrite)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            Exception failure = kind switch
+            {
+                "auth" => new KeeperException.NoAuthException(),
+                "session" => new KeeperException.SessionExpiredException(),
+                _ => new KeeperException.ConnectionLossException()
+            };
+            if (!duringWrite)
+            {
+                fake.BeforeRead = _ => Task.FromException(failure);
+            }
+
+            fake.BeforeMulti = _ => Task.FromException(failure);
+            fake.BeforeWrite = _ => Task.FromException(failure);
+            entry.IAmAliveTime = entry.IAmAliveTime.AddHours(1);
+
+            var actual = await Record.ExceptionAsync(() => InvokeNative(operation, fake, entry, TestContext.Current.CancellationToken));
+
+            Assert.Same(failure, actual);
+            Assert.Equal(3, fake.Nodes.Count);
+            Assert.Equal(1, fake.Nodes["/"].Version);
+        }
+
+        [Theory]
+        [InlineData("update")]
+        [InlineData("cleanup")]
+        public async Task MembershipOperations_ClusterRemovedDuringWrite_PropagatesNoNode(string operation)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            Task RemoveCluster()
+            {
+                fake.Nodes.Clear();
+                return Task.CompletedTask;
+            }
+
+            fake.BeforeMulti = _ => RemoveCluster();
+            fake.BeforeWrite = _ => RemoveCluster();
+            entry.IAmAliveTime = entry.IAmAliveTime.AddHours(1);
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(
+                () => InvokeNative(operation, fake, entry, TestContext.Current.CancellationToken));
+
+            Assert.Equal("/", failure.getPath());
+            Assert.Empty(fake.Nodes);
+        }
+
+        [Theory]
+        [InlineData("cleanup")]
+        public async Task NativeOperations_CanceledConflict_StopsRetrying(string operation)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var requestCount = 0;
+            Task Conflict()
+            {
+                requestCount = fake.Calls.Count;
+                cancellation.Cancel();
+                throw new KeeperException.BadVersionException(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress));
+            }
+
+            fake.BeforeMulti = _ => Conflict();
+            fake.BeforeWrite = _ => Conflict();
+            entry.IAmAliveTime = entry.IAmAliveTime.AddHours(1);
+
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => InvokeNative(operation, fake, entry, cancellation.Token));
+
+            Assert.Equal(cancellation.Token, failure.CancellationToken);
+            Assert.Equal(requestCount, fake.Calls.Count);
+            Assert.Equal(1, fake.Nodes["/"].Version);
+            Assert.Equal(3, fake.Nodes.Count);
+        }
+
+        [Theory]
+        [InlineData("read")]
+        [InlineData("point")]
+        [InlineData("insert")]
+        [InlineData("update")]
+        [InlineData("heartbeat")]
+        [InlineData("cleanup")]
+        public async Task NativeOperations_PreCanceledToken_IssuesNoRequests(string operation)
+        {
+            var fake = new ZooKeeperNativeFake();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.Cancel();
+
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => InvokeNative(operation, fake, CreateTimedEntry(), cancellation.Token));
+
+            Assert.Equal(cancellation.Token, failure.CancellationToken);
+            Assert.Empty(fake.Calls);
+        }
+
+        [Theory]
+        [InlineData("read")]
+        [InlineData("point")]
+        [InlineData("cleanup")]
+        public async Task NativeOperations_CanceledAfterRead_StartsNoFurtherRequests(string operation)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            fake.AfterRead = _ =>
+            {
+                cancellation.Cancel();
+                return Task.CompletedTask;
+            };
+            entry.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
+
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => InvokeNative(operation, fake, entry, cancellation.Token));
+
+            Assert.Equal(cancellation.Token, failure.CancellationToken);
+            Assert.Equal(1, fake.Calls.Count(call => call.StartsWith("read ", StringComparison.Ordinal)));
+            Assert.Empty(fake.Transactions);
+            Assert.DoesNotContain(fake.Calls, call => call.StartsWith("write ", StringComparison.Ordinal));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task AwaitOperation_CanceledCaller_PreservesRequestAndDisposalOwnership(bool fail)
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var request = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var disposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var failure = new KeeperException.ConnectionLossException();
+            async Task<int> NativeOperation()
+            {
+                try
+                {
+                    await request.Task;
+                    if (fail)
+                    {
+                        throw failure;
+                    }
+
+                    return 42;
+                }
+                finally
+                {
+                    disposing.SetResult();
+                    await disposal.Task;
+                }
+            }
+
+            var operation = NativeOperation();
+            var caller = ZooKeeperBasedMembershipTable.AwaitOperationAsync(operation, cancellation.Token);
+            cancellation.Cancel();
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller);
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+            Assert.False(operation.IsCompleted);
+            Assert.False(disposing.Task.IsCompleted);
+
+            request.SetResult();
+            await disposing.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.False(operation.IsCompleted);
+            disposal.SetResult();
+            if (fail)
+            {
+                Assert.Same(failure, await Record.ExceptionAsync(() => operation));
+            }
+            else
+            {
+                Assert.Equal(42, await operation);
+            }
+        }
+
+        [Theory]
+        [InlineData("MissingMethod", "expected a parameterless instance method")]
+        [InlineData("ToString", "expected System.Int32, received System.String")]
+        public void NativeFake_IncompatibleSdkMember_ReportsActionableDiagnostic(string methodName, string detail)
+        {
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                ZooKeeperNativeFake.GetValue<int>(new object(), methodName));
+
+            Assert.Contains($"System.Object.{methodName}", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(detail, failure.Message, StringComparison.Ordinal);
+            Assert.Contains("Update the fake for the installed ZooKeeperNetEx API", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(typeof(Op).Assembly.FullName!, failure.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void NativeFake_IncompatibleSdkConstructor_ReportsActionableDiagnostic()
+        {
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                ZooKeeperNativeFake.CreateResult<DataResult>());
+
+            Assert.Contains($"{typeof(DataResult).FullName}..ctor", failure.Message, StringComparison.Ordinal);
+            Assert.Contains("expected a non-public instance constructor accepting ()", failure.Message, StringComparison.Ordinal);
+            Assert.Contains("Update the fake for the installed ZooKeeperNetEx API", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(typeof(Op).Assembly.FullName!, failure.Message, StringComparison.Ordinal);
+        }
+
+        private static Task InvokeNative(string operation, ZooKeeperNativeFake fake, MembershipEntry entry, CancellationToken cancellationToken) =>
+            operation switch
+            {
+                "read" => ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, null, cancellationToken),
+                "point" => ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, entry.SiloAddress, cancellationToken),
+                "insert" => ZooKeeperBasedMembershipTable.InsertRowCoreAsync(fake.Operations, entry, new TableVersion(2, "1"), cancellationToken),
+                "update" => ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(fake.Operations, entry, "0", new TableVersion(2, "1"), cancellationToken),
+                "heartbeat" => ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(entry, fake.SetData, cancellationToken),
+                "cleanup" => ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, DateTime.UnixEpoch.AddDays(3), cancellationToken),
+                _ => throw new ArgumentOutOfRangeException(nameof(operation))
+            };
+
+        private static async Task<(ZooKeeperNativeFake Fake, MembershipEntry Entry)> CreateNativeTable(SiloStatus status = SiloStatus.Active)
+        {
+            var fake = new ZooKeeperNativeFake();
+            var entry = CreateTimedEntry();
+            entry.Status = status;
+            Assert.True(await Insert(fake, entry, 0));
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+            return (fake, entry);
+        }
+
+        private static MembershipEntry CreateTimedEntry(int generation = 12345) =>
+            new()
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), generation),
+                HostName = "host-a",
+                SiloName = "silo-a",
+                Status = SiloStatus.Active,
+                StartTime = DateTime.UnixEpoch,
+                IAmAliveTime = DateTime.UnixEpoch.AddDays(1)
+            };
+
+        private static Task<bool> Insert(ZooKeeperNativeFake fake, MembershipEntry entry, int version) =>
+            ZooKeeperBasedMembershipTable.InsertRowCoreAsync(fake.Operations, entry,
+                new TableVersion(version + 1, version.ToString()), TestContext.Current.CancellationToken);
+
+        private static Task<MembershipTableData> Read(ZooKeeperNativeFake fake, SiloAddress? address = null) =>
+            ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, address, TestContext.Current.CancellationToken);
+
+        private static Task Heartbeat(ZooKeeperNativeFake fake, MembershipEntry entry) =>
+            ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(entry, fake.SetData, TestContext.Current.CancellationToken);
+
+        private static void AssertSingleHeartbeatWrite(ZooKeeperNativeFake fake, MembershipEntry entry)
+        {
+            var path = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            Assert.Equal("write " + path, Assert.Single(fake.Calls));
+            var write = Assert.Single(fake.Writes);
+            Assert.Equal(path, write.Path);
+            Assert.Equal(-1, write.Version);
+            Assert.Equal(ZooKeeperBasedMembershipTable.Serialize(entry.IAmAliveTime), write.Data);
+            Assert.Empty(fake.Transactions);
+        }
+
+        private static void AssertSet(object operation, string path, int version)
+        {
+            var set = Assert.IsType<ZooKeeperNativeFake.SetDataRequest>(operation);
+            Assert.Equal(path, set.Path);
+            Assert.Equal(version, set.Version);
+        }
+
+        private static void AssertCreate(object operation, string path)
+        {
+            var create = Assert.IsType<ZooKeeperNativeFake.CreateRequest>(operation);
+            Assert.Equal(path, create.Path);
+            Assert.Equal(0, create.Flags);
+            Assert.Equal(ZooDefs.Ids.OPEN_ACL_UNSAFE, create.Acl);
+        }
+
+        private static void AssertDelete(object operation, string path, int version)
+        {
+            var delete = Assert.IsType<ZooKeeperNativeFake.DeleteRequest>(operation);
+            Assert.Equal(path, delete.Path);
+            Assert.Equal(version, delete.Version);
         }
 
         private static ZooKeeperBasedMembershipTable CreateSut(
