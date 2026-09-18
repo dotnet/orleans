@@ -100,14 +100,16 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         try
         {
-            var silos = await ReadSilos(cancellationToken).ConfigureAwait(false);
+            var snapshot = await ReadMembershipSnapshot(siloId: null, cancellationToken).ConfigureAwait(false);
 
-            foreach (var chunk in silos.Chunk(MaxBatchSize))
+            foreach (var chunk in snapshot.Members.Chunk(MaxBatchSize))
             {
                 var batch = _container.CreateTransactionalBatch(_partitionKey);
                 foreach (var silo in chunk)
                 {
-                    batch.DeleteItem(silo.Id);
+                    batch.DeleteItem(
+                        ConstructSiloEntityId(silo.Item1.SiloAddress),
+                        new TransactionalBatchItemRequestOptions { IfMatchEtag = silo.Item2 });
                 }
 
                 using var response = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
@@ -118,7 +120,9 @@ internal partial class CosmosMembershipTable : IMembershipTable
             }
 
             await _container.DeleteItemAsync<ClusterVersionEntity>(
-                CLUSTER_VERSION_ID, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false);
+                CLUSTER_VERSION_ID, _partitionKey,
+                new ItemRequestOptions { IfMatchEtag = snapshot.Version.VersionEtag },
+                cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

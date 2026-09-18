@@ -483,6 +483,7 @@ public class CosmosMembershipTableCancellationTests
     public async Task ScopedDeletionBatchesRowsAndDeletesVersionLast()
     {
         using var storage = new CosmosMembershipTestStorage();
+        storage.SetVersion();
         var silos = Enumerable.Range(1, 101).Select(index => Silo(index)).ToArray();
         storage.SetPages(Page("0:8", null, silos));
         var batches = new List<TransactionalBatch>();
@@ -508,12 +509,163 @@ public class CosmosMembershipTableCancellationTests
 
         Assert.Equal(new[] { 100, 1 }, batches.Select(batch =>
             batch.ReceivedCalls().Count(call => call.GetMethodInfo().Name == "DeleteItem")));
+        foreach (var silo in silos)
+        {
+            var rowDeletion = Assert.Single(batches.SelectMany(batch => batch.ReceivedCalls()), call =>
+                call.GetMethodInfo().Name == "DeleteItem" && Equals(call.GetArguments()[0], silo.Id));
+            Assert.Equal(silo.ETag, Assert.IsType<TransactionalBatchItemRequestOptions>(rowDeletion.GetArguments()[1]).IfMatchEtag);
+        }
+
+        var query = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "GetItemQueryIterator");
+        Assert.Equal("0:7", Assert.IsType<QueryRequestOptions>(query.GetArguments()[2]).SessionToken);
         storage.Container.Received(2).CreateTransactionalBatch(Partition);
         var deletion = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItemAsync");
         Assert.Equal(typeof(ClusterVersionEntity), Assert.Single(deletion.GetMethodInfo().GetGenericArguments()));
         Assert.Equal("ClusterVersion", deletion.GetArguments()[0]);
         Assert.Equal(Partition, deletion.GetArguments()[1]);
+        Assert.Equal("v7", Assert.IsType<ItemRequestOptions>(deletion.GetArguments()[2]).IfMatchEtag);
         Assert.Equal(Token, deletion.GetArguments()[3]);
+    }
+
+    [Fact]
+    public async Task ScopedDeletionUsesStableSnapshotBeforeDeletingRows()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        storage.Container.ReadItemAsync<ClusterVersionEntity>("", default, null, Token)
+            .ReturnsForAnyArgs(Version(7, "v7", "0:7"), Version(8, "v8", "0:9"), Version(8, "v8", "0:9"), Version(8, "v8", "0:10"));
+        var current = Silo(2);
+        storage.SetPages(Page("0:8", null, Silo()), Page("0:10", null, current));
+        var batch = storage.SetBatch(HttpStatusCode.OK);
+        storage.Container.DeleteItemAsync<ClusterVersionEntity>("", default, null, Token)
+            .ReturnsForAnyArgs(Version(8, "v8", "0:10"));
+
+        await storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token);
+
+        var rowDeletion = Assert.Single(batch.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItem");
+        Assert.Equal(current.Id, rowDeletion.GetArguments()[0]);
+        Assert.Equal(current.ETag, Assert.IsType<TransactionalBatchItemRequestOptions>(rowDeletion.GetArguments()[1]).IfMatchEtag);
+        var versionDeletion = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItemAsync");
+        Assert.Equal("v8", Assert.IsType<ItemRequestOptions>(versionDeletion.GetArguments()[2]).IfMatchEtag);
+        Assert.Equal(4, storage.Container.ReceivedCalls().Count(call => call.GetMethodInfo().Name == "ReadItemAsync"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ScopedDeletionPreservesChangedVersionAfterEarlierChunk(bool recreateVersion)
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        storage.SetVersion();
+        var silos = Enumerable.Range(1, 101).Select(index => Silo(index)).ToArray();
+        var rows = silos.ToDictionary(silo => silo.Id);
+        var newSilo = Silo(102);
+        ItemResponse<ClusterVersionEntity>? currentVersion = Version(7, "v7", "0:7");
+        storage.SetPages(Page("0:8", null, silos));
+        var completedChunks = 0;
+        var success = BatchResponse(HttpStatusCode.OK);
+        storage.Container.CreateTransactionalBatch(Arg.Any<PartitionKey>()).Returns(_ =>
+        {
+            var batch = Substitute.For<TransactionalBatch>();
+            var deletions = new List<string>();
+            batch.DeleteItem(Arg.Any<string>(), Arg.Any<TransactionalBatchItemRequestOptions>()).Returns(call =>
+            {
+                var id = call.Arg<string>();
+                Assert.Equal(rows[id].ETag, call.Arg<TransactionalBatchItemRequestOptions>().IfMatchEtag);
+                deletions.Add(id);
+                return batch;
+            });
+            batch.ExecuteAsync(Token).Returns(_ =>
+            {
+                foreach (var id in deletions)
+                {
+                    Assert.True(rows.Remove(id));
+                }
+
+                if (++completedChunks == 1)
+                {
+                    currentVersion = Version(recreateVersion ? 0 : 8, "concurrent-version", "0:9");
+                    rows.Add(newSilo.Id, newSilo);
+                }
+
+                return success;
+            });
+            return batch;
+        });
+        storage.Container.DeleteItemAsync<ClusterVersionEntity>("", default, null, Token).ReturnsForAnyArgs(call =>
+        {
+            Assert.Equal(2, completedChunks);
+            if (call.Arg<ItemRequestOptions>().IfMatchEtag != currentVersion!.ETag)
+            {
+                return Task.FromException<ItemResponse<ClusterVersionEntity>>(Failure(HttpStatusCode.PreconditionFailed));
+            }
+
+            var deleted = currentVersion;
+            currentVersion = null;
+            return Task.FromResult(deleted);
+        });
+
+        var exception = await Assert.ThrowsAsync<WrappedException>(() => storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token));
+
+        Assert.Contains("storage failure", exception.Message);
+        Assert.NotNull(currentVersion);
+        Assert.Equal("concurrent-version", currentVersion.ETag);
+        Assert.Equal(recreateVersion ? 0 : 8, currentVersion.Resource.ClusterVersion);
+        Assert.Same(newSilo, Assert.Single(rows.Values));
+    }
+
+    [Fact]
+    public async Task ScopedDeletionPreservesRowChangedBeforeLaterChunk()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        storage.SetVersion();
+        var silos = Enumerable.Range(1, 101).Select(index => Silo(index)).ToArray();
+        var rows = silos.ToDictionary(silo => silo.Id);
+        storage.SetPages(Page("0:8", null, silos));
+        var completedChunks = 0;
+        SiloEntity? concurrentRow = null;
+        var success = BatchResponse(HttpStatusCode.OK);
+        var conflict = BatchResponse(HttpStatusCode.PreconditionFailed);
+        storage.Container.CreateTransactionalBatch(Arg.Any<PartitionKey>()).Returns(_ =>
+        {
+            var batch = Substitute.For<TransactionalBatch>();
+            var deletions = new List<(string Id, string Etag)>();
+            batch.DeleteItem(Arg.Any<string>(), Arg.Any<TransactionalBatchItemRequestOptions>()).Returns(call =>
+            {
+                deletions.Add((call.Arg<string>(), call.Arg<TransactionalBatchItemRequestOptions>().IfMatchEtag));
+                return batch;
+            });
+            batch.ExecuteAsync(Token).Returns(_ =>
+            {
+                if (deletions.Any(deletion => rows[deletion.Id].ETag != deletion.Etag))
+                {
+                    return conflict;
+                }
+
+                foreach (var deletion in deletions)
+                {
+                    Assert.True(rows.Remove(deletion.Id));
+                }
+
+                completedChunks++;
+                var changed = Clone(Assert.Single(rows.Values));
+                changed.ETag = "concurrent-heartbeat";
+                changed.IAmAliveTime = DateTime.UnixEpoch.AddHours(1);
+                rows[changed.Id] = changed;
+                concurrentRow = changed;
+                return success;
+            });
+            return batch;
+        });
+
+        var exception = await Assert.ThrowsAsync<WrappedException>(() => storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token));
+
+        Assert.Contains("native batch failure", exception.Message);
+        Assert.Equal(1, completedChunks);
+        var remaining = Assert.Single(rows.Values);
+        Assert.Same(concurrentRow, remaining);
+        Assert.Equal("concurrent-heartbeat", remaining.ETag);
+        Assert.Equal(DateTime.UnixEpoch.AddHours(1), remaining.IAmAliveTime);
+        Assert.DoesNotContain(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "DeleteItemAsync");
     }
 
     [Fact]
@@ -595,6 +747,7 @@ public class CosmosMembershipTableCancellationTests
     public async Task ScopedDeletionFailurePreservesVersionAndRemainsVisible(HttpStatusCode status)
     {
         using var storage = new CosmosMembershipTestStorage();
+        storage.SetVersion();
         storage.SetPages(Page("0:8", null, Silo()));
         storage.SetBatch(status);
 

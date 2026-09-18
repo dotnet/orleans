@@ -98,18 +98,28 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
     public static SiloEntity Silo(int generation = 1, SiloStatus status = SiloStatus.Active)
         => new()
         {
-            Id = $"127.0.0.1-11111-{generation}", ClusterId = "cluster", ETag = $"s{generation}",
-            Address = "127.0.0.1", Port = 11111, Generation = generation,
-            Hostname = "host", SiloName = $"silo-{generation}", Status = (int)status,
-            StartTime = DateTime.UnixEpoch, IAmAliveTime = DateTime.UnixEpoch
+            Id = $"127.0.0.1-11111-{generation}",
+            ClusterId = "cluster",
+            ETag = $"s{generation}",
+            Address = "127.0.0.1",
+            Port = 11111,
+            Generation = generation,
+            Hostname = "host",
+            SiloName = $"silo-{generation}",
+            Status = (int)status,
+            StartTime = DateTime.UnixEpoch,
+            IAmAliveTime = DateTime.UnixEpoch
         };
 
     public static MembershipEntry Entry(int generation = 1)
         => new()
         {
             SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, generation),
-            Status = SiloStatus.Active, HostName = "host", SiloName = $"silo-{generation}",
-            StartTime = DateTime.UnixEpoch, IAmAliveTime = DateTime.UnixEpoch.AddHours(1)
+            Status = SiloStatus.Active,
+            HostName = "host",
+            SiloName = $"silo-{generation}",
+            StartTime = DateTime.UnixEpoch,
+            IAmAliveTime = DateTime.UnixEpoch.AddHours(1)
         };
 
     public static SiloEntity Clone(SiloEntity silo)
