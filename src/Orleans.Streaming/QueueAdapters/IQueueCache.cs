@@ -103,6 +103,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="earliestSubscriptionToken">
         /// The earliest last processed sequence token across registered subscriptions.
+        /// When caught-up progress is known, drained subscriptions can instead advance to the queue's read boundary.
         /// A <see langword="null"/> value indicates that there are no active subscriptions.
         /// The token is only valid for the duration of the call and must not be stored.
         /// </param>
