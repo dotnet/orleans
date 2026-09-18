@@ -47,6 +47,7 @@ public sealed class MessagingProviderCutoverTests
             silo.AddDurableMessaging();
             silo.Services.AddSingleton<HandlerProbe>();
             silo.Services.AddSingleton(snapshots);
+            ReceiverTestServices.AddObservedStateProbes(silo.Services);
             silo.Services.AddScoped<IJournaledStateManager>(services =>
             {
                 var context = services.GetRequiredService<IGrainContext>();
