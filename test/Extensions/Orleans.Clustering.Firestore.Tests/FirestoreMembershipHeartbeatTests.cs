@@ -287,6 +287,50 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(1, 0, false)]
+    [InlineData(0, 1, false)]
+    public async Task NativeFakeCommitComparesTimestampValues(int secondsDelta, int nanosDelta, bool matches)
+    {
+        var client = new MembershipClient();
+        var original = client.AddRow(Entry(), Now).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        var updateTime = original.UpdateTime.Clone();
+        updateTime.Seconds += secondsDelta;
+        updateTime.Nanos += nanosDelta;
+        Assert.NotSame(client.Documents[original.Name].UpdateTime, updateTime);
+        var request = new CommitRequest
+        {
+            Writes =
+            {
+                new Write
+                {
+                    Delete = original.Name,
+                    CurrentDocument = new Google.Cloud.Firestore.V1.Precondition { UpdateTime = updateTime }
+                }
+            }
+        };
+
+        if (matches)
+        {
+            await client.CommitAsync(request);
+
+            Assert.False(client.Documents.ContainsKey(original.Name));
+            Assert.Equal(original.Name, Assert.Single(client.CommittedWrites).Delete);
+        }
+        else
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(() => client.CommitAsync(request));
+
+            Assert.Equal(StatusCode.FailedPrecondition, exception.StatusCode);
+            Assert.Equal(original, client.Documents[original.Name]);
+            Assert.Empty(client.CommittedWrites);
+        }
+
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
+    [Theory]
     [InlineData(SiloStatus.None)]
     [InlineData(SiloStatus.Created)]
     [InlineData(SiloStatus.Joining)]
@@ -626,7 +670,7 @@ public sealed class FirestoreMembershipHeartbeatTests
                 var current = Documents.GetValueOrDefault(name);
                 if (write.CurrentDocument is { } precondition
                     && (precondition.ConditionTypeCase == Google.Cloud.Firestore.V1.Precondition.ConditionTypeOneofCase.UpdateTime
-                        ? current?.UpdateTime != precondition.UpdateTime
+                        ? !Equals(current?.UpdateTime, precondition.UpdateTime)
                         : precondition.Exists != (current is not null)))
                 {
                     return Task.FromException<CommitResponse>(new RpcException(new Status(StatusCode.FailedPrecondition, "Write precondition failed.")));
