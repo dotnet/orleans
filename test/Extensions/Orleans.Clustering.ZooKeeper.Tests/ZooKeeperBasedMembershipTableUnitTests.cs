@@ -857,6 +857,64 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
+        public async Task Cleanup_RowRetiredBeforeHeartbeatRead_CompletesWithUnchangedVersion()
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            fake.AfterRead = async path =>
+            {
+                if (path == ZooKeeperNativeFake.RowPath(entry.SiloAddress))
+                {
+                    fake.AfterRead = null;
+                    await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                        fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+                }
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
+
+            Assert.Single(fake.Nodes);
+            Assert.Equal(1, fake.Nodes["/"].Version);
+            Assert.Single(fake.Transactions);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Cleanup_MissingHeartbeatWithSurvivingRow_PropagatesNoNode(bool duringMulti)
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            var heartbeatPath = ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress);
+            var rowPath = ZooKeeperNativeFake.RowPath(entry.SiloAddress);
+            var row = fake.Nodes[rowPath];
+            var root = fake.Nodes["/"];
+            if (duringMulti)
+            {
+                fake.BeforeMulti = _ =>
+                {
+                    fake.Nodes.Remove(heartbeatPath);
+                    return Task.CompletedTask;
+                };
+            }
+            else
+            {
+                fake.Nodes.Remove(heartbeatPath);
+            }
+
+            var failure = await Assert.ThrowsAsync<KeeperException.NoNodeException>(() =>
+                ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                    fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken));
+
+            Assert.Equal(heartbeatPath, failure.getPath());
+            Assert.Same(row, fake.Nodes[rowPath]);
+            Assert.Same(root, fake.Nodes["/"]);
+            Assert.False(fake.Nodes.ContainsKey(heartbeatPath));
+            Assert.Equal(2, fake.Calls.Count(call => call == "read " + rowPath));
+            Assert.DoesNotContain("read /", fake.Calls);
+            Assert.Equal(duringMulti ? 1 : 0, fake.Transactions.Count);
+        }
+
+        [Fact]
         public async Task Cleanup_SelectedBatch_ReadsEachCandidateOnce()
         {
             var (fake, first) = await CreateNativeTable(SiloStatus.Dead);

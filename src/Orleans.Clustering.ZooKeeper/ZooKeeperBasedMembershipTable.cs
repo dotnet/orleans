@@ -541,9 +541,20 @@ namespace Orleans.Runtime.Membership
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                DataResult row;
                 try
                 {
-                    var row = await zk.GetData(rowPath);
+                    row = await zk.GetData(rowPath);
+                }
+                catch (KeeperException.NoNodeException)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.GetData("/");
+                    return;
+                }
+
+                try
+                {
                     var entry = Deserialize<MembershipEntry>(row.Data);
                     if (entry.Status != SiloStatus.Dead || entry.StartTime >= cutoff
                         || entry.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) == true)
@@ -573,8 +584,19 @@ namespace Orleans.Runtime.Membership
                 catch (KeeperException.NoNodeException)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await zk.GetData("/");
-                    return;
+                    try
+                    {
+                        await zk.GetData(rowPath);
+                    }
+                    catch (KeeperException.NoNodeException)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await zk.GetData("/");
+                        return;
+                    }
+
+                    // Atomic retirement removes both nodes; a surviving row has a missing heartbeat.
+                    throw;
                 }
             }
         }
