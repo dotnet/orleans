@@ -211,17 +211,22 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
                 throw;
             }
             bool disposed;
+            ClusteringConformanceException? duplicateFailure = null;
             lock (_lifecycleLock)
             {
                 disposed = _disposed != 0;
                 if (!disposed && !_endedClusters.Contains(clusterId))
                 {
                     var duplicate = _handles.Any(h => ReferenceEquals(h.Table, handle.Table));
-                    if (!_handles.Contains(handle)) _handles.Add(handle);
-                    _clusters.TryAdd(clusterId, handle.Table);
-                    ClusteringTestKitDiagnostics.Require(!duplicate,
+                    if (!duplicate)
+                    {
+                        _handles.Add(handle);
+                        _clusters.TryAdd(clusterId, handle.Table);
+                        return handle;
+                    }
+                    duplicateFailure = new ClusteringConformanceException(
                         $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
-                    return handle;
+                    if (_handles.Contains(handle)) throw duplicateFailure;
                 }
             }
 
@@ -229,8 +234,14 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
             catch (Exception exception)
             {
                 lock (_lifecycleLock) _operationFailures.Add(exception);
+                if (duplicateFailure is not null)
+                {
+                    ClusteringTestKitDiagnostics.AttachCleanupFailure(duplicateFailure, exception);
+                    throw duplicateFailure;
+                }
                 throw;
             }
+            if (duplicateFailure is not null) throw duplicateFailure;
             if (disposed)
                 throw new ObjectDisposedException(nameof(MembershipTableTestFixture), "The factory completed after its fixture was disposed.");
             throw new InvalidOperationException("The factory completed after its cluster history ended.");

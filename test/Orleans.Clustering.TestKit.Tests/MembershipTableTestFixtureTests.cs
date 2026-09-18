@@ -124,6 +124,72 @@ public sealed class MembershipTableTestFixtureTests
     }
 
     [Fact]
+    public async Task CreateAdditionalHandle_DuplicateTableDisposesOnlyRejectedWrapperBeforeTeardown()
+    {
+        var backend = new IdealizedMembershipBackend();
+        MembershipTableTestHandle? accepted = null;
+        var acceptedDisposals = 0;
+        var rejectedDisposals = 0;
+        var calls = 0;
+        var fixture = new MembershipTableTestFixture("duplicate-wrapper", (_, cluster, _) =>
+        {
+            var call = ++calls;
+            if (call == 4)
+                return ValueTask.FromResult(new MembershipTableTestHandle(accepted!.Table, () =>
+                {
+                    rejectedDisposals++;
+                    return ValueTask.CompletedTask;
+                }));
+            if (call == 5) return ValueTask.FromResult(accepted!);
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), () =>
+            {
+                acceptedDisposals++;
+                return backend.DisposeHandleAsync(cluster);
+            });
+            accepted ??= handle;
+            return ValueTask.FromResult(handle);
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        await fixture.InitializeAsync(ct);
+        await Assert.ThrowsAsync<ClusteringConformanceException>(() => fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask());
+        Assert.Equal(1, rejectedDisposals);
+        Assert.Equal(0, acceptedDisposals);
+        await Assert.ThrowsAsync<ClusteringConformanceException>(() => fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask());
+        Assert.Equal(1, rejectedDisposals);
+        Assert.Equal(0, acceptedDisposals);
+        await fixture.DisposeAsync();
+        Assert.Equal(3, acceptedDisposals);
+        Assert.Equal(1, rejectedDisposals);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
+    public async Task CreateAdditionalHandle_RejectedWrapperCleanupFailurePreservesDuplicateFailure()
+    {
+        var backend = new IdealizedMembershipBackend();
+        IMembershipTable? accepted = null;
+        var expected = new InvalidOperationException("rejected-owner-cleanup");
+        var calls = 0;
+        var fixture = new MembershipTableTestFixture("duplicate-error", (_, cluster, _) =>
+        {
+            if (++calls == 4)
+                return ValueTask.FromResult(new MembershipTableTestHandle(accepted!, () => throw expected));
+            var table = backend.Create(cluster);
+            accepted ??= table;
+            return ValueTask.FromResult(new MembershipTableTestHandle(table, () => backend.DisposeHandleAsync(cluster)));
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        await fixture.InitializeAsync(ct);
+        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask());
+        Assert.Contains("same provider instance", failure.Message);
+        Assert.Same(expected, failure.Data[ClusteringTestKitDiagnostics.CleanupFailureKey]);
+        Assert.Equal(0, backend.DisposedHandles);
+        var cleanup = await Assert.ThrowsAsync<AggregateException>(() => fixture.DisposeAsync().AsTask());
+        Assert.Same(expected, Assert.Single(cleanup.InnerExceptions));
+        Assert.Equal(3, backend.DisposedHandles);
+    }
+
+    [Fact]
     public async Task Initialize_PartialFactoryFailure_CleansAcquiredHandlesAndPreservesPrimary()
     {
         var backend = new IdealizedMembershipBackend();
