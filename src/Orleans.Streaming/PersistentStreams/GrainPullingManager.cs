@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -120,11 +121,22 @@ internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPulli
     {
         notifyCoordinator |= _provider.State == RunState.AgentsStarted;
         CloseLocalAdmission();
+        List<Exception>? failures = null;
         foreach (var queueId in _provider.Queues)
         {
-            await PullingAgentPlacement.WithRetirementHint(Silo, () => _grainFactory
-                .GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queueId))
-                .Stop(Silo, CancellationToken.None));
+            try
+            {
+                await PullingAgentPlacement.WithRetirementHint(Silo, () => _grainFactory
+                    .GetGrain<IPullingAgentGrain>(PullingAgentId.Create(_providerName, queueId))
+                    .Stop(Silo, CancellationToken.None));
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception,
+                    "Failed to stop pulling agent for provider {ProviderName}, queue {QueueId}, on {Silo}.",
+                    _providerName, queueId, Silo);
+                (failures ??= []).Add(exception);
+            }
         }
         EmitState();
         // Membership updates drive reconciliation during silo shutdown.
@@ -138,6 +150,15 @@ internal sealed class GrainPullingManager : SystemTarget, IPersistentStreamPulli
             {
                 _logger.LogWarning(exception, "Failed to notify the coordinator after provider {ProviderName} stopped on {Silo}.", _providerName, Silo);
             }
+        }
+
+        if (failures is { Count: 1 })
+        {
+            ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+        else if (failures is { Count: > 1 })
+        {
+            throw new AggregateException($"Failed to stop pulling agents for provider '{_providerName}' on {Silo}.", failures);
         }
     }
 

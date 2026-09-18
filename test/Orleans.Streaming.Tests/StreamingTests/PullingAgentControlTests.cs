@@ -313,6 +313,86 @@ public sealed class PullingAgentControlTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task StopAgents_DrainsEveryQueueBeforeReportingFailures(int failureCount)
+    {
+        await using var setup = new Setup(1, queueCount: 3);
+        await setup.Deploy();
+        var silo = setup.Cluster.Silos[0];
+        await setup.Command(silo, PersistentStreamProviderCommand.StartAgents);
+        for (var i = 0; i < setup.Queues.Length; i++)
+        {
+            await setup.NextInitialization();
+        }
+
+        var failures = Enumerable.Range(0, failureCount)
+            .Select(i => new InvalidOperationException($"Queue {i} checkpoint failed.")).ToArray();
+        var attempted = new ConcurrentQueue<QueueId>();
+        var lastShutdownEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLastShutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        setup.OnShutdown = queue =>
+        {
+            attempted.Enqueue(queue);
+            var index = attempted.Count - 1;
+            if (index < failures.Length)
+            {
+                return Task.FromException(failures[index]);
+            }
+
+            if (attempted.Count == setup.Queues.Length)
+            {
+                lastShutdownEntered.TrySetResult();
+                return releaseLastShutdown.Task;
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var notifications = setup.CoordinatorNotifications;
+        var stopping = setup.Command(silo, PersistentStreamProviderCommand.StopAgents);
+        Exception? failure = null;
+        try
+        {
+            await Task.WhenAny(lastShutdownEntered.Task, stopping).WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken);
+            Assert.True(lastShutdownEntered.Task.IsCompletedSuccessfully, "Stop returned before reaching the final queue.");
+            Assert.False(stopping.IsCompleted);
+            Assert.Equal(setup.Queues.Order(), attempted.Order());
+            Assert.Equal(3, setup.Shutdowns);
+            Assert.Equal(StreamLifecycleOptions.RunState.AgentsStopped,
+                await setup.Command(silo, PersistentStreamProviderCommand.GetAgentsState));
+            Assert.Equal(0, await setup.Command(silo, PersistentStreamProviderCommand.GetNumberRunningAgents));
+        }
+        finally
+        {
+            releaseLastShutdown.TrySetResult();
+            failure = await Record.ExceptionAsync(() => stopping.WaitAsync(PhaseTimeout, TestContext.Current.CancellationToken));
+        }
+
+        AssertFailures(failure);
+        Assert.Equal(notifications + 1, setup.CoordinatorNotifications);
+        var retryFailure = await Record.ExceptionAsync(() =>
+            setup.Command(silo, PersistentStreamProviderCommand.StopAgents));
+        AssertFailures(retryFailure);
+        Assert.Equal(3, setup.Initializations);
+        Assert.Equal(3, setup.Shutdowns);
+
+        void AssertFailures(Exception? exception)
+        {
+            if (failureCount == 1)
+            {
+                Assert.Equal(failures[0].Message, Assert.IsType<InvalidOperationException>(exception).Message);
+            }
+            else
+            {
+                var aggregate = Assert.IsType<AggregateException>(exception);
+                Assert.Equal(failures.Select(error => error.Message), aggregate.InnerExceptions.Select(error => error.Message));
+                Assert.All(aggregate.InnerExceptions, error => Assert.IsType<InvalidOperationException>(error));
+            }
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task StopAgents_DrainsActivationTriggeredWhileReceiverIsInitializing(bool cancelAfterAdmission)
@@ -534,6 +614,8 @@ public sealed class PullingAgentControlTests
         internal TaskCompletionSource? ShutdownBarrier { get; set; }
         internal TaskCompletionSource? InitializationBarrier { get; set; }
         internal Exception? ShutdownFailure { get; set; }
+        internal Func<QueueId, Task>? OnShutdown { get; set; }
+        internal QueueId[] Queues { get; }
         internal int Initializations => Volatile.Read(ref _initializations);
         internal int Shutdowns => Volatile.Read(ref _shutdowns);
         internal int Reads => Volatile.Read(ref _reads);
@@ -544,9 +626,12 @@ public sealed class PullingAgentControlTests
             bool explicitPubSub = false,
             bool namedStorage = false,
             IGrainStorage? storage = null,
-            StreamPullingAgentHostingMode hostingMode = StreamPullingAgentHostingMode.Grain)
+            StreamPullingAgentHostingMode hostingMode = StreamPullingAgentHostingMode.Grain,
+            int queueCount = 1)
         {
             _hostingMode = hostingMode;
+            Queues = Enumerable.Range(0, queueCount)
+                .Select(index => QueueId.GetQueueId("Control", (uint)index, (uint)index + 1)).ToArray();
             var builder = new InProcessTestClusterBuilder(siloCount);
             builder.ConfigureSilo((_, siloBuilder) =>
             {
@@ -657,16 +742,17 @@ public sealed class PullingAgentControlTests
         private IQueueAdapterFactory CreateFactory(string name, SiloAddress silo, ILoggerFactory loggerFactory)
         {
             var mapper = Substitute.For<IConsistentRingStreamQueueMapper>();
-            mapper.GetAllQueues().Returns([Queue]);
+            mapper.GetAllQueues().Returns(Queues);
             mapper.GetQueueForStream(Arg.Any<StreamId>()).Returns(Queue);
-            mapper.GetQueuesForRange(Arg.Any<IRingRange>()).Returns([Queue]);
+            mapper.GetQueuesForRange(Arg.Any<IRingRange>()).Returns(Queues);
             var adapterCache = new SimpleQueueAdapterCache(new SimpleQueueCacheOptions { CacheSize = 100 }, name, loggerFactory);
             var adapter = Substitute.For<IQueueAdapter>();
             adapter.Name.Returns(name);
             adapter.Direction.Returns(StreamProviderDirection.ReadOnly);
             adapter.IsRewindable.Returns(true);
-            adapter.CreateReceiver(Queue).Returns(_ =>
+            adapter.CreateReceiver(Arg.Any<QueueId>()).Returns(call =>
             {
+                var queue = call.Arg<QueueId>();
                 var receiver = Substitute.For<IQueueAdapterReceiver>();
                 receiver.Initialize(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(_ =>
                 {
@@ -683,6 +769,11 @@ public sealed class PullingAgentControlTests
                 {
                     Interlocked.Increment(ref _shutdowns);
                     ShutdownEntered.TrySetResult();
+                    if (OnShutdown is { } onShutdown)
+                    {
+                        return onShutdown(queue);
+                    }
+
                     if (ShutdownFailure is { } failure)
                     {
                         return Task.FromException(failure);
@@ -697,7 +788,7 @@ public sealed class PullingAgentControlTests
             factory.CreateAdapter(Arg.Any<CancellationToken>()).Returns(Task.FromResult(adapter));
             factory.GetStreamQueueMapper().Returns(mapper);
             factory.GetQueueAdapterCache().Returns(adapterCache);
-            factory.GetDeliveryFailureHandler(Queue).Returns(Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
+            factory.GetDeliveryFailureHandler(Arg.Any<QueueId>()).Returns(Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
             return factory;
         }
 
