@@ -47,6 +47,8 @@ namespace Orleans.Streams
         public StreamSequenceToken? LastProcessedToken;
 
         [NonSerialized]
+        public bool IsCaughtUp;
+        [NonSerialized]
         public int PendingHandshakes;
         [NonSerialized]
         public long HandshakeGeneration;
@@ -65,6 +67,7 @@ namespace Orleans.Streams
 
         internal void SafeDisposeCursor(ILogger logger)
         {
+            IsCaughtUp = false;
             PendingBatch = null;
             if (Cursor is { } cursor)
             {

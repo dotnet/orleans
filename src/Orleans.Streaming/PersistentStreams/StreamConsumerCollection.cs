@@ -23,6 +23,9 @@ namespace Orleans.Streams
         [NonSerialized]
         public Task? RegistrationTask;
 
+        [NonSerialized]
+        public StreamSequenceToken? LastReadToken;
+
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
