@@ -124,6 +124,45 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Theory]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.Created)]
+    public async Task ResourceInitializationUsesOneNativeCreateCall(HttpStatusCode containerStatus)
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var client = Substitute.For<CosmosClient>();
+        var database = Substitute.For<Database>();
+        var databaseResponse = Substitute.For<DatabaseResponse>();
+        databaseResponse.Database.Returns(database);
+        databaseResponse.StatusCode.Returns(HttpStatusCode.Created);
+        var containerResponse = Substitute.For<ContainerResponse>();
+        containerResponse.StatusCode.Returns(containerStatus);
+        client.CreateDatabaseIfNotExistsAsync(
+            Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<RequestOptions>(), Token).Returns(databaseResponse);
+        database.CreateContainerIfNotExistsAsync(
+            Arg.Any<ContainerProperties>(), Arg.Any<ThroughputProperties>(), Arg.Any<RequestOptions>(), Token).Returns(containerResponse);
+        client.GetContainer("database", "container").Returns(storage.Container);
+        storage.SetVersion();
+        var options = new CosmosClusteringOptions
+        {
+            DatabaseName = "database",
+            ContainerName = "container",
+            IsResourceCreationEnabled = true
+        };
+        options.ConfigureCosmosClient(_ => new ValueTask<CosmosClient>(client));
+        var table = CreateTable(services, options);
+
+        await table.InitializeMembershipTableAsync(true, Token);
+
+        await client.Received(1).CreateDatabaseIfNotExistsAsync("database", options.DatabaseThroughput, cancellationToken: Token);
+        await database.Received(1).CreateContainerIfNotExistsAsync(
+            Arg.Is<ContainerProperties>(properties => properties.Id == "container" && properties.PartitionKeyPath == "/ClusterId"),
+            options.ContainerThroughputProperties, cancellationToken: Token);
+        Assert.Equal("CreateContainerIfNotExistsAsync", Assert.Single(database.ReceivedCalls()).GetMethodInfo().Name);
+        storage.AssertVersionReads();
+    }
+
+    [Theory]
     [InlineData("Initialize", 1, 0)]
     [InlineData("ReadRow", 3, 0)]
     [InlineData("ReadAll", 2, 1)]
@@ -241,18 +280,16 @@ public class CosmosMembershipTableCancellationTests
         Assert.Equal(new[] { 1, 2 }, result.Members.Select(row => row.Item1.SiloAddress.Generation));
         Assert.Equal(7, result.Version.Version);
         Assert.All(result.Members, row => Assert.Equal("v7", row.Item2));
-        var queries = storage.Container.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "GetItemQueryIterator").ToArray();
-        Assert.Equal(new string?[] { null, "page2", "page3" }, queries.Select(call => call.GetArguments()[1]));
-        Assert.All(queries, call =>
-        {
-            var query = Assert.IsType<QueryDefinition>(call.GetArguments()[0]);
-            Assert.Equal("SELECT * FROM c WHERE c.EntityType = @entityType ORDER BY c.id", query.QueryText);
-            Assert.Equal(nameof(SiloEntity), Assert.Single(query.GetQueryParameters()).Value);
-            var options = Assert.IsType<QueryRequestOptions>(call.GetArguments()[2]);
-            Assert.Equal(Partition, options.PartitionKey);
-            Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
-            Assert.Null(options.SessionToken);
-        });
+        var queryCall = Assert.Single(storage.Container.ReceivedCalls(), call => call.GetMethodInfo().Name == "GetItemQueryIterator");
+        Assert.Null(queryCall.GetArguments()[1]);
+        Assert.Equal(3, storage.PageReadCount);
+        var query = Assert.IsType<QueryDefinition>(queryCall.GetArguments()[0]);
+        Assert.Equal("SELECT * FROM c WHERE c.EntityType = @entityType ORDER BY c.id", query.QueryText);
+        Assert.Equal(nameof(SiloEntity), Assert.Single(query.GetQueryParameters()).Value);
+        var options = Assert.IsType<QueryRequestOptions>(queryCall.GetArguments()[2]);
+        Assert.Equal(Partition, options.PartitionKey);
+        Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
+        Assert.Null(options.SessionToken);
         storage.AssertVersionReads(2);
     }
 
@@ -270,6 +307,7 @@ public class CosmosMembershipTableCancellationTests
 
         Assert.Contains("after 5 attempts", exception.Message);
         Assert.Equal(10, reads);
+        Assert.Equal(5, storage.PageReadCount);
     }
 
     [Fact]
@@ -307,17 +345,21 @@ public class CosmosMembershipTableCancellationTests
         storage.Container.Received(1).CreateTransactionalBatch(Partition);
         batch.Received(1).ReplaceItem(
             "ClusterVersion", Arg.Is<ClusterVersionEntity>(value => value.ClusterVersion == 8 && value.ClusterId == "cluster"),
-            Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == "v7"));
+            Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == "v7"
+                && options.EnableContentResponseOnWrite == false));
         if (update)
         {
             batch.Received(1).ReplaceItem(
                 Silo().Id, Arg.Is<SiloEntity>(value => value.IAmAliveTime == entry.IAmAliveTime && value.Status == (int)entry.Status),
-                null);
+                Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == null
+                    && options.IfNoneMatchEtag == null && options.EnableContentResponseOnWrite == false));
         }
         else
         {
-            batch.Received(1).CreateItem(Arg.Is<SiloEntity>(value =>
-                value.Id == Silo().Id && value.ClusterId == "cluster" && value.IAmAliveTime == entry.IAmAliveTime));
+            batch.Received(1).CreateItem(
+                Arg.Is<SiloEntity>(value => value.Id == Silo().Id && value.ClusterId == "cluster" && value.IAmAliveTime == entry.IAmAliveTime),
+                Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == null
+                    && options.IfNoneMatchEtag == null && options.EnableContentResponseOnWrite == false));
         }
 
         await batch.Received(1).ExecuteAsync(Token);
@@ -389,7 +431,8 @@ public class CosmosMembershipTableCancellationTests
             silo.Id, Arg.Is<SiloEntity>(value => value.Status == (int)SiloStatus.Dead
                 && value.SuspectingSilos.Count == 1 && value.SuspectingTimes.Count == 1
                 && value.IAmAliveTime == entry.IAmAliveTime),
-            null);
+            Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == null
+                && options.IfNoneMatchEtag == null && options.EnableContentResponseOnWrite == false));
         await batch.Received(1).ExecuteAsync(Token);
     }
 

@@ -23,7 +23,7 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
             Task.FromException<ItemResponse<SiloEntity>>(new InvalidOperationException("Unexpected silo operation.")));
         Container.ReturnsForAll<Task<ItemResponse<ClusterVersionEntity>>>(
             Task.FromException<ItemResponse<ClusterVersionEntity>>(new InvalidOperationException("Unexpected version operation.")));
-        Container.ReturnsForAll<FeedIterator<SiloEntity>>(new PageIterator(new()));
+        Container.ReturnsForAll<FeedIterator<SiloEntity>>(new PageIterator(new(), this));
         Table = new CosmosMembershipTable(
             NullLoggerFactory.Instance, _services,
             Options.Create(new CosmosClusteringOptions()),
@@ -33,6 +33,7 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
 
     public Container Container { get; } = Substitute.For<Container>();
     public CosmosMembershipTable Table { get; }
+    public int PageReadCount { get; private set; }
     public static PartitionKey Partition => new("cluster");
     public static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -53,7 +54,7 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
         var pending = new Queue<FeedResponse<SiloEntity>>(pages);
         Container.GetItemQueryIterator<SiloEntity>(
             new QueryDefinition("SELECT * FROM c"), null, null)
-            .ReturnsForAnyArgs(_ => new PageIterator(pending));
+            .ReturnsForAnyArgs(_ => new PageIterator(pending, this));
     }
 
     public TransactionalBatch SetBatch(params HttpStatusCode[] statuses)
@@ -193,15 +194,20 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
         public override IEnumerator<SiloEntity> GetEnumerator() => ((IEnumerable<SiloEntity>)silos).GetEnumerator();
     }
 
-    private sealed class PageIterator(Queue<FeedResponse<SiloEntity>> pages) : FeedIterator<SiloEntity>
+    private sealed class PageIterator(Queue<FeedResponse<SiloEntity>> pages, CosmosMembershipTestStorage storage) : FeedIterator<SiloEntity>
     {
-        public override bool HasMoreResults => pages.Count > 0;
+        private bool _hasMoreResults = true;
+
+        public override bool HasMoreResults => _hasMoreResults;
 
         public override Task<FeedResponse<SiloEntity>> ReadNextAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Assert.Equal(Token, cancellationToken);
-            return Task.FromResult(pages.Dequeue());
+            storage.PageReadCount++;
+            var page = pages.Dequeue();
+            _hasMoreResults = !string.IsNullOrEmpty(page.ContinuationToken);
+            return Task.FromResult(page);
         }
     }
 }

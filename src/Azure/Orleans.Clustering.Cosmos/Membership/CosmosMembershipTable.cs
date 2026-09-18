@@ -227,8 +227,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
             var versionEntity = BuildVersionEntity(tableVersion);
 
             using var response = await _container.CreateTransactionalBatch(_partitionKey)
-                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
-                .CreateItem(siloEntity)
+                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions
+                {
+                    IfMatchEtag = tableVersion.VersionEtag,
+                    EnableContentResponseOnWrite = false
+                })
+                .CreateItem(siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
             return IsSuccessfulMembershipBatch(response, allowMissingRow: false);
@@ -258,8 +262,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
             var versionEntity = BuildVersionEntity(tableVersion);
 
             using var response = await _container.CreateTransactionalBatch(_partitionKey)
-                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
-                .ReplaceItem(siloEntity.Id, siloEntity)
+                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions
+                {
+                    IfMatchEtag = tableVersion.VersionEtag,
+                    EnableContentResponseOnWrite = false
+                })
+                .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
             return IsSuccessfulMembershipBatch(response, allowMissingRow: true);
@@ -321,22 +329,20 @@ internal partial class CosmosMembershipTable : IMembershipTable
             }
             else
             {
-                string? continuationToken = null;
+                var queryOptions = new QueryRequestOptions
+                {
+                    PartitionKey = _partitionKey,
+                    ConsistencyLevel = ConsistencyLevel.Strong
+                };
+                // Heartbeats patch documents without changing the version fence; immutable
+                // ordering keeps those updates from moving rows across continuation pages.
+                using var iterator = _container.GetItemQueryIterator<SiloEntity>(
+                    CreateSiloQuery(), requestOptions: queryOptions);
                 do
                 {
-                    var queryOptions = new QueryRequestOptions
-                    {
-                        PartitionKey = _partitionKey,
-                        ConsistencyLevel = ConsistencyLevel.Strong
-                    };
-                    // Heartbeats replace documents without changing the version fence; an immutable
-                    // order keeps those replacements from moving rows across continuation pages.
-                    using var iterator = _container.GetItemQueryIterator<SiloEntity>(
-                        CreateSiloQuery(), continuationToken, queryOptions);
                     var page = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                     silos.AddRange(page);
-                    continuationToken = page.ContinuationToken;
-                } while (!string.IsNullOrEmpty(continuationToken));
+                } while (iterator.HasMoreResults);
             }
 
             // Strong reads can straddle a membership update; matching version etags fence the view.
@@ -446,21 +452,11 @@ internal partial class CosmosMembershipTable : IMembershipTable
         containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartTime/?" });
         containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/IAmAliveTime/?" });
 
-        const int maxRetries = 3;
-        for (var retry = 0; retry <= maxRetries; ++retry)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var containerResponse = await db.CreateContainerIfNotExistsAsync(
-                containerProperties,
-                _options.ContainerThroughputProperties,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
-            {
-                break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
-            }
-            await Task.Delay(1000, cancellationToken);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        await db.CreateContainerIfNotExistsAsync(
+            containerProperties,
+            _options.ContainerThroughputProperties,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ItemResponse<ClusterVersionEntity>> ReadClusterVersion(CancellationToken cancellationToken)
