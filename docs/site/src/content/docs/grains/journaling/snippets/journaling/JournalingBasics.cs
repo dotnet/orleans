@@ -12,18 +12,18 @@ public interface IShoppingCartGrain : IGrainWithStringKey
 }
 
 // <durable_shopping_cart>
-public sealed class ShoppingCartGrain(IDurableStateManager states)
+public sealed class ShoppingCartGrain(IDurableStateManager stateManager)
     : Grain, IShoppingCartGrain
 {
-    // Declare the state during construction, before Orleans recovers the journal.
+    // Declare the cart component during construction, before Orleans recovers the grain's state.
     private readonly IDurableDictionary<string, int> _items =
-        states.GetOrAddDictionary<string, int>("cart-items");
+        stateManager.GetOrAddDictionary<string, int>("cart-items");
 
     public async ValueTask AddItem(string itemId, int quantity, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _items[itemId] = quantity;
-        await states.WriteStateAsync(cancellationToken);
+        await stateManager.WriteStateAsync(cancellationToken);
     }
 
     public ValueTask<IReadOnlyDictionary<string, int>> GetItems(CancellationToken cancellationToken)

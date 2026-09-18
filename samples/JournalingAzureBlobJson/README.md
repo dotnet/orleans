@@ -9,15 +9,15 @@ The host's stopping token flows through grain calls, journal writes, and Azure
 storage operations. Graceful shutdown uses the configured host shutdown deadline.
 
 `JournaledSampleGrain` derives from `Grain` and injects `IDurableStateManager`.
-Its constructor field initializers declare the seven named states using
+Its constructor field initializers declare the seven named state components using
 `GetOrAddDictionary`, `GetOrAddList`, `GetOrAddQueue`, `GetOrAddSet`,
 `GetOrAddValue`, `GetOrAddPersistentState`, and `GetOrAddTaskCompletionSource`.
 The standard manager enrolls itself in the activation lifecycle during grain-bound
-construction, before resolution returns. Orleans recovers those states at
+construction, before resolution returns. Orleans recovers the grain's state at
 `SetupState`, before `OnActivateAsync` and grain methods run. One awaited
-`WriteStateAsync` acknowledges the pending changes across all seven states.
+`WriteStateAsync` acknowledges the pending changes across all seven components.
 
-Declare new states during construction or synchronous activation setup, before
+Declare new state components during construction or synchronous activation setup, before
 initialization; later `GetOrAdd` calls resolve existing names.
 Keyed injection remains an equivalent way to obtain the same named object,
 and `DurableGrain` remains a convenience base class. This sample preserves its

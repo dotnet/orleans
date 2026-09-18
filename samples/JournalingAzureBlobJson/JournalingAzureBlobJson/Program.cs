@@ -244,25 +244,25 @@ public interface IJournaledSampleGrain : IGrainWithStringKey
     Task Deactivate(CancellationToken cancellationToken);
 }
 
-public sealed class JournaledSampleGrain(IDurableStateManager states) : Grain, IJournaledSampleGrain
+public sealed class JournaledSampleGrain(IDurableStateManager stateManager) : Grain, IJournaledSampleGrain
 {
     private readonly Guid _activationId = Guid.NewGuid();
 
-    // Declare every state during construction; Orleans recovers them before grain methods run.
+    // Declare state components during construction; Orleans recovers state before grain methods run.
     private readonly IDurableDictionary<string, InventoryItem> _inventory =
-        states.GetOrAddDictionary<string, InventoryItem>("inventory");
+        stateManager.GetOrAddDictionary<string, InventoryItem>("inventory");
     private readonly IDurableList<JournalEvent> _events =
-        states.GetOrAddList<JournalEvent>("events");
+        stateManager.GetOrAddList<JournalEvent>("events");
     private readonly IDurableQueue<WorkItem> _workQueue =
-        states.GetOrAddQueue<WorkItem>("work");
+        stateManager.GetOrAddQueue<WorkItem>("work");
     private readonly IDurableSet<string> _tags =
-        states.GetOrAddSet<string>("tags");
+        stateManager.GetOrAddSet<string>("tags");
     private readonly IDurableValue<AccountBalance> _balance =
-        states.GetOrAddValue<AccountBalance>("balance");
+        stateManager.GetOrAddValue<AccountBalance>("balance");
     private readonly IPersistentState<ProfileState> _profile =
-        states.GetOrAddPersistentState<ProfileState>("profile");
+        stateManager.GetOrAddPersistentState<ProfileState>("profile");
     private readonly IDurableTaskCompletionSource<Receipt> _receipt =
-        states.GetOrAddTaskCompletionSource<Receipt>("receipt");
+        stateManager.GetOrAddTaskCompletionSource<Receipt>("receipt");
 
     public async Task<JournaledSampleSummary> RunScenario(CancellationToken cancellationToken)
     {
@@ -310,8 +310,8 @@ public sealed class JournaledSampleGrain(IDurableStateManager states) : Grain, I
 
         _receipt.TrySetResult(new Receipt("receipt-001", OperationCount: 24, CompletedAt: DateTimeOffset.UtcNow));
 
-        // One acknowledgement covers pending changes across all seven states.
-        await states.WriteStateAsync(cancellationToken);
+        // One acknowledgement covers pending changes across all seven state components.
+        await stateManager.WriteStateAsync(cancellationToken);
         return CreateSummary();
     }
 
