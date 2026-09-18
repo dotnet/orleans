@@ -409,7 +409,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         public ActivationId ActivationId => throw new NotImplementedException();
         public GrainAddress Address => throw new NotImplementedException();
         public IServiceProvider ActivationServices => throw new NotImplementedException();
-        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+        public IGrainLifecycle ObservableLifecycle { get; } = new CompositionTestLifecycle();
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public Task Deactivated => throw new NotImplementedException();
 

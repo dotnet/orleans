@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -38,14 +39,9 @@ internal static class Program
 
         var blobServiceClient = new BlobServiceClient(settings.ConnectionString);
         var container = blobServiceClient.GetBlobContainerClient(settings.ContainerName);
-        await container.CreateIfNotExistsAsync();
 
         var walBlobName = $"{settings.BlobName}/wal";
         var blob = container.GetAppendBlobClient(walBlobName);
-        if (settings.ResetBlob)
-        {
-            await blob.DeleteIfExistsAsync();
-        }
 
         builder.UseOrleans(siloBuilder =>
         {
@@ -68,35 +64,48 @@ internal static class Program
         });
 
         using var host = builder.Build();
+        var cancellationToken = host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
 
-        await host.StartAsync();
+        try
+        {
+            await host.StartAsync(cancellationToken);
+            await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            if (settings.ResetBlob)
+            {
+                await blob.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+            }
 
-        var client = host.Services.GetRequiredService<IClusterClient>();
-        var grain = client.GetGrain<IJournaledSampleGrain>("azure-json-codec");
+            var client = host.Services.GetRequiredService<IClusterClient>();
+            var grain = client.GetGrain<IJournaledSampleGrain>("azure-json-codec");
 
-        Console.WriteLine("Writing durable grain state...");
-        var written = await grain.RunScenario();
-        Console.WriteLine(JsonSerializer.Serialize(written, JournalingSampleJsonContext.Default.JournaledSampleSummary));
+            Console.WriteLine("Writing durable grain state...");
+            var written = await grain.RunScenario(cancellationToken);
+            Console.WriteLine(JsonSerializer.Serialize(written, JournalingSampleJsonContext.Default.JournaledSampleSummary));
 
-        Console.WriteLine("Deactivating and reactivating the grain to force recovery...");
-        await grain.Deactivate();
-        await Task.Delay(TimeSpan.FromMilliseconds(500));
+            Console.WriteLine("Deactivating and reactivating the grain to force recovery...");
+            await grain.Deactivate(cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
 
-        var recovered = await grain.GetSummary();
-        ValidateRecovery(written, recovered);
-        Console.WriteLine(JsonSerializer.Serialize(recovered, JournalingSampleJsonContext.Default.JournaledSampleSummary));
+            var recovered = await grain.GetSummary(cancellationToken);
+            ValidateRecovery(written, recovered);
+            Console.WriteLine(JsonSerializer.Serialize(recovered, JournalingSampleJsonContext.Default.JournaledSampleSummary));
 
-        Console.WriteLine();
-        Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{walBlobName}:");
-        Console.WriteLine(await DownloadBlobAsText(blob));
-
-        await host.StopAsync();
-        return 0;
+            Console.WriteLine();
+            Console.WriteLine($"Raw JSONL blob contents from {settings.ContainerName}/{walBlobName}:");
+            Console.WriteLine(await DownloadBlobAsText(blob, cancellationToken));
+            return 0;
+        }
+        finally
+        {
+            using var shutdown = new CancellationTokenSource(
+                host.Services.GetRequiredService<IOptions<HostOptions>>().Value.ShutdownTimeout);
+            await host.StopAsync(shutdown.Token);
+        }
     }
 
-    private static async Task<string> DownloadBlobAsText(AppendBlobClient blob)
+    private static async Task<string> DownloadBlobAsText(AppendBlobClient blob, CancellationToken cancellationToken)
     {
-        var result = await blob.DownloadContentAsync();
+        var result = await blob.DownloadContentAsync(cancellationToken);
         return Encoding.UTF8.GetString(result.Value.Content.ToArray());
     }
 
@@ -230,9 +239,9 @@ internal static class Program
 
 public interface IJournaledSampleGrain : IGrainWithStringKey
 {
-    Task<JournaledSampleSummary> RunScenario();
-    Task<JournaledSampleSummary> GetSummary();
-    Task Deactivate();
+    Task<JournaledSampleSummary> RunScenario(CancellationToken cancellationToken);
+    Task<JournaledSampleSummary> GetSummary(CancellationToken cancellationToken);
+    Task Deactivate(CancellationToken cancellationToken);
 }
 
 public sealed class JournaledSampleGrain(
@@ -246,8 +255,9 @@ public sealed class JournaledSampleGrain(
 {
     private readonly Guid _activationId = Guid.NewGuid();
 
-    public async Task<JournaledSampleSummary> RunScenario()
+    public async Task<JournaledSampleSummary> RunScenario(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         inventory.Clear();
         inventory["sku-apple"] = new InventoryItem("sku-apple", 12, 1.25m, ["fresh", "fruit"]);
         inventory["sku-orange"] = new InventoryItem("sku-orange", 9, 1.10m, ["citrus", "fruit"]);
@@ -291,14 +301,19 @@ public sealed class JournaledSampleGrain(
 
         receipt.TrySetResult(new Receipt("receipt-001", OperationCount: 24, CompletedAt: DateTimeOffset.UtcNow));
 
-        await WriteStateAsync();
+        await WriteStateAsync(cancellationToken);
         return CreateSummary();
     }
 
-    public Task<JournaledSampleSummary> GetSummary() => Task.FromResult(CreateSummary());
-
-    public Task Deactivate()
+    public Task<JournaledSampleSummary> GetSummary(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(CreateSummary());
+    }
+
+    public Task Deactivate(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         DeactivateOnIdle();
         return Task.CompletedTask;
     }

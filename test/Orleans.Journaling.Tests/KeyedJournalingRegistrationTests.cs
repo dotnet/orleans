@@ -36,7 +36,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var replacement = new LifecycleJournalStorageProvider();
         var grainId = GrainId.Create("test-grain", "default-override");
         var journalId = JournalId.FromGrainId(grainId);
-        builder.Services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(grainId));
+        builder.Services.AddScoped<CompositionTestLifecycle>();
+        builder.Services.AddScoped<IGrainContext>(services =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(grainId);
+            context.ObservableLifecycle.Returns(services.GetRequiredService<CompositionTestLifecycle>());
+            return context;
+        });
         if (registerOverrideFirst)
         {
             builder.Services.AddSingleton<IJournalStorageProvider>(replacement);
@@ -55,7 +62,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         {
             var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
             var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
-            await manager.InitializeAsync(token);
+            var grainLifecycle = scope.ServiceProvider.GetRequiredService<CompositionTestLifecycle>();
+            Assert.Equal(1, grainLifecycle.Subscriptions);
+            await grainLifecycle.OnStart(token);
             value.Value = 42;
             await manager.WriteStateAsync(token);
         }
@@ -77,7 +86,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         {
             var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
             var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
-            await manager.InitializeAsync(token);
+            var grainLifecycle = scope.ServiceProvider.GetRequiredService<CompositionTestLifecycle>();
+            Assert.Equal(1, grainLifecycle.Subscriptions);
+            await grainLifecycle.OnStart(token);
             Assert.Equal(43, value.Value);
         }
 
@@ -366,6 +377,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         _ = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
 
         Assert.True(wasUsed);
+        Assert.Equal(1, Assert.IsType<CompositionTestLifecycle>(
+            scope.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle).Subscriptions);
     }
 
     [Fact]
