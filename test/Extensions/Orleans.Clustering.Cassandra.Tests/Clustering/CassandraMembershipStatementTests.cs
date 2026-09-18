@@ -45,81 +45,29 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task GuardedUpdate_UsesOneSerialRowReadAndOneConditionalWrite(bool ttl)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task FullRowUpdate_UsesOnlyCanonicalTokensAndExistence(bool ttl, bool applied)
     {
-        var backend = new Backend { Version = 5 };
-        var existing = Entry(SiloStatus.Active);
-        backend.Entries.Add(existing);
-        backend.OnExecute = command => command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal)
-            ? Task.FromResult<RowSet>(Rows.Applied(true))
-            : null;
-        using var table = await backend.CreateTable(ttl);
-        var entry = Entry(SiloStatus.Active);
-        entry.IAmAliveTime = Timestamp.AddSeconds(1);
-        var token = TestContext.Current.CancellationToken;
-
-        Assert.True(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
-
-        Assert.Collection(backend.Executed,
-            AssertSingleRowRead,
-            command =>
-            {
-                Assert.StartsWith("BEGIN BATCH", command.Cql);
-                Assert.Equal(5, command.Values["expected_version"]);
-                Assert.Equal(Timestamp, command.Values["previous_time"]);
-                Assert.Equal(entry.IAmAliveTime, command.Values["i_am_alive_time"]);
-                Assert.Equal(ConsistencyLevel.Serial, command.Statement.SerialConsistencyLevel);
-                Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
-            });
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task GuardedUpdate_AbsentRow_UsesOnlyOneSerialRead(bool ttl)
-    {
-        var backend = new Backend { Version = 5 };
+        var backend = new Backend { OnExecute = _ => Task.FromResult<RowSet>(Rows.Applied(applied)) };
         using var table = await backend.CreateTable(ttl);
         var entry = Entry(SiloStatus.Active);
         var token = TestContext.Current.CancellationToken;
 
-        Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
+        Assert.Equal(applied, await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
 
-        AssertSingleRowRead(Assert.Single(backend.Executed));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task GuardedUpdate_RetiredAfterRead_StopsAfterFailedCasAndOneReread(bool ttl)
-    {
-        var backend = new Backend { Version = 5 };
-        backend.Entries.Add(Entry(SiloStatus.Dead));
-        backend.OnExecute = command =>
-        {
-            if (!command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal))
-            {
-                return null;
-            }
-
-            backend.Entries.Clear();
-            return Task.FromResult<RowSet>(Rows.Applied(false));
-        };
-        using var table = await backend.CreateTable(ttl);
-        var entry = Entry(SiloStatus.Dead);
-        entry.IAmAliveTime = Timestamp.AddSeconds(1);
-        var token = TestContext.Current.CancellationToken;
-
-        Assert.False(await table.UpdateRowAsync(entry, "5", new TableVersion(6, "5"), token));
-
-        Assert.Collection(backend.Executed,
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql),
-            AssertSingleRowRead);
-        Assert.Empty(backend.Entries);
-        Assert.Equal(5, backend.Version);
+        var command = Assert.Single(backend.Executed);
+        Assert.StartsWith("BEGIN BATCH", command.Cql);
+        Assert.Contains("IF version = :expected_version;", command.Cql);
+        Assert.EndsWith("IF start_time != null; APPLY BATCH;", command.Cql);
+        Assert.Equal(5, command.Values["expected_version"]);
+        Assert.Equal(6, command.Values["new_version"]);
+        Assert.Equal(entry.IAmAliveTime, command.Values["i_am_alive_time"]);
+        Assert.DoesNotContain("previous_time", command.Values.Keys);
+        Assert.Equal(ConsistencyLevel.Serial, command.Statement.SerialConsistencyLevel);
+        Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
     }
 
     [Fact]
@@ -159,13 +107,13 @@ public sealed class CassandraMembershipStatementTests
         Assert.Equal(ConsistencyLevel.Serial, insert.Statement.SerialConsistencyLevel);
         Assert.Equal(ConsistencyLevel.Quorum, insert.Statement.ConsistencyLevel);
 
-        var update = backend.Get(await queries.UpdateMembership("service-cluster", entry, 4, Timestamp.AddSeconds(10), TestContext.Current.CancellationToken));
+        var update = backend.Get(await queries.UpdateMembership("service-cluster", entry, 4, TestContext.Current.CancellationToken));
         Assert.StartsWith("BEGIN BATCH UPDATE membership USING TTL 0 SET version = :new_version", update.Cql);
         Assert.Contains("IF version = :expected_version;", update.Cql);
-        Assert.Contains("IF i_am_alive_time = :previous_time AND start_time != null; APPLY BATCH;", update.Cql);
+        Assert.Contains("IF start_time != null; APPLY BATCH;", update.Cql);
         Assert.Equal(expectedTtl, update.Values["ttl"]);
-        Assert.Equal(Timestamp.AddSeconds(10), update.Values["i_am_alive_time"]);
-        Assert.Equal(Timestamp.AddSeconds(10), update.Values["previous_time"]);
+        Assert.Equal(entry.IAmAliveTime, update.Values["i_am_alive_time"]);
+        Assert.DoesNotContain("previous_time", update.Values.Keys);
         Assert.Equal(5, update.Values["new_version"]);
         AssertFullRow(update, entry);
 
@@ -255,42 +203,13 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Fact]
-    public async Task FullRowWrite_RetriesHeartbeatRace_PreservingMaximumTime()
+    public async Task FullRowWrite_RejectsMismatchedRowTokenBeforeExecuting()
     {
-        var backend = new Backend { Version = 4 };
-        var entry = Entry(SiloStatus.Active);
-        backend.Entries.Add(entry);
-        var writes = 0;
-        backend.OnExecute = command =>
-        {
-            if (!command.Cql.StartsWith("BEGIN BATCH", StringComparison.Ordinal))
-            {
-                return null;
-            }
-
-            writes++;
-            if (writes == 1)
-            {
-                entry.IAmAliveTime = Timestamp.AddMinutes(1);
-                return Task.FromResult<RowSet>(Rows.Applied(false));
-            }
-
-            Assert.Equal(entry.IAmAliveTime, command.Values["previous_time"]);
-            Assert.Equal(entry.IAmAliveTime, command.Values["i_am_alive_time"]);
-            return Task.FromResult<RowSet>(Rows.Applied(true));
-        };
+        var backend = new Backend();
         using var table = await backend.CreateTable();
-        var staleEntry = Entry(SiloStatus.Dead);
-        var token = TestContext.Current.CancellationToken;
-        Assert.False(await table.UpdateRowAsync(staleEntry, "3", new TableVersion(5, "4"), token));
-        Assert.True(await table.UpdateRowAsync(staleEntry, "4", new TableVersion(5, "4"), token));
-        Assert.Equal(2, writes);
-        Assert.Equal(Timestamp, staleEntry.IAmAliveTime);
-        Assert.Collection(backend.Executed,
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql),
-            AssertSingleRowRead,
-            command => Assert.StartsWith("BEGIN BATCH", command.Cql));
+        Assert.False(await table.UpdateRowAsync(
+            Entry(SiloStatus.Dead), "3", new TableVersion(5, "4"), TestContext.Current.CancellationToken));
+        Assert.Empty(backend.Executed);
     }
 
     [Theory]
@@ -387,13 +306,6 @@ public sealed class CassandraMembershipStatementTests
         });
         Assert.All(backend.Executed.Where(command => command.Cql.StartsWith("SELECT version", StringComparison.Ordinal)),
             command => Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel));
-    }
-
-    private static void AssertSingleRowRead(Command command)
-    {
-        Assert.StartsWith("SELECT version, address", command.Cql);
-        Assert.Contains("AND address = :address AND port = :port AND generation = :generation;", command.Cql);
-        Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel);
     }
 
     private static void AssertFullRow(Command command, MembershipEntry entry)

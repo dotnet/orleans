@@ -304,7 +304,7 @@ internal sealed class OrleansQueries
         }).SetSerialConsistencyLevel(ConsistencyLevel.Serial);
     }
 
-    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, DateTime previousTime, CancellationToken cancellationToken = default)
+    public async ValueTask<IStatement> UpdateMembership(string clusterIdentifier, MembershipEntry membershipEntry, int version, CancellationToken cancellationToken = default)
     {
         _updateMembershipPreparedStatement ??= await PrepareStatementAsync("""
             BEGIN BATCH
@@ -327,7 +327,7 @@ internal sealed class OrleansQueries
             	AND port = :port
             	AND generation = :generation
             IF
-                i_am_alive_time = :previous_time AND start_time != null;
+                start_time != null;
             APPLY BATCH;
             """, MembershipWriteConsistencyLevel, cancellationToken);
         return _updateMembershipPreparedStatement.Bind(new
@@ -338,12 +338,11 @@ internal sealed class OrleansQueries
             expected_version = version,
             status = (int)membershipEntry.Status,
             suspect_times = GetSuspectTimesString(membershipEntry),
-            i_am_alive_time = new DateTime(Math.Max(membershipEntry.IAmAliveTime.Ticks, previousTime.Ticks), DateTimeKind.Utc),
+            i_am_alive_time = membershipEntry.IAmAliveTime,
             silo_name = membershipEntry.SiloName,
             host_name = membershipEntry.HostName,
             proxy_port = membershipEntry.ProxyPort,
             start_time = membershipEntry.StartTime,
-            previous_time = previousTime,
             address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
             port = membershipEntry.SiloAddress.Endpoint.Port,
             generation = membershipEntry.SiloAddress.Generation

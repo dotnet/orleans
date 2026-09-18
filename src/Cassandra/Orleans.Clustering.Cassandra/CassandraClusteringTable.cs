@@ -185,23 +185,9 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
             return false;
         }
 
-        while (true)
-        {
-            var current = await ReadRowForUpdateAsync(entry.SiloAddress, cancellationToken);
-            if (current is not { } row || row.Version != expectedVersion)
-            {
-                return false;
-            }
-
-            var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(
-                _identifier, entry, row.Version, row.Entry.IAmAliveTime, cancellationToken), cancellationToken);
-            if ((bool)query.First()["[applied]"])
-            {
-                return true;
-            }
-
-            // Only heartbeat races can be retried with the caller's original table version.
-        }
+        var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(
+            _identifier, entry, expectedVersion, cancellationToken), cancellationToken);
+        return (bool)query.First()["[applied]"];
     }
 
     private static bool TryGetExpectedVersion(TableVersion tableVersion, out int version) =>
@@ -318,19 +304,6 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         var rows = await Queries.ExecuteAsync(await Queries.MembershipReadVersion(_identifier, cancellationToken), cancellationToken);
         var row = await OrleansQueries.ReadFirstRowAsync(rows, cancellationToken);
         return row is null ? 0 : (int)row["version"];
-    }
-
-    private async Task<(MembershipEntry Entry, int Version)?> ReadRowForUpdateAsync(SiloAddress key, CancellationToken cancellationToken)
-    {
-        // A single-row serial read supplies the row/version pair; the subsequent CAS fences concurrent changes.
-        var rows = await Queries.ExecuteAsync(await Queries.MembershipReadRow(_identifier, key, cancellationToken), cancellationToken);
-        var row = await OrleansQueries.ReadFirstRowAsync(rows, cancellationToken);
-        if (row is null || GetMembershipEntry(row) is not { } entry)
-        {
-            return null;
-        }
-
-        return (entry, (int)row["version"]);
     }
 
     [Obsolete("Use UpdateIAmAliveAsync instead.")]
