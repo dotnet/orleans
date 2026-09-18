@@ -184,46 +184,24 @@ namespace Orleans.Clustering.Redis
         private async Task<bool> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var rowKey = entry.SiloAddress.ToString();
-            var updatedEntry = Deserialize(Serialize(entry));
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                RedisValue current = RedisValue.Null;
-                if (!allowInsertOnly)
-                {
-                    var rows = await ReadEntryAsync(rowKey, cancellationToken);
-                    var version = GetTableVersionFromRow(rows[0]);
-                    current = rows[1];
-                    if (!string.Equals(version.VersionEtag, tableVersion.VersionEtag, StringComparison.Ordinal) || !current.HasValue)
-                    {
-                        return false;
-                    }
-
-                    var existingEntry = Deserialize(current.ToString());
-                    updatedEntry.IAmAliveTime = new DateTime(Math.Max(entry.IAmAliveTime.Ticks, existingEntry.IAmAliveTime.Ticks), DateTimeKind.Utc);
-                }
-
-                var tx = _db.CreateTransaction();
-                tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, tableVersion.VersionEtag));
-                tx.AddCondition(allowInsertOnly
-                    ? Condition.HashNotExists(_clusterKey, rowKey)
-                    : Condition.HashEqual(_clusterKey, rowKey, current));
-                tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
-                tx.HashSetAsync(_clusterKey, rowKey, Serialize(updatedEntry)).Ignore();
-                cancellationToken.ThrowIfCancellationRequested();
-                if (await AwaitAsync(tx.ExecuteAsync(), cancellationToken))
-                {
-                    return true;
-                }
-
-                if (allowInsertOnly)
-                {
-                    return false;
-                }
-
-                // A heartbeat can change the row while the table version stays unchanged. Merge it and retry.
-            }
+            // Server-side token validation avoids WATCH conflicts caused by heartbeat writes to the same hash.
+            const string script =
+                """
+                if redis.call('HGET', KEYS[1], 'Version') ~= ARGV[2] then
+                    return 0
+                end
+                if redis.call('HEXISTS', KEYS[1], ARGV[1]) ~= tonumber(ARGV[5]) then
+                    return 0
+                end
+                redis.call('HSET', KEYS[1], 'Version', ARGV[3], ARGV[1], ARGV[4])
+                return 1
+                """;
+            var result = await AwaitAsync(_db.ScriptEvaluateAsync(
+                script,
+                [_clusterKey],
+                [entry.SiloAddress.ToString(), tableVersion.VersionEtag, SerializeVersion(tableVersion), Serialize(entry), allowInsertOnly ? 0 : 1],
+                CommandFlags.NoScriptCache), cancellationToken);
+            return (int)result == 1;
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
