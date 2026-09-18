@@ -110,6 +110,21 @@ public sealed class FaultyMembershipTableTests
     }
 
     [Fact]
+    public async Task ConcurrentReadSetup_DetectsCanonicalCorruptionUsingIndependentExpectedRows()
+    {
+        var control = new MembershipFaultController(MembershipFault.InsertChangesExistingRow);
+        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => control.Fixture().RunAsync(
+            (fixture, ct) => new MembershipTableTestRunner(fixture, concurrencyRowCount: 5).SeedConcurrentRows(ct),
+            TestContext.Current.CancellationToken));
+        Assert.Contains("HostName", failure.Message);
+        Assert.Contains("unexpected-seed-mutation", failure.Message);
+        Assert.Equal(5, control.Backend.Inserts);
+        Assert.Equal(6, control.Backend.PointReads);
+        Assert.Equal(2, control.Backend.FullReads);
+        Assert.True(control.Injected > 0);
+    }
+
+    [Fact]
     public async Task CrossRowRace_IgnoredTableCondition_DetectsTwoWinners()
     {
         var control = new MembershipFaultController(MembershipFault.IgnoreTableToken);

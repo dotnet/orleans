@@ -5,7 +5,7 @@ namespace Orleans.Clustering.TestKit.Tests;
 internal enum MembershipFault
 {
     IgnoreTableToken, IgnoreRowToken, FalseWriteChangesMembership, VersionJump, HeartbeatChangesRowToken, HeartbeatChangesTableToken, HeartbeatChangesMembership,
-    AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize,
+    AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize, InsertChangesExistingRow,
     CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, TornReadRow, RefuseStatusWrite,
     IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatStorageFailure,
@@ -168,6 +168,15 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             control.Injected++;
         }
         var success = await inner.InsertRowAsync(entry, tableVersion, cancellationToken);
+        if (success && Fault == MembershipFault.InsertChangesExistingRow)
+            Mutate(p =>
+            {
+                foreach (var other in p.Rows.Where(pair => !pair.Key.Equals(entry.SiloAddress)))
+                {
+                    other.Value.Item1.HostName = "unexpected-seed-mutation";
+                    control.Injected++;
+                }
+            });
         if (success && Fault == MembershipFault.AliasInsert)
             Mutate(p => { p.Rows[entry.SiloAddress] = Tuple.Create(entry, p.Rows[entry.SiloAddress].Item2); control.Injected++; });
         return success;
@@ -311,10 +320,12 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
         var torn = (key is null && Fault == MembershipFault.TornReadAll) || (key is not null && Fault == MembershipFault.TornReadRow);
         if (torn)
         {
-            // The five-row self-test has exactly three quiescent full reads at version five:
-            // final insertion verification, then A/B at the round boundary. Arm every later read.
+            // Two setup validation reads and two round-boundary reads precede the gated race.
             var current = await inner.ReadAllAsync(ct);
-            if (key is not null || (current.Version.Version >= 5 && Interlocked.Increment(ref control.ReadsAtFiveRows) > 3))
+            var fullReads = key is null && current.Version.Version == 5
+                ? Interlocked.Increment(ref control.ReadsAtFiveRows)
+                : Volatile.Read(ref control.ReadsAtFiveRows);
+            if (fullReads > 4 || (key is not null && fullReads >= 4))
                 await control.WriterArmed.Task.WaitAsync(ct);
             if (Volatile.Read(ref control.TornArmed) != 0)
             {

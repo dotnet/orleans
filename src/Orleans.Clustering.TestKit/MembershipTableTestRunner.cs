@@ -685,9 +685,30 @@ public sealed class MembershipTableTestRunner
 
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    internal async Task SeedConcurrentRows(CancellationToken ct)
+    {
+        var current = ClusteringMembershipSnapshot.Capture(await A.ReadRowAsync(Entry(1).SiloAddress, ct));
+        Check(current.Rows.Count == 0, "concurrent-read setup requires an unused fixture identity");
+        var expectedRows = current.Rows.ToBuilder();
+        for (var i = 1; i <= _concurrencyRowCount; i++)
+        {
+            var input = Entry(i);
+            var expectedEntry = MembershipEntrySnapshot.Capture(input);
+            var writer = i % 2 == 0 ? B : A;
+            var reader = i % 2 == 0 ? A : B;
+            Check(await writer.InsertRowAsync(input, current.Next(), ct),
+                $"concurrent-read setup insert failed: index={i}, table={current.Next()}");
+            var observed = ClusteringMembershipSnapshot.Capture(await reader.ReadRowAsync(input.SiloAddress, ct));
+            AssertCommit(current with { Rows = current.Rows.Clear() }, observed, expectedEntry.ToEntry(), insert: true);
+            expectedRows.Add(expectedEntry.Identity, new(expectedEntry, observed.Row(input.SiloAddress).Etag));
+            current = observed;
+        }
+        EqualAllowingRefreshedRowEtags(current with { Rows = expectedRows.ToImmutable() }, await SameHandles(ct));
+    }
+
     private async Task ConcurrentReads(bool pointReads, CancellationToken ct)
     {
-        for (var i = 1; i <= _concurrencyRowCount; i++) await Insert(i % 2 == 0 ? B : A, Entry(i), ct);
+        await SeedConcurrentRows(ct);
         for (var round = 0; round < 6; round++)
         {
             var before = await SameHandles(ct);

@@ -223,6 +223,12 @@ range 3–10000) bounds the multi-row workload without changing any assertion.
 An adapter must select a safe count which crosses its backend's actual paging
 or streaming boundary. Retain provider-specific pagination tests which force
 those boundaries explicitly.
+Setup uses one initial point read, one insert and verifying point read per row,
+then two full views checked against independently constructed canonical entries.
+Each insertion verifies an exact +1 commit and fresh tokens. For N rows this is
+N+1 point reads, N inserts, two full reads, and 3N membership-row observations.
+These count provider API calls; provider-specific instrumentation measures their
+native request costs.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach independent stale row/table modes,

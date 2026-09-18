@@ -54,6 +54,29 @@ public sealed class MembershipTableConformanceTests
     public Task ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews() => Run((r, ct) => r.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct));
     [Fact]
     public Task ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews() => Run((r, ct) => r.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct));
+
+    [Theory]
+    [InlineData(5, false)]
+    [InlineData(1001, false)]
+    [InlineData(4096, false)]
+    [InlineData(4096, true)]
+    public async Task ConcurrentReadSetup_UsesLinearPointReadsAndIndependentFinalView(int rows, bool tableVersionRowEtags)
+    {
+        var backend = new IdealizedMembershipBackend { TableVersionRowEtags = tableVersionRowEtags };
+        await backend.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            await new MembershipTableTestRunner(fixture, concurrencyRowCount: rows).SeedConcurrentRows(ct);
+            Assert.Equal(rows, backend.Inserts);
+            Assert.Equal(rows + 1, backend.PointReads);
+            Assert.Equal(2, backend.FullReads);
+            Assert.Equal(3 * rows, backend.RowsObserved);
+            var partition = backend.Partitions[fixture.ClusterId];
+            Assert.Equal(rows, partition.Version);
+            Assert.Equal(rows, partition.Rows.Count);
+            for (var i = 1; i <= rows; i++)
+                Assert.Equal($"host-{i}", partition.Rows[MembershipTableTestData.CreateEntry(i).SiloAddress].Item1.HostName);
+        }, TestContext.Current.CancellationToken);
+    }
     [Fact]
     public Task InitializeMembershipTable_RepeatedWithData_PreservesCommittedState() => Run((r, ct) => r.InitializeMembershipTable_RepeatedWithData_PreservesCommittedState(ct));
     [Fact]

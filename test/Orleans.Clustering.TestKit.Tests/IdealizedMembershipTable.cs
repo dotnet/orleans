@@ -27,6 +27,10 @@ internal sealed class IdealizedMembershipBackend
     internal int Deletes;
     internal int VersionedUpdates;
     internal int Reads;
+    internal int FullReads;
+    internal int PointReads;
+    internal int RowsObserved;
+    internal int Inserts;
     internal readonly List<(string Cluster, IdealizedMembershipTable Owner, SiloAddress Identity, DateTime Time, SiloStatus Status)> HeartbeatWrites = [];
 
     internal string Token() => $"opaque/{++Tokens:x}/token";
@@ -156,6 +160,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         => Locked(() =>
         {
+            backend.Inserts++;
             var partition = Partition;
             if (partition.Etag != tableVersion.VersionEtag || partition.Rows.ContainsKey(entry.SiloAddress)) return false;
             partition.Rows.Add(entry.SiloAddress, Tuple.Create(Clone(entry), backend.Token()));
@@ -209,19 +214,24 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     private MembershipTableData Snapshot(SiloAddress? key)
     {
         backend.Reads++;
+        if (key is null) backend.FullReads++;
+        else backend.PointReads++;
         var partition = Partition;
-        return new(partition.Rows.Where(p => key is null || p.Key.Equals(key))
-            .Select(p =>
+        IEnumerable<Tuple<MembershipEntry, string>> rows = key is null
+            ? partition.Rows.Values
+            : partition.Rows.TryGetValue(key, out var row) ? [row] : [];
+        var members = rows.Select(item =>
             {
-                var entry = Clone(p.Value.Item1);
-                if (backend.LagHeartbeatReads && backend.Reads % 2 == 0 && partition.EarlierHeartbeats.TryGetValue(p.Key, out var earlier))
+                var entry = Clone(item.Item1);
+                if (backend.LagHeartbeatReads && backend.Reads % 2 == 0 && partition.EarlierHeartbeats.TryGetValue(entry.SiloAddress, out var earlier))
                 {
                     entry.IAmAliveTime = earlier;
                     backend.LaggedHeartbeatReads++;
                 }
-                return Tuple.Create(entry, backend.TableVersionRowEtags ? partition.Etag : p.Value.Item2);
-            }).ToList(),
-            new(partition.Version, partition.Etag));
+                return Tuple.Create(entry, backend.TableVersionRowEtags ? partition.Etag : item.Item2);
+            }).ToList();
+        backend.RowsObserved += members.Count;
+        return new(members, new(partition.Version, partition.Etag));
     }
 
     private static DateTime EffectiveTime(MembershipEntry entry)
