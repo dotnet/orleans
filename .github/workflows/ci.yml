@@ -19,7 +19,7 @@ env:
   # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
-  COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
+  COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260907@sha256:2db1f9e74c506bcf6fc347aa937aea1c00fa756061296a5a9efba530ce86ec02
   CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
@@ -438,7 +438,7 @@ jobs:
         bash .github/scripts/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
 
         docker run -d --pull=never --name cosmosdb-emulator \
-          -p 8081:8081 \
+          -p 8081:8081 -p 8080:8080 \
           -e PROTOCOL=https \
           -e ENABLE_EXPLORER=false \
           -e ENABLE_TELEMETRY=false \
@@ -446,23 +446,15 @@ jobs:
           "$COSMOSDB_EMULATOR_IMAGE"
     - name: Wait for Azure Cosmos DB emulator
       run: |
-        endpoint="https://localhost:8081/"
-        echo "Waiting for Azure Cosmos DB emulator to be ready..."
-        for i in {1..60}; do
-          if curl --silent --show-error --insecure "${endpoint}" > /dev/null; then
-            echo "Azure Cosmos DB emulator is ready"
-            echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=${endpoint}" >> "$GITHUB_ENV"
+        for attempt in {1..60}; do
+          if curl --fail --silent --show-error http://localhost:8080/ready; then
+            echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://localhost:8081/" >> "$GITHUB_ENV"
             exit 0
           fi
-
-          if [ "$i" -eq 60 ]; then
-            docker logs --tail 200 cosmosdb-emulator
-            echo "Azure Cosmos DB emulator did not become ready in time."
-            exit 1
-          fi
-
           sleep 2
         done
+        echo "::error::Azure Cosmos DB emulator did not become ready."
+        exit 1
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -477,7 +469,15 @@ jobs:
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
     - name: Clean up Azure Cosmos DB emulator
       if: always()
-      run: docker rm -f cosmosdb-emulator || true
+      run: |
+        container_id=$(docker ps --all --quiet --filter 'name=^/cosmosdb-emulator$')
+        if [ -n "$container_id" ]; then
+          docker inspect --format '{{json .State}}' "$container_id"
+          docker logs --tail 200 "$container_id"
+          docker rm -f "$container_id"
+        else
+          echo "Cosmos DB emulator container was not created."
+        fi
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest

@@ -1,9 +1,11 @@
+using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Runtime;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -26,10 +28,11 @@ namespace Tester.Cosmos.Clustering;
 [TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
-    private const string CosmosEmulatorTransactionalBatchConditionSkipReason = "The Cosmos DB emulator does not enforce the transactional batch ETag conditions required by this test.";
+    private readonly ITestOutputHelper _output;
 
-    public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+    public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters())
     {
+        _output = output;
     }
 
     private static LoggerFilterOptions CreateFilters()
@@ -71,8 +74,50 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
-    public void MembershipTable_Cosmos_Init()
+    public async Task MembershipTable_Cosmos_Init()
     {
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        using var client = await options.CreateClient(Services);
+        var account = await client.ReadAccountAsync();
+
+        Assert.Null(client.ClientOptions.ConsistencyLevel);
+        _output.WriteLine("Account default consistency: {0}; client consistency override: inherited; connection mode: {1}",
+            account.Consistency.DefaultConsistencyLevel, client.ClientOptions.ConnectionMode);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task MembershipTable_Cosmos_HeartbeatPreservesMembershipTokens()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var table = CreateMembershipTable(loggerFactory.CreateLogger<CosmosMembershipTableTests>());
+        await table.InitializeMembershipTableAsync(false, token);
+        var initial = await table.ReadAllAsync(token);
+        var entry = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Active,
+            StartTime = DateTime.UnixEpoch,
+            IAmAliveTime = DateTime.UnixEpoch
+        };
+        Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
+        var before = await table.ReadRowAsync(entry.SiloAddress, token);
+        var (membershipEntry, rowToken) = Assert.Single(before.Members);
+
+        entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+        await table.UpdateIAmAliveAsync(entry, token);
+        membershipEntry.Status = SiloStatus.Dead;
+        membershipEntry.AddSuspector(entry.SiloAddress, DateTime.UnixEpoch.AddMinutes(2));
+        Assert.True(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
+        Assert.False(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
+
+        var after = await table.ReadRowAsync(entry.SiloAddress, token);
+        var updated = Assert.Single(after.Members).Item1;
+        Assert.Equal(SiloStatus.Dead, updated.Status);
+        Assert.Equal(membershipEntry.SuspectTimes, updated.SuspectTimes);
+        Assert.Equal(before.Version.Version + 1, after.Version.Version);
     }
 
     [Fact, TestCategory("Functional")]
@@ -101,8 +146,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_ReadRow_Insert_Read();
     }
 
@@ -115,8 +158,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRow()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRow();
     }
 
@@ -128,8 +169,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_UpdateRowInParallel()
     {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-
         await MembershipTable_UpdateRowInParallel();
     }
 
