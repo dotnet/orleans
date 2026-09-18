@@ -281,6 +281,11 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             await document.UpdateAsync(
                 nameof(SiloInstanceEntity.IAmAliveTime), iAmAliveTime, cancellationToken: cancellationToken);
         }
+        catch (RpcException exception) when (
+            cancellationToken.IsCancellationRequested && exception.StatusCode == StatusCode.Cancelled)
+        {
+            throw new OperationCanceledException("The Firestore operation was canceled.", exception, cancellationToken);
+        }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
             LogUpdateIAmAliveError(exc, entry);

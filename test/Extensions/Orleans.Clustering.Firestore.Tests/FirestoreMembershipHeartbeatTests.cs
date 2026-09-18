@@ -117,6 +117,41 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(version, client.Documents[VersionPath]);
     }
 
+    [Theory]
+    [InlineData(StatusCode.Cancelled)]
+    [InlineData(StatusCode.PermissionDenied)]
+    public async Task HeartbeatClassifiesNativeFailureUsingCallerCancellation(StatusCode status)
+    {
+        var failure = new RpcException(new Status(status, "native-write-failure"));
+        var client = new MembershipClient { CommitFailure = failure };
+        var entry = Entry();
+        var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
+        var version = client.Documents[VersionPath].Clone();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        client.BeforeCommit = cancellation.Cancel;
+        var table = CreateTable(client);
+
+        if (status == StatusCode.Cancelled)
+        {
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => table.UpdateIAmAliveAsync(entry, cancellation.Token));
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Same(failure, exception.InnerException);
+        }
+        else
+        {
+            var exception = await Assert.ThrowsAsync<RpcException>(
+                () => table.UpdateIAmAliveAsync(entry, cancellation.Token));
+            Assert.Same(failure, exception);
+        }
+
+        Assert.Equal(cancellation.Token, client.CommitCancellationToken);
+        AssertSingleHeartbeatWrite(client, entry);
+        Assert.Empty(client.CommittedWrites);
+        Assert.Equal(original, client.Documents[original.Name]);
+        Assert.Equal(version, client.Documents[VersionPath]);
+    }
+
     [Fact]
     public async Task HeartbeatPreservesConcurrentVersionedFields()
     {
@@ -747,12 +782,12 @@ public sealed class FirestoreMembershipHeartbeatTests
             var beforeCommit = BeforeCommit;
             BeforeCommit = null;
             beforeCommit?.Invoke();
-            CommitCancellationToken?.ThrowIfCancellationRequested();
             if (CommitFailure is { } failure)
             {
                 return Task.FromException<CommitResponse>(failure);
             }
 
+            CommitCancellationToken?.ThrowIfCancellationRequested();
             if (!request.Transaction.IsEmpty && _readSets[request.Transaction].Any(name =>
                 !Equals(_snapshots[request.Transaction].GetValueOrDefault(name), Documents.GetValueOrDefault(name))))
             {
