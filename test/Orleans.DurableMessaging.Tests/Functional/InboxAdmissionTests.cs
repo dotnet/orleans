@@ -22,7 +22,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Equal(0, state.InboxCount);
         Assert.Equal(1, state.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(state.Effects).Count);
-        Assert.Equal(1, attempt.Outbox.Count);
+        Assert.Single(attempt.Outbox);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
         var storage = Fixture.Storage.BlockWrite(attempt.JournalId);
         var queued = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();

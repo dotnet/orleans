@@ -22,6 +22,7 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
         var failure = new IOException("Injected inbox command codec failure.");
@@ -30,7 +31,7 @@ public sealed class InboxStateEncodingTests : DurableMessagingBehaviorTestBase
         using var envelope = CreateEnvelope(receiver, NewMessage(203, "codec"));
         await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
         Assert.Same(failure, await grain.Faulted.Task);
-        Assert.Same(failure, ((JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>()).Failure);
+        Assert.Same(failure, outbox.Failure);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
         Assert.Empty(grain.GetSnapshotForTest().Effects);

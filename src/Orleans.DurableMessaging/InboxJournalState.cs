@@ -10,6 +10,7 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
     private DurableInboxExtension? _owner;
     private bool _recovered;
     private bool _captured;
+    private DurableInboxExtension Owner => _owner ?? throw new InvalidOperationException("Durable inbox runtime must be attached before journal recovery. Select messaging activation setup using IDurableMessagingGrain or DurableGrain.");
 
     public void Attach(DurableInboxExtension owner)
     {
@@ -22,15 +23,15 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
         _owner = owner;
     }
 
-    public override bool IsWritePrepared => _owner?.IsWritePrepared ?? true;
-    public override void ValidateWrite() => _owner?.ValidateWrite();
-    public override void ValidateDelete() => _owner?.ValidateDelete();
-    public override void OnDeleteStarted() => _owner?.OnDeleteStarted();
+    public override bool IsWritePrepared => Owner.IsWritePrepared;
+    public override void ValidateWrite() => Owner.ValidateWrite();
+    public override void ValidateDelete() => Owner.ValidateDelete();
+    public override void OnDeleteStarted() => Owner.OnDeleteStarted();
     public override void OnFaulted(Exception exception) => _owner?.OnFaulted(exception);
     public override void OnRecoveryCompleted()
     {
         _recovered = true;
-        _owner?.OnRecoveryCompleted();
+        Owner.OnRecoveryCompleted();
     }
 
     public override void Reset(JournalStreamWriter writer)
@@ -43,14 +44,14 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
     public override void AppendEntries(JournalStreamWriter writer)
     {
         base.AppendEntries(writer);
-        _owner?.CaptureWrites();
+        Owner.CaptureWrites();
         _captured = true;
     }
 
     public override void AppendSnapshot(JournalStreamWriter writer)
     {
         base.AppendSnapshot(writer);
-        _owner?.CaptureWrites();
+        Owner.CaptureWrites();
         _captured = true;
     }
 
@@ -60,7 +61,7 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
         if (_captured)
         {
             _captured = false;
-            _owner?.OnWriteCompleted();
+            Owner.OnWriteCompleted();
         }
     }
 }
