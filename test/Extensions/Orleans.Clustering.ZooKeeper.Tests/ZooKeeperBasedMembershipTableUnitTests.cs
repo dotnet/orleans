@@ -991,6 +991,20 @@ namespace UnitTests.MembershipTests
             }
         }
 
+        [Theory]
+        [InlineData("MissingMethod", "expected a parameterless instance method")]
+        [InlineData("ToString", "expected System.Int32, received System.String")]
+        public void NativeFake_IncompatibleSdkMember_ReportsActionableDiagnostic(string methodName, string detail)
+        {
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                ZooKeeperNativeFake.GetValue<int>(new object(), methodName));
+
+            Assert.Contains($"System.Object.{methodName}", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(detail, failure.Message, StringComparison.Ordinal);
+            Assert.Contains("Update the fake for the installed ZooKeeperNetEx API", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(typeof(Op).Assembly.FullName!, failure.Message, StringComparison.Ordinal);
+        }
+
         private static Task InvokeNative(string operation, ZooKeeperNativeFake fake, MembershipEntry entry, CancellationToken cancellationToken) =>
             operation switch
             {

@@ -132,7 +132,7 @@ namespace Orleans.Runtime.Membership
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             return UsingZookeeper(zk => ReadCoreAsync(zk, siloAddress, cancellationToken),
-                this.deploymentConnectionString, this.watcher, cancellationToken);
+                this.deploymentConnectionString, this.watcher, cancellationToken, canBeReadOnly: true);
         }
 
         /// <summary>
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.Membership
         internal static Task<MembershipTableData> ReadAllAsync(string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
         {
             return UsingZookeeper(zk => ReadCoreAsync(zk, null, cancellationToken),
-                deploymentConnectionString, watcher, cancellationToken);
+                deploymentConnectionString, watcher, cancellationToken, canBeReadOnly: true);
         }
 
         internal static async Task<MembershipTableData> ReadCoreAsync(
@@ -494,7 +494,7 @@ namespace Orleans.Runtime.Membership
             internal Func<string, byte[], int, Task<Stat>> SetData { get; } = setData;
         }
 
-        private static async Task<T> UsingZookeeper<T>(Func<NativeOperations, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
+        private static async Task<T> UsingZookeeper<T>(Func<NativeOperations, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken, bool canBeReadOnly = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var operation = ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zk =>
@@ -503,7 +503,7 @@ namespace Orleans.Runtime.Membership
                 return zkMethod(new NativeOperations(
                     path => zk.getDataAsync(path), path => zk.getChildrenAsync(path), zk.sync,
                     operations => zk.multiAsync(operations), zk.setDataAsync));
-            });
+            }, canBeReadOnly);
 
             return await AwaitOperationAsync(operation, cancellationToken);
         }

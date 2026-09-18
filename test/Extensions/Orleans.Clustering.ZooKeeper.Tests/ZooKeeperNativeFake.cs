@@ -136,27 +136,41 @@ internal sealed class ZooKeeperNativeFake
 
     private static Request ToRequest(Op operation)
     {
-        var method = typeof(Op).GetMethod("toRequestRecord", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-        var result = method.Invoke(operation, null);
-        Assert.NotNull(result);
+        // ZooKeeperNetEx exposes only an Op's type and path publicly; decoding its payload requires this SDK seam.
+        var result = GetValue<object>(operation, "toRequestRecord", visibility: BindingFlags.NonPublic);
         var path = GetValue<string>(result, "getPath");
         return result.GetType().Name switch
         {
             "CreateRequest" => new CreateRequest(path, GetValue<byte[]>(result, "getData"),
                 GetValue<int>(result, "getFlags"), GetValue<List<ACL>>(result, "getAcl")),
-            "SetDataRequest" => new SetDataRequest(path, GetValue<byte[]?>(result, "getData"), GetValue<int>(result, "getVersion")),
+            "SetDataRequest" => new SetDataRequest(path, GetValue<byte[]?>(result, "getData", allowNull: true), GetValue<int>(result, "getVersion")),
             "DeleteRequest" => new DeleteRequest(path, GetValue<int>(result, "getVersion")),
-            _ => throw new InvalidOperationException($"Unexpected native request: {result.GetType().Name}")
+            _ => throw ApiMismatch(result.GetType(), "toRequestRecord", $"unsupported request type {result.GetType().FullName}")
         };
     }
 
-    private static T GetValue<T>(object request, string methodName)
+    internal static T GetValue<T>(object request, string methodName, bool allowNull = false, BindingFlags visibility = BindingFlags.Public)
     {
-        var method = request.GetType().GetMethod(methodName);
-        Assert.NotNull(method);
-        return (T)method.Invoke(request, null)!;
+        var type = request.GetType();
+        var method = type.GetMethod(methodName, BindingFlags.Instance | visibility, Type.EmptyTypes)
+            ?? throw ApiMismatch(type, methodName, "expected a parameterless instance method");
+        var result = method.Invoke(request, null);
+        if (result is T value)
+        {
+            return value;
+        }
+
+        if (result is null && allowNull && default(T) is null)
+        {
+            return default!;
+        }
+
+        throw ApiMismatch(type, methodName, $"expected {typeof(T).FullName}, received {result?.GetType().FullName ?? "null"}");
     }
+
+    private static InvalidOperationException ApiMismatch(Type type, string methodName, string detail) =>
+        new($"ZooKeeperNativeFake cannot decode {type.FullName}.{methodName}: {detail}. "
+            + $"Update the fake for the installed ZooKeeperNetEx API ({typeof(Op).Assembly.FullName}).");
 
     private static T CreateResult<T>(params object[] arguments) =>
         Assert.IsType<T>(Activator.CreateInstance(typeof(T), BindingFlags.Instance | BindingFlags.NonPublic,
