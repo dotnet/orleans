@@ -375,6 +375,65 @@ public partial class StateManagerTests
     }
 
     [Fact]
+    public async Task Fault_CallbackCanCoordinateCrossThreadManagerReentry()
+    {
+        var expected = new IOException("Original storage failure.");
+        var storage = new CapturingStorage { BlockNextAppend = true, NextAppendException = expected };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var first = new HookState();
+        var second = new HookState();
+        manager.RegisterState("first", first);
+        manager.RegisterState("second", second);
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        var current = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await WaitFor(storage.BlockedAppendStarted.Task);
+        var queued = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        var callbackEntered = NewSignal();
+        var workerReady = NewSignal();
+        var worker = Task.Run(async () =>
+        {
+            workerReady.SetResult();
+            await WaitFor(callbackEntered.Task);
+            return (ThreadId: Environment.CurrentManagedThreadId,
+                Failure: Record.Exception(() => manager.RegisterState("late", new HookState())));
+        }, TestContext.Current.CancellationToken);
+        await WaitFor(workerReady.Task);
+        Exception? callbackError = null;
+        var notifications = new List<string>();
+        first.FaultAction = exception =>
+        {
+            callbackError = Record.Exception(() =>
+            {
+                Assert.Same(expected, exception);
+                callbackEntered.SetResult();
+                var result = worker.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+                Assert.NotEqual(Environment.CurrentManagedThreadId, result.ThreadId);
+                Assert.Same(expected, Assert.IsType<InvalidOperationException>(result.Failure).InnerException);
+                Assert.False(current.IsCompleted);
+                Assert.False(queued.IsCompleted);
+                notifications.Add("first");
+            });
+        };
+        second.FaultAction = exception =>
+        {
+            Assert.Same(expected, exception);
+            Assert.False(current.IsCompleted);
+            Assert.False(queued.IsCompleted);
+            notifications.Add("second");
+        };
+
+        storage.ReleaseAppend.SetResult();
+        Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(current)));
+        Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(queued)));
+        await WaitFor(worker);
+        Assert.Null(callbackError);
+        Assert.Equal(["first", "second"], notifications);
+        Assert.Equal(1, first.FaultCount);
+        Assert.Equal(1, second.FaultCount);
+        Assert.False(manager.TryGetState("late", out _));
+    }
+
+    [Fact]
     public async Task LatchedFailure_PreservesAlreadyCapturedWriteAcknowledgement()
     {
         var storage = new CapturingStorage { BlockNextAppend = true };
