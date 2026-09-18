@@ -77,10 +77,17 @@ namespace Orleans.Runtime.Messaging
 
             if (_requests is not { } requests || !requests.TryGetValue(response.Id, out var trackedRequest))
             {
-                return CompletionResult.NotTracked;
+                return response.GatewayRequestAttempt == 0
+                    ? CompletionResult.NotTracked
+                    : CompletionResult.Superseded;
             }
 
             if (response.GatewayRequestAttempt != 0 && response.GatewayRequestAttempt != trackedRequest.Attempt)
+            {
+                return CompletionResult.Superseded;
+            }
+
+            if (response.GatewayRequestAttempt != 0 && response.ForwardCount < trackedRequest.ForwardCount)
             {
                 return CompletionResult.Superseded;
             }
