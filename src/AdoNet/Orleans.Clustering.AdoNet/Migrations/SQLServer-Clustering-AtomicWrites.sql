@@ -2,6 +2,7 @@
 -- Existing provider queries remain supported without applying this script.
 -- Existing table schemas, query parameters, and routine signatures are preserved.
 
+SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
 UPDATE OrleansQuery SET QueryText = '-- This is expected to never fail by Orleans, so return value

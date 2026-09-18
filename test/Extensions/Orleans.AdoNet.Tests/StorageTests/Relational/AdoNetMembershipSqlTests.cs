@@ -216,6 +216,15 @@ public sealed class AdoNetMembershipSqlTests
     }
 
     [Fact]
+    public void SqlServerUpgrade_EnablesStatementErrorRollbackBeforePublication()
+    {
+        var update = ReadScript("SQLServer", update: true);
+        var statements = Regex.Replace(Regex.Replace(update, @"--[^\n]*", ""), @"\s+", " ").Trim();
+
+        Assert.StartsWith("SET XACT_ABORT ON; BEGIN TRANSACTION;", statements, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MySqlUpgrade_PreservesExistingRoutineAndPublishesQueriesAfterAdditiveCreation()
     {
         var update = ReadScript("MySQL", update: true);

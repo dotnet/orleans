@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -157,6 +158,24 @@ public sealed class AdoNetMembershipUpgradeTests
         }
         else
         {
+            if (engine == "SQLServer")
+            {
+                var commit = migration.LastIndexOf("COMMIT;", StringComparison.Ordinal);
+                Assert.True(commit >= 0);
+                var failingMigration = migration.Insert(commit,
+                    "INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('MembershipReadRowKey', 'duplicate');\n");
+                await using var connection = new SqlConnection(database.CurrentConnectionString);
+                await connection.OpenAsync(cancellationToken);
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SET XACT_ABORT OFF;\n" + failingMigration;
+                var failure = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync(cancellationToken));
+                Assert.Equal(2627, failure.Number);
+                command.CommandText = "SELECT XACT_STATE();";
+                Assert.Equal(0, Assert.IsType<int>(await command.ExecuteScalarAsync(cancellationToken)));
+                Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
+                AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
+            }
+
             // Both native scripts are one transaction/batch, including PostgreSQL dollar-quoted functions.
             await storage.ExecuteAsync(migration, cancellationToken);
             AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
