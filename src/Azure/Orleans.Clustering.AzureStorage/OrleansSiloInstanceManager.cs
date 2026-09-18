@@ -226,6 +226,7 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Deletes Dead entries whose latest start, heartbeat, and suspicion times precede the cutoff,
         /// using row etags to protect concurrent updates and preserving the membership version.
+        /// The caller schedules subsequent attempts after native contention.
         /// </summary>
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {

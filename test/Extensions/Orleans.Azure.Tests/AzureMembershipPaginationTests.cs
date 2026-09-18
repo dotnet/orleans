@@ -431,8 +431,10 @@ public class AzureMembershipPaginationTests
         Assert.Equal(1, storage.QueryCount);
     }
 
-    [Fact]
-    public async Task CleanupPropagatesAllContentionFailuresAfterOneAttempt()
+    [Theory]
+    [InlineData(412)]
+    [InlineData(404)]
+    public async Task CleanupPropagatesAllContentionFailuresAfterOneAttempt(int secondStatus)
     {
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(7, DeadSilo("silo-0", "s0"), DeadSilo("silo-1", "s1")));
@@ -442,14 +444,13 @@ public class AzureMembershipPaginationTests
             .Returns(call => Task.FromException<Response<IReadOnlyList<Response>>>(
                 Assert.Single(call.Arg<IEnumerable<TableTransactionAction>>()).Entity.RowKey == "silo-0"
                     ? new RequestFailedException(412, "Concurrent heartbeat.")
-                    : new RequestFailedException(404, "Concurrent cleanup.", "ResourceNotFound", null)));
+                    : new RequestFailedException(secondStatus, "Concurrent cleanup.", secondStatus == 404 ? "ResourceNotFound" : "UpdateConditionNotSatisfied", null)));
 
         var exception = await Assert.ThrowsAsync<AggregateException>(() => CreateManager(storage, client, maximumRows: 1)
             .CleanupDefunctSiloEntries(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken));
 
         Assert.Equal(2, exception.InnerExceptions.Count);
-        Assert.Contains(exception.InnerExceptions, failure => failure is RequestFailedException { Status: 412 });
-        Assert.Contains(exception.InnerExceptions, failure => failure is RequestFailedException { Status: 404 });
+        Assert.Equal(new[] { 412, secondStatus }.Order(), exception.InnerExceptions.Select(failure => Assert.IsType<RequestFailedException>(failure).Status).Order());
         Assert.Equal(2, client.ReceivedCalls().Count());
         Assert.Equal(1, storage.QueryCount);
     }
