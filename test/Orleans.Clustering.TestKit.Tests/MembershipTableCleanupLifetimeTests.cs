@@ -117,10 +117,76 @@ public sealed class MembershipTableCleanupLifetimeTests
 
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    // Exercises the interface's tokenless compatibility dispatch, which cancels waits separately from operations.
-    private sealed class LegacyTable(IdealizedMembershipTable inner, Func<Task> beforeDelete) : IMembershipTable
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Dispose_WaitsForRealLegacyInitializationAfterCancellationOrConcurrentDisposal(bool cancelCaller, bool failInitialization)
     {
-        public Task InitializeMembershipTable(bool tryInitTableVersion) => inner.InitializeMembershipTableAsync(tryInitTableVersion);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        var ct = timeout.Token;
+        using var caller = new CancellationTokenSource();
+        var backend = new IdealizedMembershipBackend();
+        var initializationStarted = Gate();
+        var releaseInitialization = Gate();
+        var expected = new InvalidOperationException("late-legacy-initialization");
+        var initialized = 0;
+        var fixture = new MembershipTableTestFixture("legacy-initialization", (_, cluster, _) =>
+            ValueTask.FromResult(new MembershipTableTestHandle(
+                new LegacyTable(backend.Create(cluster), () => Task.CompletedTask, async () =>
+                {
+                    Interlocked.Increment(ref initialized);
+                    initializationStarted.TrySetResult();
+                    await releaseInitialization.Task.WaitAsync(ct);
+                    Assert.Equal(0, backend.Deletes);
+                    Assert.Equal(0, backend.DisposedHandles);
+                    if (failInitialization) throw expected;
+                }),
+                () => backend.DisposeHandleAsync(cluster))), backend.IsDeletedAsync);
+        var initialization = fixture.InitializeAsync(caller.Token).AsTask();
+        await initializationStarted.Task.WaitAsync(ct);
+        if (cancelCaller)
+        {
+            caller.Cancel();
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization.WaitAsync(ct));
+            Assert.Equal(caller.Token, canceled.CancellationToken);
+        }
+        var timedOut = await Assert.ThrowsAsync<TimeoutException>(() => fixture.DisposeAsync(TimeSpan.Zero).AsTask());
+        var completion = Assert.IsAssignableFrom<Task>(timedOut.Data[ClusteringTestKitDiagnostics.CleanupCompletionKey]);
+        Assert.False(completion.IsCompleted);
+        Assert.Equal(0, backend.Deletes);
+        Assert.Equal(0, backend.DisposedHandles);
+        releaseInitialization.TrySetResult();
+
+        if (failInitialization)
+        {
+            var cleanup = await Assert.ThrowsAsync<AggregateException>(() => fixture.DisposeAsync().AsTask().WaitAsync(ct));
+            Assert.Same(expected, Assert.Single(cleanup.InnerExceptions));
+        }
+        else await fixture.DisposeAsync().AsTask().WaitAsync(ct);
+        if (!cancelCaller)
+        {
+            if (failInitialization)
+                Assert.Same(expected, await Assert.ThrowsAsync<InvalidOperationException>(() => initialization.WaitAsync(ct)));
+            else
+                await Assert.ThrowsAsync<ObjectDisposedException>(() => initialization.WaitAsync(ct));
+        }
+        Assert.Equal(1, initialized);
+        Assert.Equal(3, backend.CreatedHandles);
+        Assert.Equal(3, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    // Exercises the interface's tokenless compatibility dispatch, which cancels waits separately from operations.
+    private sealed class LegacyTable(IdealizedMembershipTable inner, Func<Task> beforeDelete, Func<Task>? beforeInitialize = null) : IMembershipTable
+    {
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        {
+            if (beforeInitialize is not null) await beforeInitialize();
+            await inner.InitializeMembershipTableAsync(tryInitTableVersion);
+        }
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
             await beforeDelete();

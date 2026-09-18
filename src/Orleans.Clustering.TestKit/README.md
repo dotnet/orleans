@@ -72,8 +72,12 @@ The second cluster ID extends the first with a suffix, exercising isolation of
 storage keys whose cluster names share a prefix.
 `CreateAdditionalHandleAsync` accepts only those two owned, live cluster scopes.
 Handle registration and teardown's ownership snapshot share one lifecycle lock.
-An acquisition which finishes after disposal or history retirement disposes its
-returned owner before reporting the lifetime error to its caller.
+Admitted factory calls, provider initialization, and late-owner disposal remain
+owned until their actual tasks finish. Caller cancellation ends that caller's
+wait; the factory and tokenless-compatible initialization keep their original
+owners alive. An acquisition which finishes after disposal or history retirement
+disposes its returned owner before reporting the lifetime error. Teardown waits
+for these admitted operations before deleting scopes or disposing shared owners.
 Initialization of an additional handle is explicit. `RunAsync` initializes,
 executes, and tears down while preserving the primary failure. Cleanup deletes
 only the fixture's cluster partitions and attempts every owner after the actual
