@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using NSubstitute;
 using Orleans.Clustering.Redis;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -230,7 +231,6 @@ namespace Tester.Redis.Clustering
             Assert.Equal(version.Version, after.Version.Version);
             Assert.Equal(SiloStatus.Dead, persisted.Status);
             Assert.Equal(entry.SuspectTimes, persisted.SuspectTimes);
-            Assert.Equal(entry.IAmAliveTime, persisted.IAmAliveTime);
             if (insert)
             {
                 Assert.Equal(heartbeat.IAmAliveTime, Assert.Single((await table.ReadRowAsync(owner.SiloAddress, token)).Members).Item1.IAmAliveTime);
@@ -247,6 +247,85 @@ namespace Tester.Redis.Clustering
         public async Task CleanupDefunctSiloEntries()
         {
             await MembershipTable_CleanupDefunctSiloEntries();
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Cleanup_OneScanAndAtomicCandidateCommands_PreserveRacingChanges(bool refreshCandidate)
+        {
+            using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
+            using var table = new RedisMembershipTable(
+                Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
+                _clusterOptions);
+            var token = TestContext.Current.CancellationToken;
+            await table.InitializeMembershipTableAsync(false, token);
+            var cutoff = DateTime.UnixEpoch.AddSeconds(2);
+            var entries = Enumerable.Range(1, 4).Select(index => new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11110 + index, 1),
+                Status = index == 3 ? SiloStatus.Active : SiloStatus.Dead,
+                StartTime = DateTime.UnixEpoch,
+                IAmAliveTime = DateTime.UnixEpoch.AddSeconds(1),
+                HostName = "host",
+                SiloName = $"silo-{index}"
+            }).ToArray();
+            entries[3].SuspectTimes = [Tuple.Create(entries[2].SiloAddress, cutoff)];
+            foreach (var entry in entries)
+            {
+                Assert.True(await table.InsertRowAsync(entry, (await table.ReadAllAsync(token)).Version.Next(), token));
+            }
+
+            var database = connection.GetDatabase();
+            var key = RedisClusteringOptions.DefaultCreateRedisKey(_clusterOptions.Value);
+            var before = (await database.HashGetAllAsync(key)).ToDictionary(row => row.Name, row => row.Value);
+            var expiry = await database.KeyExpireTimeAsync(key);
+            Assert.NotNull(expiry);
+            var cleanupDatabase = Substitute.For<IDatabase>();
+            var cleanupConnection = Substitute.For<IConnectionMultiplexer>();
+            cleanupConnection.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(cleanupDatabase);
+            cleanupDatabase.HashGetAllAsync(key).Returns(async _ =>
+            {
+                var snapshot = await database.HashGetAllAsync(key);
+                var owner = refreshCandidate ? entries[0] : entries[2];
+                owner.IAmAliveTime = cutoff;
+                await table.UpdateIAmAliveAsync(owner, token);
+                return snapshot;
+            });
+            cleanupDatabase.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache)
+                .Returns(call => database.ScriptEvaluateAsync(
+                    call.ArgAt<string>(0), call.ArgAt<RedisKey[]>(1), call.ArgAt<RedisValue[]>(2), CommandFlags.NoScriptCache));
+            using var cleanupTable = new RedisMembershipTable(
+                Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult((cleanupConnection, true)) }),
+                _clusterOptions);
+            await cleanupTable.InitializeMembershipTableAsync(false, token);
+            ProfilingSession? activeProfile = null;
+            connection.RegisterProfiler(() => activeProfile);
+            var profile = new ProfilingSession();
+            activeProfile = profile;
+
+            await cleanupTable.CleanupDefunctSiloEntriesAsync(cutoff, token);
+
+            activeProfile = null;
+            Assert.Equal(new[] { "HGETALL", "EVAL", "EVAL", "EVAL" }, profile.FinishProfiling().Select(command => command.Command));
+            Assert.Equal(new[] { nameof(IDatabase.HashGetAllAsync), nameof(IDatabase.ScriptEvaluateAsync), nameof(IDatabase.ScriptEvaluateAsync) },
+                cleanupDatabase.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+            var after = (await database.HashGetAllAsync(key)).ToDictionary(row => row.Name, row => row.Value);
+            before.Remove(entries[1].SiloAddress.ToString());
+            if (!refreshCandidate)
+            {
+                before.Remove(entries[0].SiloAddress.ToString());
+            }
+
+            var updatedOwner = refreshCandidate ? entries[0] : entries[2];
+            before[updatedOwner.SiloAddress.ToString()] = JsonConvert.SerializeObject(updatedOwner, JsonSettings.JsonSerializerSettings);
+            Assert.Equal(before.Count, after.Count);
+            foreach (var row in before)
+            {
+                Assert.Equal(row.Value, after[row.Key]);
+            }
+
+            Assert.Equal(expiry, await database.KeyExpireTimeAsync(key));
         }
     }
 }

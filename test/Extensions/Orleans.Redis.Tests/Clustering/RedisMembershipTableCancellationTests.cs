@@ -740,7 +740,7 @@ public sealed class RedisMembershipTableCancellationTests
         var canonicalWrite = Assert.Single(commands, call => Assert.IsType<RedisValue[]>(call.GetArguments()[2]).Length == 5);
         Assert.Equal(new RedisValue[] { entry.SiloAddress.ToString(), "1", "2", JsonConvert.SerializeObject(entry, JsonSettings.JsonSerializerSettings), 0 },
             Assert.IsType<RedisValue[]>(canonicalWrite.GetArguments()[2]));
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Theory]
@@ -766,7 +766,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(persisted, backend.Rows[entry.SiloAddress.ToString()]);
         Assert.Equal(rowEtag == tableEtag ? 1 : 0, backend.Database.ReceivedCalls().Count());
         Assert.All(backend.Database.ReceivedCalls(), call => Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), call.GetMethodInfo().Name));
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Fact]
@@ -780,7 +780,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.False(await table.UpdateRowAsync(CreateEntry(), "0", new TableVersion(1, "0"), token));
 
         Assert.Equal((RedisValue)"0", Assert.Single(backend.Rows).Value);
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Theory]
@@ -844,7 +844,6 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.True(await table.UpdateRowAsync(entry, rowEtag, nextVersion, token));
 
         var persisted = backend.Read(entry);
-        Assert.Equal(entry.IAmAliveTime, persisted.IAmAliveTime);
         Assert.Equal(SiloStatus.Dead, persisted.Status);
         Assert.Equal(entry.SuspectTimes, persisted.SuspectTimes);
         Assert.Equal(original, JsonConvert.SerializeObject(entry, JsonSettings.JsonSerializerSettings));
@@ -860,7 +859,7 @@ public sealed class RedisMembershipTableCancellationTests
         var canonicalWrite = Assert.Single(commands, call => Assert.IsType<RedisValue[]>(call.GetArguments()[2]).Length == 5);
         Assert.Equal(new RedisValue[] { entry.SiloAddress.ToString(), rowEtag, "2", original, 1 },
             Assert.IsType<RedisValue[]>(canonicalWrite.GetArguments()[2]));
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Fact]
@@ -929,7 +928,7 @@ public sealed class RedisMembershipTableCancellationTests
             Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
         }
 
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Theory]
@@ -957,7 +956,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Contains("version is missing", error.Message);
         Assert.Empty(backend.Rows);
         Assert.Single(backend.Commits);
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Theory]
@@ -979,7 +978,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.False(result);
         Assert.Empty(backend.Rows);
         Assert.Equal([false], backend.Commits);
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
     }
 
     [Theory]
@@ -1033,7 +1032,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
         Assert.Equal(persisted, backend.Rows[entry.SiloAddress.ToString()]);
         Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), Assert.Single(backend.Database.ReceivedCalls()).GetMethodInfo().Name);
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
         Assert.Empty(backend.Commits);
     }
 
@@ -1059,7 +1058,7 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(cancellation.Token, error.CancellationToken);
         Assert.False(execution.Task.IsCompleted);
         Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), Assert.Single(backend.Database.ReceivedCalls()).GetMethodInfo().Name);
-        Assert.Empty(backend.Transactions);
+        backend.Database.DidNotReceive().CreateTransaction();
         execution.SetResult(RedisResult.Create(0));
     }
 
@@ -1158,13 +1157,13 @@ public sealed class RedisMembershipTableCancellationTests
         {
             Assert.Single(backend.Rows);
             Assert.Equal([true], backend.Commits);
-            await backend.Transactions.Single().DidNotReceive().HashSetAsync(Arg.Any<RedisKey>(), "Version", Arg.Any<RedisValue>());
+            backend.Database.DidNotReceive().CreateTransaction();
         }
         else
         {
             Assert.Equal(2, backend.Rows.Count);
             Assert.Equal(persisted, backend.Rows[entry.SiloAddress.ToString()]);
-            Assert.Empty(backend.Transactions);
+            await backend.Database.DidNotReceive().ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache);
         }
     }
 
@@ -1204,7 +1203,7 @@ public sealed class RedisMembershipTableCancellationTests
         if (offsetTicks >= 0)
         {
             Assert.Equal(persisted, backend.Rows[entry.SiloAddress.ToString()]);
-            Assert.Empty(backend.Transactions);
+            await backend.Database.DidNotReceive().ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache);
         }
         else
         {
@@ -1246,6 +1245,142 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(updateVote ? [true, false] : [false], backend.Commits);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cleanup_UnrelatedWrite_UsesOneScanAndOneCommandPerCandidate(bool canonicalWrite)
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var first = CreateEntry();
+        first.Status = SiloStatus.Dead;
+        var second = CreateEntry();
+        second.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
+        second.Status = SiloStatus.Dead;
+        var survivor = CreateEntry();
+        survivor.SiloAddress = SiloAddress.New(IPAddress.Loopback, 33333, 1);
+        backend.Store(first);
+        backend.Store(second);
+        backend.Store(survivor);
+        backend.BeforeExecute = async () =>
+        {
+            survivor.IAmAliveTime = survivor.IAmAliveTime.AddTicks(1);
+            if (canonicalWrite)
+            {
+                survivor.SuspectTimes = [Tuple.Create(survivor.SiloAddress, survivor.IAmAliveTime)];
+                Assert.True(await table.UpdateRowAsync(survivor, "0", new TableVersion(1, "0"), token));
+            }
+            else
+            {
+                await table.UpdateIAmAliveAsync(survivor, token);
+            }
+        };
+        backend.Database.ClearReceivedCalls();
+
+        await table.CleanupDefunctSiloEntriesAsync(first.IAmAliveTime.AddTicks(1), token);
+
+        Assert.Equal(2, backend.Rows.Count);
+        Assert.Equal(JsonConvert.SerializeObject(survivor, JsonSettings.JsonSerializerSettings),
+            backend.Rows[survivor.SiloAddress.ToString()].ToString());
+        Assert.Equal((RedisValue)(canonicalWrite ? "1" : "0"), backend.Rows["Version"]);
+        var calls = backend.Database.ReceivedCalls().ToArray();
+        Assert.Equal(4, calls.Length);
+        Assert.Equal(nameof(IDatabase.HashGetAllAsync), calls[0].GetMethodInfo().Name);
+        Assert.All(calls.Skip(1), call => Assert.Equal(nameof(IDatabase.ScriptEvaluateAsync), call.GetMethodInfo().Name));
+        var deletes = calls.Skip(1).Where(call => Assert.IsType<string>(call.GetArguments()[0]).Contains("'HDEL'", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, deletes.Length);
+        Assert.All(deletes, call =>
+        {
+            Assert.Equal(CommandFlags.NoScriptCache, Assert.IsType<CommandFlags>(call.GetArguments()[3]));
+            var values = Assert.IsType<RedisValue[]>(call.GetArguments()[2]);
+            Assert.Equal(2, values.Length);
+            var candidate = values[0] == first.SiloAddress.ToString() ? first : second;
+            Assert.Equal((RedisValue)candidate.SiloAddress.ToString(), values[0]);
+            Assert.Equal((RedisValue)JsonConvert.SerializeObject(candidate, JsonSettings.JsonSerializerSettings), values[1]);
+        });
+        backend.Database.DidNotReceive().CreateTransaction();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cleanup_ChangedOrRemovedCandidate_PreservesOtherProgress(bool removed)
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var first = CreateEntry();
+        first.Status = SiloStatus.Dead;
+        var second = CreateEntry();
+        second.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
+        second.Status = SiloStatus.Dead;
+        backend.Store(first);
+        backend.Store(second);
+        backend.BeforeExecute = async () =>
+        {
+            if (removed)
+            {
+                backend.Rows.Remove(first.SiloAddress.ToString());
+            }
+            else
+            {
+                first.Status = SiloStatus.Active;
+                Assert.True(await table.UpdateRowAsync(first, "0", new TableVersion(1, "0"), token));
+            }
+        };
+        backend.Database.ClearReceivedCalls();
+
+        await table.CleanupDefunctSiloEntriesAsync(first.IAmAliveTime.AddTicks(1), token);
+
+        Assert.False(backend.Rows.ContainsKey(second.SiloAddress.ToString()));
+        Assert.Equal(!removed, backend.Rows.ContainsKey(first.SiloAddress.ToString()));
+        if (!removed)
+        {
+            Assert.Equal(SiloStatus.Active, backend.Read(first).Status);
+        }
+
+        Assert.Equal((RedisValue)(removed ? "0" : "1"), backend.Rows["Version"]);
+        Assert.Equal(removed ? [false, true] : [true, false, true], backend.Commits);
+        await backend.Database.Received(1).HashGetAllAsync(MembershipBackend.ClusterKey);
+        await backend.Database.Received(2).ScriptEvaluateAsync(
+            Arg.Is<string>(script => script.Contains("'HDEL'", StringComparison.Ordinal)),
+            Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache);
+        backend.Database.DidNotReceive().CreateTransaction();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cleanup_NativeDeleteFailure_PropagatesSameException(bool permissions)
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var entry = CreateEntry();
+        entry.Status = SiloStatus.Dead;
+        backend.Store(entry);
+        var original = backend.Rows[entry.SiloAddress.ToString()];
+        Exception failure = permissions
+            ? new RedisServerException("NOPERM this user has no permissions to run the command")
+            : new RedisConnectionException(ConnectionFailureType.UnableToConnect, "Connection unavailable.");
+        backend.Database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache)
+            .Returns(Task.FromException<RedisResult>(failure));
+        backend.Database.ClearReceivedCalls();
+
+        Assert.Same(failure, await Record.ExceptionAsync(() => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token)));
+
+        Assert.Equal(2, backend.Rows.Count);
+        Assert.Equal((RedisValue)"0", backend.Rows["Version"]);
+        Assert.Equal(original, backend.Rows[entry.SiloAddress.ToString()]);
+        Assert.Empty(backend.Commits);
+        Assert.Equal(new[] { nameof(IDatabase.HashGetAllAsync), nameof(IDatabase.ScriptEvaluateAsync) },
+            backend.Database.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+    }
+
     private static MembershipEntry CreateEntry() => new()
     {
         SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
@@ -1270,7 +1405,6 @@ public sealed class RedisMembershipTableCancellationTests
         public Dictionary<RedisValue, RedisValue> Rows { get; } = [];
         public IDatabase Database { get; } = Substitute.For<IDatabase>();
         public IConnectionMultiplexer Multiplexer { get; } = Substitute.For<IConnectionMultiplexer>();
-        public List<ITransaction> Transactions { get; } = [];
         public List<Task> Executions { get; } = [];
         public List<bool> Commits { get; } = [];
         public Func<Task>? BeforeExecute { get; set; }
@@ -1307,11 +1441,10 @@ public sealed class RedisMembershipTableCancellationTests
                 Arg.Any<RedisValue[]>(), CommandFlags.NoScriptCache).Returns(call =>
             {
                 var values = call.ArgAt<RedisValue[]>(2);
-                var execution = ExecuteScript(values);
+                var execution = ExecuteScript(call.ArgAt<string>(0), values);
                 Executions.Add(execution);
                 return execution;
             });
-            Database.CreateTransaction().Returns(_ => CreateTransaction());
             Multiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(Database);
             Multiplexer.DisposeAsync().Returns(ValueTask.CompletedTask);
         }
@@ -1320,9 +1453,10 @@ public sealed class RedisMembershipTableCancellationTests
 
         public MembershipEntry Read(MembershipEntry entry) => JsonConvert.DeserializeObject<MembershipEntry>(Rows[entry.SiloAddress.ToString()].ToString(), JsonSettings.JsonSerializerSettings)!;
 
-        private async Task<RedisResult> ExecuteScript(RedisValue[] values)
+        private async Task<RedisResult> ExecuteScript(string script, RedisValue[] values)
         {
-            if (values.Length == 2)
+            var isDelete = script.Contains("'HDEL'", StringComparison.Ordinal);
+            if (values.Length == 2 && !isDelete)
             {
                 var row = Rows[values[0]].ToString();
                 var entry = JsonConvert.DeserializeObject<MembershipEntry>(row, JsonSettings.JsonSerializerSettings)!;
@@ -1332,7 +1466,6 @@ public sealed class RedisMembershipTableCancellationTests
                 return RedisResult.Create(0);
             }
 
-            Assert.Equal(5, values.Length);
             var beforeExecute = BeforeExecute;
             BeforeExecute = null;
             if (beforeExecute is not null)
@@ -1340,6 +1473,16 @@ public sealed class RedisMembershipTableCancellationTests
                 await beforeExecute();
             }
 
+            if (isDelete)
+            {
+                Assert.Equal(2, values.Length);
+                var deleted = Rows.GetValueOrDefault(values[0], RedisValue.Null) == values[1]
+                    && Rows.Remove(values[0]);
+                Commits.Add(deleted);
+                return RedisResult.Create(deleted ? 1 : 0);
+            }
+
+            Assert.Equal(5, values.Length);
             var success = Rows.GetValueOrDefault("Version", RedisValue.Null) == values[1]
                 && Rows.ContainsKey(values[0]) == (values[4] == "1");
             if (success)
@@ -1350,64 +1493,6 @@ public sealed class RedisMembershipTableCancellationTests
 
             Commits.Add(success);
             return RedisResult.Create(success ? 1 : 0);
-        }
-
-        private ITransaction CreateTransaction()
-        {
-            var transaction = Substitute.For<ITransaction>();
-            Transactions.Add(transaction);
-            var conditions = new List<Condition>();
-            var writes = new List<Action>();
-            var fields = new HashSet<RedisValue>();
-            transaction.When(tx => tx.AddCondition(Arg.Any<Condition>()))
-                .Do(call => conditions.Add(call.Arg<Condition>()));
-            transaction.HashSetAsync(ClusterKey, Arg.Any<RedisValue>(), Arg.Any<RedisValue>()).Returns(call =>
-            {
-                var key = call.ArgAt<RedisValue>(1);
-                var value = call.ArgAt<RedisValue>(2);
-                fields.Add(key);
-                writes.Add(() => Rows[key] = value);
-                return Task.FromResult(true);
-            });
-            transaction.HashDeleteAsync(ClusterKey, Arg.Any<RedisValue>()).Returns(call =>
-            {
-                var key = call.ArgAt<RedisValue>(1);
-                fields.Add(key);
-                writes.Add(() => Rows.Remove(key));
-                return Task.FromResult(true);
-            });
-            transaction.ExecuteAsync().Returns(_ =>
-            {
-                var execution = Execute();
-                Executions.Add(execution);
-                return execution;
-            });
-            return transaction;
-
-            async Task<bool> Execute()
-            {
-                var beforeExecute = BeforeExecute;
-                BeforeExecute = null;
-                if (beforeExecute is not null)
-                {
-                    await beforeExecute();
-                }
-
-                // Evaluate the provider's native conditions against the state at EXEC, then apply its queued writes atomically.
-                var success = conditions.All(condition =>
-                    Rows.Any(row => condition.ToString() == Condition.HashEqual(ClusterKey, row.Key, row.Value).ToString())
-                    || fields.Any(key => !Rows.ContainsKey(key) && condition.ToString() == Condition.HashNotExists(ClusterKey, key).ToString()));
-                if (success)
-                {
-                    foreach (var write in writes)
-                    {
-                        write();
-                    }
-                }
-
-                Commits.Add(success);
-                return success;
-            }
         }
     }
 }

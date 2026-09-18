@@ -343,11 +343,15 @@ namespace Orleans.Clustering.Redis
                     && entry.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var tx = _db.CreateTransaction();
-                    tx.AddCondition(Condition.HashEqual(_clusterKey, row.Name, row.Value));
-                    tx.HashDeleteAsync(_clusterKey, row.Name).Ignore();
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await AwaitAsync(tx.ExecuteAsync(), cancellationToken);
+                    const string script =
+                        """
+                        if redis.call('HGET', KEYS[1], ARGV[1]) == ARGV[2] then
+                            return redis.call('HDEL', KEYS[1], ARGV[1])
+                        end
+                        return 0
+                        """;
+                    await AwaitAsync(_db.ScriptEvaluateAsync(
+                        script, [_clusterKey], [row.Name, row.Value], CommandFlags.NoScriptCache), cancellationToken);
                 }
             }
         }
