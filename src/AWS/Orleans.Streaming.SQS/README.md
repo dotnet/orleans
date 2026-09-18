@@ -28,6 +28,8 @@ clientBuilder.AddSqsStreams("Orders", options =>
 
 When explicit credentials aren't present in the connection string, the provider uses the AWS SDK credential resolution chain. Prefer workload credentials such as an IAM role.
 
+For .NET Aspire AppHost projects, install `Microsoft.Orleans.Streaming.SQS.Aspire` to provision the partition queues through AWS CDK and emit the matching silo/client configuration from one options object.
+
 ## Documentation
 
 See [Stream with Amazon SQS](https://dotnet.github.io/orleans/docs/streaming/sqs-streaming/) for FIFO queues, custom data adapters, delivery semantics, permissions, tuning, and operational guidance.

@@ -1,7 +1,7 @@
 ---
 title: Orleans stream providers
 description: Compare built-in Orleans stream providers by durability, rewindability, status, and prerequisites.
-ms.date: 08/18/2026
+ms.date: 08/26/2026
 ms.topic: concept-article
 ---
 
@@ -18,6 +18,7 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 | Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
 | Amazon Kinesis | [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Stable | Yes, within Kinesis retention | Yes | Kinesis data stream, AWS credentials, region, and durable checkpoint storage |
 | Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
+| Amazon SQS Aspire AppHost | [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) | Stable | Uses the SQS provider's queues | No | .NET Aspire AppHost, AWS CDK, AWS credentials, and region configuration |
 | ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
 | NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
 | Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
