@@ -209,7 +209,6 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 }
 
                 data.Entry.IAmAliveTime = entry.IAmAliveTime;
-                _table[entry.SiloAddress] = (data.Entry, NewETag());
             }
         }
 
@@ -220,8 +219,8 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 var entries = _table.Values.ToList();
                 foreach (var (entry, _) in entries)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                    if (entry.Status == SiloStatus.Dead
+                        && entry.EffectiveUpdateTime < beforeDate)
                     {
                         _table.Remove(entry.SiloAddress, out _);
                     }

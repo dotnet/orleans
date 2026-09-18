@@ -68,7 +68,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Delete all dead silo entries older than <paramref name="beforeDate"/>
+        /// Removes dead silo entries whose last known update precedes <paramref name="beforeDate"/>.
         /// </summary>
         /// <param name="beforeDate">The exclusive upper bound for the last known update time of entries to delete.</param>
         /// <returns>A task representing the cleanup operation.</returns>
@@ -141,7 +141,7 @@ namespace Orleans
         /// Atomically tries to insert (add) a new MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
         /// 1) New MembershipEntry will be added to the table.
-        /// 2) The newly added MembershipEntry will also be added with the new unique automatically generated eTag.
+        /// 2) The newly added MembershipEntry will have a provider-defined row eTag.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
         /// All those changes to the table, insert of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
@@ -173,18 +173,25 @@ namespace Orleans
         /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
-        /// 1) The MembershipEntry for this silo will be updated to the new MembershipEntry (the old entry will be fully substituted by the new entry) 
-        /// 2) The eTag for the updated MembershipEntry will also be eTag with the new unique automatically generated eTag.
+        /// 1) The MembershipEntry for this silo will be updated using the supplied entry.
+        /// 2) The row eTag for the updated MembershipEntry will reflect the provider's metadata or concurrency-token policy.
         /// 3) TableVersion.Version in the table will be updated to the new TableVersion.Version.
         /// 4) TableVersion etag in the table will be updated to the new unique automatically generated eTag.
         /// All those changes to the table, update of a new row and update of the table version and the associated etags, should happen atomically, or fail atomically with no side effects.
         /// The operation should fail in each of the following conditions:
         /// 1) A MembershipEntry for a given silo does not exist in the table
-        /// 2) A MembershipEntry for a given silo exist in the table but its etag in the table does not match the provided etag.
-        /// 3) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
+        /// 2) Update of the TableVersion failed since the given TableVersion etag (as specified by the TableVersion.VersionEtag property) did not match the TableVersion etag in the table.
+        /// 3) The provider validates a separate canonical row concurrency token and the supplied etag does not match it.
         /// </summary>
+        /// <remarks>
+        /// Providers atomically require an existing row and validate <see cref="TableVersion.VersionEtag"/>.
+        /// A provider can use the row eTag as an additional heartbeat-neutral concurrency token or ignore it when
+        /// table-ETag validation protects the existing-row update. Additional row guards must remain satisfied
+        /// across heartbeat-only activity, preserving validation of previously read row and table inputs
+        /// while the row exists and the table ETag remains current.
+        /// </remarks>
         /// <param name="entry">MembershipEntry to be updated.</param>
-        /// <param name="etag">The etag  for the given MembershipEntry.</param>
+        /// <param name="etag">The provider-defined row entity tag obtained from a membership read.</param>
         /// <param name="tableVersion">The new TableVersion for this table, along with its etag.</param>
         /// <returns>True if the update operation succeeded and false otherwise.</returns>
         [Obsolete("Use UpdateRowAsync instead.")]
@@ -192,7 +199,7 @@ namespace Orleans
 
         /// <inheritdoc cref="UpdateRow(MembershipEntry, string, TableVersion)"/>
         /// <param name="entry">The membership entry to update.</param>
-        /// <param name="etag">The expected etag of the membership entry.</param>
+        /// <param name="etag">The provider-defined row entity tag obtained from a membership read.</param>
         /// <param name="tableVersion">The new table version and its expected etag.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
         [Alias("E06D3DBC")]
@@ -207,15 +214,15 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive column and not change other columns.
-        /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
-        /// With regards to eTags update:
-        /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
-        /// With regards to TableVersion:
-        /// this operation should not change the TableVersion of the table. It should leave it untouched.
-        /// There is no scenario where this operation could fail due to table semantical reasons. It can only fail due to network problems or table unavailability.
+        /// Updates the IAmAliveTime column of the MembershipEntry for this silo.
         /// </summary>
+        /// <remarks>
+        /// Each silo owns its heartbeat and writes the supplied timestamp directly to its IAmAliveTime column.
+        /// Preserves the other membership fields and the table version, including its ETag.
+        /// The returned row ETag may reflect backend-managed metadata and change with the heartbeat.
+        /// While the row exists and the table ETag remains current, heartbeat-only activity leaves previously
+        /// read row and table inputs usable by <see cref="UpdateRowAsync"/>.
+        /// </remarks>
         /// <param name="entry">The membership entry containing the updated <see cref="MembershipEntry.IAmAliveTime"/> value.</param>
         /// <returns>A task representing the update operation.</returns>
         [Obsolete("Use UpdateIAmAliveAsync instead.")]
@@ -276,7 +283,8 @@ namespace Orleans
         /// Creates the next membership table version while retaining the current entity tag for concurrency validation.
         /// </summary>
         /// <returns>The next membership table version.</returns>
-        public TableVersion Next() => new(Version + 1, VersionEtag);
+        /// <exception cref="OverflowException">The membership table version has reached <see cref="int.MaxValue"/>.</exception>
+        public TableVersion Next() => new(checked(Version + 1), VersionEtag);
 
         /// <inheritdoc />
         public override string ToString() => $"<{Version}, {VersionEtag}>";
@@ -319,7 +327,7 @@ namespace Orleans
     public sealed class MembershipTableData
     {
         /// <summary>
-        /// Gets the membership entries and their entity tags.
+        /// Gets the membership entries and their provider-defined row entity tags.
         /// </summary>
         [Id(0)]
         public IReadOnlyList<Tuple<MembershipEntry, string>> Members { get; private set; }
