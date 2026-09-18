@@ -57,6 +57,39 @@ Each record contains one published batch of events. A value such as `25` reduces
 
 The bound is measured in records. The aggregate byte size depends on the serialized payloads in those records, including all events in each published batch. Size producer batches and payloads so that a complete dequeue response fits the configured Orleans message-body limit. The queue grain removes records before its response is serialized; an oversized response can therefore lose those records when serialization fails. Tune the count alongside measured response sizes and queue lag.
 
+## Change pulling-agent hosting mode
+
+<xref:Orleans.Configuration.StreamPullingAgentOptions.HostingMode> selects the host for a named provider. `SystemTarget` is the default. `Grain` uses a directory-registered grain for each provider/queue pair and ordinary activation migration for balancing. Configure it through <xref:Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigurePullingAgent*> on every participating silo.
+
+Configure the named provider, compatible queue mapping, and consistent grain-hosting intervals on its participating hosts. In grain mode, a central coordinator observes actual agent locations and balances queue counts across running, compatible hosts. Queue-balancer configuration applies to `SystemTarget` hosting.
+
+<xref:Orleans.Configuration.StreamPullingAgentOptions.GrainHostingProbePeriod> defaults to 30 seconds and controls agent probing and coordinator liveness checks. Probes retain healthy agent locations and activate missing agents using placement hints. Membership and provider availability changes request an immediate reconciliation.
+
+<xref:Orleans.Configuration.StreamPullingAgentOptions.GrainHostingRebalanceDelay> defaults to one minute. Optional redistribution waits for stable eligible hosts and persistent count imbalance, then moves the minimum excess agents needed for counts to differ by at most one. Host-set changes and incomplete observations restart the delay; each rebalance round also establishes another delay. Balancing runs on a probe round after the delay has elapsed. Missing-agent recovery proceeds immediately. Both intervals must be positive.
+
+Switch modes at a provider-wide drain boundary:
+
+1. Issue <xref:Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.StopAgents> for that provider on every participating silo and await completion.
+1. Confirm that receiver shutdown, final checkpoint persistence, and publisher retirement succeeded. Retry failed stops while the grain-hosted configuration remains deployed.
+1. Upgrade all participating hosts and configure the same hosting mode on each.
+1. Restart the provider's agents and verify receiver readiness, checkpoint position, and active-agent counts.
+
+Rollback uses the same stop, drain, configure, and restart sequence. Preserve provider names, service identity, queue mapping, consumer groups, and checkpoint storage throughout the change.
+
+Start and stop commands retain their per-silo/provider scope. A stop closes local activation admission and drains initializing and running receivers on the addressed silo; a request which reaches an already-moved activation leaves that successor running. The stop also visits dormant queues to retire their persistent publisher index without starting a receiver. The coordinator maintains queue coverage using other running provider hosts. To pause the whole provider, stop it on every participating host. Local coordinator liveness checks stop with the provider, and the coordinator suspends probing when every provider host is stopped. Pub/sub callbacks to a stopped activation leave local polling stopped. `StartupState` controls automatic startup as usual.
+
+Caller cancellation is checked before stop admission. Once admitted, receiver cleanup completes under its own timeouts even if the caller stops waiting or a deactivation deadline expires. This keeps active receiver resources tracked until their cleanup finishes.
+
+Silo shutdown closes local admission and coordinator liveness checks, then grain deactivation performs the final receiver flush and producer-preserving migration. A failed drain remains observable to deactivation until a successful receiver restart. Explicit `StopAgents` commands drain raw publisher-registration completions and retire indexed registrations for the addressed host, including streams which became inactive in earlier activations.
+
+Explicit pub/sub stores the write-ahead publisher index in the named provider's existing grain storage, falling back to `PubSubStore`. Use storage whose durability and concurrency guarantees match the rendezvous state. Budget one extra write per newly encountered stream and per retired stream. The index retains distinct stream IDs across cache eviction and activation changes until administrative retirement; check the store's maximum record size against your partition's stream cardinality. Implicit-only providers use metadata-based subscriptions and require no index storage.
+
+**Preview upgrade boundary:** deployments of earlier grain-hosted previews can contain durable publishers which were never indexed. Ordinary old-host stop only knows its activation-local cache. Migrating such a deployment requires an independently verified inventory and cleanup of its old grain publishers before rollback or reuse of the provider identity. Automated repair of legacy unindexed registrations is a rollout blocker requiring an operator decision. For new deployments, upgrade every participating host to the indexed implementation before enabling grain hosting.
+
+For checkpoint-backed providers, graceful movement completes final checkpoint persistence before the destination initializes its receiver. Event Hubs resumes inclusively at the stored offset, so consumers handle replay. Other adapters retain their acknowledgement and recovery semantics. Qualify hard-process-crash recovery with the exact adapter, checkpoint store, pub/sub store, and grain directory used in production. In-process lifecycle regressions cover graceful handoff and retirement; hard-crash qualification for live Event Hubs and external directory/storage combinations remains outstanding.
+
+Correlate pulling-agent and receiver lifecycle events with grain activation/migration diagnostics. Track actual hosts, requested hosts, safe checkpoint positions, migration downtime, and recovery latency. A rebalance reply reports request acceptance; subsequent probes and receiver lifecycle events establish actual destination readiness. Include one probe per queue per interval, silo-local coordinator liveness calls, and membership-triggered rounds when sizing control traffic.
+
 ## Observe health
 
 Export Orleans meters and correlate them with broker metrics and application event IDs. Useful Orleans instruments include:
