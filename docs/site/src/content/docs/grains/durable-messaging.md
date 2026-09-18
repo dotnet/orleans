@@ -117,6 +117,12 @@ commit: replay restores that committed envelope and exact ownership handle. A fa
 ownership-clear write follows the same boundary; fresh replay determines whether the
 previous owner remains responsible or cleanup was committed.
 
+If another state rejects a write request after Messaging has staged an attempt,
+Messaging retains the original failure, stops that activation's work and requests
+deactivation. The manager's request-validation boundary can reject the request while
+remaining healthy. The inbox's latched failure blocks a later admitted capture, and
+a fresh activation recovers the durable outcome.
+
 Cancellation of a caller's wait for
 <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
 queued write running through capture and acknowledgement. Feature completion tracks
