@@ -163,6 +163,11 @@ public sealed class AdoNetMembershipUpgradeTests
         var afterLegacyUpdate = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(afterLegacyUpdate, 8, active, dead, suspected, joining, duringUpgrade, currentEntry);
 
+        var capturedMembership = await current.ReadRowAsync(active.SiloAddress, cancellationToken);
+        var originalRowToken = Assert.Single(capturedMembership.Members).Item2;
+        var originalTableVersion = capturedMembership.Version.Next();
+        Assert.Equal(8, capturedMembership.Version.Version);
+
         active.IAmAliveTime = StartTime.AddMinutes(10);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
         var afterHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
@@ -172,7 +177,7 @@ public sealed class AdoNetMembershipUpgradeTests
         active.Status = SiloStatus.ShuttingDown;
         active.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(4))];
         active.IAmAliveTime = StartTime.AddMinutes(5);
-        Assert.True(await current.UpdateRowAsync(active, afterHeartbeat.Etag, afterHeartbeat.NextVersion, cancellationToken));
+        Assert.True(await current.UpdateRowAsync(active, originalRowToken, originalTableVersion, cancellationToken));
         active.IAmAliveTime = StartTime.AddMinutes(10);
         var afterUpdate = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(afterUpdate, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);

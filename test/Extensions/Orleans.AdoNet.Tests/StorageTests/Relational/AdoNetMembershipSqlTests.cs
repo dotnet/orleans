@@ -147,6 +147,11 @@ public sealed class AdoNetMembershipSqlTests
             Assert.Matches($@"\b{column} = (?:@{column}|{column}Arg|PARAM_{column.ToUpperInvariant()})", update);
         }
 
+        var rowConditions = update[update.LastIndexOf("WHERE", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("IAmAliveTime", rowConditions, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SuspectTimes", rowConditions, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("StartTime", rowConditions, StringComparison.OrdinalIgnoreCase);
+
         if (engine == "MySQL")
         {
             Assert.Single(Regex.Matches(update, @"\bUPDATE\b"));

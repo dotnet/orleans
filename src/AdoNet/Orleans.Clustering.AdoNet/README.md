@@ -125,7 +125,7 @@ namespace ExampleGrains;
 
 ### Upgrading membership queries
 
-Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment to `IAmAliveTime`, sent as a single database command. Full membership updates preserve the latest stored heartbeat when applying row and table-version changes.
+Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment to `IAmAliveTime`, sent as a single database command. Heartbeats preserve the logical membership row and table tokens, so a membership update can use tokens captured before a heartbeat. Full membership updates preserve the latest stored heartbeat within their existing row update statement.
 
 For an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` update before upgrading **silos or ADO.NET gateway-discovery clients**. The update preserves membership tables and stored rows, updates membership writes, and adds `CleanupDefunctSiloEntryKey` for conditional Dead-row cleanup. Updated providers require this query at initialization and report its absence as an error.
 
