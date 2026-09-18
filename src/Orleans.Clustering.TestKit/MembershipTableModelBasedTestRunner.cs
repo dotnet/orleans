@@ -87,6 +87,7 @@ public sealed class MembershipTableModelBasedTestRunner
                     BeforeEach = info =>
                     {
                         ct.ThrowIfCancellationRequested();
+                        if (cleanupFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
                         current = _factory() ?? throw new InvalidOperationException("The model fixture factory returned null.");
                         ClusteringTestKitDiagnostics.Require(scopes.Add(current.ClusterId), "model factory reused a fixture/scope between cases");
                         // Accordant 0.1.6 hooks are synchronous. Bound the bridge; never use async-void callbacks.
@@ -96,14 +97,23 @@ public sealed class MembershipTableModelBasedTestRunner
                     },
                     AfterEach = info =>
                     {
+                        if (!info.Success)
+                            primary ??= new ClusteringConformanceException($"provider={_options.ProviderName}; seed={_options.Seed}; executed cases={caseNumber}; {info.FailureMessage}");
                         try
                         {
                             if (current is { } fixture)
                                 Task.Run(() => fixture.DisposeAsync().AsTask()).GetAwaiter().GetResult();
                         }
-                        catch (Exception exception) { cleanupFailure ??= exception; }
-                        current = null;
-                        if (!info.Success) _output?.Invoke(info.FailureMessage);
+                        catch (Exception exception)
+                        {
+                            cleanupFailure ??= exception;
+                            throw;
+                        }
+                        finally
+                        {
+                            current = null;
+                            if (!info.Success) _output?.Invoke(info.FailureMessage);
+                        }
                     }
                 }).WaitAsync(ct);
                 var failure = results.FirstOrDefault(result => !result.Success);
@@ -111,7 +121,7 @@ public sealed class MembershipTableModelBasedTestRunner
                     primary = new ClusteringConformanceException($"provider={_options.ProviderName}; seed={_options.Seed}; executed cases={caseNumber}; {failure.LastFailureMessage}");
                 ClusteringTestKitDiagnostics.Require(results.Count > 0, "Accordant generated/executed no cases");
             }
-            catch (Exception exception) { primary = exception; }
+            catch (Exception exception) { primary ??= exception; }
             finally
             {
                 if (current is not null)
@@ -124,7 +134,7 @@ public sealed class MembershipTableModelBasedTestRunner
             if (cleanupFailure is not null)
             {
                 if (primary is null) primary = cleanupFailure;
-                else ClusteringTestKitDiagnostics.AttachCleanupFailure(primary, cleanupFailure);
+                else if (!ReferenceEquals(primary, cleanupFailure)) ClusteringTestKitDiagnostics.AttachCleanupFailure(primary, cleanupFailure);
             }
             if (primary is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
         }

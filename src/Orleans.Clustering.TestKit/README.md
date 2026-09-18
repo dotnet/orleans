@@ -72,7 +72,8 @@ The second cluster ID extends the first with a suffix, exercising isolation of
 storage keys whose cluster names share a prefix.
 `CreateAdditionalHandleAsync` accepts only those two owned, live cluster scopes.
 Handle registration and teardown's ownership snapshot share one lifecycle lock.
-Admitted factory calls, provider initialization, and late-owner disposal remain
+Admitted factory calls, provider initialization, terminal deletion, native probes,
+and late-owner disposal remain
 owned until their actual tasks finish. Caller cancellation ends that caller's
 wait; the factory and tokenless-compatible initialization keep their original
 owners alive. An acquisition which finishes after disposal or history retirement
@@ -237,3 +238,6 @@ validated before the model records a version delta. Final execution checks
 require all eighteen operation kinds. Self-tests exercise both cleanup
 strategies with an independent oracle, alternating liveness lag, full-row
 heartbeat overwrite, and deliberate canonical/token contract-violating mutants.
+Any fixture teardown failure stops the generated run before another case or
+replay can acquire owners. The original case failure and teardown diagnostics
+remain available together.

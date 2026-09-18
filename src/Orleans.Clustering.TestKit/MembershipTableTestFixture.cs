@@ -265,20 +265,50 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
 
     internal async Task<bool> DeleteClusterAsync(IMembershipTable table, string clusterId, bool allowRetained, CancellationToken cancellationToken)
     {
-        await AssertHistoryPresentAsync(clusterId, cancellationToken);
+        TaskCompletionSource pending;
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            cancellationToken.ThrowIfCancellationRequested();
+            pending = BeginOperation();
+        }
+        var operation = DeleteClusterCoreAsync(table, clusterId, allowRetained, pending);
+        try { return await operation.WaitAsync(cancellationToken); }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = ObserveLateCleanupFailureAsync(operation, exception);
+            throw;
+        }
+    }
+
+    private async Task<bool> DeleteClusterCoreAsync(IMembershipTable table, string clusterId, bool allowRetained, TaskCompletionSource pending)
+    {
+        try { return await DeleteAndVerifyAsync(table, clusterId, allowRetained); }
+        catch (Exception exception)
+        {
+            lock (_lifecycleLock) _operationFailures.Add(exception);
+            throw;
+        }
+        finally { EndOperation(pending); }
+    }
+
+    private async Task<bool> DeleteAndVerifyAsync(IMembershipTable table, string clusterId, bool allowRetained)
+    {
+        ClusteringTestKitDiagnostics.Require(!await ProbeDeletionAsync(clusterId),
+            $"deletion probe reported deleted populated history: cluster={clusterId}");
         // A failed request can have committed. Retire these handles until native evidence proves retention.
         lock (_lifecycleLock) _endedClusters.Add(clusterId);
         var rejected = false;
         try
         {
-            await table.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
+            await table.DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
         }
         catch (ArgumentException exception) when (allowRetained && exception.ParamName == nameof(clusterId))
         {
             rejected = true;
         }
 
-        var deleted = await ObserveDeletionAsync(clusterId, cancellationToken);
+        var deleted = await ProbeDeletionAsync(clusterId);
         ClusteringTestKitDiagnostics.Require(!rejected || !deleted,
             $"rejected foreign deletion changed its target scope: cluster={clusterId}");
         ClusteringTestKitDiagnostics.Require(allowRetained || deleted,
@@ -288,10 +318,37 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
 
     private async ValueTask<bool> ObserveDeletionAsync(string clusterId, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        TaskCompletionSource pending;
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            cancellationToken.ThrowIfCancellationRequested();
+            pending = BeginOperation();
+        }
+        var operation = ObserveDeletionCoreAsync(clusterId, pending);
+        try { return await operation.WaitAsync(cancellationToken); }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = ObserveLateCleanupFailureAsync(operation, exception);
+            throw;
+        }
+    }
+
+    private async Task<bool> ObserveDeletionCoreAsync(string clusterId, TaskCompletionSource pending)
+    {
+        try { return await ProbeDeletionAsync(clusterId); }
+        catch (Exception exception)
+        {
+            lock (_lifecycleLock) _operationFailures.Add(exception);
+            throw;
+        }
+        finally { EndOperation(pending); }
+    }
+
+    private async Task<bool> ProbeDeletionAsync(string clusterId)
+    {
         lock (_lifecycleLock) _endedClusters.Add(clusterId);
-        var deleted = await _isDeleted(clusterId, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        var deleted = await _isDeleted(clusterId, CancellationToken.None);
         if (!deleted)
         {
             lock (_lifecycleLock) _endedClusters.Remove(clusterId);

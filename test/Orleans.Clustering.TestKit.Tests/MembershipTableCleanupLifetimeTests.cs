@@ -118,6 +118,98 @@ public sealed class MembershipTableCleanupLifetimeTests
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TerminalDelete_CancelledCallerRetainsOwnerThroughNativeDeleteAndProbe(bool pauseProbe)
+    {
+        var backend = new IdealizedMembershipBackend();
+        var entered = Gate();
+        var release = Gate();
+        using var caller = new CancellationTokenSource();
+        var ct = TestContext.Current.CancellationToken;
+        var probes = 0;
+        var fixture = new MembershipTableTestFixture("terminal-operation", (_, cluster, _) =>
+            ValueTask.FromResult(new MembershipTableTestHandle(new LegacyTable(backend.Create(cluster), async () =>
+            {
+                if (!pauseProbe && backend.Deletes == 0)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(ct);
+                    Assert.Equal(0, backend.DisposedHandles);
+                }
+            }), () => backend.DisposeHandleAsync(cluster))),
+            async (cluster, _) =>
+            {
+                if (Interlocked.Increment(ref probes) == 2 && pauseProbe)
+                {
+                    entered.TrySetResult();
+                    await release.Task.WaitAsync(ct);
+                    Assert.Equal(0, backend.DisposedHandles);
+                }
+                return await backend.IsDeletedAsync(cluster, ct);
+            });
+        await fixture.InitializeAsync(ct);
+        await MembershipTableTestRunner.Insert(fixture.First, MembershipTableTestData.CreateEntry(1), ct);
+        var deletion = fixture.DeleteClusterAsync(fixture.First, fixture.ClusterId, false, caller.Token);
+        await entered.Task.WaitAsync(ct);
+        caller.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => deletion);
+        await Assert.ThrowsAsync<TimeoutException>(() => fixture.DisposeAsync(TimeSpan.Zero).AsTask());
+        Assert.Equal(0, backend.DisposedHandles);
+        release.TrySetResult();
+        await fixture.DisposeAsync().AsTask().WaitAsync(ct);
+        Assert.Equal(2, probes);
+        Assert.Equal(2, backend.Deletes);
+        Assert.Equal(3, backend.DisposedHandles);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GeneratedRunner_TeardownFailureStopsFurtherFactoriesAndReplay(bool failCase)
+    {
+        var backend = new IdealizedMembershipBackend();
+        var control = new MembershipFaultController(MembershipFault.VersionJump) { Backend = backend };
+        var expected = new TimeoutException("fixture teardown timeout");
+        var factories = 0;
+        var firstFailureFactory = 0;
+        var nativeCallsAfterFailure = 0;
+        var failed = false;
+        var runner = new MembershipTableModelBasedTestRunner(() =>
+        {
+            factories++;
+            if (failed) nativeCallsAfterFailure++;
+            return new MembershipTableTestFixture("fail-stop", (_, cluster, _) =>
+            {
+                if (failed) nativeCallsAfterFailure++;
+                IMembershipTable table = failCase
+                    ? new FaultyMembershipTable(control, cluster, backend.Create(cluster))
+                    : backend.Create(cluster);
+                return ValueTask.FromResult(new MembershipTableTestHandle(table, () =>
+                {
+                    if (!failed && (!failCase || control.Injected > 0))
+                    {
+                        failed = true;
+                        firstFailureFactory = factories;
+                        throw expected;
+                    }
+                    return backend.DisposeHandleAsync(cluster);
+                }));
+            }, backend.IsDeletedAsync);
+        }, "fail-stop");
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
+        Assert.True(failed);
+        Assert.Equal(firstFailureFactory, factories);
+        Assert.Equal(0, nativeCallsAfterFailure);
+        if (failCase)
+        {
+            Assert.Contains("commit integer", failure.Message);
+            Assert.IsType<AggregateException>(failure.Data[ClusteringTestKitDiagnostics.CleanupFailureKey]);
+        }
+        else Assert.Contains("Membership fixture teardown failed", failure.Message);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
