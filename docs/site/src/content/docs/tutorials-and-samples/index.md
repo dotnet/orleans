@@ -79,6 +79,7 @@ The Azure Blob JSON sample uses the experimental `Microsoft.Orleans.Journaling` 
 | --- | --- |
 | [Azure Container Apps](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureContainerApps) | A cluster, clients, dashboard, scaler, and Bicep deployment. |
 | [Azure App Service](https://github.com/dotnet/orleans/tree/main/samples/Deployment/AzureAppService) | A multi-instance Orleans application on App Service. |
+| [Authenticated Silo Connections](https://github.com/dotnet/orleans/tree/main/samples/AuthenticatedSiloConnections) | TLS and Microsoft Entra workload authentication for silo connections. |
 | [Transport Layer Security](https://github.com/dotnet/orleans/tree/main/samples/TransportLayerSecurity) | Mutual TLS for Orleans network communication. |
 | [Voting](https://github.com/dotnet/orleans/tree/main/samples/Voting) | Kubernetes-oriented deployment and the Orleans Dashboard. |
 

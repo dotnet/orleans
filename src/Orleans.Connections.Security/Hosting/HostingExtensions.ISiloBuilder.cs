@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Connections.Security;
 
@@ -105,6 +107,88 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<TlsOptions> configureOptions)
         {
+            var options = CreateAndValidateOptions(configureOptions);
+            return builder
+                .UseSiloTls(options)
+                .UseGatewayTls(options);
+        }
+
+        /// <summary>
+        /// Configures TLS for connections between silos.
+        /// </summary>
+        /// <param name="builder">The builder to configure.</param>
+        /// <param name="configureOptions">An action to configure the <see cref="TlsOptions"/>.</param>
+        /// <returns>The builder.</returns>
+        public static ISiloBuilder UseSiloTls(
+            this ISiloBuilder builder,
+            Action<TlsOptions> configureOptions)
+        {
+            return builder.UseSiloTls(CreateAndValidateOptions(configureOptions));
+        }
+
+        /// <summary>
+        /// Configures TLS for gateway connections from clients.
+        /// </summary>
+        /// <param name="builder">The builder to configure.</param>
+        /// <param name="configureOptions">An action to configure the <see cref="TlsOptions"/>.</param>
+        /// <returns>The builder.</returns>
+        public static ISiloBuilder UseGatewayTls(
+            this ISiloBuilder builder,
+            Action<TlsOptions> configureOptions)
+        {
+            return builder.UseGatewayTls(CreateAndValidateOptions(configureOptions));
+        }
+
+        private static ISiloBuilder UseSiloTls(this ISiloBuilder builder, TlsOptions options)
+        {
+            if (builder.Services.Any(descriptor =>
+                descriptor.ServiceType == typeof(SiloConnectionAuthenticationRegistration)
+                || descriptor.ServiceType == typeof(SiloTlsRegistrationMarker)))
+            {
+                throw new InvalidOperationException("Silo TLS or connection authentication has already been configured.");
+            }
+
+            builder.Services.AddSingleton<SiloTlsRegistrationMarker>();
+
+            return builder.Configure<SiloConnectionOptions>(connectionOptions =>
+            {
+                connectionOptions.ConfigureSiloInboundConnection(connectionBuilder =>
+                {
+                    connectionBuilder.UseServerTls(options);
+                });
+
+                connectionOptions.ConfigureSiloOutboundConnection(connectionBuilder =>
+                {
+                    connectionBuilder.UseClientTls(options);
+                });
+            });
+        }
+
+        private static ISiloBuilder UseGatewayTls(this ISiloBuilder builder, TlsOptions options)
+        {
+            if (builder.Services.Any(descriptor => descriptor.ServiceType == typeof(GatewayTlsRegistrationMarker)))
+            {
+                throw new InvalidOperationException("Gateway TLS has already been configured.");
+            }
+
+            if (builder.Services.Any(descriptor => descriptor.ServiceType == typeof(GatewayConnectionAuthenticationRegistration)))
+            {
+                throw new InvalidOperationException("Gateway TLS or client connection authentication has already been configured.");
+            }
+
+            builder.Services.AddSingleton<GatewayTlsRegistrationMarker>();
+
+            return builder.Configure<SiloConnectionOptions>(connectionOptions =>
+            {
+                connectionOptions.ConfigureGatewayInboundConnection(connectionBuilder =>
+                {
+                    connectionBuilder.UseServerTls(options);
+                });
+            });
+        }
+
+        private static TlsOptions CreateAndValidateOptions(Action<TlsOptions> configureOptions)
+        {
             if (configureOptions is null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
@@ -122,23 +206,7 @@ namespace Orleans.Hosting
                 TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
-            return builder.Configure<SiloConnectionOptions>(connectionOptions =>
-            {
-                connectionOptions.ConfigureSiloInboundConnection(connectionBuilder =>
-                {
-                    connectionBuilder.UseServerTls(options);
-                });
-
-                connectionOptions.ConfigureGatewayInboundConnection(connectionBuilder =>
-                {
-                    connectionBuilder.UseServerTls(options);
-                });
-
-                connectionOptions.ConfigureSiloOutboundConnection(connectionBuilder =>
-                {
-                    connectionBuilder.UseClientTls(options);
-                });
-            });
+            return options;
         }
     }
 }
