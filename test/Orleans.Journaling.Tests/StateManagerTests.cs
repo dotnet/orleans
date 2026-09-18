@@ -26,7 +26,7 @@ namespace Orleans.Journaling.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestCategory("BVT")]
-public class StateManagerTests : JournalingTestBase
+public partial class StateManagerTests : JournalingTestBase
 {
     /// <summary>
     /// Tests the registration and basic operation of multiple states.

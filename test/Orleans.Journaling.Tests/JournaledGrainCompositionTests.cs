@@ -348,7 +348,12 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     {
         public IJournaledStateManager Manager => StateManager;
         public IDurableValue<string> Value => ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>("helper");
-        public IJournaledState State => GetOrCreateState("helper-state", static _ => Substitute.For<IJournaledState>(), 0);
+        public IJournaledState State => GetOrCreateState("helper-state", static _ =>
+        {
+            var state = Substitute.For<IJournaledState>();
+            state.IsWritePrepared.Returns(true);
+            return state;
+        }, 0);
         public ValueTask Commit() => WriteStateAsync();
     }
 }

@@ -14,7 +14,8 @@ namespace Orleans.Journaling;
 /// both apply the mutation locally and emit the corresponding command to the journal).
 /// </item>
 /// <item>
-/// When the application requests a write, the journaled state manager calls
+/// When the application requests a write, the journaled state manager validates the request,
+/// prepares all states, and calls
 /// <see cref="AppendEntries"/> (and occasionally <see cref="AppendSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
@@ -66,6 +67,72 @@ public interface IJournaledState
     /// This method will be called before any <see cref="AppendEntries"/> or <see cref="AppendSnapshot"/> calls.
     /// </remarks>
     void OnRecoveryCompleted() { }
+
+    /// <summary>
+    /// Gets whether this state has the prerequisites required for synchronous write capture.
+    /// The default is <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// This synchronous check is pure. The manager evaluates it inside the admitted operation's
+    /// failure boundary, including writes which only flush committed entries or produce zero bytes.
+    /// An unrecoverable state-local error can be reported by throwing, which fences the manager.
+    /// </remarks>
+    bool IsWritePrepared => true;
+
+    /// <summary>
+    /// Acquires state-owned prerequisites for synchronous write capture when <see cref="IsWritePrepared"/> is false.
+    /// The default implementation completes synchronously.
+    /// </summary>
+    /// <param name="cancellationToken">The manager operation and shutdown token.</param>
+    /// <returns>A task which completes when this state is prepared.</returns>
+    /// <remarks>
+    /// Completion must establish this state's readiness. Retain valid prepared resources across readiness
+    /// rechecks. After preparation awaits, the manager rechecks every state and captures synchronously
+    /// in the same continuation as the final ready pass. Caller wait cancellation leaves preparation running.
+    /// Preparation failures fence the manager.
+    /// </remarks>
+    ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => default;
+
+    /// <summary>
+    /// Validates a write request in the public caller's context before it is queued.
+    /// The default implementation accepts the request.
+    /// </summary>
+    /// <remarks>
+    /// Validation is pure. Throwing rejects this request and leaves the manager healthy.
+    /// </remarks>
+    void ValidateWrite() { }
+
+    /// <summary>
+    /// Validates deletion at public request admission and again during serialized execution.
+    /// The default implementation accepts deletion.
+    /// </summary>
+    /// <remarks>
+    /// Validation is pure. An admission failure rejects the request and leaves the manager healthy.
+    /// An execution-time failure fences the manager. All states pass execution-time validation
+    /// before the manager calls <see cref="OnDeleteStarted"/> on any state.
+    /// </remarks>
+    void ValidateDelete() { }
+
+    /// <summary>
+    /// Notifies the state that deletion is starting, after all execution-time validation succeeds
+    /// and before the storage operation begins. The default implementation performs no action.
+    /// </summary>
+    /// <remarks>
+    /// A successful storage deletion is followed by <see cref="Reset"/> before deletion waiters complete.
+    /// </remarks>
+    void OnDeleteStarted() { }
+
+    /// <summary>
+    /// Notifies the state of the manager's first terminal failure, before current and queued operation waiters fault.
+    /// The default implementation performs no action.
+    /// </summary>
+    /// <param name="exception">The original failure recorded by the manager.</param>
+    /// <remarks>
+    /// The manager is already fenced when this callback runs. Every registered state is notified even if
+    /// another notification throws; notification errors are logged and the original failure is preserved.
+    /// Idle shutdown completes normally. Cancellation during admitted preparation or storage work is terminal.
+    /// </remarks>
+    void OnFaulted(Exception exception) { }
 
     /// <summary>
     /// Writes pending state changes to the journal.
