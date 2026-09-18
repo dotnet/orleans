@@ -854,6 +854,10 @@ internal sealed partial class DurableInboxExtension :
     public async Task OnStart(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_grainContext.GrainInstance is not DurableGrain and not IDurableMessagingGrain)
+        {
+            throw new InvalidOperationException("Durable inbox activation requires IDurableMessagingGrain or DurableGrain.");
+        }
         await ResumeProcessingAsync(cancellationToken).ConfigureAwait(true);
         if (_deadLetters.Values.Any(entry => DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), entry.DeadLetteredAt, _deadLetterRetentionPeriod))
             || _deadLetters.Count > _maxRetainedDeadLetters
