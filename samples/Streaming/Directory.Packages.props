@@ -5,7 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.RabbitMQ" Version="13.2.4" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.12.2" />
+    <PackageVersion Include="MessagePack" Version="3.1.7" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
@@ -15,5 +18,6 @@
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Streaming.EventHubs" Version="10.2.2" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.RabbitMQ" Version="10.2.2" />
   </ItemGroup>
 </Project>
