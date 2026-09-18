@@ -95,18 +95,18 @@ public sealed class AdoNetMembershipSqlTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void FullMembershipUpdate_AssignsSuppliedBestEffortHeartbeat(string engine)
+    public void FullMembershipUpdate_PreservesHeartbeatWithinExistingStatement(string engine)
     {
         var script = ReadScript(engine);
         var update = UpdateBody(engine, Queries(script), Routines(script));
-        var parameter = engine switch
+        if (engine == "SQLServer")
         {
-            "PostgreSQL" => "IAmAliveTimeArg",
-            "Oracle" => "PARAM_IAMALIVETIME",
-            _ => "@IAmAliveTime",
-        };
-        Assert.Contains($"IAmAliveTime = {parameter}", update, StringComparison.Ordinal);
-        Assert.DoesNotMatch(@"(?i)\b(?:CASE|GREATEST)\b", update);
+            Assert.Contains("IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END", update, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Matches(@"IAmAliveTime = GREATEST\((?:[dm]\.)?IAmAliveTime, ", update);
+        }
     }
 
     [Theory]

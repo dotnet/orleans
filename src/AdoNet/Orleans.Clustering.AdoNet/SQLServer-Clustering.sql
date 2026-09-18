@@ -165,7 +165,7 @@ SELECT
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
-		IAmAliveTime = @IAmAliveTime
+		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Address = @Address AND @Address IS NOT NULL

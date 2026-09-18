@@ -198,6 +198,7 @@ public sealed class AdoNetMembershipUpgradeTests
         active.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(4))];
         active.IAmAliveTime = StartTime.AddMinutes(5);
         Assert.True(await current.UpdateRowAsync(active, originalRowToken, originalTableVersion, cancellationToken));
+        active.IAmAliveTime = StartTime.AddMinutes(10);
         var afterUpdate = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(afterUpdate, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
 

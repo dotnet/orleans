@@ -133,7 +133,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
-        IAmAliveTime = IAmAliveTimeArg
+        IAmAliveTime = GREATEST(IAmAliveTime, IAmAliveTimeArg)
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
         AND Address = AddressArg AND AddressArg IS NOT NULL
