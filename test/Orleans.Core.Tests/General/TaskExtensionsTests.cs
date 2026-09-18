@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Orleans.Internal;
 using Xunit;
 
 namespace UnitTests.UtilsTests;
@@ -12,7 +13,7 @@ public class TaskExtensionsTests
     [Fact]
     public void WhenAll_EmptyInputCompletesSynchronously()
     {
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException([]);
+        var result = TaskUtilities.WhenAllWithAggregateException([]);
 
         Assert.True(result.IsCompletedSuccessfully);
     }
@@ -22,7 +23,7 @@ public class TaskExtensionsTests
     {
         var first = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException([first.Task, second.Task]);
+        var result = TaskUtilities.WhenAllWithAggregateException([first.Task, second.Task]);
 
         first.SetResult();
         Assert.False(result.IsCompleted);
@@ -37,7 +38,7 @@ public class TaskExtensionsTests
     {
         var failure = new InvalidOperationException("Original failure.");
         var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException([ThrowFromOriginalSite(failure), pending.Task]);
+        var result = TaskUtilities.WhenAllWithAggregateException([ThrowFromOriginalSite(failure), pending.Task]);
 
         Assert.False(result.IsCompleted);
         pending.SetResult();
@@ -57,7 +58,7 @@ public class TaskExtensionsTests
         var second = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var firstFailure = new InvalidOperationException("First failure.");
         var secondFailure = new UnauthorizedAccessException("Second failure.");
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException(alreadyCompleted
+        var result = TaskUtilities.WhenAllWithAggregateException(alreadyCompleted
             ? [ThrowFromOriginalSite(firstFailure), ThrowFromOriginalSite(secondFailure)]
             : [first.Task, second.Task]);
         if (!alreadyCompleted)
@@ -84,7 +85,7 @@ public class TaskExtensionsTests
     public async Task WhenAll_SingleAggregateFailurePreservesOriginalAggregate()
     {
         var failure = new AggregateException(new InvalidOperationException(), new UnauthorizedAccessException());
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException([ThrowFromOriginalSite(failure), Task.CompletedTask]);
+        var result = TaskUtilities.WhenAllWithAggregateException([ThrowFromOriginalSite(failure), Task.CompletedTask]);
 
         var exception = await Assert.ThrowsAsync<AggregateException>(() => result.WaitAsync(TestContext.Current.CancellationToken));
 
@@ -99,7 +100,7 @@ public class TaskExtensionsTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException([Task.FromCanceled(cancellation.Token), pending.Task]);
+        var result = TaskUtilities.WhenAllWithAggregateException([Task.FromCanceled(cancellation.Token), pending.Task]);
 
         Assert.False(result.IsCompleted);
         pending.SetResult();
@@ -118,7 +119,7 @@ public class TaskExtensionsTests
         cancellation.Cancel();
         var first = new InvalidOperationException("First failure.");
         var second = new UnauthorizedAccessException("Second failure.");
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException(
+        var result = TaskUtilities.WhenAllWithAggregateException(
             [Task.FromCanceled(cancellation.Token), Task.FromException(first), multipleFailures ? Task.FromException(second) : Task.CompletedTask]);
 
         if (multipleFailures)
@@ -141,7 +142,7 @@ public class TaskExtensionsTests
     public void WhenAll_EnumeratesInputOnce()
     {
         var enumerations = 0;
-        var result = PublicOrleansTaskExtensions.WhenAllWithAggregateException(Tasks());
+        var result = TaskUtilities.WhenAllWithAggregateException(Tasks());
 
         Assert.True(result.IsCompletedSuccessfully);
         Assert.Equal(1, enumerations);
@@ -159,13 +160,13 @@ public class TaskExtensionsTests
     {
         var nullInput = Assert.Throws<ArgumentNullException>(() =>
         {
-            _ = PublicOrleansTaskExtensions.WhenAllWithAggregateException(null!);
+            _ = TaskUtilities.WhenAllWithAggregateException(null!);
         });
         Assert.Equal("tasks", nullInput.ParamName);
 
         var nullElement = Assert.Throws<ArgumentException>(() =>
         {
-            _ = PublicOrleansTaskExtensions.WhenAllWithAggregateException([Task.CompletedTask, null!]);
+            _ = TaskUtilities.WhenAllWithAggregateException([Task.CompletedTask, null!]);
         });
         Assert.Equal("tasks", nullElement.ParamName);
     }

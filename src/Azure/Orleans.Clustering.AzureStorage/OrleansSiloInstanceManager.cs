@@ -12,6 +12,7 @@ using Azure.Data.Tables.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -270,7 +271,7 @@ namespace Orleans.AzureUtils
             }
             else
             {
-                await PublicOrleansTaskExtensions.WhenAllWithAggregateException(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
+                await TaskUtilities.WhenAllWithAggregateException(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
                     .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
             }
         }
