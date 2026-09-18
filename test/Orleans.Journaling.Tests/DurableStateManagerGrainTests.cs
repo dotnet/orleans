@@ -19,7 +19,7 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
     : IClassFixture<DurableStateManagerIntegrationFixture>
 {
     [Fact]
-    public async Task Lifecycle_RepeatedHostingAndParticipation_SubscribeSetupStateOnce()
+    public async Task Lifecycle_RepeatedHostingAndResolution_SubscribeSetupStateOnce()
     {
         var builder = new LifecycleTestSiloBuilder();
         builder.Services.AddSerializer();
@@ -30,6 +30,10 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         builder.AddJournaling();
         builder.AddJournaling();
         builder.AddJournaling();
+        builder.Services.AddStateMachine<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
+        builder.Services.AddKeyedScoped<IDurableDictionaryCommandCodec<string, uint>>(
+            JsonLinesJournalFormat.JournalFormatKey,
+            static (_, _) => new JsonDurableDictionaryCommandCodec<string, uint>(JournalingTestsJsonContext.Default.Options));
 
         Assert.DoesNotContain(builder.Services, descriptor =>
             descriptor.ServiceType == typeof(IConfigureGrainTypeComponents));
@@ -45,11 +49,6 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         storageProvider.CreateStorage(Arg.Any<JournalId>()).Returns(storage);
         builder.Services.AddSingleton(storageProvider);
 
-        await using var services = builder.Services.BuildServiceProvider();
-        var journalId = new JournalId($"lifecycle/{Guid.NewGuid():N}");
-        await using var manager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
-        var probe = new DurableManagerRecoveryProbe();
-        manager.RegisterStateMachine("recovery", probe);
         var lifecycle = Substitute.For<IGrainLifecycle>();
         var subscriptions = new List<(int Stage, ILifecycleObserver Observer)>();
         lifecycle.Subscribe(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<ILifecycleObserver>())
@@ -59,10 +58,26 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
                 return Substitute.For<IDisposable>();
             });
 
-        var participant = Assert.IsAssignableFrom<ILifecycleParticipant<IGrainLifecycle>>(manager);
-        participant.Participate(lifecycle);
-        participant.Participate(lifecycle);
-        participant.Participate(lifecycle);
+        var grainId = GrainId.Create("lifecycle", Guid.NewGuid().ToString("N"));
+        var journalId = JournalId.FromGrainId(grainId);
+        builder.Services.AddScoped<IGrainContext>(activationServices =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(grainId);
+            context.ActivationServices.Returns(activationServices);
+            context.ObservableLifecycle.Returns(lifecycle);
+            return context;
+        });
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = services.CreateAsyncScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var stateManager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
+        Assert.Same(manager, stateManager);
+        Assert.Same(manager, scope.ServiceProvider.GetRequiredService<IJournaledStateManager>());
+        Assert.Same(stateManager, scope.ServiceProvider.GetRequiredService<IDurableStateManager>());
+        Assert.Same(scope.ServiceProvider, Assert.IsType<DurableStateManager>(manager).ServiceProvider);
+        var probe = stateManager.GetOrAddState<DurableManagerRecoveryProbe>("recovery");
+        Assert.Same(probe, scope.ServiceProvider.GetRequiredKeyedService<DurableManagerRecoveryProbe>("recovery"));
 
         var subscription = Assert.Single(subscriptions);
         Assert.Equal(GrainLifecycleStage.SetupState, subscription.Stage);
@@ -76,7 +91,6 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         Assert.Equal(1, probe.RecoveryCount);
 
         await AwaitLifecycleAsync(subscription.Observer.OnStart(token), $"repeated start of {journalId}");
-        participant.Participate(lifecycle);
         Assert.Single(subscriptions);
         await storage.Received(1).ReadAsync(Arg.Any<IJournalStorageConsumer>(), Arg.Any<CancellationToken>());
         Assert.Equal(1, probe.ResetCount);

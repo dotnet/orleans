@@ -21,7 +21,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
-    private readonly IServiceProvider _serviceProvider;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -32,15 +31,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private ManagerState _state;
     private long _deletionGeneration;
     private Exception? _failure;
-    private bool _initializationStarted;
     private bool _migrationSnapshotRequired;
     private int _disposed;
-    private int _lifecycleEnrolled;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
-        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)), grainContext.ActivationServices)
+        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)), grainContext)
     {
-        _grainContext = grainContext;
         try
         {
             ((ILifecycleParticipant<IGrainLifecycle>)this).Participate(grainContext.ObservableLifecycle);
@@ -60,15 +56,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     internal JournaledStateManager(
         JournaledStateManagerShared shared,
         IJournalStorage storage,
-        IServiceProvider? serviceProvider = null)
+        IGrainContext? grainContext = null)
     {
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
         _storage = storage;
-        _serviceProvider = serviceProvider ?? shared.ServiceProvider;
-        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(_serviceProvider, WriteJournalFormatKey);
-        var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(_serviceProvider, WriteJournalFormatKey);
+        _grainContext = grainContext;
+        var serviceProvider = ServiceProvider;
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
+        var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
         _journalWriter = _shared.JournalFormat.CreateWriter();
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
@@ -101,7 +98,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
 
-    internal IServiceProvider ServiceProvider => _serviceProvider;
+    internal IServiceProvider ServiceProvider => _grainContext is { } context ? context.ActivationServices : _shared.ServiceProvider;
 
     public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
     {
@@ -128,7 +125,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             ThrowIfFenced();
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
-            if (_initializationStarted)
+            if (_workLoop is not null)
             {
                 throw new InvalidOperationException("New states cannot be registered after journaled state manager initialization has begun.");
             }
@@ -165,7 +162,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfFenced();
-            _initializationStarted = true;
             if (_workLoop is null)
             {
                 _workLoop = Start();
@@ -1014,12 +1010,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     public long PendingWriteByteCount => _journalWriter.CommittedLength;
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer)
-    {
-        if (Interlocked.Exchange(ref _lifecycleEnrolled, 1) == 0)
-        {
-            observer.Subscribe(GrainLifecycleStage.SetupState, this);
-        }
-    }
+        => observer.Subscribe(GrainLifecycleStage.SetupState, this);
 
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
     async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken) => await StopAsync(cancellationToken).ConfigureAwait(false);
