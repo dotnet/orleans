@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using UnitTests.General;
 
 namespace UnitTests.StorageTests.Relational;
 
@@ -8,6 +9,28 @@ namespace UnitTests.StorageTests.Relational;
 public sealed class AdoNetMembershipSqlTests
 {
     public static TheoryData<string> Engines => new() { "SQLServer", "PostgreSQL", "MySQL", "Oracle" };
+
+    [Fact]
+    public void MySqlSetup_SkipsWhitespaceOnlyDelimiterBatches()
+    {
+        var setup = new MySqlStorageForTesting("Server=localhost;");
+        var batches = setup.SplitScript(" \r\nDELIMITER $$\r\nCREATE PROCEDURE p() BEGIN SELECT 1; END$$\r\nDELIMITER ;\r\n \t");
+
+        Assert.Equal(["CREATE PROCEDURE p() BEGIN SELECT 1; END;"], batches);
+    }
+
+    [Fact]
+    public void MySqlSetup_FreshInstallationProducesExecutableBatches()
+    {
+        var setup = new MySqlStorageForTesting("Server=localhost;");
+        var script = string.Join("\r\n", new[] { "Main", "Clustering", "Persistence", "Reminders", "Streaming", "GrainDirectory" }
+            .Select(name => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"MySQL-{name}.sql"))));
+        var batches = setup.SplitScript(script).ToArray();
+
+        Assert.NotEmpty(batches);
+        Assert.All(batches, batch => Assert.False(string.IsNullOrWhiteSpace(batch)));
+        Assert.Contains(batches, batch => batch.Contains("CREATE PROCEDURE InsertMembershipKey(", StringComparison.Ordinal));
+    }
 
     [Theory]
     [MemberData(nameof(Engines))]
