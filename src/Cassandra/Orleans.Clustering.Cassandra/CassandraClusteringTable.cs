@@ -231,7 +231,7 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         return result;
     }
 
-    private async Task<MembershipTableData> GetMembershipTableData(RowSet rows, CancellationToken cancellationToken)
+    private static async Task<MembershipTableData?> GetMembershipTableData(RowSet rows, CancellationToken cancellationToken)
     {
         int? version = null;
         var entries = new List<Tuple<MembershipEntry, string>>();
@@ -245,23 +245,9 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
             }
         }
 
-        if (version.HasValue)
-        {
-            return new MembershipTableData(entries, new TableVersion(version.Value, version.Value.ToString(CultureInfo.InvariantCulture)));
-        }
-        else
-        {
-            var result = await OrleansQueries.ReadFirstRowAsync(
-                await Queries.ExecuteAsync(await Queries.MembershipReadVersion(_identifier, cancellationToken), cancellationToken),
-                cancellationToken);
-            if (result is null)
-            {
-                return new MembershipTableData([], new TableVersion(0, "0"));
-            }
-
-            var tableVersion = (int)result["version"];
-            return new MembershipTableData([], new TableVersion(tableVersion, tableVersion.ToString(CultureInfo.InvariantCulture)));
-        }
+        return version.HasValue
+            ? new MembershipTableData(entries, new TableVersion(version.Value, version.Value.ToString(CultureInfo.InvariantCulture)))
+            : null;
     }
 
     [Obsolete("Use ReadAllAsync instead.")]
@@ -282,20 +268,44 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     private async Task<MembershipTableData> ReadConsistentAsync(SiloAddress? key, CancellationToken cancellationToken)
     {
+        int? before = null;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var before = await ReadVersionAsync(cancellationToken);
             var statement = key is null
                 ? await Queries.MembershipReadAll(_identifier, cancellationToken)
                 : await Queries.MembershipReadRow(_identifier, key, cancellationToken);
-            var result = await GetMembershipTableData(await Queries.ExecuteAsync(statement, cancellationToken), cancellationToken);
-            var after = await ReadVersionAsync(cancellationToken);
-            // Cassandra paging does not retain a snapshot. Fence the entire enumeration, not just the first page.
-            if (before == after && result.Version.Version == after)
+            var rows = await Queries.ExecuteAsync(statement, cancellationToken);
+            var singlePage = rows.IsFullyFetched;
+            var hasOpeningVersion = rows.GetAvailableWithoutFetching() > 0;
+            if (!singlePage && !hasOpeningVersion && !before.HasValue)
             {
+                // An empty opening page supplies no version. Restart with an explicit opening fence.
+                before = await ReadVersionAsync(cancellationToken);
+                continue;
+            }
+
+            var result = await GetMembershipTableData(rows, cancellationToken);
+            if (singlePage && result is not null)
+            {
+                // The partition's static version and selected rows share the native read boundary.
                 return result;
             }
+
+            if (singlePage && key is null)
+            {
+                return new MembershipTableData([], new TableVersion(0, "0"));
+            }
+
+            var after = await ReadVersionAsync(cancellationToken);
+            // Pages carry no snapshot. Use the opening page's version, or a preceding explicit fence,
+            // and reuse the closing version for the next attempt when a point read is absent or a scan races.
+            if ((hasOpeningVersion ? result?.Version.Version : before) == after && (result is null || result.Version.Version == after))
+            {
+                return result ?? new MembershipTableData([], new TableVersion(after, after.ToString(CultureInfo.InvariantCulture)));
+            }
+
+            before = after;
         }
     }
 
@@ -320,11 +330,13 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
 
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
-        var table = await ReadAllAsync(cancellationToken);
-        foreach (var row in table.Members)
+        var statement = await Queries.MembershipReadAll(_identifier, cancellationToken);
+        statement.SetConsistencyLevel(ConsistencyLevel.Quorum);
+        var rows = await Queries.ExecuteAsync(statement, cancellationToken);
+        await foreach (var row in OrleansQueries.ReadRowsAsync(rows, cancellationToken))
         {
-            var entry = row.Item1;
-            if (entry.Status == SiloStatus.Dead
+            var entry = GetMembershipEntry(row);
+            if (entry is { Status: SiloStatus.Dead }
                 && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.UtcDateTime.Ticks
                 && entry.SuspectTimes?.Any(vote => vote.Item2 >= beforeDate.UtcDateTime) != true)
             {

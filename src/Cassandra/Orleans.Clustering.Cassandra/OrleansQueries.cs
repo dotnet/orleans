@@ -258,7 +258,7 @@ internal sealed class OrleansQueries
                 AND port = :port
                 AND generation = :generation;
              """,
-            MembershipWriteConsistencyLevel, cancellationToken);
+            ConsistencyLevel.Any, cancellationToken);
 
         return _updateIAmAlivePreparedStatement.Bind(new
         {

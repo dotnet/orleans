@@ -41,7 +41,7 @@ public sealed class CassandraMembershipStatementTests
         Assert.Equal(entry.SiloAddress.Endpoint.Address.ToString(), command.Values["address"]);
         Assert.Equal(entry.SiloAddress.Endpoint.Port, command.Values["port"]);
         Assert.Equal(entry.SiloAddress.Generation, command.Values["generation"]);
-        Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
+        Assert.Equal(ConsistencyLevel.Any, command.Statement.ConsistencyLevel);
     }
 
     [Theory]
@@ -299,6 +299,7 @@ public sealed class CassandraMembershipStatementTests
         Assert.Equal(1, fetched);
         Assert.Equal(new TableVersion(2, "2"), result.Version);
         Assert.Equal(2, result.Members.Count);
+        Assert.Equal(3, backend.Executed.Count);
         Assert.All(result.Members, row =>
         {
             Assert.Equal(SiloStatus.Active, row.Item1.Status);
@@ -306,6 +307,241 @@ public sealed class CassandraMembershipStatementTests
         });
         Assert.All(backend.Executed.Where(command => command.Cql.StartsWith("SELECT version", StringComparison.Ordinal)),
             command => Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SinglePageRead_UsesNativeRowAndStaticVersionInOneRequest(bool pointRead)
+    {
+        var backend = new Backend { Version = 9 };
+        var entry = Entry(SiloStatus.Active);
+        backend.Entries.Add(entry);
+        using var table = await backend.CreateTable();
+        var token = TestContext.Current.CancellationToken;
+
+        var result = pointRead
+            ? await table.ReadRowAsync(entry.SiloAddress, token)
+            : await table.ReadAllAsync(token);
+
+        Assert.Equal(new TableVersion(9, "9"), result.Version);
+        Assert.Equal(entry.ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
+        Assert.Equal("9", result.Members[0].Item2);
+        var command = Assert.Single(backend.Executed);
+        Assert.StartsWith("SELECT version, address", command.Cql);
+        Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadAll_EmptyPartition_UsesOneRequest(bool initialized)
+    {
+        var backend = new Backend
+        {
+            OnExecute = _ => Task.FromResult<RowSet>(initialized
+                ? new Rows(CreateRow(new() { ["version"] = 9, ["start_time"] = null }))
+                : new Rows())
+        };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Members);
+        Assert.Equal(initialized ? new TableVersion(9, "9") : new TableVersion(0, "0"), result.Version);
+        Assert.Single(backend.Executed);
+    }
+
+    [Fact]
+    public async Task ReadRow_Absent_FencesAbsenceWithoutAnExtraVersionLookup()
+    {
+        var backend = new Backend { Version = 9 };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadRowAsync(Entry(SiloStatus.Active).SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Members);
+        Assert.Equal(new TableVersion(9, "9"), result.Version);
+        Assert.Collection(backend.Executed,
+            command => Assert.StartsWith("SELECT version, address", command.Cql),
+            command => Assert.StartsWith("SELECT version FROM membership", command.Cql),
+            command => Assert.StartsWith("SELECT version, address", command.Cql),
+            command => Assert.StartsWith("SELECT version FROM membership", command.Cql));
+    }
+
+    [Fact]
+    public async Task ReadRow_InsertedDuringAbsentRead_ReturnsNativeRowVersion()
+    {
+        var backend = new Backend { Version = 9 };
+        var entry = Entry(SiloStatus.Active);
+        backend.OnExecute = command =>
+        {
+            if (command.Cql.StartsWith("SELECT version FROM membership", StringComparison.Ordinal))
+            {
+                backend.Version = 10;
+                backend.Entries.Add(entry);
+                return Task.FromResult<RowSet>(new Rows(CreateRow(new() { ["version"] = 9 })));
+            }
+
+            return null;
+        };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Equal(new TableVersion(10, "10"), result.Version);
+        Assert.Equal(entry.ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
+        Assert.Equal("10", result.Members[0].Item2);
+        Assert.Equal(3, backend.Executed.Count);
+    }
+
+    [Fact]
+    public async Task ReadRow_Absent_RetriesWhenTheClosingVersionChanges()
+    {
+        var backend = new Backend { Version = 9 };
+        var reads = 0;
+        backend.OnExecute = command =>
+        {
+            if (command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal) && ++reads == 2)
+            {
+                backend.Version = 10;
+            }
+
+            return null;
+        };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadRowAsync(Entry(SiloStatus.Active).SiloAddress, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Members);
+        Assert.Equal(new TableVersion(10, "10"), result.Version);
+        Assert.Equal(3, reads);
+        Assert.Equal(6, backend.Executed.Count);
+    }
+
+    [Fact]
+    public async Task ReadAll_StablePages_UseOnlyOneClosingVersionRead()
+    {
+        var backend = new Backend { Version = 9 };
+        var first = Entry(SiloStatus.Active);
+        var second = Entry(SiloStatus.Joining, 2);
+        var fetched = 0;
+        backend.OnExecute = command =>
+        {
+            if (!command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var rows = new Rows(Backend.Member(9, first));
+            rows.SetNextPage(() =>
+            {
+                fetched++;
+                return Task.FromResult<RowSet>(new Rows(Backend.Member(9, second)));
+            });
+            return Task.FromResult<RowSet>(rows);
+        };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new TableVersion(9, "9"), result.Version);
+        Assert.Equal(2, result.Members.Count);
+        Assert.Equal(first.ToFullString(), result.Members[0].Item1.ToFullString());
+        Assert.Equal(second.ToFullString(), result.Members[1].Item1.ToFullString());
+        Assert.Equal(1, fetched);
+        Assert.Equal(2, backend.Executed.Count);
+    }
+
+    [Fact]
+    public async Task ReadAll_EmptyOpeningPage_RestartsWithAnExplicitVersionFence()
+    {
+        var backend = new Backend { Version = 9 };
+        var entry = Entry(SiloStatus.Active);
+        var reads = 0;
+        var fetched = 0;
+        backend.OnExecute = command =>
+        {
+            if (!command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var rows = new Rows();
+            var firstAttempt = ++reads == 1;
+            rows.SetNextPage(() =>
+            {
+                Assert.False(firstAttempt, "The scan without an opening version must be restarted.");
+                fetched++;
+                return Task.FromResult<RowSet>(new Rows(Backend.Member(9, entry)));
+            });
+            return Task.FromResult<RowSet>(rows);
+        };
+        using var table = await backend.CreateTable();
+
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new TableVersion(9, "9"), result.Version);
+        Assert.Equal(entry.ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
+        Assert.Equal(2, reads);
+        Assert.Equal(1, fetched);
+        Assert.Equal(4, backend.Executed.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cleanup_StreamsQuorumPagesAndAttemptsEachCandidateOnce(bool firstDeleteApplies)
+    {
+        var backend = new Backend { Version = 9 };
+        var fetched = 0;
+        var deleted = new List<int>();
+        backend.OnExecute = command =>
+        {
+            if (command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal))
+            {
+                Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
+                var rows = new Rows(Backend.Member(9, Entry(SiloStatus.Dead)));
+                rows.SetNextPage(() =>
+                {
+                    Assert.Equal(new[] { 1 }, deleted);
+                    fetched++;
+                    return Task.FromResult<RowSet>(new Rows(Backend.Member(10, Entry(SiloStatus.Dead, 2))));
+                });
+                return Task.FromResult<RowSet>(rows);
+            }
+
+            if (command.Cql.StartsWith("DELETE FROM", StringComparison.Ordinal))
+            {
+                deleted.Add(Assert.IsType<int>(command.Values["generation"]));
+                return Task.FromResult<RowSet>(Rows.Applied(deleted.Count > 1 || firstDeleteApplies));
+            }
+
+            throw new InvalidOperationException($"Unexpected cleanup statement: {command.Cql}");
+        };
+        using var table = await backend.CreateTable();
+
+        await table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(Timestamp.AddTicks(1)), TestContext.Current.CancellationToken);
+
+        Assert.Equal(new[] { 1, 2 }, deleted);
+        Assert.Equal(1, fetched);
+        Assert.Equal(3, backend.Executed.Count);
+    }
+
+    [Fact]
+    public async Task Cleanup_FailedDelete_PropagatesStorageFailure()
+    {
+        var error = new InvalidOperationException("Cassandra delete failed.");
+        var backend = new Backend { Version = 9 };
+        backend.Entries.Add(Entry(SiloStatus.Dead));
+        backend.OnExecute = command => command.Cql.StartsWith("DELETE FROM", StringComparison.Ordinal)
+            ? Task.FromException<RowSet>(error)
+            : null;
+        using var table = await backend.CreateTable();
+
+        Assert.Same(error, await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(Timestamp.AddTicks(1)), TestContext.Current.CancellationToken)));
+        Assert.Equal(2, backend.Executed.Count);
     }
 
     private static void AssertFullRow(Command command, MembershipEntry entry)

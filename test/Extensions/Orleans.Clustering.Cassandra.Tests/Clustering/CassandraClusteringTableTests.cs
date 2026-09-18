@@ -1,6 +1,7 @@
 using System.Net;
 using Cassandra;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Orleans.Clustering.Cassandra;
 using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Configuration;
@@ -68,6 +69,84 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         Assert.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString(), entries);
         Assert.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString(), entries);
         Assert.Equal(2, entries.Count);
+    }
+
+    [Fact]
+    public async Task MembershipTable_PagedReadsAndCleanup_UseNativeBoundaries()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var native = await CreateSession(token);
+        var session = Substitute.For<ISession>();
+        var statements = new List<IStatement>();
+        var pagedScans = 0;
+        var forcePages = false;
+        session.Keyspace.Returns(native.Keyspace);
+        session.PrepareAsync(Arg.Any<string>()).Returns(call => native.PrepareAsync(call.Arg<string>()));
+        session.ExecuteAsync(Arg.Any<IStatement>()).Returns(async call =>
+        {
+            var statement = call.Arg<IStatement>();
+            statements.Add(statement);
+            var scan = statement is BoundStatement bound
+                && bound.PreparedStatement.QueryString.Contains("silo_name", StringComparison.Ordinal)
+                && bound.PreparedStatement.QueryString.StartsWith("SELECT", StringComparison.Ordinal)
+                && !bound.PreparedStatement.QueryString.Contains("AND address", StringComparison.Ordinal);
+            if (scan && forcePages)
+            {
+                statement.SetPageSize(2);
+            }
+
+            var rows = await native.ExecuteAsync(statement);
+            if (scan && !rows.IsFullyFetched)
+            {
+                pagedScans++;
+            }
+
+            return rows;
+        });
+        await using var services = CreateMembershipServices(
+            $"Service_{Guid.NewGuid():N}", $"Cluster_{Guid.NewGuid():N}", () => Task.FromResult(session), cassandraTtl: false);
+        var table = services.GetRequiredService<CassandraClusteringTable>();
+        await table.InitializeMembershipTableAsync(true, token);
+        var entries = Enumerable.Range(0, 3).Select(_ => CreateMembershipEntryForTest()).ToArray();
+        var data = await table.ReadAllAsync(token);
+        foreach (var entry in entries)
+        {
+            entry.Status = SiloStatus.Dead;
+            entry.StartTime = entry.IAmAliveTime = GetUtcNowWithSecondsResolution().AddDays(-10);
+            Assert.True(await table.InsertRowAsync(entry, data.Version.Next(), token));
+            data = await table.ReadRowAsync(entry.SiloAddress, token);
+        }
+
+        var canonicalVersion = data.Version;
+        statements.Clear();
+        forcePages = true;
+        var all = await table.ReadAllAsync(token);
+        Assert.Equal(canonicalVersion, all.Version);
+        Assert.Equal(entries.Select(entry => entry.ToFullString()).Order(),
+            all.Members.Select(row => row.Item1.ToFullString()).Order());
+        Assert.Equal(1, pagedScans);
+        Assert.Equal(2, statements.Count);
+        Assert.All(statements, statement => Assert.Equal(ConsistencyLevel.Serial, statement.ConsistencyLevel));
+
+        statements.Clear();
+        var single = await table.ReadRowAsync(entries[0].SiloAddress, token);
+        Assert.Equal(canonicalVersion, single.Version);
+        Assert.Equal(entries[0].ToFullString(), Assert.Single(single.Members).Item1.ToFullString());
+        Assert.Single(statements);
+
+        statements.Clear();
+        await table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(GetUtcNowWithSecondsResolution()), token);
+        Assert.Equal(2, pagedScans);
+        Assert.Equal(4, statements.Count);
+        Assert.Equal(ConsistencyLevel.Quorum, statements[0].ConsistencyLevel);
+        Assert.All(statements.Skip(1), statement =>
+        {
+            Assert.StartsWith("DELETE FROM", Assert.IsType<BoundStatement>(statement).PreparedStatement.QueryString);
+            Assert.Equal(ConsistencyLevel.Serial, statement.SerialConsistencyLevel);
+        });
+        var retired = await table.ReadAllAsync(token);
+        Assert.Empty(retired.Members);
+        Assert.Equal(canonicalVersion, retired.Version);
     }
 
     [Fact]
