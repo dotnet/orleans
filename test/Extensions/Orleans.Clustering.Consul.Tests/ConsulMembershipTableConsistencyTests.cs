@@ -186,7 +186,7 @@ public class ConsulMembershipTableConsistencyTests
     }
 
     [Fact]
-    public async Task HeartbeatAndStatusRacesPreserveMaximumTimestamp()
+    public async Task StatusUpdatePreservesConcurrentOwnerHeartbeat()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
@@ -198,16 +198,6 @@ public class ConsulMembershipTableConsistencyTests
         var later = Entry();
         later.IAmAliveTime = Epoch.AddHours(4);
         store.BeforeTransaction = () => otherWriter.UpdateIAmAliveAsync(later, CancellationToken);
-        entry.IAmAliveTime = Epoch.AddHours(2);
-        await table.UpdateIAmAliveAsync(entry, CancellationToken);
-        var heartbeatOnly = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
-        Assert.Equal(later.IAmAliveTime, Assert.Single(heartbeatOnly.Members).Item1.IAmAliveTime);
-        Assert.Equal(original.Item2, heartbeatOnly.Members[0].Item2);
-        Assert.Equal(first.Version, heartbeatOnly.Version);
-        Assert.Equal(1, store.ConflictCount);
-
-        later.IAmAliveTime = Epoch.AddHours(6);
-        store.BeforeTransaction = () => otherWriter.UpdateIAmAliveAsync(later, CancellationToken);
         entry.Status = SiloStatus.ShuttingDown;
         Assert.True(await table.UpdateRowAsync(entry, original.Item2, first.Version.Next(), CancellationToken));
         var updated = await table.ReadAllAsync(CancellationToken);
@@ -215,11 +205,10 @@ public class ConsulMembershipTableConsistencyTests
         Assert.Equal(later.IAmAliveTime, row.Item1.IAmAliveTime);
         Assert.Equal(SiloStatus.ShuttingDown, row.Item1.Status);
         Assert.Equal(2, updated.Version.Version);
-        Assert.Equal(2, store.ConflictCount);
+        Assert.Equal(1, store.ConflictCount);
 
         entry.IAmAliveTime = Epoch.AddHours(8);
         Assert.True(await table.UpdateRowAsync(entry, row.Item2, updated.Version.Next(), CancellationToken));
-        await table.UpdateIAmAliveAsync(later, CancellationToken);
         updated = await table.ReadAllAsync(CancellationToken);
         Assert.Equal(entry.IAmAliveTime, Assert.Single(updated.Members).Item1.IAmAliveTime);
         Assert.Equal(3, updated.Version.Version);
@@ -274,35 +263,100 @@ public class ConsulMembershipTableConsistencyTests
     }
 
     [Theory]
-    [InlineData(3)]
-    [InlineData(5)]
-    public async Task HeartbeatRacingStatusUpdatePreservesStatusAndMaximum(int statusHeartbeatHour)
+    [InlineData(null)]
+    [InlineData("membership/nested")]
+    public async Task OwnerHeartbeatUsesOneBlindWriteAndPreservesOtherFields(string? root)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable(root: root);
+        var entry = Entry();
+        entry.ProxyPort = 30000;
+        entry.SuspectTimes = new() { Tuple.Create(Entry(2).SiloAddress, Epoch) };
+        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), CancellationToken));
+        Assert.True(await table.InsertRowAsync(Entry(2), (await table.ReadAllAsync(CancellationToken)).Version.Next(), CancellationToken));
+        var first = await table.ReadAllAsync(CancellationToken);
+        var original = first.Members.Single(row => row.Item1.SiloAddress.Equals(entry.SiloAddress));
+        var prefix = root is null ? "orleans/cluster" : $"{root}/orleans/cluster";
+        var heartbeatKey = $"{prefix}/{entry.SiloAddress.ToParsableString()}/iamalive";
+        var otherFields = store.Snapshot(excludedKey: heartbeatKey);
+        foreach (var time in new[] { Epoch.AddHours(2), Epoch.AddHours(2), Epoch.AddHours(3) })
+        {
+            var requests = store.RequestCount;
+            var reads = store.Reads.Count;
+            var transactions = store.Transactions.Count;
+            var puts = store.Puts.Count;
+            await table.UpdateIAmAliveAsync(new MembershipEntry { SiloAddress = entry.SiloAddress, IAmAliveTime = time }, CancellationToken);
+            Assert.Equal(requests + 1, store.RequestCount);
+            Assert.Equal(reads, store.Reads.Count);
+            Assert.Equal(transactions, store.Transactions.Count);
+            var put = Assert.Single(store.Puts.Skip(puts));
+            Assert.Equal(heartbeatKey, put.Key);
+            Assert.Equal(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(time)), put.Value);
+            Assert.Equal(otherFields, store.Snapshot(excludedKey: heartbeatKey));
+        }
+
+        var result = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(first.Version, result.Version);
+        var updated = result.Members.Single(row => row.Item1.SiloAddress.Equals(entry.SiloAddress));
+        Assert.Equal(original.Item2, updated.Item2);
+        Assert.Equal(Epoch.AddHours(3), updated.Item1.IAmAliveTime);
+        Assert.Equal(entry.ProxyPort, updated.Item1.ProxyPort);
+        Assert.Equal(entry.Status, updated.Item1.Status);
+        Assert.Equal(entry.SuspectTimes, updated.Item1.SuspectTimes);
+        Assert.Equal(0, store.ConflictCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnerHeartbeatHonorsCancellation(bool cancelBeforeWrite)
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
-        var otherWriter = store.CreateTable();
         var entry = Entry();
-        Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), CancellationToken));
-        var first = await table.ReadAllAsync(CancellationToken);
-        MembershipTableData? committed = null;
-        store.BeforeTransaction = async () =>
+        store.Seed(entry);
+        var before = store.Snapshot();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        if (cancelBeforeWrite)
         {
-            var statusUpdate = Entry();
-            statusUpdate.Status = SiloStatus.ShuttingDown;
-            statusUpdate.IAmAliveTime = Epoch.AddHours(statusHeartbeatHour);
-            Assert.True(await otherWriter.UpdateRowAsync(statusUpdate, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken));
-            committed = await otherWriter.ReadAllAsync(CancellationToken);
-        };
-        entry.IAmAliveTime = Epoch.AddHours(4);
-        await table.UpdateIAmAliveAsync(entry, CancellationToken);
-        var result = await table.ReadAllAsync(CancellationToken);
-        Assert.NotNull(committed);
-        Assert.Equal(committed.Version, result.Version);
-        var row = Assert.Single(result.Members);
-        Assert.Equal(Assert.Single(committed.Members).Item2, row.Item2);
-        Assert.Equal(SiloStatus.ShuttingDown, row.Item1.Status);
-        Assert.Equal(Epoch.AddHours(Math.Max(4, statusHeartbeatHour)), row.Item1.IAmAliveTime);
-        Assert.Equal(1, store.ConflictCount);
+            cancellation.Cancel();
+        }
+        else
+        {
+            store.BeforePut = token =>
+            {
+                Assert.True(token.CanBeCanceled);
+                cancellation.Cancel();
+                Assert.True(token.IsCancellationRequested);
+                return Task.CompletedTask;
+            };
+        }
+
+        entry.IAmAliveTime = Epoch.AddHours(2);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.UpdateIAmAliveAsync(entry, cancellation.Token));
+        Assert.Equal(cancelBeforeWrite ? 0 : 1, store.RequestCount);
+        Assert.Equal(cancelBeforeWrite ? 0 : 1, store.Puts.Count);
+        Assert.Empty(store.Reads);
+        Assert.Empty(store.Transactions);
+        Assert.Equal(before, store.Snapshot());
+    }
+
+    [Fact]
+    public async Task OwnerHeartbeatSurfacesFalseWriteResponse()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var entry = Entry();
+        store.Seed(entry);
+        var before = store.Snapshot();
+        store.PutResult = false;
+        entry.IAmAliveTime = Epoch.AddHours(2);
+        await Assert.ThrowsAsync<OrleansException>(() => table.UpdateIAmAliveAsync(entry, CancellationToken));
+        Assert.Equal(1, store.RequestCount);
+        Assert.Single(store.Puts);
+        Assert.Empty(store.Reads);
+        Assert.Empty(store.Transactions);
+        Assert.Equal(before, store.Snapshot());
     }
 
     [Theory]
@@ -396,7 +450,11 @@ public class ConsulMembershipTableConsistencyTests
             if (update == "heartbeat")
             {
                 entry.IAmAliveTime = Epoch.AddDays(2);
-                await otherWriter.UpdateIAmAliveAsync(entry, CancellationToken);
+                var heartbeat = new KVPair($"orleans/cluster/{entry.SiloAddress.ToParsableString()}/iamalive")
+                {
+                    Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(entry.IAmAliveTime))
+                };
+                Assert.True((await store.Client.KV.Put(heartbeat, CancellationToken)).Response);
             }
             else
             {
@@ -425,11 +483,10 @@ public class ConsulMembershipTableConsistencyTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task RetiredHeartbeatCannotRecreateRowHeartbeatOrVersion(bool legacy)
+    public async Task LateStatusUpdateCannotRecreatePrunedRowOrVersion(bool legacy)
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
-        var otherWriter = store.CreateTable();
         var entry = Entry();
         entry.Status = SiloStatus.Dead;
         store.Seed(entry, heartbeat: !legacy);
@@ -439,16 +496,14 @@ public class ConsulMembershipTableConsistencyTests
         }
 
         var first = await table.ReadAllAsync(CancellationToken);
-        store.BeforeTransaction = () => otherWriter.CleanupDefunctSiloEntriesAsync(Epoch.AddDays(1), CancellationToken);
+        await table.CleanupDefunctSiloEntriesAsync(Epoch.AddDays(1), CancellationToken);
         entry.IAmAliveTime = Epoch.AddDays(2);
-        await table.UpdateIAmAliveAsync(entry, CancellationToken);
-        await table.UpdateIAmAliveAsync(entry, CancellationToken);
         Assert.False(await table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken));
         var result = await table.ReadAllAsync(CancellationToken);
         Assert.Empty(result.Members);
         Assert.Equal(first.Version, result.Version);
         Assert.Equal(legacy ? Array.Empty<string>() : new[] { "orleans/cluster/version" }, store.Keys);
-        Assert.Equal(1, store.ConflictCount);
+        Assert.Equal(0, store.ConflictCount);
     }
 
     [Theory]
@@ -490,10 +545,11 @@ public class ConsulMembershipTableConsistencyTests
         using var store = new ConsulHandler();
         var table = store.CreateTable();
         var entry = Entry();
-        entry.Status = SiloStatus.Dead;
+        entry.Status = operation == "cleanup" ? SiloStatus.Dead : SiloStatus.Active;
         Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), CancellationToken));
         var first = await table.ReadAllAsync(CancellationToken);
         var before = store.Snapshot();
+        var requests = store.RequestCount;
         entry.IAmAliveTime = Epoch.AddHours(2);
         store.FailureMethod = operation is "read-all" or "read-row" ? HttpMethod.Get
             : operation == "delete" ? HttpMethod.Delete : HttpMethod.Put;
@@ -511,6 +567,10 @@ public class ConsulMembershipTableConsistencyTests
         });
         Assert.Contains("injected failure", exception.Message);
         Assert.Equal(before, store.Snapshot());
+        if (operation == "heartbeat")
+        {
+            Assert.Equal(requests + 1, store.RequestCount);
+        }
     }
 
     [Fact]
@@ -526,10 +586,8 @@ public class ConsulMembershipTableConsistencyTests
         await Assert.ThrowsAsync<FormatException>(() => table.InsertRowAsync(Entry(), new TableVersion(1, "invalid"), CancellationToken));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CancellationStopsTransactionConflictRetries(bool updateRow)
+    [Fact]
+    public async Task CancellationStopsStatusTransactionConflictRetries()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
@@ -544,16 +602,13 @@ public class ConsulMembershipTableConsistencyTests
             return Task.CompletedTask;
         };
         entry.IAmAliveTime = Epoch.AddHours(2);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => updateRow
-            ? table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), cancellation.Token)
-            : table.UpdateIAmAliveAsync(entry, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), cancellation.Token));
         Assert.Single(store.Transactions);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RepeatedTransactionConflictsRetryUntilSuccess(bool updateRow)
+    [Fact]
+    public async Task RepeatedStatusTransactionConflictsRetryUntilSuccess()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
@@ -575,15 +630,8 @@ public class ConsulMembershipTableConsistencyTests
 
         store.BeforeTransaction = AdvanceHeartbeat;
         entry.IAmAliveTime = Epoch.AddHours(10);
-        if (updateRow)
-        {
-            entry.Status = SiloStatus.ShuttingDown;
-            Assert.True(await table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken));
-        }
-        else
-        {
-            await table.UpdateIAmAliveAsync(entry, CancellationToken);
-        }
+        entry.Status = SiloStatus.ShuttingDown;
+        Assert.True(await table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken));
 
         Assert.Equal(3, store.ConflictCount);
         Assert.Equal(4, store.Transactions.Count);
@@ -591,7 +639,7 @@ public class ConsulMembershipTableConsistencyTests
         var row = Assert.Single(result.Members);
         Assert.Equal(entry.IAmAliveTime, row.Item1.IAmAliveTime);
         Assert.Equal(entry.Status, row.Item1.Status);
-        Assert.Equal(updateRow ? 1 : 0, result.Version.Version);
+        Assert.Equal(1, result.Version.Version);
     }
 
     private static MembershipEntry Entry(int id = 1) => new()
@@ -621,10 +669,13 @@ public class ConsulMembershipTableConsistencyTests
         public int ReturnedKeyCount { get; private set; }
         public List<(string Key, bool Recursive)> Reads { get; } = new();
         public List<List<KVTxnOp>> Transactions { get; } = new();
+        public List<KVPair> Puts { get; } = new();
         public Func<Task>? BeforeTransaction { get; set; }
+        public Func<CancellationToken, Task>? BeforePut { get; set; }
         public Func<string, bool, Task>? AfterRead { get; set; }
         public HttpMethod? FailureMethod { get; set; }
         public bool DeleteResult { get; set; } = true;
+        public bool PutResult { get; set; } = true;
 
         public ConsulBasedMembershipTable CreateTable(string cluster = "cluster", string? root = null)
         {
@@ -659,7 +710,8 @@ public class ConsulMembershipTableConsistencyTests
 
         public void Set(string key, byte[] value) => _rows[key] = new(key) { Value = value, ModifyIndex = ++_index };
 
-        public string Snapshot() => JsonConvert.SerializeObject(_rows.Values.OrderBy(row => row.Key, StringComparer.Ordinal));
+        public string Snapshot(string? excludedKey = null) =>
+            JsonConvert.SerializeObject(_rows.Values.Where(row => row.Key != excludedKey).OrderBy(row => row.Key, StringComparer.Ordinal));
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -722,6 +774,25 @@ public class ConsulMembershipTableConsistencyTests
 
             Assert.StartsWith("/v1/kv/", uri.AbsolutePath);
             var key = Uri.UnescapeDataString(uri.AbsolutePath["/v1/kv/".Length..]);
+            if (request.Method == HttpMethod.Put)
+            {
+                Assert.Empty(uri.Query);
+                var value = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+                Puts.Add(new(key) { Value = value });
+                if (BeforePut is { } before)
+                {
+                    await before(cancellationToken);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (PutResult)
+                {
+                    Set(key, value);
+                }
+
+                return Response(HttpStatusCode.OK, PutResult ? "true" : "false");
+            }
+
             if (request.Method == HttpMethod.Get)
             {
                 Assert.Contains("consistent", uri.Query);

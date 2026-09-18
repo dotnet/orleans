@@ -228,37 +228,11 @@ namespace Orleans.Runtime.Membership
         public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(clusterId, kvRootFolder, entry.SiloAddress);
-            var heartbeatKey = ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKey);
-            while (true)
+            var heartbeat = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(clusterId, kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
+            var response = await _consulClient.KV.Put(heartbeat, cancellationToken);
+            if (!response.Response)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var entries = (await _consulClient.KV.List(siloKey, ConsistentRead, cancellationToken)).Response;
-                var row = entries?.SingleOrDefault(kv => kv.Key.Equals(siloKey, StringComparison.Ordinal));
-                if (row is null)
-                {
-                    return;
-                }
-
-                var current = entries!.SingleOrDefault(kv => kv.Key.Equals(heartbeatKey, StringComparison.Ordinal));
-                var registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, row, current);
-                if (registration.IAmAliveTime >= entry.IAmAliveTime)
-                {
-                    return;
-                }
-
-                var heartbeat = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(clusterId, kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
-                var operations = new List<KVTxnOp>
-                {
-                    new(siloKey, KVTxnVerb.CheckIndex) { Index = row.ModifyIndex },
-                    new(heartbeat.Key, KVTxnVerb.CAS) { Index = current?.ModifyIndex ?? 0, Value = heartbeat.Value }
-                };
-                if ((await _consulClient.KV.Txn(operations, cancellationToken)).Response.Success)
-                {
-                    return;
-                }
-
-                await Task.Delay(ConflictRetryDelay, cancellationToken);
+                throw new OrleansException($"Consul failed to update the heartbeat for silo '{entry.SiloAddress}'.");
             }
         }
 

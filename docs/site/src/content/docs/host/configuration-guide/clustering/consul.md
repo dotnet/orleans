@@ -44,7 +44,9 @@ Under the cluster prefix, the provider maintains:
 | `<silo-address>` | The silo registration, including its host name, gateway port, start time, status, silo name, and failure-detector votes. |
 | `<silo-address>/iamalive` | The silo's periodic `IAmAlive` timestamp. |
 
-Membership reads use Consul's consistent mode to return coherent snapshots. Single-silo reads query the silo's registration and timestamp prefix and validate that the table version's ETag remains unchanged across the read. Insertions and status updates use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) to atomically compare-and-set the registration, timestamp, and table version. Status and `IAmAlive` updates preserve the greatest stored timestamp; an `IAmAlive` update retains the table version. Retried reads and updates wait 100 ms after a concurrency conflict and honor cancellation.
+Membership reads use Consul's consistent mode to return coherent snapshots. Single-silo reads query the silo's registration and timestamp prefix and validate that the table version's ETag remains unchanged across the read. Insertions and status updates use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) to atomically compare-and-set the registration, timestamp, and table version. Status updates preserve the greatest stored timestamp. Retried reads and status updates wait 100 ms after a concurrency conflict and honor cancellation.
+
+Each silo owns its periodic `IAmAlive` updates throughout its registered lifetime. Each update performs one native write to that silo's `iamalive` key, retaining the registration fields and table version. The write honors cancellation and propagates storage failures.
 
 Cleanup removes Dead registrations whose start time, `IAmAlive` timestamp, and failure-detector votes all precede the cutoff. It compares the registration and timestamp keys atomically and retains the table version, preserving entries changed by concurrent writers.
 
