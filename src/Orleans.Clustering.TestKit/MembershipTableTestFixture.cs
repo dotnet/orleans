@@ -27,6 +27,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
 {
     private readonly Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> _factory;
     private readonly Func<string, CancellationToken, ValueTask<bool>> _isDeleted;
+    private readonly object _lifecycleLock = new();
     private readonly List<MembershipTableTestHandle> _handles = [];
     private readonly Dictionary<string, IMembershipTable> _clusters = new(StringComparer.Ordinal);
     private readonly HashSet<string> _endedClusters = new(StringComparer.Ordinal);
@@ -88,11 +89,14 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     /// <summary>Constructs and initializes the three required handles. Partial failures clean up acquired resources.</summary>
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (_endedClusters.Count > 0)
-            throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
-        if (_initialized) return;
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_endedClusters.Count > 0)
+                throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
+            if (_initialized) return;
+        }
         try
         {
             First = (await CreateAdditionalHandleAsync(ClusterId, cancellationToken)).Table;
@@ -100,7 +104,11 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
             OtherCluster = (await CreateAdditionalHandleAsync(OtherClusterId, cancellationToken)).Table;
             foreach (var table in new[] { First, Second, OtherCluster })
                 await table.InitializeMembershipTableAsync(true, cancellationToken);
-            _initialized = true;
+            lock (_lifecycleLock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed != 0, this);
+                _initialized = true;
+            }
         }
         catch (Exception primary)
         {
@@ -113,26 +121,37 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     /// <summary>Acquires another handle in one of this fixture's owned scopes. Initialization is explicit.</summary>
     public async ValueTask<MembershipTableTestHandle> CreateAdditionalHandleAsync(string clusterId, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        if (clusterId != ClusterId && clusterId != OtherClusterId)
-            throw new ArgumentException("Additional handles must belong to a fixture-owned cluster.", nameof(clusterId));
-        if (_endedClusters.Contains(clusterId))
-            throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
-        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            if (clusterId != ClusterId && clusterId != OtherClusterId)
+                throw new ArgumentException("Additional handles must belong to a fixture-owned cluster.", nameof(clusterId));
+            if (_endedClusters.Contains(clusterId))
+                throw new InvalidOperationException("A deleted history requires a new fixture and owner.");
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         var handle = await _factory(ServiceId, clusterId, cancellationToken)
             ?? throw new InvalidOperationException("The membership handle factory returned null.");
-        if (Volatile.Read(ref _disposed) != 0)
+        bool disposed;
+        lock (_lifecycleLock)
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            await handle.DisposeAsync().AsTask().WaitAsync(timeout.Token);
-            throw new ObjectDisposedException(nameof(MembershipTableTestFixture), "The factory completed after its fixture was disposed.");
+            disposed = _disposed != 0;
+            if (!disposed && !_endedClusters.Contains(clusterId))
+            {
+                var duplicate = _handles.Any(h => ReferenceEquals(h.Table, handle.Table));
+                if (!_handles.Contains(handle)) _handles.Add(handle);
+                _clusters.TryAdd(clusterId, handle.Table);
+                ClusteringTestKitDiagnostics.Require(!duplicate,
+                    $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
+                return handle;
+            }
         }
-        var duplicate = _handles.Any(h => ReferenceEquals(h.Table, handle.Table));
-        if (!_handles.Contains(handle)) _handles.Add(handle);
-        _clusters.TryAdd(clusterId, handle.Table);
-        ClusteringTestKitDiagnostics.Require(!duplicate,
-            $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
-        return handle;
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await handle.DisposeAsync().AsTask().WaitAsync(timeout.Token);
+        if (disposed)
+            throw new ObjectDisposedException(nameof(MembershipTableTestFixture), "The factory completed after its fixture was disposed.");
+        throw new InvalidOperationException("The factory completed after its cluster history ended.");
     }
 
     internal async Task AssertHistoryPresentAsync(string clusterId, CancellationToken cancellationToken)
@@ -145,7 +164,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     {
         await AssertHistoryPresentAsync(clusterId, cancellationToken);
         // A failed request can have committed. Retire these handles until native evidence proves retention.
-        _endedClusters.Add(clusterId);
+        lock (_lifecycleLock) _endedClusters.Add(clusterId);
         var rejected = false;
         try
         {
@@ -167,10 +186,13 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     private async ValueTask<bool> ObserveDeletionAsync(string clusterId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _endedClusters.Add(clusterId);
+        lock (_lifecycleLock) _endedClusters.Add(clusterId);
         var deleted = await _isDeleted(clusterId, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!deleted) _endedClusters.Remove(clusterId);
+        if (!deleted)
+        {
+            lock (_lifecycleLock) _endedClusters.Remove(clusterId);
+        }
         return deleted;
     }
 
@@ -198,17 +220,24 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     /// <summary>Deletes only owned clusters and disposes every acquired owner, with independent bounded cancellation.</summary>
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        var failures = new List<Exception>();
-        foreach (var (cluster, table) in _clusters)
+        KeyValuePair<string, IMembershipTable>[] clusters;
+        MembershipTableTestHandle[] handles;
+        lock (_lifecycleLock)
         {
-            if (_endedClusters.Contains(cluster)) continue;
+            if (_disposed != 0) return;
+            _disposed = 1;
+            clusters = _clusters.Where(pair => !_endedClusters.Contains(pair.Key)).ToArray();
+            handles = _handles.ToArray();
+        }
+        var failures = new List<Exception>();
+        foreach (var (cluster, table) in clusters)
+        {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try { await table.DeleteMembershipTableEntriesAsync(cluster, timeout.Token).WaitAsync(timeout.Token); }
             catch (Exception exception) { failures.Add(new InvalidOperationException($"cleanup cluster={cluster}", exception)); }
         }
 
-        foreach (var handle in _handles.AsEnumerable().Reverse())
+        foreach (var handle in handles.AsEnumerable().Reverse())
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try { await handle.DisposeAsync().AsTask().WaitAsync(timeout.Token); }

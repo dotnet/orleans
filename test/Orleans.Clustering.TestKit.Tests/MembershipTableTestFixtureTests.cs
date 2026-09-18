@@ -122,6 +122,202 @@ public sealed class MembershipTableTestFixtureTests
         Assert.Equal(2, backend.Deletes);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CreateAdditionalHandle_FactoryCompletesDuringOrAfterDisposal_DisposesLateOwnerOnce(bool disposalCompletesFirst)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        var ct = timeout.Token;
+        var backend = new IdealizedMembershipBackend { TerminalDeletion = true };
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var disposalEntered = Gate();
+        var releaseDisposal = Gate();
+        var lateDisposalEntered = Gate();
+        var releaseLateDisposal = Gate();
+        var factoryCalls = 0;
+        var disposalCalls = new int[4];
+        var fixture = new MembershipTableTestFixture("gated-disposal", async (_, cluster, _) =>
+        {
+            var index = Interlocked.Increment(ref factoryCalls) - 1;
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), async () =>
+            {
+                Interlocked.Increment(ref disposalCalls[index]);
+                if (index == 2)
+                {
+                    disposalEntered.TrySetResult();
+                    await releaseDisposal.Task.WaitAsync(ct);
+                }
+                else if (index == 3)
+                {
+                    lateDisposalEntered.TrySetResult();
+                    await releaseLateDisposal.Task.WaitAsync(ct);
+                }
+                await backend.DisposeHandleAsync(cluster);
+            });
+            if (index == 3)
+            {
+                factoryEntered.TrySetResult();
+                await releaseFactory.Task.WaitAsync(ct);
+            }
+            return handle;
+        }, backend.IsDeletedAsync);
+        await fixture.InitializeAsync(ct);
+        var acquisition = fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        var disposal = fixture.DisposeAsync().AsTask();
+        try
+        {
+            await disposalEntered.Task.WaitAsync(ct);
+            Assert.Equal(2, backend.Deletes);
+            Assert.False(acquisition.IsCompleted);
+            if (disposalCompletesFirst)
+            {
+                releaseDisposal.TrySetResult();
+                await disposal.WaitAsync(ct);
+                Assert.Equal(3, backend.DisposedHandles);
+            }
+            else
+            {
+                Assert.False(disposal.IsCompleted);
+            }
+
+            releaseFactory.TrySetResult();
+            await lateDisposalEntered.Task.WaitAsync(ct);
+            Assert.False(acquisition.IsCompleted);
+            Assert.Equal(1, Volatile.Read(ref disposalCalls[3]));
+            releaseLateDisposal.TrySetResult();
+            var failure = await Assert.ThrowsAsync<ObjectDisposedException>(() => acquisition.WaitAsync(ct));
+            Assert.Equal(nameof(MembershipTableTestFixture), failure.ObjectName);
+        }
+        finally
+        {
+            releaseFactory.TrySetResult();
+            releaseDisposal.TrySetResult();
+            releaseLateDisposal.TrySetResult();
+            await disposal.WaitAsync(ct);
+        }
+
+        await fixture.DisposeAsync();
+        Assert.Equal(4, backend.CreatedHandles);
+        Assert.Equal(4, backend.DisposedHandles);
+        Assert.Equal(new[] { 1, 1, 1, 1 }, disposalCalls);
+        Assert.Equal(0, backend.OperationsAfterDeletion);
+        Assert.Empty(backend.Partitions);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask());
+        Assert.Equal(4, factoryCalls);
+    }
+
+    [Fact]
+    public async Task CreateAdditionalHandle_RegistersBeforeDisposal_IsIncludedInOwnershipSnapshot()
+    {
+        var backend = new IdealizedMembershipBackend { TerminalDeletion = true };
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var calls = 0;
+        var fixture = new MembershipTableTestFixture("registered-first", async (_, cluster, ct) =>
+        {
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), () => backend.DisposeHandleAsync(cluster));
+            if (Interlocked.Increment(ref calls) == 4)
+            {
+                factoryEntered.TrySetResult();
+                await releaseFactory.Task.WaitAsync(ct);
+            }
+            return handle;
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        await fixture.InitializeAsync(ct);
+        var acquisition = fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        releaseFactory.TrySetResult();
+        var handle = await acquisition.WaitAsync(ct);
+
+        await fixture.DisposeAsync();
+        await handle.DisposeAsync();
+        Assert.Equal(4, backend.CreatedHandles);
+        Assert.Equal(4, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+        Assert.Equal(0, backend.OperationsAfterDeletion);
+        Assert.Empty(backend.Partitions);
+    }
+
+    [Fact]
+    public async Task CreateAdditionalHandle_HistoryRetiresWhileFactoryIsPending_DisposesOwnerAndRejectsRegistration()
+    {
+        var backend = new IdealizedMembershipBackend { TerminalDeletion = true };
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var calls = 0;
+        var fixture = new MembershipTableTestFixture("retired-history", async (_, cluster, ct) =>
+        {
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), () => backend.DisposeHandleAsync(cluster));
+            if (Interlocked.Increment(ref calls) == 4)
+            {
+                factoryEntered.TrySetResult();
+                await releaseFactory.Task.WaitAsync(ct);
+            }
+            return handle;
+        }, backend.IsDeletedAsync);
+        await fixture.RunAsync(async (f, ct) =>
+        {
+            var acquisition = f.CreateAdditionalHandleAsync(f.ClusterId, ct).AsTask();
+            try
+            {
+                await factoryEntered.Task.WaitAsync(ct);
+                await new MembershipTableTestRunner(f).DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(ct);
+                Assert.Equal(0, backend.DisposedHandles);
+            }
+            finally
+            {
+                releaseFactory.TrySetResult();
+            }
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => acquisition.WaitAsync(ct));
+            Assert.Contains("cluster history ended", failure.Message);
+            Assert.Equal(1, backend.DisposedHandles);
+        }, TestContext.Current.CancellationToken);
+        Assert.Equal(4, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+        Assert.Equal(0, backend.OperationsAfterDeletion);
+        Assert.Empty(backend.Partitions);
+    }
+
+    [Fact]
+    public async Task CreateAdditionalHandle_LateOwnerDisposalFailure_Propagates()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var expected = new InvalidOperationException("late-owner-disposal");
+        var disposalCalls = 0;
+        var fixture = new MembershipTableTestFixture("late-failure", async (_, cluster, ct) =>
+        {
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), () =>
+            {
+                Interlocked.Increment(ref disposalCalls);
+                throw expected;
+            });
+            factoryEntered.TrySetResult();
+            await releaseFactory.Task.WaitAsync(ct);
+            return handle;
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        var acquisition = fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        await fixture.DisposeAsync();
+        releaseFactory.TrySetResult();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => acquisition.WaitAsync(ct));
+        Assert.Same(expected, failure);
+        Assert.Equal(1, disposalCalls);
+        Assert.Equal(0, backend.Deletes);
+        await fixture.DisposeAsync();
+        Assert.Equal(1, disposalCalls);
+    }
+
+    private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     [Fact]
     public async Task Handle_DisposeAsync_OwnsOnlyExplicitDisposerAndRunsOnce()
     {
