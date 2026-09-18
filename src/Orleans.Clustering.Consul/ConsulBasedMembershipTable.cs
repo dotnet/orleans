@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,8 +62,15 @@ namespace Orleans.Runtime.Membership
             cancellationToken.ThrowIfCancellationRequested();
             if (tryInitTableVersion)
             {
-                await _consulClient.KV.Txn(
-                    new List<KVTxnOp> { GetVersionRowUpdate(NotFoundTableVersion) }, cancellationToken);
+                var response = await _consulClient.KV.CAS(new KVPair(versionKey)
+                {
+                    ModifyIndex = 0,
+                    Value = Encoding.UTF8.GetBytes("0")
+                }, cancellationToken);
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    throw new OrleansException($"Consul failed to initialize the membership table: {response.StatusCode}.");
+                }
             }
         }
 
@@ -123,14 +131,9 @@ namespace Orleans.Runtime.Membership
             }
 
             var allSiloRegistrations =
-                deploymentKVAddresses.Response
-                .Where(siloKV => !siloKV.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.Ordinal)
-                        && !siloKV.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.Ordinal))
-                .Select(siloKV =>
-                {
-                    var iAmAliveKV = deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.Ordinal));
-                    return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
-                }).ToArray();
+                GetSiloEntries(deploymentKVAddresses.Response)
+                .Select(entry => ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, entry.Row, entry.Heartbeat))
+                .ToArray();
 
             var tableVersionKey = versionKey ?? ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder);
             var tableVersion = GetTableVersion(deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(tableVersionKey, StringComparison.Ordinal)));
@@ -154,7 +157,7 @@ namespace Orleans.Runtime.Membership
                 var rowInsert = new KVTxnOp(insertKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = insertKV.Value };
                 var versionUpdate = this.GetVersionRowUpdate(tableVersion);
                 var responses = await _consulClient.KV.Txn(new List<KVTxnOp> { rowInsert, versionUpdate }, cancellationToken);
-                if (!responses.Response.Success)
+                if (!IsTransactionSuccessful(responses.Response))
                 {
                     LogDebugConsulMembershipProviderFailedToInsertRow(entry.SiloAddress);
                     return false;
@@ -195,12 +198,13 @@ namespace Orleans.Runtime.Membership
                     GetVersionRowUpdate(tableVersion)
                 };
                 var response = await _consulClient.KV.Txn(operations, cancellationToken);
-                if (!response.Response.Success)
+                if (!IsTransactionSuccessful(response.Response))
                 {
                     LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
+                    return false;
                 }
 
-                return response.Response.Success;
+                return true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -263,6 +267,44 @@ namespace Orleans.Runtime.Membership
             return new KVTxnOp(this.versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
         }
 
+        private static bool IsTransactionSuccessful(KVTxnResponse response)
+        {
+            if (response.Success)
+            {
+                return true;
+            }
+
+            // Consul uses HTTP 409 for both stale-index conflicts and per-operation failures such as ACL denial.
+            if (response.Errors.Count > 0 && response.Errors.All(error =>
+                (error.What.StartsWith("failed to set key ", StringComparison.Ordinal)
+                    || error.What.StartsWith("failed to delete key ", StringComparison.Ordinal))
+                && error.What.EndsWith(", index is stale", StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            var details = response.Errors.Count == 0
+                ? "Consul returned no error details."
+                : string.Join("; ", response.Errors.Select(error => $"Operation {error.OpIndex}: {error.What}"));
+            throw new OrleansException($"Consul membership transaction failed: {details}");
+        }
+
+        private static IEnumerable<(KVPair Row, KVPair? Heartbeat)> GetSiloEntries(KVPair[] entries)
+        {
+            var entriesByKey = entries.ToDictionary(entry => entry.Key, StringComparer.Ordinal);
+            foreach (var row in entries)
+            {
+                if (row.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.Ordinal)
+                    || row.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                entriesByKey.TryGetValue(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(row.Key), out var heartbeat);
+                yield return (row, heartbeat);
+            }
+        }
+
         private async Task<(ConsulSiloRegistration?, TableVersion)> GetConsulSiloRegistration(SiloAddress siloAddress, CancellationToken cancellationToken)
         {
             var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
@@ -314,17 +356,14 @@ namespace Orleans.Runtime.Membership
             }
 
             var allRegistrations =
-                allKVs.Response
-                .Where(siloKV => !siloKV.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.Ordinal)
-                    && !siloKV.Key.EndsWith("/" + ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.Ordinal))
-                .Select(siloKV =>
+                GetSiloEntries(allKVs.Response)
+                .Select(entry =>
                 {
-                    var iAmAliveKV = allKVs.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.Ordinal));
                     return new
                     {
-                        RegistrationKey = siloKV.Key,
-                        Heartbeat = iAmAliveKV,
-                        Registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV)
+                        RegistrationKey = entry.Row.Key,
+                        entry.Heartbeat,
+                        Registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, entry.Row, entry.Heartbeat)
                     };
                 }).ToArray();
 
@@ -340,7 +379,7 @@ namespace Orleans.Runtime.Membership
                         // DeleteCAS with index zero guards the absence of a legacy heartbeat key.
                         new(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(entry.RegistrationKey), KVTxnVerb.DeleteCAS) { Index = entry.Heartbeat?.ModifyIndex ?? 0 }
                     }, cancellationToken);
-                    if (!response.Response.Success)
+                    if (!IsTransactionSuccessful(response.Response))
                     {
                         LogDebugConsulMembershipProviderFailedCASCheck(entry.Registration.Address);
                     }

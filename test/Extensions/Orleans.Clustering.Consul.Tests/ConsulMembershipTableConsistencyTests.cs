@@ -23,6 +23,176 @@ public class ConsulMembershipTableConsistencyTests
     [Theory]
     [InlineData(null)]
     [InlineData("membership/nested")]
+    public async Task InitializationUsesOneNativeCASAndPreservesExistingVersion(string? root)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable(root: root);
+        await table.InitializeMembershipTableAsync(false, CancellationToken);
+        Assert.Equal(0, store.RequestCount);
+        await table.InitializeMembershipTableAsync(true, CancellationToken);
+        Assert.Equal(1, store.RequestCount);
+        Assert.Empty(store.Reads);
+        Assert.Empty(store.Transactions);
+        Assert.Empty(store.Puts);
+        var operation = Assert.Single(store.CompareAndSets);
+        Assert.Equal(root is null ? "orleans/cluster/version" : $"{root}/orleans/cluster/version", operation.Key);
+        Assert.Equal(0UL, operation.ModifyIndex);
+        Assert.Equal(Encoding.UTF8.GetBytes("0"), operation.Value);
+
+        var version = (await table.ReadAllAsync(CancellationToken)).Version;
+        Assert.True(await table.InsertRowAsync(Entry(), version.Next(), CancellationToken));
+        var before = store.Snapshot();
+        var requests = store.RequestCount;
+        await table.InitializeMembershipTableAsync(true, CancellationToken);
+        Assert.Equal(requests + 1, store.RequestCount);
+        Assert.Equal(2, store.CompareAndSets.Count);
+        Assert.Equal(before, store.Snapshot());
+    }
+
+    [Fact]
+    public async Task InitializationSurfacesUnexpectedNotFoundResponse()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        store.FailureMethod = HttpMethod.Put;
+        store.FailureStatus = HttpStatusCode.NotFound;
+        var exception = await Assert.ThrowsAsync<OrleansException>(() => table.InitializeMembershipTableAsync(true, CancellationToken));
+        Assert.Contains("NotFound", exception.Message);
+        Assert.Equal(1, store.RequestCount);
+        Assert.Empty(store.Keys);
+    }
+
+    [Fact]
+    public async Task ReadsAssociateHeartbeatsFromOneSnapshot()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var expected = new Dictionary<SiloAddress, DateTime>();
+        for (var i = 1; i <= 50; i++)
+        {
+            var entry = Entry(i);
+            entry.IAmAliveTime = Epoch.AddMinutes(i);
+            var heartbeat = i % 3 != 0;
+            store.Seed(entry, heartbeat);
+            expected.Add(entry.SiloAddress, heartbeat ? entry.IAmAliveTime : entry.StartTime);
+        }
+
+        await table.InitializeMembershipTableAsync(true, CancellationToken);
+        var requests = store.RequestCount;
+        var result = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(requests + 1, store.RequestCount);
+        Assert.Equal(expected.Count, result.Members.Count);
+        Assert.All(result.Members, row => Assert.Equal(expected[row.Item1.SiloAddress], row.Item1.IAmAliveTime));
+        Assert.Equal(0, result.Version.Version);
+        Assert.NotEqual("0", result.Version.VersionEtag);
+        Assert.Empty(store.Transactions);
+    }
+
+    [Fact]
+    public async Task CleanupUsesOneSnapshotAndIsolatesConflictingCandidates()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        for (var i = 1; i <= 10; i++)
+        {
+            var entry = Entry(i);
+            entry.Status = SiloStatus.Dead;
+            store.Seed(entry, heartbeat: i % 2 == 0);
+        }
+
+        var survivor = Entry(20);
+        store.Seed(survivor);
+        await table.InitializeMembershipTableAsync(true, CancellationToken);
+        var version = (await table.ReadAllAsync(CancellationToken)).Version;
+        MembershipEntry? refreshed = null;
+        store.BeforeTransaction = () =>
+        {
+            var key = Assert.Single(store.Transactions).First().Key;
+            refreshed = Entry();
+            refreshed.SiloAddress = SiloAddress.FromParsableString(key["orleans/cluster/".Length..]);
+            refreshed.Status = SiloStatus.Dead;
+            refreshed.SuspectTimes = new() { Tuple.Create(survivor.SiloAddress, Epoch.AddDays(2)) };
+            store.Seed(refreshed);
+            return Task.CompletedTask;
+        };
+
+        var reads = store.Reads.Count;
+        var requests = store.RequestCount;
+        await table.CleanupDefunctSiloEntriesAsync(Epoch.AddDays(1), CancellationToken);
+        Assert.Equal(reads + 1, store.Reads.Count);
+        Assert.Equal(requests + 11, store.RequestCount);
+        Assert.Equal(10, store.Transactions.Count);
+        Assert.Equal(1, store.ConflictCount);
+        Assert.All(store.Transactions, operations =>
+        {
+            Assert.Equal(2, operations.Count);
+            Assert.All(operations, operation => Assert.Equal(KVTxnVerb.DeleteCAS, operation.Verb));
+        });
+        Assert.NotNull(refreshed);
+        var result = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(version, result.Version);
+        Assert.Equal(2, result.Members.Count);
+        Assert.NotNull(result.TryGet(survivor.SiloAddress));
+        Assert.Equal(refreshed.SuspectTimes, result.TryGet(refreshed.SiloAddress)!.Item1.SuspectTimes);
+    }
+
+    [Theory]
+    [InlineData("insert", "permission")]
+    [InlineData("insert", "storage")]
+    [InlineData("insert", "mixed")]
+    [InlineData("insert", "empty")]
+    [InlineData("update", "permission")]
+    [InlineData("update", "storage")]
+    [InlineData("update", "mixed")]
+    [InlineData("update", "empty")]
+    [InlineData("cleanup", "permission")]
+    [InlineData("cleanup", "storage")]
+    [InlineData("cleanup", "mixed")]
+    [InlineData("cleanup", "empty")]
+    public async Task TransactionFailuresSurfaceNativeOperationErrors(string operation, string failure)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var entry = Entry();
+        entry.Status = SiloStatus.Dead;
+        store.Seed(entry);
+        var first = await table.ReadAllAsync(CancellationToken);
+        var before = store.Snapshot();
+        var what = failure == "storage" ? "failed kvs lookup: injected storage failure"
+            : "Permission denied: token with AccessorID 'test' lacks permission 'key:write' on 'orleans/cluster'";
+        store.TransactionErrors = failure switch
+        {
+            "empty" => [],
+            "mixed" =>
+            [
+                (0, $"failed to {(operation == "cleanup" ? "delete" : "set")} key \"orleans/cluster/silo\", index is stale"),
+                (1, what)
+            ],
+            _ => [(0, what)]
+        };
+
+        var requests = store.RequestCount;
+        var exception = await Assert.ThrowsAsync<OrleansException>(() => operation switch
+        {
+            "insert" => table.InsertRowAsync(Entry(2), first.Version.Next(), CancellationToken),
+            "update" => table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken),
+            "cleanup" => table.CleanupDefunctSiloEntriesAsync(Epoch.AddDays(1), CancellationToken),
+            _ => throw new InvalidOperationException(operation)
+        });
+        Assert.Contains("Consul membership transaction failed", exception.Message);
+        if (failure != "empty")
+        {
+            Assert.Contains(what, exception.Message);
+        }
+
+        Assert.Equal(requests + (operation == "cleanup" ? 2 : 1), store.RequestCount);
+        Assert.Single(store.Transactions);
+        Assert.Equal(before, store.Snapshot());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("membership/nested")]
     public async Task ReadsReturnOneConsistentClusterSnapshot(string? root)
     {
         using var store = new ConsulHandler();
@@ -754,10 +924,13 @@ public class ConsulMembershipTableConsistencyTests
         public List<(string Key, bool Recursive)> Reads { get; } = new();
         public List<List<KVTxnOp>> Transactions { get; } = new();
         public List<KVPair> Puts { get; } = new();
+        public List<KVPair> CompareAndSets { get; } = new();
         public Func<Task>? BeforeTransaction { get; set; }
         public Func<CancellationToken, Task>? BeforePut { get; set; }
         public Func<string, bool, Task>? AfterRead { get; set; }
         public HttpMethod? FailureMethod { get; set; }
+        public HttpStatusCode FailureStatus { get; set; } = HttpStatusCode.InternalServerError;
+        public (int OpIndex, string What)[]? TransactionErrors { get; set; }
         public bool DeleteResult { get; set; } = true;
         public bool PutResult { get; set; } = true;
 
@@ -803,7 +976,7 @@ public class ConsulMembershipTableConsistencyTests
             Assert.True(++RequestCount <= 200, "Consul request budget exhausted: possible unbounded retry.");
             if (request.Method == FailureMethod)
             {
-                return Response(HttpStatusCode.InternalServerError, "injected failure");
+                return Response(FailureStatus, "injected failure");
             }
 
             var uri = request.RequestUri!;
@@ -812,6 +985,14 @@ public class ConsulMembershipTableConsistencyTests
                 var body = JArray.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
                 var operations = body.Select(item => item["KV"]!.ToObject<KVTxnOp>()!).ToList();
                 Transactions.Add(operations);
+                if (TransactionErrors is { } errors)
+                {
+                    return Response(HttpStatusCode.Conflict, JsonConvert.SerializeObject(new
+                    {
+                        Errors = errors.Select(error => new { error.OpIndex, error.What })
+                    }));
+                }
+
                 if (BeforeTransaction is { } before)
                 {
                     BeforeTransaction = null;
@@ -835,7 +1016,14 @@ public class ConsulMembershipTableConsistencyTests
                         ConflictCount++;
                         return Response(HttpStatusCode.Conflict, JsonConvert.SerializeObject(new
                         {
-                            Errors = new[] { new { OpIndex = i, What = "CAS index mismatch" } }
+                            Errors = new[]
+                            {
+                                new
+                                {
+                                    OpIndex = i,
+                                    What = $"failed to {(operation.Verb.Equals(KVTxnVerb.DeleteCAS) ? "delete" : "set")} key {JsonConvert.SerializeObject(operation.Key)}, index is stale"
+                                }
+                            }
                         }));
                     }
 
@@ -861,8 +1049,21 @@ public class ConsulMembershipTableConsistencyTests
             var key = Uri.UnescapeDataString(uri.AbsolutePath["/v1/kv/".Length..]);
             if (request.Method == HttpMethod.Put)
             {
-                Assert.Empty(uri.Query);
                 var value = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
+                if (uri.Query.StartsWith("?cas=", StringComparison.Ordinal))
+                {
+                    var index = ulong.Parse(uri.Query["?cas=".Length..], CultureInfo.InvariantCulture);
+                    CompareAndSets.Add(new(key) { Value = value, ModifyIndex = index });
+                    var matches = (_rows.GetValueOrDefault(key)?.ModifyIndex ?? 0) == index;
+                    if (matches)
+                    {
+                        Set(key, value);
+                    }
+
+                    return Response(HttpStatusCode.OK, matches ? "true" : "false");
+                }
+
+                Assert.Empty(uri.Query);
                 Puts.Add(new(key) { Value = value });
                 if (BeforePut is { } before)
                 {
