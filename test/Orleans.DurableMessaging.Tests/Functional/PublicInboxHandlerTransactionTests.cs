@@ -19,6 +19,36 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
     }
 
     [Fact]
+    public async Task CaptureProbeSnapshot_RemainsStableAcrossLaterWrites()
+    {
+        var receiver = NewGrain();
+        var first = new DurableEffect(Guid.NewGuid(), 1, 1, "first");
+        var second = new DurableEffect(Guid.NewGuid(), 1, 2, "second");
+        await receiver.StageEffectAsync(first);
+        await receiver.RetryWriteStateAsync();
+        var grain = Assert.IsType<DurableMessagingTestGrain>(Fixture.GetGrainContext(receiver).GrainInstance);
+        var captures = grain.Captures;
+        var originalCount = captures.Count;
+        using var enumerator = captures.GetEnumerator();
+        Assert.True(enumerator.MoveNext());
+        var observed = new List<DurableEndpointSnapshot> { enumerator.Current };
+
+        await receiver.StageEffectAsync(second);
+        await receiver.RetryWriteStateAsync();
+
+        while (enumerator.MoveNext())
+        {
+            observed.Add(enumerator.Current);
+        }
+
+        Assert.Equal(originalCount, captures.Count);
+        Assert.Equal(originalCount, observed.Count);
+        Assert.Equal(captures, observed);
+        Assert.DoesNotContain(captures, capture => capture.Effects.Contains(second));
+        Assert.Contains(grain.Captures, capture => capture.Effects.Contains(second));
+    }
+
+    [Fact]
     public async Task HandlerSuccess_CommitsEffectCompletionDedupeAndOutgoingAtomically()
     {
         var receiver = NewGrain();

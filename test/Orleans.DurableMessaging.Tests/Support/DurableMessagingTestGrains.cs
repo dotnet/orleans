@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.DurableMessaging;
@@ -382,16 +383,20 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnCompleted() { }
     public void Dispose() => _lifecycleSubscription.Dispose();
 
-    internal List<DurableEndpointSnapshot> Captures { get; } = [];
-    internal List<Guid[]> OutputCaptures { get; } = [];
+    private readonly ConcurrentQueue<DurableEndpointSnapshot> _captures = new();
+    private readonly ConcurrentQueue<Guid[]> _outputCaptures = new();
+    internal IReadOnlyList<DurableEndpointSnapshot> Captures => _captures.ToArray();
+    internal IReadOnlyList<Guid[]> OutputCaptures => _outputCaptures.ToArray();
     internal Exception? NextApplyFailure { get; set; }
     internal TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    internal void ClearCaptures() => _captures.Clear();
 
     internal DurableEndpointSnapshot CaptureStorageWrite()
     {
         var snapshot = CreateSnapshot();
-        Captures.Add(snapshot);
-        OutputCaptures.Add(_outbox.Messages.Select(static envelope => envelope.MessageId).ToArray());
+        _captures.Enqueue(snapshot);
+        _outputCaptures.Enqueue(_outbox.Messages.Select(static envelope => envelope.MessageId).ToArray());
         return snapshot;
     }
 
