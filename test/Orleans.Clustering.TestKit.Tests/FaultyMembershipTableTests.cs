@@ -68,6 +68,11 @@ public sealed class FaultyMembershipTableTests
         Assert.Contains("provider=Deliberate-" + faultName, failure.Message);
         Assert.True(control.Injected > 0, "The intended mutant must actually execute, not fail during unrelated setup.");
         if (fault == MembershipFault.RefuseStatusWrite) Assert.Equal(1, control.UpdateCalls);
+        if (fault == MembershipFault.CrossClusterPointRead)
+        {
+            Assert.Equal(4, control.Backend.CreatedHandles);
+            Assert.Equal(control.Backend.CreatedHandles, control.Backend.DisposedHandles);
+        }
     }
 
     [Fact]

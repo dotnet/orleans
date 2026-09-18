@@ -283,14 +283,17 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     {
         if (Fault == MembershipFault.CrossClusterPointRead)
         {
+            string? wrongCluster;
             lock (control.Backend.Sync)
             {
-                var wrongCluster = control.Backend.Partitions.FirstOrDefault(p => p.Key != cluster && p.Value.Rows.ContainsKey(key));
-                if (wrongCluster.Value is not null)
-                {
-                    control.Injected++;
-                    return control.Backend.Create(wrongCluster.Key).ReadRowAsync(key, cancellationToken).GetAwaiter().GetResult();
-                }
+                wrongCluster = control.Backend.Partitions.FirstOrDefault(p => p.Key != cluster && p.Value.Rows.ContainsKey(key)).Key;
+            }
+            if (wrongCluster is not null)
+            {
+                control.Injected++;
+                await using var handle = new MembershipTableTestHandle(control.Backend.Create(wrongCluster),
+                    () => control.Backend.DisposeHandleAsync(wrongCluster));
+                return await handle.Table.ReadRowAsync(key, cancellationToken);
             }
         }
         return await Read(key, cancellationToken);
