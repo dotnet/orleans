@@ -45,7 +45,7 @@ public sealed class DynamoDBRemindersProviderBuilderTests
 
     private sealed class TestSiloBuilder(IConfiguration configuration) : ISiloBuilder
     {
-        public IServiceCollection Services { get; } = new ServiceCollection();
+        public IServiceCollection Services { get; } = new ServiceCollection().AddSingleton(configuration);
 
         public IConfiguration Configuration { get; } = configuration;
     }

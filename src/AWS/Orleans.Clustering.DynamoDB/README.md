@@ -69,6 +69,10 @@ await host.WaitForShutdownAsync();
 
 The AWS SDK credential chain supplies credentials for regions and HTTPS endpoints when explicit keys and a profile are omitted. HTTP endpoints use the local-development credentials `dummy` and `dummyKey` in that case. Configure explicit credentials when a DynamoDB Local instance uses an access key to select its database.
 
+## Aspire
+
+AWS Aspire can run DynamoDB Local and provide CDK or CloudFormation table outputs to Orleans. See [Use Amazon DynamoDB with Aspire](https://dotnet.github.io/orleans/docs/host/dynamodb-aspire/) for clustering, grain storage, reminders, identity, and table lifecycle guidance.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

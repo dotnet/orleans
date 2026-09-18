@@ -18,14 +18,15 @@ internal sealed partial class NatsConnectionManager
 {
     private static readonly byte[] AckPayload = "+ACK"u8.ToArray();
     private readonly string _providerName;
-    private readonly NatsOpts _natsClientOptions;
-    private readonly NatsConnection _natsConnection;
+    private readonly INatsConnection _natsConnection;
     private readonly string _natsServer;
+    private readonly bool _usesSharedConnection;
     private readonly ILogger _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly NatsOptions _options;
     private readonly NatsJSContext[] _producerNatsContexts;
     private readonly NatsJSContext _natsContext;
+    private readonly NatsJsonContextOptionsSerializerRegistry _serializerRegistry;
 
     [GeneratedActivatorConstructor]
     public NatsConnectionManager(string providerName, ILoggerFactory loggerFactory, NatsOptions options)
@@ -36,39 +37,45 @@ internal sealed partial class NatsConnectionManager
         this._options = options;
         this._options.JsonSerializerOptions ??= new();
         this._options.JsonSerializerOptions.TypeInfoResolverChain.Add(NatsSerializerContext.Default);
+        this._serializerRegistry = new NatsJsonContextOptionsSerializerRegistry(this._options.JsonSerializerOptions);
 
-        if (this._options.NatsClientOptions is null)
+        if (this._options.Connection is { } sharedConnection)
         {
-            this._options.NatsClientOptions = NatsOpts.Default with
-            {
-                Name = $"Orleans-{this._providerName}",
-                SerializerRegistry =
-                new NatsJsonContextOptionsSerializerRegistry(this._options.JsonSerializerOptions)
-            };
+            this._usesSharedConnection = true;
+            this._natsConnection = sharedConnection;
+            this._natsServer = GetLogSafeServerDescription(sharedConnection.Opts.Url);
         }
         else
         {
-            this._options.NatsClientOptions = this._options.NatsClientOptions with
+            var clientOptions = this._options.NatsClientOptions ?? NatsOpts.Default;
+            this._options.NatsClientOptions = clientOptions with
             {
-                Name = string.IsNullOrWhiteSpace(this._options.NatsClientOptions.Name)
+                Name = string.IsNullOrWhiteSpace(clientOptions.Name)
                     ? $"Orleans-{this._providerName}"
-                    : this._options.NatsClientOptions.Name,
-                SerializerRegistry = new NatsJsonContextOptionsSerializerRegistry(this._options.JsonSerializerOptions)
+                    : clientOptions.Name,
+                SerializerRegistry = this._serializerRegistry
             };
+            this._natsConnection = new NatsConnection(this._options.NatsClientOptions);
+            this._natsServer = GetLogSafeServerDescription(this._options.NatsClientOptions.Url);
         }
 
-        this._natsClientOptions = this._options.NatsClientOptions;
-        this._natsServer = GetLogSafeServerDescription(this._natsClientOptions.Url);
-        this._natsConnection = new NatsConnection(this._natsClientOptions);
         this._natsContext = new NatsJSContext(this._natsConnection);
 
         this._producerNatsContexts = new NatsJSContext[this._options.ProducerCount];
 
         for (var i = 0; i < this._options.ProducerCount; i++)
         {
-            var producerOptions = this._natsClientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
-            var producerConnection = new NatsConnection(producerOptions);
-            this._producerNatsContexts[i] = new NatsJSContext(producerConnection);
+            if (this._usesSharedConnection)
+            {
+                this._producerNatsContexts[i] = new NatsJSContext(this._natsConnection);
+            }
+            else
+            {
+                var clientOptions = this._options.NatsClientOptions
+                    ?? throw new InvalidOperationException("NATS client options were not initialized.");
+                var producerOptions = clientOptions with { Name = $"Orleans-{this._providerName}-Producer-{i}" };
+                this._producerNatsContexts[i] = new NatsJSContext(new NatsConnection(producerOptions));
+            }
         }
     }
 
@@ -93,15 +100,18 @@ internal sealed partial class NatsConnectionManager
                 return;
             }
 
-            foreach (var producerContext in this._producerNatsContexts)
+            if (!this._usesSharedConnection)
             {
-                await producerContext.Connection.ConnectAsync();
-
-                if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
+                foreach (var producerContext in this._producerNatsContexts)
                 {
-                    this.LogUnableToConnectToNatsServer(
-                        GetLogSafeServerDescription(producerContext.Connection.Opts.Url));
-                    return;
+                    await producerContext.Connection.ConnectAsync();
+
+                    if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
+                    {
+                        this.LogUnableToConnectToNatsServer(
+                            GetLogSafeServerDescription(producerContext.Connection.Opts.Url));
+                        return;
+                    }
                 }
             }
 
@@ -188,7 +198,7 @@ internal sealed partial class NatsConnectionManager
         var ack = await context.TryPublishAsync(
             subject,
             message,
-            this._natsClientOptions.SerializerRegistry.GetSerializer<NatsStreamMessage>(),
+            this._serializerRegistry.GetSerializer<NatsStreamMessage>(),
             cancellationToken: cancellationToken);
 
         if (ack.Success)
@@ -213,7 +223,7 @@ internal sealed partial class NatsConnectionManager
             this._options.StreamName,
             partition,
             this._options.BatchSize,
-            this._natsClientOptions.SerializerRegistry.GetDeserializer<NatsStreamMessage>());
+            this._serializerRegistry.GetDeserializer<NatsStreamMessage>());
 
     internal static int GetProducerIndex(int hashCode, int producerCount)
         => (int)((uint)hashCode % (uint)producerCount);

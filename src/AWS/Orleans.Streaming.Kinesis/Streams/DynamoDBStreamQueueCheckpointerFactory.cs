@@ -121,7 +121,9 @@ namespace Orleans.Streaming.Kinesis
                     AuthenticationRegion = GetAuthenticationRegion(options.Service),
                     ServiceURL = options.Service,
                 };
-                var endpointCredentials = CreateCredentials(options, useDummyCredentials: serviceUri.IsLoopback);
+                var endpointCredentials = CreateCredentials(
+                    options,
+                    useDummyCredentials: serviceUri.IsLoopback || serviceUri.Scheme == Uri.UriSchemeHttp);
                 return endpointCredentials is null
                     ? new AmazonDynamoDBClient(config)
                     : new AmazonDynamoDBClient(endpointCredentials, config);

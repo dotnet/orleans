@@ -10,6 +10,8 @@ namespace Orleans.Streaming.NATS;
 /// </summary>
 public class NatsOptions
 {
+    internal INatsConnection? Connection { get; set; }
+
     /// <summary>
     /// Gets or sets the name of the NATS JetStream stream used by the provider.
     /// </summary>

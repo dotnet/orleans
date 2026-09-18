@@ -1,4 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
   <PropertyGroup>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <DefineConstants>TRACE;TESTER_AZUREUTILS;ORLEANS_PERSISTENCE</DefineConstants>
@@ -7,14 +8,32 @@
     <GenerateProgramFile>false</GenerateProgramFile>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+    <IsAspireHost>false</IsAspireHost>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectCapability Include="Aspire" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Aspire.Azure.Storage.Queues" />
+    <PackageReference Include="Aspire.Hosting.AppHost" />
     <PackageReference Include="Azure.Data.Tables" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <Compile Remove="AzureStorageAspireIntegrationTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,6 +42,7 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)\src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
@@ -30,5 +50,8 @@
 
   <ItemGroup>
     <Compile Include="$(SourceRoot)src\Azure\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\AspireTestInfrastructure\AspireResourceConfiguration.cs" Link="AspireResourceConfiguration.cs" />
   </ItemGroup>
 </Project>

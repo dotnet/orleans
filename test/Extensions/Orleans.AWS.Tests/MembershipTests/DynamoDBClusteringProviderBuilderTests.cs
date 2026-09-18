@@ -68,14 +68,14 @@ public sealed class DynamoDBClusteringProviderBuilderTests
 
     private sealed class TestSiloBuilder(IConfiguration configuration) : ISiloBuilder
     {
-        public IServiceCollection Services { get; } = new ServiceCollection();
+        public IServiceCollection Services { get; } = new ServiceCollection().AddSingleton(configuration);
 
         public IConfiguration Configuration { get; } = configuration;
     }
 
     private sealed class TestClientBuilder(IConfiguration configuration) : IClientBuilder
     {
-        public IServiceCollection Services { get; } = new ServiceCollection();
+        public IServiceCollection Services { get; } = new ServiceCollection().AddSingleton(configuration);
 
         public IConfiguration Configuration { get; } = configuration;
     }

@@ -47,7 +47,24 @@ clientBuilder.AddKinesisStreams(
     });
 ```
 
-When access and secret keys are not configured, the provider uses the standard AWS SDK credential chain.
+Explicit access and secret keys take precedence for both regions and endpoint URLs. HTTP emulator endpoints use the development credentials `dummy` and `dummy` when those keys are omitted. Regions and HTTPS endpoints use the standard AWS SDK credential chain when explicit keys are omitted.
+
+## Configuration-driven hosting
+
+The package registers `Kinesis`, `AmazonKinesis`, and `KinesisStream` aliases for silo and client streaming configuration. The canonical Aspire configuration uses `Kinesis`:
+
+```text
+Orleans__Streaming__Orders__ProviderType=Kinesis
+Orleans__Streaming__Orders__ServiceKey=orders-stream
+Orleans__Streaming__Orders__Checkpoint__Type=Grain
+AWS__Resources__orders-stream__StreamArn=arn:aws:kinesis:us-west-2:123456789012:stream/orders
+```
+
+`ServiceKey` selects the AWS Aspire resource under `AWS:Resources`. Set `ResourceConfigSection` when the resource reference uses a custom configuration section. Direct `StreamArn`, `StreamName`, `Region`, `Service`, `ConnectionName`, and `ConnectionString` values are also supported.
+
+Silos select `Checkpoint:Type` as `Grain` or `DynamoDB`. Grain checkpoints accept `Checkpoint:StorageProviderName` and `Checkpoint:PersistInterval`. DynamoDB checkpoints accept `Checkpoint:ServiceKey` for an AWS Aspire table output, `Checkpoint:ResourceConfigSection` for a custom output path, and the properties on `DynamoDBStreamQueueCheckpointerOptions`.
+
+DynamoDB checkpoint clients preserve configured key, session, or named-profile credentials. When these settings are omitted, HTTP and loopback endpoints use the development credentials `dummy` and `dummy`; other endpoints and regions use the AWS SDK credential chain.
 
 ## Checkpoint persistence
 

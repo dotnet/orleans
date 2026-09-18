@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 using StackExchange.Redis;
 
 namespace Orleans.Docs.Snippets.Aspire.Silo;
@@ -9,6 +10,18 @@ namespace Orleans.Docs.Snippets.Aspire.Silo;
 // This class contains example code for Orleans silo configuration with Aspire
 public static class SiloProgram
 {
+    // <kinesis_streaming_silo>
+    public static void KinesisStreaming(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </kinesis_streaming_silo>
+
     // <silo_basic_config>
     public static void BasicSiloConfiguration(string[] args)
     {
@@ -68,6 +81,59 @@ public static class SiloProgram
         builder.Build().Run();
     }
     // </silo_azure_config>
+
+    // <azure_storage_providers_silo>
+    public static void AzureStorageProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient("orleans-tables");
+        builder.AddKeyedAzureBlobServiceClient("orleans-blobs");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </azure_storage_providers_silo>
+
+    // <cosmos_providers_silo>
+    public static void CosmosProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureCosmosClient("orleans-cosmos");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </cosmos_providers_silo>
+
+    // <redis_providers_silo>
+    public static void RedisProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedRedisClient("orleans-redis");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </redis_providers_silo>
+
+    // <event_hubs_silo>
+    public static void EventHubsSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient("checkpoint-tables");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </event_hubs_silo>
 
     // <health_checks>
     public static void ConfigureHealthChecks(IHostApplicationBuilder builder)

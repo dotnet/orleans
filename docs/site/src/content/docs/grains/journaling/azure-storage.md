@@ -1,7 +1,7 @@
 ---
 title: Azure Storage providers for Journaling
 description: Configure Azure Blob Storage or Azure Table Storage for experimental Orleans Journaling.
-ms.date: 08/21/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -27,6 +27,14 @@ conditional ownership updates, journal mutations, and delete permissions.
 Granting only read access prevents successful draining. See
 [Migrate Durable Jobs storage](durable-jobs-migration.md) for the staged rollout,
 full inventory, and retirement criteria.
+
+## Use with Aspire
+
+Aspire injects the Azure Storage connection and keyed SDK client. Configure the journaling provider section explicitly in the silo resource:
+
+:::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="azure_table_journaling_aspire":::
+
+The example activates Azure Table journal storage. Use `AzureBlobStorage` as `ProviderType`, reference the blob resource service key, and register the corresponding keyed <xref:Azure.Storage.Blobs.BlobServiceClient> to activate Azure Blob journal storage.
 
 ## Azure Blob Storage
 

@@ -20,6 +20,8 @@ The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.
 
 <xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> must remain stable across deployments that share the same logical application state. The provider uses optimistic concurrency and rejects stale writes.
 
+For Aspire AppHost configuration, DynamoDB Local, and structured AWS CDK or CloudFormation outputs, see [Use Amazon DynamoDB with Aspire](../../host/dynamodb-aspire).
+
 ## Serialization
 
 Set <xref:Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer> to customize the stored representation. Changing serializers doesn't rewrite existing items, so the replacement must read the previous representation or be accompanied by a migration.
