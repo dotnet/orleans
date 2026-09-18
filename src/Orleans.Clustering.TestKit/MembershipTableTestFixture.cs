@@ -215,6 +215,14 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
             lock (_lifecycleLock)
             {
                 disposed = _disposed != 0;
+                if (_handles.Contains(handle))
+                {
+                    ObjectDisposedException.ThrowIf(disposed, this);
+                    if (_endedClusters.Contains(clusterId))
+                        throw new InvalidOperationException("The factory completed after its cluster history ended.");
+                    throw new ClusteringConformanceException(
+                        $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
+                }
                 if (!disposed && !_endedClusters.Contains(clusterId))
                 {
                     var duplicate = _handles.Any(h => ReferenceEquals(h.Table, handle.Table));
@@ -226,7 +234,6 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
                     }
                     duplicateFailure = new ClusteringConformanceException(
                         $"provider={ProviderName}; cluster={clusterId}; factory returned the same provider instance; independently construct each IMembershipTable");
-                    if (_handles.Contains(handle)) throw duplicateFailure;
                 }
             }
 

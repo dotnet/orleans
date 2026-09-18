@@ -163,6 +163,61 @@ public sealed class MembershipTableTestFixtureTests
         Assert.Equal(2, backend.Deletes);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreateAdditionalHandle_LateAcceptedHandleWaitsForOtherAdmittedOperations(bool disposeFixture)
+    {
+        var backend = new IdealizedMembershipBackend();
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var probeEntered = Gate();
+        var releaseProbe = Gate();
+        MembershipTableTestHandle? accepted = null;
+        var calls = 0;
+        var probes = 0;
+        var fixture = new MembershipTableTestFixture("late-accepted", async (_, cluster, _) =>
+        {
+            if (++calls == 4)
+            {
+                factoryEntered.TrySetResult();
+                await releaseFactory.Task.WaitAsync(TestContext.Current.CancellationToken);
+                return accepted!;
+            }
+            var handle = new MembershipTableTestHandle(backend.Create(cluster), () => backend.DisposeHandleAsync(cluster));
+            accepted ??= handle;
+            return handle;
+        }, async (cluster, _) =>
+        {
+            if (++probes == 2)
+            {
+                probeEntered.TrySetResult();
+                await releaseProbe.Task.WaitAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(0, backend.DisposedHandles);
+            }
+            return await backend.IsDeletedAsync(cluster, TestContext.Current.CancellationToken);
+        });
+        var ct = TestContext.Current.CancellationToken;
+        await fixture.InitializeAsync(ct);
+        await MembershipTableTestRunner.Insert(fixture.First, MembershipTableTestData.CreateEntry(1), ct);
+        var acquisition = fixture.CreateAdditionalHandleAsync(fixture.ClusterId, ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        var deletion = fixture.DeleteClusterAsync(fixture.First, fixture.ClusterId, false, ct);
+        await probeEntered.Task.WaitAsync(ct);
+        if (disposeFixture)
+            await Assert.ThrowsAsync<TimeoutException>(() => fixture.DisposeAsync(TimeSpan.Zero).AsTask());
+        releaseFactory.TrySetResult();
+        if (disposeFixture) await Assert.ThrowsAsync<ObjectDisposedException>(() => acquisition.WaitAsync(ct));
+        else await Assert.ThrowsAsync<InvalidOperationException>(() => acquisition.WaitAsync(ct));
+        Assert.Equal(0, backend.DisposedHandles);
+        releaseProbe.TrySetResult();
+        Assert.True(await deletion.WaitAsync(ct));
+        await fixture.DisposeAsync();
+        Assert.Equal(3, backend.CreatedHandles);
+        Assert.Equal(3, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+    }
+
     [Fact]
     public async Task CreateAdditionalHandle_RejectedWrapperCleanupFailurePreservesDuplicateFailure()
     {
