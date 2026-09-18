@@ -185,9 +185,10 @@ namespace Orleans
         /// </summary>
         /// <remarks>
         /// Providers atomically require an existing row and validate <see cref="TableVersion.VersionEtag"/>.
-        /// A provider can use the row eTag as an additional concurrency token or ignore it when table-ETag
-        /// validation protects the existing-row update. Heartbeat-only activity preserves the usability of
-        /// previously read row and table inputs while the row exists and the table ETag remains current.
+        /// A provider can use the row eTag as an additional heartbeat-neutral concurrency token or ignore it when
+        /// table-ETag validation protects the existing-row update. Additional row guards must remain satisfied
+        /// across heartbeat-only activity, preserving validation of previously read row and table inputs
+        /// while the row exists and the table ETag remains current.
         /// </remarks>
         /// <param name="entry">MembershipEntry to be updated.</param>
         /// <param name="etag">The provider-defined row entity tag obtained from a membership read.</param>
