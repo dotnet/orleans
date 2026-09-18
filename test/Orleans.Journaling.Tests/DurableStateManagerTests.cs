@@ -1,8 +1,6 @@
 using System.Buffers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -23,19 +21,12 @@ public sealed class DurableStateManagerTests
     {
         var builder = CreateBuilder();
         builder.AddVolatileJournalStorage();
-        builder.Services.AddScoped<IGrainContext>(activationServices =>
-        {
-            var context = Substitute.For<IGrainContext>();
-            context.GrainId.Returns(GrainId.Create("registry-test", "activation"));
-            context.ActivationServices.Returns(activationServices);
-            return context;
-        });
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        await using var scope = services.CreateAsyncScope();
+        await using var scope = CreateActivationScope(services, GrainId.Create("registry-test", "activation"));
         var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
         var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         Assert.Same(owner, manager);
-        Assert.Same(scope.ServiceProvider, Assert.IsType<JournaledStateManager>(owner).ServiceProvider);
+        Assert.Same(scope.ServiceProvider, Assert.IsType<DurableStateManager>(owner).ServiceProvider);
 
         var first = keyedFirst
             ? scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value")
@@ -73,10 +64,10 @@ public sealed class DurableStateManagerTests
         var builder = CreateBuilder();
         builder.AddVolatileJournalStorage();
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        await using var manager = services.GetRequiredService<IJournaledStateManagerFactory>()
-            .CreateStandalone(new JournalId("registry/invalid"));
+        await using var scope = CreateActivationScope(services, GrainId.Create("registry-test", "invalid"));
+        var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var original = manager.GetOrAddValue<int>("state");
-        var owningServices = Assert.IsType<JournaledStateManager>(manager).ServiceProvider;
+        var owningServices = scope.ServiceProvider;
 
         switch (requestKind)
         {
@@ -106,7 +97,7 @@ public sealed class DurableStateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Factory_CustomRegistration_ConstructsOnceAndOwnsScope(bool useFactory)
+    public async Task Activation_CustomRegistration_ConstructsOnceAndScopeOwnsLifetime(bool useFactory)
     {
         var builder = CreateBuilder();
         var constructions = new ProbeCounter();
@@ -131,18 +122,22 @@ public sealed class DurableStateManagerTests
 
         builder.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        Assert.Null(services.GetService<IGrainContext>());
         await using var callerScope = services.CreateAsyncScope();
         var callerMarker = callerScope.ServiceProvider.GetRequiredService<ScopedProbe>();
-        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
-        var idA = new JournalId("factory/scope-A");
-        var idB = new JournalId("factory/scope-B");
-        await using var managerA = factory.CreateStandalone(idA);
-        await using var managerB = factory.CreateStandalone(idB);
-        var scopeA = Assert.IsType<JournaledStateManager>(managerA).ServiceProvider;
-        var scopeB = Assert.IsType<JournaledStateManager>(managerB).ServiceProvider;
-        AssertManagerAliases(managerA, scopeA);
-        AssertManagerAliases(managerB, scopeB);
+        var idA = GrainId.Create("scope-test", "A");
+        var idB = GrainId.Create("scope-test", "B");
+        await using var activationA = CreateActivationScope(services, idA);
+        await using var activationB = CreateActivationScope(services, idB);
+        var scopeA = activationA.ServiceProvider;
+        var scopeB = activationB.ServiceProvider;
+        var ownerA = scopeA.GetRequiredService<IJournaledStateManager>();
+        var ownerB = scopeB.GetRequiredService<IJournaledStateManager>();
+        var managerA = scopeA.GetRequiredService<IDurableStateManager>();
+        var managerB = scopeB.GetRequiredService<IDurableStateManager>();
+        AssertManagerAliases(ownerA, scopeA);
+        AssertManagerAliases(ownerB, scopeB);
+        Assert.Same(scopeA, Assert.IsType<DurableStateManager>(ownerA).ServiceProvider);
+        Assert.Same(scopeB, Assert.IsType<DurableStateManager>(ownerB).ServiceProvider);
 
         var probeA = Assert.IsType<ProbeState>(managerA.GetOrAddState<IProbeState>("probe"));
         var probeB = Assert.IsType<ProbeState>(scopeB.GetRequiredKeyedService<IProbeState>("probe"));
@@ -173,8 +168,8 @@ public sealed class DurableStateManagerTests
         var valueA = managerA.GetOrAddValue<int>("value");
         var valueB = managerB.GetOrAddValue<int>("value");
         Assert.NotSame(valueA, valueB);
-        await WaitFor(managerA.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "initialize scope A");
-        await WaitFor(managerB.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "initialize scope B");
+        await WaitFor(ownerA.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "initialize scope A");
+        await WaitFor(ownerB.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "initialize scope B");
         valueA.Value = 11;
         valueB.Value = 22;
         await WaitFor(managerA.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), "persist scope A");
@@ -182,8 +177,15 @@ public sealed class DurableStateManagerTests
         Assert.Equal(11, valueA.Value);
         Assert.Equal(22, valueB.Value);
 
-        await managerA.DisposeAsync();
-        await managerA.DisposeAsync();
+        await ownerA.DisposeAsync();
+        await ownerA.DisposeAsync();
+        Assert.Equal(0, probeA.DisposalCount);
+        Assert.Equal(0, probeA.Marker.DisposalCount);
+        Assert.Equal(0, probeB.DisposalCount);
+        Assert.Equal(0, probeB.Marker.DisposalCount);
+        Assert.Equal(0, callerMarker.DisposalCount);
+
+        await activationA.DisposeAsync();
         Assert.Equal(1, probeA.DisposalCount);
         Assert.Equal(0, probeB.DisposalCount);
         Assert.Equal(1, probeA.Marker.DisposalCount);
@@ -192,13 +194,15 @@ public sealed class DurableStateManagerTests
         valueB.Value = 23;
         await WaitFor(managerB.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), "persist surviving scope B");
         Assert.Equal(23, valueB.Value);
-        Assert.Same(factory, services.GetRequiredService<IJournaledStateManagerFactory>());
         await using (var freshCallerScope = services.CreateAsyncScope())
         {
             Assert.NotSame(callerMarker, freshCallerScope.ServiceProvider.GetRequiredService<ScopedProbe>());
         }
 
-        await managerB.DisposeAsync();
+        await ownerB.DisposeAsync();
+        Assert.Equal(0, probeB.DisposalCount);
+        Assert.Equal(0, probeB.Marker.DisposalCount);
+        await activationB.DisposeAsync();
         Assert.Equal(1, probeB.DisposalCount);
         Assert.Equal(1, probeA.DisposalCount);
         Assert.Equal(1, probeB.Marker.DisposalCount);
@@ -207,96 +211,84 @@ public sealed class DurableStateManagerTests
         Assert.Equal(2, constructions.Count);
 
         // Distinct live values alone would not catch two managers writing to the same journal.
-        await using var recoveredA = factory.CreateStandalone(idA);
-        await using var recoveredB = factory.CreateStandalone(idB);
+        await using var recoveredScopeA = CreateActivationScope(services, idA);
+        await using var recoveredScopeB = CreateActivationScope(services, idB);
+        var recoveredA = recoveredScopeA.ServiceProvider.GetRequiredService<IDurableStateManager>();
+        var recoveredB = recoveredScopeB.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var persistedA = recoveredA.GetOrAddValue<int>("value");
         var persistedB = recoveredB.GetOrAddValue<int>("value");
-        await WaitFor(recoveredA.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "recover scope A");
-        await WaitFor(recoveredB.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "recover scope B");
+        await WaitFor(recoveredScopeA.ServiceProvider.GetRequiredService<IJournaledStateManager>()
+            .InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "recover scope A");
+        await WaitFor(recoveredScopeB.ServiceProvider.GetRequiredService<IJournaledStateManager>()
+            .InitializeAsync(TestContext.Current.CancellationToken).AsTask(), "recover scope B");
         Assert.Equal(11, persistedA.Value);
         Assert.Equal(23, persistedB.Value);
     }
 
     [Fact]
-    public async Task Factory_ManualState_ReplaysWithoutCreatingScope()
+    public async Task Factory_ManualState_ReplaysUsingSharedServicesAndCallerOwnedComponents()
     {
-        var builder = CreateBuilder();
+        var builder = CreateBuilder(withGrainContext: false);
         builder.AddVolatileJournalStorage();
-        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        var trackedServices = new TrackingServiceProvider(services);
-        var factory = CreateStandaloneFactory(trackedServices);
-        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey);
-        var id = new JournalId("factory/manual");
-
-        await using (var manager = factory.CreateStandalone(id))
-        {
-            Assert.Equal(0, trackedServices.CreatedScopes);
-            var value = new DurableValue<int>("value", manager, codec);
-            Assert.Same(value, manager.GetOrAddValue<int>("value"));
-            await manager.InitializeAsync(TestContext.Current.CancellationToken);
-            value.Value = 42;
-            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(0, trackedServices.CreatedScopes);
-        }
-
-        await using (var manager = factory.CreateStandalone(id))
-        {
-            var value = new DurableValue<int>("value", manager, codec);
-            await manager.InitializeAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(42, value.Value);
-            AssertExisting<IDurableValue<int>>(manager, "value", value);
-            Assert.Same(value, manager.GetOrAddValue<int>("value"));
-        }
-
-        Assert.Equal(0, trackedServices.CreatedScopes);
-        Assert.Equal(0, trackedServices.DisposedScopes);
-
-        await using var unused = factory.CreateStandalone(new JournalId("factory/unused"));
-        await unused.DisposeAsync();
-        Assert.Throws<ObjectDisposedException>(() => new JournalReplayContext(Assert.IsType<JournaledStateManager>(unused)).ServiceProvider);
-        Assert.Equal(0, trackedServices.CreatedScopes);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Factory_StateServices_CreateAndDisposeOneScope(bool replayServicesFirst)
-    {
-        var builder = CreateBuilder();
-        builder.AddVolatileJournalStorage();
-        builder.Services.AddSingleton<ProbeCounter>();
+        var constructions = new ProbeCounter();
+        builder.Services.AddSingleton(constructions);
         builder.Services.AddScoped<ScopedProbe>();
         builder.Services.AddStateMachine<IProbeState, ProbeState>();
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        var trackedServices = new TrackingServiceProvider(services);
-        var factory = CreateStandaloneFactory(trackedServices);
-        await using var manager = factory.CreateStandalone(new JournalId("factory/lazy"));
-        Assert.Equal(0, trackedServices.CreatedScopes);
+        Assert.Null(services.GetService<IGrainContext>());
+        var sharedServices = services.GetRequiredService<IServiceProvider>();
+        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey);
+        var id = new JournalId("factory/manual");
+        var supplied = new CallerOwnedState();
+        DurableValue<int> originalValue;
 
-        if (replayServicesFirst)
+        await using (var owner = factory.CreateStandalone(id))
         {
-            var replayServices = new JournalReplayContext(Assert.IsType<JournaledStateManager>(manager)).ServiceProvider;
-            AssertManagerAliases(manager, replayServices);
-            Assert.NotSame(services, replayServices);
+            Assert.False(owner is IDurableStateManager);
+            var concrete = Assert.IsType<JournaledStateManager>(owner);
+            Assert.Same(sharedServices, concrete.ServiceProvider);
+            Assert.Same(sharedServices, new JournalReplayContext(concrete).ServiceProvider);
+            originalValue = new DurableValue<int>("value", owner, codec);
+            owner.RegisterStateMachine("supplied", supplied);
+            Assert.True(owner.TryGetStateMachine("value", out var valueStateMachine));
+            Assert.Same(originalValue, valueStateMachine);
+            Assert.True(owner.TryGetStateMachine("supplied", out var suppliedStateMachine));
+            Assert.Same(supplied, suppliedStateMachine);
+            await WaitFor(owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"initialize {id}");
+            originalValue.Value = 42;
+            await WaitFor(owner.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), $"persist {id}");
+            Assert.Equal(0, constructions.ScopedConstructionCount);
+            Assert.Equal(0, constructions.ScopedDisposalCount);
         }
 
-        var probe = Assert.IsType<ProbeState>(manager.GetOrAddState<IProbeState>("probe"));
-        Assert.Equal(1, trackedServices.CreatedScopes);
-        Assert.Same(probe, manager.GetOrAddState<IProbeState>("probe"));
-        var value = manager.GetOrAddValue<int>("value");
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        value.Value = 17;
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, trackedServices.CreatedScopes);
-        Assert.Equal(0, trackedServices.DisposedScopes);
+        Assert.Equal(0, supplied.DisposalCount);
+        var recoveredSupplied = new CallerOwnedState();
+        await using (var owner = factory.CreateStandalone(id))
+        {
+            Assert.False(owner is IDurableStateManager);
+            Assert.Same(sharedServices, Assert.IsType<JournaledStateManager>(owner).ServiceProvider);
+            var value = new DurableValue<int>("value", owner, codec);
+            owner.RegisterStateMachine("supplied", recoveredSupplied);
+            Assert.NotSame(originalValue, value);
+            Assert.NotSame(supplied, recoveredSupplied);
+            await WaitFor(owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"recover {id}");
+            Assert.Equal(42, value.Value);
+            Assert.True(owner.TryGetStateMachine("value", out var stateMachine));
+            Assert.Same(value, stateMachine);
+            Assert.True(owner.TryGetStateMachine("supplied", out stateMachine));
+            Assert.Same(recoveredSupplied, stateMachine);
+        }
 
-        await manager.DisposeAsync();
-        await manager.DisposeAsync();
-        Assert.Equal(1, trackedServices.DisposedScopes);
-        Assert.Equal(1, probe.DisposalCount);
-        Assert.Equal(1, probe.Marker.DisposalCount);
-        Assert.Throws<ObjectDisposedException>(() => new JournalReplayContext(Assert.IsType<JournaledStateManager>(manager)).ServiceProvider);
-        Assert.Equal(1, trackedServices.CreatedScopes);
+        Assert.Equal(0, supplied.DisposalCount);
+        Assert.Equal(0, recoveredSupplied.DisposalCount);
+        Assert.Equal(0, constructions.Count);
+        Assert.Equal(0, constructions.ScopedConstructionCount);
+        Assert.Equal(0, constructions.ScopedDisposalCount);
+        await supplied.DisposeAsync();
+        await recoveredSupplied.DisposeAsync();
+        Assert.Equal(1, supplied.DisposalCount);
+        Assert.Equal(1, recoveredSupplied.DisposalCount);
     }
 
     [Theory]
@@ -304,25 +296,32 @@ public sealed class DurableStateManagerTests
     [InlineData(true)]
     public async Task Registry_InitializationBoundary_RejectsOnlyNewStates(bool duringRecovery)
     {
-        var id = new JournalId("registry/initialization");
+        var grainId = GrainId.Create("registry-test", "initialization");
+        var id = JournalId.FromGrainId(grainId);
         var storage = new ControlledStorage();
         var readBarrier = new StorageBarrier();
         storage.NextReadBarrier = readBarrier;
         var constructions = new ProbeCounter();
+        var factoryCalls = 0;
         var builder = CreateBuilder();
         builder.Services.AddSingleton(constructions);
         builder.Services.AddScoped<ScopedProbe>();
         builder.AddJournaling();
-        builder.Services.AddStateMachine<IProbeState, ProbeState>();
+        builder.Services.AddStateMachine<IProbeState, ProbeState>((owningServices, _) =>
+        {
+            factoryCalls++;
+            return new ProbeState(owningServices.GetRequiredService<ScopedProbe>());
+        });
         builder.Services.AddSingleton<IJournalStorageProvider>(new SingleJournalProvider(id, storage));
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
-        await using var manager = factory.CreateStandalone(id);
-        var owningServices = Assert.IsType<JournaledStateManager>(manager).ServiceProvider;
+        await using var scope = CreateActivationScope(services, grainId);
+        var owningServices = scope.ServiceProvider;
+        var owner = owningServices.GetRequiredService<IJournaledStateManager>();
+        var manager = owningServices.GetRequiredService<IDurableStateManager>();
         var value = manager.GetOrAddValue<int>("value");
         var probe = manager.GetOrAddState<IProbeState>("probe");
         var explicitState = new InertState();
-        var initialization = manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
+        var initialization = owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
         try
         {
             await WaitFor(readBarrier.Entered.Task, $"read started for {id}; duringRecovery={duringRecovery}");
@@ -345,10 +344,12 @@ public sealed class DurableStateManagerTests
             AssertAdmissionRejected(() => manager.GetOrAddState<IProbeState>("late-programmatic"));
             AssertMissing<IProbeState>(manager, "late-programmatic");
             Assert.Equal(1, constructions.Count);
+            Assert.Equal(1, factoryCalls);
             AssertAdmissionRejected(() => owningServices.GetRequiredKeyedService<IProbeState>("late-keyed"));
             AssertMissing<IProbeState>(manager, "late-keyed");
             Assert.Equal(1, constructions.Count);
-            AssertAdmissionRejected(() => manager.RegisterStateMachine("late-explicit", explicitState));
+            Assert.Equal(1, factoryCalls);
+            AssertAdmissionRejected(() => owner.RegisterStateMachine("late-explicit", explicitState));
             AssertMissing<InertState>(manager, "late-explicit");
             AssertAdmissionRejected(() => manager.GetOrAddValue<int>("late-value"));
             AssertMissing<IDurableValue<int>>(manager, "late-value");
@@ -365,16 +366,19 @@ public sealed class DurableStateManagerTests
         value.Value = 31;
         await WaitFor(manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), $"write after rejected registration for {id}");
         Assert.Equal(1, storage.SuccessfulAppendCount);
-        await manager.DisposeAsync();
+        await scope.DisposeAsync();
 
-        await using var recovered = factory.CreateStandalone(id);
+        await using var recoveredScope = CreateActivationScope(services, grainId);
+        var recoveredOwner = recoveredScope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var recovered = recoveredScope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var recoveredValue = recovered.GetOrAddValue<int>("value");
         recovered.GetOrAddState<IProbeState>("probe");
-        await WaitFor(recovered.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fresh recovery for {id}");
+        await WaitFor(recoveredOwner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fresh recovery for {id}");
         Assert.NotSame(value, recoveredValue);
         Assert.Equal(31, recoveredValue.Value);
         Assert.Equal(2, storage.ReadCount);
         Assert.Equal(2, constructions.Count);
+        Assert.Equal(2, factoryCalls);
         AssertMissing<IProbeState>(recovered, "late-programmatic");
         AssertMissing<IProbeState>(recovered, "late-keyed");
         AssertMissing<InertState>(recovered, "late-explicit");
@@ -383,23 +387,24 @@ public sealed class DurableStateManagerTests
     }
 
     [Fact]
-    public async Task Factory_AllHelpers_ShareAcknowledgementAndRecover()
+    public async Task Activation_AllHelpers_ShareAcknowledgementAndRecover()
     {
         AssertNullManagerGuards();
-        var id = new JournalId("factory/all-helpers");
+        var grainId = GrainId.Create("activation-test", "all-helpers");
+        var id = JournalId.FromGrainId(grainId);
         var storage = new ControlledStorage();
         var provider = new SingleJournalProvider(id, storage);
         var builder = CreateBuilder();
         builder.AddJournaling();
         builder.Services.AddSingleton<IJournalStorageProvider>(provider);
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        Assert.Null(services.GetService<IGrainContext>());
-        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
-        await using var manager = factory.CreateStandalone(id);
+        await using var scope = CreateActivationScope(services, grainId);
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey,
-            Assert.IsType<JournaledStateManager>(manager).WriteJournalFormatKey);
+            Assert.IsType<DurableStateManager>(owner).WriteJournalFormatKey);
         var states = new SevenStates(manager);
-        await WaitFor(manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"initialize {id}");
+        await WaitFor(owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"initialize {id}");
         Assert.Equal(0, storage.AppendCount);
         Assert.False(states.Completion.Task.IsCompleted);
         states.Dictionary["a"] = 11;
@@ -433,9 +438,11 @@ public sealed class DurableStateManagerTests
         await WaitFor(write, $"shared acknowledgement for {id}");
         Assert.Equal(1, storage.SuccessfulAppendCount);
         await states.AssertPersisted();
-        await manager.DisposeAsync();
+        await scope.DisposeAsync();
 
-        await using var recovered = factory.CreateStandalone(id);
+        await using var recoveredScope = CreateActivationScope(services, grainId);
+        var recoveredOwner = recoveredScope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var recovered = recoveredScope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var recoveredStates = new SevenStates(recovered);
         Assert.NotSame(states.Dictionary, recoveredStates.Dictionary);
         Assert.NotSame(states.List, recoveredStates.List);
@@ -444,7 +451,7 @@ public sealed class DurableStateManagerTests
         Assert.NotSame(states.Value, recoveredStates.Value);
         Assert.NotSame(states.Completion, recoveredStates.Completion);
         Assert.NotSame(states.Persistent, recoveredStates.Persistent);
-        await WaitFor(recovered.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"recover seven states for {id}");
+        await WaitFor(recoveredOwner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"recover seven states for {id}");
         await recoveredStates.AssertPersisted();
         Assert.Equal(2, provider.CreateCount);
         Assert.Equal(2, storage.ReadCount);
@@ -455,9 +462,10 @@ public sealed class DurableStateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Factory_WriteFailure_FencesManagerAndRecoversCommit(bool committed)
+    public async Task Activation_WriteFailure_FencesManagerAndRecoversCommit(bool committed)
     {
-        var id = new JournalId("factory/failure");
+        var grainId = GrainId.Create("activation-test", "failure");
+        var id = JournalId.FromGrainId(grainId);
         var storage = new ControlledStorage();
         var constructions = new ProbeCounter();
         var builder = CreateBuilder();
@@ -467,10 +475,11 @@ public sealed class DurableStateManagerTests
         builder.Services.AddStateMachine<IProbeState, ProbeState>();
         builder.Services.AddSingleton<IJournalStorageProvider>(new SingleJournalProvider(id, storage));
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
-        var factory = services.GetRequiredService<IJournaledStateManagerFactory>();
-        await using var manager = factory.CreateStandalone(id);
+        await using var scope = CreateActivationScope(services, grainId);
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var value = manager.GetOrAddValue<int>("value");
-        await WaitFor(manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"initialize {id}");
+        await WaitFor(owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"initialize {id}");
         value.Value = 1;
         await WaitFor(manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), $"persist initial value for {id}");
         value.Value = 2;
@@ -489,7 +498,7 @@ public sealed class DurableStateManagerTests
             WaitFor(manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(), $"fenced write for {id}"));
         AssertFenced(writeRejection, injected);
         var initializationRejection = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            WaitFor(manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fenced recovery for {id}"));
+            WaitFor(owner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fenced recovery for {id}"));
         AssertFenced(initializationRejection, injected);
         var registrationRejection = Assert.Throws<InvalidOperationException>(
             () => manager.GetOrAddState<IProbeState>("late"));
@@ -498,11 +507,13 @@ public sealed class DurableStateManagerTests
         Assert.Equal(1, storage.ReadCount);
         Assert.Equal(2, storage.AppendCount);
         Assert.Equal(committed ? 2 : 1, storage.SuccessfulAppendCount);
-        await manager.DisposeAsync();
+        await scope.DisposeAsync();
 
-        await using var recovered = factory.CreateStandalone(id);
+        await using var recoveredScope = CreateActivationScope(services, grainId);
+        var recoveredOwner = recoveredScope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var recovered = recoveredScope.ServiceProvider.GetRequiredService<IDurableStateManager>();
         var recoveredValue = recovered.GetOrAddValue<int>("value");
-        await WaitFor(recovered.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fresh recovery for {id}, committed={committed}");
+        await WaitFor(recoveredOwner.InitializeAsync(TestContext.Current.CancellationToken).AsTask(), $"fresh recovery for {id}, committed={committed}");
         Assert.NotSame(value, recoveredValue);
         Assert.Equal(committed ? 2 : 1, recoveredValue.Value);
         AssertMissing<IProbeState>(recovered, "late");
@@ -511,7 +522,7 @@ public sealed class DurableStateManagerTests
         Assert.Equal(2, storage.AppendCount);
     }
 
-    private static TestSiloBuilder CreateBuilder()
+    private static TestSiloBuilder CreateBuilder(bool withGrainContext = true)
     {
         var builder = new TestSiloBuilder();
         builder.Services.AddSerializer();
@@ -519,17 +530,25 @@ public sealed class DurableStateManagerTests
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, TimeProvider.System);
         builder.Services.Configure<JournaledStateManagerOptions>(
             options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
+        if (withGrainContext)
+        {
+            builder.Services.AddScoped<IGrainContext>(activationServices =>
+            {
+                var context = Substitute.For<IGrainContext>();
+                context.ActivationServices.Returns(activationServices);
+                context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
+                return context;
+            });
+        }
+
         return builder;
     }
 
-    private static JournaledStateManagerFactory CreateStandaloneFactory(TrackingServiceProvider services)
+    private static AsyncServiceScope CreateActivationScope(ServiceProvider services, GrainId grainId)
     {
-        var shared = new JournaledStateManagerShared(
-            services.GetRequiredService<ILogger<JournaledStateManager>>(),
-            services.GetRequiredService<IOptions<JournaledStateManagerOptions>>(),
-            TimeProvider.System,
-            services);
-        return new(shared, services.GetRequiredService<IJournalStorageProvider>());
+        var scope = services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<IGrainContext>().GrainId.Returns(grainId);
+        return scope;
     }
 
     private static void AssertManagerAliases(IJournaledStateManager manager, IServiceProvider services)
@@ -672,66 +691,54 @@ public sealed class DurableStateManagerTests
     public sealed class ProbeCounter
     {
         private int _count;
+        private int _scopedConstructionCount;
+        private int _scopedDisposalCount;
         public int Count => Volatile.Read(ref _count);
+        public int ScopedConstructionCount => Volatile.Read(ref _scopedConstructionCount);
+        public int ScopedDisposalCount => Volatile.Read(ref _scopedDisposalCount);
         public void Increment() => Interlocked.Increment(ref _count);
+        public void OnScopedConstructed() => Interlocked.Increment(ref _scopedConstructionCount);
+        public void OnScopedDisposed() => Interlocked.Increment(ref _scopedDisposalCount);
     }
 
-    public sealed class ScopedProbe(ProbeCounter counter) : IAsyncDisposable
+    public sealed class ScopedProbe : IAsyncDisposable
     {
+        private readonly ProbeCounter _counter;
         private int _constructionCount;
         private int _disposalCount;
+
+        public ScopedProbe(ProbeCounter counter)
+        {
+            _counter = counter;
+            counter.OnScopedConstructed();
+        }
+
         public int ConstructionCount => Volatile.Read(ref _constructionCount);
         public int DisposalCount => Volatile.Read(ref _disposalCount);
 
         public void OnConstructed()
         {
             Interlocked.Increment(ref _constructionCount);
-            counter.Increment();
+            _counter.Increment();
         }
 
         public ValueTask DisposeAsync()
         {
             Interlocked.Increment(ref _disposalCount);
+            _counter.OnScopedDisposed();
             return ValueTask.CompletedTask;
         }
     }
 
-    private sealed class TrackingServiceProvider(ServiceProvider inner) : IKeyedServiceProvider, IServiceScopeFactory
+    private sealed class CallerOwnedState : InertState, IAsyncDisposable
     {
-        public int CreatedScopes { get; private set; }
-        public int DisposedScopes { get; private set; }
+        private int _disposalCount;
+        public int DisposalCount => Volatile.Read(ref _disposalCount);
 
-        public object? GetService(Type serviceType)
-            => serviceType == typeof(IServiceScopeFactory) ? this : inner.GetService(serviceType);
-
-        public object? GetKeyedService(Type serviceType, object? serviceKey)
-            => inner.GetKeyedService(serviceType, serviceKey);
-
-        public object GetRequiredKeyedService(Type serviceType, object? serviceKey)
-            => inner.GetRequiredKeyedService(serviceType, serviceKey);
-
-        public IServiceScope CreateScope()
+        public ValueTask DisposeAsync()
         {
-            var scope = inner.CreateAsyncScope();
-            CreatedScopes++;
-            return new TrackedScope(this, scope);
-        }
-
-        private sealed class TrackedScope(TrackingServiceProvider owner, AsyncServiceScope scope) : IServiceScope, IAsyncDisposable
-        {
-            public IServiceProvider ServiceProvider => scope.ServiceProvider;
-
-            public void Dispose()
-            {
-                scope.Dispose();
-                owner.DisposedScopes++;
-            }
-
-            public async ValueTask DisposeAsync()
-            {
-                await scope.DisposeAsync();
-                owner.DisposedScopes++;
-            }
+            Interlocked.Increment(ref _disposalCount);
+            return ValueTask.CompletedTask;
         }
     }
 

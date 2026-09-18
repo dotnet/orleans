@@ -32,13 +32,12 @@ public static class JournalingHostingExtensions
                 ? new JournalingInstruments(instruments)
                 : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
-        builder.Services.TryAddScoped<JournaledStateManagerBinding>();
         builder.Services.TryAddScoped<IJournaledStateManager>(static services =>
-            services.GetRequiredService<JournaledStateManagerBinding>().Manager ??= new JournaledStateManager(
+            new DurableStateManager(
                 services.GetRequiredService<JournaledStateManagerShared>(),
                 services.GetRequiredService<IJournalStorageProvider>(),
                 services.GetRequiredService<IGrainContext>()));
-        builder.Services.TryAddScoped<IDurableStateManager>(static services => services.GetRequiredService<IJournaledStateManager>());
+        builder.Services.TryAddScoped<IDurableStateManager>(static services => (IDurableStateManager)services.GetRequiredService<IJournaledStateManager>());
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
                 ?? ActivatorUtilities.CreateInstance<JournaledStateManagerFactory>(services));
@@ -66,7 +65,7 @@ public static class JournalingHostingExtensions
     /// <returns>The service collection.</returns>
     /// <remarks>
     /// Requires journaling services registered by <see cref="AddJournaling"/>.
-    /// Constructor dependencies are resolved from the owning manager's service scope.
+    /// Constructor dependencies are resolved from the grain activation's service scope.
     /// Use the factory overload when construction needs the state name.
     /// The manager registers the instance; its constructor need not register itself.
     /// </remarks>
@@ -86,12 +85,12 @@ public static class JournalingHostingExtensions
     /// <typeparam name="TState">The application state contract.</typeparam>
     /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
     /// <param name="services">The service collection.</param>
-    /// <param name="factory">Creates a state using its owning service scope and stable state name.</param>
+    /// <param name="factory">Creates a state component using its activation's service scope and stable state name.</param>
     /// <returns>The service collection.</returns>
     /// <remarks>
     /// Requires journaling services registered by <see cref="AddJournaling"/>.
     /// Keyed injection and the manager return the same named instance. The manager registers the state,
-    /// and the service scope disposes it. The factory is not invoked for an existing compatible state.
+    /// and the activation scope disposes it. The factory is not invoked for an existing compatible state.
     /// </remarks>
     public static IServiceCollection AddStateMachine<TState, TImplementation>(
         this IServiceCollection services,
@@ -108,9 +107,9 @@ public static class JournalingHostingExtensions
                 throw new ArgumentException("A durable state service key must be a non-empty string.", nameof(key));
             }
 
-            if (serviceProvider.GetRequiredService<IJournaledStateManager>() is not JournaledStateManager manager)
+            if (serviceProvider.GetRequiredService<IDurableStateManager>() is not DurableStateManager manager)
             {
-                throw new InvalidOperationException("Custom durable state factories require the journaling state manager registered by AddJournaling.");
+                throw new InvalidOperationException("Custom state machine factories require the grain's durable state manager registered by AddJournaling.");
             }
 
             return manager.GetOrAddState<TState, TImplementation>(name, factory);

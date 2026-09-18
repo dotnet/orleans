@@ -30,7 +30,6 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         builder.AddJournaling();
         builder.AddJournaling();
         builder.AddJournaling();
-        builder.Services.AddStateMachine<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
 
         Assert.DoesNotContain(builder.Services, descriptor =>
             descriptor.ServiceType == typeof(IConfigureGrainTypeComponents));
@@ -49,7 +48,8 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         await using var services = builder.Services.BuildServiceProvider();
         var journalId = new JournalId($"lifecycle/{Guid.NewGuid():N}");
         await using var manager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
-        var probe = manager.GetOrAddState<DurableManagerRecoveryProbe>("recovery");
+        var probe = new DurableManagerRecoveryProbe();
+        manager.RegisterStateMachine("recovery", probe);
         var lifecycle = Substitute.For<IGrainLifecycle>();
         var subscriptions = new List<(int Stage, ILifecycleObserver Observer)>();
         lifecycle.Subscribe(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<ILifecycleObserver>())
@@ -82,7 +82,8 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         Assert.Equal(1, probe.ResetCount);
         Assert.Equal(1, probe.RecoveryCount);
         Assert.Equal(0, probe.WriteCompletionCount);
-        Assert.Same(probe, manager.GetOrAddState<DurableManagerRecoveryProbe>("recovery"));
+        Assert.True(manager.TryGetStateMachine("recovery", out var stateMachine));
+        Assert.Same(probe, stateMachine);
     }
 
     [Theory]

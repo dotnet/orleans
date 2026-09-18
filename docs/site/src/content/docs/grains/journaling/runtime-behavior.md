@@ -37,13 +37,13 @@ Storage providers can split reads at arbitrary byte boundaries. The journal form
 
 ### Custom and caller-owned managers
 
-Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor. Custom managers establish it in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
+Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor and implements both the grain-facing `IDurableStateManager` and the independent journal-owner <xref:Orleans.Journaling.IJournaledStateManager>. Custom grain manager replacements provide both contracts and their registrations as appropriate. They establish enrollment in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.
 
-Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> with an explicit <xref:Orleans.Journaling.JournalId>, and managers constructed directly from storage without a grain context, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Register their states, await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with the operation's cancellation token, and dispose the manager when processing ends. A caller can deliberately assign lifecycle ownership by enrolling the manager in a grain-scoped registration factory. Standalone creation keeps failure handling independent of the ambient activation, including after the caller enrolls that manager in a lifecycle.
+Managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> with an explicit <xref:Orleans.Journaling.JournalId>, and managers constructed directly from storage without a grain context, retain caller-owned initialization and disposal. This applies inside grain calls as well as outside the runtime. Construct state machine components with their dependencies, register them with <xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, and await <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> with the operation's cancellation token before using recovered state. Look up registered components with <xref:Orleans.Journaling.IJournaledStateManager.TryGetStateMachine*>. A caller can deliberately assign lifecycle ownership by enrolling the owner in a grain-scoped registration factory. Standalone creation keeps failure handling independent of the ambient activation, including after such enrollment.
 
-Grain-owned managers use the existing activation scope. A standalone manager creates its own scope lazily, on the first actual state-service resolution: requesting a missing DI-created state through `GetOrAddState`, or accessing <xref:Orleans.Journaling.JournalReplayContext.ServiceProvider> during replay. That one scope is bound to the manager and reused for isolation, scoped-service caching, and dependency disposal.
+Grain-owned managers use the existing activation scope for `GetOrAddState` and keyed component resolution. The runtime-owned scope controls disposal of the DI-created state components, their dependencies, and the manager. <xref:Orleans.Journaling.JournalingHostingExtensions.AddStateMachine*> registers application state components for this grain-facing path.
 
-`CreateStandalone`, manual <xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*> calls, and lookups of existing states leave the scope unallocated. Recovery and writes which use already-supplied same-format codecs also remain scope-free until service resolution is needed. This avoids creating a scope for standalone integrations such as Durable Jobs shards which provide their own state and codecs. The manager disposes only the scope it owns; the grain runtime owns disposal of the activation scope.
+Standalone journal owners orchestrate manually registered components and never create or dispose DI scopes. Their callers supply component dependencies and manage their lifetimes, including any caller-owned scopes. Replay uses the configured shared journal services when it needs a codec for a stored format. Disposing the owner stops journal processing and releases journal resources; component and dependency disposal remains the caller's responsibility. Durable Jobs shards use this ownership model for their explicitly supplied state.
 
 ## Mutation and write acknowledgement
 
@@ -90,10 +90,11 @@ application outcome and reconcile in a new activation using an operation identif
 mechanism.
 
 Owners of standalone managers created through <xref:Orleans.Journaling.IJournaledStateManagerFactory>
-dispose the failed manager and create a new one for the same <xref:Orleans.Journaling.JournalId>. Declare
-new durable state instances with the manager's `GetOrAdd` helpers, or use
-<xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*> for an explicitly owned
-<xref:Orleans.Journaling.IStateMachine>, then initialize before resuming processing.
+dispose the failed manager and create a new one for the same <xref:Orleans.Journaling.JournalId>.
+Construct fresh state machine components with caller-supplied dependencies and register them using
+<xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, then initialize before resuming
+processing. The caller also retires the failed components and their dependencies according to their
+assigned lifetimes.
 
 Cancelling a write's cancellation token stops the caller's wait. An already queued write continues to its
 storage outcome, so the caller reconciles that outcome before retrying the command.

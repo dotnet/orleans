@@ -732,8 +732,7 @@ public partial class JournaledJobShardManagerTests
         public long PendingWriteByteCount => inner.PendingWriteByteCount;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
         public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
-        public TState GetOrAddState<TState>(string name) where TState : class => inner.GetOrAddState<TState>(name);
-        public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState? state) where TState : class => inner.TryGetState(name, out state);
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine) => inner.TryGetStateMachine(name, out stateMachine);
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
 

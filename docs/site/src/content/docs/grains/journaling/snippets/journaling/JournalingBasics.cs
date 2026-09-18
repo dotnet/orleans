@@ -61,15 +61,35 @@ public static class StandaloneJournaling
     public static async ValueTask<int> Increment(
         IJournaledStateManagerFactory factory,
         JournalId journalId,
+        IDurableValueCommandCodec<int> codec,
         CancellationToken cancellationToken)
     {
-        await using var manager = factory.CreateStandalone(journalId);
-        var count = manager.GetOrAddValue<int>("count");
-        await manager.InitializeAsync(cancellationToken);
+        await using var stateManager = factory.CreateStandalone(journalId);
+        var component = new CounterState(codec);
+        stateManager.RegisterStateMachine("count", component);
+        await stateManager.InitializeAsync(cancellationToken);
 
-        count.Value++;
-        await manager.WriteStateAsync(cancellationToken);
-        return count.Value;
+        cancellationToken.ThrowIfCancellationRequested();
+        component.Value++;
+        await stateManager.WriteStateAsync(cancellationToken);
+        return component.Value;
     }
     // </standalone_durable_state>
+
+    private sealed class CounterState(IDurableValueCommandCodec<int> codec)
+        : IStateMachine, IDurableValueCommandHandler<int>
+    {
+        public int Value { get; set; }
+
+        public void Reset(JournalStreamWriter writer) => Value = 0;
+
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
+
+        public void WritePendingEntries(JournalStreamWriter writer) => codec.WriteSet(Value, writer);
+
+        public void WriteSnapshot(JournalStreamWriter writer) => codec.WriteSet(Value, writer);
+
+        public void ApplySet(int value) => Value = value;
+    }
 }

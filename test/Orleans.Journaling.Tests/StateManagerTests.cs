@@ -1134,7 +1134,7 @@ public class StateManagerTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        Assert.False(sut.Manager.TryGetState<IStateMachine>("stale", out _));
+        Assert.False(sut.Manager.TryGetStateMachine("stale", out _));
         await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
     }
 

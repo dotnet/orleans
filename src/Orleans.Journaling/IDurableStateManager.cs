@@ -3,16 +3,17 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Provides named durable state instances which share a journal and write acknowledgement boundary.
+/// Manages a grain's durable state, whose named components share a journal and write acknowledgement boundary.
 /// </summary>
 /// <remarks>
-/// Declare states during construction or setup, before the manager begins initialization.
-/// Existing states can be retrieved after initialization. State contents are available after recovery completes.
+/// Declare state components during grain construction or synchronous activation setup, before initialization.
+/// Operations run in the owning activation's execution context. Existing components can be retrieved after
+/// initialization, and state contents are available after recovery completes.
 /// </remarks>
 public interface IDurableStateManager
 {
     /// <summary>
-    /// Gets an existing state or creates it using the registered implementation of its application contract.
+    /// Gets an existing state component or creates it using the registered implementation of its application contract.
     /// </summary>
     /// <typeparam name="TState">The application contract of the state.</typeparam>
     /// <param name="name">The stable, ordinal, case-sensitive state name.</param>
@@ -23,7 +24,7 @@ public interface IDurableStateManager
     TState GetOrAddState<TState>(string name) where TState : class;
 
     /// <summary>
-    /// Attempts to retrieve an existing state without creating it.
+    /// Attempts to retrieve an existing state component without creating it.
     /// </summary>
     /// <typeparam name="TState">The application contract of the state.</typeparam>
     /// <param name="name">The stable, ordinal, case-sensitive state name.</param>
@@ -39,7 +40,7 @@ public interface IDurableStateManager
     /// Stage mutations only after establishing that they are safe to commit. Pending changes are shared
     /// by all interleaved callers using this manager, so a write can include another caller's changes.
     /// Storage acknowledgement establishes durability. A failed journal operation permanently fences the
-    /// manager: recovery requires a new manager and new state instances.
+    /// manager; a new activation recovers the durable state.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
     /// </remarks>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>

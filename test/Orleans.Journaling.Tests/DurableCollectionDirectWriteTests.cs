@@ -197,11 +197,9 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(writer.CreateWriter());
 
-        public TState GetOrAddState<TState>(string name) where TState : class => throw new NotSupportedException();
-
-        public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState? state) where TState : class
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
         {
-            state = null;
+            stateMachine = null;
             return false;
         }
 

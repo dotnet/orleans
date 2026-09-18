@@ -11,11 +11,10 @@ public interface IJournaledStateManagerFactory
     /// <param name="journalId">The journal id.</param>
     /// <returns>The journaled state manager.</returns>
     /// <remarks>
-    /// Each manager owns an independent state registry. Its service scope is created when state services
-    /// are first requested, and disposed with the manager. Manually registered states can use the manager
-    /// without creating a service scope. Declare states using
-    /// <see cref="IDurableStateManager.GetOrAddState{TState}"/> or
+    /// The caller constructs state machines and registers them using
     /// <see cref="IJournaledStateManager.RegisterStateMachine"/> before initializing the manager.
+    /// State machine dependencies and their lifetime are supplied by the caller.
+    /// Each manager owns its journal processing and resources.
     /// The caller must initialize and asynchronously dispose the returned manager, including when
     /// creating it from within a grain activation.
     /// </remarks>

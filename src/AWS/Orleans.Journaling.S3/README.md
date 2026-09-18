@@ -17,11 +17,13 @@ same named object; `DurableGrain` provides a convenience base class. After recov
 are available for lookup and mutation, while adding a missing name fails immediately. Await
 `WriteStateAsync` to acknowledge the manager's shared journal batch.
 
-Standalone consumers use `IJournaledStateManagerFactory.CreateStandalone(JournalId)`, declare their states,
-then await `InitializeAsync` before using recovered contents. They own the resulting
-`IJournaledStateManager` lifetime and dispose it when work ends. Its DI scope is created lazily on
-the first state-service resolution and is disposed with the manager. Manually registered state and
-recovery/writes using already-supplied same-format codecs remain scope-free until services are needed.
+Standalone consumers use `IJournaledStateManagerFactory.CreateStandalone(JournalId)` to obtain the
+independent `IJournaledStateManager` owner contract. They explicitly construct state machine components
+with caller-supplied dependencies, register them through `RegisterStateMachine`, and await
+`InitializeAsync` before using recovered state. `WriteStateAsync` acknowledges journal writes, and
+`TryGetStateMachine` finds registered components. Disposing the owner stops journal processing and
+releases journal resources. Components, dependencies, and any scopes used to construct them remain
+caller-owned; the journal owner never creates or disposes DI scopes.
 
 ## Object layout
 

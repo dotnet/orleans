@@ -219,7 +219,7 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IJournaledStateManager : IDurableStateManager, System.IAsyncDisposable
+    public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
         long PendingWriteByteCount { get; }
 
@@ -227,6 +227,8 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken = default);
         void RegisterStateMachine(string name, IStateMachine stateMachine);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
+        bool TryGetStateMachine(string name, out IStateMachine? stateMachine);
+        System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJournaledStateManagerFactory

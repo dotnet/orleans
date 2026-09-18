@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
@@ -9,7 +8,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -22,9 +21,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
-    private readonly IServiceScopeFactory? _serviceScopeFactory;
-    private IServiceProvider _serviceProvider;
-    private AsyncServiceScope? _ownedScope;
+    private readonly IServiceProvider _serviceProvider;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -56,23 +53,20 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     }
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, JournalId journalId)
-        : this(shared, CreateStorage(storageProvider, journalId),
-            scopeFactory: shared.ServiceProvider.GetRequiredService<IServiceScopeFactory>())
+        : this(shared, CreateStorage(storageProvider, journalId))
     {
     }
 
     internal JournaledStateManager(
         JournaledStateManagerShared shared,
         IJournalStorage storage,
-        IServiceProvider? serviceProvider = null,
-        IServiceScopeFactory? scopeFactory = null)
+        IServiceProvider? serviceProvider = null)
     {
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
         _storage = storage;
         _serviceProvider = serviceProvider ?? shared.ServiceProvider;
-        _serviceScopeFactory = scopeFactory;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(_serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(_serviceProvider, WriteJournalFormatKey);
         _journalWriter = _shared.JournalFormat.CreateWriter();
@@ -107,59 +101,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
 
-    internal IServiceProvider ServiceProvider
-    {
-        get
-        {
-            lock (_lock)
-            {
-                ObjectDisposedException.ThrowIf(_disposed != 0, this);
-                if (_serviceScopeFactory is { } scopeFactory && _ownedScope is null)
-                {
-                    var scope = scopeFactory.CreateAsyncScope();
-                    try
-                    {
-                        scope.ServiceProvider.GetRequiredService<JournaledStateManagerBinding>().Manager = this;
-                        _serviceProvider = scope.ServiceProvider;
-                        _ownedScope = scope;
-                    }
-                    catch
-                    {
-                        scope.Dispose();
-                        throw;
-                    }
-                }
+    internal IServiceProvider ServiceProvider => _serviceProvider;
 
-                return _serviceProvider;
-            }
-        }
-    }
-
-    public TState GetOrAddState<TState>(string name) where TState : class
-    {
-        if (TryGetState<TState>(name, out var existing))
-        {
-            return existing;
-        }
-
-        EnsureRegistrationAllowed();
-
-        // Open generic keyed registrations must use implementation types. Resolving their canonical
-        // scoped instance keeps keyed injection and programmatic access on the same construction path.
-        var result = ServiceProvider.GetKeyedService<TState>(name)
-            ?? throw new InvalidOperationException(
-                $"No durable state implementation is registered for contract '{typeof(TState)}' and name '{name}'. " +
-                "Register the contract using AddStateMachine<TState, TImplementation>.");
-        if (result is not IStateMachine stateMachine)
-        {
-            throw new InvalidOperationException(
-                $"The durable state implementation for contract '{typeof(TState)}' and name '{name}' does not implement {nameof(IStateMachine)}.");
-        }
-
-        return RegisterResolvedState(name, result, stateMachine);
-    }
-
-    public bool TryGetState<TState>(string name, [NotNullWhen(true)] out TState? state) where TState : class
+    public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
         lock (_lock)
@@ -168,18 +112,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
             if (_states.TryGetValue(name, out var existing) && existing is not RetiredStateMachine)
             {
-                state = existing as TState
-                    ?? throw new InvalidOperationException(
-                        $"A state named '{name}' is already registered with type '{existing.GetType()}', which is incompatible with '{typeof(TState)}'.");
+                stateMachine = existing;
                 return true;
             }
         }
 
-        state = null;
+        stateMachine = null;
         return false;
     }
 
-    private void EnsureRegistrationAllowed()
+    protected void EnsureRegistrationAllowed()
     {
         lock (_lock)
         {
@@ -190,43 +132,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             {
                 throw new InvalidOperationException("New states cannot be registered after journaled state manager initialization has begun.");
             }
-        }
-    }
-
-    private TState RegisterResolvedState<TState>(string name, TState state, IStateMachine stateMachine) where TState : class
-    {
-        lock (_lock)
-        {
-            if (TryGetState<TState>(name, out var existing))
-            {
-                if (!ReferenceEquals(existing, state))
-                {
-                    throw new InvalidOperationException($"A different state instance is already registered with name '{name}'.");
-                }
-
-                return existing;
-            }
-
-            RegisterStateMachine(name, stateMachine);
-            return state;
-        }
-    }
-
-    internal TState GetOrAddState<TState, TImplementation>(string name, Func<IServiceProvider, string, TImplementation> factory)
-        where TState : class
-        where TImplementation : class, TState, IStateMachine
-    {
-        lock (_lock)
-        {
-            if (TryGetState<TState>(name, out var existing))
-            {
-                return existing;
-            }
-
-            EnsureRegistrationAllowed();
-            var state = factory(ServiceProvider, name)
-                ?? throw new InvalidOperationException($"The durable state factory for '{typeof(TState)}' returned null for name '{name}'.");
-            return RegisterResolvedState<TState>(name, state, state);
         }
     }
 
@@ -1171,10 +1076,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
             _shutdownCancellation.Dispose();
             _journalWriter.Dispose();
-            if (_ownedScope is { } scope)
-            {
-                await scope.DisposeAsync().ConfigureAwait(false);
-            }
         }
     }
 

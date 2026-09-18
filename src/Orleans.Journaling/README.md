@@ -7,7 +7,7 @@ The package includes a JSON Lines-based storage format powered by System.Text.Js
 
 Application code uses `IDurableStateManager` to manage the grain's durable state, declare its components, and acknowledge writes.
 `IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
-`IJournaledStateManager` extends the application interface with journal ownership and lifetime operations.
+`IJournaledStateManager` is an independent contract for journal ownership and lifetime operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -123,6 +123,10 @@ before resolution returns. Custom manager replacements establish this in their c
 registration factory, enrolling their `ILifecycleParticipant<IGrainLifecycle>` or subscribing their
 initialization and shutdown callbacks directly.
 
+The default grain manager implements both independent contracts, `IDurableStateManager` and
+`IJournaledStateManager`, on the same activation-scoped object. Custom grain manager replacements
+provide both contracts and their registrations as appropriate.
+
 Shared activation setup actions run synchronously after construction and can first resolve the manager
 or additional state components. The manager subscribes through the existing lifecycle participation mechanism.
 Resolve grain-owned managers and declare state components during construction or synchronous activation
@@ -148,18 +152,20 @@ the same instance; an incompatible contract or closed generic type fails immedia
 of `[FromKeyedServices("cart")] IDurableDictionary<string, int>` returns the same object as
 `stateManager.GetOrAddDictionary<string, int>("cart")`, regardless of which path resolves it first.
 
-All durable state types use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
+Built-in durable state components use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
 ## Custom state and standalone ownership
 
-Register an application contract and its implementation with
+Register a grain-facing state component contract and its implementation with
 `services.AddStateMachine<TState, TImplementation>()` on `IServiceCollection`. Both type arguments
 are reference types, and the implementation implements both `TState` and `IStateMachine`.
 In silo configuration, use `siloBuilder.AddJournaling()` for core setup and
-`siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the state mapping. Storage-provider
-registration already calls `AddJournaling` internally. The manager owns construction, registration, and binding; constructors receive
+`siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the grain state component mapping.
+Storage-provider registration already calls `AddJournaling` internally. Grain code obtains components
+through `IDurableStateManager.GetOrAddState` using the existing activation scope. The manager handles
+construction, registration, and journal-stream binding; constructors receive
 dependencies and leave registration to the manager. Unsupported application contracts produce an
 explicit registration error at `GetOrAddState`.
 
@@ -180,34 +186,46 @@ provider and requested state name.
 The recovery model uses fresh instances and replay. `JournalReplayContext.ResolveStateMachine`
 routes entries to the state machine for their stream.
 
-`IJournaledStateManager` extends `IDurableStateManager` and `IAsyncDisposable`. Its advanced owner
-API adds `RegisterStateMachine`, `InitializeAsync`, whole-journal `DeleteStateAsync`, and
-`PendingWriteByteCount`. `IJournaledStateManagerFactory.CreateStandalone(JournalId)` creates a standalone
-manager with its own registry and lifetime. Declare state components before initializing it:
+`IJournaledStateManager` is independent of the grain-facing `IDurableStateManager` and extends
+`IAsyncDisposable`. Its owner API provides `RegisterStateMachine`, `TryGetStateMachine`,
+`InitializeAsync`, `WriteStateAsync`, whole-journal `DeleteStateAsync`, and `PendingWriteByteCount`.
+`IJournaledStateManagerFactory.CreateStandalone(JournalId)` returns this owner contract. Construct
+state machine components with caller-supplied dependencies and register them before initialization.
+This helper accepts a caller-owned component and an operation which updates it after recovery:
 
 ```csharp
-await using var manager = factory.CreateStandalone(journalId);
-var count = manager.GetOrAddValue<int>("count");
-await manager.InitializeAsync(cancellationToken);
+using Orleans.Journaling;
 
-count.Value++;
-await manager.WriteStateAsync(cancellationToken);
+public static class StandaloneJournal
+{
+    public static async ValueTask Update(
+        IJournaledStateManagerFactory factory,
+        JournalId journalId,
+        IStateMachine component,
+        Action updateComponent,
+        CancellationToken cancellationToken)
+    {
+        await using var stateManager = factory.CreateStandalone(journalId);
+        stateManager.RegisterStateMachine("count", component);
+        await stateManager.InitializeAsync(cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        updateComponent();
+        await stateManager.WriteStateAsync(cancellationToken);
+    }
+}
 ```
 
-The factory's provider selection and the manager's configured format apply to every state component it creates.
-The owner initializes and disposes standalone managers; Orleans performs those operations for
-grain-owned managers.
+The caller supplies component codecs matching the journal's configured write format and retains
+ownership of the components and their dependencies. Standalone journal owners never create or dispose
+DI scopes. If component construction needs a scope, the caller supplies and manages it. Disposing
+the owner stops journal processing and releases journal resources; component and dependency disposal
+remains the caller's responsibility. `TryGetStateMachine` looks up an explicitly registered component.
 
-Grain-owned managers use the activation's existing service scope. Standalone creation allocates no DI
-scope. The first missing state component resolved through DI, or replay access to
-`JournalReplayContext.ServiceProvider`, lazily creates one manager-owned scope and binds it to that
-manager. The scope supplies isolation, caching, and disposal for scoped dependencies and is reused
-until the manager is disposed.
-
-Manual `RegisterStateMachine` calls and lookups of existing state components leave the scope unallocated.
-Initialization and writes using already-supplied same-format codecs also remain scope-free until
-services are needed. This benefits integrations such as Durable Jobs shards which provide their own
-state. A manager disposes only its owned scope; the grain runtime disposes the activation scope.
+Grain-facing `GetOrAdd` and keyed resolution use the existing activation scope. The runtime owns
+that scope and the lifetime of its DI-created state components, dependencies, and manager cleanup.
+Standalone integrations, such as Durable Jobs shards, explicitly provide their own state components
+and use the owner interface to coordinate recovery and writes.
 
 Managers created with an explicit `JournalId` through `CreateStandalone`, or constructed
 directly from storage without a grain context, retain caller-owned initialization and disposal even when
@@ -241,7 +259,8 @@ A failed journal operation permanently fences the manager, faults queued operati
 deactivation of the associated grain. In-flight calls retain their existing in-memory state while subsequent
 state-manager operations fail explicitly. A new activation recovers the actual durable outcome.
 For a manager created through `IJournaledStateManagerFactory`, dispose the failed instance and create
-another manager for the same `JournalId`, registering new state instances before initialization.
+another manager for the same `JournalId`, explicitly constructing and registering fresh state components
+before initialization and retiring the old components and dependencies according to their assigned lifetimes.
 
 Cancelling a caller's wait leaves an already queued write running. Observe durability through write
 acknowledgement or a fresh activation before deciding whether to retry an application command.
