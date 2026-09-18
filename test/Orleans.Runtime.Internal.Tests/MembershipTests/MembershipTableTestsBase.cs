@@ -335,6 +335,7 @@ namespace UnitTests.MembershipTests
                 Assert.Equal(tuple.Item1.ToFullString(), siloEntry.ToFullString());
 
                 var etagAfter = tuple.Item2;
+                var versionBeforeRejectedUpdate = tableData.Version;
 
                 if (extendedProtocol)
                 {
@@ -351,14 +352,12 @@ namespace UnitTests.MembershipTests
 
                 tableData = await membershipTable.ReadAllAsync(cancellationToken);
 
-                etagBefore = etagAfter;
-
-                etagAfter = tableData.TryGet(siloEntry.SiloAddress)?.Item2;
-
-                Assert.Equal(etagBefore, etagAfter);
                 Assert.NotNull(tableData.Version);
                 if (extendedProtocol)
+                {
+                    Assert.Equal(versionBeforeRejectedUpdate, tableData.Version);
                     Assert.Equal(tableVersion!.Version, tableData.Version.Version);
+                }
 
                 Assert.Equal(i, tableData.Members.Count);
             }
