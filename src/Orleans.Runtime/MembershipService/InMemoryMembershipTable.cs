@@ -61,14 +61,8 @@ namespace Orleans.Runtime.MembershipService
             if (data == null) return false;
             if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
 
-            var updated = entry.Copy();
-            if (data.Item1.IAmAliveTime > updated.IAmAliveTime)
-            {
-                updated.IAmAliveTime = data.Item1.IAmAliveTime;
-            }
-
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                updated, lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
             tableVersion = new TableVersion(version.Version, NewETag());
             return true;
         }

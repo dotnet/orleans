@@ -124,7 +124,7 @@ public sealed class InProcessMembershipTableTests
     }
 
     [Fact]
-    public async Task Update_WithPreHeartbeatTokens_SucceedsAndPreservesMaximumHeartbeat()
+    public async Task Update_WithPreHeartbeatTokens_CommitsCanonicalFields()
     {
         var entry = CreateEntry(SiloStatus.Joining);
         var originalHeartbeat = entry.IAmAliveTime;
@@ -135,7 +135,6 @@ public sealed class InProcessMembershipTableTests
             SiloAddress = entry.SiloAddress,
             IAmAliveTime = entry.IAmAliveTime.AddHours(2)
         };
-        var maximum = heartbeat.IAmAliveTime;
         await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
 
         entry.Status = SiloStatus.Active;
@@ -151,7 +150,6 @@ public sealed class InProcessMembershipTableTests
         Assert.Equal(entry.SiloName, stored.Item1.SiloName);
         Assert.Equal(entry.StartTime, stored.Item1.StartTime);
         Assert.Equal(SiloStatus.Active, stored.Item1.Status);
-        Assert.Equal(maximum, stored.Item1.IAmAliveTime);
         Assert.Equal(originalHeartbeat, entry.IAmAliveTime);
     }
 

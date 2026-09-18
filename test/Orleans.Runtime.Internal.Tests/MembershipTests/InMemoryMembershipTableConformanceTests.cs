@@ -29,7 +29,7 @@ public partial class InMemoryMembershipTableTests
     }
 
     [Fact]
-    public void Update_WithPreHeartbeatTokens_SucceedsAndPreservesMaximumHeartbeat()
+    public void Update_WithPreHeartbeatTokens_CommitsCanonicalFields()
     {
         var entry = CreateConformanceEntry(1);
         Assert.True(table.Insert(entry, table.ReadTableVersion().Next()));
@@ -45,9 +45,7 @@ public partial class InMemoryMembershipTableTests
 
         var after = table.Read(entry.SiloAddress);
         var row = Assert.Single(after.Members);
-        var expected = entry.Copy();
-        expected.IAmAliveTime = heartbeat.IAmAliveTime;
-        AssertConformanceEntry(expected, row.Item1);
+        AssertCanonicalFields(entry, row.Item1);
         Assert.Equal(inputHeartbeat, entry.IAmAliveTime);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
         Assert.NotEqual(before.Version.VersionEtag, after.Version.VersionEtag);
@@ -280,6 +278,12 @@ public partial class InMemoryMembershipTableTests
 
     private static void AssertConformanceEntry(MembershipEntry expected, MembershipEntry actual)
     {
+        AssertCanonicalFields(expected, actual);
+        Assert.Equal(expected.IAmAliveTime, actual.IAmAliveTime);
+    }
+
+    private static void AssertCanonicalFields(MembershipEntry expected, MembershipEntry actual)
+    {
         Assert.Equal(expected.SiloAddress, actual.SiloAddress);
         Assert.Equal(expected.SiloName, actual.SiloName);
         Assert.Equal(expected.HostName, actual.HostName);
@@ -289,7 +293,6 @@ public partial class InMemoryMembershipTableTests
         Assert.Equal(expected.ProxyPort, actual.ProxyPort);
         Assert.Equal(expected.Status, actual.Status);
         Assert.Equal(expected.StartTime, actual.StartTime);
-        Assert.Equal(expected.IAmAliveTime, actual.IAmAliveTime);
         Assert.Equal(expected.SuspectTimes, actual.SuspectTimes);
     }
 }

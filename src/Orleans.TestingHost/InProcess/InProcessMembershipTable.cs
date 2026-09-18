@@ -193,13 +193,7 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                     return false;
                 }
 
-                var updated = entry.Copy();
-                if (data.Entry.IAmAliveTime > updated.IAmAliveTime)
-                {
-                    updated.IAmAliveTime = data.Entry.IAmAliveTime;
-                }
-
-                _table[entry.SiloAddress] = (updated, _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                _table[entry.SiloAddress] = (entry.Copy(), _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
                 _tableVersion = new TableVersion(version.Version, NewETag());
                 return true;
             }
