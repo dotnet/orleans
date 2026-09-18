@@ -161,10 +161,10 @@ public sealed class AdoNetMembershipSqlTests
             updatedQueries.Add(match.Groups["key"].Value, match.Groups["text"].Value.Replace("''", "'"));
         }
 
-        Assert.Equal(engine switch { "SQLServer" => 7, "MySQL" => 4, _ => 2 }, updatedQueries.Count);
+        Assert.Equal(engine switch { "SQLServer" => 7, "MySQL" => 5, _ => 2 }, updatedQueries.Count);
         foreach (var (key, text) in updatedQueries)
         {
-            Assert.Equal(installQueries[key], text);
+            Assert.Equal(installQueries[key], text.Replace("InsertMembershipKeyAtomic(", "InsertMembershipKey("));
         }
 
         var installRoutines = Routines(install);
@@ -172,12 +172,28 @@ public sealed class AdoNetMembershipSqlTests
         Assert.Equal(engine switch { "PostgreSQL" => 4, "Oracle" => 3, "MySQL" => 1, _ => 0 }, updatedRoutines.Count);
         foreach (var (name, text) in updatedRoutines)
         {
-            Assert.Equal(installRoutines[name], text);
+            var installName = name == "InsertMembershipKeyAtomic" ? "InsertMembershipKey" : name;
+            Assert.Equal(installRoutines[installName], text.Replace("InsertMembershipKeyAtomic(", "InsertMembershipKey("));
         }
 
         Assert.DoesNotMatch(@"(?i)\b(?:CREATE|ALTER|DROP)\s+TABLE\b", update);
         Assert.DoesNotMatch(@"(?i)(?:FUNCTION|PROCEDURE)\s+Cleanup", update);
         Assert.Equal("DELETE", updatedQueries["CleanupDefunctSiloEntryKey"].Trim().Split(' ')[0]);
+    }
+
+    [Fact]
+    public void MySqlUpgrade_PreservesExistingRoutineAndPublishesQueriesAfterAdditiveCreation()
+    {
+        var update = ReadScript("MySQL", update: true);
+
+        Assert.DoesNotMatch(@"(?i)\b(?:DROP|ALTER)\s+PROCEDURE\b", update);
+        Assert.DoesNotMatch(@"(?i)\bCREATE\s+(?:OR REPLACE\s+)?PROCEDURE\s+InsertMembershipKey\s*\(", update);
+        Assert.Equal("InsertMembershipKeyAtomic", Assert.Single(Routines(update)).Key);
+        var create = update.IndexOf("CREATE PROCEDURE InsertMembershipKeyAtomic(", StringComparison.Ordinal);
+        var publication = update.IndexOf("START TRANSACTION;", update.IndexOf("DELIMITER ;", StringComparison.Ordinal), StringComparison.Ordinal);
+        var route = update.IndexOf("call InsertMembershipKeyAtomic(", StringComparison.Ordinal);
+        Assert.True(create >= 0 && publication > create && route > publication, update);
+        Assert.EndsWith("COMMIT;", update.Trim(), StringComparison.Ordinal);
     }
 
     private static void AssertRollback(string engine, string body)

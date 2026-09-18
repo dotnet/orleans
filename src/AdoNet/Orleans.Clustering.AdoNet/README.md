@@ -123,6 +123,19 @@ namespace ExampleGrains;
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/PostgreSQL-Clustering.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
+### Upgrading membership queries
+
+For an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` update before upgrading **silos or ADO.NET gateway-discovery clients**. The update preserves membership tables and stored rows, updates membership writes, and adds `CleanupDefunctSiloEntryKey` for conditional Dead-row cleanup. Updated providers require this query at initialization and report its absence as an error.
+
+Use a database migration account with permission to update `OrleansQuery` and create or replace the routines in the selected script. Configure the script runner to stop on the first error. Verify the update completed before deploying the provider package.
+
+The MySQL update has two phases, separated by `DELIMITER ;`:
+
+1. Create `InsertMembershipKeyAtomic` once using the intended routine-definer account. The existing `InsertMembershipKey` routine and its permissions continue serving callers which cached the original query.
+2. Ensure the runtime database principals have `EXECUTE` permission on the new routine, then execute the catalog-publication transaction following `DELIMITER ;`. Principals with database-wide `EXECUTE` grants already cover the new routine; routine-specific grants must include `InsertMembershipKeyAtomic`. The transaction switches the insert query and publishes the other query updates together.
+
+Providers load and cache queries during initialization. Roll silos and clients after the SQL update so they load the updated catalog; already-running instances continue using their cached queries until restarted. Existing query parameters and membership storage formats support this rolling upgrade. Retain the updated database objects when rolling binaries back: earlier providers can use the updated catalog, and updated providers still require the captured-row cleanup query.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

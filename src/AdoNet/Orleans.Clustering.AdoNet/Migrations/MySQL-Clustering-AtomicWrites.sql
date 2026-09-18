@@ -1,11 +1,12 @@
 -- Updates membership writes and adds captured-value Dead-row pruning.
 -- Apply to an existing clustering database before starting the updated provider.
 -- Existing table schemas, query parameters, and routine signatures are preserved.
+-- Create the new routine once, grant runtime callers EXECUTE, then publish the queries below.
+-- The existing InsertMembershipKey routine and its grants remain available to cached callers.
 
-DROP PROCEDURE IF EXISTS InsertMembershipKey;
 DELIMITER $$
 
-CREATE PROCEDURE InsertMembershipKey(
+CREATE PROCEDURE InsertMembershipKeyAtomic(
     in    _DeploymentId NVARCHAR(150),
     in    _Address VARCHAR(45),
     in    _Port INT,
@@ -82,6 +83,14 @@ END$$
 
 DELIMITER ;
 
+-- Ensure runtime callers can execute InsertMembershipKeyAtomic before publishing this catalog.
+START TRANSACTION;
+
+UPDATE OrleansQuery SET QueryText = '
+    call InsertMembershipKeyAtomic(@DeploymentId, @Address, @Port, @Generation,
+    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
+WHERE QueryKey = 'InsertMembershipKey';
+
 UPDATE OrleansQuery SET QueryText = '
     -- This is expected to never fail by Orleans, so return value
     -- is not needed nor is it checked.
@@ -133,3 +142,5 @@ SELECT 'CleanupDefunctSiloEntryKey', '
         AND CAST(COALESCE(SuspectTimes, '''') AS BINARY) = CAST(COALESCE(@SuspectTimes, '''') AS BINARY);
 '
 WHERE NOT EXISTS (SELECT 1 FROM OrleansQuery WHERE QueryKey = 'CleanupDefunctSiloEntryKey');
+
+COMMIT;

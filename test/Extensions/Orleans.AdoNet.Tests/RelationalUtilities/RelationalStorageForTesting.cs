@@ -109,7 +109,8 @@ namespace UnitTests.General
             string invariantName,
             string testDatabaseName,
             string? connectionString = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            IEnumerable<string>? setupSqlScriptFileNames = null)
         {
             CheckPreconditionsOrThrow(invariantName, connectionString);
             if (string.IsNullOrWhiteSpace(invariantName))
@@ -152,7 +153,7 @@ namespace UnitTests.General
             var setupScript = string.Empty;
 
             // Concatenate scripts
-            foreach (var fileName in testStorage.SetupSqlScriptFileNames)
+            foreach (var fileName in setupSqlScriptFileNames ?? testStorage.SetupSqlScriptFileNames)
             {
                 setupScript += await File.ReadAllTextAsync(fileName, cancellationToken);
 
