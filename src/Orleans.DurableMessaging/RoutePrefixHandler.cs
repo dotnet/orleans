@@ -12,8 +12,8 @@ namespace Orleans.DurableMessaging;
 /// <see cref="RoutePrefixHandler"/> simplifies implementing handlers that respond to messages
 /// with a <see cref="DurableEnvelope.RouteKey"/> that starts with a specific prefix.
 /// For example, a prefix of "orders/" matches "orders/create", "orders/update", and "orders/archive".
-/// Derived classes override <see cref="HandleAsync(IInboxHandlerContext, CancellationToken)"/>
-/// to implement the message processing logic.
+/// Derived classes override <see cref="PrepareAsync(IInboxHandlerContext, CancellationToken)"/>
+/// to implement asynchronous preparation and return the synchronous apply action.
 /// </para>
 /// <para>
 /// The prefix is automatically normalized to end with a forward slash ('/') to ensure
@@ -31,60 +31,16 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 /// <example>
 /// <code>
-/// public class OrderPrefixHandler : RoutePrefixHandler
+/// protected override ValueTask&lt;Action&gt; PrepareAsync(
+///     IInboxHandlerContext context, CancellationToken ct)
 /// {
-///     public OrderPrefixHandler() : base("orders/")
+///     return GetRouteSuffix(context.Envelope.RouteKey) switch
 ///     {
-///     }
-///
-///     protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
-///     {
-///         // Get the route suffix to determine the specific operation
-///         var suffix = GetRouteSuffix(context.Envelope.RouteKey);
-///
-///         switch (suffix)
-///         {
-///             case "create":
-///                 await HandleCreate(context, ct);
-///                 break;
-///             case "archive":
-///                 await HandleArchive(context, ct);
-///                 break;
-///             default:
-///                 throw new InvalidOperationException($"Unknown order operation: {suffix}");
-///         }
-///     }
-///
-///     private async ValueTask HandleCreate(IInboxHandlerContext context, CancellationToken ct)
-///     {
-///         if (!context.Envelope.Data.TryGetBody&lt;CreateOrder&gt;(out var request))
-///         {
-///             throw new InvalidOperationException("Failed to deserialize CreateOrder");
-///         }
-///
-///         // Process and send reply
-///         var result = await ProcessRequest(request, ct);
-///
-///         if (context.Envelope.ReplyTo is { } replyTo)
-///         {
-///             var response = context.CreateEnvelope()
-///                 .To(replyTo, "orders/created")
-///                 .WithBody(result)
-///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
-///                 .Build();
-///
-///             context.Send(response);
-///         }
-///     }
-///
-///     private async ValueTask HandleArchive(IInboxHandlerContext context, CancellationToken ct)
-///     {
-///         // ...
-///     }
+///         "create" =&gt; PrepareCreateAsync(context, ct),
+///         "archive" =&gt; PrepareArchiveAsync(context, ct),
+///         var operation =&gt; throw new InvalidOperationException($"Unknown operation: {operation}")
+///     };
 /// }
-///
-/// // Registration
-/// inbox.RegisterHandler(new OrderPrefixHandler());
 /// </code>
 /// </example>
 public abstract class RoutePrefixHandler : IInboxHandler
@@ -142,27 +98,21 @@ public abstract class RoutePrefixHandler : IInboxHandler
     /// this method returns "create".
     /// </para>
     /// <para>
-    /// This helper method is useful when implementing <see cref="HandleAsync"/> to
+    /// This helper method is useful when implementing <see cref="PrepareAsync"/> to
     /// determine the specific operation within the prefix namespace.
     /// </para>
     /// </remarks>
     /// <example>
     /// <code>
-    /// protected override async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
+    /// protected override ValueTask&lt;Action&gt; PrepareAsync(
+    ///     IInboxHandlerContext context, CancellationToken ct)
     /// {
-    ///     var operation = GetRouteSuffix(context.Envelope.RouteKey);
-    ///
-    ///     switch (operation)
+    ///     return GetRouteSuffix(context.Envelope.RouteKey) switch
     ///     {
-    ///         case "create":
-    ///             await HandleCreate(context, ct);
-    ///             break;
-    ///         case "archive":
-    ///             await HandleArchive(context, ct);
-    ///             break;
-    ///         default:
-    ///             throw new InvalidOperationException($"Unknown operation: {operation}");
-    ///     }
+    ///         "create" =&gt; PrepareCreateAsync(context, ct),
+    ///         "archive" =&gt; PrepareArchiveAsync(context, ct),
+    ///         var operation =&gt; throw new InvalidOperationException($"Unknown operation: {operation}")
+    ///     };
     /// }
     /// </code>
     /// </example>
@@ -182,11 +132,11 @@ public abstract class RoutePrefixHandler : IInboxHandler
     }
 
     /// <summary>
-    /// Handles a message that matches the configured route key prefix.
+    /// Prepares a message that matches the configured route key prefix.
     /// </summary>
     /// <param name="context">Handler context containing the envelope and methods for sending messages.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="cancellationToken">The cancellation token for preparation.</param>
+    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
     /// <remarks>
     /// <para>
     /// This method is only called when <see cref="CanHandle"/> returns <c>true</c>, meaning the
@@ -197,18 +147,17 @@ public abstract class RoutePrefixHandler : IInboxHandler
     /// route key after the prefix to determine the specific operation to perform.
     /// </para>
     /// <para>
-    /// Derived classes should handle business logic errors gracefully (e.g., log and send error
-    /// response) rather than throwing exceptions. Unhandled exceptions will be logged and may
-    /// prevent the message from being marked as processed.
+    /// Follow the preparation and synchronous application requirements of <see cref="IInboxHandler.PrepareAsync"/>.
+    /// The interface implementation forwards the returned action to Messaging for invocation.
     /// </para>
     /// </remarks>
-    protected abstract ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    protected abstract ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Explicit interface implementation that delegates to the protected <see cref="HandleAsync"/> method.
+    /// Explicit interface implementation that delegates to the protected <see cref="PrepareAsync"/> method.
     /// </summary>
-    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        return HandleAsync(context, cancellationToken);
+        return PrepareAsync(context, cancellationToken);
     }
 }

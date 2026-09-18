@@ -11,8 +11,8 @@ namespace Orleans.DurableMessaging;
 /// <remarks>
 /// <para>
 /// Handlers are registered with an inbox using <c>IDurableInbox.RegisterHandler(string routeKey, IInboxHandler handler)</c>.
-/// When a message arrives with a matching RouteKey, the inbox invokes the handler with the full envelope and a context
-/// for sending outbound messages.
+/// For a matching message, the inbox awaits preparation and invokes the returned synchronous action once
+/// for that prepared attempt. The action applies the prepared business mutations and outbound messages.
 /// </para>
 /// <para>
 /// For strongly-typed message handling, implement <see cref="IInboxHandler{TMessage}"/> instead, which provides
@@ -23,25 +23,14 @@ namespace Orleans.DurableMessaging;
 /// <code>
 /// public class PaymentHandler : IInboxHandler&lt;PaymentRequest&gt;
 /// {
-///     public async ValueTask HandleAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
+///     public async ValueTask&lt;Action&gt; PrepareAsync(
+///         PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
 ///     {
-///         var result = await ProcessPayment(request);
-///
-///         // Send reply if requested
-///         if (context.Envelope.ReplyTo is { } replyTo)
-///         {
-///             var response = context.CreateEnvelope()
-///                 .To(replyTo, "payment/response")
-///                 .WithBody(result)
-///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
-///                 .Build();
-///
-///             context.Send(response);
-///         }
+///         var prepared = await PreparePaymentAsync(request, ct);
+///         return () =&gt; ApplyPayment(prepared);
 ///     }
 /// }
 ///
-/// // Registration
 /// inbox.RegisterHandler("payment/process", new PaymentHandler());
 /// </code>
 /// </example>
@@ -66,8 +55,8 @@ public interface IInboxHandler
     /// <para>
     /// Selection is read-only. <see cref="IInboxHandlerContext.CreateEnvelope"/>,
     /// <see cref="IInboxHandlerContext.Send"/>, and <see cref="IInboxHandlerContext.Outbox"/>
-    /// throw when called from this method. Stage journaled effects and outgoing messages from
-    /// <see cref="HandleAsync"/> after selection completes.
+    /// throw when called from this method. After selection, <see cref="PrepareAsync"/> prepares local
+    /// values and returns the action which stages journaled effects and outgoing messages.
     /// </para>
     /// <para>
     /// <b>Handler Precedence:</b> When multiple handlers return <c>true</c>, the first registered
@@ -78,29 +67,14 @@ public interface IInboxHandler
     /// <code>
     /// public class OrderHandler : IInboxHandler&lt;OrderRequest&gt;
     /// {
-    ///     public bool CanHandle(IInboxHandlerContext context)
-    ///     {
-    ///         // Match specific route key
-    ///         return context.Envelope.RouteKey == "order/process";
-    ///     }
+    ///     public bool CanHandle(IInboxHandlerContext context) =&gt;
+    ///         context.Envelope.RouteKey == "order/process";
     ///
-    ///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+    ///     public async ValueTask&lt;Action&gt; PrepareAsync(
+    ///         OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
     ///     {
-    ///         // Handle the order
-    ///     }
-    /// }
-    ///
-    /// public class PrefixHandler : IInboxHandler
-    /// {
-    ///     public bool CanHandle(IInboxHandlerContext context)
-    ///     {
-    ///         // Match route prefix
-    ///         return context.Envelope.RouteKey?.StartsWith("orders/") == true;
-    ///     }
-    ///
-    ///     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken ct)
-    ///     {
-    ///         // Handle any order message using context.Envelope
+    ///         var prepared = await PrepareOrderAsync(message, ct);
+    ///         return () =&gt; ApplyOrder(prepared);
     ///     }
     /// }
     /// </code>
@@ -108,25 +82,29 @@ public interface IInboxHandler
     bool CanHandle(IInboxHandlerContext context);
 
     /// <summary>
-    /// Handles a message from the inbox.
+    /// Prepares a message from the inbox and returns its synchronous apply action.
     /// </summary>
     /// <param name="context">Handler context containing the envelope, grain information, and methods for sending messages.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="cancellationToken">The cancellation token for preparation.</param>
+    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
     /// <remarks>
     /// <para>
-    /// Prepare and validate the operation using local values before mutating journaled state or
-    /// calling <see cref="IInboxHandlerContext.Send"/>. Complete failure-prone work, including
-    /// asynchronous preparation and envelope serialization, before staging its effects.
+    /// Perform validation, asynchronous I/O, and other failure-prone work using operation-local values.
+    /// Prepare outbound envelopes during this phase. Keep journaled state unchanged until the returned
+    /// action is invoked, and call <see cref="IInboxHandlerContext.Send"/> from that action.
     /// </para>
     /// <para>
-    /// Every staged mutation and outbound message must already be safe to commit. Pending journal
+    /// Messaging awaits preparation and invokes the returned action once for that prepared attempt.
+    /// Use a synchronous lambda or method group which applies already-prepared business mutations and
+    /// stages prepared messages. An attempt with no effects returns an empty synchronous action.
+    /// </para>
+    /// <para>
+    /// Every applied mutation and outbound message must already be safe to commit. Pending journal
     /// changes are shared by all callers using the grain's state manager, and a journal write captures
-    /// those shared changes. Represent expected business failures as validated outcomes before staging
-    /// state changes or response messages.
+    /// those shared changes. Represent expected business failures as validated outcomes during preparation.
     /// </para>
     /// </remarks>
-    ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -145,59 +123,47 @@ public interface IInboxHandler
 /// </remarks>
 /// <example>
 /// <code>
-/// [GenerateSerializer]
-/// public record PaymentRequest
+/// public async ValueTask&lt;Action&gt; PrepareAsync(
+///     PaymentRequest message, IInboxHandlerContext context, CancellationToken ct)
 /// {
-///     [Id(0)] public required decimal Amount { get; init; }
-///     [Id(1)] public required string AccountId { get; init; }
-/// }
-///
-/// public class PaymentHandler : IInboxHandler&lt;PaymentRequest&gt;
-/// {
-///     private readonly IPaymentService _paymentService;
-///
-///     public PaymentHandler(IPaymentService paymentService)
+///     var prepared = await PreparePaymentAsync(message, ct);
+///     DurableEnvelope? response = null;
+///     if (context.Envelope.ReplyTo is { } replyTo)
 ///     {
-///         _paymentService = paymentService;
+///         response = context.CreateEnvelope()
+///             .To(replyTo, "payment/response")
+///             .WithBody(prepared.Response)
+///             .Build();
 ///     }
 ///
-///     public async ValueTask HandleAsync(PaymentRequest message, IInboxHandlerContext context, CancellationToken ct)
+///     return () =&gt;
 ///     {
-///         // Message is already deserialized and type-checked
-///         var result = await _paymentService.ProcessPayment(message.AccountId, message.Amount, ct);
-///
-///         // Send reply with result
-///         if (context.Envelope.ReplyTo is { } replyTo)
+///         ApplyPayment(prepared);
+///         if (response is { } envelope)
 ///         {
-///             var response = context.CreateEnvelope()
-///                 .To(replyTo, "payment/response")
-///                 .WithBody(new PaymentResult { Success = result, TransactionId = Guid.NewGuid() })
-///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
-///                 .Build();
-///
-///             context.Send(response);
+///             context.Send(envelope);
 ///         }
-///     }
+///     };
 /// }
 /// </code>
 /// </example>
 public interface IInboxHandler<TMessage> : IInboxHandler
 {
     /// <summary>
-    /// Handles a typed message.
+    /// Prepares a typed message and returns its synchronous apply action.
     /// </summary>
     /// <param name="message">
     /// The deserialized message body. This can be <see langword="null"/> when the sender
     /// serialized a null reference or nullable value.
     /// </param>
     /// <param name="context">Handler context for creating and sending envelopes.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    /// <param name="cancellationToken">The cancellation token for preparation.</param>
+    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
     /// <remarks>
     /// Follow the preparation and safe-to-commit staging requirements of
-    /// <see cref="IInboxHandler.HandleAsync"/>.
+    /// <see cref="IInboxHandler.PrepareAsync"/>.
     /// </remarks>
-    ValueTask HandleAsync([AllowNull] TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
+    ValueTask<Action> PrepareAsync([AllowNull] TMessage message, IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
     /// Default implementation that returns true (capability check deferred to derived class).
@@ -209,7 +175,7 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// or other metadata filters before message processing.
     /// </para>
     /// <para>
-    /// Type checking happens later during the envelope handling when the message body is deserialized.
+    /// Type checking happens during preparation when the message body is deserialized.
     /// This design allows handlers to inspect metadata without deserialization overhead.
     /// </para>
     /// </remarks>
@@ -222,11 +188,11 @@ public interface IInboxHandler<TMessage> : IInboxHandler
     /// This method attempts to deserialize the envelope body as <typeparamref name="TMessage"/>.
     /// If deserialization fails, it throws an <see cref="InvalidOperationException"/>.
     /// </remarks>
-    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         if (context.Envelope.Data.TryGetBody<TMessage>(out var typed))
         {
-            return HandleAsync(typed, context, cancellationToken);
+            return PrepareAsync(typed, context, cancellationToken);
         }
 
         throw new InvalidOperationException(

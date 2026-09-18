@@ -100,12 +100,22 @@ public sealed class HandlerRoutingContractTests : IDisposable
         var handler = new TypedHandler();
         using var context = CreateContext("typed", body: new RoutedMessage(81, "typed-body"));
 
+        using var cancellation = new CancellationTokenSource();
         Assert.True(((IInboxHandler)handler).CanHandle(context));
-        await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
+        var apply = await ((IInboxHandler)handler).PrepareAsync(context, cancellation.Token);
 
         Assert.Equal(1, handler.CallCount);
         Assert.Equal(new RoutedMessage(81, "typed-body"), handler.Message);
         Assert.Same(context, handler.Context);
+        Assert.Equal(cancellation.Token, handler.CancellationToken);
+        Assert.NotNull(apply);
+        Assert.Equal(0, handler.ApplyCount);
+        Assert.Null(handler.AppliedMessage);
+
+        apply();
+
+        Assert.Equal(1, handler.ApplyCount);
+        Assert.Equal(new RoutedMessage(81, "typed-body"), handler.AppliedMessage);
     }
 
     [Fact]
@@ -115,12 +125,192 @@ public sealed class HandlerRoutingContractTests : IDisposable
         using var context = CreateContext("typed", body: "not-a-routed-message");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None));
+            async () => await ((IInboxHandler)handler).PrepareAsync(context, CancellationToken.None));
 
         Assert.Contains(typeof(RoutedMessage).FullName!, exception.Message, StringComparison.Ordinal);
         Assert.Contains("typed", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, handler.CallCount);
         Assert.Null(handler.Message);
+        Assert.Equal(0, handler.ApplyCount);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_CompletedPreparation_PreservesActionAndArguments(string kind)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var context = CreatePreparedContext();
+        var preparationCalls = 0;
+        var applied = new List<string>();
+        Action expected = () => applied.Add("applied");
+        var handler = CreatePreparedHandler(kind, (actualContext, token) =>
+        {
+            Assert.Same(context, actualContext);
+            Assert.Equal(cancellation.Token, token);
+            preparationCalls++;
+            return ValueTask.FromResult(expected);
+        });
+
+        Assert.True(handler.CanHandle(context));
+        var preparation = handler.PrepareAsync(context, cancellation.Token);
+        Assert.True(preparation.IsCompletedSuccessfully);
+        var apply = await preparation;
+
+        Assert.Equal(1, preparationCalls);
+        Assert.Same(expected, apply);
+        Assert.Empty(applied);
+
+        apply();
+
+        Assert.Equal(["applied"], applied);
+        Assert.Equal(1, preparationCalls);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_AsyncPreparation_DefersApplyUntilInvoked(string kind)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var context = CreatePreparedContext();
+        var completion = new TaskCompletionSource<Action>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var preparationCalls = 0;
+        var applyCount = 0;
+        Action expected = () => applyCount++;
+        var handler = CreatePreparedHandler(kind, (actualContext, token) =>
+        {
+            Assert.Same(context, actualContext);
+            Assert.Equal(cancellation.Token, token);
+            preparationCalls++;
+            return new ValueTask<Action>(completion.Task);
+        });
+
+        var preparation = handler.PrepareAsync(context, cancellation.Token);
+
+        Assert.False(preparation.IsCompleted);
+        Assert.Equal(1, preparationCalls);
+        Assert.Equal(0, applyCount);
+        completion.SetResult(expected);
+        var apply = await preparation;
+        Assert.Same(expected, apply);
+        Assert.Equal(0, applyCount);
+
+        apply();
+
+        Assert.Equal(1, applyCount);
+        Assert.Equal(1, preparationCalls);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_PreparationFailure_PreservesException(string kind)
+    {
+        using var context = CreatePreparedContext();
+        var failure = new InvalidOperationException("Preparation failed.");
+        var completion = new TaskCompletionSource<Action>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = CreatePreparedHandler(kind, (_, _) => new ValueTask<Action>(completion.Task));
+        var preparation = handler.PrepareAsync(context, CancellationToken.None);
+        Assert.False(preparation.IsCompleted);
+
+        completion.SetException(failure);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(async () => await preparation);
+        Assert.Same(failure, actual);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_Cancellation_PreservesCancellationToken(string kind)
+    {
+        using var context = CreatePreparedContext();
+        using var cancellation = new CancellationTokenSource();
+        var completion = new TaskCompletionSource<Action>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = CreatePreparedHandler(kind, (_, token) =>
+        {
+            Assert.Equal(cancellation.Token, token);
+            return new ValueTask<Action>(completion.Task);
+        });
+        var preparation = handler.PrepareAsync(context, cancellation.Token);
+        Assert.False(preparation.IsCompleted);
+
+        cancellation.Cancel();
+        completion.SetCanceled(cancellation.Token);
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await preparation);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_ApplyFailure_IsDeferredToSynchronousInvocation(string kind)
+    {
+        using var context = CreatePreparedContext();
+        var failure = new InvalidOperationException("Apply failed.");
+        var applyCount = 0;
+        Action expected = () =>
+        {
+            applyCount++;
+            throw failure;
+        };
+        var handler = CreatePreparedHandler(kind, (_, _) => ValueTask.FromResult(expected));
+
+        var apply = await handler.PrepareAsync(context, CancellationToken.None);
+
+        Assert.Same(expected, apply);
+        Assert.Equal(0, applyCount);
+        var actual = Assert.Throws<InvalidOperationException>(apply);
+        Assert.Same(failure, actual);
+        Assert.Equal(1, applyCount);
+    }
+
+    [Fact]
+    public async Task TypedHandler_NullBody_PreservesNullablePayloadAndDeferredApply()
+    {
+        var sender = GrainId.Create("sender", "null-body");
+        var receiver = GrainId.Create("receiver", "null-body");
+        var envelope = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "typed/request")
+            .WithBody<RoutedMessage?>(null)
+            .Build();
+        using var context = new TestContext(envelope, receiver);
+        using var cancellation = new CancellationTokenSource();
+        var preparationCalls = 0;
+        var applyCount = 0;
+        IInboxHandler handler = new DelegateTypedHandler((message, actualContext, token) =>
+        {
+            Assert.Null(message);
+            Assert.Same(context, actualContext);
+            Assert.Equal(cancellation.Token, token);
+            preparationCalls++;
+            return ValueTask.FromResult<Action>(() => applyCount++);
+        });
+
+        var apply = await handler.PrepareAsync(context, cancellation.Token);
+
+        Assert.Equal(1, preparationCalls);
+        Assert.Equal(0, applyCount);
+        Assert.NotNull(apply);
+        apply();
+        Assert.Equal(1, applyCount);
     }
 
     public void Dispose() => _services.Dispose();
@@ -139,23 +329,77 @@ public sealed class HandlerRoutingContractTests : IDisposable
         return new TestContext(envelope, receiver);
     }
 
+    private TestContext CreatePreparedContext() =>
+        CreateContext("typed/request", HierarchicalKey.Create("workflow/request"), new RoutedMessage(42, "prepared"));
+
+    private static IInboxHandler CreatePreparedHandler(
+        string kind, Func<IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) => kind switch
+        {
+            "exact" => new DelegatingExactHandler(prepare),
+            "prefix" => new DelegatingPrefixHandler(prepare),
+            "correlation" => new DelegatingCorrelationHandler(prepare),
+            "untyped" => new DelegateHandler(prepare),
+            "typed" => new DelegateTypedHandler((_, context, token) => prepare(context, token)),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown handler kind.")
+        };
+
+    private sealed class DelegatingExactHandler(
+        Func<IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) : RouteKeyHandler("typed/request")
+    {
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            prepare(context, cancellationToken);
+    }
+
+    private sealed class DelegatingPrefixHandler(
+        Func<IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) : RoutePrefixHandler("typed")
+    {
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            prepare(context, cancellationToken);
+    }
+
+    private sealed class DelegatingCorrelationHandler(
+        Func<IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) : CorrelationHandler(HierarchicalKey.Create("workflow"))
+    {
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            prepare(context, cancellationToken);
+    }
+
+    private sealed class DelegateHandler(
+        Func<IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) : IInboxHandler
+    {
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            prepare(context, cancellationToken);
+    }
+
+    private sealed class DelegateTypedHandler(
+        Func<RoutedMessage?, IInboxHandlerContext, CancellationToken, ValueTask<Action>> prepare) : IInboxHandler<RoutedMessage>
+    {
+        public ValueTask<Action> PrepareAsync(RoutedMessage? message, IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            prepare(message, context, cancellationToken);
+    }
+
     private sealed class ExactHandler(string route) : RouteKeyHandler(route)
     {
         public string ExposedRoute => RouteKey;
-        protected override ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) => default;
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<Action>(static () => { });
     }
 
     private sealed class PrefixHandler(string prefix) : RoutePrefixHandler(prefix)
     {
         public string ExposedPrefix => Prefix;
         public string? Suffix(string? route) => GetRouteSuffix(route);
-        protected override ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) => default;
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<Action>(static () => { });
     }
 
     private sealed class HierarchyHandler(HierarchicalKey correlation) : CorrelationHandler(correlation)
     {
         public HierarchicalKey ExposedCorrelation => CorrelationKey;
-        protected override ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) => default;
+        protected override ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<Action>(static () => { });
     }
 
     private sealed class TypedHandler : IInboxHandler<RoutedMessage>
@@ -163,13 +407,21 @@ public sealed class HandlerRoutingContractTests : IDisposable
         public int CallCount { get; private set; }
         public RoutedMessage? Message { get; private set; }
         public IInboxHandlerContext? Context { get; private set; }
+        public CancellationToken CancellationToken { get; private set; }
+        public int ApplyCount { get; private set; }
+        public RoutedMessage? AppliedMessage { get; private set; }
 
-        public ValueTask HandleAsync(RoutedMessage? message, IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask<Action> PrepareAsync(RoutedMessage? message, IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             CallCount++;
             Message = message ?? throw new InvalidOperationException("A routed message is required.");
             Context = context;
-            return default;
+            CancellationToken = cancellationToken;
+            return ValueTask.FromResult<Action>(() =>
+            {
+                ApplyCount++;
+                AppliedMessage = message;
+            });
         }
     }
 
