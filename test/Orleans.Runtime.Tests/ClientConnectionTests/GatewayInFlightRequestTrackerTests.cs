@@ -267,6 +267,41 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void SameAttemptTrackingRejectsEqualForwardingGeneration()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var delayed = CreateMessage(1, Message.Directions.Request, Silo2);
+        delayed.GatewayRequestAttempt = request.GatewayRequestAttempt;
+        delayed.ForwardCount = request.ForwardCount;
+
+        Assert.False(tracker.Track(delayed));
+
+        var current = Assert.Single(tracker.RemoveForSilo(Silo1)!);
+        Assert.Equal(request.GatewayRequestAttempt, current.GatewayRequestAttempt);
+        Assert.Equal(0, current.ForwardCount);
+    }
+
+    [Fact]
+    public void SameAttemptTrackingAdvancesForwardingGeneration()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var forwarded = CreateMessage(1, Message.Directions.Request, Silo2);
+        forwarded.GatewayRequestAttempt = request.GatewayRequestAttempt;
+        forwarded.ForwardCount = request.ForwardCount + 1;
+
+        Assert.True(tracker.Track(forwarded));
+
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        var current = Assert.Single(tracker.RemoveForSilo(Silo2)!);
+        Assert.Equal(forwarded.GatewayRequestAttempt, current.GatewayRequestAttempt);
+        Assert.Equal(1, current.ForwardCount);
+    }
+
+    [Fact]
     public void RemovedAttemptCannotRecreateTrackingOnDelayedForward()
     {
         var tracker = CreateTracker();
