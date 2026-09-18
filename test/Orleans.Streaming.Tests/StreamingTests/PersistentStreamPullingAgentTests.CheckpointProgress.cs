@@ -4,6 +4,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
@@ -17,6 +18,242 @@ public partial class PersistentStreamPullingAgentTests
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public void PersistentDeliveryRetriesAreOptIn()
         => Assert.False(new StreamPullingAgentOptions().RetryFailedDeliveries);
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task CheckpointProgress_SameCursorHandshakePreservesUnsettledDelivery(bool pooled, bool retry, bool fail)
+    {
+        await using var scenario = await CreateCheckpointScenario(pooled, batchSize: 2, retryFailedDeliveries: retry);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        var cursor = scenario.Idle.Cursor;
+        var generation = scenario.Idle.HandshakeGeneration;
+        var releaseDelivery = new TaskCompletionSource<StreamHandshakeToken?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = new List<long>();
+        var consumer = new RecordingConsumer
+        {
+            OnDelivery = batch =>
+            {
+                attempts.AddRange(CheckpointBatchSequences(batch));
+                return attempts.Count == 2 ? releaseDelivery.Task : Task.FromResult<StreamHandshakeToken?>(null);
+            },
+        };
+        scenario.Idle.StreamConsumer = consumer;
+        var delivery = scenario.Accessor.RunConsumerCursor(scenario.Idle);
+        try
+        {
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await scenario.Accessor.AddSubscriber(scenario.Idle);
+            Assert.Same(cursor, scenario.Idle.Cursor);
+            Assert.Equal(generation + 1, scenario.Idle.HandshakeGeneration);
+            if (fail)
+                releaseDelivery.SetException(new InvalidOperationException("Delivery failed after same-cursor handshake"));
+            else
+                releaseDelivery.SetResult(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(200)));
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+            Assert.Equal(new long[] { 3, 4 }, attempts);
+            Assert.Equal(1, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            Assert.Empty(consumer.Errors);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
+
+            await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+            Assert.Equal(new long[] { 3, 4, 3, 4 }, attempts);
+            Assert.Same(cursor, scenario.Idle.Cursor);
+            Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
+        }
+        finally
+        {
+            releaseDelivery.TrySetResult(null);
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_SameCursorHandshakeDuringErrorHandlingPreservesReplay(bool pooled)
+    {
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Retry budget exhausted"));
+        await using var scenario = await CreateCheckpointScenario(pooled, batchSize: 2, deliveryBackoff: backoff);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Idle, 4), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        var errorStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseError = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fail = true;
+        var consumer = new RecordingConsumer
+        {
+            OnDelivery = _ => fail
+                ? Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Delivery failed"))
+                : Task.FromResult<StreamHandshakeToken?>(null),
+            OnError = _ =>
+            {
+                errorStarted.TrySetResult();
+                return releaseError.Task;
+            },
+        };
+        scenario.Idle.StreamConsumer = consumer;
+        var cursor = scenario.Idle.Cursor;
+        var delivery = scenario.Accessor.RunConsumerCursor(scenario.Idle);
+        try
+        {
+            await errorStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await scenario.Accessor.AddSubscriber(scenario.Idle);
+            Assert.Same(cursor, scenario.Idle.Cursor);
+            fail = false;
+            releaseError.SetResult();
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.Equal(3, Assert.Single(consumer.DeliveredTokens).SequenceNumber);
+            Assert.IsType<StreamEventDeliveryFailureException>(Assert.Single(consumer.Errors));
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
+
+            await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+            Assert.Equal(new long[] { 3, 3 }, consumer.DeliveredTokens.Select(token => token.SequenceNumber));
+            Assert.Equal(4, scenario.Idle.LastProcessedToken?.SequenceNumber);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
+        }
+        finally
+        {
+            releaseError.TrySetResult();
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_BusyPumpPublishesBeforeEachRead(bool pooled)
+    {
+        var receiver = Substitute.For<IQueueAdapterReceiver>();
+        await using var scenario = await CreateCheckpointScenario(pooled, receiver: receiver);
+        var reads = 0;
+        receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                if (reads > 0)
+                    Assert.Equal(reads, scenario.Checkpoints[^1]?.SequenceNumber);
+                reads++;
+                return Task.FromResult<IList<IBatchContainer>>(reads <= 100
+                    ? [new TestBatchContainer(scenario.Busy.StreamId.StreamId, new EventSequenceTokenV2(reads))]
+                    : []);
+            });
+
+        await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+
+        Assert.Equal(101, reads);
+        Assert.Equal(Enumerable.Range(1, 100).Select(value => (long)value),
+            scenario.Checkpoints.Select(token => token!.SequenceNumber));
+        Assert.Equal(100, scenario.Idle.LastSafePartitionToken?.SequenceNumber);
+        Assert.Equal(100, scenario.Busy.LastProcessedToken?.SequenceNumber);
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_StickyMissNotifiesFailurePolicy(bool faultSubscription)
+    {
+        var handler = Substitute.For<IStreamFailureHandler>();
+        handler.ShouldFaultSubsriptionOnError.Returns(faultSubscription);
+        await using var scenario = await CreateCheckpointScenario(pooled: true, failureHandler: handler);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        scenario.Idle.State = StreamConsumerDataState.Active;
+        await scenario.Read((scenario.Idle, 3), (scenario.Busy, 200));
+        scenario.Idle.State = StreamConsumerDataState.Inactive;
+        var cursor = scenario.Idle.Cursor;
+        var consumer = new RecordingConsumer();
+        scenario.Idle.StreamConsumer = consumer;
+        Assert.IsType<PurgeablePooledQueueCache>(scenario.Cache).Purge();
+
+        await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+
+        Assert.Empty(consumer.DeliveredTokens);
+        Assert.IsType<QueueCacheMissException>(consumer.Errors[0]);
+        await handler.Received(1).OnDeliveryFailure(
+            scenario.Idle.SubscriptionId, "provider", scenario.Idle.StreamId.StreamId, null);
+        if (faultSubscription)
+        {
+            Assert.Equal(2, consumer.Errors.Count);
+            Assert.IsType<FaultedSubscriptionException>(consumer.Errors[1]);
+            Assert.Null(scenario.Idle.Cursor);
+            Assert.False((await scenario.Accessor.GetPubSubCache()).ContainsKey(scenario.Idle.StreamId));
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 200);
+        }
+        else
+        {
+            Assert.Single(consumer.Errors);
+            Assert.Same(cursor, scenario.Idle.Cursor);
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
+            await scenario.Accessor.RunConsumerCursor(scenario.Idle);
+            Assert.Equal(2, consumer.Errors.Count);
+            Assert.All(consumer.Errors, error => Assert.IsType<QueueCacheMissException>(error));
+            await AssertReportedPartitionPrefix(scenario.Accessor, scenario.Checkpoints, 2);
+        }
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckpointProgress_RemovingFailedInitialSubscriberReleasesRegistrationPin(bool keepHealthySubscriber)
+    {
+        var cache = new RecordingSimpleQueueCache();
+        var streamId = new QualifiedStreamId("provider", StreamId.Create("registration", Guid.NewGuid()));
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Handshake retry budget exhausted"));
+        var (accessor, pubSub, stream) = await CreateInitializedAgentWithStream(
+            streamId, new EventSequenceTokenV2(1), cache, new StreamPullingAgentOptions(), deliveryBackoff: backoff);
+        try
+        {
+            var consumer = new RecordingConsumer
+            {
+                OnHandshake = () => Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Initial handshake failed")),
+            };
+            var failed = stream.AddConsumer(GuidId.GetNewGuidId(), streamId, consumer, null, DateTime.UtcNow);
+            var healthy = keepHealthySubscriber ? AddCheckpointConsumer(stream, streamId, cache) : null;
+            cache.AddToCache(
+            [
+                new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(1)),
+                new TestBatchContainer(streamId.StreamId, new EventSequenceTokenV2(2)),
+            ]);
+            pubSub.RegisterProducer(Arg.Any<QualifiedStreamId>(), Arg.Any<GrainId>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<ISet<PubSubSubscriptionState>>(
+                    new HashSet<PubSubSubscriptionState> { new(failed.SubscriptionId, streamId, default) }));
+            await accessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+            Assert.True(stream.StreamRegistered);
+            Assert.Null(stream.RegistrationTask);
+            Assert.NotNull(stream.RegistrationCursor);
+            Assert.False(failed.IsRegistered);
+            Assert.True(failed.HasUnresolvedHandshake);
+            Assert.Single(consumer.Errors);
+            if (healthy is not null) await accessor.RunConsumerCursor(healthy);
+            Assert.False(cache.TryPurgeFromCache(out _));
+
+            var agent = (PersistentStreamPullingAgent)accessor;
+            await agent.RunOrQueueTask(() => agent.RemoveSubscriber(
+                failed.SubscriptionId, streamId, TestContext.Current.CancellationToken));
+
+            Assert.Null(stream.RegistrationCursor);
+            Assert.Equal(keepHealthySubscriber, (await accessor.GetPubSubCache()).ContainsKey(streamId));
+            Assert.True(cache.TryPurgeFromCache(out var purged));
+            Assert.Equal(new long[] { 1, 2 }, purged.Select(batch => batch.SequenceToken.SequenceNumber));
+        }
+        finally
+        {
+            await accessor.Shutdown();
+        }
+    }
 
     [Theory, TestCategory("BVT"), TestCategory("Streaming")]
     [InlineData(false)]
