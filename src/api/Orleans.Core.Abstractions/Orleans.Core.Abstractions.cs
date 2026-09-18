@@ -1392,6 +1392,8 @@ namespace Orleans
     public static partial class PublicOrleansTaskExtensions
     {
         public static void Ignore(this System.Threading.Tasks.Task task) { }
+
+        public static System.Threading.Tasks.Task WhenAllWithAggregateException(System.Collections.Generic.IEnumerable<System.Threading.Tasks.Task> tasks) { throw null; }
     }
 
     public static partial class StableHash

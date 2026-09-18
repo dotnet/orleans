@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +12,35 @@ namespace Orleans
     public static class PublicOrleansTaskExtensions
     {
         private static readonly Action<Task> IgnoreTaskContinuation = t => { _ = t.Exception; };
+
+        /// <summary>
+        /// Waits for every supplied task, propagating a single failure directly or multiple failures as an <see cref="AggregateException"/>.
+        /// </summary>
+        /// <param name="tasks">The tasks to await.</param>
+        /// <returns>
+        /// A task which completes after all supplied tasks complete. It is faulted if any task fails,
+        /// canceled if any task is canceled and none fail, and successful otherwise.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tasks"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="tasks"/> contains a <see langword="null"/> task.</exception>
+        /// <exception cref="AggregateException">The supplied tasks produce multiple failures.</exception>
+        public static Task WhenAllWithAggregateException(IEnumerable<Task> tasks)
+        {
+            var combined = Task.WhenAll(tasks);
+            return combined.IsCompletedSuccessfully ? combined : AwaitCompletion(combined);
+
+            static async Task AwaitCompletion(Task task)
+            {
+                try
+                {
+                    await task.ConfigureAwait(false);
+                }
+                catch when (task.Exception is { InnerExceptions.Count: > 1 } exception)
+                {
+                    ExceptionDispatchInfo.Throw(exception);
+                }
+            }
+        }
 
         /// <summary>
         /// Observes and ignores a potential exception on a given Task.

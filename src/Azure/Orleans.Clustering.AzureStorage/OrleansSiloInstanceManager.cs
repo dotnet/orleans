@@ -270,17 +270,8 @@ namespace Orleans.AzureUtils
             }
             else
             {
-                var deletions = Task.WhenAll(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
+                await PublicOrleansTaskExtensions.WhenAllWithAggregateException(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
                     .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
-                try
-                {
-                    await deletions;
-                }
-                catch when (deletions.Exception is { InnerExceptions.Count: > 1 })
-                {
-                    // Preserve every failed batch for the caller.
-                    throw deletions.Exception;
-                }
             }
         }
 
