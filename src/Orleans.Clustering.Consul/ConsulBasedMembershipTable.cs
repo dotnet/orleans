@@ -20,6 +20,7 @@ namespace Orleans.Runtime.Membership
     {
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
         private static readonly QueryOptions ConsistentRead = new() { Consistency = ConsistencyMode.Consistent };
+        private static readonly TimeSpan ConflictRetryDelay = TimeSpan.FromMilliseconds(100);
         private readonly ILogger _logger;
         private readonly IConsulClient _consulClient;
         private readonly ConsulClusteringOptions clusteringSiloTableOptions;
@@ -131,7 +132,8 @@ namespace Orleans.Runtime.Membership
                     return ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
                 }).ToArray();
 
-            var tableVersion = GetTableVersion(versionKey ?? ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder), deploymentKVAddresses);
+            var tableVersionKey = versionKey ?? ConsulSiloRegistrationAssembler.FormatVersionKey(clusterId, kvRootFolder);
+            var tableVersion = GetTableVersion(deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(tableVersionKey, StringComparison.Ordinal)));
 
             return AssembleMembershipTableData(tableVersion, allSiloRegistrations);
         }
@@ -207,6 +209,8 @@ namespace Orleans.Runtime.Membership
                     {
                         return true;
                     }
+
+                    await Task.Delay(ConflictRetryDelay, cancellationToken);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -253,6 +257,8 @@ namespace Orleans.Runtime.Membership
                 {
                     return;
                 }
+
+                await Task.Delay(ConflictRetryDelay, cancellationToken);
             }
         }
 
@@ -271,10 +277,9 @@ namespace Orleans.Runtime.Membership
             }
         }
 
-        private static TableVersion GetTableVersion(string? versionKey, QueryResult<KVPair[]> entries)
+        private static TableVersion GetTableVersion(KVPair? tableVersionEntry)
         {
             TableVersion tableVersion;
-            var tableVersionEntry = entries.Response?.FirstOrDefault(kv => kv.Key.Equals(versionKey, StringComparison.Ordinal));
             if (tableVersionEntry != null)
             {
                 var versionNumber = int.Parse(Encoding.UTF8.GetString(tableVersionEntry.Value), CultureInfo.InvariantCulture);
@@ -297,18 +302,27 @@ namespace Orleans.Runtime.Membership
 
         private async Task<(ConsulSiloRegistration?, TableVersion, KVPair?)> GetConsulSiloRegistration(SiloAddress siloAddress, CancellationToken cancellationToken)
         {
-            var deploymentKey = ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder);
             var siloKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(this.clusterId, this.kvRootFolder, siloAddress);
-            var entries = await _consulClient.KV.List(deploymentKey + "/", ConsistentRead, cancellationToken);
-            if (entries.Response == null) return (null, NotFoundTableVersion, null);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var versionBefore = (await _consulClient.KV.Get(versionKey, ConsistentRead, cancellationToken)).Response;
+                var entries = (await _consulClient.KV.List(siloKey, ConsistentRead, cancellationToken)).Response;
+                var versionAfter = (await _consulClient.KV.Get(versionKey, ConsistentRead, cancellationToken)).Response;
 
-            var siloKV = entries.Response.SingleOrDefault(KV => KV.Key.Equals(siloKey, StringComparison.Ordinal));
-            var iAmAliveKV = entries.Response.SingleOrDefault(KV => KV.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKey), StringComparison.Ordinal));
-            var tableVersion = GetTableVersion(versionKey: versionKey, entries: entries);
+                // An unchanged version ETag places the atomic row/heartbeat read within this table version.
+                if (versionBefore?.ModifyIndex != versionAfter?.ModifyIndex)
+                {
+                    await Task.Delay(ConflictRetryDelay, cancellationToken);
+                    continue;
+                }
 
-            var siloRegistration = siloKV is null ? null : ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
+                var siloKV = entries?.SingleOrDefault(kv => kv.Key.Equals(siloKey, StringComparison.Ordinal));
+                var iAmAliveKV = entries?.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKey), StringComparison.Ordinal));
+                var siloRegistration = siloKV is null ? null : ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
 
-            return (siloRegistration, tableVersion, iAmAliveKV);
+                return (siloRegistration, GetTableVersion(versionAfter), iAmAliveKV);
+            }
         }
 
         private static MembershipTableData AssembleMembershipTableData(TableVersion tableVersion, params ConsulSiloRegistration?[] silos)
