@@ -27,6 +27,8 @@ namespace Orleans.Clustering.Redis
         private bool _muxerIsShared;
         private bool _disposed;
         private int _initializingCount;
+        private IConnectionMultiplexer? _deferredOwnedMultiplexer;
+        private TaskCompletionSource? _deferredDisposal;
 
         public RedisMembershipTable(IOptions<RedisClusteringOptions> redisOptions, IOptions<ClusterOptions> clusterOptions)
         {
@@ -81,11 +83,30 @@ namespace Orleans.Clustering.Redis
             }
             finally
             {
+                IConnectionMultiplexer? deferredMultiplexer = null;
+                TaskCompletionSource? deferredDisposal = null;
                 lock (_lifecycleLock)
                 {
                     if (--_initializingCount == 0 && _disposed)
                     {
                         _initializationLock.Dispose();
+                        deferredMultiplexer = _deferredOwnedMultiplexer;
+                        _deferredOwnedMultiplexer = null;
+                        deferredDisposal = _deferredDisposal;
+                    }
+                }
+
+                if (deferredMultiplexer is not null)
+                {
+                    try
+                    {
+                        await deferredMultiplexer.DisposeAsync().ConfigureAwait(false);
+                        deferredDisposal!.SetResult();
+                    }
+                    catch (Exception exception)
+                    {
+                        deferredDisposal!.SetException(exception);
+                        throw;
                     }
                 }
             }
@@ -349,6 +370,17 @@ namespace Orleans.Clustering.Redis
             {
                 await muxer.DisposeAsync().ConfigureAwait(false);
             }
+
+            Task? deferredDisposal;
+            lock (_lifecycleLock)
+            {
+                deferredDisposal = _deferredDisposal?.Task;
+            }
+
+            if (deferredDisposal is not null)
+            {
+                await deferredDisposal.ConfigureAwait(false);
+            }
         }
 
         private IConnectionMultiplexer? DetachOwnedMultiplexer()
@@ -371,6 +403,15 @@ namespace Orleans.Clustering.Redis
                 _db = null!;
                 _muxerIsShared = false;
                 IsInitialized = false;
+                if (_initializingCount > 0 && ownedMuxer is not null)
+                {
+                    // The last admitted initializer releases the published connection after its backend work.
+                    _deferredOwnedMultiplexer = ownedMuxer;
+                    _deferredDisposal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _deferredDisposal.Task.Ignore();
+                    return null;
+                }
+
                 return ownedMuxer;
             }
         }

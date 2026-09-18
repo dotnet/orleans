@@ -215,9 +215,10 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.False(initialization.IsCompleted);
         Assert.False(waiting.IsCompleted);
 
+        Task disposal = Task.CompletedTask;
         if (disposeAsync)
         {
-            await table.DisposeAsync();
+            disposal = table.DisposeAsync().AsTask();
         }
         else
         {
@@ -226,6 +227,13 @@ public sealed class RedisMembershipTableCancellationTests
 
         Assert.False(table.IsInitialized);
         Assert.False(expiry.Task.IsCompleted);
+        backend.Multiplexer.DidNotReceive().Dispose();
+        await backend.Multiplexer.DidNotReceive().DisposeAsync();
+        if (disposeAsync)
+        {
+            Assert.Equal(repeated && !isShared, !disposal.IsCompleted);
+        }
+
         expiry.SetResult(true);
 
         var error = await Assert.ThrowsAsync<ObjectDisposedException>(() => initialization.WaitAsync(token));
@@ -234,10 +242,72 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal(typeof(RedisMembershipTable).FullName, waitingError.ObjectName);
         Assert.False(table.IsInitialized);
         Assert.Equal(1, factoryCalls);
+        await disposal.WaitAsync(token);
         await table.DisposeAsync();
         table.Dispose();
-        backend.Multiplexer.Received(!isShared && repeated && !disposeAsync ? 1 : 0).Dispose();
-        await backend.Multiplexer.Received(!isShared && (!repeated || disposeAsync) ? 1 : 0).DisposeAsync();
+        backend.Multiplexer.DidNotReceive().Dispose();
+        await backend.Multiplexer.Received(!isShared ? 1 : 0).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DisposeAsync_WaitsForInitializingConnectionCleanup(bool disposalFails)
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, false)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var versionWrite = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Database.HashSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<RedisValue>(), When.NotExists)
+            .Returns(versionWrite.Task);
+        var disposalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connectionDisposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Multiplexer.DisposeAsync().Returns(_ =>
+        {
+            disposalStarted.SetResult();
+            return new ValueTask(connectionDisposal.Task);
+        });
+        backend.Database.KeyExpireAsync(Arg.Any<RedisKey>(), Arg.Any<TimeSpan?>()).Returns(_ =>
+        {
+            Assert.False(disposalStarted.Task.IsCompleted);
+            return Task.FromResult(true);
+        });
+        var initialization = table.InitializeMembershipTableAsync(true, token);
+
+        var firstDisposal = table.DisposeAsync().AsTask();
+        var secondDisposal = table.DisposeAsync().AsTask();
+        table.Dispose();
+
+        Assert.False(initialization.IsCompleted);
+        Assert.False(firstDisposal.IsCompleted);
+        Assert.False(secondDisposal.IsCompleted);
+        Assert.False(disposalStarted.Task.IsCompleted);
+        Assert.False(table.IsInitialized);
+        versionWrite.SetResult(false);
+        await disposalStarted.Task.WaitAsync(token);
+        Assert.False(initialization.IsCompleted);
+        Assert.False(firstDisposal.IsCompleted);
+        Assert.False(secondDisposal.IsCompleted);
+        if (disposalFails)
+        {
+            var failure = new InvalidOperationException("Connection disposal failed.");
+            connectionDisposal.SetException(failure);
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => initialization.WaitAsync(token)));
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => firstDisposal.WaitAsync(token)));
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => secondDisposal.WaitAsync(token)));
+        }
+        else
+        {
+            connectionDisposal.SetResult();
+            var error = await Assert.ThrowsAsync<ObjectDisposedException>(() => initialization.WaitAsync(token));
+            Assert.Equal(typeof(RedisMembershipTable).FullName, error.ObjectName);
+            await Task.WhenAll(firstDisposal, secondDisposal).WaitAsync(token);
+        }
+
+        Assert.False(table.IsInitialized);
+        backend.Multiplexer.DidNotReceive().Dispose();
+        _ = backend.Multiplexer.Received(1).DisposeAsync();
     }
 
     [Theory]
