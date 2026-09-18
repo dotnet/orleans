@@ -35,7 +35,7 @@ public sealed class MessagingActivationBehaviorTests : DurableMessagingBehaviorT
         Assert.Equal(0, snapshot.OutboxCount);
     }
     [Fact]
-    public async Task PublicHosting_BindsRealOutboxEndpointAndRegistersOneComposite()
+    public async Task PublicHosting_BindsRealOutboxAndRegisteredMessagingStates()
     {
         var grain = NewGrain();
         _ = await grain.GetSnapshotAsync();
@@ -43,22 +43,18 @@ public sealed class MessagingActivationBehaviorTests : DurableMessagingBehaviorT
         var outbox = services.GetRequiredService<IDurableOutbox>();
         Assert.Equal("Orleans.DurableMessaging.DurableOutbox", outbox.GetType().FullName);
         Assert.Same(outbox, services.GetRequiredKeyedService<IDurableOutbox>("__orleans.durable-messaging.outbox"));
-        var endpointType = ReceiverTestServices.GetImplementationType("DurableMessagingJournalEndpoint");
-        var endpoint = services.GetRequiredKeyedService(endpointType, "__orleans.durable-messaging.outbox-observer");
-        Assert.Same(outbox, endpointType.GetProperty("Observer")!.GetValue(endpoint));
-        Assert.Equal(typeof(void), endpointType.GetMethod("FinalizeWrite")!.ReturnType);
         var manager = services.GetRequiredService<IJournaledStateManager>();
-        var observers = (IEnumerable<IJournaledStateObserver>)manager.GetType().GetField("_observers",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(manager)!;
-        Assert.Single(observers, observer => observer.GetType().Name == "DurableMessagingJournalObserver");
-        Assert.DoesNotContain(observers, observer => observer.GetType().Name is "DurableInboxExtension" or "DurableOutbox");
-        var missing = new ServiceCollection();
-        missing.AddLogging();
-        using var provider = missing.BuildServiceProvider();
-        var inbox = services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        var error = Assert.Throws<InvalidOperationException>(() => ActivatorUtilities.CreateInstance(provider,
-            ReceiverTestServices.GetImplementationType("DurableMessagingJournalObserver"), inbox));
-        Assert.Contains("DurableMessagingJournalEndpoint", error.Message, StringComparison.Ordinal);
+        Assert.True(manager.TryGetState("__orleans.durable-messaging.outbox", out var outboxState));
+        Assert.True(manager.TryGetState("__orleans.durable-messaging.inbox", out var inboxState));
+        Assert.Same(
+            services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox"),
+            outboxState);
+        Assert.Same(
+            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"),
+            inboxState);
+        Assert.NotSame(inboxState, outboxState);
+        Assert.Equal(typeof(IDurableInbox).Assembly, inboxState.GetType().Assembly);
+        Assert.Equal(typeof(IDurableOutbox).Assembly, outboxState.GetType().Assembly);
     }
 
 }
