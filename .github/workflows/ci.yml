@@ -453,11 +453,8 @@ jobs:
           $status = Get-CosmosDbEmulatorStatus
           Write-Host "Cosmos emulator status: $status"
           if ($status -eq "Running") {
-            curl.exe --fail --silent --show-error --insecure "${endpoint}_explorer/emulator.pem" > $null
-            if ($LASTEXITCODE -eq 0) {
-              "ORLEANSCOSMOSDBACCOUNTENDPOINT=$endpoint" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-              exit 0
-            }
+            "ORLEANSCOSMOSDBACCOUNTENDPOINT=$endpoint" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            exit 0
           }
           Start-Sleep -Seconds 2
         }
