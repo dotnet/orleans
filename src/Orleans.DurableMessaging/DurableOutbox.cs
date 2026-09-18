@@ -322,7 +322,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         if (!IsWritePrepared)
         {
-            throw new InvalidOperationException("Outbox capture requires prepared durable job ownership for the complete current cohort.");
+            throw new InvalidOperationException("Outbox capture requires acknowledged durable job ownership for the complete current cohort.");
         }
         _captureStarted = true;
         _capturedMessages = _pendingMessages.Values.ToArray();

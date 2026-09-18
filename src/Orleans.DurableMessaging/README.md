@@ -128,8 +128,8 @@ and stage their removal for the next journal write.
 
 The builder encodes the body and request context into an envelope buffer which the
 outbox reuses as a local pending intent with the owning grain as sender. Journal
-codecs serialize pending outbox commands during state capture. `Count`, `Messages`, and `TryGetMessage` include local intents and
-journaled messages once per ID. `Count` and depth metrics combine the journaled count
+codecs serialize pending outbox commands during state capture. `Count`, `Messages`,
+and `TryGetMessage` include local intents and journaled messages once per ID. `Count` and depth metrics combine the journaled count
 with the number of local intents awaiting capture in constant time. Captured
 intents remain delivery-fenced until their exact capture is acknowledged. Repeated
 equivalent enqueues preserve their original message, enqueue time, and commit status.
