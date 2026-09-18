@@ -585,12 +585,14 @@ public sealed class MembershipTableTestRunner
         Check(!string.IsNullOrEmpty(after.TableEtag)
             && (delta == 0 ? after.TableEtag == before.TableEtag : after.TableEtag != before.TableEtag),
             $"cleanup table ETag must match version progress: delta={delta}, old={before.TableEtag}, observed={after.TableEtag}");
-        EqualAllowingRefreshedRowEtags(before with
+        var expected = before with
         {
             Version = after.Version,
             TableEtag = after.TableEtag,
             Rows = before.Rows.RemoveRange(removed)
-        }, after);
+        };
+        if (delta == 0) Equal(expected, after);
+        else EqualAllowingRefreshedRowEtags(expected, after);
     }
 
     private async Task CleanupWithConcurrentReads(CancellationToken ct)
@@ -749,7 +751,7 @@ public sealed class MembershipTableTestRunner
                 if (sample.Version == before.Version)
                 {
                     if (cleanup && !sample.Rows.ContainsKey(id))
-                        EqualAllowingRefreshedRowEtags(expectedBefore with { Rows = expectedBefore.Rows.Remove(id) }, sample);
+                        Equal(expectedBefore with { Rows = expectedBefore.Rows.Remove(id) }, sample);
                     else
                         Equal(expectedBefore, sample);
                 }

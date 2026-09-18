@@ -198,6 +198,17 @@ public sealed class MembershipTableSnapshotTests
         Assert.Equal(versioned ? 12 : 10, final.Version);
         Assert.Equal(3, before.Rows.Count);
 
+        var changedToken = intermediate with
+        {
+            Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
+                intermediate.Row(live.SiloAddress) with { Etag = "refreshed-row-token" })
+        };
+        if (versioned)
+            MembershipTableTestRunner.AssertCleanup(before, changedToken, T1, requireAllEligible: false);
+        else
+            Assert.Contains("row ETag", Assert.Throws<ClusteringConformanceException>(() =>
+                MembershipTableTestRunner.AssertCleanup(before, changedToken, T1, requireAllEligible: false)).Message);
+
         var skippedEmptyBatch = intermediate with { Version = 12, TableEtag = "v12" };
         Assert.Contains("cleanup version", Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertCleanup(before, skippedEmptyBatch, T1, requireAllEligible: false)).Message);
