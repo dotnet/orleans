@@ -93,6 +93,225 @@ public sealed class RedisMembershipTableCancellationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Initialize_FactoryFailure_PropagatesOriginalExceptionAndAllowsRetry(bool synchronous)
+    {
+        var backend = new MembershipBackend();
+        var failure = new RedisConnectionException(ConnectionFailureType.UnableToConnect, "Factory failed.");
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            if (++factoryCalls == 1)
+            {
+                if (synchronous)
+                {
+                    throw failure;
+                }
+
+                return Task.FromException<(IConnectionMultiplexer, bool)>(failure);
+            }
+
+            return Task.FromResult((backend.Multiplexer, false));
+        });
+        var token = TestContext.Current.CancellationToken;
+
+        Assert.Same(failure, await Assert.ThrowsAsync<RedisConnectionException>(
+            () => table.InitializeMembershipTableAsync(true, token)));
+        Assert.False(table.IsInitialized);
+        await backend.Multiplexer.DidNotReceive().DisposeAsync();
+
+        await table.InitializeMembershipTableAsync(true, token);
+
+        Assert.True(table.IsInitialized);
+        Assert.Equal(2, factoryCalls);
+        Assert.Equal((RedisValue)"0", Assert.Single(backend.Rows).Value);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Initialize_DisposedDuringFactory_RejectsLatePublicationAndWaitingCalls(bool isShared, bool disposeAsync)
+    {
+        var backend = new MembershipBackend();
+        var creation = new TaskCompletionSource<(IConnectionMultiplexer, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            factoryCalls++;
+            return creation.Task;
+        });
+        var token = TestContext.Current.CancellationToken;
+        var first = table.InitializeMembershipTableAsync(true, token);
+        var waiting = table.InitializeMembershipTableAsync(true, token);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var canceledWaiter = table.InitializeMembershipTableAsync(true, cancellation.Token);
+        Assert.False(first.IsCompleted);
+        Assert.False(waiting.IsCompleted);
+        Assert.False(canceledWaiter.IsCompleted);
+
+        if (disposeAsync)
+        {
+            await table.DisposeAsync();
+        }
+        else
+        {
+            table.Dispose();
+        }
+
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWaiter.WaitAsync(token));
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        var subsequent = await Assert.ThrowsAsync<ObjectDisposedException>(() => table.InitializeMembershipTableAsync(true, token));
+        Assert.Equal(typeof(RedisMembershipTable).FullName, subsequent.ObjectName);
+        Assert.False(table.IsInitialized);
+        Assert.False(creation.Task.IsCompleted);
+        Assert.Equal(1, factoryCalls);
+
+        creation.SetResult((backend.Multiplexer, isShared));
+
+        var firstError = await Assert.ThrowsAsync<ObjectDisposedException>(() => first.WaitAsync(token));
+        var waitingError = await Assert.ThrowsAsync<ObjectDisposedException>(() => waiting.WaitAsync(token));
+        Assert.Equal(typeof(RedisMembershipTable).FullName, firstError.ObjectName);
+        Assert.Equal(typeof(RedisMembershipTable).FullName, waitingError.ObjectName);
+        Assert.False(table.IsInitialized);
+        Assert.Equal(1, factoryCalls);
+        Assert.Empty(backend.Rows);
+        backend.Multiplexer.DidNotReceive().GetDatabase(Arg.Any<int>(), Arg.Any<object>());
+        table.Dispose();
+        await table.DisposeAsync();
+        backend.Multiplexer.DidNotReceive().Dispose();
+        await backend.Multiplexer.Received(isShared ? 0 : 1).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task Initialize_DisposedDuringExpiry_PreservesDisposalAndConnectionOwnership(bool repeated, bool isShared, bool disposeAsync)
+    {
+        var backend = new MembershipBackend();
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            factoryCalls++;
+            return Task.FromResult((backend.Multiplexer, isShared));
+        });
+        var token = TestContext.Current.CancellationToken;
+        if (repeated)
+        {
+            await table.InitializeMembershipTableAsync(true, token);
+        }
+
+        var expiry = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Database.KeyExpireAsync(Arg.Any<RedisKey>(), Arg.Any<TimeSpan?>()).Returns(expiry.Task);
+        var initialization = table.InitializeMembershipTableAsync(true, token);
+        var waiting = table.InitializeMembershipTableAsync(true, token);
+        Assert.False(initialization.IsCompleted);
+        Assert.False(waiting.IsCompleted);
+
+        if (disposeAsync)
+        {
+            await table.DisposeAsync();
+        }
+        else
+        {
+            table.Dispose();
+        }
+
+        Assert.False(table.IsInitialized);
+        Assert.False(expiry.Task.IsCompleted);
+        expiry.SetResult(true);
+
+        var error = await Assert.ThrowsAsync<ObjectDisposedException>(() => initialization.WaitAsync(token));
+        var waitingError = await Assert.ThrowsAsync<ObjectDisposedException>(() => waiting.WaitAsync(token));
+        Assert.Equal(typeof(RedisMembershipTable).FullName, error.ObjectName);
+        Assert.Equal(typeof(RedisMembershipTable).FullName, waitingError.ObjectName);
+        Assert.False(table.IsInitialized);
+        Assert.Equal(1, factoryCalls);
+        await table.DisposeAsync();
+        table.Dispose();
+        backend.Multiplexer.Received(!isShared && repeated && !disposeAsync ? 1 : 0).Dispose();
+        await backend.Multiplexer.Received(!isShared && (!repeated || disposeAsync) ? 1 : 0).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Initialize_DisposedAndCanceledDuringFactory_PreservesCancellationAndDisposesLateConnection(bool disposeAsync)
+    {
+        var backend = new MembershipBackend();
+        var creation = new TaskCompletionSource<(IConnectionMultiplexer, bool)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Multiplexer.DisposeAsync().Returns(_ =>
+        {
+            disposed.SetResult();
+            return ValueTask.CompletedTask;
+        });
+        using var table = CreateTable(_ => creation.Task);
+        var token = TestContext.Current.CancellationToken;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var initialization = table.InitializeMembershipTableAsync(true, cancellation.Token);
+        Assert.False(initialization.IsCompleted);
+
+        if (disposeAsync)
+        {
+            await table.DisposeAsync();
+        }
+        else
+        {
+            table.Dispose();
+        }
+
+        cancellation.Cancel();
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization.WaitAsync(token));
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(table.IsInitialized);
+        Assert.False(creation.Task.IsCompleted);
+
+        creation.SetResult((backend.Multiplexer, false));
+        await disposed.Task.WaitAsync(token);
+
+        Assert.False(table.IsInitialized);
+        backend.Multiplexer.DidNotReceive().GetDatabase(Arg.Any<int>(), Arg.Any<object>());
+        await backend.Multiplexer.Received(1).DisposeAsync();
+        backend.Multiplexer.DidNotReceive().Dispose();
+    }
+
+    [Fact]
+    public async Task Dispose_OverlappingSyncAndAsyncCalls_DisposesOwnedConnectionOnce()
+    {
+        var backend = new MembershipBackend();
+        var disposal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Multiplexer.DisposeAsync().Returns(_ => new ValueTask(disposal.Task));
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, false)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+
+        var first = table.DisposeAsync().AsTask();
+        Assert.False(first.IsCompleted);
+        Assert.False(table.IsInitialized);
+        table.Dispose();
+        await table.DisposeAsync();
+
+        var error = await Assert.ThrowsAsync<ObjectDisposedException>(() => table.InitializeMembershipTableAsync(true, token));
+        Assert.Equal(typeof(RedisMembershipTable).FullName, error.ObjectName);
+        disposal.SetResult();
+        await first.WaitAsync(token);
+
+        Assert.False(table.IsInitialized);
+        backend.Multiplexer.DidNotReceive().Dispose();
+        await backend.Multiplexer.Received(1).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Initialize_CanceledDuringTableVersion_DoesNotExpireOrPublishConnection(bool isShared)
     {
         var versionWrite = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

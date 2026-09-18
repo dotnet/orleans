@@ -20,10 +20,13 @@ namespace Orleans.Clustering.Redis
         private readonly ClusterOptions _clusterOptions;
         private readonly JsonSerializerSettings _jsonSerializerSettings;
         private readonly RedisKey _clusterKey;
+        private readonly object _lifecycleLock = new();
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
         private IConnectionMultiplexer _muxer = null!;
         private IDatabase _db = null!;
         private bool _muxerIsShared;
+        private bool _disposed;
+        private int _initializingCount;
 
         public RedisMembershipTable(IOptions<RedisClusteringOptions> redisOptions, IOptions<ClusterOptions> clusterOptions)
         {
@@ -56,42 +59,76 @@ namespace Orleans.Clustering.Redis
 
         public async Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         {
-            await _initializationLock.WaitAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_lifecycleLock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                // Include semaphore waiters so disposal occurs after every wait and release has finished.
+                _initializingCount++;
+            }
+
             try
             {
-                await InitializeMembershipTableCoreAsync(tryInitTableVersion, cancellationToken);
+                await _initializationLock.WaitAsync(cancellationToken);
+                try
+                {
+                    await InitializeMembershipTableCoreAsync(tryInitTableVersion, cancellationToken);
+                }
+                finally
+                {
+                    _initializationLock.Release();
+                }
             }
             finally
             {
-                _initializationLock.Release();
+                lock (_lifecycleLock)
+                {
+                    if (--_initializingCount == 0 && _disposed)
+                    {
+                        _initializationLock.Dispose();
+                    }
+                }
             }
         }
 
         private async Task InitializeMembershipTableCoreAsync(bool tryInitTableVersion, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var muxer = _muxer;
-            var isShared = _muxerIsShared;
-            var isNewConnection = muxer is null;
-            if (muxer is null)
+            IConnectionMultiplexer? muxer;
+            bool isShared;
+            lock (_lifecycleLock)
             {
-                var creation = _redisOptions.CreateMultiplexer(_redisOptions);
-                try
-                {
-                    (muxer, isShared) = await AwaitAsync(creation, cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    // The tokenless factory can still return an owned connection after the caller stops waiting.
-                    DisposeAbandonedMultiplexerAsync(creation).Ignore();
-                    throw;
-                }
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                muxer = _muxer;
+                isShared = _muxerIsShared;
             }
 
+            var isNewConnection = muxer is null;
             var initialized = false;
             try
             {
-                var db = isNewConnection ? muxer.GetDatabase() : _db;
+                if (muxer is null)
+                {
+                    var creation = _redisOptions.CreateMultiplexer(_redisOptions);
+                    try
+                    {
+                        (muxer, isShared) = await AwaitAsync(creation, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        // The tokenless factory can still return an owned connection after the caller stops waiting.
+                        DisposeAbandonedMultiplexerAsync(creation).Ignore();
+                        throw;
+                    }
+                }
+
+                IDatabase db;
+                lock (_lifecycleLock)
+                {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    db = isNewConnection ? muxer.GetDatabase() : _db;
+                }
+
                 if (tryInitTableVersion)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -104,19 +141,23 @@ namespace Orleans.Clustering.Redis
                     }
                 }
 
-                if (isNewConnection)
+                lock (_lifecycleLock)
                 {
-                    _muxer = muxer;
-                    _muxerIsShared = isShared;
-                    _db = db;
-                }
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    if (isNewConnection)
+                    {
+                        _muxer = muxer;
+                        _muxerIsShared = isShared;
+                        _db = db;
+                    }
 
-                IsInitialized = true;
-                initialized = true;
+                    IsInitialized = true;
+                    initialized = true;
+                }
             }
             finally
             {
-                if (!initialized && isNewConnection && !isShared)
+                if (!initialized && isNewConnection && !isShared && muxer is not null)
                 {
                     await muxer.DisposeAsync().ConfigureAwait(false);
                 }
@@ -333,43 +374,38 @@ namespace Orleans.Clustering.Redis
 
         public void Dispose()
         {
-            _initializationLock.Dispose();
-            var muxer = _muxer;
-            if (muxer is null)
-            {
-                return;
-            }
-
-            var muxerIsShared = _muxerIsShared;
-            _muxer = null!;
-            _db = null!;
-            _muxerIsShared = false;
-            IsInitialized = false;
-
-            if (!muxerIsShared)
-            {
-                muxer.Dispose();
-            }
+            DetachOwnedMultiplexer()?.Dispose();
         }
 
         public async ValueTask DisposeAsync()
         {
-            _initializationLock.Dispose();
-            var muxer = _muxer;
-            if (muxer is null)
-            {
-                return;
-            }
-
-            var muxerIsShared = _muxerIsShared;
-            _muxer = null!;
-            _db = null!;
-            _muxerIsShared = false;
-            IsInitialized = false;
-
-            if (!muxerIsShared)
+            if (DetachOwnedMultiplexer() is { } muxer)
             {
                 await muxer.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        private IConnectionMultiplexer? DetachOwnedMultiplexer()
+        {
+            lock (_lifecycleLock)
+            {
+                if (_disposed)
+                {
+                    return null;
+                }
+
+                _disposed = true;
+                if (_initializingCount == 0)
+                {
+                    _initializationLock.Dispose();
+                }
+
+                var ownedMuxer = _muxerIsShared ? null : _muxer;
+                _muxer = null!;
+                _db = null!;
+                _muxerIsShared = false;
+                IsInitialized = false;
+                return ownedMuxer;
             }
         }
 
