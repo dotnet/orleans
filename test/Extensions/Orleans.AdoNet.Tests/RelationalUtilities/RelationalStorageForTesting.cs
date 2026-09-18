@@ -54,6 +54,7 @@ namespace UnitTests.General
         /// <summary>
         /// The script that creates Orleans schema in the database, usually CreateOrleansTables_xxxx.sql
         /// </summary>
+        // Replaying historical clustering migrations after a fresh install can replace current routines.
         protected string[] SetupSqlScriptFileNames => new[] {
                                 $"{this.ProviderMoniker}-Main.sql",
                                 $"{this.ProviderMoniker}-Clustering.sql",
@@ -61,8 +62,7 @@ namespace UnitTests.General
                                 $"{this.ProviderMoniker}-Reminders.sql",
                                 $"{this.ProviderMoniker}-Streaming.sql",
                                 $"{this.ProviderMoniker}-GrainDirectory.sql"
-                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Clustering-*.sql")
-                                .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql"))
+                                }.Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Persistence-*.sql")
                                 .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Reminders-*.sql"))
                                 .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-Streaming-*.sql"))
                                 .Concat(Directory.GetFiles(Environment.CurrentDirectory, $"{this.ProviderMoniker}-GrainDirectory-*.sql"))

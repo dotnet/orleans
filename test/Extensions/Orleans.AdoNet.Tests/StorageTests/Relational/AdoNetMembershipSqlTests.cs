@@ -176,69 +176,6 @@ public sealed class AdoNetMembershipSqlTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public void CompatibleUpdate_MatchesFreshInstallQueriesAndRoutines(string engine)
-    {
-        var install = ReadScript(engine);
-        var update = ReadScript(engine, update: true);
-        var installQueries = Queries(install);
-        var updatedQueries = Queries(update);
-        foreach (Match match in Regex.Matches(update, @"UPDATE OrleansQuery SET QueryText = '(?<text>(?:''|[^'])*)'\s*WHERE QueryKey = '(?<key>\w+)';"))
-        {
-            updatedQueries.Add(match.Groups["key"].Value, match.Groups["text"].Value.Replace("''", "'"));
-        }
-
-        Assert.Equal(engine switch { "SQLServer" => 4, "MySQL" => 5, _ => 2 }, updatedQueries.Count);
-        if (engine == "SQLServer")
-        {
-            Assert.DoesNotContain("MembershipReadRowKey", updatedQueries.Keys);
-            Assert.DoesNotContain("MembershipReadAllKey", updatedQueries.Keys);
-        }
-
-        foreach (var (key, text) in updatedQueries)
-        {
-            Assert.Equal(installQueries[key], text.Replace("InsertMembershipKeyAtomic(", "InsertMembershipKey("));
-        }
-
-        var installRoutines = Routines(install);
-        var updatedRoutines = Routines(update);
-        Assert.Equal(engine switch { "PostgreSQL" => 3, "Oracle" => 3, "MySQL" => 1, _ => 0 }, updatedRoutines.Count);
-        foreach (var (name, text) in updatedRoutines)
-        {
-            var installName = name == "InsertMembershipKeyAtomic" ? "InsertMembershipKey" : name;
-            Assert.Equal(installRoutines[installName], text.Replace("InsertMembershipKeyAtomic(", "InsertMembershipKey("));
-        }
-
-        Assert.DoesNotMatch(@"(?i)\b(?:CREATE|ALTER|DROP)\s+TABLE\b", update);
-        Assert.DoesNotMatch(@"(?i)(?:FUNCTION|PROCEDURE)\s+Cleanup", update);
-        Assert.Equal("DELETE", updatedQueries["CleanupDefunctSiloEntryKey"].Trim().Split(' ')[0]);
-    }
-
-    [Fact]
-    public void SqlServerUpgrade_EnablesStatementErrorRollbackBeforePublication()
-    {
-        var update = ReadScript("SQLServer", update: true);
-        var statements = Regex.Replace(Regex.Replace(update, @"--[^\n]*", ""), @"\s+", " ").Trim();
-
-        Assert.StartsWith("SET XACT_ABORT ON; BEGIN TRANSACTION;", statements, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void MySqlUpgrade_PreservesExistingRoutineAndPublishesQueriesAfterAdditiveCreation()
-    {
-        var update = ReadScript("MySQL", update: true);
-
-        Assert.DoesNotMatch(@"(?i)\b(?:DROP|ALTER)\s+PROCEDURE\b", update);
-        Assert.DoesNotMatch(@"(?i)\bCREATE\s+(?:OR REPLACE\s+)?PROCEDURE\s+InsertMembershipKey\s*\(", update);
-        Assert.Equal("InsertMembershipKeyAtomic", Assert.Single(Routines(update)).Key);
-        var create = update.IndexOf("CREATE PROCEDURE InsertMembershipKeyAtomic(", StringComparison.Ordinal);
-        var publication = update.IndexOf("START TRANSACTION;", update.IndexOf("DELIMITER ;", StringComparison.Ordinal), StringComparison.Ordinal);
-        var route = update.IndexOf("call InsertMembershipKeyAtomic(", StringComparison.Ordinal);
-        Assert.True(create >= 0 && publication > create && route > publication, update);
-        Assert.EndsWith("COMMIT;", update.Trim(), StringComparison.Ordinal);
-    }
-
     private static void AssertRollback(string engine, string body)
     {
         if (engine == "PostgreSQL")
@@ -267,8 +204,8 @@ public sealed class AdoNetMembershipSqlTests
         _ => queries["UpdateMembershipKey"],
     };
 
-    private static string ReadScript(string engine, bool update = false) =>
-        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{engine}-Clustering{(update ? "-AtomicWrites" : "")}.sql")).Replace("\r\n", "\n");
+    private static string ReadScript(string engine) =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{engine}-Clustering.sql")).Replace("\r\n", "\n");
 
     private static string[] Parameters(string query) =>
         Regex.Matches(query, @"[@:](\w+)").Select(match => match.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ToArray();

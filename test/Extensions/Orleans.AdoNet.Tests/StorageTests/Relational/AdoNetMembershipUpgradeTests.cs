@@ -1,13 +1,12 @@
-using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using MySql.Data.MySqlClient;
+using Npgsql;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Membership;
@@ -21,355 +20,183 @@ namespace UnitTests.StorageTests.Relational;
 [TestArea("Membership")]
 public sealed class AdoNetMembershipUpgradeTests
 {
-    private const string ClusterId = "membership-upgrade";
+    private const string ClusterId = "membership-compatibility";
     private static readonly DateTime StartTime = new(2030, 1, 2, 3, 4, 5, DateTimeKind.Utc);
 
     // src/AdoNet/Orleans.Clustering.AdoNet/*-Clustering.sql from d515d75eaaa3a0390a74cb11c96aa758358b5a67,
     // extracted with only trailing line spaces/tabs removed. Hashes also normalize checkout line endings.
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [TestProvider("SqlServer")]
-    public Task SqlServer_NativeUpgrade_PreservesCachedLegacyCaller() =>
-        UpgradeAsync("SQLServer", AdoNetInvariants.InvariantNameSqlServer,
+    public Task SqlServer_NativeMembership_OriginalAndEnhancedCatalogs(bool enhanced) =>
+        VerifyInstallationAsync("SQLServer", AdoNetInvariants.InvariantNameSqlServer, enhanced,
             "FB94B7309CA2FDB11BDC8FDA44684DC2CA4636BDC570A491EBF91E9D4E579660");
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [TestProvider("PostgreSql")]
-    public Task PostgreSql_NativeUpgrade_PreservesCachedLegacyCaller() =>
-        UpgradeAsync("PostgreSQL", AdoNetInvariants.InvariantNamePostgreSql,
+    public Task PostgreSql_NativeMembership_OriginalAndEnhancedCatalogs(bool enhanced) =>
+        VerifyInstallationAsync("PostgreSQL", AdoNetInvariants.InvariantNamePostgreSql, enhanced,
             "75682538351DC15AD74D86FAB14110CCA2603FD063D19CEBC76118FF84C88328");
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [TestProvider("MySql")]
-    public Task MySql_NativeUpgrade_PreservesCachedLegacyCaller() =>
-        UpgradeAsync("MySQL", AdoNetInvariants.InvariantNameMySql,
+    public Task MySql_NativeMembership_OriginalAndEnhancedCatalogs(bool enhanced) =>
+        VerifyInstallationAsync("MySQL", AdoNetInvariants.InvariantNameMySql, enhanced,
             "FD33B6AD41DDA95942F275857F27C7FD02A0DB433747DA4C3B92D677ACB6014E");
 
-    private static async Task UpgradeAsync(string engine, string invariant, string expectedFixtureHash)
+    private static async Task VerifyInstallationAsync(string engine, string invariant, bool enhanced, string fixtureHash)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var fixturePath = Path.Combine(AppContext.BaseDirectory, "MembershipUpgradeFixtures", $"{engine}-Clustering.sql");
         var fixture = await File.ReadAllTextAsync(fixturePath, cancellationToken);
-        Assert.Equal(expectedFixtureHash, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Replace("\r\n", "\n")))));
-
-        // Do not install current clustering or glob migrations before exercising the frozen catalog.
+        Assert.Equal(fixtureHash, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Replace("\r\n", "\n")))));
+        var clusteringPath = enhanced ? Path.Combine(AppContext.BaseDirectory, $"{engine}-Clustering.sql") : fixturePath;
         var database = await RelationalStorageForTesting.SetupInstance(
             invariant,
-            $"MembershipUpgrade_{Guid.NewGuid():N}",
+            $"MembershipCompatibility_{Guid.NewGuid():N}",
             cancellationToken: cancellationToken,
-            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, $"{engine}-Main.sql"), fixturePath]);
+            setupSqlScriptFileNames: [Path.Combine(AppContext.BaseDirectory, $"{engine}-Main.sql"), clusteringPath]);
         var storage = database.Storage;
         var queries = await ReadQueriesAsync(storage, cancellationToken);
-        Assert.DoesNotContain("CleanupDefunctSiloEntryKey", queries.Keys);
-        var legacy = new CachedLegacyClient(storage, queries, cancellationToken);
-        Assert.True(await legacy.InsertVersionAsync());
+        Assert.Equal(enhanced, queries.ContainsKey("CleanupDefunctSiloEntryKey"));
+        var connectionString = database.CurrentConnectionString;
+        if (enhanced && engine == "PostgreSQL")
+        {
+            // Enhanced rollback must not depend on the server's optional PL/pgSQL assertions.
+            connectionString = new NpgsqlConnectionStringBuilder(connectionString) { Options = "-c plpgsql.check_asserts=off" }.ConnectionString;
+        }
 
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = ClusterId });
+        var current = new AdoNetClusteringTable(
+            services, clusterOptions,
+            Options.Create(new AdoNetClusteringSiloOptions { Invariant = invariant, ConnectionString = connectionString }),
+            NullLogger<AdoNetClusteringTable>.Instance);
+        var gateway = new AdoNetGatewayListProvider(
+            NullLogger<AdoNetGatewayListProvider>.Instance, services,
+            Options.Create(new AdoNetClusteringClientOptions { Invariant = invariant, ConnectionString = connectionString }),
+            Options.Create(new GatewayOptions()), clusterOptions);
+        await current.InitializeMembershipTableAsync(true, cancellationToken);
+        var empty = await ReadSnapshotAsync(storage, cancellationToken);
+        AssertStored(empty, 0);
+        AssertReadMatches(empty, await current.ReadAllAsync(cancellationToken));
+
+        var cutoff = StartTime.AddHours(1);
         var active = Entry(1, SiloStatus.Active);
         active.ProxyPort = 30001;
         var dead = Entry(2, SiloStatus.Dead);
         var suspected = Entry(3, SiloStatus.Dead);
         var joining = Entry(4, SiloStatus.Joining);
-        Assert.True(await legacy.InsertAsync(active, "0"));
-        Assert.True(await legacy.InsertAsync(dead, "1"));
-        Assert.True(await legacy.InsertAsync(suspected, "2"));
-        Assert.True(await legacy.InsertAsync(joining, "3"));
-        var cutoff = StartTime.AddHours(1);
-        active.IAmAliveTime = StartTime.AddMinutes(1);
-        await legacy.HeartbeatAsync(active);
+        var startingAtCutoff = Entry(5, SiloStatus.Dead);
+        startingAtCutoff.StartTime = cutoff;
+        var heartbeatAtCutoff = Entry(6, SiloStatus.Dead);
+        heartbeatAtCutoff.IAmAliveTime = cutoff;
+        var oldSuspect = Entry(7, SiloStatus.Dead);
+        var entries = new[] { active, dead, suspected, joining, startingAtCutoff, heartbeatAtCutoff, oldSuspect };
+        for (var version = 0; version < entries.Length; version++)
+        {
+            Assert.True(await current.InsertRowAsync(entries[version], new TableVersion(version + 1, version.ToString(CultureInfo.InvariantCulture)), cancellationToken));
+        }
 
-        var beforeInitialization = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(beforeInitialization, 4, active, dead, suspected, joining);
-        AssertReadMatches(beforeInitialization, await legacy.ReadAllAsync());
-
-        using var services = new ServiceCollection().BuildServiceProvider();
-        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = ClusterId });
-        var current = new AdoNetClusteringTable(
-            services,
-            clusterOptions,
-            Options.Create(new AdoNetClusteringSiloOptions { Invariant = invariant, ConnectionString = database.CurrentConnectionString }),
-            NullLogger<AdoNetClusteringTable>.Instance);
-        var gateway = new AdoNetGatewayListProvider(
-            NullLogger<AdoNetGatewayListProvider>.Instance,
-            services,
-            Options.Create(new AdoNetClusteringClientOptions { Invariant = invariant, ConnectionString = database.CurrentConnectionString }),
-            Options.Create(new GatewayOptions()),
-            clusterOptions);
-        // Upgrading the provider package requires no database update, including the optional cleanup key.
-        await current.InitializeMembershipTableAsync(true, cancellationToken);
-        await gateway.InitializeGatewayListProvider().WaitAsync(cancellationToken);
-        AssertReadMatches(beforeInitialization, await current.ReadAllAsync(cancellationToken));
-        Assert.Equal(
-            [SiloAddress.New(active.SiloAddress.Endpoint.Address, active.ProxyPort, active.SiloAddress.Generation).ToGatewayUri()],
-            await gateway.GetGateways().WaitAsync(cancellationToken));
-        AssertUnchanged(beforeInitialization, await ReadSnapshotAsync(storage, cancellationToken));
-        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
-
-        var originalSqlMembership = await current.ReadRowAsync(suspected.SiloAddress, cancellationToken);
-        var originalSqlRow = Assert.Single(originalSqlMembership.Members);
-        Assert.Equal(4, originalSqlMembership.Version.Version);
-        Assert.Equal(beforeInitialization.Etag, originalSqlRow.Item2);
-        Assert.Equal(StoredMember.FromEntry(suspected), StoredMember.FromEntry(originalSqlRow.Item1));
-        await current.UpdateIAmAliveAsync(active, cancellationToken);
-        AssertUnchanged(beforeInitialization, await ReadSnapshotAsync(storage, cancellationToken));
         suspected.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff)];
-        Assert.True(await current.UpdateRowAsync(suspected, originalSqlRow.Item2, originalSqlMembership.Version.Next(), cancellationToken));
-        var beforeUpgrade = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(beforeUpgrade, 5, active, dead, suspected, joining);
-        AssertReadMatches(beforeUpgrade, await current.ReadAllAsync(cancellationToken));
-        AssertReadMatches(beforeUpgrade, await legacy.ReadAllAsync());
-
-        // The frozen cleanup query is still supported. This cutoff deliberately makes it a safe no-op.
-        await current.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(StartTime), cancellationToken);
-        AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
-        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
-
-        var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, $"{engine}-Clustering-AtomicWrites.sql"), cancellationToken);
-        var duringUpgrade = Entry(5, SiloStatus.Joining);
-        if (database is MySqlStorageForTesting mysql)
+        oldSuspect.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff.AddSeconds(-1))];
+        foreach (var entry in new[] { suspected, oldSuspect })
         {
-            var originalRoutine = await ReadMySqlRoutineAsync(storage, cancellationToken);
-            var batches = mysql.SplitScript(migration).ToArray();
-            Assert.Equal(3, batches.Length);
-            Assert.All(batches[0].Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-                line => Assert.StartsWith("--", line, StringComparison.Ordinal));
-            Assert.StartsWith("CREATE PROCEDURE InsertMembershipKeyAtomic(", batches[1].TrimStart(), StringComparison.Ordinal);
-
-            await storage.ExecuteAsync(batches[1], cancellationToken);
-            AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
-            Assert.Equal(originalRoutine, await ReadMySqlRoutineAsync(storage, cancellationToken));
-            Assert.Equal(queries["InsertMembershipKey"], (await ReadQueriesAsync(storage, cancellationToken))["InsertMembershipKey"]);
-
-            // The DELIMITER boundary is a deterministic barrier: the new routine exists, but the
-            // catalog is not published yet. A cached caller must still find the original routine.
-            Assert.True(await legacy.InsertAsync(duringUpgrade, "5"));
-            var beforePublication = await ReadSnapshotAsync(storage, cancellationToken);
-            AssertStored(beforePublication, 6, active, dead, suspected, joining, duringUpgrade);
-            await storage.ExecuteAsync(batches[2], cancellationToken);
-            AssertUnchanged(beforePublication, await ReadSnapshotAsync(storage, cancellationToken));
-            Assert.Equal(originalRoutine, await ReadMySqlRoutineAsync(storage, cancellationToken));
-            var publishedQueries = await ReadQueriesAsync(storage, cancellationToken);
-            Assert.Contains("call InsertMembershipKeyAtomic(", publishedQueries["InsertMembershipKey"], StringComparison.Ordinal);
-
-            // Reapplying must fail at CREATE, not drop/replace a routine which callers can be using.
-            var duplicateRoutine = await Assert.ThrowsAsync<MySqlException>(() => storage.ExecuteAsync(batches[1], cancellationToken));
-            Assert.Equal(1304, duplicateRoutine.Number); // ER_SP_ALREADY_EXISTS
-            AssertUnchanged(beforePublication, await ReadSnapshotAsync(storage, cancellationToken));
-            Assert.Equal(originalRoutine, await ReadMySqlRoutineAsync(storage, cancellationToken));
-            Assert.Equal(publishedQueries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
-        }
-        else
-        {
-            if (engine == "SQLServer")
-            {
-                var commit = migration.LastIndexOf("COMMIT;", StringComparison.Ordinal);
-                Assert.True(commit >= 0);
-                var failingMigration = migration.Insert(commit,
-                    "INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('MembershipReadRowKey', 'duplicate');\n");
-                await using var connection = new SqlConnection(database.CurrentConnectionString);
-                await connection.OpenAsync(cancellationToken);
-                await using var command = connection.CreateCommand();
-                command.CommandText = "SET XACT_ABORT OFF;\n" + failingMigration;
-                var failure = await Assert.ThrowsAsync<SqlException>(() => command.ExecuteNonQueryAsync(cancellationToken));
-                Assert.Equal(2627, failure.Number);
-                command.CommandText = "SELECT XACT_STATE();";
-                Assert.Equal((short)0, Assert.IsType<short>(await command.ExecuteScalarAsync(cancellationToken)));
-                Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
-                AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
-            }
-
-            // Both native scripts are one transaction/batch, including PostgreSQL dollar-quoted functions.
-            await storage.ExecuteAsync(migration, cancellationToken);
-            AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
-            if (engine == "SQLServer")
-            {
-                var updatedQueries = await ReadQueriesAsync(storage, cancellationToken);
-                var updated = new CachedLegacyClient(storage, updatedQueries, cancellationToken);
-                var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                var oldInsert = InsertAfterBarrierAsync(legacy);
-                var newInsert = InsertAfterBarrierAsync(updated);
-                start.SetResult();
-                Assert.Single(await Task.WhenAll(oldInsert, newInsert), inserted => inserted);
-
-                async Task<bool> InsertAfterBarrierAsync(CachedLegacyClient client)
-                {
-                    await start.Task.WaitAsync(cancellationToken);
-                    return await client.InsertAsync(duringUpgrade, "5");
-                }
-            }
-            else
-            {
-                Assert.True(await legacy.InsertAsync(duringUpgrade, "5"));
-            }
+            var row = await current.ReadRowAsync(entry.SiloAddress, cancellationToken);
+            Assert.True(await current.UpdateRowAsync(entry, Assert.Single(row.Members).Item2, row.Version.Next(), cancellationToken));
         }
 
-        var upgraded = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(upgraded, 6, active, dead, suspected, joining, duringUpgrade);
-        // Reload the catalog to use the optional captured-value cleanup enhancement.
+        // A populated original installation supports package upgrades without any catalog edits.
+        var populated = await ReadSnapshotAsync(storage, cancellationToken);
+        AssertStored(populated, 9, entries);
         await current.InitializeMembershipTableAsync(true, cancellationToken);
         await gateway.InitializeGatewayListProvider().WaitAsync(cancellationToken);
-        AssertUnchanged(upgraded, await ReadSnapshotAsync(storage, cancellationToken));
-        AssertReadMatches(upgraded, await current.ReadAllAsync(cancellationToken));
+        AssertReadMatches(populated, await current.ReadAllAsync(cancellationToken));
         Assert.Equal(
             [SiloAddress.New(active.SiloAddress.Endpoint.Address, active.ProxyPort, active.SiloAddress.Generation).ToGatewayUri()],
             await gateway.GetGateways().WaitAsync(cancellationToken));
+        AssertUnchanged(populated, await ReadSnapshotAsync(storage, cancellationToken));
+        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
 
-        // Alternate new-provider and cached old-query writes, always with the original parameter sets.
-        // Cached SQL Server/MySQL inline SQL retains its old behavior: legacy writes here are valid
-        // and advance heartbeats, not assertions that the unchanged old SQL has acquired bug fixes.
-        var currentEntry = Entry(6, SiloStatus.Active);
-        Assert.True(await current.InsertRowAsync(currentEntry, upgraded.NextVersion, cancellationToken));
-        duringUpgrade.Status = SiloStatus.Stopping;
-        duringUpgrade.IAmAliveTime = StartTime.AddMinutes(2);
-        Assert.True(await legacy.UpdateAsync(duringUpgrade, "7"));
-        var afterLegacyUpdate = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterLegacyUpdate, 8, active, dead, suspected, joining, duringUpgrade, currentEntry);
-
-        var capturedMembership = await current.ReadRowAsync(active.SiloAddress, cancellationToken);
-        var originalRowToken = Assert.Single(capturedMembership.Members).Item2;
-        var originalTableVersion = capturedMembership.Version.Next();
-        Assert.Equal(8, capturedMembership.Version.Version);
-
+        var captured = await current.ReadRowAsync(active.SiloAddress, cancellationToken);
+        Assert.Equal(populated.Version, captured.Version.Version);
+        Assert.Equal(populated.Etag, captured.Version.VersionEtag);
+        var capturedRow = Assert.Single(captured.Members);
+        Assert.Equal(StoredMember.FromEntry(active), StoredMember.FromEntry(capturedRow.Item1));
+        var originalRowToken = capturedRow.Item2;
+        Assert.Equal(populated.Etag, originalRowToken);
         active.IAmAliveTime = StartTime.AddMinutes(10);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
         var afterHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterHeartbeat, 8, active, dead, suspected, joining, duringUpgrade, currentEntry);
-        Assert.Equal(afterLegacyUpdate.VersionTimestamp, afterHeartbeat.VersionTimestamp);
-
+        AssertStored(afterHeartbeat, 9, entries);
+        Assert.Equal(populated.VersionTimestamp, afterHeartbeat.VersionTimestamp);
         active.Status = SiloStatus.ShuttingDown;
         active.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(4))];
         active.IAmAliveTime = StartTime.AddMinutes(5);
-        Assert.True(await current.UpdateRowAsync(active, originalRowToken, originalTableVersion, cancellationToken));
-        active.IAmAliveTime = StartTime.AddMinutes(10);
+        Assert.True(await current.UpdateRowAsync(active, originalRowToken, captured.Version.Next(), cancellationToken));
+        // Original SQL can overwrite a newer heartbeat; only enhanced full-row writes retain MAX.
+        active.IAmAliveTime = StartTime.AddMinutes(enhanced ? 10 : 5);
         var afterUpdate = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterUpdate, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
-
+        AssertStored(afterUpdate, 10, entries);
         active.IAmAliveTime = StartTime.AddMinutes(3);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
         var afterBlindHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterBlindHeartbeat, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
+        AssertStored(afterBlindHeartbeat, 10, entries);
         Assert.Equal(afterUpdate.VersionTimestamp, afterBlindHeartbeat.VersionTimestamp);
         active.IAmAliveTime = StartTime.AddMinutes(20);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
-        var afterNewHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterNewHeartbeat, 9, active, dead, suspected, joining, duringUpgrade, currentEntry);
-        Assert.Equal(afterUpdate.VersionTimestamp, afterNewHeartbeat.VersionTimestamp);
-
-        await current.UpdateIAmAliveAsync(Entry(10, SiloStatus.Active), cancellationToken);
-        AssertUnchanged(afterNewHeartbeat, await ReadSnapshotAsync(storage, cancellationToken));
-
-        duringUpgrade.IAmAliveTime = StartTime.AddMinutes(4);
-        await legacy.HeartbeatAsync(duringUpgrade);
-        var legacyEntry = Entry(7, SiloStatus.Joining);
-        Assert.True(await legacy.InsertAsync(legacyEntry, "9"));
         var stable = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(stable, 10, active, dead, suspected, joining, duringUpgrade, currentEntry, legacyEntry);
-        AssertReadMatches(stable, await current.ReadAllAsync(cancellationToken));
-        AssertReadMatches(stable, await legacy.ReadAllAsync());
+        AssertStored(stable, 10, entries);
+        Assert.Equal(afterUpdate.VersionTimestamp, stable.VersionTimestamp);
+        await current.UpdateIAmAliveAsync(Entry(20, SiloStatus.Active), cancellationToken);
+        AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
 
-        var absent = Entry(8, SiloStatus.Dead);
-        await AssertRejectedAsync(() => current.InsertRowAsync(absent, afterUpdate.NextVersion, cancellationToken));
-        var changed = Entry(1, SiloStatus.Dead);
-        changed.IAmAliveTime = StartTime.AddDays(1);
-        changed.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddDays(1))];
-        await AssertRejectedAsync(() => current.UpdateRowAsync(changed, afterUpdate.Etag, afterUpdate.NextVersion, cancellationToken));
-        await AssertRejectedAsync(() => current.InsertRowAsync(changed, stable.NextVersion, cancellationToken));
-        await AssertRejectedAsync(() => current.UpdateRowAsync(changed, afterUpdate.Etag, stable.NextVersion, cancellationToken));
-        await AssertRejectedAsync(() => current.UpdateRowAsync(absent, stable.Etag, stable.NextVersion, cancellationToken));
+        if (enhanced)
+        {
+            var absent = Entry(20, SiloStatus.Dead);
+            var changed = Entry(1, SiloStatus.Dead);
+            changed.IAmAliveTime = StartTime.AddDays(1);
+            changed.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddDays(1))];
+            await AssertRejectedAsync(() => current.InsertRowAsync(absent, captured.Version.Next(), cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(changed, originalRowToken, captured.Version.Next(), cancellationToken));
+            await AssertRejectedAsync(() => current.InsertRowAsync(changed, stable.NextVersion, cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(changed, originalRowToken, stable.NextVersion, cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(absent, stable.Etag, stable.NextVersion, cancellationToken));
 
-        await current.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(cutoff), cancellationToken);
+            absent.HostName = null!;
+            var error = await Assert.ThrowsAnyAsync<DbException>(() => current.InsertRowAsync(absent, stable.NextVersion, cancellationToken));
+            Assert.True(engine switch
+            {
+                "SQLServer" => error is Microsoft.Data.SqlClient.SqlException { Number: 515 },
+                "MySQL" => error is MySql.Data.MySqlClient.MySqlException { Number: 1048 },
+                "PostgreSQL" => error is PostgresException { SqlState: PostgresErrorCodes.NotNullViolation },
+                _ => false
+            }, error.ToString());
+            AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
+            using var canceled = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            canceled.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => current.InsertRowAsync(Entry(20, SiloStatus.Joining), stable.NextVersion, canceled.Token));
+            AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
+        }
+
+        // Original cleanup retains its original semantics, so use a safe no-op cutoff in that mode.
+        await current.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(enhanced ? cutoff : StartTime), cancellationToken);
         var afterCleanup = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterCleanup, 10, active, suspected, joining, duringUpgrade, currentEntry, legacyEntry);
+        var survivors = enhanced ? entries.Where(entry => entry != dead && entry != oldSuspect).ToArray() : entries;
+        AssertStored(afterCleanup, 10, survivors);
         Assert.Equal(stable.VersionTimestamp, afterCleanup.VersionTimestamp);
-        Assert.Equal(stable.Members.Where(member => !member.SiloAddress.Equals(dead.SiloAddress)), afterCleanup.Members);
         AssertReadMatches(afterCleanup, await current.ReadAllAsync(cancellationToken));
-
-        // A binary rollback/restart reloads the upgraded catalog rather than retaining cached SQL.
-        // Exercise the same old client and parameter sets against that distinct compatibility path.
-        var reloadedQueries = await ReadQueriesAsync(storage, cancellationToken);
-        Assert.All(queries.Keys, key => Assert.Contains(key, reloadedQueries.Keys));
-        var reloadedLegacy = new CachedLegacyClient(storage, reloadedQueries, cancellationToken);
-        Assert.False(await reloadedLegacy.InsertVersionAsync());
-        AssertUnchanged(afterCleanup, await ReadSnapshotAsync(storage, cancellationToken));
-        var restartedEntry = Entry(9, SiloStatus.Joining);
-        Assert.True(await reloadedLegacy.InsertAsync(restartedEntry, afterCleanup.Etag));
-        var afterRestartedInsert = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterRestartedInsert, 11, active, suspected, joining, duringUpgrade, currentEntry, legacyEntry, restartedEntry);
-        restartedEntry.Status = SiloStatus.Stopping;
-        restartedEntry.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(3))];
-        restartedEntry.IAmAliveTime = StartTime.AddMinutes(5);
-        Assert.True(await reloadedLegacy.UpdateAsync(restartedEntry, afterRestartedInsert.Etag));
-        var afterRestartedUpdate = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterRestartedUpdate, 12, active, suspected, joining, duringUpgrade, currentEntry, legacyEntry, restartedEntry);
-        restartedEntry.IAmAliveTime = StartTime.AddMinutes(6);
-        await reloadedLegacy.HeartbeatAsync(restartedEntry);
-        var afterRestart = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(afterRestart, 12, active, suspected, joining, duringUpgrade, currentEntry, legacyEntry, restartedEntry);
-        Assert.Equal(afterRestartedUpdate.VersionTimestamp, afterRestart.VersionTimestamp);
-        AssertReadMatches(afterRestart, await reloadedLegacy.ReadAllAsync());
-        AssertReadMatches(afterRestart, await legacy.ReadAllAsync());
-        AssertReadMatches(afterRestart, await current.ReadAllAsync(cancellationToken));
-
-        if (engine is "SQLServer" or "MySQL")
-        {
-            // Frozen inline SQL keeps its original semantics until the caller reloads the catalog.
-            Assert.False(await legacy.UpdateAsync(absent, afterRestart.Etag));
-            var afterCachedFailure = await ReadSnapshotAsync(storage, cancellationToken);
-            Assert.Equal(afterRestart.Version + 1, afterCachedFailure.Version);
-            Assert.Equal(afterRestart.Members, afterCachedFailure.Members);
-            Assert.False(await reloadedLegacy.UpdateAsync(absent, afterCachedFailure.Etag));
-            AssertUnchanged(afterCachedFailure, await ReadSnapshotAsync(storage, cancellationToken));
-
-            await reloadedLegacy.CleanupAsync(cutoff);
-            AssertUnchanged(afterCachedFailure, await ReadSnapshotAsync(storage, cancellationToken));
-            await legacy.CleanupAsync(cutoff);
-            var afterCachedCleanup = await ReadSnapshotAsync(storage, cancellationToken);
-            Assert.Equal(afterCachedFailure.Version, afterCachedCleanup.Version);
-            Assert.Equal(afterCachedFailure.VersionTimestamp, afterCachedCleanup.VersionTimestamp);
-            Assert.Equal(
-                afterCachedFailure.Members.Where(member => member.Status == SiloStatus.Active || member.IAmAliveTime >= cutoff),
-                afterCachedCleanup.Members);
-        }
-
-        if (engine == "MySQL")
-        {
-            var beforeOverlap = await ReadSnapshotAsync(storage, cancellationToken);
-            var overlappingEntry = Entry(11, SiloStatus.Joining);
-            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var oldInsert = InsertAfterBarrierAsync(legacy);
-            var newInsert = InsertAfterBarrierAsync(reloadedLegacy);
-            start.SetResult();
-            var outcomes = await Task.WhenAll(oldInsert, newInsert);
-            Assert.Single(outcomes, outcome => outcome.Inserted);
-            foreach (var outcome in outcomes)
-            {
-                if (outcome.Error is not null)
-                {
-                    Assert.Equal(1213, Assert.IsType<MySqlException>(outcome.Error).Number);
-                }
-            }
-
-            var afterOverlap = await ReadSnapshotAsync(storage, cancellationToken);
-            Assert.Equal(beforeOverlap.Version + 1, afterOverlap.Version);
-            Assert.Equal(beforeOverlap.Members.Append(StoredMember.FromEntry(overlappingEntry)), afterOverlap.Members);
-            Assert.False(await reloadedLegacy.InsertAsync(overlappingEntry, beforeOverlap.Etag));
-            AssertUnchanged(afterOverlap, await ReadSnapshotAsync(storage, cancellationToken));
-
-            async Task<(bool Inserted, Exception? Error)> InsertAfterBarrierAsync(CachedLegacyClient client)
-            {
-                await start.Task.WaitAsync(cancellationToken);
-                var inserted = false;
-                var error = await Record.ExceptionAsync(async () => inserted = await client.InsertAsync(overlappingEntry, beforeOverlap.Etag));
-                return (inserted, error);
-            }
-        }
 
         if (engine == "SQLServer")
         {
             Assert.True(Assert.Single(await storage.ReadAsync(
                 "SELECT is_read_committed_snapshot_on FROM sys.databases WHERE database_id = DB_ID()",
-                record => record.GetBoolean(0),
-                null,
-                cancellationToken)));
-            var beforeOverlap = await ReadSnapshotAsync(storage, cancellationToken);
+                record => record.GetBoolean(0), null, cancellationToken)));
             var overlappingEntry = Entry(12, SiloStatus.Joining);
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var insertion = InsertAfterBarrierAsync();
@@ -379,25 +206,24 @@ public sealed class AdoNetMembershipUpgradeTests
             Assert.True(await insertion);
             var observed = await reading;
             var afterOverlap = await ReadSnapshotAsync(storage, cancellationToken);
-            Assert.Equal(beforeOverlap.Version + 1, afterOverlap.Version);
-            Assert.Equal(beforeOverlap.Members.Append(StoredMember.FromEntry(overlappingEntry)), afterOverlap.Members);
+            AssertStored(afterOverlap, 11, survivors.Append(overlappingEntry).ToArray());
             Assert.Equal(observed.Version.Version.ToString(CultureInfo.InvariantCulture), observed.Version.VersionEtag);
-            if (observed.Version.Version == beforeOverlap.Version)
+            if (observed.Version.Version == afterCleanup.Version)
             {
                 Assert.Empty(observed.Members);
             }
             else
             {
                 Assert.Equal(afterOverlap.Version, observed.Version.Version);
-                var observedRow = Assert.Single(observed.Members);
-                Assert.Equal(afterOverlap.Etag, observedRow.Item2);
-                Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(observedRow.Item1));
+                var row = Assert.Single(observed.Members);
+                Assert.Equal(afterOverlap.Etag, row.Item2);
+                Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(row.Item1));
             }
 
             async Task<bool> InsertAfterBarrierAsync()
             {
                 await start.Task.WaitAsync(cancellationToken);
-                return await legacy.InsertAsync(overlappingEntry, beforeOverlap.Etag);
+                return await current.InsertRowAsync(overlappingEntry, afterCleanup.NextVersion, cancellationToken);
             }
 
             async Task<MembershipTableData> ReadAfterBarrierAsync()
@@ -407,6 +233,7 @@ public sealed class AdoNetMembershipUpgradeTests
             }
         }
 
+        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
         async Task AssertRejectedAsync(Func<Task<bool>> write)
         {
             Assert.False(await write());
@@ -428,20 +255,12 @@ public sealed class AdoNetMembershipUpgradeTests
         (await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null, cancellationToken))
             .ToDictionary(pair => pair.Key, pair => pair.Value);
 
-    private static async Task<string[]> ReadMySqlRoutineAsync(IRelationalStorage storage, CancellationToken cancellationToken) =>
-        Assert.Single(await storage.ReadAsync(
-            "SHOW CREATE PROCEDURE InsertMembershipKey",
-            record => Enumerable.Range(0, record.FieldCount).Select(index => record.GetString(index)).ToArray(),
-            null,
-            cancellationToken));
-
     private static async Task<Snapshot> ReadSnapshotAsync(IRelationalStorage storage, CancellationToken cancellationToken)
     {
         var version = Assert.Single(await storage.ReadAsync(
             "SELECT Version, Timestamp FROM OrleansMembershipVersionTable WHERE DeploymentId = @DeploymentId",
             record => (Version: record.GetInt32(0), Timestamp: record.GetDateTime(1)),
-            command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId },
-            cancellationToken));
+            command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId }, cancellationToken));
         var members = await storage.ReadAsync(
             """
             SELECT DeploymentId, Address, Port, Generation, SiloName, HostName, Status, ProxyPort, SuspectTimes, StartTime, IAmAliveTime
@@ -450,15 +269,9 @@ public sealed class AdoNetMembershipUpgradeTests
             record => new StoredMember(
                 record.GetString(0),
                 SiloAddress.New(IPAddress.Parse(record.GetString(1)), record.GetInt32(2), record.GetInt32(3)),
-                record.GetString(4),
-                record.GetString(5),
-                (SiloStatus)record.GetInt32(6),
-                record.GetInt32(7),
-                record.IsDBNull(8) ? null : record.GetString(8),
-                record.GetDateTime(9),
-                record.GetDateTime(10)),
-            command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId },
-            cancellationToken);
+                record.GetString(4), record.GetString(5), (SiloStatus)record.GetInt32(6), record.GetInt32(7),
+                record.IsDBNull(8) ? null : record.GetString(8), record.GetDateTime(9), record.GetDateTime(10)),
+            command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId }, cancellationToken);
         return new Snapshot(version.Version, version.Timestamp, members.ToArray());
     }
 
@@ -490,91 +303,12 @@ public sealed class AdoNetMembershipUpgradeTests
     }
 
     private sealed record StoredMember(
-        string DeploymentId,
-        SiloAddress SiloAddress,
-        string SiloName,
-        string HostName,
-        SiloStatus Status,
-        int ProxyPort,
-        string? SuspectTimes,
-        DateTime StartTime,
-        DateTime IAmAliveTime)
+        string DeploymentId, SiloAddress SiloAddress, string SiloName, string HostName, SiloStatus Status,
+        int ProxyPort, string? SuspectTimes, DateTime StartTime, DateTime IAmAliveTime)
     {
         public static StoredMember FromEntry(MembershipEntry entry) => new(
-            ClusterId,
-            entry.SiloAddress,
-            entry.SiloName,
-            entry.HostName,
-            entry.Status,
-            entry.ProxyPort,
+            ClusterId, entry.SiloAddress, entry.SiloName, entry.HostName, entry.Status, entry.ProxyPort,
             entry.SuspectTimes is null ? null : string.Join("|", entry.SuspectTimes.Select(vote => $"{vote.Item1.ToParsableString()},{LogFormatter.PrintDate(vote.Item2)}")),
-            entry.StartTime,
-            entry.IAmAliveTime);
-    }
-
-    // Each instance keeps its original QueryText and parameter sets rather than reloading the
-    // catalog or invoking current RelationalOrleansQueries. Only server-side routines can change.
-    private sealed class CachedLegacyClient(IRelationalStorage storage, Dictionary<string, string> queries, CancellationToken cancellationToken)
-    {
-        public Task<bool> InsertVersionAsync() =>
-            WriteAsync("InsertMembershipVersionKey", command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId });
-
-        public Task<bool> InsertAsync(MembershipEntry entry, string etag) =>
-            WriteAsync("InsertMembershipKey", command => _ = new DbStoredQueries.Columns(command)
-            {
-                DeploymentId = ClusterId,
-                SiloAddress = entry.SiloAddress,
-                SiloName = entry.SiloName,
-                HostName = entry.HostName,
-                Status = entry.Status,
-                ProxyPort = entry.ProxyPort,
-                StartTime = entry.StartTime,
-                IAmAliveTime = entry.IAmAliveTime,
-                Version = etag
-            });
-
-        public Task<bool> UpdateAsync(MembershipEntry entry, string etag) =>
-            WriteAsync("UpdateMembershipKey", command => _ = new DbStoredQueries.Columns(command)
-            {
-                DeploymentId = ClusterId,
-                SiloAddress = entry.SiloAddress,
-                Status = entry.Status,
-                SuspectTimes = entry.SuspectTimes,
-                IAmAliveTime = entry.IAmAliveTime,
-                Version = etag
-            });
-
-        public Task HeartbeatAsync(MembershipEntry entry) =>
-            storage.ExecuteAsync(queries["UpdateIAmAlivetimeKey"], command => _ = new DbStoredQueries.Columns(command)
-            {
-                DeploymentId = ClusterId,
-                SiloAddress = entry.SiloAddress,
-                IAmAliveTime = entry.IAmAliveTime
-            }, cancellationToken: cancellationToken);
-
-        public Task CleanupAsync(DateTime cutoff) =>
-            storage.ExecuteAsync(queries["CleanupDefunctSiloEntriesKey"], command => _ = new DbStoredQueries.Columns(command)
-            {
-                DeploymentId = ClusterId,
-                IAmAliveTime = cutoff
-            }, cancellationToken: cancellationToken);
-
-        public async Task<MembershipTableData> ReadAllAsync()
-        {
-            var rows = (await storage.ReadAsync(
-                queries["MembershipReadAllKey"],
-                DbStoredQueries.Converters.GetMembershipEntry,
-                command => _ = new DbStoredQueries.Columns(command) { DeploymentId = ClusterId },
-                cancellationToken)).ToArray();
-            var version = rows[0].Item2;
-            var etag = version.ToString(CultureInfo.InvariantCulture);
-            Assert.All(rows, row => Assert.Equal(version, row.Item2));
-            return new MembershipTableData(
-                rows.Where(row => row.Item1 is not null).Select(row => Tuple.Create(row.Item1!, etag)).ToList(),
-                new TableVersion(version, etag));
-        }
-
-        private async Task<bool> WriteAsync(string key, Action<IDbCommand> parameters) =>
-            Assert.Single(await storage.ReadAsync(queries[key], DbStoredQueries.Converters.GetSingleBooleanValue, parameters, cancellationToken));
+            entry.StartTime, entry.IAmAliveTime);
     }
 }

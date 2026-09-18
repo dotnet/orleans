@@ -129,16 +129,11 @@ Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment
 
 Upgrading silos or ADO.NET gateway-discovery clients preserves support for existing query installations. Database updates are optional. With an existing catalog, cleanup continues using its installed `CleanupDefunctSiloEntriesKey` query and behavior.
 
-To adopt the SQL enhancements on an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` script from the repository. These optional updates improve conditional-write rollback and Dead-row cleanup while preserving table schemas and stored data. The added `CleanupDefunctSiloEntryKey` enables cleanup based on the latest start, heartbeat, and suspicion timestamps, with a captured-row condition protecting concurrent changes. Fresh installations receive these definitions from the existing `*-Clustering.sql` scripts.
+The existing `*-Clustering.sql` installation scripts include improved conditional-write rollback and Dead-row cleanup. Their optional `CleanupDefunctSiloEntryKey` enables cleanup based on the latest start, heartbeat, and suspicion timestamps, with a captured-row condition protecting concurrent changes. Fresh installations receive these definitions through the usual database setup.
 
 SQL Server joined membership reads use statement snapshots provided by `READ_COMMITTED_SNAPSHOT`, which the existing `SQLServer-Main.sql` setup enables.
 
-Run optional SQL updates with a migration account permitted to update `OrleansQuery` and create or replace the affected routines. Configure the script runner to stop on the first error. The MySQL update has two phases, separated by `DELIMITER ;`:
-
-1. Create `InsertMembershipKeyAtomic` once using the intended routine-definer account. The existing `InsertMembershipKey` routine and its permissions continue serving callers which cached the original query.
-2. Ensure the runtime database principals have `EXECUTE` permission on the new routine, then execute the catalog-publication transaction following `DELIMITER ;`. Principals with database-wide `EXECUTE` grants already cover the new routine; routine-specific grants must include `InsertMembershipKeyAtomic`. The transaction switches the insert query and publishes the other query updates together.
-
-Providers load and cache queries during initialization. After choosing to apply a SQL update, restart silos and clients to adopt the enhanced catalog. Already-running instances continue using their cached queries until reinitialized. Both earlier and updated providers can use the original query keys and parameter sets.
+Providers load and cache queries during initialization. Existing deployments continue using their installed definitions. Operators choosing to adopt revised definitions can use their normal database change-management process; reinitialize providers afterward to load the revised catalog. The original query keys and parameter sets remain supported.
 
 The SQL enhancements take effect per process as it adopts the updated queries. Until then, cached SQL Server/MySQL updates retain their previous missing-row version-increment behavior, and cached cleanup retains its previous status filter. The enhanced behavior applies cluster-wide once all membership writers use those definitions. SQL Server and MySQL inserts retain the original row-then-version statement order.
 
