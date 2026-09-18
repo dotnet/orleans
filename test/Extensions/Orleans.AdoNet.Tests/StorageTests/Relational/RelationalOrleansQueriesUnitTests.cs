@@ -1413,15 +1413,50 @@ public sealed class RelationalOrleansQueriesUnitTests
     }
 
     [Fact]
-    public async Task CreateInstance_RequiresCapturedMembershipCleanupQuery()
+    public async Task CleanupDefunctSiloEntriesAsync_UsesExistingQueryWithoutSqlUpdate()
+    {
+        var cutoff = new DateTimeOffset(2026, 8, 28, 4, 15, 30, TimeSpan.FromHours(5.5));
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(),
+            MembershipQueryKeys.Where(key => key != "CleanupDefunctSiloEntryKey").ToArray())
+            .ExpectExecute(Sql("CleanupDefunctSiloEntriesKey"), affectedRows: 1);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        await queries.CleanupDefunctSiloEntriesAsync(cutoff, "cluster-cleanup", TestContext.Current.CancellationToken);
+
+        var call = AssertOperationCall(storage, Sql("CleanupDefunctSiloEntriesKey"), ExpectedCallKind.Execute);
+        AssertParameters(call, ("DeploymentId", "cluster-cleanup"), ("IAmAliveTime", cutoff.UtcDateTime));
+        Assert.Equal(TestContext.Current.CancellationToken, call.CancellationToken);
+        storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CleanupDefunctSiloEntriesAsync_ExistingQueryPropagatesNativeFailure(bool canceled)
+    {
+        Exception failure = canceled ? new OperationCanceledException() : new InvalidOperationException("Storage unavailable.");
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(),
+            MembershipQueryKeys.Where(key => key != "CleanupDefunctSiloEntryKey").ToArray())
+            .ExpectExecuteException(Sql("CleanupDefunctSiloEntriesKey"), failure);
+        var queries = await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken);
+
+        Assert.Same(failure, await Record.ExceptionAsync(() =>
+            queries.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(2026, 8, 28, 0, 0, 0, TimeSpan.Zero), "cluster-cleanup", TestContext.Current.CancellationToken)));
+
+        AssertOperationCall(storage, Sql("CleanupDefunctSiloEntriesKey"), ExpectedCallKind.Execute);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
+    public async Task CreateInstance_StillRequiresExistingMembershipQueries()
     {
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(),
-            MembershipQueryKeys.Where(key => key != "CleanupDefunctSiloEntryKey").ToArray());
+            MembershipQueryKeys.Where(key => key != "UpdateMembershipKey").ToArray());
 
         var failure = await Assert.ThrowsAsync<ArgumentException>(
             () => ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken));
 
-        Assert.Contains("CleanupDefunctSiloEntryKey", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("UpdateMembershipKey", failure.Message, StringComparison.Ordinal);
         AssertOnlyQueryLoadCall(storage);
         storage.VerifyComplete();
     }

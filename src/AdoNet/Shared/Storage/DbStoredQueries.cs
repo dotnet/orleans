@@ -100,9 +100,9 @@ namespace Orleans.Tests.SqlUtils
         internal string CleanupDefunctSiloEntriesKey => queries[nameof(CleanupDefunctSiloEntriesKey)];
 
         /// <summary>
-        /// Deletes a dead membership row whose captured activity values still match.
+        /// Gets the optional query for deleting a dead row whose captured activity values still match.
         /// </summary>
-        internal string CleanupDefunctSiloEntryKey => queries[nameof(CleanupDefunctSiloEntryKey)];
+        internal string? GetCleanupDefunctSiloEntryQuery() => queries.GetValueOrDefault("CleanupDefunctSiloEntryKey");
 
 #endif
 

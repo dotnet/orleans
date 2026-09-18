@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -73,14 +72,12 @@ public sealed class AdoNetMembershipUpgradeTests
         Assert.True(await legacy.InsertAsync(suspected, "2"));
         Assert.True(await legacy.InsertAsync(joining, "3"));
         var cutoff = StartTime.AddHours(1);
-        suspected.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff)];
-        Assert.True(await legacy.UpdateAsync(suspected, "4"));
         active.IAmAliveTime = StartTime.AddMinutes(1);
         await legacy.HeartbeatAsync(active);
 
-        var beforeUpgrade = await ReadSnapshotAsync(storage, cancellationToken);
-        AssertStored(beforeUpgrade, 5, active, dead, suspected, joining);
-        AssertReadMatches(beforeUpgrade, await legacy.ReadAllAsync());
+        var beforeInitialization = await ReadSnapshotAsync(storage, cancellationToken);
+        AssertStored(beforeInitialization, 4, active, dead, suspected, joining);
+        AssertReadMatches(beforeInitialization, await legacy.ReadAllAsync());
 
         using var services = new ServiceCollection().BuildServiceProvider();
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = ClusterId });
@@ -95,11 +92,34 @@ public sealed class AdoNetMembershipUpgradeTests
             Options.Create(new AdoNetClusteringClientOptions { Invariant = invariant, ConnectionString = database.CurrentConnectionString }),
             Options.Create(new GatewayOptions()),
             clusterOptions);
-        var tableError = await Assert.ThrowsAsync<ArgumentException>(() => current.InitializeMembershipTableAsync(true, cancellationToken));
-        Assert.Contains("CleanupDefunctSiloEntryKey", tableError.Message, StringComparison.Ordinal);
-        var gatewayError = await Assert.ThrowsAsync<ArgumentException>(() => gateway.InitializeGatewayListProvider().WaitAsync(cancellationToken));
-        Assert.Contains("CleanupDefunctSiloEntryKey", gatewayError.Message, StringComparison.Ordinal);
+        // Upgrading the provider package requires no database update, including the optional cleanup key.
+        await current.InitializeMembershipTableAsync(true, cancellationToken);
+        await gateway.InitializeGatewayListProvider().WaitAsync(cancellationToken);
+        AssertReadMatches(beforeInitialization, await current.ReadAllAsync(cancellationToken));
+        Assert.Equal(
+            [SiloAddress.New(active.SiloAddress.Endpoint.Address, active.ProxyPort, active.SiloAddress.Generation).ToGatewayUri()],
+            await gateway.GetGateways().WaitAsync(cancellationToken));
+        AssertUnchanged(beforeInitialization, await ReadSnapshotAsync(storage, cancellationToken));
+        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
+
+        var originalSqlMembership = await current.ReadRowAsync(suspected.SiloAddress, cancellationToken);
+        var originalSqlRow = Assert.Single(originalSqlMembership.Members);
+        Assert.Equal(4, originalSqlMembership.Version.Version);
+        Assert.Equal(beforeInitialization.Etag, originalSqlRow.Item2);
+        Assert.Equal(StoredMember.FromEntry(suspected), StoredMember.FromEntry(originalSqlRow.Item1));
+        await current.UpdateIAmAliveAsync(active, cancellationToken);
+        AssertUnchanged(beforeInitialization, await ReadSnapshotAsync(storage, cancellationToken));
+        suspected.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff)];
+        Assert.True(await current.UpdateRowAsync(suspected, originalSqlRow.Item2, originalSqlMembership.Version.Next(), cancellationToken));
+        var beforeUpgrade = await ReadSnapshotAsync(storage, cancellationToken);
+        AssertStored(beforeUpgrade, 5, active, dead, suspected, joining);
+        AssertReadMatches(beforeUpgrade, await current.ReadAllAsync(cancellationToken));
+        AssertReadMatches(beforeUpgrade, await legacy.ReadAllAsync());
+
+        // The frozen cleanup query is still supported. This cutoff deliberately makes it a safe no-op.
+        await current.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(StartTime), cancellationToken);
         AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
+        Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
 
         var migration = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, $"{engine}-Clustering-AtomicWrites.sql"), cancellationToken);
         var duringUpgrade = Entry(5, SiloStatus.Joining);
@@ -164,6 +184,7 @@ public sealed class AdoNetMembershipUpgradeTests
 
         var upgraded = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(upgraded, 6, active, dead, suspected, joining, duringUpgrade);
+        // Reload the catalog to use the optional captured-value cleanup enhancement.
         await current.InitializeMembershipTableAsync(true, cancellationToken);
         await gateway.InitializeGatewayListProvider().WaitAsync(cancellationToken);
         AssertUnchanged(upgraded, await ReadSnapshotAsync(storage, cancellationToken));
@@ -324,6 +345,11 @@ public sealed class AdoNetMembershipUpgradeTests
 
         if (engine == "SQLServer")
         {
+            Assert.True(Assert.Single(await storage.ReadAsync(
+                "SELECT is_read_committed_snapshot_on FROM sys.databases WHERE database_id = DB_ID()",
+                record => record.GetBoolean(0),
+                null,
+                cancellationToken)));
             var beforeOverlap = await ReadSnapshotAsync(storage, cancellationToken);
             var overlappingEntry = Entry(12, SiloStatus.Joining);
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -331,30 +357,12 @@ public sealed class AdoNetMembershipUpgradeTests
             var reading = ReadAfterBarrierAsync();
             start.SetResult();
             await Task.WhenAll(insertion, reading);
-            var (inserted, insertError) = await insertion;
-            var (observed, readError) = await reading;
-            if (insertError is not null)
-            {
-                Assert.Equal(1205, Assert.IsType<SqlException>(insertError).Number);
-                AssertUnchanged(beforeOverlap, await ReadSnapshotAsync(storage, cancellationToken));
-                var refreshed = await legacy.ReadAllAsync();
-                Assert.True(await legacy.InsertAsync(overlappingEntry, refreshed.Version.VersionEtag));
-            }
-            else
-            {
-                Assert.True(inserted);
-            }
-
+            Assert.True(await insertion);
+            var observed = await reading;
             var afterOverlap = await ReadSnapshotAsync(storage, cancellationToken);
             Assert.Equal(beforeOverlap.Version + 1, afterOverlap.Version);
             Assert.Equal(beforeOverlap.Members.Append(StoredMember.FromEntry(overlappingEntry)), afterOverlap.Members);
-            if (readError is not null)
-            {
-                Assert.Equal(1205, Assert.IsType<SqlException>(readError).Number);
-                observed = await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken);
-            }
-
-            Assert.NotNull(observed);
+            Assert.Equal(observed.Version.Version.ToString(CultureInfo.InvariantCulture), observed.Version.VersionEtag);
             if (observed.Version.Version == beforeOverlap.Version)
             {
                 Assert.Empty(observed.Members);
@@ -362,23 +370,21 @@ public sealed class AdoNetMembershipUpgradeTests
             else
             {
                 Assert.Equal(afterOverlap.Version, observed.Version.Version);
-                Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(Assert.Single(observed.Members).Item1));
+                var observedRow = Assert.Single(observed.Members);
+                Assert.Equal(afterOverlap.Etag, observedRow.Item2);
+                Assert.Equal(StoredMember.FromEntry(overlappingEntry), StoredMember.FromEntry(observedRow.Item1));
             }
 
-            async Task<(bool Inserted, Exception? Error)> InsertAfterBarrierAsync()
+            async Task<bool> InsertAfterBarrierAsync()
             {
                 await start.Task.WaitAsync(cancellationToken);
-                var inserted = false;
-                var error = await Record.ExceptionAsync(async () => inserted = await legacy.InsertAsync(overlappingEntry, beforeOverlap.Etag));
-                return (inserted, error);
+                return await legacy.InsertAsync(overlappingEntry, beforeOverlap.Etag);
             }
 
-            async Task<(MembershipTableData? Snapshot, Exception? Error)> ReadAfterBarrierAsync()
+            async Task<MembershipTableData> ReadAfterBarrierAsync()
             {
                 await start.Task.WaitAsync(cancellationToken);
-                MembershipTableData? snapshot = null;
-                var error = await Record.ExceptionAsync(async () => snapshot = await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken));
-                return (snapshot, error);
+                return await current.ReadRowAsync(overlappingEntry.SiloAddress, cancellationToken);
             }
         }
 
@@ -487,8 +493,8 @@ public sealed class AdoNetMembershipUpgradeTests
             entry.IAmAliveTime);
     }
 
-    // This intentionally never constructs current RelationalOrleansQueries (which rejects the old
-    // catalog) or reloads QueryText after migration. Only the server-side routines can change.
+    // Each instance keeps its original QueryText and parameter sets rather than reloading the
+    // catalog or invoking current RelationalOrleansQueries. Only server-side routines can change.
     private sealed class CachedLegacyClient(IRelationalStorage storage, Dictionary<string, string> queries, CancellationToken cancellationToken)
     {
         public Task<bool> InsertVersionAsync() =>

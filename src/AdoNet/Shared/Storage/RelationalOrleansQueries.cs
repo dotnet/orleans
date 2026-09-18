@@ -295,7 +295,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <summary>
-        /// Removes dead rows whose latest start, heartbeat, and suspect times precede the cutoff.
+        /// Runs the installed cleanup query, using captured-row eligibility when the optional query is available.
         /// </summary>
         /// <param name="beforeDate"></param>
         /// <param name="deploymentId"></param>
@@ -304,6 +304,13 @@ namespace Orleans.Tests.SqlUtils
         internal async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, string deploymentId, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (dbStoredQueries.GetCleanupDefunctSiloEntryQuery() is not { } cleanupQuery)
+            {
+                await ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntriesKey, command =>
+                    new DbStoredQueries.Columns(command) { DeploymentId = deploymentId, IAmAliveTime = beforeDate.UtcDateTime }, cancellationToken);
+                return;
+            }
+
             var table = await MembershipReadAllAsync(deploymentId, cancellationToken);
             var cutoff = beforeDate.UtcDateTime;
             foreach (var (entry, _) in table.Members)
@@ -314,7 +321,7 @@ namespace Orleans.Tests.SqlUtils
                     && entry.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) != true)
                 {
                     // Evaluate the cutoff in .NET and match the original storage values in SQL.
-                    await ExecuteAsync(dbStoredQueries.CleanupDefunctSiloEntryKey, command =>
+                    await ExecuteAsync(cleanupQuery, command =>
                     {
                         var columns = new DbStoredQueries.Columns(command)
                         {

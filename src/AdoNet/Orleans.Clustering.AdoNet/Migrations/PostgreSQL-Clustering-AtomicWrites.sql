@@ -1,5 +1,5 @@
--- Updates membership writes and adds captured-value Dead-row pruning.
--- Apply to an existing clustering database before starting the updated provider.
+-- Optional enhancements for an existing clustering database.
+-- Existing provider queries remain supported without applying this script.
 -- Existing table schemas, query parameters, and routine signatures are preserved.
 
 BEGIN TRANSACTION;
@@ -51,7 +51,7 @@ BEGIN
             Version = Version + 1
         WHERE
             DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
-            AND Version = VersionArg AND VersionArg IS NOT NULL AND Version < 2147483647;
+            AND Version = VersionArg AND VersionArg IS NOT NULL;
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
@@ -124,7 +124,7 @@ BEGIN
         Version = Version + 1
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
-        AND Version = VersionArg AND VersionArg IS NOT NULL AND Version < 2147483647;
+        AND Version = VersionArg AND VersionArg IS NOT NULL;
 
 
     GET DIAGNOSTICS RowCountVar = ROW_COUNT;

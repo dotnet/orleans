@@ -63,7 +63,9 @@ public sealed class AdoNetMembershipSqlTests
             Assert.Contains("v.DeploymentId = m.DeploymentId", query, StringComparison.Ordinal);
             if (engine == "SQLServer")
             {
-                Assert.Equal(2, Regex.Matches(query, @"WITH\(HOLDLOCK\)").Count);
+                Assert.DoesNotContain("HOLDLOCK", query, StringComparison.OrdinalIgnoreCase);
+                var setup = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "SQLServer-Main.sql"));
+                Assert.Contains("SET READ_COMMITTED_SNAPSHOT ON", setup, StringComparison.Ordinal);
             }
         }
     }
@@ -138,7 +140,6 @@ public sealed class AdoNetMembershipSqlTests
         }
 
         Assert.Matches(@"Version = (?:@Version|_Version|VersionArg|PARAM_VERSION)", insert);
-        Assert.Contains("Version < 2147483647", insert, StringComparison.Ordinal);
         AssertRollback(engine, insert);
     }
 
@@ -150,7 +151,6 @@ public sealed class AdoNetMembershipSqlTests
         var update = UpdateBody(engine, Queries(script), Routines(script));
 
         Assert.Matches(@"Version = (?:@Version|VersionArg|PARAM_VERSION)", update);
-        Assert.Contains("Version < 2147483647", update, StringComparison.Ordinal);
         foreach (var column in new[] { "Address", "Port", "Generation" })
         {
             Assert.Matches($@"\b{column} = (?:@{column}|{column}Arg|PARAM_{column.ToUpperInvariant()})", update);
@@ -189,7 +189,13 @@ public sealed class AdoNetMembershipSqlTests
             updatedQueries.Add(match.Groups["key"].Value, match.Groups["text"].Value.Replace("''", "'"));
         }
 
-        Assert.Equal(engine switch { "SQLServer" => 7, "MySQL" => 5, _ => 2 }, updatedQueries.Count);
+        Assert.Equal(engine switch { "SQLServer" => 4, "MySQL" => 5, _ => 2 }, updatedQueries.Count);
+        if (engine == "SQLServer")
+        {
+            Assert.DoesNotContain("MembershipReadRowKey", updatedQueries.Keys);
+            Assert.DoesNotContain("MembershipReadAllKey", updatedQueries.Keys);
+        }
+
         foreach (var (key, text) in updatedQueries)
         {
             Assert.Equal(installQueries[key], text.Replace("InsertMembershipKeyAtomic(", "InsertMembershipKey("));

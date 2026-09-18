@@ -128,7 +128,7 @@ SELECT
 		Version = Version + 1
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647
+		AND Version = @Version AND @Version IS NOT NULL
 		AND @@ROWCOUNT > 0;
 
 	SET @ROWCOUNT = @@ROWCOUNT;
@@ -159,7 +159,7 @@ SELECT
 		Version = Version + 1
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647;
+		AND Version = @Version AND @Version IS NOT NULL;
 
 	UPDATE OrleansMembershipTable
 	SET
@@ -225,9 +225,9 @@ SELECT
 		m.IAmAliveTime,
 		v.Version
 	FROM
-		OrleansMembershipVersionTable v WITH(HOLDLOCK)
+		OrleansMembershipVersionTable v
 		-- This ensures the version table will returned even if there is no matching membership row.
-		LEFT OUTER JOIN OrleansMembershipTable m WITH(HOLDLOCK) ON v.DeploymentId = m.DeploymentId
+		LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
 		AND Address = @Address AND @Address IS NOT NULL
 		AND Port = @Port AND @Port IS NOT NULL
 		AND Generation = @Generation AND @Generation IS NOT NULL
@@ -258,7 +258,7 @@ SELECT
 		m.IAmAliveTime,
 		v.Version
 	FROM
-		OrleansMembershipVersionTable v WITH(HOLDLOCK) LEFT OUTER JOIN OrleansMembershipTable m WITH(HOLDLOCK)
+		OrleansMembershipVersionTable v LEFT OUTER JOIN OrleansMembershipTable m
 		ON v.DeploymentId = m.DeploymentId
 	WHERE
 		v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;

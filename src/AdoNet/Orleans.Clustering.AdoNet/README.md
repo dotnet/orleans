@@ -123,22 +123,24 @@ namespace ExampleGrains;
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/PostgreSQL-Clustering.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Clustering.AdoNet/Oracle-Clustering.sql)
 
-### Upgrading membership queries
+### Optional membership SQL enhancements
 
 Each silo owns its heartbeat. A heartbeat is one primary-key-targeted assignment to `IAmAliveTime`, sent as a single database command. Heartbeats preserve the logical membership row and table tokens, so a membership update can use tokens captured before a heartbeat. Canonical membership consistency is governed by those logical tokens; heartbeat timestamps are best-effort liveness observations.
 
-For an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` update before upgrading **silos or ADO.NET gateway-discovery clients**. The update preserves membership tables and stored rows, updates membership writes, and adds `CleanupDefunctSiloEntryKey` for conditional Dead-row cleanup. Updated providers require this query at initialization and report its absence as an error.
+Upgrading silos or ADO.NET gateway-discovery clients preserves support for existing query installations. Database updates are optional. With an existing catalog, cleanup continues using its installed `CleanupDefunctSiloEntriesKey` query and behavior.
 
-Use a database migration account with permission to update `OrleansQuery` and create or replace the routines in the selected script. Configure the script runner to stop on the first error. Verify the update completed before deploying the provider package.
+To adopt the SQL enhancements on an existing database, apply the matching `Migrations/<database>-Clustering-AtomicWrites.sql` script from the repository. These optional updates improve conditional-write rollback and Dead-row cleanup while preserving table schemas and stored data. The added `CleanupDefunctSiloEntryKey` enables cleanup based on the latest start, heartbeat, and suspicion timestamps, with a captured-row condition protecting concurrent changes. Fresh installations receive these definitions from the existing `*-Clustering.sql` scripts.
 
-The MySQL update has two phases, separated by `DELIMITER ;`:
+SQL Server joined membership reads use statement snapshots provided by `READ_COMMITTED_SNAPSHOT`, which the existing `SQLServer-Main.sql` setup enables.
+
+Run optional SQL updates with a migration account permitted to update `OrleansQuery` and create or replace the affected routines. Configure the script runner to stop on the first error. The MySQL update has two phases, separated by `DELIMITER ;`:
 
 1. Create `InsertMembershipKeyAtomic` once using the intended routine-definer account. The existing `InsertMembershipKey` routine and its permissions continue serving callers which cached the original query.
 2. Ensure the runtime database principals have `EXECUTE` permission on the new routine, then execute the catalog-publication transaction following `DELIMITER ;`. Principals with database-wide `EXECUTE` grants already cover the new routine; routine-specific grants must include `InsertMembershipKeyAtomic`. The transaction switches the insert query and publishes the other query updates together.
 
-Providers load and cache queries during initialization. Roll silos and clients after the SQL update so they load the updated catalog; already-running instances continue using their cached queries until restarted. Existing query parameters and membership storage formats support this rolling upgrade. Retain the updated database objects when rolling binaries back: earlier providers can use the updated catalog, and updated providers still require the captured-row cleanup query.
+Providers load and cache queries during initialization. After choosing to apply a SQL update, restart silos and clients to adopt the enhanced catalog. Already-running instances continue using their cached queries until reinitialized. Both earlier and updated providers can use the original query keys and parameter sets.
 
-The corrected SQL Server/MySQL missing-row rollback and cached cleanup queries take effect for each process when it reloads the catalog. During rolling overlap, legacy cached inline updates retain their previous missing-row version-increment behavior, and legacy cleanup retains its broader status filter. Cluster-wide corrected-write guarantees apply once all membership writers use the updated queries. Complete the rolling process replacement to reach that boundary. SQL Server and MySQL inserts preserve the legacy row-then-version statement order while committing or rolling back the row and version together.
+The SQL enhancements take effect per process as it adopts the updated queries. Until then, cached SQL Server/MySQL updates retain their previous missing-row version-increment behavior, and cached cleanup retains its previous status filter. The enhanced behavior applies cluster-wide once all membership writers use those definitions. SQL Server and MySQL inserts retain the original row-then-version statement order.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

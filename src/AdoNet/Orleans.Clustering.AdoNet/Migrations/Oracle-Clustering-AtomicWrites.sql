@@ -1,5 +1,5 @@
--- Updates membership writes and adds captured-value Dead-row pruning.
--- Apply to an existing clustering database before starting the updated provider.
+-- Optional enhancements for an existing clustering database.
+-- Existing provider queries remain supported without applying this script.
 -- Existing table schemas, query parameters, and routine signatures are preserved.
 
 CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
@@ -12,7 +12,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
     SET Timestamp = sys_extract_utc(systimestamp),
         Version = Version + 1
     WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-      AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL AND Version < 2147483647;
+      AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
     rowcount := SQL%ROWCOUNT;
 
     INSERT INTO OrleansMembershipTable
@@ -78,7 +78,7 @@ CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
         Version = Version + 1
     WHERE
 		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-		AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL AND Version < 2147483647;
+		AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
     rowcount := SQL%ROWCOUNT;
     UPDATE OrleansMembershipTable
       SET

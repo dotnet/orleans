@@ -136,7 +136,7 @@ BEGIN
     UPDATE OrleansMembershipVersionTable
     SET Version = Version + 1
     WHERE DeploymentId = _DeploymentId AND _DeploymentId IS NOT NULL
-        AND Version = _Version AND _Version IS NOT NULL AND Version < 2147483647
+        AND Version = _Version AND _Version IS NOT NULL
         AND ROW_COUNT() > 0;
 
     SET _ROWCOUNT = ROW_COUNT();
@@ -163,7 +163,7 @@ VALUES
         m.SuspectTimes = @SuspectTimes,
         m.IAmAliveTime = GREATEST(m.IAmAliveTime, @IAmAliveTime)
     WHERE v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-        AND v.Version = @Version AND @Version IS NOT NULL AND v.Version < 2147483647
+        AND v.Version = @Version AND @Version IS NOT NULL
         AND m.Address = @Address AND @Address IS NOT NULL
         AND m.Port = @Port AND @Port IS NOT NULL
         AND m.Generation = @Generation AND @Generation IS NOT NULL;
