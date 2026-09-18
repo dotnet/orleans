@@ -183,15 +183,22 @@ public sealed class FirestoreMembershipHeartbeatTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task HeartbeatPreservesCanonicalReadTokens(bool readAll)
+    public async Task MembershipReadsReturnEachRowETagAndPreserveTableVersionAcrossHeartbeat(bool readAll)
     {
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
-        client.AddRow(Entry(2), DateTime.UnixEpoch);
+        var other = client.AddRow(Entry(2), DateTime.UnixEpoch);
+        other.UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(2));
         client.Documents[VersionPath].UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(1));
         var table = CreateTable(client);
         var before = await Read();
+        Assert.Equal(ETag(original), before.TryGet(entry.SiloAddress)!.Item2);
+        Assert.NotEqual(before.Version.VersionEtag, before.TryGet(entry.SiloAddress)!.Item2);
+        if (readAll)
+        {
+            Assert.Equal(ETag(other), before.TryGet(Entry(2).SiloAddress)!.Item2);
+        }
 
         await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
@@ -199,8 +206,12 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.NotEqual(original.UpdateTime, client.Documents[original.Name].UpdateTime);
         Assert.Equal(before.Version.Version, after.Version.Version);
         Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
-        Assert.All(before.Members, row => Assert.Equal(before.Version.VersionEtag, row.Item2));
-        Assert.All(after.Members, row => Assert.Equal(before.Version.VersionEtag, row.Item2));
+        Assert.All(after.Members, row => Assert.Equal(ETag(client.Documents[RowPath(row.Item1)]), row.Item2));
+        Assert.NotEqual(before.TryGet(entry.SiloAddress)!.Item2, after.TryGet(entry.SiloAddress)!.Item2);
+        if (readAll)
+        {
+            Assert.Equal(before.TryGet(Entry(2).SiloAddress)!.Item2, after.TryGet(Entry(2).SiloAddress)!.Item2);
+        }
         Assert.Equal(entry.IAmAliveTime, after.TryGet(entry.SiloAddress)!.Item1.IAmAliveTime);
 
         Task<MembershipTableData> Read() => readAll
@@ -209,11 +220,12 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Fact]
-    public async Task FullRowUpdateAfterHeartbeatUsesOriginalCanonicalTokens()
+    public async Task FullRowUpdateAfterHeartbeatUsesOriginalRowETagAndTableVersion()
     {
         var client = new MembershipClient();
         var entry = Entry();
         client.AddRow(entry, DateTime.UnixEpoch);
+        client.Documents[VersionPath].UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(1));
         var table = CreateTable(client);
         var snapshot = await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         var row = Assert.Single(snapshot.Members);
@@ -222,6 +234,8 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
         Assert.Equal(Time(Now), client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.IAmAliveTime)]);
+        Assert.NotEqual(row.Item2, ETag(client.Documents[RowPath(entry)]));
+        Assert.NotEqual(row.Item2, snapshot.Version.VersionEtag);
 
         Assert.True(await table.UpdateRowAsync(
             row.Item1, row.Item2, snapshot.Version.Next(), TestContext.Current.CancellationToken));
@@ -241,7 +255,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
-        var token = ETag(client.Documents[VersionPath]);
+        var token = ETag(original);
         client.BeforeCommit = () => client.Change(original.Name, nameof(SiloInstanceEntity.IAmAliveTime), Time(Now));
 
         Assert.True(await CreateTable(client).UpdateRowAsync(
@@ -264,7 +278,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
         var other = client.AddRow(Entry(2), DateTime.UnixEpoch);
-        var token = ETag(client.Documents[VersionPath]);
+        var token = ETag(original);
         var table = CreateTable(client);
         Dictionary<string, Document>? concurrentState = null;
         client.BeforeCommit = () =>
@@ -301,7 +315,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         entry.AddSuspector(SiloAddress.New(IPAddress.Loopback, 11112, 1), Now);
 
         Assert.True(await CreateTable(client).UpdateRowAsync(
-            entry, ETag(version), NextVersion(client), TestContext.Current.CancellationToken));
+            entry, ETag(client.Documents[original.Name]), NextVersion(client), TestContext.Current.CancellationToken));
 
         Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
@@ -321,23 +335,47 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Fact]
-    public async Task FullRowUpdateRejectsMismatchedCanonicalRowToken()
+    public async Task FullRowUpdateAcceptsDistinctRowAndTableETags()
     {
         var client = new MembershipClient();
         var entry = Entry();
         var original = client.AddRow(entry, DateTime.UnixEpoch).Clone();
-        var token = ETag(client.Documents[VersionPath]);
+        var token = ETag(original);
         client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
         var version = client.Documents[VersionPath].Clone();
 
-        Assert.False(await CreateTable(client).UpdateRowAsync(
+        Assert.True(await CreateTable(client).UpdateRowAsync(
             entry, token, new TableVersion(9, ETag(version)), TestContext.Current.CancellationToken));
 
         Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Reads);
         Assert.Empty(client.Queries);
-        Assert.Empty(client.Commits);
-        Assert.Empty(client.AttemptedWrites);
+        Assert.Single(client.Commits);
+        Assert.Equal(2, client.CommittedWrites.Count);
+        Assert.Equal(9, client.Documents[original.Name].Fields[nameof(SiloInstanceEntity.MembershipVersion)].IntegerValue);
+        Assert.Equal(9, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
+    }
+
+    [Fact]
+    public async Task FullRowUpdateRejectsStaleTableVersionWithCurrentRowETag()
+    {
+        var client = new MembershipClient();
+        var entry = Entry();
+        var document = client.AddRow(entry, Now);
+        var staleVersion = NextVersion(client);
+        client.Change(document.Name, nameof(SiloInstanceEntity.Status), new Value { IntegerValue = (int)SiloStatus.ShuttingDown });
+        client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
+        var original = document.Clone();
+        var version = client.Documents[VersionPath].Clone();
+
+        Assert.False(await CreateTable(client).UpdateRowAsync(
+            entry, ETag(original), staleVersion, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        Assert.Single(client.Commits);
+        Assert.Empty(client.CommittedWrites);
         Assert.Equal(original, client.Documents[original.Name]);
         Assert.Equal(version, client.Documents[VersionPath]);
     }
@@ -826,6 +864,8 @@ public sealed class FirestoreMembershipHeartbeatTests
         var entry = Entry();
         var document = client.AddRow(entry, Now);
         document.Fields[nameof(SiloInstanceEntity.ProxyPort)] = new Value { IntegerValue = 7 };
+        document.UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(2));
+        var rowETag = ETag(document);
         var token = ETag(client.Documents[VersionPath]);
         client.AfterFirstReadResponse = () =>
         {
@@ -843,7 +883,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(token, result.Version.VersionEtag);
         var row = Assert.Single(result.Members);
         Assert.Equal(7, row.Item1.ProxyPort);
-        Assert.Equal(token, row.Item2);
+        Assert.Equal(rowETag, row.Item2);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
         Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Commits);

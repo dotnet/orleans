@@ -101,6 +101,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
         await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken, current);
 
         var before = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
+        Assert.Equal(Utils.FormatTimestamp(this._entity.ETag!.Value), Assert.Single(before.Members).Item2);
         var expected = Assert.Single(before.Members).Item1;
         expected.IAmAliveTime = current.AddMinutes(1).UtcDateTime;
         var entry = this._entity.ToMembershipEntry();
@@ -111,13 +112,16 @@ public class FirestoreClusteringTests : IAsyncLifetime
 
         var after = await this._membershipTable.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
         Assert.Equal(expected.ToFullString(), Assert.Single(after.Members).Item1.ToFullString());
-        Assert.Equal(Assert.Single(before.Members).Item2, Assert.Single(after.Members).Item2);
+        var stored = await this._storage.ReadEntity<SiloInstanceEntity>(this._entity.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(Utils.FormatTimestamp(stored.ETag!.Value), Assert.Single(after.Members).Item2);
+        Assert.NotEqual(Assert.Single(before.Members).Item2, Assert.Single(after.Members).Item2);
         Assert.Equal(before.Version.Version, after.Version.Version);
         Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
     }
 
     [Fact]
-    public async Task UpdateRowUsesOriginalCanonicalTokensAfterHeartbeat()
+    public async Task UpdateRowUsesOriginalRowETagAndTableVersionAfterHeartbeat()
     {
         await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken);
         var before = await this._membershipTable.ReadRowAsync(this._siloAddress, TestContext.Current.CancellationToken);
@@ -140,7 +144,9 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.Equal(original.Item1.StartTime, updated.Item1.StartTime);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
         Assert.NotEqual(before.Version.VersionEtag, after.Version.VersionEtag);
-        Assert.Equal(after.Version.VersionEtag, updated.Item2);
+        var stored = await this._storage.ReadEntity<SiloInstanceEntity>(this._entity.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(Utils.FormatTimestamp(stored.ETag!.Value), updated.Item2);
     }
 
     [Fact]

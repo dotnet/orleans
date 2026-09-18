@@ -245,21 +245,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            var result = false;
-            if (string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+            bool result;
+            try
             {
-                try
-                {
-                    var batch = collection.Database.StartBatch();
-                    batch.Update(siloReference, silo.GetFields(), Precondition.MustExist);
-                    batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                    await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
-                    result = true;
-                }
-                catch (RpcException exception) when (IsContention(exception))
-                {
-                    result = false;
-                }
+                var batch = collection.Database.StartBatch();
+                // The version guards canonical changes; heartbeat writes can change the row ETag.
+                batch.Update(siloReference, silo.GetFields(), Precondition.MustExist);
+                batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
+                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
+                result = true;
+            }
+            catch (RpcException exception) when (IsContention(exception))
+            {
+                result = false;
             }
 
             if (result == false)
@@ -347,12 +345,10 @@ internal partial class FirestoreMembershipTable : IMembershipTable
 
     private static MembershipTableData Convert((SiloInstanceEntity[] Silos, ClusterVersionEntity Version) data)
     {
-        // Row tokens identify the canonical table version, which advances only with membership mutations.
-        var version = data.Version.ToTableVersion();
         return new MembershipTableData
         (
-            data.Silos.Select(s => Tuple.Create(s.ToMembershipEntry(), version.VersionEtag)).ToList(),
-            version
+            data.Silos.Select(s => Tuple.Create(s.ToMembershipEntry(), Utils.FormatTimestamp(s.ETag!.Value))).ToList(),
+            data.Version.ToTableVersion()
         );
     }
 
