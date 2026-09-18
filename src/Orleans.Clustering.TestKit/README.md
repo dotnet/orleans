@@ -156,7 +156,8 @@ and must advance exactly once. ETags are opaque. The membership protocol supplie
 valid next-version integers and forward status transitions.
 Canonical updates atomically validate the table ETag and replace an existing
 row. A provider can additionally validate a canonical row token, or ignore the
-supplied row ETag when table-version CAS protects the update. Stale-table tests
+supplied row ETag when table-version CAS protects the update. Any additional
+row guard remains satisfied across heartbeat-only activity. Stale-table tests
 use freshly read row metadata after a competing cross-row commit and original
 snapshot inputs after a same-row commit. Every unchanged canonical entry field
 is preserved. Full-row writes can overwrite a heartbeat with an earlier value.
@@ -199,6 +200,10 @@ heartbeat: **zero prerequisite reads, zero compare-and-swap operations, and one
 blind liveness write**. The kit's observation reads bracket the provider call to
 check resulting fields; native SDK instrumentation establishes the operation
 count. Runtime snapshot merging retains maximum observed liveness.
+Provider-native tests also verify that an original-input canonical update after
+heartbeat-only activity takes one mutation attempt, with no heartbeat-driven
+reread or retry hidden behind the provider API. The generic scenarios establish
+the outcome at that API boundary; SDK instrumentation establishes the attempt count.
 
 G07 and G08 capture the row ETag and table version, perform an owner heartbeat,
 then commit a status or suspect-vote change using the original inputs. Each update
