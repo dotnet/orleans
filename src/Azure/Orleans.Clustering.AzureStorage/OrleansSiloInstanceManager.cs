@@ -207,40 +207,15 @@ namespace Orleans.AzureUtils
 
         internal async Task<string?> MergeTableEntryAsync(SiloInstanceTableEntry data, CancellationToken cancellationToken = default)
         {
-            var proposedTime = LogFormatter.ParseDate(data.IAmAliveTime!);
-            while (true)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var current = await storage.Table.GetEntityIfExistsAsync<SiloInstanceTableEntry>(
-                    data.PartitionKey, data.RowKey, cancellationToken: cancellationToken);
-                if (!current.HasValue)
-                {
-                    await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
-                        data.PartitionKey, SiloInstanceTableEntry.TABLE_VERSION_ROW, cancellationToken: cancellationToken);
-                    return null;
-                }
-
-                var currentEntry = current.Value!;
-                if (!string.IsNullOrEmpty(currentEntry.IAmAliveTime)
-                    && LogFormatter.ParseDate(currentEntry.IAmAliveTime) >= proposedTime)
-                {
-                    return currentEntry.ETag.ToString();
-                }
-
-                try
-                {
-                    return await storage.MergeTableEntryAsync(data, currentEntry.ETag, cancellationToken);
-                }
-                catch (RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.PreconditionFailed)
-                {
-                    // A concurrent heartbeat or membership update won. Re-read before taking the maximum.
-                }
-                catch (RequestFailedException exception) when (IsRowNotFound(exception))
-                {
-                    await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
-                        data.PartitionKey, SiloInstanceTableEntry.TABLE_VERSION_ROW, cancellationToken: cancellationToken);
-                    return null;
-                }
+                return await storage.MergeTableEntryAsync(data, AzureTableUtils.ANY_ETAG, cancellationToken);
+            }
+            catch (RequestFailedException exception) when (IsRowNotFound(exception))
+            {
+                await storage.Table.GetEntityAsync<SiloInstanceTableEntry>(
+                    data.PartitionKey, SiloInstanceTableEntry.TABLE_VERSION_ROW, cancellationToken: cancellationToken);
+                return null;
             }
         }
 

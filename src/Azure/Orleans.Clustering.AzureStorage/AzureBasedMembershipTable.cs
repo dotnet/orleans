@@ -377,7 +377,6 @@ namespace Orleans.Runtime.MembershipService
         {
             return new SiloInstanceTableEntry
             {
-                DeploymentId = deploymentId,
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
                 PartitionKey = deploymentId,
                 RowKey = SiloInstanceTableEntry.ConstructRowKey(memEntry.SiloAddress)

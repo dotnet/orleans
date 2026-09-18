@@ -424,12 +424,10 @@ public class AzureMembershipPaginationTests
         Assert.Equal(4, storage.VersionReadCount);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatAfterCompactionPreservesAbsenceAndVersion(bool deletionRacesMerge)
+    [Fact]
+    public async Task HeartbeatAfterCompactionPreservesAbsenceAndVersion()
     {
-        var client = CreateSiloClient(deletionRacesMerge ? StoredSilo() : null);
+        var client = CreateHeartbeatClient();
         var version = Version(7, "v7").Entity;
         _ = client.GetEntityAsync<SiloInstanceTableEntry>(
             ClusterId, SiloInstanceTableEntry.TABLE_VERSION_ROW, null, TestContext.Current.CancellationToken)
@@ -442,8 +440,7 @@ public class AzureMembershipPaginationTests
         await table.UpdateIAmAliveAsync(ProposedEntry(), TestContext.Current.CancellationToken);
 
         Assert.Equal("7", version.MembershipVersion);
-        Assert.Equal(deletionRacesMerge ? 3 : 2, client.ReceivedCalls().Count());
-        Assert.DoesNotContain(client.ReceivedCalls(), call => call.GetMethodInfo().Name is "AddEntityAsync" or "UpsertEntityAsync" or "SubmitTransactionAsync");
+        Assert.Equal(["UpdateEntityAsync", "GetEntityAsync"], client.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
     }
 
     [Theory]
@@ -776,87 +773,63 @@ public class AzureMembershipPaginationTests
         Assert.Same(failure, exception);
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(0)]
-    [InlineData(1)]
-    public async Task HeartbeatPreservesMaximumAndWritesOnlyLiveness(int offsetDays)
+    [Fact]
+    public async Task OwnerHeartbeatUsesSingleUnconditionalLivenessMerge()
     {
-        var current = StoredSilo();
-        var client = CreateSiloClient(current);
+        var client = CreateHeartbeatClient();
         SiloInstanceTableEntry? written = null;
         _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 written = call.Arg<SiloInstanceTableEntry>();
-                Assert.Equal("s1", call.Arg<ETag>().ToString());
+                Assert.Equal(ETag.All, call.Arg<ETag>());
                 Assert.Equal(TestContext.Current.CancellationToken, call.Arg<CancellationToken>());
                 return Substitute.ForPartsOf<Response>();
             });
         var table = CreateTable(CreateManager(null, client));
         var entry = ProposedEntry();
-        entry.IAmAliveTime = LogFormatter.ParseDate(current.IAmAliveTime!).AddDays(offsetDays);
 
         await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
-        Assert.Equal("2026-01-01 00:00:00.000 GMT", current.IAmAliveTime);
-        Assert.Equal(offsetDays > 0 ? 2 : 1, client.ReceivedCalls().Count());
-        if (offsetDays > 0)
-        {
-            Assert.NotNull(written);
-            Assert.Equal(current.RowKey, written.RowKey);
-            Assert.Equal(LogFormatter.PrintDate(entry.IAmAliveTime), written.IAmAliveTime);
-            Assert.Null(written.Status);
-            Assert.Null(written.StartTime);
-            Assert.Null(written.SuspectingSilos);
-            Assert.Null(written.SuspectingTimes);
-            Assert.Null(written.MembershipVersion);
-        }
-        else
-        {
-            Assert.Null(written);
-        }
+        Assert.Equal(nameof(TableClient.UpdateEntityAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
+        Assert.NotNull(written);
+        Assert.Equal(ClusterId, written.PartitionKey);
+        Assert.Equal(SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress), written.RowKey);
+        Assert.Equal(LogFormatter.PrintDate(entry.IAmAliveTime), written.IAmAliveTime);
+        Assert.Null(written.DeploymentId);
+        Assert.Null(written.HostName);
+        Assert.Null(written.Status);
+        Assert.Null(written.StartTime);
+        Assert.Null(written.SuspectingSilos);
+        Assert.Null(written.SuspectingTimes);
+        Assert.Null(written.MembershipVersion);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatConflictRereadsMaximumOrHonorsCancellation(bool cancel)
+    [Fact]
+    public async Task HeartbeatMergeHonorsCancellation()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var current = StoredSilo();
-        var client = CreateSiloClient(current);
+        var client = CreateHeartbeatClient();
         _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
             .Returns(call =>
             {
-                Assert.Equal("s1", call.Arg<ETag>().ToString());
-                current.IAmAliveTime = "2026-01-03 00:00:00.000 GMT";
-                current.ETag = new ETag("s2");
-                if (cancel) cancellation.Cancel();
-                return Task.FromException<Response>(new RequestFailedException(412, "Concurrent heartbeat."));
+                Assert.Equal(cancellation.Token, call.Arg<CancellationToken>());
+                cancellation.Cancel();
+                return Task.FromCanceled<Response>(cancellation.Token);
             });
         var table = CreateTable(CreateManager(null, client));
 
-        if (cancel)
-        {
-            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.UpdateIAmAliveAsync(ProposedEntry(), cancellation.Token));
-            Assert.Equal(cancellation.Token, exception.CancellationToken);
-        }
-        else
-        {
-            await table.UpdateIAmAliveAsync(ProposedEntry(), cancellation.Token);
-        }
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.UpdateIAmAliveAsync(ProposedEntry(), cancellation.Token));
 
-        Assert.Equal("2026-01-03 00:00:00.000 GMT", current.IAmAliveTime);
-        Assert.Equal(cancel ? 2 : 3, client.ReceivedCalls().Count());
-        Assert.Single(client.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(TableClient.UpdateEntityAsync));
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(nameof(TableClient.UpdateEntityAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Theory]
-    [InlineData("Read", 404, null)]
-    [InlineData("Read", 403, null)]
-    [InlineData("Read", 503, null)]
-    [InlineData("Read", 0, null)]
+    [InlineData("Merge", 404, null)]
+    [InlineData("Merge", 403, null)]
+    [InlineData("Merge", 503, null)]
+    [InlineData("Merge", 412, "UpdateConditionNotSatisfied")]
     [InlineData("Merge", 0, null)]
     [InlineData("History", 404, "ResourceNotFound")]
     [InlineData("History", 404, "TableNotFound")]
@@ -864,21 +837,19 @@ public class AzureMembershipPaginationTests
     [InlineData("History", 503, "ServerBusy")]
     public async Task HeartbeatFailuresRemainVisible(string phase, int status, string? code)
     {
-        var client = CreateSiloClient(phase == "History" ? null : StoredSilo());
+        var client = CreateHeartbeatClient();
         Exception failure = status == 0
             ? new System.Net.Http.HttpRequestException("Connection interrupted.")
             : new RequestFailedException(status, "Storage failure.", code, null);
         switch (phase)
         {
-            case "Read":
-                _ = client.GetEntityIfExistsAsync<SiloInstanceTableEntry>(string.Empty, string.Empty, null, TestContext.Current.CancellationToken)
-                    .ReturnsForAnyArgs(Task.FromException<NullableResponse<SiloInstanceTableEntry>>(failure));
-                break;
             case "Merge":
                 _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
                     .Returns(Task.FromException<Response>(failure));
                 break;
             case "History":
+                _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
+                    .Returns(Task.FromException<Response>(new RequestFailedException(404, "Retired silo.", "ResourceNotFound", null)));
                 _ = client.GetEntityAsync<SiloInstanceTableEntry>(ClusterId, SiloInstanceTableEntry.TABLE_VERSION_ROW, null, TestContext.Current.CancellationToken)
                     .Returns(Task.FromException<Response<SiloInstanceTableEntry>>(failure));
                 break;
@@ -891,7 +862,7 @@ public class AzureMembershipPaginationTests
             () => table.UpdateIAmAliveAsync(ProposedEntry(), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
-        Assert.Equal(phase == "Read" ? 1 : 2, client.ReceivedCalls().Count());
+        Assert.Equal(phase == "Merge" ? 1 : 2, client.ReceivedCalls().Count());
     }
 
     [Fact]
@@ -1054,8 +1025,6 @@ public class AzureMembershipPaginationTests
     private static TableClient CreateSiloClient(SiloInstanceTableEntry? current)
     {
         var client = CreateHeartbeatClient();
-        _ = client.GetEntityIfExistsAsync<SiloInstanceTableEntry>(string.Empty, string.Empty, null, TestContext.Current.CancellationToken)
-            .ReturnsForAnyArgs(current is null ? new MissingSiloResponse() : Response.FromValue(current, Substitute.For<Response>()));
         _ = client.GetEntityAsync<SiloInstanceTableEntry>(
             ClusterId, SiloInstanceTableEntry.ConstructRowKey(ProposedEntry().SiloAddress), null, TestContext.Current.CancellationToken)
             .Returns(current is null
@@ -1120,13 +1089,6 @@ public class AzureMembershipPaginationTests
         return row;
     }
 
-    private sealed class MissingSiloResponse : NullableResponse<SiloInstanceTableEntry>
-    {
-        public override bool HasValue => false;
-        public override SiloInstanceTableEntry Value => throw new InvalidOperationException("The silo row is absent.");
-        public override Response GetRawResponse() => Substitute.For<Response>();
-    }
-
     private sealed class NotFoundTableHandler(string errorCode) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
@@ -1151,8 +1113,6 @@ public class AzureMembershipPaginationTests
     private static TableClient CreateHeartbeatClient()
     {
         var client = Substitute.For<TableClient>();
-        client.ReturnsForAll<Task<NullableResponse<SiloInstanceTableEntry>>>(
-            Task.FromException<NullableResponse<SiloInstanceTableEntry>>(new InvalidOperationException("Unexpected silo read.")));
         client.ReturnsForAll<Task<Response<SiloInstanceTableEntry>>>(
             Task.FromException<Response<SiloInstanceTableEntry>>(new InvalidOperationException("Unexpected version read.")));
         return client;
