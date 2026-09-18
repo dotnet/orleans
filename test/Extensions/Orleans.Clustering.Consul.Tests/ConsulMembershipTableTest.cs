@@ -107,31 +107,31 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_InsertRow()
         {
-            await MembershipTable_InsertRow(false);
+            await MembershipTable_InsertRow();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadRow_Insert_Read()
         {
-            await MembershipTable_ReadRow_Insert_Read(false);
+            await MembershipTable_ReadRow_Insert_Read();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_ReadAll_Insert_ReadAll()
         {
-            await MembershipTable_ReadAll_Insert_ReadAll(false);
+            await MembershipTable_ReadAll_Insert_ReadAll();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRow()
         {
-            await MembershipTable_UpdateRow(false);
+            await MembershipTable_UpdateRow();
         }
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateRowInParallel()
         {
-            await MembershipTable_UpdateRowInParallel(false);
+            await MembershipTable_UpdateRowInParallel();
         }
 
         /// <summary>
@@ -142,7 +142,7 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_UpdateIAmAlive()
         {
-            await MembershipTable_UpdateIAmAlive(false);
+            await MembershipTable_UpdateIAmAlive();
         }
 
         /// <summary>
@@ -154,7 +154,7 @@ namespace Consul.Tests
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Consul_CleanupDefunctSiloEntries()
         {
-            await MembershipTable_CleanupDefunctSiloEntries(false);
+            await MembershipTable_CleanupDefunctSiloEntries();
         }
     }
 }
