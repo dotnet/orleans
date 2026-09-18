@@ -76,17 +76,24 @@ public sealed class IdealizedMembershipTableTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Heartbeat_NewerOlderAndStalePayloadUpdate_PreserveMaximum(bool changesToken)
+    public async Task Heartbeat_OwnerSequencedBlindWritesAndStalePayloadUpdate_PreserveLiveness(bool changesToken)
     {
-        var table = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesToken }.Create("A");
+        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesToken };
+        var table = backend.Create("A");
         var initial = await table.ReadAllAsync(Ct);
         var entry = Entry();
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), Ct));
         var inserted = await table.ReadAllAsync(Ct);
-        entry.IAmAliveTime = Start.AddMinutes(2);
-        await table.UpdateIAmAliveAsync(entry, Ct);
+        var reads = backend.Reads;
         entry.IAmAliveTime = Start.AddMinutes(1);
         await table.UpdateIAmAliveAsync(entry, Ct);
+        entry.IAmAliveTime = Start.AddMinutes(2);
+        await table.UpdateIAmAliveAsync(entry, Ct);
+        await table.UpdateIAmAliveAsync(entry, Ct);
+        Assert.Equal(reads, backend.Reads);
+        Assert.Equal(0, backend.VersionedUpdates);
+        Assert.Equal(new[] { Start.AddMinutes(1), Start.AddMinutes(2), Start.AddMinutes(2) }, backend.HeartbeatWrites.Select(write => write.Time));
+        Assert.All(backend.HeartbeatWrites, write => Assert.Same(table, write.Owner));
         var heartbeat = await table.ReadAllAsync(Ct);
         Assert.Equal(inserted.Version, heartbeat.Version);
         Assert.Equal(Start.AddMinutes(2), heartbeat.Members[0].Item1.IAmAliveTime);
@@ -98,6 +105,19 @@ public sealed class IdealizedMembershipTableTests
         Assert.Equal(Start.AddMinutes(2), final.Members[0].Item1.IAmAliveTime);
         Assert.Equal(SiloStatus.Active, final.Members[0].Item1.Status);
         Assert.Equal(heartbeat.Version.Version + 1, final.Version.Version);
+    }
+
+    [Fact]
+    public async Task Heartbeat_MissingRow_PreservesNativeError()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var table = backend.Create("A");
+        await table.InitializeMembershipTableAsync(true, Ct);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => table.UpdateIAmAliveAsync(Entry(), Ct));
+
+        Assert.Empty(backend.HeartbeatWrites);
+        Assert.Equal(0, backend.Reads);
     }
 
     [Fact]

@@ -21,9 +21,9 @@ public sealed class MembershipTableConformanceTests
     [Fact]
     public Task Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration() => Run((r, ct) => r.Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(ct));
     [Fact]
-    public Task UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum() => Run((r, ct) => r.UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(ct));
+    public Task UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields() => Run((r, ct) => r.UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct));
     [Fact]
-    public Task UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum() => Run((r, ct) => r.UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct));
+    public Task UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat() => Run((r, ct) => r.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct));
     [Fact]
     public Task UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry() => Run((r, ct) => r.UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(ct));
     [Fact]
@@ -81,10 +81,26 @@ public sealed class MembershipTableConformanceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public Task MembershipTable_ModelBased_GeneratedConformance(bool versionedCleanup)
+    public async Task MembershipTable_ModelBased_GeneratedConformance(bool versionedCleanup)
     {
         var backend = new IdealizedMembershipBackend { TerminalDeletion = true, VersionedCleanup = versionedCleanup, CleanupBatchSize = 1 };
-        return new MembershipTableModelBasedTestRunner(() => backend.Fixture(), "Idealized").RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
+        await new MembershipTableModelBasedTestRunner(() => backend.Fixture(), "Idealized").RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
+        Assert.NotEmpty(backend.HeartbeatWrites);
+        Assert.Contains(backend.HeartbeatWrites.GroupBy(write => (write.Cluster, write.Identity)), history =>
+            history.Select(write => write.Time).SequenceEqual(new[] { MembershipTableTestData.T1, MembershipTableTestData.T2, MembershipTableTestData.T2 }));
+        foreach (var history in backend.HeartbeatWrites.GroupBy(write => (write.Cluster, write.Identity)))
+        {
+            var owner = history.First().Owner;
+            var previous = DateTime.MinValue;
+            foreach (var write in history)
+            {
+                Assert.Same(owner, write.Owner);
+                Assert.InRange(write.Status, Orleans.Runtime.SiloStatus.Created, Orleans.Runtime.SiloStatus.Stopping);
+                Assert.True(write.Time >= previous);
+                previous = write.Time;
+            }
+        }
+        Assert.Equal(0, backend.OperationsAfterDeletion);
     }
 
     [Theory]
@@ -97,7 +113,7 @@ public sealed class MembershipTableConformanceTests
         [
             (runner, ct) => runner.Reads_SameVersion_PreservesRetainedCanonicalFields(ct),
             (runner, ct) => runner.Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(ct),
-            (runner, ct) => runner.UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct),
+            (runner, ct) => runner.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
             (runner, ct) => runner.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
             (runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
             (runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
@@ -152,6 +168,23 @@ public sealed class MembershipTableConformanceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task OwnerSequencedHeartbeats_OnlyChangeLivenessAndOptionalRowToken(bool changesRowEtag)
+    {
+        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesRowEtag };
+        await backend.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            await new MembershipTableTestRunner(fixture).UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct);
+            Assert.Equal(3, backend.HeartbeatWrites.Count);
+            Assert.All(backend.HeartbeatWrites, write => Assert.Same(fixture.First, write.Owner));
+            Assert.Equal(new[] { MembershipTableTestData.T1, MembershipTableTestData.T2, MembershipTableTestData.T2 },
+                backend.HeartbeatWrites.Select(write => write.Time));
+        }, TestContext.Current.CancellationToken);
+        Assert.Empty(backend.Partitions);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task HeartbeatEtagVariants_OldPayloadAndSingleRereadRetryAreUnconditional(bool changesRowEtag)
     {
         var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesRowEtag };
@@ -162,7 +195,7 @@ public sealed class MembershipTableConformanceTests
         if (changesRowEtag) Assert.Contains(messages, m => m.Contains("refresh only row ETag", StringComparison.Ordinal));
         else Assert.Empty(messages);
         await backend.Fixture().RunAsync((f, ct) => new MembershipTableTestRunner(f)
-            .UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct), TestContext.Current.CancellationToken);
+            .UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct), TestContext.Current.CancellationToken);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
     }
 

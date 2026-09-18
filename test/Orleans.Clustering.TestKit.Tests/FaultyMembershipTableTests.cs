@@ -9,7 +9,8 @@ public sealed class FaultyMembershipTableTests
     [InlineData("IgnoreRowToken", "stale-row", "unexpectedly succeeded")]
     [InlineData("FalseWriteChangesHeartbeat", "stale-row", "IAmAliveTime")]
     [InlineData("VersionJump", "insert", "commit integer")]
-    [InlineData("HeartbeatRegression", "heartbeat", "IAmAliveTime")]
+    [InlineData("IgnoreHeartbeatWrite", "heartbeat", "IAmAliveTime")]
+    [InlineData("HeartbeatChangesMembership", "heartbeat", "ProxyPort")]
     [InlineData("OldPayloadRegression", "old-payload", "IAmAliveTime")]
     [InlineData("AliasInsert", "alias-insert", "Status")]
     [InlineData("AliasUpdate", "alias-update", "Status")]
@@ -33,7 +34,6 @@ public sealed class FaultyMembershipTableTests
     [InlineData("DeleteNoOp", "wrong-cluster", "deletion left populated history")]
     [InlineData("DeletePartial", "delete-own", "deletion left populated history")]
     [InlineData("DeleteThenRejectForeign", "wrong-cluster", "rejected foreign deletion changed its target scope")]
-    [InlineData("HeartbeatResurrectsCompactedRow", "missing-row", "unexpected identity")]
     public async Task DirectGuarantee_DeliberateMutant_FailsWithSpecificEvidence(string faultName, string scenario, string expectedMessage)
     {
         var fault = Enum.Parse<MembershipFault>(faultName);
@@ -46,8 +46,8 @@ public sealed class FaultyMembershipTableTests
                 "stale-table" => runner.UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(ct),
                 "stale-row" => runner.UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(ct),
                 "insert" => runner.InsertRow_CurrentTableVersion_CommitsExactlyOneVersion(ct),
-                "heartbeat" => runner.UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(ct),
-                "old-payload" => runner.UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct),
+                "heartbeat" => runner.UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
+                "old-payload" => runner.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
                 "alias-insert" => runner.InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
                 "alias-update" => runner.UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
                 "alias-read" => runner.Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState(ct),
@@ -70,17 +70,17 @@ public sealed class FaultyMembershipTableTests
     }
 
     [Fact]
-    public async Task HeartbeatAfterCompaction_BackendFailure_PropagatesUnchanged()
+    public async Task Heartbeat_LiveRowBackendFailure_PropagatesUnchanged()
     {
         var control = new MembershipFaultController(MembershipFault.HeartbeatStorageFailure);
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
+                .UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
             TestContext.Current.CancellationToken));
 
         Assert.Same(control.HeartbeatFailure, failure);
-        Assert.True(control.CleanupCompleted);
+        Assert.False(control.CleanupCompleted);
         Assert.Empty(control.Backend.Partitions);
     }
 
@@ -98,7 +98,7 @@ public sealed class FaultyMembershipTableTests
         using var caller = new CancellationTokenSource();
         var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(ct),
+                .UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
             caller.Token));
 
         Assert.Same(expected, failure);

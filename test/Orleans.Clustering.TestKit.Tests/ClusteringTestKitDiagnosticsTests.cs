@@ -23,10 +23,10 @@ public sealed class ClusteringTestKitDiagnosticsTests
     }
 
     [Fact]
-    public void FormatHistory_ReportsSeedCaseOperationPrefixAndHeartbeatMaximum()
+    public void FormatHistory_ReportsSeedCaseOperationPrefixAndOwnerHeartbeat()
     {
-        var history = ClusteringTestKitDiagnostics.FormatHistory(17, 9, ["InsertNew", "HeartbeatNewer", "UpdateWithOldHeartbeat"], "heartbeat maximum=2024-01-02T03:06:00Z");
-        Assert.Equal("seed=17; case=9; prefix=[InsertNew -> HeartbeatNewer -> UpdateWithOldHeartbeat]; heartbeat maximum=2024-01-02T03:06:00Z", history);
+        var history = ClusteringTestKitDiagnostics.FormatHistory(17, 9, ["InsertNew", "HeartbeatAdvance", "UpdateWithOldHeartbeat"], "owner heartbeat=2024-01-02T03:06:00Z");
+        Assert.Equal("seed=17; case=9; prefix=[InsertNew -> HeartbeatAdvance -> UpdateWithOldHeartbeat]; owner heartbeat=2024-01-02T03:06:00Z", history);
         Assert.DoesNotContain("System.Collections", history);
     }
 

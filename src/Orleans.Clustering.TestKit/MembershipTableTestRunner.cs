@@ -121,18 +121,18 @@ public sealed class MembershipTableTestRunner
         EqualRow(MembershipEntrySnapshot.Capture(successor), final.Row(successor.SiloAddress).Entry);
     }, cancellationToken);
 
-    /// <summary>G06: newer, older, and repeated heartbeat writes retain the exact maximum.</summary>
-    public Task UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>G06: one owner publishes sequenced liveness writes while preserving the membership version and other fields.</summary>
+    public Task UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
+        await Heartbeat(A, Entry(1), T1, ct);
         await Heartbeat(A, Entry(1), T2, ct);
-        await Heartbeat(B, Entry(1), T1, ct);
         await Heartbeat(A, Entry(1), T2, ct);
-        Check((await SameHandles(ct)).Row(Entry(1).SiloAddress).Entry.IAmAliveTime == T2, "heartbeat maximum must be t2");
+        Check((await SameHandles(ct)).Row(Entry(1).SiloAddress).Entry.IAmAliveTime == T2, "owner's latest heartbeat must be t2");
     }, cancellationToken);
 
     /// <summary>G07: even fresh tokens with an old heartbeat must retain stored liveness.</summary>
-    public Task UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(CancellationToken cancellationToken = default) => Run(async ct =>
+    public Task UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         await Heartbeat(B, Entry(1), T2, ct);
@@ -141,7 +141,7 @@ public sealed class MembershipTableTestRunner
         {
             payload = Forward(payload);
             await Update(A, payload, ct);
-            Check((await SameHandles(ct)).Row(payload.SiloAddress).Entry.IAmAliveTime == T2, "fresh-token update regressed heartbeat maximum");
+            Check((await SameHandles(ct)).Row(payload.SiloAddress).Entry.IAmAliveTime == T2, "full-row update overwrote the owner's stored heartbeat");
         }
         while (payload.Status != SiloStatus.Dead);
 
@@ -255,8 +255,6 @@ public sealed class MembershipTableTestRunner
         AssertCleanup(beforeCleanup, compacted, T1);
         await Reject(() => A.UpdateRowAsync(dead, delayedRowEtag, delayedVersion, ct), ct);
         await Reject(() => A.UpdateRowAsync(dead, delayedRowEtag, compacted.Next(), ct), ct);
-        await A.UpdateIAmAliveAsync(new MembershipEntry { SiloAddress = dead.SiloAddress, IAmAliveTime = T2 }, ct);
-        Equal(compacted, await SameHandles(ct));
     }, cancellationToken);
 
     /// <summary>G15: point/full reads agree for distinct generations, other endpoints, and absent identities.</summary>
@@ -690,18 +688,23 @@ public sealed class MembershipTableTestRunner
     internal static async Task Heartbeat(IMembershipTable table, MembershipEntry entry, DateTime time, CancellationToken ct)
     {
         var before = await Read(table, ct);
-        var payload = Copy(entry);
-        payload.IAmAliveTime = time;
+        var payload = new MembershipEntry { SiloAddress = entry.SiloAddress, IAmAliveTime = time };
         await table.UpdateIAmAliveAsync(payload, ct);
         var after = await Read(table, ct);
-        var id = entry.SiloAddress.ToParsableString();
+        AssertHeartbeat(before, after, payload);
+    }
+
+    internal static void AssertHeartbeat(ClusteringMembershipSnapshot before, ClusteringMembershipSnapshot after, MembershipEntry input)
+    {
+        var id = input.SiloAddress.ToParsableString();
         Check(after.Rows.ContainsKey(id), $"heartbeat removed identity={id}");
+        Check(!string.IsNullOrEmpty(after.Rows[id].Etag), $"heartbeat returned an unusable row ETag: identity={id}");
         var row = before.Rows[id];
         var expected = before with
         {
             Rows = before.Rows.SetItem(id, new(row.Entry with
             {
-                IAmAliveTime = time > row.Entry.IAmAliveTime ? time : row.Entry.IAmAliveTime
+                IAmAliveTime = input.IAmAliveTime
             }, after.Rows[id].Etag))
         };
         Equal(expected, after);

@@ -26,7 +26,7 @@ MembershipTableTestFixture CreateFixture() => new(
 
 await CreateFixture().RunAsync(
     (fixture, ct) => new MembershipTableTestRunner(fixture, seed: 17)
-        .UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct),
+        .UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
     cancellationToken);
 
 await new MembershipTableModelBasedTestRunner(
@@ -97,8 +97,8 @@ runs the same behavioral assertions.
 | G03 | `Reads_SameVersion_PreservesRetainedCanonicalFields` |
 | G04 | `Reads_MaySkipCommittedVersions_WithoutSkippingHistoryValidation` |
 | G05 | `Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration` |
-| G06 | `UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum` |
-| G07 | `UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum` |
+| G06 | `UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields` |
+| G07 | `UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat` |
 | G08 | `UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry` |
 | G09 | `Handles_IndependentlyConstructed_ShareCommittedBackingState` |
 | G10 | `InsertRow_StaleTableToken_ReturnsFalseWithoutSideEffects` |
@@ -148,7 +148,7 @@ is preserved.
 Different reads can skip committed versions. A newer full view can omit a
 previously live identity, establishing its terminal death even when the observer
 missed its explicit Dead transition. The history retains terminal identities
-and maximum observed heartbeats across compaction.
+across compaction.
 
 Dead-only cleanup can preserve the version and table ETag or use atomic +1
 commits with fresh table ETags. With several eligible rows, the suite accepts
@@ -171,9 +171,21 @@ the requested foreign scope. If the foreign scope is retained, G27 checks its
 complete view and then exercises its own-scope deletion. Native probes establish
 which scopes remain readable; retired handles receive only owner disposal.
 
-Heartbeat tests use fixed whole-second UTC t0 < t1 < t2. Newer-then-older and
-repeated heartbeat writes, and fresh-token status writes carrying t0, must
-retain exactly t2. G08 permits **one** retry only if the controlled t2 heartbeat
+Each owning silo publishes its own liveness using a single blind column write.
+Heartbeat inputs carry the identity and timestamp. The kit publishes fixed
+whole-second UTC t1, t2, t2 in sequence through one owner while its row is live.
+Each call stores its supplied timestamp, preserves the membership version and
+other fields, and permits a refreshed row ETag. Generated heartbeat operations
+use a fixed owner handle per identity and stay within that row's live lifetime.
+
+Provider-native tests verify the storage-operation budget for each periodic
+heartbeat: **zero prerequisite reads, zero compare-and-swap operations, and one
+blind liveness write**. The kit's observation reads bracket the provider call to
+check resulting fields; native SDK instrumentation establishes the operation
+count. Runtime snapshot merging retains maximum observed liveness.
+
+Full-row membership updates carrying an old timestamp preserve the stored
+heartbeat. G08 permits **one** retry only if the controlled t2 heartbeat
 changed the target row ETag, with unchanged table integer/token and complete
 versioned fields. A false write must have no other side effects. Refresh only
 the expected row ETag; retain the original table candidate and old-heartbeat
@@ -186,9 +198,9 @@ existing suspect's timestamp, and clear a populated suspect list using either an
 empty list or null. The stale-heartbeat trace progresses through Dead and verifies
 cleanup retains the tombstone until its effective update time passes the cutoff.
 Missing-row checks include delayed updates after Dead-row
-compaction, checking both stale tokens and fresh table candidates. A delayed heartbeat to
-the compacted identity preserves the complete remaining table and its version.
-Storage exceptions propagate to the caller.
+compaction, checking both stale tokens and fresh table candidates. Periodic
+heartbeats finish within the owner's live-row lifetime; native missing-row
+errors and infrastructure exceptions propagate.
 
 Concurrency uses materialized ready/start/completion gates, exact winner counts,
 and immediate per-observation checks against known before/after histories.

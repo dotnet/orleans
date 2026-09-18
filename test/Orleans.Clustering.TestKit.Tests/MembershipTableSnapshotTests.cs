@@ -239,7 +239,7 @@ public sealed class MembershipTableSnapshotTests
     }
 
     [Fact]
-    public void History_SameVersionDeadPruningRetainsCanonicalFieldsAndMaximumHeartbeat()
+    public void History_SameVersionDeadPruningRetainsCanonicalFields()
     {
         var live = CreateEntry(1, status: SiloStatus.Active);
         var dead = CreateEntry(2, status: SiloStatus.Dead);
@@ -250,14 +250,6 @@ public sealed class MembershipTableSnapshotTests
         live.IAmAliveTime = T2;
         history.Observe(Snapshot(live, rowToken: "heartbeat"));
         Assert.True(history.IsTerminal(dead.SiloAddress.ToParsableString()));
-        live.IAmAliveTime = T1;
-        Assert.Contains("heartbeat maximum regressed", Assert.Throws<ClusteringConformanceException>(() =>
-            history.Observe(Snapshot(live, rowToken: "older-heartbeat"))).Message);
-        live.IAmAliveTime = T2;
-        history.Observe(Snapshot(live, 6, "table-6"));
-        live.IAmAliveTime = T0;
-        Assert.Contains("heartbeat maximum regressed", Assert.Throws<ClusteringConformanceException>(() =>
-            history.Observe(Snapshot(live, 7, "table-7"))).Message);
     }
 
     [Fact]
@@ -272,24 +264,6 @@ public sealed class MembershipTableSnapshotTests
             history.Observe(Snapshot(CreateSuccessor(entry)))).Message);
         Assert.Contains("table ETag", Assert.Throws<ClusteringConformanceException>(() =>
             history.Observe(Snapshot(entry, tableToken: "different-token"))).Message);
-    }
-
-    [Fact]
-    public void History_InferredDeathRetainsHeartbeatMaximumAcrossAbsentViews()
-    {
-        var entry = CreateEntry(1, status: SiloStatus.Active);
-        entry.IAmAliveTime = T2;
-        var history = new MembershipHistory();
-        history.Observe(Snapshot(entry));
-        history.Observe(ClusteringMembershipSnapshot.Capture(new(new TableVersion(7, "table-7"))));
-        history.Observe(ClusteringMembershipSnapshot.Capture(new(new TableVersion(8, "table-8"))));
-        entry.Status = SiloStatus.Dead;
-        entry.IAmAliveTime = T1;
-        Assert.Contains("heartbeat maximum regressed", Assert.Throws<ClusteringConformanceException>(() =>
-            history.Observe(Snapshot(entry, 9, "table-9"))).Message);
-        entry.IAmAliveTime = T2;
-        history.Observe(Snapshot(entry, 9, "table-9"));
-        Assert.True(history.IsTerminal(entry.SiloAddress.ToParsableString()));
     }
 
     [Theory]

@@ -24,6 +24,8 @@ internal sealed class IdealizedMembershipBackend
     internal int DisposedHandles;
     internal int Deletes;
     internal int VersionedUpdates;
+    internal int Reads;
+    internal readonly List<(string Cluster, IdealizedMembershipTable Owner, SiloAddress Identity, DateTime Time, SiloStatus Status)> HeartbeatWrites = [];
 
     internal string Token() => $"opaque/{++Tokens:x}/token";
     internal sealed class Partition(string token)
@@ -178,10 +180,11 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
         => Locked(() =>
         {
             var partition = Partition;
-            if (!partition.Rows.TryGetValue(entry.SiloAddress, out var row)) return;
-            var stored = Clone(row.Item1);
-            if (entry.IAmAliveTime > stored.IAmAliveTime) stored.IAmAliveTime = entry.IAmAliveTime;
-            partition.Rows[stored.SiloAddress] = Tuple.Create(stored, backend.ChangeHeartbeatEtag ? backend.Token() : row.Item2);
+            var row = partition.Rows[entry.SiloAddress];
+            backend.HeartbeatWrites.Add((scopeClusterId, this, entry.SiloAddress, entry.IAmAliveTime, row.Item1.Status));
+            row.Item1.IAmAliveTime = entry.IAmAliveTime;
+            if (backend.ChangeHeartbeatEtag)
+                partition.Rows[entry.SiloAddress] = Tuple.Create(row.Item1, backend.Token());
         }, cancellationToken);
 
     internal static MembershipEntry Clone(MembershipEntry entry) => new()
@@ -202,6 +205,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
 
     private MembershipTableData Snapshot(SiloAddress? key)
     {
+        backend.Reads++;
         var partition = Partition;
         return new(partition.Rows.Where(p => key is null || p.Key.Equals(key))
             .Select(p => Tuple.Create(Clone(p.Value.Item1), backend.TableVersionRowEtags ? partition.Etag : p.Value.Item2)).ToList(),

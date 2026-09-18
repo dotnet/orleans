@@ -7,7 +7,7 @@ namespace Orleans.Clustering.TestKit;
 internal enum MembershipOperationKind
 {
     Initialize, ReadAll, ReadPresentRow, ReadAbsentRow, InsertNew, InsertDuplicate, InsertStaleTable,
-    UpdateForward, UpdateStaleTable, UpdateStaleRow, UpdateMissing, HeartbeatNewer, HeartbeatOlder,
+    UpdateForward, UpdateStaleTable, UpdateStaleRow, UpdateMissing, HeartbeatAdvance, HeartbeatRepeat,
     UpdateWithOldHeartbeat, CleanupDead, StartSuccessor, DeleteCluster, ReadOtherCluster
 }
 
@@ -90,6 +90,9 @@ internal static class MembershipModel
     internal static bool IsCommit(MembershipOperationKind kind) => kind is MembershipOperationKind.InsertNew
         or MembershipOperationKind.UpdateForward or MembershipOperationKind.UpdateWithOldHeartbeat or MembershipOperationKind.StartSuccessor;
 
+    internal static bool IsHeartbeat(MembershipOperationKind kind)
+        => kind is MembershipOperationKind.HeartbeatAdvance or MembershipOperationKind.HeartbeatRepeat;
+
     internal static bool CanApply(MembershipRequest request, MembershipModelState state)
     {
         if (state.Deleted) return false;
@@ -105,8 +108,8 @@ internal static class MembershipModel
             MembershipOperationKind.UpdateStaleTable => forward && state.Version > 1 && state.LastChangedKey != request.Key,
             MembershipOperationKind.UpdateStaleRow => forward && row!.Revision > 1,
             MembershipOperationKind.UpdateMissing => !exists && state.Rows.Count > 0,
-            MembershipOperationKind.HeartbeatNewer => exists && row!.Status < (int)SiloStatus.Dead && row.HeartbeatTicks < T2.Ticks,
-            MembershipOperationKind.HeartbeatOlder => exists && row!.HeartbeatTicks == T2.Ticks,
+            MembershipOperationKind.HeartbeatAdvance => forward && row!.HeartbeatTicks < T2.Ticks,
+            MembershipOperationKind.HeartbeatRepeat => forward && row!.HeartbeatTicks > T0.Ticks,
             MembershipOperationKind.CleanupDead => state.Rows.Values.Any(r => r.Status == (int)SiloStatus.Dead),
             MembershipOperationKind.StartSuccessor => !exists && state.TerminalGenerations.ContainsKey(request.Key),
             MembershipOperationKind.DeleteCluster => state.Rows.Count > 0,
@@ -144,8 +147,8 @@ internal static class MembershipModel
                 row.Suspects["127.0.0.1:11003@12"] = T0.Ticks;
                 if (row.Status == (int)SiloStatus.Dead) next.TerminalGenerations[request.Key] = row.GenerationOffset;
                 break;
-            case MembershipOperationKind.HeartbeatNewer:
-                next.Rows[request.Key].HeartbeatTicks = T2.Ticks;
+            case MembershipOperationKind.HeartbeatAdvance:
+                next.Rows[request.Key].HeartbeatTicks = next.Rows[request.Key].HeartbeatTicks == T0.Ticks ? T1.Ticks : T2.Ticks;
                 break;
             case MembershipOperationKind.CleanupDead:
                 var removed = next.Rows.Where(p => p.Value.Status == (int)SiloStatus.Dead
@@ -311,7 +314,8 @@ internal sealed class MembershipModelExecutionContext
         try
         {
             ClusteringTestKitDiagnostics.Require(MembershipModel.CanApply(request, _model), $"generated illegal operation {request}");
-            var writer = _prefix.Count % 2 == 0 ? _fixture.First : _fixture.Second;
+            var writer = (MembershipModel.IsHeartbeat(request.Kind) ? request.Key % 2 == 1 : _prefix.Count % 2 == 0)
+                ? _fixture.First : _fixture.Second;
             var reader = ReferenceEquals(writer, _fixture.First) ? _fixture.Second : _fixture.First;
             _otherBaseline ??= await MembershipTableTestRunner.Insert(_fixture.OtherCluster, CreateEntry(1, _seed), _ct);
             var before = await MembershipTableTestRunner.Read(reader, _ct);
@@ -328,7 +332,7 @@ internal sealed class MembershipModelExecutionContext
                 tableCandidate = _previousTable ?? throw new ClusteringConformanceException("missing real previous table candidate");
             if (request.Kind == MembershipOperationKind.UpdateStaleRow)
                 rowToken = _previousRows[id];
-            var detail = $"table={tableCandidate}; row ETag={rowToken}; heartbeat maximum={input.IAmAliveTime:O}";
+            var detail = $"table={tableCandidate}; row ETag={rowToken}; owner heartbeat={input.IAmAliveTime:O}";
             _prefix[^1] += $" [{detail}]";
             switch (request.Kind)
             {
@@ -367,9 +371,13 @@ internal sealed class MembershipModelExecutionContext
                     input.IAmAliveTime = T2; // Side-effect checks include rejected liveness writes.
                     outcome = await writer.UpdateRowAsync(input, rowToken!, tableCandidate, _ct);
                     break;
-                case MembershipOperationKind.HeartbeatNewer:
-                case MembershipOperationKind.HeartbeatOlder:
-                    input.IAmAliveTime = request.Kind == MembershipOperationKind.HeartbeatNewer ? T2 : T1;
+                case MembershipOperationKind.HeartbeatAdvance:
+                case MembershipOperationKind.HeartbeatRepeat:
+                    input = new MembershipEntry
+                    {
+                        SiloAddress = input.SiloAddress,
+                        IAmAliveTime = new(next.Rows[request.Key].HeartbeatTicks, DateTimeKind.Utc)
+                    };
                     await writer.UpdateIAmAliveAsync(input, _ct);
                     break;
                 case MembershipOperationKind.CleanupDead:
@@ -403,9 +411,9 @@ internal sealed class MembershipModelExecutionContext
                 if (before.Rows.TryGetValue(input.SiloAddress.ToParsableString(), out var previousRow))
                     _previousRows[input.SiloAddress.ToParsableString()] = previousRow.Etag;
             }
-            else if (request.Kind is MembershipOperationKind.HeartbeatNewer or MembershipOperationKind.HeartbeatOlder)
+            else if (MembershipModel.IsHeartbeat(request.Kind))
             {
-                ClusteringTestKitDiagnostics.Require(before.CompareVersioned(after) is null, $"heartbeat changed versioned state: {before.CompareVersioned(after)}");
+                MembershipTableTestRunner.AssertHeartbeat(before, after, input);
             }
             else if (request.Kind == MembershipOperationKind.CleanupDead)
             {

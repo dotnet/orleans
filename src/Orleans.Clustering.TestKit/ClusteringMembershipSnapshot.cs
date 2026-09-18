@@ -117,7 +117,6 @@ internal sealed class MembershipHistory
 {
     private ClusteringMembershipSnapshot? _previous;
     private readonly HashSet<string> _terminal = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, DateTime> _maxHeartbeats = new(StringComparer.Ordinal);
 
     internal bool IsTerminal(string identity) => _terminal.Contains(identity);
 
@@ -138,18 +137,12 @@ internal sealed class MembershipHistory
         {
             ClusteringTestKitDiagnostics.Require(!_terminal.Contains(identity) || row.Entry.Status == SiloStatus.Dead,
                 $"terminal identity reappeared live: {identity}; observed={row.Entry.Status}");
-            if (_maxHeartbeats.TryGetValue(identity, out var maximum))
-            {
-                ClusteringTestKitDiagnostics.Require(row.Entry.IAmAliveTime >= maximum,
-                    $"heartbeat maximum regressed: {identity}; expected>={maximum:O}, observed={row.Entry.IAmAliveTime:O}");
-            }
         }
 
         if (_previous is { } previous)
             _terminal.UnionWith(previous.Rows.Keys.Except(observation.Rows.Keys));
         foreach (var (identity, row) in observation.Rows)
         {
-            _maxHeartbeats[identity] = row.Entry.IAmAliveTime;
             if (row.Entry.Status == SiloStatus.Dead) _terminal.Add(identity);
         }
         _previous = observation;

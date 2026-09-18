@@ -48,18 +48,39 @@ public sealed class MembershipTableModelTests
     }
 
     [Fact]
-    public void Apply_HeartbeatAndOldHeartbeatStatusUpdate_PreserveMaximum()
+    public void Apply_OwnerSequencedHeartbeatsAndStalePayloadUpdate_PreserveStoredHeartbeat()
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
-        Apply(state, MembershipOperationKind.HeartbeatNewer);
-        Apply(state, MembershipOperationKind.HeartbeatOlder);
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
+        Assert.Equal(T1.Ticks, state.Rows[1].HeartbeatTicks);
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
+        Apply(state, MembershipOperationKind.HeartbeatRepeat);
         Assert.Equal(1, state.Version);
         Assert.Equal(T2.Ticks, state.Rows[1].HeartbeatTicks);
         Apply(state, MembershipOperationKind.UpdateWithOldHeartbeat);
         Assert.Equal(2, state.Version);
         Assert.Equal((int)SiloStatus.Joining, state.Rows[1].Status);
         Assert.Equal(T2.Ticks, state.Rows[1].HeartbeatTicks);
+    }
+
+    [Fact]
+    public void CanApply_HeartbeatOperationsRequireOwningLiveRowLifetime()
+    {
+        var state = new MembershipModelState();
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatAdvance), state));
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatRepeat), state));
+        Apply(state, MembershipOperationKind.InsertNew);
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
+        Assert.True(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatRepeat), state));
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatAdvance), state));
+        for (var i = 0; i < 5; i++) Apply(state, MembershipOperationKind.UpdateForward);
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatAdvance), state));
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatRepeat), state));
+        Apply(state, MembershipOperationKind.DeleteCluster);
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatAdvance), state));
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatRepeat), state));
     }
 
     [Fact]
@@ -71,6 +92,8 @@ public sealed class MembershipTableModelTests
         Assert.Equal((int)SiloStatus.Dead, state.Rows[1].Status);
         Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.UpdateForward), state));
         Apply(state, MembershipOperationKind.CleanupDead);
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatAdvance), state));
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.HeartbeatRepeat), state));
         Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.InsertNew), state));
         Assert.True(MembershipModel.CanApply(new(MembershipOperationKind.StartSuccessor), state));
         Assert.Equal(0, state.TerminalGenerations[1]);
@@ -115,7 +138,8 @@ public sealed class MembershipTableModelTests
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
-        Apply(state, MembershipOperationKind.HeartbeatNewer);
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
+        Apply(state, MembershipOperationKind.HeartbeatAdvance);
         for (var i = 0; i < 5; i++) Apply(state, MembershipOperationKind.UpdateForward);
         var version = state.Version;
 
