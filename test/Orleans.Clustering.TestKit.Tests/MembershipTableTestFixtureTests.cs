@@ -27,6 +27,88 @@ public sealed class MembershipTableTestFixtureTests
     }
 
     [Fact]
+    public async Task Initialize_ConcurrentCallersShareExactlyThreeInitializedHandles()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var tables = new System.Collections.Concurrent.ConcurrentQueue<IdealizedMembershipTable>();
+        var fixture = new MembershipTableTestFixture("concurrent-initialization", async (_, cluster, ct) =>
+        {
+            var table = backend.Create(cluster);
+            tables.Enqueue(table);
+            factoryEntered.TrySetResult();
+            await releaseFactory.Task.WaitAsync(ct);
+            return new MembershipTableTestHandle(table, () => backend.DisposeHandleAsync(cluster));
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        var first = fixture.InitializeAsync(ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        var second = fixture.InitializeAsync(ct).AsTask();
+        try
+        {
+            Assert.False(first.IsCompleted);
+            Assert.False(second.IsCompleted);
+            Assert.Single(tables);
+        }
+        finally
+        {
+            releaseFactory.TrySetResult();
+            await Task.WhenAll(first, second).WaitAsync(ct);
+            await fixture.DisposeAsync();
+        }
+
+        Assert.Equal(new[] { fixture.First, fixture.Second, fixture.OtherCluster }, tables.ToArray());
+        Assert.All(tables, table => Assert.Equal(1, table.InitializeCalls));
+        Assert.Equal(3, backend.CreatedHandles);
+        Assert.Equal(3, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
+    public async Task Initialize_CancelledQueuedCallerLeavesActiveInitializationIntact()
+    {
+        var backend = new IdealizedMembershipBackend();
+        var factoryEntered = Gate();
+        var releaseFactory = Gate();
+        var fixture = new MembershipTableTestFixture("cancelled-initialization-waiter", async (_, cluster, ct) =>
+        {
+            var table = backend.Create(cluster);
+            factoryEntered.TrySetResult();
+            await releaseFactory.Task.WaitAsync(ct);
+            return new MembershipTableTestHandle(table, () => backend.DisposeHandleAsync(cluster));
+        }, backend.IsDeletedAsync);
+        var ct = TestContext.Current.CancellationToken;
+        var first = fixture.InitializeAsync(ct).AsTask();
+        await factoryEntered.Task.WaitAsync(ct);
+        using var cancelled = new CancellationTokenSource();
+        var second = fixture.InitializeAsync(cancelled.Token).AsTask();
+        try
+        {
+            cancelled.Cancel();
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => second.WaitAsync(ct));
+            Assert.Equal(cancelled.Token, failure.CancellationToken);
+            Assert.False(first.IsCompleted);
+            Assert.Equal(1, backend.CreatedHandles);
+            Assert.Equal(0, backend.DisposedHandles);
+            Assert.Equal(0, backend.Deletes);
+        }
+        finally
+        {
+            releaseFactory.TrySetResult();
+            await first.WaitAsync(ct);
+            await fixture.DisposeAsync();
+        }
+
+        Assert.Equal(1, Assert.IsType<IdealizedMembershipTable>(fixture.First).InitializeCalls);
+        Assert.Equal(1, Assert.IsType<IdealizedMembershipTable>(fixture.Second).InitializeCalls);
+        Assert.Equal(1, Assert.IsType<IdealizedMembershipTable>(fixture.OtherCluster).InitializeCalls);
+        Assert.Equal(3, backend.CreatedHandles);
+        Assert.Equal(3, backend.DisposedHandles);
+        Assert.Equal(2, backend.Deletes);
+    }
+
+    [Fact]
     public async Task Initialize_SingletonFactory_IsRejectedAndAcquiredOwnerDisposedOnce()
     {
         var backend = new IdealizedMembershipBackend();

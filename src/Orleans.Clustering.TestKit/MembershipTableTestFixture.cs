@@ -28,6 +28,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     private readonly Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> _factory;
     private readonly Func<string, CancellationToken, ValueTask<bool>> _isDeleted;
     private readonly object _lifecycleLock = new();
+    private readonly SemaphoreSlim _initializationGate = new(1, 1);
     private readonly List<MembershipTableTestHandle> _handles = [];
     private readonly Dictionary<string, IMembershipTable> _clusters = new(StringComparer.Ordinal);
     private readonly HashSet<string> _endedClusters = new(StringComparer.Ordinal);
@@ -88,6 +89,19 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
 
     /// <summary>Constructs and initializes the three required handles. Partial failures clean up acquired resources.</summary>
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await _initializationGate.WaitAsync(cancellationToken);
+        try
+        {
+            await InitializeCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            _initializationGate.Release();
+        }
+    }
+
+    private async ValueTask InitializeCoreAsync(CancellationToken cancellationToken)
     {
         lock (_lifecycleLock)
         {

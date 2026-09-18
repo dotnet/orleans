@@ -81,6 +81,8 @@ internal sealed class IdealizedMembershipBackend
 
 internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backend, string scopeClusterId) : IMembershipTable
 {
+    internal int InitializeCalls { get; private set; }
+
     private IdealizedMembershipBackend.Partition Partition
     {
         get
@@ -97,6 +99,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     public Task InitializeMembershipTableAsync(bool tryInitTableVersion, CancellationToken cancellationToken = default)
         => Locked(() =>
         {
+            InitializeCalls++;
             if (!backend.Partitions.ContainsKey(scopeClusterId))
             {
                 backend.Partitions.Add(scopeClusterId, new(backend.Token()));

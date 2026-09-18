@@ -66,6 +66,8 @@ deletion even when owner disposal would destroy the backing data.
 
 `InitializeAsync` creates A1/A2 in `ClusterId` and B1 in `OtherClusterId`;
 `First`, `Second`, and `OtherCluster` expose those distinct providers.
+Concurrent initialization callers share the same three initialized handles;
+each queued caller can cancel its own wait.
 The second cluster ID extends the first with a suffix, exercising isolation of
 storage keys whose cluster names share a prefix.
 `CreateAdditionalHandleAsync` accepts only those two owned, live cluster scopes.
