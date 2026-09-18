@@ -56,7 +56,10 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         try
         {
-            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(CLUSTER_VERSION_ID, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false)).Resource;
+            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(
+                CLUSTER_VERSION_ID, _partitionKey,
+                new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
+                cancellationToken).ConfigureAwait(false)).Resource;
         }
         catch (CosmosException ce) when (IsMissingItem(ce))
         {
@@ -161,7 +164,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 }
                 catch (CosmosException exception) when (IsMissingItem(exception))
                 {
-                    await ReadClusterVersion(cancellationToken, exception.Headers.Session).ConfigureAwait(false);
+                    await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -251,12 +254,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
             {
                 current = (await _container.ReadItemAsync<SiloEntity>(
                     siloEntity.Id, _partitionKey,
-                    new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Session },
+                    new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
                     cancellationToken).ConfigureAwait(false)).Resource;
             }
             catch (CosmosException exception) when (IsMissingItem(exception))
             {
-                await ReadClusterVersion(cancellationToken, exception.Headers.Session).ConfigureAwait(false);
+                await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
                 return false;
             }
 
@@ -302,7 +305,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 cancellationToken.ThrowIfCancellationRequested();
                 var current = (await _container.ReadItemAsync<SiloEntity>(
                     siloEntityId, _partitionKey,
-                    new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Session },
+                    new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
                     cancellationToken).ConfigureAwait(false)).Resource;
                 if (current.IAmAliveTime.UtcDateTime >= entry.IAmAliveTime)
                 {
@@ -327,7 +330,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         catch (CosmosException exception) when (IsMissingItem(exception))
         {
             // A surviving version row distinguishes a retired silo from missing membership resources.
-            await ReadClusterVersion(cancellationToken, exception.Headers.Session).ConfigureAwait(false);
+            await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -342,7 +345,6 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var before = await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
-            var sessionToken = before.Headers.Session;
             var silos = new List<SiloEntity>();
             if (siloId is not null)
             {
@@ -350,14 +352,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 {
                     var response = await _container.ReadItemAsync<SiloEntity>(
                         siloId, _partitionKey,
-                        new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Session, SessionToken = sessionToken },
+                        new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
                         cancellationToken).ConfigureAwait(false);
                     silos.Add(response.Resource);
-                    sessionToken = response.Headers.Session;
                 }
                 catch (CosmosException exception) when (IsMissingItem(exception))
                 {
-                    sessionToken = exception.Headers.Session;
+                    // The closing version read verifies the membership view containing this absence.
                 }
             }
             else
@@ -368,8 +369,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
                     var queryOptions = new QueryRequestOptions
                     {
                         PartitionKey = _partitionKey,
-                        ConsistencyLevel = ConsistencyLevel.Session,
-                        SessionToken = sessionToken
+                        ConsistencyLevel = ConsistencyLevel.Strong
                     };
                     // Heartbeats replace documents without changing the version fence; an immutable
                     // order keeps those replacements from moving rows across continuation pages.
@@ -377,14 +377,12 @@ internal partial class CosmosMembershipTable : IMembershipTable
                         CreateSiloQuery(), continuationToken, queryOptions);
                     var page = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
                     silos.AddRange(page);
-                    sessionToken = page.Headers.Session;
                     continuationToken = page.ContinuationToken;
                 } while (!string.IsNullOrEmpty(continuationToken));
             }
 
-            // Session tokens order the reads within this logical partition. The closing read
-            // must observe at least the LSN of every page, even on a newly-created client.
-            var after = await ReadClusterVersion(cancellationToken, sessionToken).ConfigureAwait(false);
+            // Strong reads can straddle a membership update; matching version etags fence the view.
+            var after = await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
             if (string.Equals(before.ETag, after.ETag, StringComparison.Ordinal))
             {
                 return new MembershipTableData(
@@ -414,7 +412,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             && response[0].StatusCode == HttpStatusCode.FailedDependency
             && response[1].StatusCode == HttpStatusCode.NotFound)
         {
-            await ReadClusterVersion(cancellationToken, response.Headers.Session).ConfigureAwait(false);
+            await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
             return false;
         }
 
@@ -503,14 +501,14 @@ internal partial class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    private async Task<ItemResponse<ClusterVersionEntity>> ReadClusterVersion(CancellationToken cancellationToken, string? sessionToken = null)
+    private async Task<ItemResponse<ClusterVersionEntity>> ReadClusterVersion(CancellationToken cancellationToken)
     {
         try
         {
             return await _container.ReadItemAsync<ClusterVersionEntity>(
                 CLUSTER_VERSION_ID,
                 _partitionKey,
-                new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Session, SessionToken = sessionToken },
+                new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -527,7 +525,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             using var iterator = _container.GetItemQueryIterator<SiloEntity>(
                 CreateSiloQuery(status),
-                requestOptions: new QueryRequestOptions { PartitionKey = _partitionKey, ConsistencyLevel = ConsistencyLevel.Session });
+                requestOptions: new QueryRequestOptions { PartitionKey = _partitionKey, ConsistencyLevel = ConsistencyLevel.Strong });
 
             var silos = new List<SiloEntity>();
             do

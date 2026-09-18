@@ -143,16 +143,21 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
 
     private static Headers Headers(string session) => new() { ["x-ms-session-token"] = session };
 
-    public void AssertVersionRead(string session)
+    public void AssertVersionReads(int expectedCount = 1)
     {
-        var call = Assert.Single(Container.ReceivedCalls(), call =>
+        var calls = Container.ReceivedCalls().Where(call =>
             call.GetMethodInfo().Name == "ReadItemAsync"
-            && call.GetMethodInfo().GetGenericArguments().Contains(typeof(ClusterVersionEntity))
-            && ((ItemRequestOptions)call.GetArguments()[2]!).SessionToken == session);
-        Assert.Equal("ClusterVersion", call.GetArguments()[0]);
-        Assert.Equal(Partition, call.GetArguments()[1]);
-        Assert.Equal(ConsistencyLevel.Session, Assert.IsType<ItemRequestOptions>(call.GetArguments()[2]).ConsistencyLevel);
-        Assert.Equal(Token, call.GetArguments()[3]);
+            && call.GetMethodInfo().GetGenericArguments().Contains(typeof(ClusterVersionEntity))).ToArray();
+        Assert.Equal(expectedCount, calls.Length);
+        Assert.All(calls, call =>
+        {
+            Assert.Equal("ClusterVersion", call.GetArguments()[0]);
+            Assert.Equal(Partition, call.GetArguments()[1]);
+            var options = Assert.IsType<ItemRequestOptions>(call.GetArguments()[2]);
+            Assert.Equal(ConsistencyLevel.Strong, options.ConsistencyLevel);
+            Assert.Null(options.SessionToken);
+            Assert.Equal(Token, call.GetArguments()[3]);
+        });
     }
 
     public void AssertConditionalDelete(SiloEntity silo)

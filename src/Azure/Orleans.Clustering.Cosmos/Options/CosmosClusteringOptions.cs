@@ -4,8 +4,8 @@ namespace Orleans.Clustering.Cosmos;
 /// Options for configuring Azure Cosmos DB clustering.
 /// </summary>
 /// <remarks>
-/// Membership uses single-partition transactions and session-ordered reads. Configure the account
-/// with a single writable region and Session, BoundedStaleness, or Strong consistency.
+/// Membership uses single-partition transactions and Strong reads with table-version fencing.
+/// Configure the account with a single writable region and Strong consistency.
 /// </remarks>
 public class CosmosClusteringOptions : CosmosOptions
 {
