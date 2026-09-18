@@ -75,9 +75,7 @@ namespace Tester.StreamingTests
                 Fixture.StreamProviderName,
                 Fixture.StreamNamespace,
                 output,
-                null,
-                true,
-                TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken);
         }
     }
 }

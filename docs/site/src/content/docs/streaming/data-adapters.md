@@ -18,7 +18,7 @@ The built-in providers expose these data-adapter extension points:
 | Provider | Data-adapter contract | Registration | Runtime outcome |
 |---|---|---|---|
 | Azure Queue Storage | <xref:Orleans.Streams.IQueueDataAdapter`2> with `string` queue messages and <xref:Orleans.Streams.IBatchContainer> batches | <xref:Orleans.Hosting.AzureQueueStreamConfiguratorExtensions.ConfigureQueueDataAdapter*> | Replaces encoding and decoding while retaining Azure Queue mapping, visibility, deletion, and non-rewindable delivery |
-| Azure Event Hubs | <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter> | <xref:Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter*> | Replaces wire-format, stream-mapping, and cache conversion behavior while retaining Event Hubs partition reading, checkpointing, and rewindable delivery |
+| Azure Event Hubs | <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter> | <xref:Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter*> | Replaces wire-format, stream-mapping, and cache conversion behavior while retaining Event Hubs partition reading, checkpoint recovery, and live-cache rewind |
 | Amazon SQS | <xref:Orleans.Streaming.SQS.Streams.ISQSDataAdapter> | <xref:Orleans.Hosting.SiloSqsStreamConfigurator.UseDataAdapter*> and <xref:Orleans.Hosting.ClusterClientSqsStreamConfigurator.UseDataAdapter*> | Replaces the message body, application attributes, and batch decoding while retaining SQS queue mapping, FIFO transport fields, deletion, and non-rewindable delivery |
 
 <xref:Orleans.Streams.IQueueDataAdapter`1> defines conversion from an Orleans batch to a native queue message. <xref:Orleans.Streams.IQueueDataAdapter`2> adds conversion from a native message to the batch container delivered by Orleans. Provider-specific contracts can add the position and cache operations required by their transport.
@@ -62,7 +62,7 @@ For Event Hubs, derive from <xref:Orleans.Streaming.EventHubs.EventHubDataAdapte
 - <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter.ToQueueMessage*> to encode events published through Orleans; and
 - <xref:Orleans.Streaming.EventHubs.EventHubDataAdapter.GetPartitionKey*> to select the physical Event Hubs partition key.
 
-The adapter also participates in cache conversion and sequence positioning through <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Preserve the Event Hubs offset and sequence number when constructing batch tokens so checkpoint and rewind behavior remains aligned with the partition log.
+The adapter also participates in cache conversion and sequence positioning through <xref:Orleans.Streaming.EventHubs.IEventHubDataAdapter>. Preserve the Event Hubs offset and sequence number when constructing batch tokens so checkpoint recovery and live-cache rewind remain aligned with the stream partition.
 
 Register the adapter and Event Hubs connection under the same provider name on silos and publishing clients. The silo registration also configures durable Azure Table checkpoints:
 
@@ -89,4 +89,4 @@ Keep provider name, stream identity encoding, partition mapping, queue mode, and
 
 Conversion failures surface as stream-delivery failures. Throw a descriptive exception for malformed payloads, unsupported versions, and missing routing metadata so the provider retains or replays the source message according to its delivery semantics. Monitor conversion failures and quarantine poison messages through the transport's operational process before they exhaust retention or block partition progress.
 
-Test both conversion directions with retained messages from every deployed schema version. Include heterogeneous batches, request context, duplicate delivery, malformed envelopes, unknown versions, rolling upgrades, and replay from an older Event Hubs checkpoint.
+Test both conversion directions with retained messages from every deployed schema version. Include heterogeneous batches, request context, duplicate delivery, malformed envelopes, unknown versions, rolling upgrades, and receiver recovery from an older Event Hubs checkpoint.

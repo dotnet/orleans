@@ -21,20 +21,23 @@ namespace Orleans.Streaming.Kinesis
     /// <summary>
     /// Queue adapter factory which allows the PersistentStreamProvider to use AWS Kinesis Data Streams as its backend persistent event queue.
     /// </summary>
-    internal class KinesisAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IDisposable
+    internal class KinesisAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache, IDisposable
     {
         private readonly KinesisStreamOptions _options;
         private readonly Serializer<KinesisBatchContainer.Body> _serializer;
         private readonly IStreamQueueCheckpointerFactory? _checkpointerFactory;
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IQueueAdapterCache _adapterCache;
+        private readonly SimpleQueueCacheOptions _cacheOptions;
+        private readonly RecoverableStreamReplayOptions _replayOptions;
         private readonly ILogger<KinesisAdapterFactory> _logger;
         private readonly Func<string[], HashRingBasedPartitionedStreamQueueMapper> _queueMapperFactory;
         private readonly IAmazonKinesis _client;
         private readonly TimeProvider _timeProvider;
+        private readonly SemaphoreSlim _initializationSemaphore = new(1);
 
         private HashRingBasedPartitionedStreamQueueMapper _streamQueueMapper = null!;
         private KinesisShardTopologyMonitor _topologyMonitor = null!;
+        private QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver> _receivers = null!;
         private int _disposed;
 
         public KinesisAdapterFactory(
@@ -44,7 +47,8 @@ namespace Orleans.Streaming.Kinesis
             Serializer<KinesisBatchContainer.Body> serializer,
             IStreamQueueCheckpointerFactory? checkpointerFactory,
             ILoggerFactory loggerFactory,
-            TimeProvider? timeProvider = null
+            TimeProvider? timeProvider = null,
+            RecoverableStreamReplayOptions? replayOptions = null
         )
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -53,14 +57,10 @@ namespace Orleans.Streaming.Kinesis
             _serializer = serializer;
             _checkpointerFactory = checkpointerFactory;
             _loggerFactory = loggerFactory;
+            _cacheOptions = cacheOptions;
+            _replayOptions = replayOptions ?? new RecoverableStreamReplayOptions();
             _logger = loggerFactory.CreateLogger<KinesisAdapterFactory>();
             _timeProvider = timeProvider ?? TimeProvider.System;
-
-            _adapterCache = new SimpleQueueAdapterCache(
-                cacheOptions,
-                name,
-                loggerFactory
-            );
 
             _queueMapperFactory = partitions => new HashRingBasedPartitionedStreamQueueMapper(partitions, Name);
             _client = CreateClient();
@@ -68,7 +68,7 @@ namespace Orleans.Streaming.Kinesis
 
         public string Name { get; }
 
-        public bool IsRewindable => false;
+        public bool IsRewindable => true;
 
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
@@ -79,6 +79,7 @@ namespace Orleans.Streaming.Kinesis
             var serializer = services.GetRequiredService<Serializer<KinesisBatchContainer.Body>>();
             var checkpointerFactory = services.GetKeyedService<IStreamQueueCheckpointerFactory>(name);
             var logger = services.GetRequiredService<ILoggerFactory>();
+            var replayOptions = services.GetOptionsByName<RecoverableStreamReplayOptions>(name);
 
             return new KinesisAdapterFactory(
                 name,
@@ -87,7 +88,8 @@ namespace Orleans.Streaming.Kinesis
                 serializer,
                 checkpointerFactory,
                 logger,
-                services.GetService<TimeProvider>());
+                services.GetService<TimeProvider>(),
+                replayOptions);
         }
 
         public async Task<IQueueAdapter> CreateAdapter()
@@ -95,24 +97,43 @@ namespace Orleans.Streaming.Kinesis
 
         public async Task<IQueueAdapter> CreateAdapter(CancellationToken cancellationToken)
         {
-            if (_streamQueueMapper is null)
+            if (Volatile.Read(ref _streamQueueMapper) is not null)
             {
-                var kinesisStreams = await GetPartitionIdsAsync(cancellationToken);
-                _streamQueueMapper = _queueMapperFactory(kinesisStreams);
-                _topologyMonitor = new(
+                return this;
+            }
+
+            await _initializationSemaphore.WaitAsync(cancellationToken);
+            try
+            {
+                if (_streamQueueMapper is not null)
+                {
+                    return this;
+                }
+
+                var partitions = await GetPartitionIdsAsync(cancellationToken);
+                var queueMapper = _queueMapperFactory(partitions);
+                var topologyMonitor = new KinesisShardTopologyMonitor(
                     _client,
                     _options.StreamName,
-                    kinesisStreams,
+                    partitions,
                     _options.TopologyCheckInterval,
                     _timeProvider,
                     _loggerFactory.CreateLogger<KinesisShardTopologyMonitor>());
-            }
+                var receivers = new QueueAdapterReceiverRegistry<KinesisPooledAdapterReceiver>(MakeReceiver);
 
-            return this;
+                _topologyMonitor = topologyMonitor;
+                _receivers = receivers;
+                Volatile.Write(ref _streamQueueMapper, queueMapper);
+                return this;
+            }
+            finally
+            {
+                _initializationSemaphore.Release();
+            }
         }
 
         public IQueueAdapterCache GetQueueAdapterCache()
-            => _adapterCache;
+            => this;
 
         public IStreamQueueMapper GetStreamQueueMapper()
             => _streamQueueMapper;
@@ -135,6 +156,12 @@ namespace Orleans.Streaming.Kinesis
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
+            => GetOrCreateReceiver(queueId);
+
+        public IQueueCache CreateQueueCache(QueueId queueId)
+            => GetOrCreateReceiver(queueId);
+
+        private KinesisPooledAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
             if (_checkpointerFactory is null)
             {
@@ -142,18 +169,25 @@ namespace Orleans.Streaming.Kinesis
                     $"No {nameof(IStreamQueueCheckpointerFactory)} is configured for the Kinesis stream provider '{Name}'.");
             }
 
-            var partition = _streamQueueMapper.QueueToPartition(queueId);
+            return _receivers.GetOrCreate(queueId);
+        }
 
-            return new KinesisAdapterReceiver(
-                CreateClient(),
+        private KinesisPooledAdapterReceiver MakeReceiver(QueueId queueId)
+        {
+            var partition = _streamQueueMapper.QueueToPartition(queueId);
+            return new KinesisPooledAdapterReceiver(
+                CreateClient,
                 _options.StreamName,
                 partition,
-                _checkpointerFactory,
+                _checkpointerFactory!,
+                _cacheOptions,
                 _serializer,
                 _loggerFactory,
                 _topologyMonitor,
                 _options.GetRecordsInterval,
-                _timeProvider
+                _timeProvider,
+                _replayOptions,
+                receiver => _receivers.Remove(queueId, receiver)
                 );
         }
 
@@ -209,7 +243,7 @@ namespace Orleans.Streaming.Kinesis
         internal async Task<string[]> GetPartitionIdsAsync()
             => await GetPartitionIdsAsync(CancellationToken.None);
 
-        internal async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
+        internal virtual async Task<string[]> GetPartitionIdsAsync(CancellationToken cancellationToken)
             => await GetPartitionIdsAsync(_client, _options.StreamName, cancellationToken);
 
         internal static Task<string[]> GetPartitionIdsAsync(IAmazonKinesis client, string streamName)
