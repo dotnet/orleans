@@ -238,7 +238,7 @@ public sealed class DeliveryAndOptionsContractTests
             throwOnError: true)!;
         var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
         var grainContext = Substitute.For<IGrainContext>();
-        grainContext.GrainInstance.Returns(new object());
+        grainContext.GrainInstance.Returns(Substitute.For<IDurableMessagingGrain>());
         extensionType.GetField("_grainContext", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(extension, grainContext);
         extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!
