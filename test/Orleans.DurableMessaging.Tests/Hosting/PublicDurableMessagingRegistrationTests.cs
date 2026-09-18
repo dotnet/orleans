@@ -47,9 +47,20 @@ public sealed class PublicDurableMessagingRegistrationTests
             Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
         }
 
-        var endpoint = Assert.Single(services, descriptor =>
-            descriptor.IsKeyedService && Equals(descriptor.ServiceKey, "__orleans.durable-messaging.outbox-observer"));
-        Assert.Equal(ServiceLifetime.Scoped, endpoint.Lifetime);
+        foreach (var stateName in new[]
+        {
+            "inbox", "inbox-processed", "inbox-message-state", "inbox-dead-letters",
+            "outbox", "outbox-message-state", "outbox-dead-letters", "outbox-job-id",
+            "outbox-job-handle", "outbox-completed-job-id", "outbox-job-sequence"
+        })
+        {
+            var state = Assert.Single(services, descriptor =>
+                descriptor.IsKeyedService && Equals(descriptor.ServiceKey, $"__orleans.durable-messaging.{stateName}")
+                && descriptor.ServiceType.IsGenericType
+                && (descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IDurableDictionary<,>)
+                    || descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IDurableValue<>)));
+            Assert.Equal(ServiceLifetime.Scoped, state.Lifetime);
+        }
         var extension = Assert.Single(services, descriptor =>
             descriptor.ServiceType == typeof(IGrainExtension) && Equals(descriptor.ServiceKey, typeof(IDurableInboxExtension)));
         Assert.Equal(ServiceLifetime.Scoped, extension.Lifetime);
@@ -212,13 +223,13 @@ public sealed class PublicDurableMessagingRegistrationTests
     {
         var services = new ServiceCollection();
         services.AddDurableMessaging();
-        services.AddScoped<IJournaledStateManager, FullyCapableStateManager>();
+        services.AddScoped<IJournaledStateManager, ConstructionTestStateManager>();
         await using var provider = services.BuildServiceProvider();
         var extensionType = services.Single(descriptor => descriptor.ServiceType.Name == "DurableInboxExtension").ServiceType;
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService(extensionType));
 
-        Assert.DoesNotContain("observer support", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(nameof(IGrainContext), exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -272,12 +283,10 @@ public sealed class PublicDurableMessagingRegistrationTests
     {
     }
 
-    private class StateManagerWithoutObservers : IJournaledStateManager
+    private sealed class ConstructionTestStateManager : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
-        public virtual void RegisterObserver(IJournaledStateObserver observer) =>
-            throw new NotSupportedException();
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
         {
             state = null;
@@ -288,8 +297,4 @@ public sealed class PublicDurableMessagingRegistrationTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class FullyCapableStateManager : StateManagerWithoutObservers
-    {
-        public override void RegisterObserver(IJournaledStateObserver observer) { }
-    }
 }
