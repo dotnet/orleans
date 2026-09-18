@@ -111,8 +111,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 1, now + TimeSpan.FromMinutes(1));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
 
-        Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
-        using (var runningLocalDrain = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), envelope.Value.RouteKey))
+        using (var runningLocalDrain = ArmHandlerBeforeAdvance(receiver.GetGrainId(), envelope.Value.RouteKey, TimeSpan.FromMinutes(1)))
         {
             Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
             await runningLocalDrain.WaitUntilEnteredAsync();
@@ -123,8 +122,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
             Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await retry).Status);
         }
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
-        Fixture.Clock.Advance(TimeSpan.FromMinutes(2));
-        using var runningRequestedPump = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), envelope.Value.RouteKey);
+        using var runningRequestedPump = ArmHandlerBeforeAdvance(receiver.GetGrainId(), envelope.Value.RouteKey, TimeSpan.FromMinutes(2));
         var terminal = RunPumpAsync(receiver, job);
         await runningRequestedPump.WaitUntilEnteredAsync();
         await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, terminal);
@@ -144,6 +142,61 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(1, ScheduleCount(receiver));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
         Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).Faulted.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task RetryBarrier_IsArmedWhenClockMakesBackgroundPumpEligible()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(receiver, NewMessage(192, "clock-boundary") with { ThrowDuringPreparation = true });
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        var stopped = WaitForPumpAsync(events, receiver.GetGrainId());
+        var now = Fixture.Clock.GetUtcNow();
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await stopped;
+        var first = await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var job = Assert.IsType<DurableJob>(first.InboxJob);
+        AssertPendingRetry(context, first, expectedAttempts: 1, now + TimeSpan.FromMinutes(1));
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
+        HandlerProbe.Barrier? observedBarrier = null;
+        Task<DurableJobRunResult>? background = null;
+        using var tick = Fixture.Clock.CreateTimer(_ =>
+        {
+            Fixture.HandlerProbe.TryGet(receiver.GetGrainId(), envelope.Value.RouteKey, out observedBarrier);
+            background = RunPumpAsync(receiver, job);
+        }, null, TimeSpan.FromMinutes(1), Timeout.InfiniteTimeSpan);
+
+        using var handler = ArmHandlerBeforeAdvance(receiver.GetGrainId(), envelope.Value.RouteKey, TimeSpan.FromMinutes(1));
+        Assert.Same(handler, observedBarrier);
+        Assert.NotNull(background);
+        await handler.WaitUntilEnteredAsync();
+        await OnTurnAsync(context, () => AssertPendingRetry(context, grain.GetSnapshotForTest(), expectedAttempts: 1, now + TimeSpan.FromMinutes(1)));
+        Assert.False(background.IsCompleted);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, background);
+        handler.Release();
+        Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await background).Status);
+        AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        Assert.Equal(1, ScheduleCount(receiver));
+        Assert.False(grain.Faulted.Task.IsCompleted);
+    }
+
+    private HandlerProbe.Barrier ArmHandlerBeforeAdvance(GrainId grainId, string route, TimeSpan advance)
+    {
+        var handler = Fixture.HandlerProbe.Arm(grainId, route);
+        try
+        {
+            Fixture.Clock.Advance(advance);
+            return handler;
+        }
+        catch
+        {
+            handler.Dispose();
+            throw;
+        }
     }
 
     private static async Task AssertUnrelatedTimerDoesNotCompleteAsync(IGrainContext context, DiagnosticEventCollector events, Task pump)
