@@ -243,6 +243,72 @@ namespace Tester.Redis.Clustering
             Assert.Equal(SiloStatus.Dead, Assert.Single(unchanged.Members).Item1.Status);
         }
 
+        [Theory]
+        [InlineData(false, 0)]
+        [InlineData(false, 1)]
+        [InlineData(false, 10)]
+        [InlineData(true, 0)]
+        [InlineData(true, 1)]
+        [InlineData(true, 10)]
+        public async Task CanonicalWrite_RejectsNonSequentialVersionInOneCommand(bool insert, int proposedVersion)
+        {
+            using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
+            using var table = new RedisMembershipTable(
+                Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
+                _clusterOptions);
+            var token = TestContext.Current.CancellationToken;
+            await table.InitializeMembershipTableAsync(false, token);
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+                Status = SiloStatus.Active,
+                StartTime = DateTime.UnixEpoch,
+                IAmAliveTime = DateTime.UnixEpoch,
+                HostName = "host",
+                SiloName = "silo"
+            };
+            Assert.True(await table.InsertRowAsync(entry, (await table.ReadAllAsync(token)).Version.Next(), token));
+            var snapshot = await table.ReadRowAsync(entry.SiloAddress, token);
+            var rowEtag = Assert.Single(snapshot.Members).Item2;
+            if (insert)
+            {
+                entry.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
+            }
+
+            entry.Status = SiloStatus.Dead;
+            var database = connection.GetDatabase();
+            var key = RedisClusteringOptions.DefaultCreateRedisKey(_clusterOptions.Value);
+            var before = (await database.HashGetAllAsync(key)).ToDictionary(row => row.Name, row => row.Value);
+            var expiry = await database.KeyExpireTimeAsync(key);
+            var invalid = new TableVersion(proposedVersion, snapshot.Version.VersionEtag);
+            ProfilingSession? activeProfile = null;
+            connection.RegisterProfiler(() => activeProfile);
+            var profile = new ProfilingSession();
+            activeProfile = profile;
+
+            var result = insert
+                ? await table.InsertRowAsync(entry, invalid, token)
+                : await table.UpdateRowAsync(entry, rowEtag, invalid, token);
+
+            activeProfile = null;
+            Assert.False(result);
+            Assert.Equal("EVAL", Assert.Single(profile.FinishProfiling()).Command);
+            var after = (await database.HashGetAllAsync(key)).ToDictionary(row => row.Name, row => row.Value);
+            Assert.Equal(before.Count, after.Count);
+            foreach (var row in before)
+            {
+                Assert.Equal(row.Value, after[row.Key]);
+            }
+
+            Assert.Equal(expiry, await database.KeyExpireTimeAsync(key));
+            Assert.True(insert
+                ? await table.InsertRowAsync(entry, snapshot.Version.Next(), token)
+                : await table.UpdateRowAsync(entry, rowEtag, snapshot.Version.Next(), token));
+            var updated = await table.ReadRowAsync(entry.SiloAddress, token);
+            Assert.Equal(snapshot.Version.Version + 1, updated.Version.Version);
+            Assert.Equal(SiloStatus.Dead, Assert.Single(updated.Members).Item1.Status);
+        }
+
         [Fact]
         public async Task CleanupDefunctSiloEntries()
         {

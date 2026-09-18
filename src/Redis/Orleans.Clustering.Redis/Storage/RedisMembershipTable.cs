@@ -208,7 +208,8 @@ namespace Orleans.Clustering.Redis
             // Server-side token validation avoids WATCH conflicts caused by heartbeat writes to the same hash.
             const string script =
                 """
-                if redis.call('HGET', KEYS[1], 'Version') ~= ARGV[2] then
+                if redis.call('HGET', KEYS[1], 'Version') ~= ARGV[2]
+                    or tonumber(ARGV[2]) ~= tonumber(ARGV[3]) - 1 then
                     return 0
                 end
                 if redis.call('HEXISTS', KEYS[1], ARGV[1]) ~= tonumber(ARGV[5]) then

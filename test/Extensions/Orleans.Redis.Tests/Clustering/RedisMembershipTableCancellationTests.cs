@@ -692,6 +692,47 @@ public sealed class RedisMembershipTableCancellationTests
         Assert.Equal([false, true, false], backend.Commits);
     }
 
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 1)]
+    [InlineData(false, 10)]
+    [InlineData(true, 0)]
+    [InlineData(true, 1)]
+    [InlineData(true, 10)]
+    public async Task CanonicalWrite_RequiresNextVersionWithCurrentToken(bool insert, int proposedVersion)
+    {
+        var backend = new MembershipBackend();
+        using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var existing = CreateEntry();
+        Assert.True(await table.InsertRowAsync(existing, new TableVersion(1, "0"), token));
+        var captured = backend.Rows[existing.SiloAddress.ToString()];
+        var entry = CreateEntry();
+        entry.Status = SiloStatus.Dead;
+        if (insert)
+        {
+            entry.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
+        }
+
+        var invalid = new TableVersion(proposedVersion, "1");
+        var result = insert
+            ? await table.InsertRowAsync(entry, invalid, token)
+            : await table.UpdateRowAsync(entry, "1", invalid, token);
+
+        Assert.False(result);
+        Assert.Equal(2, backend.Rows.Count);
+        Assert.Equal((RedisValue)"1", backend.Rows["Version"]);
+        Assert.Equal(captured, backend.Rows[existing.SiloAddress.ToString()]);
+        Assert.Equal([true, false], backend.Commits);
+        var next = new TableVersion(2, "1");
+        Assert.True(insert
+            ? await table.InsertRowAsync(entry, next, token)
+            : await table.UpdateRowAsync(entry, "1", next, token));
+        Assert.Equal((RedisValue)"2", backend.Rows["Version"]);
+        Assert.Equal(SiloStatus.Dead, backend.Read(entry).Status);
+    }
+
     [Fact]
     public async Task Insert_ConcurrentWriter_AllowsOneWinner()
     {
@@ -1484,6 +1525,7 @@ public sealed class RedisMembershipTableCancellationTests
 
             Assert.Equal(5, values.Length);
             var success = Rows.GetValueOrDefault("Version", RedisValue.Null) == values[1]
+                && (long)values[1] == (long)values[2] - 1
                 && Rows.ContainsKey(values[0]) == (values[4] == "1");
             if (success)
             {
