@@ -609,7 +609,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
             _state = ManagerState.Fenced;
             _failure = exception;
+        }
 
+        try
+        {
+            // Fencing prevents registration, so callbacks can use the stable registry outside the lock.
             foreach (var (name, state) in _states)
             {
                 try
@@ -621,10 +625,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     LogErrorNotifyingFaultedState(_shared.Logger, notificationException, name);
                 }
             }
-        }
 
-        try
-        {
             if (!_shutdownCancellation.IsCancellationRequested)
             {
                 LogErrorProcessingWorkItems(_shared.Logger, exception);
