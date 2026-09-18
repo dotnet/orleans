@@ -340,7 +340,10 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
         Assert.Equal(ReceiverTestServices.GetImplementationType("DurableMessagingGrainTypeConfigurator"), descriptor.ImplementationType);
         Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IDurableOutbox));
-        Assert.Single(services, static descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, BootstrapOutboxServices.ObserverName));
+        foreach (var stateName in BootstrapOutboxServices.StateNames)
+        {
+            Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, stateName));
+        }
         Assert.Empty(typeof(IDurableMessagingGrain).GetInterfaces());
         Assert.Empty(typeof(IDurableMessagingGrain).GetMethods());
         Assert.False(typeof(IAddressable).IsAssignableFrom(typeof(IDurableMessagingGrain)));
@@ -371,8 +374,13 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Equal(8, BootstrapState.ReadMessagingStates(observation.Manager!).Count());
         var primary = services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox");
         Assert.Same(primary, applicationManager.GetOrAddState<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"));
-        Assert.True(observation.Manager!.TryGetStateMachine("test-handler-output", out var output));
-        Assert.Same(applicationOutbox, output);
+        Assert.Same(observation.Outbox, services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableOutbox")));
+        foreach (var name in BootstrapOutboxServices.StateNames)
+        {
+            Assert.True(observation.Manager!.TryGetStateMachine(name, out _));
+        }
+        Assert.True(observation.Manager!.TryGetStateMachine("__orleans.durable-messaging.outbox-job-handle", out var jobState));
+        Assert.Same(jobState, services.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle"));
     }
     private IBootstrapTestGrain CreateGrain(Type grainClass) => grainClass == typeof(GenericBootstrapGrain<int>)
         ? Fixture.Client.GetGrain<IGenericBootstrapTestGrain<int>>(Guid.NewGuid())
