@@ -306,19 +306,38 @@ namespace Orleans.AzureUtils
         {
             string rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
 
-            var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX}))");
-            for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
+            var filter = TableClient.CreateQueryFilter($"(PartitionKey eq {DeploymentId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))");
+            var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter, cancellationToken);
+            if (queryResults.Count < 1 || queryResults.Count > 2)
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Could not find table version row or found too many entries. Was looking for key {0}, found = {1}",
+                    siloAddress,
+                    Utils.EnumerableToString(queryResults)));
+
+            var numTableVersionRows = 0;
+            foreach (var entry in queryResults)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var queryResults = await storage.ReadTableEntriesAndEtagsAsync(filter, cancellationToken);
-                if (CanAcceptSnapshot(queryResults))
+                if (entry.Item1.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW)
                 {
-                    return RemoveBoundaryVersionRows(queryResults);
+                    numTableVersionRows++;
                 }
             }
 
-            throw new InconsistentStateException(
-                $"Unable to read a consistent membership row for '{siloAddress}' after {MaxMembershipSnapshotAttempts} attempts.");
+            if (numTableVersionRows < 1)
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Did not read table version row. Read = {0}",
+                    Utils.EnumerableToString(queryResults)));
+
+            if (numTableVersionRows > 1)
+                throw new KeyNotFoundException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    "Read {0} table version rows, while was expecting only 1. Read = {1}",
+                    numTableVersionRows,
+                    Utils.EnumerableToString(queryResults)));
+
+            return queryResults;
         }
 
         internal async Task<List<(SiloInstanceTableEntry Entity, string ETag)>> FindAllSiloEntries(
