@@ -128,7 +128,6 @@ public class CosmosMembershipTableCancellationTests
     [InlineData("ReadRow", 3, 0)]
     [InlineData("ReadAll", 2, 1)]
     [InlineData("Update", 1, 0)]
-    [InlineData("Heartbeat", 1, 0)]
     [InlineData("Cleanup", 0, 1)]
     [InlineData("Delete", 2, 1)]
     public async Task MembershipOperationsRequestStrongConsistency(string operation, int expectedItemReads, int expectedQueries)
@@ -143,7 +142,6 @@ public class CosmosMembershipTableCancellationTests
         storage.SetSilo(silo);
         storage.SetPages(Page("0:8", null, silo));
         storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.OK);
-        storage.Container.ReplaceItemAsync(new SiloEntity(), "", null, null, Token).ReturnsForAnyArgs(Item(silo));
         storage.Container.DeleteItemAsync<SiloEntity>("", default, null, Token).ReturnsForAnyArgs(Item(silo));
         storage.Container.DeleteItemAsync<ClusterVersionEntity>("", default, null, Token).ReturnsForAnyArgs(Version(7, "v7", "0:7"));
 
@@ -153,7 +151,6 @@ public class CosmosMembershipTableCancellationTests
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
             "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
-            "Heartbeat" => storage.Table.UpdateIAmAliveAsync(Entry(), Token),
             "Cleanup" => storage.Table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), Token),
             "Delete" => storage.Table.DeleteMembershipTableEntriesAsync("cluster", Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
@@ -400,122 +397,73 @@ public class CosmosMembershipTableCancellationTests
         Assert.Contains("native batch failure", exception.ToString());
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatAfterCompactionPreservesAbsenceAndVersion(bool deletionRacesReplace)
+    [Fact]
+    public async Task HeartbeatUsesOneBlindTimestampPatch()
     {
         using var storage = new CosmosMembershipTestStorage();
-        storage.SetVersion();
-        if (deletionRacesReplace)
-        {
-            storage.SetSilo(Silo());
-            storage.Container.ReplaceItemAsync(
-                new SiloEntity(), "", null, null, Token)
-                .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.NotFound)));
-        }
-        else
-        {
-            storage.Container.ReadItemAsync<SiloEntity>(
-                "", default, null, Token)
-                .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.NotFound)));
-        }
+        using var response = new ResponseMessage(HttpStatusCode.OK);
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Arg.Any<CancellationToken>()).Returns(response);
+        var entry = Entry();
 
-        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
+        await storage.Table.UpdateIAmAliveAsync(entry, Token);
 
-        Assert.Equal(deletionRacesReplace ? 3 : 2, storage.Container.ReceivedCalls().Count());
-        Assert.DoesNotContain(storage.Container.ReceivedCalls(), call =>
-            call.GetMethodInfo().Name is "CreateItemAsync" or "UpsertItemAsync" or "CreateTransactionalBatch");
-        storage.AssertVersionReads();
+        var call = Assert.Single(storage.Container.ReceivedCalls());
+        Assert.Equal("PatchItemStreamAsync", call.GetMethodInfo().Name);
+        Assert.Equal(Silo().Id, call.GetArguments()[0]);
+        Assert.Equal(Partition, call.GetArguments()[1]);
+        var patch = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<PatchOperation>>(call.GetArguments()[2]));
+        Assert.Equal(PatchOperationType.Set, patch.OperationType);
+        Assert.Equal("/IAmAliveTime", patch.Path);
+        Assert.Equal(new DateTimeOffset(entry.IAmAliveTime), Assert.IsAssignableFrom<PatchOperation<DateTimeOffset>>(patch).Value);
+        var options = Assert.IsType<PatchItemRequestOptions>(call.GetArguments()[3]);
+        Assert.Null(options.IfMatchEtag);
+        Assert.Null(options.IfNoneMatchEtag);
+        Assert.Null(options.FilterPredicate);
+        Assert.False(options.EnableContentResponseOnWrite);
+        Assert.Equal(Token, call.GetArguments()[4]);
     }
 
     [Fact]
-    public async Task HeartbeatRetriesConcurrentMembershipUpdateWithoutOverwritingIt()
-    {
-        using var storage = new CosmosMembershipTestStorage();
-        var first = Silo();
-        var concurrent = Silo(status: SiloStatus.Dead);
-        concurrent.ETag = "s2";
-        concurrent.SuspectingSilos.Add(Entry(2).SiloAddress.ToParsableString());
-        concurrent.SuspectingTimes.Add(LogFormatter.PrintDate(DateTime.UnixEpoch.AddMinutes(30)));
-        storage.Container.ReadItemAsync<SiloEntity>(
-            "", default, null, Token)
-            .ReturnsForAnyArgs(Item(Clone(first)), Item(Clone(concurrent)));
-        storage.Container.ReplaceItemAsync(
-            new SiloEntity(), "", null, null, Token)
-            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.PreconditionFailed)), Task.FromResult(Item(concurrent)));
-
-        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
-
-        var replacement = Assert.Single(storage.Container.ReceivedCalls(), call =>
-            call.GetMethodInfo().Name == "ReplaceItemAsync"
-            && ((ItemRequestOptions)call.GetArguments()[3]!).IfMatchEtag == "s2");
-        var value = Assert.IsType<SiloEntity>(replacement.GetArguments()[0]);
-        Assert.Equal((int)SiloStatus.Dead, value.Status);
-        Assert.Equal(DateTime.UnixEpoch.AddHours(1), value.IAmAliveTime);
-        Assert.Equal(concurrent.SuspectingTimes, value.SuspectingTimes);
-        Assert.Equal(concurrent.SuspectingSilos, value.SuspectingSilos);
-        Assert.Equal(first.Id, replacement.GetArguments()[1]);
-        Assert.Equal(Partition, replacement.GetArguments()[2]);
-        Assert.Equal(Token, replacement.GetArguments()[4]);
-        Assert.Equal(4, storage.Container.ReceivedCalls().Count());
-    }
-
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    public async Task OlderOrEqualHeartbeatPreservesStoredRow(int storedHours)
-    {
-        using var storage = new CosmosMembershipTestStorage();
-        var silo = Silo();
-        silo.IAmAliveTime = DateTime.UnixEpoch.AddHours(storedHours);
-        storage.SetSilo(silo);
-
-        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
-
-        Assert.Equal("ReadItemAsync", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
-        Assert.Equal(DateTime.UnixEpoch.AddHours(storedHours), silo.IAmAliveTime);
-    }
-
-    [Fact]
-    public async Task HeartbeatContentionObservesCancellation()
+    public async Task NativeHeartbeatPatchCancellationRetainsToken()
     {
         using var storage = new CosmosMembershipTestStorage();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
-        storage.SetSilo(Silo());
-        storage.Container.ReplaceItemAsync(new SiloEntity(), "", null, null, Token).ReturnsForAnyArgs(call =>
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             Assert.Equal(cancellation.Token, call.Arg<CancellationToken>());
             cancellation.Cancel();
-            return Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.PreconditionFailed));
+            return Task.FromCanceled<ResponseMessage>(cancellation.Token);
         });
 
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => storage.Table.UpdateIAmAliveAsync(Entry(), cancellation.Token));
+        var operation = storage.Table.UpdateIAmAliveAsync(Entry(), cancellation.Token);
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(new[] { "ReadItemAsync", "ReplaceItemAsync" },
-            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+        Assert.True(operation.IsCanceled);
+        Assert.Equal("PatchItemStreamAsync", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
-    [Fact]
-    public async Task HeartbeatContentionCompletesWhenConcurrentHeartbeatAdvances()
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.PreconditionFailed)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task HeartbeatPatchFailuresRemainVisibleWithoutAdditionalRequests(HttpStatusCode status)
     {
         using var storage = new CosmosMembershipTestStorage();
-        var concurrent = Silo();
-        concurrent.ETag = "advanced-heartbeat";
-        concurrent.IAmAliveTime = DateTime.UnixEpoch.AddHours(2);
-        storage.Container.ReadItemAsync<SiloEntity>("", default, null, Token)
-            .ReturnsForAnyArgs(Item(Silo()), Item(concurrent));
-        storage.Container.ReplaceItemAsync(new SiloEntity(), "", null, null, Token)
-            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(Failure(HttpStatusCode.PreconditionFailed)));
+        using var response = new ResponseMessage(status);
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Arg.Any<CancellationToken>()).Returns(response);
 
-        await storage.Table.UpdateIAmAliveAsync(Entry(), Token);
+        var exception = await Assert.ThrowsAsync<WrappedException>(() => storage.Table.UpdateIAmAliveAsync(Entry(), Token));
 
-        Assert.Equal(new[] { "ReadItemAsync", "ReplaceItemAsync", "ReadItemAsync" },
-            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
-        Assert.Equal(DateTime.UnixEpoch.AddHours(2), concurrent.IAmAliveTime);
-        Assert.Equal("advanced-heartbeat", concurrent.ETag);
+        Assert.Contains($"({(int)status})", exception.Message);
+        Assert.Equal("PatchItemStreamAsync", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Fact]
@@ -786,10 +734,6 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Theory]
-    [InlineData("Heartbeat", HttpStatusCode.NotFound, 0)]
-    [InlineData("Heartbeat", HttpStatusCode.NotFound, 1002)]
-    [InlineData("Heartbeat", HttpStatusCode.Forbidden, 0)]
-    [InlineData("Heartbeat", HttpStatusCode.ServiceUnavailable, 0)]
     [InlineData("ReadRow", HttpStatusCode.NotFound, 0)]
     [InlineData("ReadRow", HttpStatusCode.NotFound, 1002)]
     [InlineData("ReadAll", HttpStatusCode.NotFound, 0)]
@@ -813,7 +757,6 @@ public class CosmosMembershipTableCancellationTests
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => operation switch
         {
-            "Heartbeat" => storage.Table.UpdateIAmAliveAsync(Entry(), Token),
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "ReadAll" => storage.Table.ReadAllAsync(Token),
             "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
@@ -864,7 +807,6 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Theory]
-    [InlineData("Heartbeat")]
     [InlineData("ReadRow")]
     [InlineData("Update")]
     public async Task SessionUnavailableRemainsVisibleWithSurvivingVersion(string operation)
@@ -876,7 +818,6 @@ public class CosmosMembershipTableCancellationTests
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => operation switch
         {
-            "Heartbeat" => storage.Table.UpdateIAmAliveAsync(Entry(), Token),
             "ReadRow" => storage.Table.ReadRowAsync(Entry().SiloAddress, Token),
             "Update" => storage.Table.UpdateRowAsync(Entry(), "s1", new TableVersion(8, "v7"), Token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
@@ -890,13 +831,15 @@ public class CosmosMembershipTableCancellationTests
     public async Task HeartbeatTransportFailureRemainsVisible()
     {
         using var storage = new CosmosMembershipTestStorage();
-        storage.Container.ReadItemAsync<SiloEntity>("", default, null, Token)
-            .ReturnsForAnyArgs(Task.FromException<ItemResponse<SiloEntity>>(new HttpRequestException("transport unavailable")));
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ResponseMessage>(new HttpRequestException("transport unavailable")));
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => storage.Table.UpdateIAmAliveAsync(Entry(), Token));
 
         Assert.Contains("transport unavailable", exception.Message);
-        Assert.Single(storage.Container.ReceivedCalls());
+        Assert.Equal("PatchItemStreamAsync", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Fact]

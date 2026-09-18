@@ -300,37 +300,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         try
         {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var current = (await _container.ReadItemAsync<SiloEntity>(
-                    siloEntityId, _partitionKey,
-                    new ItemRequestOptions { ConsistencyLevel = ConsistencyLevel.Strong },
-                    cancellationToken).ConfigureAwait(false)).Resource;
-                if (current.IAmAliveTime.UtcDateTime >= entry.IAmAliveTime)
-                {
-                    return;
-                }
-
-                current.IAmAliveTime = entry.IAmAliveTime;
-                try
-                {
-                    await _container.ReplaceItemAsync(
-                        current, siloEntityId, _partitionKey,
-                        new ItemRequestOptions { IfMatchEtag = current.ETag },
-                        cancellationToken).ConfigureAwait(false);
-                    return;
-                }
-                catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
-                {
-                    // Re-read after a concurrent heartbeat or membership update.
-                }
-            }
-        }
-        catch (CosmosException exception) when (IsMissingItem(exception))
-        {
-            // A surviving version row distinguishes a retired silo from missing membership resources.
-            await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
+            using var response = await _container.PatchItemStreamAsync(
+                siloEntityId,
+                _partitionKey,
+                [PatchOperation.Set("/IAmAliveTime", new DateTimeOffset(entry.IAmAliveTime))],
+                new PatchItemRequestOptions { EnableContentResponseOnWrite = false },
+                cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
