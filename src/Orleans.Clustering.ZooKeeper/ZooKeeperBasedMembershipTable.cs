@@ -30,6 +30,7 @@ namespace Orleans.Runtime.Membership
     /// Every Silo's state is saved in        /UniqueDeploymentId/IP:Port@Gen
     /// Every Silo's IAmAlive is saved in     /UniqueDeploymentId/IP:Port@Gen/IAmAlive
     /// IAmAlive is saved in a separate node so owner heartbeat writes preserve the membership row's version.
+    /// Membership updates atomically modify the row and deployment nodes, preserving the separate heartbeat node.
     /// 
     /// a node's ZK version is its ETag:
     /// the table version is the version of /UniqueDeploymentId
@@ -320,50 +321,30 @@ namespace Orleans.Runtime.Membership
         internal static async Task<bool> UpdateRowCoreAsync(
             NativeOperations zk, MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string rowPath = ConvertToRowPath(entry.SiloAddress);
-            string rowIAmAlivePath = ConvertToRowIAmAlivePath(entry.SiloAddress);
             var newRowData = Serialize(entry);
             int expectedTableVersion = int.Parse(tableVersion.VersionEtag, CultureInfo.InvariantCulture);
             int expectedRowVersion = int.Parse(etag, CultureInfo.InvariantCulture);
 
-            while (true)
+            try
+            {
+                await zk.Multi(
+                [
+                    Op.setData("/", null, expectedTableVersion),
+                    Op.setData(rowPath, newRowData, expectedRowVersion)
+                ]);
+                return true;
+            }
+            catch (KeeperException.BadVersionException)
+            {
+                return false;
+            }
+            catch (KeeperException.NoNodeException)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if ((await zk.GetData("/")).Stat.getVersion() != expectedTableVersion)
-                {
-                    return false;
-                }
-
-                try
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if ((await zk.GetData(rowPath)).Stat.getVersion() != expectedRowVersion)
-                    {
-                        return false;
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var heartbeat = await zk.GetData(rowIAmAlivePath);
-                    var time = new DateTime(Math.Max(entry.IAmAliveTime.Ticks, Deserialize<DateTime>(heartbeat.Data).Ticks), DateTimeKind.Utc);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await zk.Multi(
-                    [
-                        Op.setData("/", null, expectedTableVersion),
-                        Op.setData(rowPath, newRowData, expectedRowVersion),
-                        Op.setData(rowIAmAlivePath, Serialize(time), heartbeat.Stat.getVersion())
-                    ]);
-                    return true;
-                }
-                catch (KeeperException.BadVersionException)
-                {
-                    // Retry heartbeat races while retaining the caller's row and table preconditions.
-                }
-                catch (KeeperException.NoNodeException)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await zk.GetData("/");
-                    return false;
-                }
+                await zk.GetData("/");
+                return false;
             }
         }
 
