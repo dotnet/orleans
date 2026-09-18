@@ -117,20 +117,20 @@ namespace Orleans.Clustering.TestKit
 
         public System.Threading.Tasks.Task Reads_SameVersion_PreservesRetainedCanonicalFields(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_CurrentTokens_CommitsExactlyOneVersion(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public System.Threading.Tasks.Task UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
         public System.Threading.Tasks.Task UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }

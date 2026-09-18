@@ -49,7 +49,7 @@ public sealed class MembershipTableModelBasedTestRunnerTests
     [Fact]
     public async Task RunGeneratedCases_HaveFreshScopesAndDisposeEveryAcquiredHandle()
     {
-        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = true };
+        var backend = new IdealizedMembershipBackend { LagHeartbeatReads = true };
         var scopes = new HashSet<string>(StringComparer.Ordinal);
         var messages = new List<string>();
         var runner = new MembershipTableModelBasedTestRunner(() =>
@@ -69,6 +69,6 @@ public sealed class MembershipTableModelBasedTestRunnerTests
         Assert.Contains("StartSuccessor", summary);
         Assert.Contains("UpdateStaleTable", summary);
         Assert.Contains("UpdateStaleRow", summary);
-        Assert.Contains("UpdateWithOldHeartbeat", summary);
+        Assert.Contains("UpdateAfterHeartbeat", summary);
     }
 }

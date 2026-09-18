@@ -4,10 +4,10 @@ namespace Orleans.Clustering.TestKit.Tests;
 
 internal enum MembershipFault
 {
-    IgnoreTableToken, IgnoreRowToken, FalseWriteChangesHeartbeat, VersionJump, IgnoreHeartbeatWrite, HeartbeatChangesMembership,
-    OldPayloadRegression, AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize,
+    IgnoreTableToken, IgnoreRowToken, FalseWriteChangesMembership, VersionJump, HeartbeatChangesRowToken, HeartbeatChangesTableToken, HeartbeatChangesMembership,
+    AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize,
     CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, TornReadRow, RefuseStatusWrite,
-    IgnoreNewUpdateHeartbeat, IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
+    IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatStorageFailure,
     CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow,
     DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation
@@ -182,17 +182,12 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             control.Injected++;
             return await inner.InsertRowAsync(entry, tableVersion, cancellationToken);
         }
-        if (Fault is MembershipFault.IgnoreNewUpdateHeartbeat or MembershipFault.IgnoreUpdatedVoteTime or MembershipFault.PreserveClearedVotes)
+        if (Fault is MembershipFault.IgnoreUpdatedVoteTime or MembershipFault.PreserveClearedVotes)
         {
             var existing = (await inner.ReadRowAsync(entry.SiloAddress, cancellationToken)).TryGet(entry.SiloAddress);
             if (existing is not null)
             {
                 entry = IdealizedMembershipTable.Clone(entry);
-                if (Fault == MembershipFault.IgnoreNewUpdateHeartbeat && entry.IAmAliveTime > existing.Item1.IAmAliveTime)
-                {
-                    entry.IAmAliveTime = existing.Item1.IAmAliveTime;
-                    control.Injected++;
-                }
                 if (Fault == MembershipFault.IgnoreUpdatedVoteTime && entry.SuspectTimes is not null)
                 {
                     for (var i = 0; i < entry.SuspectTimes.Count; i++)
@@ -237,16 +232,14 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             await control.ReadStarted.Task.WaitAsync(cancellationToken);
         }
         var success = await inner.UpdateRowAsync(entry, etag, tableVersion, cancellationToken);
-        if (success && Fault == MembershipFault.OldPayloadRegression)
-            Mutate(p => { p.Rows[entry.SiloAddress].Item1.IAmAliveTime = entry.IAmAliveTime; control.Injected++; });
         if (success && Fault == MembershipFault.AliasUpdate)
             Mutate(p => { p.Rows[entry.SiloAddress] = Tuple.Create(entry, p.Rows[entry.SiloAddress].Item2); control.Injected++; });
-        if (!success && Fault == MembershipFault.FalseWriteChangesHeartbeat)
+        if (!success && Fault == MembershipFault.FalseWriteChangesMembership)
             Mutate(p =>
             {
                 if (p.Rows.TryGetValue(entry.SiloAddress, out var row))
                 {
-                    row.Item1.IAmAliveTime = row.Item1.IAmAliveTime.AddMinutes(3);
+                    row.Item1.HostName += "-failed-write";
                     control.Injected++;
                 }
             });
@@ -261,12 +254,15 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     {
         if (Fault == MembershipFault.HeartbeatStorageFailure) throw control.HeartbeatFailure;
         if (Fault == MembershipFault.HeartbeatCancellation) throw control.HeartbeatCancellation;
-        if (Fault == MembershipFault.IgnoreHeartbeatWrite)
-        {
-            control.Injected++;
-            return;
-        }
         await inner.UpdateIAmAliveAsync(entry, cancellationToken);
+        if (Fault == MembershipFault.HeartbeatChangesRowToken)
+            Mutate(p =>
+            {
+                p.Rows[entry.SiloAddress] = Tuple.Create(p.Rows[entry.SiloAddress].Item1, control.Backend.Token());
+                control.Injected++;
+            });
+        if (Fault == MembershipFault.HeartbeatChangesTableToken)
+            Mutate(p => { p.Etag = control.Backend.Token(); control.Injected++; });
         if (Fault == MembershipFault.HeartbeatChangesMembership)
             Mutate(p => { p.Rows[entry.SiloAddress].Item1.ProxyPort++; control.Injected++; });
         if (Fault == MembershipFault.MutateRetainedReads) MutateRetained(entry);

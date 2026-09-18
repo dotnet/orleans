@@ -54,7 +54,7 @@ public sealed class MembershipTableSnapshotTests
     [InlineData("FaultZone")]
     [InlineData("StartTime")]
     [InlineData("SuspectTimes")]
-    public void CompareVersioned_IncludesEveryFieldExceptHeartbeatAndRowEtag(string field)
+    public void CompareCanonical_IncludesEveryFieldExceptHeartbeat(string field)
     {
         var expected = Snapshot(CreateEntry(1));
         var changed = CreateEntry(1);
@@ -71,15 +71,16 @@ public sealed class MembershipTableSnapshotTests
             case "StartTime": changed.StartTime = T1; break;
             case "SuspectTimes": changed.SuspectTimes![0] = Tuple.Create(CreateEntry(8).SiloAddress, T2); break;
         }
-        Assert.NotNull(expected.CompareVersioned(Snapshot(changed)));
+        Assert.NotNull(expected.CompareCanonical(Snapshot(changed)));
         var heartbeatOnly = CreateEntry(1);
         heartbeatOnly.IAmAliveTime = T2;
-        Assert.Null(expected.CompareVersioned(Snapshot(heartbeatOnly, rowToken: "heartbeat-token")));
+        Assert.Null(expected.CompareCanonical(Snapshot(heartbeatOnly)));
+        Assert.Contains("row ETag", expected.CompareCanonical(Snapshot(heartbeatOnly, rowToken: "heartbeat-token"))!);
         Assert.Contains("IAmAliveTime", expected.CompareComplete(Snapshot(heartbeatOnly, rowToken: "heartbeat-token"))!);
     }
 
     [Fact]
-    public void CompareVersioned_IgnoresEnumerationOrderAndNormalizesEmptySuspects()
+    public void CompareCanonical_IgnoresEnumerationOrderAndNormalizesEmptySuspects()
     {
         var first = CreateEntry(1);
         var second = CreateEntry(2);
@@ -97,24 +98,24 @@ public sealed class MembershipTableSnapshotTests
     }
 
     [Fact]
-    public void CompareVersioned_DistinguishesGenerationsAtSameEndpoint()
+    public void CompareCanonical_DistinguishesGenerationsAtSameEndpoint()
     {
         var first = CreateEntry(1);
         var successor = CreateSuccessor(first);
         var expected = Snapshot(first);
-        Assert.Contains("missing identity", expected.CompareVersioned(Snapshot(successor))!);
+        Assert.Contains("missing identity", expected.CompareCanonical(Snapshot(successor))!);
         Assert.Equal(first.SiloAddress.Endpoint, successor.SiloAddress.Endpoint);
         Assert.NotEqual(first.SiloAddress.ToParsableString(), successor.SiloAddress.ToParsableString());
     }
 
     [Fact]
-    public void CompareVersioned_DetectsTimestampOnlyChangeForExistingSuspector()
+    public void CompareCanonical_DetectsTimestampOnlyChangeForExistingSuspector()
     {
         var entry = CreateEntry(1);
         var expected = Snapshot(entry);
         var voter = entry.SuspectTimes![0].Item1;
         entry.SuspectTimes[0] = Tuple.Create(voter, T2);
-        Assert.Contains("SuspectTimes", expected.CompareVersioned(Snapshot(entry))!);
+        Assert.Contains("SuspectTimes", expected.CompareCanonical(Snapshot(entry))!);
         Assert.Equal(voter.ToParsableString(), expected.Rows[entry.SiloAddress.ToParsableString()].Entry.Suspects[0].Identity);
         Assert.Equal(T0.AddSeconds(-10), expected.Rows[entry.SiloAddress.ToParsableString()].Entry.Suspects[0].Time);
     }
@@ -215,8 +216,7 @@ public sealed class MembershipTableSnapshotTests
             Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
             intermediate.Row(live.SiloAddress) with { Entry = intermediate.Row(live.SiloAddress).Entry with { IAmAliveTime = T0.AddSeconds(-1) } })
         };
-        Assert.Contains("IAmAliveTime", Assert.Throws<ClusteringConformanceException>(() =>
-            MembershipTableTestRunner.AssertCleanup(before, regressed, T1, requireAllEligible: false)).Message);
+        MembershipTableTestRunner.AssertCleanup(before, regressed, T1, requireAllEligible: false);
         Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertCleanup(before, before with { Version = 11, TableEtag = "v11" }, T1, requireAllEligible: false));
     }
@@ -248,8 +248,32 @@ public sealed class MembershipTableSnapshotTests
         var history = new MembershipHistory();
         history.Observe(initial);
         live.IAmAliveTime = T2;
-        history.Observe(Snapshot(live, rowToken: "heartbeat"));
+        history.Observe(Snapshot(live, rowToken: "live"));
         Assert.True(history.IsTerminal(dead.SiloAddress.ToParsableString()));
+    }
+
+    [Fact]
+    public void CanonicalObservations_AcceptRawHeartbeatLagAndRejectLogicalTokenChanges()
+    {
+        var entry = CreateEntry(1, status: SiloStatus.Active);
+        entry.IAmAliveTime = T2;
+        var before = Snapshot(entry);
+        var history = new MembershipHistory();
+        history.Observe(before);
+        entry.IAmAliveTime = T0;
+        var lagged = Snapshot(entry);
+
+        MembershipTableTestRunner.AssertHeartbeat(before, lagged);
+        history.Observe(lagged);
+        Assert.Null(before.CompareCanonical(lagged));
+        Assert.Contains("IAmAliveTime", before.CompareComplete(lagged)!);
+        Assert.Contains("row ETag", Assert.Throws<ClusteringConformanceException>(() =>
+            MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry, rowToken: "changed"))).Message);
+        Assert.Contains("table ETag", Assert.Throws<ClusteringConformanceException>(() =>
+            MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry, tableToken: "changed"))).Message);
+        entry.ProxyPort++;
+        Assert.Contains("ProxyPort", Assert.Throws<ClusteringConformanceException>(() =>
+            MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry))).Message);
     }
 
     [Fact]

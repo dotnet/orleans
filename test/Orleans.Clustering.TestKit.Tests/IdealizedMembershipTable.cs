@@ -8,7 +8,9 @@ internal sealed class IdealizedMembershipBackend
     internal readonly object Sync = new();
     internal readonly Dictionary<string, Partition> Partitions = new(StringComparer.Ordinal);
     internal long Tokens;
-    internal bool ChangeHeartbeatEtag { get; init; }
+    internal bool PreserveHeartbeatOnFullWrite { get; init; }
+    internal bool LagHeartbeatReads { get; init; }
+    internal int LaggedHeartbeatReads;
     internal bool TableVersionRowEtags { get; init; }
     internal int CleanupBatchSize { get; init; } = int.MaxValue;
     internal bool VersionedCleanup { get; init; } = true;
@@ -33,6 +35,7 @@ internal sealed class IdealizedMembershipBackend
         internal int Version;
         internal string Etag = token;
         internal readonly Dictionary<SiloAddress, Tuple<MembershipEntry, string>> Rows = [];
+        internal readonly Dictionary<SiloAddress, DateTime> EarlierHeartbeats = [];
     }
 
     internal IdealizedMembershipTable Create(string cluster)
@@ -169,7 +172,8 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             if (partition.Etag != tableVersion.VersionEtag || !partition.Rows.TryGetValue(entry.SiloAddress, out var row)
                 || (backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return false;
             var stored = Clone(entry);
-            if (stored.IAmAliveTime < row.Item1.IAmAliveTime) stored.IAmAliveTime = row.Item1.IAmAliveTime;
+            if (backend.PreserveHeartbeatOnFullWrite && stored.IAmAliveTime < row.Item1.IAmAliveTime)
+                stored.IAmAliveTime = row.Item1.IAmAliveTime;
             partition.Rows[stored.SiloAddress] = Tuple.Create(stored, backend.Token());
             partition.Version = tableVersion.Version;
             partition.Etag = backend.Token();
@@ -182,9 +186,8 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             var partition = Partition;
             var row = partition.Rows[entry.SiloAddress];
             backend.HeartbeatWrites.Add((scopeClusterId, this, entry.SiloAddress, entry.IAmAliveTime, row.Item1.Status));
+            partition.EarlierHeartbeats.TryAdd(entry.SiloAddress, row.Item1.IAmAliveTime);
             row.Item1.IAmAliveTime = entry.IAmAliveTime;
-            if (backend.ChangeHeartbeatEtag)
-                partition.Rows[entry.SiloAddress] = Tuple.Create(row.Item1, backend.Token());
         }, cancellationToken);
 
     internal static MembershipEntry Clone(MembershipEntry entry) => new()
@@ -208,7 +211,16 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
         backend.Reads++;
         var partition = Partition;
         return new(partition.Rows.Where(p => key is null || p.Key.Equals(key))
-            .Select(p => Tuple.Create(Clone(p.Value.Item1), backend.TableVersionRowEtags ? partition.Etag : p.Value.Item2)).ToList(),
+            .Select(p =>
+            {
+                var entry = Clone(p.Value.Item1);
+                if (backend.LagHeartbeatReads && backend.Reads % 2 == 0 && partition.EarlierHeartbeats.TryGetValue(p.Key, out var earlier))
+                {
+                    entry.IAmAliveTime = earlier;
+                    backend.LaggedHeartbeatReads++;
+                }
+                return Tuple.Create(entry, backend.TableVersionRowEtags ? partition.Etag : p.Value.Item2);
+            }).ToList(),
             new(partition.Version, partition.Etag));
     }
 

@@ -44,24 +44,27 @@ public sealed class MembershipTableModelTests
         Apply(state, MembershipOperationKind.UpdateStaleRow);
         Assert.Equal(3, state.Version);
         Assert.Equal(2, state.Rows[1].Revision);
-        Assert.Equal(T0.Ticks, state.Rows[1].HeartbeatTicks);
+        Assert.Equal(T0.Ticks, state.Rows[1].OwnerHeartbeatTicks);
     }
 
     [Fact]
-    public void Apply_OwnerSequencedHeartbeatsAndStalePayloadUpdate_PreserveStoredHeartbeat()
+    public void Apply_OwnerHeartbeatInputsRemainIndependentOfCanonicalUpdates()
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
         Apply(state, MembershipOperationKind.HeartbeatAdvance);
-        Assert.Equal(T1.Ticks, state.Rows[1].HeartbeatTicks);
+        Assert.Equal(T1.Ticks, state.Rows[1].OwnerHeartbeatTicks);
         Apply(state, MembershipOperationKind.HeartbeatAdvance);
         Apply(state, MembershipOperationKind.HeartbeatRepeat);
         Assert.Equal(1, state.Version);
-        Assert.Equal(T2.Ticks, state.Rows[1].HeartbeatTicks);
-        Apply(state, MembershipOperationKind.UpdateWithOldHeartbeat);
+        Assert.Equal(1, state.Rows[1].HeartbeatVersion);
+        Assert.True(MembershipModel.CanApply(new(MembershipOperationKind.UpdateAfterHeartbeat), state));
+        Assert.Equal(T2.Ticks, state.Rows[1].OwnerHeartbeatTicks);
+        Apply(state, MembershipOperationKind.UpdateAfterHeartbeat);
         Assert.Equal(2, state.Version);
         Assert.Equal((int)SiloStatus.Joining, state.Rows[1].Status);
-        Assert.Equal(T2.Ticks, state.Rows[1].HeartbeatTicks);
+        Assert.Equal(T2.Ticks, state.Rows[1].OwnerHeartbeatTicks);
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.UpdateAfterHeartbeat), state));
     }
 
     [Fact]
@@ -134,7 +137,7 @@ public sealed class MembershipTableModelTests
     }
 
     [Fact]
-    public void Apply_CleanupWithoutEligibleRows_PreservesVersionAndDeadRecord()
+    public void Apply_CleanupCutoffExceedsAllGeneratedHeartbeatInputs()
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
@@ -146,8 +149,8 @@ public sealed class MembershipTableModelTests
         Apply(state, MembershipOperationKind.CleanupDead);
 
         Assert.Equal(version, state.Version);
-        Assert.Equal((int)SiloStatus.Dead, Assert.Single(state.Rows).Value.Status);
-        Assert.Equal(T2.Ticks, state.Rows[1].HeartbeatTicks);
+        Assert.Empty(state.Rows);
+        Assert.True(MembershipModel.CleanupCutoff > T2);
         Assert.Equal(0, state.TerminalGenerations[1]);
     }
 
@@ -227,7 +230,7 @@ public sealed class MembershipTableModelTests
         }
         Assert.Contains(MembershipOperationKind.UpdateStaleTable, reached);
         Assert.Contains(MembershipOperationKind.UpdateStaleRow, reached);
-        Assert.Contains(MembershipOperationKind.UpdateWithOldHeartbeat, reached);
+        Assert.Contains(MembershipOperationKind.UpdateAfterHeartbeat, reached);
         Assert.Contains(MembershipOperationKind.StartSuccessor, reached);
     }
 }

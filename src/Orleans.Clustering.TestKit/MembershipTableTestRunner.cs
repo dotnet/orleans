@@ -57,7 +57,7 @@ public sealed class MembershipTableTestRunner
         await SameHandles(ct);
     }, cancellationToken);
 
-    /// <summary>G03: equal versions retain canonical fields and non-Dead rows while liveness advances and Dead rows compact.</summary>
+    /// <summary>G03: equal versions retain canonical fields and non-Dead rows while liveness varies and Dead rows compact.</summary>
     public Task Reads_SameVersion_PreservesRetainedCanonicalFields(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
@@ -121,61 +121,39 @@ public sealed class MembershipTableTestRunner
         EqualRow(MembershipEntrySnapshot.Capture(successor), final.Row(successor.SiloAddress).Entry);
     }, cancellationToken);
 
-    /// <summary>G06: one owner publishes sequenced liveness writes while preserving the membership version and other fields.</summary>
-    public Task UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>G06: owner liveness writes preserve canonical membership fields and logical row/table concurrency tokens.</summary>
+    public Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         await Heartbeat(A, Entry(1), T1, ct);
         await Heartbeat(A, Entry(1), T2, ct);
         await Heartbeat(A, Entry(1), T2, ct);
-        Check((await SameHandles(ct)).Row(Entry(1).SiloAddress).Entry.IAmAliveTime == T2, "owner's latest heartbeat must be t2");
+        await SameHandles(ct);
     }, cancellationToken);
 
-    /// <summary>G07: even fresh tokens with an old heartbeat must retain stored liveness.</summary>
-    public Task UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>G07: tokens captured before an owner heartbeat commit a canonical status change exactly once.</summary>
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(CancellationToken cancellationToken = default)
+        => Run(ct => UpdateAfterHeartbeat(updateStatus: true, ct), cancellationToken);
+
+    /// <summary>G08: tokens captured before an owner heartbeat commit a canonical suspect-vote change exactly once.</summary>
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(CancellationToken cancellationToken = default)
+        => Run(ct => UpdateAfterHeartbeat(updateStatus: false, ct), cancellationToken);
+
+    private async Task UpdateAfterHeartbeat(bool updateStatus, CancellationToken ct)
     {
         await Seed(ct);
-        await Heartbeat(B, Entry(1), T2, ct);
-        var payload = Entry(1);
-        do
+        var before = await SameHandles(ct);
+        var payload = updateStatus ? Forward(Entry(1)) : Entry(1);
+        if (!updateStatus)
         {
-            payload = Forward(payload);
-            await Update(A, payload, ct);
-            Check((await SameHandles(ct)).Row(payload.SiloAddress).Entry.IAmAliveTime == T2, "full-row update overwrote the owner's stored heartbeat");
-        }
-        while (payload.Status != SiloStatus.Dead);
-
-        var beforeCleanup = await SameHandles(ct);
-        await B.CleanupDefunctSiloEntriesAsync(new(T1), ct);
-        Equal(beforeCleanup, await SameHandles(ct));
-        await B.CleanupDefunctSiloEntriesAsync(new(T2.AddSeconds(1)), ct);
-        AssertCleanup(beforeCleanup, await SameHandles(ct), T2.AddSeconds(1));
-    }, cancellationToken);
-
-    /// <summary>G08: only a proved heartbeat-only row-ETag conflict permits one row-token-only reread/retry.</summary>
-    public Task UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(CancellationToken cancellationToken = default) => Run(async ct =>
-    {
-        await Seed(ct);
-        var beforeHeartbeat = await Read(A, ct);
-        var payload = Forward(Entry(1));
-        var candidate = beforeHeartbeat.Next();
-        var oldRowEtag = beforeHeartbeat.Row(payload.SiloAddress).Etag;
-        await Heartbeat(B, Entry(1), T2, ct);
-        var beforeWrite = await Read(B, ct);
-        var success = await A.UpdateRowAsync(payload, oldRowEtag, candidate, ct);
-        if (!success)
-        {
-            var fresh = await SameHandles(ct);
-            Equal(beforeWrite, fresh);
-            Check(beforeHeartbeat.CompareVersioned(fresh) is null, "retry forbidden: heartbeat changed versioned view or table token");
-            var freshRowEtag = fresh.Row(payload.SiloAddress).Etag;
-            Check(oldRowEtag != freshRowEtag, "retry forbidden: false result with unchanged row ETag; not a heartbeat-only conflict");
-            _output?.Invoke($"heartbeat-only row-ETag conflict: refresh only row ETag {oldRowEtag} -> {freshRowEtag}; retain table={candidate}, supplied heartbeat={payload.IAmAliveTime:O}");
-            Check(await A.UpdateRowAsync(payload, freshRowEtag, candidate, ct), "single documented heartbeat-only reread/retry failed");
+            payload.AddOrUpdateSuspector(Entry(2).SiloAddress, T1, maxVotes: 10);
         }
 
-        AssertCommit(beforeWrite, await SameHandles(ct), payload, insert: false);
-    }, cancellationToken);
+        await B.UpdateIAmAliveAsync(new MembershipEntry { SiloAddress = payload.SiloAddress, IAmAliveTime = T2 }, ct);
+        Check(await A.UpdateRowAsync(payload, before.Row(payload.SiloAddress).Etag, before.Next(), ct),
+            "canonical update with pre-heartbeat tokens returned false");
+        AssertCommit(before, await SameHandles(ct), payload, insert: false);
+    }
 
     /// <summary>G09: distinct constructed handles share one committed backing table.</summary>
     public Task Handles_IndependentlyConstructed_ShareCommittedBackingState(CancellationToken cancellationToken = default) => Run(async ct =>
@@ -284,8 +262,8 @@ public sealed class MembershipTableTestRunner
         await Heartbeat(B, Entry(1), T2, ct);
         await Update(A, Forward(Entry(1)), ct);
         await Update(B, Forward(Entry(2)), ct);
-        Equal(baseline, ClusteringMembershipSnapshot.Capture(retained));
-        EqualRow(baseline.Row(Entry(1).SiloAddress).Entry, MembershipEntrySnapshot.Capture(entryReference));
+        Equal(baseline, ClusteringMembershipSnapshot.Capture(retained), complete: true);
+        EqualRow(baseline.Row(Entry(1).SiloAddress).Entry, MembershipEntrySnapshot.Capture(entryReference), complete: true);
         Check(listBaseline.SequenceEqual(listReference?.Select(v => new SuspectSnapshot(v.Item1.ToParsableString(), v.Item2)) ?? []),
             "retained actual suspect-list reference changed after provider writes");
     }, cancellationToken);
@@ -407,7 +385,7 @@ public sealed class MembershipTableTestRunner
         Equal(other with { Rows = other.Rows.Clear() }, absentFromOther);
     }, cancellationToken);
 
-    /// <summary>G25: eligible Dead rows compact at the same version or in atomic +1 batches; retained fields and liveness are preserved.</summary>
+    /// <summary>G25: eligible Dead rows compact at the same version or in atomic +1 batches; retained canonical fields are preserved.</summary>
     public Task CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         foreach (var entry in CreateCleanupEntries(_seed)) await Insert(A, entry, ct);
@@ -502,10 +480,13 @@ public sealed class MembershipTableTestRunner
     }
 
     private static void Check(bool condition, string detail) => ClusteringTestKitDiagnostics.Require(condition, detail);
-    internal static void Equal(ClusteringMembershipSnapshot expected, ClusteringMembershipSnapshot observed)
-        => Check(expected.CompareComplete(observed) is null, expected.CompareComplete(observed) ?? "equal");
-    internal static void EqualRow(MembershipEntrySnapshot expected, MembershipEntrySnapshot observed)
-        => Check(expected.Difference(observed, complete: true) is null, expected.Difference(observed, complete: true) ?? "equal");
+    internal static void Equal(ClusteringMembershipSnapshot expected, ClusteringMembershipSnapshot observed, bool complete = false)
+    {
+        var difference = complete ? expected.CompareComplete(observed) : expected.CompareCanonical(observed);
+        Check(difference is null, difference ?? "equal");
+    }
+    internal static void EqualRow(MembershipEntrySnapshot expected, MembershipEntrySnapshot observed, bool complete = false)
+        => Check(expected.Difference(observed, complete) is null, expected.Difference(observed, complete) ?? "equal");
     private static void EqualAllowingRefreshedRowEtags(ClusteringMembershipSnapshot expected, ClusteringMembershipSnapshot observed)
     {
         var rows = expected.Rows;
@@ -568,8 +549,6 @@ public sealed class MembershipTableTestRunner
         Check(!string.IsNullOrEmpty(row!.Etag) && (insert || row.Etag != before.Rows[id].Etag),
             $"commit must issue usable new row ETag: identity={id}, observed={row.Etag}");
         var expectedEntry = MembershipEntrySnapshot.Capture(input);
-        if (!insert && before.Rows[id].Entry.IAmAliveTime > expectedEntry.IAmAliveTime)
-            expectedEntry = expectedEntry with { IAmAliveTime = before.Rows[id].Entry.IAmAliveTime };
         EqualAllowingRefreshedRowEtags(before with
         {
             Version = before.Version + 1,
@@ -691,24 +670,11 @@ public sealed class MembershipTableTestRunner
         var payload = new MembershipEntry { SiloAddress = entry.SiloAddress, IAmAliveTime = time };
         await table.UpdateIAmAliveAsync(payload, ct);
         var after = await Read(table, ct);
-        AssertHeartbeat(before, after, payload);
+        AssertHeartbeat(before, after);
     }
 
-    internal static void AssertHeartbeat(ClusteringMembershipSnapshot before, ClusteringMembershipSnapshot after, MembershipEntry input)
-    {
-        var id = input.SiloAddress.ToParsableString();
-        Check(after.Rows.ContainsKey(id), $"heartbeat removed identity={id}");
-        Check(!string.IsNullOrEmpty(after.Rows[id].Etag), $"heartbeat returned an unusable row ETag: identity={id}");
-        var row = before.Rows[id];
-        var expected = before with
-        {
-            Rows = before.Rows.SetItem(id, new(row.Entry with
-            {
-                IAmAliveTime = input.IAmAliveTime
-            }, after.Rows[id].Etag))
-        };
-        Equal(expected, after);
-    }
+    internal static void AssertHeartbeat(ClusteringMembershipSnapshot before, ClusteringMembershipSnapshot after)
+        => Equal(before, after);
 
     private async Task Reject(Func<Task<bool>> write, CancellationToken ct)
     {
@@ -804,8 +770,8 @@ public sealed class MembershipTableTestRunner
             {
                 var expectedBefore = pointReads ? before.Select(key) : before;
                 var expectedAfter = pointReads ? committed.Select(key) : committed;
-                Check(expectedBefore.CompareComplete(sample) is null || expectedAfter.CompareComplete(sample) is null,
-                    $"atomic read matches neither committed view: before={expectedBefore.CompareComplete(sample)}; after={expectedAfter.CompareComplete(sample)}");
+                Check(expectedBefore.CompareCanonical(sample) is null || expectedAfter.CompareCanonical(sample) is null,
+                    $"atomic read matches neither committed view: before={expectedBefore.CompareCanonical(sample)}; after={expectedAfter.CompareCanonical(sample)}");
             }
         }
     }

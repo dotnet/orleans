@@ -76,9 +76,9 @@ public sealed class IdealizedMembershipTableTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Heartbeat_OwnerSequencedBlindWritesAndStalePayloadUpdate_PreserveLiveness(bool changesToken)
+    public async Task Heartbeat_BlindWritesPreserveTokensWhileFullRowWritesMayClobberLiveness(bool preserveHeartbeatOnFullWrite)
     {
-        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesToken };
+        var backend = new IdealizedMembershipBackend { PreserveHeartbeatOnFullWrite = preserveHeartbeatOnFullWrite };
         var table = backend.Create("A");
         var initial = await table.ReadAllAsync(Ct);
         var entry = Entry();
@@ -97,12 +97,12 @@ public sealed class IdealizedMembershipTableTests
         var heartbeat = await table.ReadAllAsync(Ct);
         Assert.Equal(inserted.Version, heartbeat.Version);
         Assert.Equal(Start.AddMinutes(2), heartbeat.Members[0].Item1.IAmAliveTime);
-        Assert.Equal(changesToken, inserted.Members[0].Item2 != heartbeat.Members[0].Item2);
+        Assert.Equal(inserted.Members[0].Item2, heartbeat.Members[0].Item2);
         entry.Status = SiloStatus.Active;
         entry.IAmAliveTime = Start;
-        Assert.True(await table.UpdateRowAsync(entry, heartbeat.Members[0].Item2, heartbeat.Version.Next(), Ct));
+        Assert.True(await table.UpdateRowAsync(entry, inserted.Members[0].Item2, inserted.Version.Next(), Ct));
         var final = await table.ReadAllAsync(Ct);
-        Assert.Equal(Start.AddMinutes(2), final.Members[0].Item1.IAmAliveTime);
+        Assert.Equal(preserveHeartbeatOnFullWrite ? Start.AddMinutes(2) : Start, final.Members[0].Item1.IAmAliveTime);
         Assert.Equal(SiloStatus.Active, final.Members[0].Item1.Status);
         Assert.Equal(heartbeat.Version.Version + 1, final.Version.Version);
     }

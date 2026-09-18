@@ -7,11 +7,13 @@ public sealed class FaultyMembershipTableTests
     [Theory]
     [InlineData("IgnoreTableToken", "stale-table", "unexpectedly succeeded")]
     [InlineData("IgnoreRowToken", "stale-row", "unexpectedly succeeded")]
-    [InlineData("FalseWriteChangesHeartbeat", "stale-row", "IAmAliveTime")]
+    [InlineData("FalseWriteChangesMembership", "stale-row", "HostName")]
     [InlineData("VersionJump", "insert", "commit integer")]
-    [InlineData("IgnoreHeartbeatWrite", "heartbeat", "IAmAliveTime")]
+    [InlineData("HeartbeatChangesRowToken", "heartbeat", "row ETag")]
+    [InlineData("HeartbeatChangesTableToken", "heartbeat", "table ETag")]
     [InlineData("HeartbeatChangesMembership", "heartbeat", "ProxyPort")]
-    [InlineData("OldPayloadRegression", "old-payload", "IAmAliveTime")]
+    [InlineData("HeartbeatChangesRowToken", "heartbeat-status", "pre-heartbeat tokens returned false")]
+    [InlineData("HeartbeatChangesTableToken", "heartbeat-vote", "pre-heartbeat tokens returned false")]
     [InlineData("AliasInsert", "alias-insert", "Status")]
     [InlineData("AliasUpdate", "alias-update", "Status")]
     [InlineData("AliasRead", "alias-read", "Status")]
@@ -23,8 +25,7 @@ public sealed class FaultyMembershipTableTests
     [InlineData("CleanupVersionRollback", "cleanup", "cleanup version")]
     [InlineData("CleanupRoundsExclusiveCutoff", "cleanup", "left eligible Dead rows")]
     [InlineData("DeleteConfiguredScope", "wrong-cluster", "deletion probe reported deleted populated history")]
-    [InlineData("RefuseStatusWrite", "heartbeat-retry", "retry forbidden")]
-    [InlineData("IgnoreNewUpdateHeartbeat", "successful-update", "IAmAliveTime")]
+    [InlineData("RefuseStatusWrite", "heartbeat-vote", "pre-heartbeat tokens returned false")]
     [InlineData("IgnoreUpdatedVoteTime", "successful-update", "SuspectTimes")]
     [InlineData("PreserveClearedVotes", "successful-update", "SuspectTimes")]
     [InlineData("CrossClusterPointRead", "isolation", "table integer")]
@@ -46,8 +47,8 @@ public sealed class FaultyMembershipTableTests
                 "stale-table" => runner.UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(ct),
                 "stale-row" => runner.UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(ct),
                 "insert" => runner.InsertRow_CurrentTableVersion_CommitsExactlyOneVersion(ct),
-                "heartbeat" => runner.UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
-                "old-payload" => runner.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
+                "heartbeat" => runner.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
+                "heartbeat-status" => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
                 "alias-insert" => runner.InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
                 "alias-update" => runner.UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
                 "alias-read" => runner.Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState(ct),
@@ -55,7 +56,7 @@ public sealed class FaultyMembershipTableTests
                 "initialize" => runner.InitializeMembershipTable_RepeatedWithData_PreservesCommittedState(ct),
                 "cleanup" => runner.CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct),
                 "wrong-cluster" => runner.DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct),
-                "heartbeat-retry" => runner.UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(ct),
+                "heartbeat-vote" => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct),
                 "successful-update" => runner.UpdateRow_CurrentTokens_CommitsExactlyOneVersion(ct),
                 "isolation" => runner.Clusters_SharedBackendWithOverlappingSiloAddresses_AreIsolated(ct),
                 "missing-row" => runner.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
@@ -76,7 +77,7 @@ public sealed class FaultyMembershipTableTests
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
+                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
             TestContext.Current.CancellationToken));
 
         Assert.Same(control.HeartbeatFailure, failure);
@@ -98,7 +99,7 @@ public sealed class FaultyMembershipTableTests
         using var caller = new CancellationTokenSource();
         var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct),
+                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
             caller.Token));
 
         Assert.Same(expected, failure);

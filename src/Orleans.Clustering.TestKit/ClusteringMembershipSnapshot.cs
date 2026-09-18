@@ -84,13 +84,13 @@ internal sealed record ClusteringMembershipSnapshot(int Version, string TableEta
         => this with { Rows = Rows.Where(p => p.Key == address.ToParsableString()).ToImmutableDictionary(StringComparer.Ordinal) };
 
     internal string? CompareComplete(ClusteringMembershipSnapshot actual) => Compare(actual, true);
-    internal string? CompareVersioned(ClusteringMembershipSnapshot actual) => Compare(actual, false);
+    internal string? CompareCanonical(ClusteringMembershipSnapshot actual) => Compare(actual, false);
 
     internal string? CompareSameVersionSuccessor(ClusteringMembershipSnapshot actual)
     {
         var compacted = Rows.Where(pair => pair.Value.Entry.Status == SiloStatus.Dead && !actual.Rows.ContainsKey(pair.Key))
             .Select(pair => pair.Key);
-        return (this with { Rows = Rows.RemoveRange(compacted) }).CompareVersioned(actual);
+        return (this with { Rows = Rows.RemoveRange(compacted) }).CompareCanonical(actual);
     }
 
     private string? Compare(ClusteringMembershipSnapshot actual, bool complete)
@@ -105,7 +105,7 @@ internal sealed record ClusteringMembershipSnapshot(int Version, string TableEta
             }
 
             if (row.Entry.Difference(observed.Entry, complete) is { } difference) return difference;
-            if (complete && row.Etag != observed.Etag) return $"{identity}.row ETag: expected={row.Etag}, observed={observed.Etag}";
+            if (row.Etag != observed.Etag) return $"{identity}.row ETag: expected={row.Etag}, observed={observed.Etag}";
         }
 
         var extra = actual.Rows.Keys.Except(Rows.Keys).FirstOrDefault();

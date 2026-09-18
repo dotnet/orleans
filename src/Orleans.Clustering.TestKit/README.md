@@ -26,7 +26,7 @@ MembershipTableTestFixture CreateFixture() => new(
 
 await CreateFixture().RunAsync(
     (fixture, ct) => new MembershipTableTestRunner(fixture, seed: 17)
-        .UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
+        .UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
     cancellationToken);
 
 await new MembershipTableModelBasedTestRunner(
@@ -97,9 +97,9 @@ runs the same behavioral assertions.
 | G03 | `Reads_SameVersion_PreservesRetainedCanonicalFields` |
 | G04 | `Reads_MaySkipCommittedVersions_WithoutSkippingHistoryValidation` |
 | G05 | `Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration` |
-| G06 | `UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields` |
-| G07 | `UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat` |
-| G08 | `UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry` |
+| G06 | `UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens` |
+| G07 | `UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange` |
+| G08 | `UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange` |
 | G09 | `Handles_IndependentlyConstructed_ShareCommittedBackingState` |
 | G10 | `InsertRow_StaleTableToken_ReturnsFalseWithoutSideEffects` |
 | G11 | `UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects` |
@@ -128,10 +128,12 @@ The generated fact is conventionally named
 
 The immutable observation captures all public persisted entry fields, nested
 suspect identities/times, full endpoint/generation identity, row ETags, and
-integer/table ETag. Rejections, aliasing, initialization, and isolation compare
-the complete observation. At equal versions the history requires every non-Dead
+integer/table ETag. Provider observations compare canonical fields and logical
+concurrency tokens independently of raw IAmAliveTime. Retained-object detachment
+also compares the captured object's liveness field. At equal versions the history requires every non-Dead
 row and every retained canonical field, while allowing previously Dead rows to
-be pruned. IAmAliveTime advances independently and row ETags are opaque.
+be pruned. IAmAliveTime is independently and inconsistently updated; row ETags
+are opaque logical membership tokens which heartbeat-only writes preserve.
 Null/empty suspect lists and suspect/row enumeration order are
 canonicalized, as are null/empty representations of an absent optional role name.
 Optional Azure deployment metadata is explicitly initialized to
@@ -143,8 +145,8 @@ valid next-version integers and forward status transitions.
 Successful commits can refresh row ETags for unchanged entries, including
 providers which derive row tokens from the table version. Stale-table tests use a
 freshly read row token after the competing commit; stale-row tests pair a saved
-row token with a fresh table candidate. Every unchanged entry field and heartbeat
-is preserved.
+row token with a fresh table candidate. Every unchanged canonical entry field
+is preserved. Full-row writes can overwrite a heartbeat with an earlier value.
 Different reads can skip committed versions. A newer full view can omit a
 previously live identity, establishing its terminal death even when the observer
 missed its explicit Dead transition. The history retains terminal identities
@@ -153,8 +155,8 @@ across compaction.
 Dead-only cleanup can preserve the version and table ETag or use atomic +1
 commits with fresh table ETags. With several eligible rows, the suite accepts
 batches and bounds the total version increase between zero and the number of
-removed rows. Every retained canonical field and heartbeat remains unchanged.
-Empty cleanup preserves the complete observation.
+removed rows. Every retained canonical field remains unchanged.
+Empty cleanup preserves the canonical observation and logical tokens.
 The cleanup scenario retains a Dead row exactly at the cutoff, repeats that
 cutoff as a no-op, then advances it by one tick and requires that row's deletion.
 Restarts use a strictly newer generation at the same endpoint. The generated
@@ -166,16 +168,17 @@ cluster's complete view. G27 checks unused and foreign cluster IDs, verifying
 the configured cluster's complete view throughout.
 For a foreign cluster ID, a scoped provider can leave that scope unchanged or
 reject it with `ArgumentException` naming `clusterId`. The suite verifies complete
-state preservation after rejection; a backend-wide provider can instead delete
+canonical-state preservation after rejection; a backend-wide provider can instead delete
 the requested foreign scope. If the foreign scope is retained, G27 checks its
-complete view and then exercises its own-scope deletion. Native probes establish
+canonical view and then exercises its own-scope deletion. Native probes establish
 which scopes remain readable; retired handles receive only owner disposal.
 
 Each owning silo publishes its own liveness using a single blind column write.
 Heartbeat inputs carry the identity and timestamp. The kit publishes fixed
 whole-second UTC t1, t2, t2 in sequence through one owner while its row is live.
-Each call stores its supplied timestamp, preserves the membership version and
-other fields, and permits a refreshed row ETag. Generated heartbeat operations
+Each call preserves canonical membership fields, the table version, and both
+logical concurrency tokens. Reads can lag or expose older liveness values.
+Generated heartbeat operations
 use a fixed owner handle per identity and stay within that row's live lifetime.
 
 Provider-native tests verify the storage-operation budget for each periodic
@@ -184,19 +187,15 @@ blind liveness write**. The kit's observation reads bracket the provider call to
 check resulting fields; native SDK instrumentation establishes the operation
 count. Runtime snapshot merging retains maximum observed liveness.
 
-Full-row membership updates carrying an old timestamp preserve the stored
-heartbeat. G08 permits **one** retry only if the controlled t2 heartbeat
-changed the target row ETag, with unchanged table integer/token and complete
-versioned fields. A false write must have no other side effects. Refresh only
-the expected row ETag; retain the original table candidate and old-heartbeat
-payload. Unchanged row ETag, stale table, infrastructure exceptions, unrelated
-false, or changed view never permit retry. Both heartbeat row-ETag strategies
-are exercised by the independent local oracle.
+G07 and G08 capture logical row/table tokens, perform an owner heartbeat, then
+commit a status or suspect-vote change using the original tokens. Each update
+succeeds once with an exact +1 version advance. These cases make heartbeat
+noninterference observable at the canonical write boundary. Full-row payloads
+may clobber a newer stored heartbeat; the model's owner-published timestamps
+describe generated inputs, independently of the raw liveness values returned.
 
-Successful forward updates also advance a supplied newer heartbeat, refresh an
-existing suspect's timestamp, and clear a populated suspect list using either an
-empty list or null. The stale-heartbeat trace progresses through Dead and verifies
-cleanup retains the tombstone until its effective update time passes the cutoff.
+Successful forward updates refresh an existing suspect's timestamp and clear
+a populated suspect list using either an empty list or null.
 Missing-row checks include delayed updates after Dead-row
 compaction, checking both stale tokens and fresh table candidates. Periodic
 heartbeats finish within the owner's live-row lifetime; native missing-row
@@ -216,12 +215,15 @@ those boundaries explicitly.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach independent stale row/table modes,
-old-heartbeat status writes, and single- and multi-row Dead compaction followed
+original-token updates after heartbeats, and single- and multi-row Dead compaction followed
 by successor creation. Every generated case acquires fresh scopes;
 the execution context retains real token history separately from the abstract
 model. `DeleteCluster` is terminal: its result carries verified deletion evidence
 and ends all operations for that history. The next case constructs a new fixture
-and its owners. Cleanup outcomes are range-checked and their complete surviving rows
+and its owners. Generated cleanup uses a cutoff later than every generated
+timestamp, making the expected Dead-row removals independent of heartbeat lag
+or overwrite. Cleanup outcomes are range-checked and their surviving canonical rows
 validated before the model records a version delta. Final execution checks
 require all eighteen operation kinds. Self-tests exercise both cleanup
-strategies with an independent oracle and deliberate contract-violating mutants.
+strategies with an independent oracle, alternating liveness lag, full-row
+heartbeat overwrite, and deliberate canonical/token contract-violating mutants.

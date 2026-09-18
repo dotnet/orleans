@@ -21,11 +21,11 @@ public sealed class MembershipTableConformanceTests
     [Fact]
     public Task Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration() => Run((r, ct) => r.Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(ct));
     [Fact]
-    public Task UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields() => Run((r, ct) => r.UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct));
+    public Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens() => Run((r, ct) => r.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct));
     [Fact]
-    public Task UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat() => Run((r, ct) => r.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct));
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange() => Run((r, ct) => r.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct));
     [Fact]
-    public Task UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry() => Run((r, ct) => r.UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(ct));
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange() => Run((r, ct) => r.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct));
     [Fact]
     public Task Handles_IndependentlyConstructed_ShareCommittedBackingState() => Run((r, ct) => r.Handles_IndependentlyConstructed_ShareCommittedBackingState(ct));
     [Fact]
@@ -79,11 +79,19 @@ public sealed class MembershipTableConformanceTests
     [Fact]
     public Task DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster() => Run((r, ct) => r.DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct));
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipTable_ModelBased_GeneratedConformance(bool versionedCleanup)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task MembershipTable_ModelBased_GeneratedConformance(bool versionedCleanup, bool lagHeartbeatReads)
     {
-        var backend = new IdealizedMembershipBackend { TerminalDeletion = true, VersionedCleanup = versionedCleanup, CleanupBatchSize = 1 };
+        var backend = new IdealizedMembershipBackend
+        {
+            TerminalDeletion = true,
+            VersionedCleanup = versionedCleanup,
+            CleanupBatchSize = 1,
+            LagHeartbeatReads = lagHeartbeatReads
+        };
         await new MembershipTableModelBasedTestRunner(() => backend.Fixture(), "Idealized").RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         Assert.NotEmpty(backend.HeartbeatWrites);
         Assert.Contains(backend.HeartbeatWrites.GroupBy(write => (write.Cluster, write.Identity)), history =>
@@ -101,6 +109,7 @@ public sealed class MembershipTableConformanceTests
             }
         }
         Assert.Equal(0, backend.OperationsAfterDeletion);
+        if (lagHeartbeatReads) Assert.True(backend.LaggedHeartbeatReads > 0);
     }
 
     [Theory]
@@ -113,7 +122,7 @@ public sealed class MembershipTableConformanceTests
         [
             (runner, ct) => runner.Reads_SameVersion_PreservesRetainedCanonicalFields(ct),
             (runner, ct) => runner.Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(ct),
-            (runner, ct) => runner.UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct),
+            (runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
             (runner, ct) => runner.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
             (runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
             (runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
@@ -123,7 +132,7 @@ public sealed class MembershipTableConformanceTests
             await backend.Fixture().RunAsync(
                 (fixture, ct) => scenario(new MembershipTableTestRunner(fixture, concurrencyRowCount: 5), ct),
                 TestContext.Current.CancellationToken);
-        Assert.Equal(14, backend.CleanupBatches);
+        Assert.Equal(13, backend.CleanupBatches);
         Assert.Empty(backend.Partitions);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
     }
@@ -168,12 +177,12 @@ public sealed class MembershipTableConformanceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OwnerSequencedHeartbeats_OnlyChangeLivenessAndOptionalRowToken(bool changesRowEtag)
+    public async Task OwnerSequencedHeartbeats_PreserveCanonicalFieldsAndTokensDespiteReadLag(bool lagHeartbeatReads)
     {
-        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesRowEtag };
+        var backend = new IdealizedMembershipBackend { LagHeartbeatReads = lagHeartbeatReads };
         await backend.Fixture().RunAsync(async (fixture, ct) =>
         {
-            await new MembershipTableTestRunner(fixture).UpdateIAmAlive_OwnerSequencedWrites_PreserveMembershipFields(ct);
+            await new MembershipTableTestRunner(fixture).UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct);
             Assert.Equal(3, backend.HeartbeatWrites.Count);
             Assert.All(backend.HeartbeatWrites, write => Assert.Same(fixture.First, write.Owner));
             Assert.Equal(new[] { MembershipTableTestData.T1, MembershipTableTestData.T2, MembershipTableTestData.T2 },
@@ -183,19 +192,30 @@ public sealed class MembershipTableConformanceTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task HeartbeatEtagVariants_OldPayloadAndSingleRereadRetryAreUnconditional(bool changesRowEtag)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task PreHeartbeatTokens_CommitCanonicalWritesWithLagOrHeartbeatOverwrite(bool lagHeartbeatReads, bool preserveHeartbeatOnFullWrite)
     {
-        var backend = new IdealizedMembershipBackend { ChangeHeartbeatEtag = changesRowEtag };
-        var messages = new List<string>();
-        await backend.Fixture().RunAsync((f, ct) => new MembershipTableTestRunner(f, output: messages.Add)
-            .UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(ct), TestContext.Current.CancellationToken);
-        Assert.Equal(changesRowEtag ? 2 : 1, backend.VersionedUpdates);
-        if (changesRowEtag) Assert.Contains(messages, m => m.Contains("refresh only row ETag", StringComparison.Ordinal));
-        else Assert.Empty(messages);
-        await backend.Fixture().RunAsync((f, ct) => new MembershipTableTestRunner(f)
-            .UpdateRow_StaleHeartbeatPayload_PreservesStoredHeartbeat(ct), TestContext.Current.CancellationToken);
+        var backend = new IdealizedMembershipBackend
+        {
+            LagHeartbeatReads = lagHeartbeatReads,
+            PreserveHeartbeatOnFullWrite = preserveHeartbeatOnFullWrite
+        };
+        foreach (var statusChange in new[] { false, true })
+        {
+            await backend.Fixture().RunAsync(async (f, ct) =>
+            {
+                var runner = new MembershipTableTestRunner(f);
+                if (statusChange) await runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct);
+                else await runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct);
+                var stored = backend.Partitions[f.ClusterId].Rows[MembershipTableTestData.CreateEntry(1).SiloAddress].Item1;
+                Assert.Equal(preserveHeartbeatOnFullWrite ? MembershipTableTestData.T2 : MembershipTableTestData.T0, stored.IAmAliveTime);
+            }, TestContext.Current.CancellationToken);
+        }
+        Assert.Equal(2, backend.VersionedUpdates);
+        if (lagHeartbeatReads) Assert.True(backend.LaggedHeartbeatReads > 0);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
     }
 
@@ -209,6 +229,9 @@ public sealed class MembershipTableConformanceTests
             (runner, ct) => runner.UpdateRow_CurrentTokens_CommitsExactlyOneVersion(ct),
             (runner, ct) => runner.UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(ct),
             (runner, ct) => runner.UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(ct),
+            (runner, ct) => runner.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
+            (runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
+            (runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct),
             (runner, ct) => runner.ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner(ct),
             (runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
             (runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
