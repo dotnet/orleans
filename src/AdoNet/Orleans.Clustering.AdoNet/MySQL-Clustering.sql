@@ -161,7 +161,7 @@ VALUES
     SET v.Version = v.Version + 1,
         m.Status = @Status,
         m.SuspectTimes = @SuspectTimes,
-        m.IAmAliveTime = GREATEST(m.IAmAliveTime, @IAmAliveTime)
+        m.IAmAliveTime = @IAmAliveTime
     WHERE v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
         AND v.Version = @Version AND @Version IS NOT NULL AND v.Version < 2147483647
         AND m.Address = @Address AND @Address IS NOT NULL

@@ -26,39 +26,6 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION insert_membership_version(
-    DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE
-)
-  RETURNS TABLE(row_count integer) AS
-$func$
-DECLARE
-    RowCountVar int := 0;
-BEGIN
-
-    BEGIN
-
-        INSERT INTO OrleansMembershipVersionTable
-        (
-            DeploymentId
-        )
-        SELECT DeploymentIdArg
-        ON CONFLICT (DeploymentId) DO NOTHING;
-
-        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
-
-        IF RowCountVar = 0 THEN
-            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
-        END IF;
-
-        RETURN QUERY SELECT RowCountVar;
-    EXCEPTION
-    WHEN assert_failure THEN
-        RETURN QUERY SELECT RowCountVar;
-    END;
-
-END
-$func$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION insert_membership(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE,
     AddressArg      OrleansMembershipTable.Address%TYPE,
@@ -166,7 +133,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
-        IAmAliveTime = GREATEST(IAmAliveTime, IAmAliveTimeArg)
+        IAmAliveTime = IAmAliveTimeArg
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
         AND Address = AddressArg AND AddressArg IS NOT NULL

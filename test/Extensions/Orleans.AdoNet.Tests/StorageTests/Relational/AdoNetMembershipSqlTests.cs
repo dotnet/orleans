@@ -95,18 +95,18 @@ public sealed class AdoNetMembershipSqlTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void FullMembershipUpdate_PreservesMaximumHeartbeat(string engine)
+    public void FullMembershipUpdate_AssignsSuppliedBestEffortHeartbeat(string engine)
     {
         var script = ReadScript(engine);
         var update = UpdateBody(engine, Queries(script), Routines(script));
-        if (engine == "SQLServer")
+        var parameter = engine switch
         {
-            Assert.Contains("IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END", update, StringComparison.Ordinal);
-        }
-        else
-        {
-            Assert.Matches(@"IAmAliveTime = GREATEST\((?:[dm]\.)?IAmAliveTime, ", update);
-        }
+            "PostgreSQL" => "IAmAliveTimeArg",
+            "Oracle" => "PARAM_IAMALIVETIME",
+            _ => "@IAmAliveTime",
+        };
+        Assert.Contains($"IAmAliveTime = {parameter}", update, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"(?i)\b(?:CASE|GREATEST)\b", update);
     }
 
     [Theory]
@@ -197,7 +197,7 @@ public sealed class AdoNetMembershipSqlTests
 
         var installRoutines = Routines(install);
         var updatedRoutines = Routines(update);
-        Assert.Equal(engine switch { "PostgreSQL" => 4, "Oracle" => 3, "MySQL" => 1, _ => 0 }, updatedRoutines.Count);
+        Assert.Equal(engine switch { "PostgreSQL" => 3, "Oracle" => 3, "MySQL" => 1, _ => 0 }, updatedRoutines.Count);
         foreach (var (name, text) in updatedRoutines)
         {
             var installName = name == "InsertMembershipKeyAtomic" ? "InsertMembershipKey" : name;

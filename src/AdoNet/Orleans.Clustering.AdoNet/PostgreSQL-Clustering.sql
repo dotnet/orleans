@@ -84,9 +84,7 @@ BEGIN
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        IF RowCountVar = 0 THEN
-            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
-        END IF;
+        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
 
         RETURN QUERY SELECT RowCountVar;
     EXCEPTION
@@ -232,7 +230,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
-        IAmAliveTime = GREATEST(IAmAliveTime, IAmAliveTimeArg)
+        IAmAliveTime = IAmAliveTimeArg
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
         AND Address = AddressArg AND AddressArg IS NOT NULL

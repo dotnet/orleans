@@ -94,7 +94,7 @@ UPDATE OrleansQuery SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
 	SET
 		Status = @Status,
 		SuspectTimes = @SuspectTimes,
-		IAmAliveTime = CASE WHEN IAmAliveTime > @IAmAliveTime THEN IAmAliveTime ELSE @IAmAliveTime END
+		IAmAliveTime = @IAmAliveTime
 	WHERE
 		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
 		AND Address = @Address AND @Address IS NOT NULL
