@@ -6,16 +6,17 @@ using Orleans.Journaling;
 namespace Orleans.DurableMessaging.Tests.Support;
 
 // Captures handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
-internal sealed class JournaledTestOutbox(
-    [FromKeyedServices("test-handler-output")] IDurableDictionary<Guid, DurableEnvelope> messages) : IDurableOutbox, IJournaledStateObserver
+internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
+    : ObservedJournalDictionary<Guid, DurableEnvelope>(manager, "test-handler-output", deferred: true), IDurableOutbox
 {
     private static readonly Func<DurableEnvelope, DurableEnvelope, bool> AreEquivalent = ReceiverTestServices
         .GetImplementationType("DurableEnvelopeEquivalence")
         .GetMethod("AreEquivalent")!
         .CreateDelegate<Func<DurableEnvelope, DurableEnvelope, bool>>();
 
-    private readonly Dictionary<Guid, DurableEnvelope> _pending = [];
-    private KeyValuePair<Guid, DurableEnvelope>[] _admitted = [];
+    private readonly HashSet<Guid> _pending = [];
+    private Guid[] _admitted = [];
+    private bool _preparing;
     private ExceptionDispatchInfo? _failure;
     private PreparationBarrier? _nextPreparation;
     public Exception? Failure => _failure?.SourceException;
@@ -46,8 +47,7 @@ internal sealed class JournaledTestOutbox(
         public void Dispose() => Release();
     }
 
-    public int Count => messages.Count + _pending.Keys.Count(key => !messages.ContainsKey(key));
-    public IEnumerable<DurableEnvelope> Messages => messages.Values.Concat(_pending.Where(pair => !messages.ContainsKey(pair.Key)).Select(static pair => pair.Value));
+    public IEnumerable<DurableEnvelope> Messages => Values;
     public void Send(DurableEnvelope envelope)
     {
         _failure?.Throw();
@@ -62,18 +62,28 @@ internal sealed class JournaledTestOutbox(
             return;
         }
 
-        _pending.Add(envelope.MessageId, envelope);
+        Add(envelope.MessageId, envelope);
+        _pending.Add(envelope.MessageId);
     }
 
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
-        _pending.TryGetValue(messageId, out envelope) || messages.TryGetValue(messageId, out envelope);
+        TryGetValue(messageId, out envelope);
 
-    public async ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+    public override bool IsWritePrepared
+    {
+        get
+        {
+            _failure?.Throw();
+            return _nextPreparation is null && !_preparing;
+        }
+    }
+
+    public override async ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         PreparationScheduler = TaskScheduler.Current;
         PreparationContext = ReceiverTestServices.CurrentGrainContext;
-        _admitted = _pending.ToArray();
+        _preparing = true;
         var barrier = _nextPreparation;
         _nextPreparation = null;
         if (barrier is not null)
@@ -84,32 +94,46 @@ internal sealed class JournaledTestOutbox(
         ContinuationScheduler = TaskScheduler.Current;
         ContinuationContext = ReceiverTestServices.CurrentGrainContext;
         BeforeFinalization?.Invoke();
+        _preparing = false;
     }
 
-    public void FinalizeWrite(CancellationToken cancellationToken)
+    public override void AppendEntries(JournalStreamWriter writer)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        foreach (var entry in _admitted)
-        {
-            messages.Add(entry.Key, entry.Value);
-        }
+        base.AppendEntries(writer);
+        Capture();
     }
 
-    public void OnWriteStarted() => LastCapturedIds = _admitted.Select(static pair => pair.Key).ToArray();
-    public void OnWriteCompleted()
+    public override void AppendSnapshot(JournalStreamWriter writer)
     {
-        foreach (var entry in _admitted)
-        {
-            _pending.Remove(entry.Key);
-        }
+        base.AppendSnapshot(writer);
+        Capture();
+    }
+
+    private void Capture()
+    {
+        _admitted = _pending.ToArray();
+        _pending.Clear();
+        LastCapturedIds = _admitted;
+    }
+
+    public override void OnWriteCompleted()
+    {
+        base.OnWriteCompleted();
         _admitted = [];
         AfterWriteCompleted?.Invoke();
     }
-    public void OnRecoveryCompleted() { }
-    public void OnFaulted(Exception exception) => _failure = ExceptionDispatchInfo.Capture(exception);
-    public void OnDeleteCompleted()
+
+    public override void OnFaulted(Exception exception)
     {
+        _failure ??= ExceptionDispatchInfo.Capture(exception);
+        base.OnFaulted(exception);
+    }
+
+    public override void Reset(JournalStreamWriter writer)
+    {
+        base.Reset(writer);
         _pending.Clear();
         _admitted = [];
+        _preparing = false;
     }
 }
