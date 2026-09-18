@@ -15,7 +15,7 @@ permissions:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
-  DOTNET_COVERAGE_VERSION: 18.5.2
+  DOTNET_COVERAGE_VERSION: 18.11.2
   # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a

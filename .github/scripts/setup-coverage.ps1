@@ -36,7 +36,9 @@ if ([string]::IsNullOrWhiteSpace($toolPath)) {
 }
 
 Assert-NotReparsePoint $toolPath
-dotnet tool install --tool-path $toolPath dotnet-coverage --version $Version
+dotnet tool install --tool-path $toolPath dotnet-coverage --version $Version `
+    --add-source https://api.nuget.org/v3/index.json `
+    --ignore-failed-sources
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet-coverage installation failed with exit code $LASTEXITCODE"
 }
