@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
@@ -10,33 +11,40 @@ internal static class BootstrapOutboxServices
 {
     public const string JobName = "orleans.messaging.outbox-flush";
     public const string StateName = "__orleans.durable-messaging.outbox";
-    public const string ObserverName = "__orleans.durable-messaging.outbox-observer";
+    public static readonly string[] StateNames =
+    [
+        StateName,
+        "__orleans.durable-messaging.outbox-message-state",
+        "__orleans.durable-messaging.outbox-dead-letters",
+        "__orleans.durable-messaging.outbox-job-id",
+        "__orleans.durable-messaging.outbox-job-handle",
+        "__orleans.durable-messaging.outbox-completed-job-id",
+        "__orleans.durable-messaging.outbox-job-sequence"
+    ];
 
     public static void Add(IServiceCollection services)
     {
         var outboxType = ReceiverTestServices.GetImplementationType("DurableOutbox");
-        var endpointType = ReceiverTestServices.GetImplementationType("DurableMessagingJournalEndpoint");
         services.RemoveAll<IDurableOutbox>();
         services.TryAddScoped(outboxType);
         services.AddScoped<IDurableOutbox>(provider => (IDurableOutbox)provider.GetRequiredService(outboxType));
-        services.RemoveAllKeyed(endpointType, ObserverName);
-        services.AddKeyedScoped(endpointType, ObserverName, (provider, _) =>
+        AddAlias(typeof(IDurableDictionary<Guid, DurableEnvelope>), StateNames[0], "MessageState");
+        AddAlias(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), ReceiverTestServices.GetImplementationType("OutboxMessageState")), StateNames[1], "AttemptState");
+        AddAlias(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), ReceiverTestServices.GetImplementationType("OutboxDeadLetter")), StateNames[2], "DeadLetterState");
+        AddAlias(typeof(IDurableValue<string>), StateNames[3], "JobIdState");
+        AddAlias(typeof(IDurableValue<Orleans.DurableJobs.DurableJob>), StateNames[4], "JobState");
+        AddAlias(typeof(IDurableValue<string>), StateNames[5], "CompletedJobIdState");
+        AddAlias(typeof(IDurableValue<long>), StateNames[6], "JobSequenceState");
+
+        void AddAlias(Type serviceType, string key, string property)
         {
-            var outbox = provider.GetRequiredService<IDurableOutbox>();
-            if (provider.GetRequiredService<IGrainContext>().GrainInstance is FailingBootstrapGrain)
-            {
-                var observation = provider.GetRequiredService<BootstrapObservation>();
-                observation.Manager = provider.GetRequiredService<IJournaledStateManager>();
-                observation.Inbox = provider.GetRequiredService<IDurableInbox>();
-                observation.Outbox = outbox;
-                observation.Extension = provider.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-                observation.ExpectedFailure = new IOException("Expected bootstrap endpoint construction failure.");
-                throw observation.ExpectedFailure;
-            }
-            var finalize = outboxType.GetMethod("FinalizeWrite")!.CreateDelegate<Action<CancellationToken>>(outbox);
-            return ActivatorUtilities.CreateInstance(provider, endpointType, (IJournaledStateObserver)outbox, finalize);
-        });
+            var getter = outboxType.GetProperty(property, BindingFlags.Instance | BindingFlags.NonPublic)!;
+            services.RemoveAllKeyed(serviceType, key);
+            services.AddKeyedScoped(serviceType, key, (provider, _) => getter.GetValue(provider.GetRequiredService(outboxType))!);
+        }
     }
+
+
 }
 
 public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter
@@ -67,42 +75,67 @@ public interface IBootstrapOutputGrain : IGrainWithStringKey
 }
 
 [GrainType("bootstrap-output")]
-public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurableMessagingGrain, IInboxHandler, IJournaledStateObserver
+public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurableMessagingGrain, IInboxHandler,
+    IJournaledState, IDurableDictionaryCommandHandler<Guid, int>
 {
-    private readonly IDurableDictionary<Guid, int> _values;
+    private readonly Dictionary<Guid, int> _values = [];
+    private readonly List<(GrainId Sender, Guid MessageId, int Value)> _pending = [];
+    private (GrainId Sender, Guid MessageId, int Value)[] _captured = [];
     private readonly BootstrapDeliveryProbe _probe;
-    private (GrainId Sender, Guid MessageId, int Value)? _committing;
+    private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
 
-    public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox,
-        [FromKeyedServices("bootstrap-output-values")] IDurableDictionary<Guid, int> values, BootstrapDeliveryProbe probe)
+    public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox, BootstrapDeliveryProbe probe)
     {
-        _values = values;
         _probe = probe;
+        _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
+        manager.RegisterState("bootstrap-output-values", this);
         inbox.RegisterHandler("output", this);
-        manager.RegisterObserver(this);
     }
 
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == "output";
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!context.Envelope.Data.TryGetBody<int>(out var value))
         {
             throw new InvalidOperationException("The bootstrap output must contain an integer.");
         }
-        _values.Add(context.Envelope.MessageId, value);
-        _committing = (context.Envelope.SenderId, context.Envelope.MessageId, value);
-        return default;
+        return ValueTask.FromResult<Action>(() =>
+        {
+            _values.Add(context.Envelope.MessageId, value);
+            _pending.Add((context.Envelope.SenderId, context.Envelope.MessageId, value));
+        });
     }
 
     public Task<int> GetMessageCountAsync() => Task.FromResult(_values.Count);
-    public void OnWriteStarted() { }
-    public void OnRecoveryCompleted() { }
+    public void AppendEntries(JournalStreamWriter writer)
+    {
+        _captured = _pending.ToArray();
+        _pending.Clear();
+        foreach (var item in _captured) _codec.WriteSet(item.MessageId, item.Value, writer);
+    }
+    public void AppendSnapshot(JournalStreamWriter writer)
+    {
+        _captured = _pending.ToArray();
+        _pending.Clear();
+        _codec.WriteSnapshot(_values, writer);
+    }
     public void OnWriteCompleted()
     {
-        if (_committing is { } output)
-        {
-            _committing = null;
-            _probe.OnOutput(output.Sender, output.MessageId, output.Value);
-        }
+        foreach (var output in _captured) _probe.OnOutput(output.Sender, output.MessageId, output.Value);
+        _captured = [];
     }
+    public void Reset(JournalStreamWriter writer)
+    {
+        _values.Clear();
+        _pending.Clear();
+        _captured = [];
+    }
+    public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+    public IJournaledState DeepCopy() => throw new NotSupportedException();
+    public void ApplySet(Guid key, int value) => _values[key] = value;
+    public void ApplyRemove(Guid key) => _values.Remove(key);
+    public void ApplyClear() => _values.Clear();
+    public void Reset(int capacityHint) => _values.Clear();
 }
