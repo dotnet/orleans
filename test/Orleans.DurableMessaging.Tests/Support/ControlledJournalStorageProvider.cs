@@ -9,12 +9,16 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 {
     private VolatileJournalStorageProvider? _inner;
     private readonly ConcurrentDictionary<JournalId, WritePlan> _readPlans = new();
+    private readonly ConcurrentDictionary<JournalId, WritePlan> _deletePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
     private readonly ConcurrentDictionary<JournalId, int> _reads = new();
     private readonly ConcurrentDictionary<JournalId, int> _creations = new();
     private readonly ConcurrentDictionary<JournalId, int> _initializations = new();
+
+    private readonly ConcurrentDictionary<JournalId, byte> _snapshots = new();
+    public void RequestSnapshot(JournalId journalId) => _snapshots[journalId] = 0;
 
     public string? JournalFormatKey { get; private set; }
 
@@ -48,6 +52,16 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             throw new InvalidOperationException($"A write plan is already armed for journal '{journalId}'.");
         }
 
+        return new WriteBarrier(plan);
+    }
+
+    public WriteBarrier BlockDelete(JournalId journalId)
+    {
+        var plan = new WritePlan(1, fail: false);
+        if (!_deletePlans.TryAdd(journalId, plan))
+        {
+            throw new InvalidOperationException($"A delete plan is already armed for journal '{journalId}'.");
+        }
         return new WriteBarrier(plan);
     }
 
@@ -159,7 +173,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         JournalId journalId,
         IJournalStorage inner) : IJournalStorage
     {
-        public bool IsCompactionRequested => inner.IsCompactionRequested;
+        public bool IsCompactionRequested => owner._snapshots.ContainsKey(journalId) || inner.IsCompactionRequested;
 
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
@@ -190,6 +204,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         {
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
+            owner._snapshots.TryRemove(journalId, out _);
             owner.OnWriteSucceeded(journalId);
             owner.AfterWrite(journalId);
         }
@@ -202,7 +217,14 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             owner.AfterWrite(journalId);
         }
 
-        public ValueTask DeleteAsync(CancellationToken cancellationToken) =>
-            inner.DeleteAsync(cancellationToken);
+        public async ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            if (owner._deletePlans.TryRemove(journalId, out var plan))
+            {
+                plan.Entered.TrySetResult();
+                await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await inner.DeleteAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 }

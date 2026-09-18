@@ -17,10 +17,6 @@ public sealed class ActivationValidationTests
         .GetImplementationType("DurableMessagingActivationValidator")
         .GetMethod("Validate")!
         .CreateDelegate<Action<IGrainContext>>();
-    private static readonly Action<IJournaledStateManager, IJournaledStateObserver> RegisterObserver = ReceiverTestServices
-        .GetImplementationType("DurableMessagingStateManagerCapabilities")
-        .GetMethod("RegisterObserver")!
-        .CreateDelegate<Action<IJournaledStateManager, IJournaledStateObserver>>();
 
     [Fact]
     public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
@@ -72,30 +68,27 @@ public sealed class ActivationValidationTests
     }
 
     [Fact]
-    public void MissingObserverCapability_ReportsRequiredContractAndPreservesCause()
+    public void MissingCodecCapability_PreservesRequiredContractFailure()
     {
         var manager = Substitute.For<IJournaledStateManager>();
-        var observer = Substitute.For<IJournaledStateObserver>();
-        var cause = new NotSupportedException("observer capability");
-        manager.When(value => value.RegisterObserver(observer)).Do(_ => throw cause);
+        var cause = new NotSupportedException("manager-bound codec capability");
+        manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>().Returns(_ => throw cause);
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            RegisterObserver(manager, observer));
+        var exception = Assert.Throws<NotSupportedException>(() =>
+            ReceiverTestServices.CreateDeferredDictionary<string, int>(manager));
 
-        Assert.Contains("IJournaledStateManager.RegisterObserver", exception.Message, StringComparison.Ordinal);
-        Assert.Same(cause, exception.InnerException);
+        Assert.Same(cause, exception);
     }
 
     [Fact]
-    public void ObserverRegistration_PreservesUnrelatedFailure()
+    public void CodecResolution_PreservesUnrelatedFailure()
     {
         var manager = Substitute.For<IJournaledStateManager>();
-        var observer = Substitute.For<IJournaledStateObserver>();
-        var cause = new InvalidOperationException("registration failure");
-        manager.When(value => value.RegisterObserver(observer)).Do(_ => throw cause);
+        var cause = new InvalidOperationException("codec resolution failure");
+        manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>().Returns(_ => throw cause);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            RegisterObserver(manager, observer));
+            ReceiverTestServices.CreateDeferredDictionary<string, int>(manager));
 
         Assert.Same(cause, exception);
     }

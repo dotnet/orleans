@@ -97,7 +97,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                     scheduling.Continue();
                 }
                 await preparation.WaitAsync();
-                await AssertCountsAsync(context, probe, new(existing, 0, existing));
+                await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 var duplicate = StartDelivery(context, probe.Extension, envelope.Value, Cancellation);
                 preparation.Release();
                 await storage.WaitUntilEnteredAsync();
@@ -116,7 +116,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                 outbox.AfterWriteCompleted = () =>
                 {
                     outbox.AfterWriteCompleted = null;
-                    acknowledged.TrySetResult(probe.Read());
+                    context.Scheduler.QueueAction(() => acknowledged.TrySetResult(probe.Read()));
                 };
                 storage.Release();
                 Assert.Equal(new Counts(existing + 1, 0, existing + 1), await acknowledged.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
@@ -207,7 +207,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task RejectedAcceptanceCount_LeavesCollectionsEmpty(bool scheduling)
+    public async Task RejectedAcceptanceCount_DistinguishesSchedulingFailureFromStagedRequestFailure(bool scheduling)
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -226,12 +226,18 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
             var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, envelope.Value));
             Assert.Equal("Expected count request veto.", failure.Message);
         }
-        await AssertCountsAsync(context, probe, new(0, 0, 0));
+        Assert.Equal(new Counts(scheduling ? 0 : 1, scheduling ? 0 : 1, 0), probe.Read());
         Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        if (!scheduling)
+        {
+            await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        }
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
-        await AssertCountsAsync(context, probe, new(0, 0, 0));
+        var current = Fixture.GetGrainContext(receiver);
+        await AssertCountsAsync(current, new CountProbe(current), new(0, 0, 0));
+        if (!scheduling) Assert.Equal(new Counts(1, 1, 0), probe.Read());
     }
 
     [Fact]

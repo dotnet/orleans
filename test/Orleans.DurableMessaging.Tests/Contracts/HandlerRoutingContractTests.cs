@@ -30,6 +30,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
     {
         var inbox = CreateInbox();
         var handler = Substitute.For<IInboxHandler>();
+        handler.PrepareAsync(Arg.Any<IInboxHandlerContext>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<Action>(() => { }));
         inbox.RegisterHandler("orders/submit", handler);
 
         Assert.True(inbox.HasHandler("orders/submit"));
@@ -49,6 +50,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
     {
         var inbox = CreateInbox();
         var handler = Substitute.For<IInboxHandler>();
+        handler.PrepareAsync(Arg.Any<IInboxHandlerContext>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<Action>(() => { }));
         var fallback = Substitute.For<IInboxHandler>();
         fallback.CanHandle(Arg.Any<IInboxHandlerContext>()).Returns(true);
         inbox.RegisterHandler(fallback);
@@ -61,11 +63,12 @@ public sealed class HandlerRoutingContractTests : IDisposable
 
         Assert.True((bool)select.Invoke(inbox, arguments)!);
         Assert.Same(handler, arguments[1]);
-        await ((IInboxHandler)arguments[1]!).HandleAsync(exactContext, cancellationToken);
+        var apply = await ((IInboxHandler)arguments[1]!).PrepareAsync(exactContext, cancellationToken);
+        apply();
 
         handler.DidNotReceive().CanHandle(Arg.Any<IInboxHandlerContext>());
         fallback.DidNotReceive().CanHandle(Arg.Any<IInboxHandlerContext>());
-        await handler.Received(1).HandleAsync(exactContext, cancellationToken);
+        await handler.Received(1).PrepareAsync(exactContext, cancellationToken);
 
         arguments = [differentCaseContext, null];
         Assert.True((bool)select.Invoke(inbox, arguments)!);

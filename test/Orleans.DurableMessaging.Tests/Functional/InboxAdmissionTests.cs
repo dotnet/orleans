@@ -19,8 +19,8 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     {
         using var attempt = await PrepareAttemptAsync("atomic-admission");
         var state = attempt.Grain.GetSnapshotForTest();
-        Assert.Equal(1, state.InboxCount);
-        Assert.Equal(0, state.ProcessedMessageCount);
+        Assert.Equal(0, state.InboxCount);
+        Assert.Equal(1, state.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(state.Effects).Count);
         Assert.Equal(1, attempt.Outbox.Count);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
@@ -69,8 +69,8 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
         var failed = attempt.Grain.GetSnapshotForTest();
         Assert.Single(failed.Effects);
-        Assert.Equal(1, failed.InboxCount);
-        Assert.Equal(0, failed.ProcessedMessageCount);
+        Assert.Equal(0, failed.InboxCount);
+        Assert.Equal(1, failed.ProcessedMessageCount);
         _ = await attempt.Receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(attempt.Receiver, 1);
         Assert.NotEqual(failed.ActivationId, recovered.ActivationId);
@@ -102,8 +102,8 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
         var failed = attempt.Grain.GetSnapshotForTest();
         Assert.Single(failed.Effects);
-        Assert.Equal(1, failed.InboxCount);
-        Assert.Equal(0, failed.ProcessedMessageCount);
+        Assert.Equal(0, failed.InboxCount);
+        Assert.Equal(1, failed.ProcessedMessageCount);
         await attempt.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await attempt.Receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(attempt.Receiver, 1);
@@ -113,7 +113,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task LateOutgoingIntent_AfterPreparationCutoff_WaitsForNextCapture()
+    public async Task LateOutgoingIntent_AfterCapture_WaitsForNextCapture()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -124,15 +124,15 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var first = new DurableEnvelopeBuilder(sessions, receiver.GetGrainId()).To(receiver.GetGrainId(), "messages/output").WithBody(1).Build();
         var late = new DurableEnvelopeBuilder(sessions, receiver.GetGrainId()).To(receiver.GetGrainId(), "messages/output").WithBody(2).Build();
         await receiver.StageOutputAsync(first);
-        using var preparation = outbox.BlockNextPreparation();
+        var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var write = Fixture.WriteStateAsync(receiver).AsTask();
-        await preparation.WaitAsync();
+        await storage.WaitUntilEnteredAsync();
         await OnTurnAsync(context, () => outbox.Send(late));
-        preparation.Release();
-        await write;
-        Assert.Equal(first.MessageId, Assert.Single(durable).Key);
         Assert.Equal(new[] { first.MessageId }, outbox.LastCapturedIds);
         Assert.Equal(2, outbox.Count);
+        storage.Release();
+        await write;
+        Assert.Equal(new[] { first.MessageId }, outbox.LastCapturedIds);
         await receiver.RetryWriteStateAsync();
         Assert.Equal(new[] { late.MessageId }, outbox.LastCapturedIds);
         Assert.Equal(2, durable.Count);
@@ -141,7 +141,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task AcceptanceAfterInboxPreparationCutoff_IsAppliedByLaterOperation()
+    public async Task AcceptanceAfterCapture_IsAcknowledgedByLaterOperation()
     {
         var receiver = NewGrain();
         using var seed = CreateEnvelope(receiver, NewMessage(110, "seed"), "messages/cutoff");
@@ -158,18 +158,19 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-        using var preparation = outbox.BlockNextPreparation();
+        var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         grain.Captures.Clear();
+        await OnTurnAsync(context, () => context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "capture-cutoff");
         var preceding = Fixture.WriteStateAsync(receiver).AsTask();
-        await preparation.WaitAsync();
+        await storage.WaitUntilEnteredAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/cutoff");
         using var incoming = CreateEnvelope(receiver, NewMessage(111, "late-acceptance"), "messages/cutoff");
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         Task<DeliveryResult> delivery = null!;
         await OnTurnAsync(context, () => delivery = extension.DeliverAsync(incoming.Value).AsTask());
         Assert.False(delivery.IsCompleted);
-        Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
-        preparation.Release();
+        Assert.Equal(2, grain.GetSnapshotForTest().InboxCount);
+        storage.Release();
         await preceding;
         Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
         await handler.WaitUntilEnteredAsync();
@@ -238,30 +239,23 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task CompositeIsSoleMessagingObserver_AndRequiresExplicitOutboxEndpoint()
+    public async Task MessagingPrimaryStates_AreTheRegisteredScopedDataInstances()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var services = Fixture.GetGrainContext(receiver).ActivationServices;
         var manager = services.GetRequiredService<IJournaledStateManager>();
-        var registered = (IEnumerable<IJournaledStateObserver>)manager.GetType().GetField("_observers",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(manager)!;
-        var compositeType = ReceiverTestServices.GetImplementationType("DurableMessagingJournalObserver");
-        Assert.Single(registered, observer => observer.GetType() == compositeType);
-        Assert.DoesNotContain(registered, observer => observer.GetType().Name is "DurableInboxExtension" or "JournaledTestOutbox");
-        var endpointType = ReceiverTestServices.GetImplementationType("DurableMessagingJournalEndpoint");
-        var endpoint = services.GetRequiredKeyedService(endpointType, "__orleans.durable-messaging.outbox-observer");
-        Assert.Same(services.GetRequiredService<IDurableOutbox>(), endpointType.GetProperty("Observer")!.GetValue(endpoint));
-        var missing = new ServiceCollection();
-        missing.AddLogging();
-        using var provider = missing.BuildServiceProvider();
-        var inbox = services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        var exception = Assert.Throws<InvalidOperationException>(() => ActivatorUtilities.CreateInstance(provider, compositeType, inbox));
-        Assert.Contains("DurableMessagingJournalEndpoint", exception.Message, StringComparison.Ordinal);
+        Assert.True(manager.TryGetState("__orleans.durable-messaging.inbox", out var inbox));
+        Assert.Equal("InboxJournalState", inbox.GetType().Name);
+        Assert.Same(services.GetRequiredService(ReceiverTestServices.GetImplementationType("InboxJournalState")), inbox);
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
+        Assert.True(manager.TryGetState("test-handler-output", out var output));
+        Assert.Same(services.GetRequiredService<IDurableOutbox>(), output);
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"), output);
     }
 
     [Fact]
-    public async Task RequestVetoBeforeAdmission_LeavesAcknowledgedScheduleProposalLocal()
+    public async Task RequestRejectionAfterStaging_FailsClosedAndFreshScopeRetries()
     {
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
@@ -273,15 +267,20 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         using var envelope = CreateEnvelope(receiver, NewMessage(114, "request-veto"));
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, envelope.Value));
         Assert.Contains("pre-admission veto", failure.Message, StringComparison.Ordinal);
-        var rejected = await receiver.GetSnapshotAsync();
+        var rejected = grain.GetSnapshotForTest();
         Assert.Equal(before.ActivationId, rejected.ActivationId);
-        Assert.Equal(0, rejected.InboxCount);
-        Assert.Null(rejected.InboxJobId);
-        Assert.Null(rejected.InboxJob);
+        Assert.Equal(1, rejected.InboxCount);
+        Assert.NotNull(rejected.InboxJobId);
+        Assert.NotNull(rejected.InboxJob);
         Assert.Empty(rejected.Effects);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.False(grain.Faulted.Task.IsCompleted);
         Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(rejected.ActivationId, recovered.ActivationId);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Null(recovered.InboxJobId);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
         var jobs = Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId());

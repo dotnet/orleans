@@ -12,7 +12,6 @@ internal static class DurableMessagingStateNames
     public const string InboxJobHandle = Prefix + "inbox-job-handle";
     public const string InboxCompletedJobId = Prefix + "inbox-completed-job-id";
     public const string InboxJobSequence = Prefix + "inbox-job-sequence";
-    public const string OutboxObserver = Prefix + "outbox-observer";
     public const string Outbox = Prefix + "outbox";
     public const string OutboxMessageState = Prefix + "outbox-message-state";
     public const string OutboxDeadLetters = Prefix + "outbox-dead-letters";

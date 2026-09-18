@@ -46,7 +46,7 @@ public sealed class BootstrapObservation : IDisposable
     public void Dispose() => Disposals++;
 }
 
-public sealed class BootstrapState : IJournaledStateObserver, IInboxHandler, IDisposable
+public sealed class BootstrapState : IInboxHandler, IDisposable
 {
     public const string Route = "bootstrap";
     private readonly HandlerProbe _handlers;
@@ -59,14 +59,17 @@ public sealed class BootstrapState : IJournaledStateObserver, IInboxHandler, IDi
         observation.Value = value;
         observation.Inbox = inbox;
         observation.Outbox = outbox;
-        manager.RegisterObserver(this);
+        var journal = (ObservedJournalValue<int>)value;
+        journal.Initializing = OnRecoveryStarted;
+        journal.Recovered = OnRecoveryCompleted;
+        journal.Written = OnWriteCompleted;
         inbox.RegisterHandler(Route, this);
     }
 
     public BootstrapObservation Observation { get; }
     public int RecoveryStarts { get; private set; }
     public int RecoveryCompletions { get; private set; }
-    public int CompositeCountAtRecovery { get; private set; }
+    public int PrimaryStateCountAtRecovery { get; private set; }
     public object? GrainAtRecovery { get; private set; }
     public int ActivationValue { get; private set; }
     public int HandlerCalls { get; private set; }
@@ -88,8 +91,8 @@ public sealed class BootstrapState : IJournaledStateObserver, IInboxHandler, IDi
     {
         RecoveryStarts++;
         GrainAtRecovery = Observation.Context.GrainInstance;
-        CompositeCountAtRecovery = ReadObservers(Observation.Manager!).Count(static observer =>
-            observer.GetType().Name == "DurableMessagingJournalObserver");
+        PrimaryStateCountAtRecovery = ReadMessagingStates(Observation.Manager!).Count(static observer =>
+            observer.GetType().Name == "InboxJournalState");
     }
     public void OnRecoveryCompleted() => RecoveryCompletions++;
     public void OnWriteStarted() { }
@@ -98,7 +101,7 @@ public sealed class BootstrapState : IJournaledStateObserver, IInboxHandler, IDi
         if (HandlerCalls > 0) Handled.TrySetResult();
     }
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == Route;
-    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         if (_handlers.TryGet(context.GrainId, Route, out var barrier))
         {
@@ -107,13 +110,20 @@ public sealed class BootstrapState : IJournaledStateObserver, IInboxHandler, IDi
         }
         var value = Observation.Value!.Value + 1;
         var outgoing = context.CreateEnvelope().To(GrainId.Create("bootstrap-output", "capture"), "output").WithBody(value).Build();
-        Observation.Value.Value = value;
-        context.Send(outgoing);
-        HandlerCalls++;
+        return () =>
+        {
+            Observation.Value.Value = value;
+            context.Send(outgoing);
+            HandlerCalls++;
+        };
     }
     public void Dispose() => Disposals++;
-    public static IEnumerable<IJournaledStateObserver> ReadObservers(IJournaledStateManager manager) =>
-        (IEnumerable<IJournaledStateObserver>)manager.GetType().GetField("_observers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(manager)!;
+    public static IEnumerable<IJournaledState> ReadMessagingStates(IJournaledStateManager manager)
+    {
+        if (manager.TryGetState("__orleans.durable-messaging.inbox", out var inbox)) yield return inbox;
+        if (manager.TryGetState("test-handler-output", out var outbox)) yield return outbox;
+    }
+
 }
 
 public interface IBootstrapTestGrain : IGrainWithGuidKey
@@ -224,22 +234,24 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
         services.AddSingleton(Probe);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();
-        var endpointType = ReceiverTestServices.GetImplementationType("DurableMessagingJournalEndpoint");
-        services.AddKeyedScoped(endpointType, "__orleans.durable-messaging.outbox-observer", (provider, _) =>
+        var extensionType = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+        var descriptor = services.Last(entry => entry.ServiceType == extensionType);
+        services.AddScoped(extensionType, provider =>
         {
+            var extension = descriptor.ImplementationFactory!(provider);
             var context = provider.GetRequiredService<IGrainContext>();
-            var outbox = (JournaledTestOutbox)provider.GetRequiredService<IDurableOutbox>();
             if (context.GrainInstance is FailingBootstrapGrain)
             {
                 var observation = provider.GetRequiredService<BootstrapObservation>();
                 observation.Manager = provider.GetRequiredService<IJournaledStateManager>();
                 observation.Inbox = provider.GetRequiredService<IDurableInbox>();
-                observation.Outbox = outbox;
-                observation.Extension = provider.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-                observation.ExpectedFailure = new IOException("Expected bootstrap endpoint construction failure.");
+                observation.Outbox = provider.GetRequiredService<IDurableOutbox>();
+                observation.Extension = extension;
+                observation.ExpectedFailure = new IOException("Expected bootstrap runtime construction failure.");
+                ((IDisposable)extension).Dispose();
                 throw observation.ExpectedFailure;
             }
-            return ActivatorUtilities.CreateInstance(provider, endpointType, outbox, (Action<CancellationToken>)outbox.FinalizeWrite);
+            return extension;
         });
     }
 }
