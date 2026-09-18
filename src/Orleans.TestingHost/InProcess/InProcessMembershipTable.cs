@@ -12,10 +12,22 @@ namespace Orleans.TestingHost.InProcess;
 /// <summary>
 /// An in-memory implementation of <see cref="IMembershipTable"/> for testing purposes.
 /// </summary>
-internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTable, IGatewayListProvider
+internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListProvider
 {
-    private readonly Table _table = new();
-    private readonly string _clusterId = clusterId;
+    private readonly Table _table;
+    private readonly string _clusterId;
+
+    public InProcessMembershipTable(string clusterId) : this(clusterId, new Table())
+    {
+    }
+
+    private InProcessMembershipTable(string clusterId, Table table)
+    {
+        _clusterId = clusterId;
+        _table = table;
+    }
+
+    internal InProcessMembershipTable CreateClient() => new(_clusterId, _table);
 
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;

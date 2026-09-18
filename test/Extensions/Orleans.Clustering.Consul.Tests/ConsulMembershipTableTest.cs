@@ -1,4 +1,7 @@
+using System.Net;
+using Consul;
 using Orleans.Messaging;
+using Orleans.Clustering.TestKit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -49,6 +52,9 @@ namespace Consul.Tests
         /// and creates the membership table implementation.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             ConsulTestUtils.EnsureConsul();
             var options = new ConsulClusteringOptions();
@@ -56,7 +62,41 @@ namespace Consul.Tests
 
             options.ConfigureConsulClient(address);
 
-            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this._clusterOptions);
+            return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), clusterOptions);
+        }
+
+        protected override MembershipTableTestHandle CreateConformanceHandle(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var client = options.CreateClient();
+            options.ConfigureConsulClient(() => client);
+            var table = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), clusterOptions);
+            return new MembershipTableTestHandle(table, () =>
+            {
+                client.Dispose();
+                return ValueTask.CompletedTask;
+            });
+        }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var client = new ConsulClient(options => options.Address = new Uri(connectionString));
+            var response = await client.KV.List(
+                $"orleans/{clusterId}/",
+                new QueryOptions { Consistency = ConsistencyMode.Consistent },
+                cancellationToken);
+            if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.NotFound))
+            {
+                throw new InvalidOperationException($"Consul deletion probe returned {response.StatusCode}.");
+            }
+
+            return response.Response is null or { Length: 0 };
         }
 
         /// <summary>

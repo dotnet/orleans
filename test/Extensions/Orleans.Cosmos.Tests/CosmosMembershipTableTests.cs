@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
@@ -6,6 +7,8 @@ using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
 using Orleans.Runtime;
+using Orleans.Clustering.TestKit;
+using Orleans.Configuration;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -49,11 +52,98 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// including database/container names and consistency levels.
     /// </summary>
     protected override IMembershipTable CreateMembershipTable(ILogger logger)
+        => CreateMembershipTable(logger, _clusterOptions);
+
+    protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
     {
         CosmosTestUtils.CheckCosmosStorage();
+        return new CosmosMembershipTable(loggerFactory, Services, Options.Create(CreateClusteringOptions()), clusterOptions);
+    }
+
+    // The SDK's default query page contains at most 100 items.
+    protected override int ConformanceConcurrencyRowCount => 101;
+
+    protected override MembershipTableTestFixture CreateConformanceFixture()
+    {
+        CosmosTestUtils.CheckCosmosStorage();
+        var probeOptions = CreateClusteringOptions();
+        CosmosClient? probe = null;
+        return new MembershipTableTestFixture(
+            GetType().Name,
+            async (serviceId, clusterId, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var clients = new List<CosmosClient>();
+                try
+                {
+                    if (probe is null)
+                    {
+                        probe = await probeOptions.CreateClient!(Services);
+                        clients.Add(probe);
+                    }
+
+                    var options = CreateClusteringOptions();
+                    var createClient = options.CreateClient!;
+                    options.ConfigureCosmosClient(async services =>
+                    {
+                        var client = await createClient(services);
+                        clients.Add(client);
+                        return client;
+                    });
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var table = new CosmosMembershipTable(
+                        loggerFactory,
+                        Services,
+                        Options.Create(options),
+                        Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }));
+                    return new MembershipTableTestHandle(table, () =>
+                    {
+                        foreach (var client in clients)
+                        {
+                            client.Dispose();
+                        }
+
+                        return ValueTask.CompletedTask;
+                    });
+                }
+                catch
+                {
+                    foreach (var client in clients)
+                    {
+                        client.Dispose();
+                    }
+
+                    throw;
+                }
+            },
+            async (clusterId, cancellationToken) =>
+            {
+                var container = probe!.GetContainer(probeOptions.DatabaseName, probeOptions.ContainerName);
+                // Include ClusterVersion as well as all silo documents in the original partition.
+                using var iterator = container.GetItemQueryIterator<string>(
+                    "SELECT VALUE c.id FROM c",
+                    requestOptions: new QueryRequestOptions
+                    {
+                        PartitionKey = new PartitionKey(clusterId),
+                        ConsistencyLevel = ConsistencyLevel.Session
+                    });
+                var empty = true;
+                while (iterator.HasMoreResults)
+                {
+                    var page = await iterator.ReadNextAsync(cancellationToken);
+                    empty &= page.Count == 0;
+                }
+
+                return empty;
+            });
+    }
+
+    private static CosmosClusteringOptions CreateClusteringOptions()
+    {
         var options = new CosmosClusteringOptions();
         options.ConfigureTestDefaults();
-        return new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
+        options.CleanResourcesOnInitialization = false;
+        return options;
     }
 
     /// <summary>

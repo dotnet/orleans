@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Cassandra\Orleans.Clustering.Cassandra\Orleans.Clustering.Cassandra.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
 
   </ItemGroup>

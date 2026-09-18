@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Streaming.EventHubs\Orleans.Streaming.EventHubs.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.NewtonsoftJson\Orleans.Serialization.NewtonsoftJson.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
@@ -22,6 +23,7 @@
 
   <ItemGroup>
     <Content Include="*.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\MembershipTests\MembershipTableConformanceTestsBase.cs" Link="Membership\MembershipTableConformanceTestsBase.cs" />
   </ItemGroup>
 
   <ItemGroup>
