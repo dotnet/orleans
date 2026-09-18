@@ -100,6 +100,11 @@ before invoking it, then stages inbox completion and deduplication before the ac
 turn yields. Earlier journal writes can complete while preparation awaits because the
 prepared attempt's effects are still local.
 
+The handler context admits outgoing sends only while its returned action executes.
+Both context send paths share this attempt-scoped boundary. Preparation retains
+read-only outbox inspection and envelope construction; sending during preparation or
+through a context retained from another attempt reports an explicit contract violation.
+
 The registered inbox and outbox states own their capture, acknowledgement, replay and
 reset bookkeeping. The outbox prepares durable wake-up ownership inside the serialized
 journal operation. After every preparation await, the manager checks all states'
