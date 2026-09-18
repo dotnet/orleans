@@ -345,6 +345,29 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Equal(7, client.VersionEtag);
         }
 
+        [Fact]
+        public async Task CleanupPreservesVersionRowWithStrayMembershipFields()
+        {
+            using var client = new BatchDeleteClient
+            {
+                RowCount = 1,
+                CustomizeVersion = version =>
+                {
+                    version.Status = (int)SiloStatus.Dead;
+                    version.StartTime = "2026-01-01 00:00:00.000 GMT";
+                    version.IAmAliveTime = "2026-01-01 00:00:00.000 GMT";
+                }
+            };
+            client.CompleteAll();
+
+            await DeleteEntries(CreateTable(client), cleanup: true, TestContext.Current.CancellationToken);
+
+            Assert.Equal("silo-0", Assert.Single(client.Deletes).Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
+            Assert.Empty(client.Records);
+            Assert.Equal(7, client.Version);
+            Assert.Equal(7, client.VersionEtag);
+        }
+
         [Theory]
         [InlineData(nameof(SiloInstanceRecord.StartTime))]
         [InlineData(nameof(SiloInstanceRecord.IAmAliveTime))]
@@ -469,268 +492,100 @@ namespace AWSUtils.Tests.MembershipTests
                 ? table.CleanupDefunctSiloEntriesAsync(new DateTimeOffset(2026, 1, 2, 0, 0, 0, TimeSpan.Zero), cancellationToken)
                 : table.DeleteMembershipTableEntriesAsync("cluster", cancellationToken);
 
-        [Fact]
-        public async Task HeartbeatAfterCleanupPreservesAbsenceAndVersion()
-        {
-            using var client = new HeartbeatClient();
-            var table = CreateTable(client);
-
-            await table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken);
-
-            Assert.Single(client.Updates);
-            Assert.Contains("attribute_exists(DeploymentId)", client.Updates[0].ConditionExpression);
-            Assert.Contains("attribute_exists(SiloIdentity)", client.Updates[0].ConditionExpression);
-            Assert.Equal(new[] { "127.0.0.1-11111-1", SiloInstanceRecord.TABLE_VERSION_ROW },
-                client.Reads.Select(request => request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S));
-            Assert.Equal(7, client.Version.MembershipVersion);
-            Assert.Equal(7, client.Version.ETag);
-        }
-
         [Theory]
-        [InlineData("resource")]
-        [InlineData("authorization")]
-        [InlineData("network")]
-        public async Task HeartbeatInfrastructureFailuresRemainVisible(string kind)
-        {
-            var failure = CreateStorageFailure(kind);
-            using var client = new HeartbeatClient { Failure = failure };
-            var table = CreateTable(client);
-
-            var exception = await Assert.ThrowsAnyAsync<Exception>(() => table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken));
-
-            Assert.Same(failure, exception);
-            Assert.Single(client.Updates);
-            Assert.Empty(client.Reads);
-        }
-
-        [Fact]
-        public async Task HeartbeatMissingMembershipHistoryFailsClosed()
-        {
-            using var client = new HeartbeatClient { VersionExists = false };
-            var table = CreateTable(client);
-
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken));
-
-            Assert.Single(client.Updates);
-            Assert.Equal(2, client.Reads.Count);
-        }
-
-        [Theory]
-        [InlineData(-1)]
-        [InlineData(0)]
-        [InlineData(1)]
-        public async Task HeartbeatsPreserveMaximumTimestampAndLogicalVersions(int offset)
-        {
-            var now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            using var client = new HeartbeatClient { Current = CreateRecord() };
-            var before = client.Current.GetFields(includeKeys: true);
-            var table = CreateTable(client);
-
-            await table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = now.AddSeconds(offset)
-            }, TestContext.Current.CancellationToken);
-
-            Assert.Equal(LogFormatter.PrintDate(now.AddSeconds(Math.Max(offset, 0))), client.Current.IAmAliveTime);
-            var after = client.Current.GetFields(includeKeys: true);
-            Assert.Equal(before.Keys.Order(), after.Keys.Order());
-            foreach (var field in before.Keys.Where(key => key != SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME))
-            {
-                Assert.Equal(before[field].N, after[field].N);
-                Assert.Equal(before[field].S, after[field].S);
-            }
-            Assert.Single(client.Updates);
-            Assert.Equal(offset > 0 ? 0 : 1, client.Reads.Count);
-            Assert.Equal(7, client.Version.MembershipVersion);
-            Assert.Equal(7, client.Version.ETag);
-        }
-
-        [Theory]
-        [InlineData("resource")]
-        [InlineData("authorization")]
-        [InlineData("network")]
-        public async Task HeartbeatVerificationReadFailuresRemainVisible(string kind)
-        {
-            var failure = CreateStorageFailure(kind);
-            using var client = new HeartbeatClient { ReadFailure = failure };
-            var table = CreateTable(client);
-
-            var exception = await Assert.ThrowsAnyAsync<Exception>(() => table.UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken));
-
-            Assert.Same(failure, exception);
-            Assert.Single(client.Updates);
-            Assert.Single(client.Reads);
-        }
-
-        [Theory]
+        [InlineData("valid")]
+        [InlineData("absent")]
         [InlineData("number")]
         [InlineData("null")]
-        [InlineData("boolean")]
-        [InlineData("map")]
-        [InlineData("list")]
-        [InlineData("string-set")]
-        [InlineData("invalid-date")]
-        public async Task HeartbeatRejectsMalformedPresentAttributeWithoutRetrying(string kind)
+        public async Task HeartbeatUsesOneUnconditionalTimestampWrite(string previousValue)
         {
-            var heartbeat = kind switch
-            {
-                "number" => new AttributeValue { N = "123" },
-                "null" => new AttributeValue { NULL = true },
-                "boolean" => new AttributeValue { BOOL = true },
-                "map" => new AttributeValue { M = new() { ["value"] = new AttributeValue("timestamp") } },
-                "list" => new AttributeValue { L = [new AttributeValue("timestamp")] },
-                "string-set" => new AttributeValue { SS = ["timestamp"] },
-                "invalid-date" => new AttributeValue("not-a-date"),
-                _ => throw new ArgumentOutOfRangeException(nameof(kind))
-            };
             var fields = CreateRecord().GetFields(includeKeys: true);
-            fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat;
+            switch (previousValue)
+            {
+                case "absent": fields.Remove(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME); break;
+                case "number": fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = new AttributeValue { N = "123" }; break;
+                case "null": fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = new AttributeValue { NULL = true }; break;
+            }
+            var before = new Dictionary<string, AttributeValue>(fields);
             var updates = 0;
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             using var client = new RequestClient
             {
+                Token = cancellation.Token,
                 Update = request =>
                 {
                     Assert.Equal(1, ++updates);
-                    Assert.Contains("attribute_not_exists(IAmAliveTime)", request.ConditionExpression);
-                    Assert.Contains("IAmAliveTime < :IAmAliveTime", request.ConditionExpression);
-                    throw new ConditionalCheckFailedException("Present heartbeat fails the string comparison.");
-                },
-                Read = request =>
-                {
-                    Assert.True(request.ConsistentRead);
+                    Assert.Equal("membership", request.TableName);
+                    Assert.Equal(2, request.Key.Count);
+                    Assert.Equal("cluster", request.Key[SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME].S);
                     Assert.Equal("127.0.0.1-11111-1", request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
-                    return new GetItemResponse { Item = fields };
+                    Assert.Null(request.ConditionExpression);
+                    Assert.Equal("SET IAmAliveTime = :IAmAliveTime", request.UpdateExpression);
+                    Assert.Equal(ReturnValue.UPDATED_NEW, request.ReturnValues);
+                    var value = Assert.Single(request.ExpressionAttributeValues);
+                    Assert.Equal(":IAmAliveTime", value.Key);
+                    Assert.Equal("2026-01-02 00:00:00.000 GMT", value.Value.S);
+                    fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = value.Value;
+                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = value.Value } };
                 }
-            };
-
-            var exception = await Assert.ThrowsAsync<FormatException>(() => CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken));
-
-            Assert.Contains("IAmAliveTime", exception.Message);
-            Assert.Equal(1, updates);
-            Assert.Equal(1, client.ReadCount);
-            Assert.Same(heartbeat, fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME]);
-        }
-
-        [Theory]
-        [InlineData(null, 2)]
-        [InlineData("2025-12-31 00:00:00.000 GMT", 2)]
-        [InlineData("2026-01-01 00:00:00.000 GMT", 1)]
-        [InlineData("2026-01-02 00:00:00.000 GMT", 1)]
-        public async Task HeartbeatRechecksAbsentOrValidAttributeAfterContention(string? heartbeat, int expectedUpdates)
-        {
-            var row = CreateRecord();
-            row.IAmAliveTime = heartbeat;
-            var fields = row.GetFields(includeKeys: true);
-            var updates = 0;
-            using var client = new RequestClient
-            {
-                Update = request =>
-                {
-                    Assert.True(++updates <= expectedUpdates);
-                    if (updates == 1)
-                    {
-                        throw new ConditionalCheckFailedException("Row changed before the verification read.");
-                    }
-
-                    var next = request.ExpressionAttributeValues[":IAmAliveTime"];
-                    Assert.True(!fields.TryGetValue(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, out var current)
-                        || string.CompareOrdinal(current.S, next.S) < 0);
-                    fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = next;
-                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = next } };
-                },
-                Read = _ => new GetItemResponse { Item = fields }
             };
 
             await CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
             {
                 SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-            }, TestContext.Current.CancellationToken);
+                IAmAliveTime = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+            }, cancellation.Token);
 
-            Assert.Equal(expectedUpdates, updates);
-            Assert.Equal(1, client.ReadCount);
-            Assert.Equal(expectedUpdates == 2 ? "2026-01-01 00:00:00.000 GMT" : heartbeat,
-                fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
-            Assert.Equal("3", fields[SiloInstanceRecord.ETAG_PROPERTY_NAME].N);
-            Assert.Equal("7", fields[SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME].N);
+            Assert.Equal(1, updates);
+            Assert.Equal(0, client.ReadCount);
+            Assert.Equal(0, client.WriteCount);
+            Assert.Equal(0, client.DeleteCount);
+            Assert.Equal("2026-01-02 00:00:00.000 GMT", fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
+            Assert.Equal(before.Keys.Append(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME).Distinct().Order(), fields.Keys.Order());
+            foreach (var field in before.Where(field => field.Key != SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME))
+            {
+                Assert.Same(field.Value, fields[field.Key]);
+            }
         }
 
-        [Fact]
-        public async Task HeartbeatRetryHonorsCancellationAfterVerificationRead()
+        [Theory]
+        [InlineData("resource")]
+        [InlineData("authorization")]
+        [InlineData("network")]
+        [InlineData("cancellation")]
+        public async Task HeartbeatPropagatesNativeFailures(string kind)
         {
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-            var row = CreateRecord();
-            row.IAmAliveTime = null;
+            var failure = kind == "cancellation"
+                ? new OperationCanceledException(cancellation.Token)
+                : CreateStorageFailure(kind);
             var updates = 0;
             using var client = new RequestClient
             {
                 Token = cancellation.Token,
-                Update = _ =>
+                Update = request =>
                 {
                     Assert.Equal(1, ++updates);
-                    throw new ConditionalCheckFailedException("Row changed before the verification read.");
-                },
-                Read = _ =>
-                {
-                    cancellation.Cancel();
-                    return new GetItemResponse { Item = row.GetFields(includeKeys: true) };
+                    Assert.Null(request.ConditionExpression);
+                    throw failure;
                 }
             };
 
-            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() => CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
             {
                 SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
                 IAmAliveTime = DateTime.UnixEpoch
             }, cancellation.Token));
 
-            Assert.Equal(cancellation.Token, exception.CancellationToken);
+            Assert.Same(failure, exception);
             Assert.Equal(1, updates);
-            Assert.Equal(1, client.ReadCount);
-        }
-
-        [Fact]
-        public async Task HeartbeatInitializesAbsentAttribute()
-        {
-            using var client = new HeartbeatClient { Current = CreateRecord() };
-            client.Current.IAmAliveTime = null;
-
-            await CreateTable(client).UpdateIAmAliveAsync(new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                IAmAliveTime = DateTime.UnixEpoch
-            }, TestContext.Current.CancellationToken);
-
-            Assert.Equal("1970-01-01 00:00:00.000 GMT", client.Current.IAmAliveTime);
-            Assert.Single(client.Updates);
-            Assert.Empty(client.Reads);
-            Assert.Equal(3, client.Current.ETag);
-            Assert.Equal(7, client.Current.MembershipVersion);
+            Assert.Equal(0, client.ReadCount);
+            Assert.Equal(0, client.WriteCount);
         }
 
         public static IEnumerable<object[]> MalformedRecencyAttributes()
         {
-            foreach (var operation in new[] { "UpdateRow", "ReadRow", "ReadAll", "Cleanup", "Heartbeat" })
+            foreach (var operation in new[] { "UpdateRow", "ReadRow", "ReadAll", "Cleanup" })
             {
                 foreach (var attribute in new[]
                 {
@@ -767,7 +622,6 @@ namespace AWSUtils.Tests.MembershipTests
                 _ => throw new ArgumentOutOfRangeException(nameof(corruption))
             };
             fields[attribute] = invalid;
-            var updates = 0;
             using var client = new RequestClient
             {
                 Read = request => new GetItemResponse
@@ -780,12 +634,7 @@ namespace AWSUtils.Tests.MembershipTests
                 {
                     Responses = [new ItemResponse { Item = fields }, new ItemResponse { Item = CreateVersion(7).GetFields(true) }]
                 },
-                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] },
-                Update = _ =>
-                {
-                    Assert.Equal(1, ++updates);
-                    throw new ConditionalCheckFailedException("Row requires verification.");
-                }
+                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true), fields], LastEvaluatedKey = [] }
             };
             var table = CreateTable(client);
             var entry = new MembershipEntry
@@ -800,7 +649,6 @@ namespace AWSUtils.Tests.MembershipTests
                 "ReadRow" => table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken),
                 "ReadAll" => table.ReadAllAsync(TestContext.Current.CancellationToken),
                 "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
-                "Heartbeat" => table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             });
 
@@ -808,7 +656,6 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Contains(row.SiloIdentity, exception.Message);
             Assert.Equal(0, client.WriteCount);
             Assert.Equal(0, client.DeleteCount);
-            Assert.Equal(operation == "Heartbeat" ? 1 : 0, updates);
             Assert.Same(invalid, fields[attribute]);
         }
 
@@ -817,7 +664,6 @@ namespace AWSUtils.Tests.MembershipTests
         [InlineData("ReadRow")]
         [InlineData("ReadAll")]
         [InlineData("Cleanup")]
-        [InlineData("Heartbeat")]
         public async Task MembershipOperationsPreserveAbsentLegacyRecencyAttributes(string operation)
         {
             var row = CreateRecord();
@@ -825,7 +671,6 @@ namespace AWSUtils.Tests.MembershipTests
             row.IAmAliveTime = null;
             row.StartTime = null;
             var fields = row.GetFields(includeKeys: true);
-            var updates = 0;
             using var client = new RequestClient
             {
                 Read = request => new GetItemResponse
@@ -846,18 +691,6 @@ namespace AWSUtils.Tests.MembershipTests
                     Assert.Equal("1970-01-01 00:00:00.000 GMT", put.Item[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
                     Assert.False(put.ExpressionAttributeValues.ContainsKey(":currentHeartbeat"));
                     return new TransactWriteItemsResponse();
-                },
-                Update = request =>
-                {
-                    Assert.True(++updates <= 2);
-                    if (updates == 1)
-                    {
-                        throw new ConditionalCheckFailedException("Row changed before verification.");
-                    }
-                    Assert.False(fields.ContainsKey(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME));
-                    var heartbeat = request.ExpressionAttributeValues[":IAmAliveTime"];
-                    fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat;
-                    return new UpdateItemResponse { Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat } };
                 }
             };
             var table = CreateTable(client);
@@ -887,14 +720,9 @@ namespace AWSUtils.Tests.MembershipTests
                     await table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken);
                     Assert.False(fields.ContainsKey(SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME));
                     break;
-                case "Heartbeat":
-                    await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
-                    Assert.Equal("1970-01-01 00:00:00.000 GMT", fields[SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME].S);
-                    break;
             }
 
             Assert.Equal(operation == "UpdateRow" ? 1 : 0, client.WriteCount);
-            Assert.Equal(operation == "Heartbeat" ? 2 : 0, updates);
             Assert.Equal(0, client.DeleteCount);
         }
 
@@ -1212,7 +1040,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         public static IEnumerable<object[]> MalformedVersionRows()
         {
-            foreach (var operation in new[] { "ReadRow", "ReadAllBefore", "ReadAllQuery", "ReadAllAfter", "HeartbeatHistory" })
+            foreach (var operation in new[] { "ReadRow", "ReadAllBefore", "ReadAllQuery", "ReadAllAfter" })
             {
                 foreach (var attribute in new[] { SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME, SiloInstanceRecord.ETAG_PROPERTY_NAME })
                 {
@@ -1256,7 +1084,7 @@ namespace AWSUtils.Tests.MembershipTests
                     }
 
                     reads++;
-                    var malformed = operation is "ReadAllBefore" or "HeartbeatHistory"
+                    var malformed = operation == "ReadAllBefore"
                         || (operation == "ReadAllAfter" && reads == 2);
                     return new GetItemResponse { Item = malformed ? fields : CreateVersion(7).GetFields(true) };
                 },
@@ -1268,8 +1096,7 @@ namespace AWSUtils.Tests.MembershipTests
                 ReadTransaction = _ => new TransactGetItemsResponse
                 {
                     Responses = [new ItemResponse(), new ItemResponse { Item = fields }]
-                },
-                Update = _ => throw new ConditionalCheckFailedException("Silo row absent.")
+                }
             };
             var table = CreateTable(client);
             var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
@@ -1277,11 +1104,6 @@ namespace AWSUtils.Tests.MembershipTests
             var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
             {
                 "ReadRow" => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
-                "HeartbeatHistory" => table.UpdateIAmAliveAsync(new MembershipEntry
-                {
-                    SiloAddress = address,
-                    IAmAliveTime = DateTime.UnixEpoch
-                }, TestContext.Current.CancellationToken),
                 _ => table.ReadAllAsync(TestContext.Current.CancellationToken)
             });
 
@@ -1363,67 +1185,6 @@ namespace AWSUtils.Tests.MembershipTests
             return table;
         }
 
-        private sealed class HeartbeatClient() : AmazonDynamoDBClient(
-            new AnonymousAWSCredentials(), new AmazonDynamoDBConfig { ServiceURL = "http://localhost" })
-        {
-            public Exception? Failure { get; init; }
-            public Exception? ReadFailure { get; init; }
-            public SiloInstanceRecord? Current { get; init; }
-            public bool VersionExists { get; init; } = true;
-            public List<UpdateItemRequest> Updates { get; } = [];
-            public List<GetItemRequest> Reads { get; } = [];
-            public SiloInstanceRecord Version { get; } = new()
-            {
-                DeploymentId = "cluster",
-                SiloIdentity = SiloInstanceRecord.TABLE_VERSION_ROW,
-                MembershipVersion = 7,
-                ETag = 7
-            };
-
-            public override Task<UpdateItemResponse> UpdateItemAsync(UpdateItemRequest request, CancellationToken cancellationToken = default)
-            {
-                Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
-                Updates.Add(request);
-                Assert.Equal("membership", request.TableName);
-                Assert.Equal("attribute_exists(DeploymentId) AND attribute_exists(SiloIdentity)"
-                    + " AND (attribute_not_exists(IAmAliveTime) OR IAmAliveTime < :IAmAliveTime)", request.ConditionExpression);
-                Assert.Equal("SET IAmAliveTime = :IAmAliveTime", request.UpdateExpression);
-                Assert.Equal(ReturnValue.UPDATED_NEW, request.ReturnValues);
-                var heartbeat = Assert.Single(request.ExpressionAttributeValues).Value;
-                if (Failure is not null)
-                {
-                    return Task.FromException<UpdateItemResponse>(Failure);
-                }
-                if (Current is null || string.CompareOrdinal(Current.IAmAliveTime, heartbeat.S) >= 0)
-                {
-                    return Task.FromException<UpdateItemResponse>(new ConditionalCheckFailedException("Heartbeat condition failed."));
-                }
-                Current.IAmAliveTime = heartbeat.S;
-                return Task.FromResult(new UpdateItemResponse
-                {
-                    Attributes = new() { [SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME] = heartbeat }
-                });
-            }
-
-            public override Task<GetItemResponse> GetItemAsync(GetItemRequest request, CancellationToken cancellationToken = default)
-            {
-                Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
-                Assert.True(request.ConsistentRead);
-                Reads.Add(request);
-                if (ReadFailure is not null)
-                {
-                    return Task.FromException<GetItemResponse>(ReadFailure);
-                }
-                if (Current is not null && request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == Current.SiloIdentity)
-                {
-                    return Task.FromResult(new GetItemResponse { Item = Current.GetFields(includeKeys: true) });
-                }
-                return Task.FromResult(VersionExists && request.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S == SiloInstanceRecord.TABLE_VERSION_ROW
-                    ? new GetItemResponse { Item = Version.GetFields(includeKeys: true) }
-                    : new GetItemResponse());
-            }
-        }
-
         private sealed class RequestClient() : AmazonDynamoDBClient(
             new AnonymousAWSCredentials(), new AmazonDynamoDBConfig { ServiceURL = "http://localhost" })
         {
@@ -1487,6 +1248,7 @@ namespace AWSUtils.Tests.MembershipTests
 
             public Action? OnFirstDeleteRequest { get; set; }
             public Action<int>? OnDeleteRequest { get; init; }
+            public Action<SiloInstanceRecord>? CustomizeVersion { get; init; }
             public Exception? DeleteFailure { get; set; }
             public int RowCount { get; init; } = 51;
             public int Version { get; } = 7;
@@ -1521,6 +1283,7 @@ namespace AWSUtils.Tests.MembershipTests
                     MembershipVersion = Version,
                     ETag = VersionEtag
                 };
+                CustomizeVersion?.Invoke(version);
                 return Task.FromResult(new QueryResponse
                 {
                     Items = Records.Values.Append(version).Select(record => record.GetFields(includeKeys: true)).ToList(),

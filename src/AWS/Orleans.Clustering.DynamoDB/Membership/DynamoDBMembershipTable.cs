@@ -419,42 +419,7 @@ namespace Orleans.Clustering.DynamoDB
                 LogDebugMergeEntry(entry);
                 var siloEntry = ConvertPartial(entry);
                 var fields = new Dictionary<string, AttributeValue> { { SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME, new AttributeValue(siloEntry.IAmAliveTime) } };
-                var expression = $"attribute_exists({SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME})"
-                    + $" AND attribute_exists({SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME})"
-                    + $" AND (attribute_not_exists({SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})"
-                    + $" OR {SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME} < :{SiloInstanceRecord.I_AM_ALIVE_TIME_PROPERTY_NAME})";
-                while (true)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, cancellationToken, expression);
-                        break;
-                    }
-                    catch (ConditionalCheckFailedException)
-                    {
-                        var current = await storage.ReadSingleEntryAsync(this.options.TableName, siloEntry.GetKeys(),
-                            ParseRecord, cancellationToken);
-                        if (current is null)
-                        {
-                            var versionKeys = new Dictionary<string, AttributeValue>
-                            {
-                                [SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME] = new AttributeValue(this.clusterId),
-                                [SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME] = new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW)
-                            };
-                            _ = await storage.ReadSingleEntryAsync(this.options.TableName, versionKeys,
-                                ParseRecord, cancellationToken)
-                                ?? throw new KeyNotFoundException("No version row found for membership table");
-                            break;
-                        }
-
-                        if (current.IAmAliveTime is { } heartbeat
-                            && LogFormatter.ParseDate(heartbeat) >= LogFormatter.ParseDate(siloEntry.IAmAliveTime!))
-                        {
-                            break;
-                        }
-                    }
-                }
+                await this.storage.UpsertEntryAsync(this.options.TableName, siloEntry.GetKeys(), fields, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -721,7 +686,8 @@ namespace Orleans.Clustering.DynamoDB
 
         internal static bool SiloIsDefunct(SiloInstanceRecord silo, DateTimeOffset beforeDate)
         {
-            return silo.Status == (int)SiloStatus.Dead
+            return silo.SiloIdentity != SiloInstanceRecord.TABLE_VERSION_ROW
+                && silo.Status == (int)SiloStatus.Dead
                 && !string.IsNullOrEmpty(silo.IAmAliveTime)
                 && IsBeforeCutoff(silo.IAmAliveTime)
                 && IsBeforeCutoff(silo.StartTime)
