@@ -347,6 +347,14 @@ internal sealed class MembershipModelExecutionContext
                 tableCandidate = captured.Next();
                 rowToken = captured.Rows[id].Etag;
             }
+            if (MembershipModel.IsHeartbeat(request.Kind))
+            {
+                input = new MembershipEntry
+                {
+                    SiloAddress = input.SiloAddress,
+                    IAmAliveTime = new(next.Rows[request.Key].OwnerHeartbeatTicks, DateTimeKind.Utc)
+                };
+            }
             var detail = $"table={tableCandidate}; row ETag={rowToken}; owner heartbeat={input.IAmAliveTime:O}";
             _prefix[^1] += $" [{detail}]";
             switch (request.Kind)
@@ -389,11 +397,6 @@ internal sealed class MembershipModelExecutionContext
                 case MembershipOperationKind.HeartbeatAdvance:
                 case MembershipOperationKind.HeartbeatRepeat:
                     _beforeHeartbeats[id] = before;
-                    input = new MembershipEntry
-                    {
-                        SiloAddress = input.SiloAddress,
-                        IAmAliveTime = new(next.Rows[request.Key].OwnerHeartbeatTicks, DateTimeKind.Utc)
-                    };
                     await writer.UpdateIAmAliveAsync(input, _ct);
                     break;
                 case MembershipOperationKind.CleanupDead:

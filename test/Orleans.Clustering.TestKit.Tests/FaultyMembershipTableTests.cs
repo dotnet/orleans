@@ -173,6 +173,25 @@ public sealed class FaultyMembershipTableTests
     }
 
     [Fact]
+    public async Task GeneratedHeartbeatFailure_ReportsTimestampSentToProvider()
+    {
+        var control = new MembershipFaultController(MembershipFault.HeartbeatChangesRowToken);
+        await control.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            var context = new MembershipModelExecutionContext(fixture, 0, 0, ct, _ => { });
+            Assert.Null((await context.ExecuteAsync(new(MembershipOperationKind.InsertNew))).Failure);
+
+            var result = await context.ExecuteAsync(new(MembershipOperationKind.HeartbeatAdvance));
+
+            var write = Assert.Single(control.Backend.HeartbeatWrites);
+            Assert.Equal(MembershipTableTestData.T1, write.Time);
+            Assert.Contains($"HeartbeatAdvance(key=1; table-mode=current; row-mode=current) [table=", result.Failure);
+            Assert.Contains($"owner heartbeat={write.Time:O}]", result.Failure);
+            Assert.Contains("row ETag", result.Failure);
+        }, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task GeneratedModel_IndependentStaleRowMutant_IsDetectedWithOperationPrefix()
     {
         var control = new MembershipFaultController(MembershipFault.IgnoreRowToken);
