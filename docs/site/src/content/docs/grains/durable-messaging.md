@@ -173,10 +173,12 @@ Orleans caches messaging selection with each concrete grain type. After construc
 and grain-instance assignment, shared activation setup validates the execution model,
 resolves the activation's scoped endpoints, and registers one composite journal observer.
 Journal recovery then restores application and messaging state before activation completes.
-The standard <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*> factory enrolls
-the manager in the grain lifecycle before returning it. Application-supplied grain-scoped
-factories own that enrollment, while explicit-<xref:Orleans.Journaling.JournalId> standalone
-managers have caller-owned initialization and disposal.
+With <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*>, the standard manager
+enrolls in the grain lifecycle during grain-bound construction, before resolution returns.
+An application-supplied manager establishes one enrollment owner in its constructor or
+registration factory. A scoped factory assigning an explicit-<xref:Orleans.Journaling.JournalId>
+manager to a grain lifecycle performs that enrollment before returning it. Standalone
+managers retain caller-owned initialization and disposal.
 
 Durable Messaging selects the built-in `orleans-binary`
 journal format so opaque envelope bodies and request-context slices recover exactly.
