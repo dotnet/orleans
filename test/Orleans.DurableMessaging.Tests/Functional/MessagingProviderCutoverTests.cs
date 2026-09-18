@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.Configuration;
@@ -152,8 +153,11 @@ public sealed class MessagingProviderCutoverTests
         Assert.NotNull(await fixture.A.CreateStorage(id).GetMetadataAsync(Token));
         Assert.NotNull(await fixture.B.CreateStorage(id).GetMetadataAsync(Token));
         Assert.Null(await fixture.Services.GetRequiredService<IJournalStorageProvider>().CreateStorage(id).GetMetadataAsync(Token));
-        Assert.IsAssignableFrom<IJournaledStateObserver>(a.Outbox);
-        Assert.IsAssignableFrom<IJournaledStateObserver>(a.InboxExtension);
+        foreach (var name in new[] { "__orleans.durable-messaging.outbox", "__orleans.durable-messaging.inbox" })
+        {
+            Assert.True(a.Manager.TryGetState(name, out var messagingState));
+            Assert.Equal(typeof(IDurableOutbox).Assembly, messagingState.GetType().Assembly);
+        }
     }
 
     [Theory]
@@ -178,7 +182,7 @@ public sealed class MessagingProviderCutoverTests
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousA = fixture.Jobs.Scheduled.Last();
         if (outbox) await retried.AssertFencedAsync();
-        else Assert.Equal(0, retried.Fault.Count);
+        else Assert.Equal(0, retried.Fault.FailureCount);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -200,7 +204,7 @@ public sealed class MessagingProviderCutoverTests
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousB = fixture.Jobs.Scheduled.Last();
         if (outbox) await retried.AssertFencedAsync();
-        else Assert.Equal(0, retried.Fault.Count);
+        else Assert.Equal(0, retried.Fault.FailureCount);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -666,20 +670,18 @@ public sealed class MessagingProviderCutoverTests
             Id = id;
             var services = scope.ServiceProvider;
             Manager = services.GetRequiredService<IJournaledStateManager>();
-            Manager.RegisterObserver(Fault);
-            Manager.RegisterObserver((IJournaledStateObserver)services.GetRequiredService(
-                ReceiverTestServices.GetImplementationType("DurableMessagingJournalObserver")));
+            Fault = new FaultTrackingEffects(Manager);
             Inbox = services.GetRequiredService<IDurableInbox>();
             Outbox = services.GetRequiredService<IDurableOutbox>();
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
             Timers = services.GetRequiredService<ManualTimers>();
-            Effects = services.GetRequiredKeyedService<IDurableDictionary<Guid, int>>("effects");
+            Effects = Fault;
             Inbox.RegisterHandler("record", new RecordHandler(Effects));
         }
 
         public string Provider { get; }
         public JournalId Id { get; }
-        public FaultObserver Fault { get; } = new();
+        public FaultTrackingEffects Fault { get; }
         public GrainId GrainId { get; }
         public IJournaledStateManager Manager { get; }
         public IDurableInbox Inbox { get; }
@@ -712,7 +714,7 @@ public sealed class MessagingProviderCutoverTests
             Assert.IsType<IOException>(failure);
             var fenced = await Assert.ThrowsAsync<InvalidOperationException>(() => Manager.WriteStateAsync(Token).AsTask());
             Assert.Same(failure, fenced.InnerException);
-            Assert.Equal(1, Fault.Count);
+            Assert.Equal(1, Fault.FailureCount);
             var callback = Substitute.For<IJobRunContext>();
             callback.Job.Returns(new DurableJob { Id = "post-fault", ShardId = "post-fault", Name = JobName(true), TargetGrainId = GrainId });
             callback.RunId.Returns("post-fault");
@@ -746,16 +748,98 @@ public sealed class MessagingProviderCutoverTests
         }
     }
 
-    private sealed class FaultObserver : IJournaledStateObserver
+    private sealed class FaultTrackingEffects : IDurableDictionary<Guid, int>, IJournaledState, IDurableDictionaryCommandHandler<Guid, int>
     {
+        private readonly Dictionary<Guid, int> _effects = [];
+        private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
+        private bool _dirty;
+
+        public FaultTrackingEffects(IJournaledStateManager manager)
+        {
+            _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
+            manager.RegisterState("effects", this);
+        }
+
         public TaskCompletionSource<Exception> Failure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public int Count { get; private set; }
-        public void OnWriteStarted() { }
-        public void OnWriteCompleted() { }
-        public void OnRecoveryCompleted() { }
+        public int FailureCount { get; private set; }
+        public int Count => _effects.Count;
+        public bool IsReadOnly => false;
+        public ICollection<Guid> Keys => _effects.Keys;
+        public ICollection<int> Values => _effects.Values;
+        public int this[Guid key]
+        {
+            get => _effects[key];
+            set
+            {
+                _effects[key] = value;
+                _dirty = true;
+            }
+        }
+
+        public void Add(Guid key, int value)
+        {
+            _effects.Add(key, value);
+            _dirty = true;
+        }
+
+        public void Add(KeyValuePair<Guid, int> item) => Add(item.Key, item.Value);
+        public void Clear()
+        {
+            _effects.Clear();
+            _dirty = true;
+        }
+
+        public bool ContainsKey(Guid key) => _effects.ContainsKey(key);
+        public bool TryGetValue(Guid key, out int value) => _effects.TryGetValue(key, out value);
+        public bool Contains(KeyValuePair<Guid, int> item) => ((ICollection<KeyValuePair<Guid, int>>)_effects).Contains(item);
+        public void CopyTo(KeyValuePair<Guid, int>[] array, int arrayIndex) => ((ICollection<KeyValuePair<Guid, int>>)_effects).CopyTo(array, arrayIndex);
+        public bool Remove(Guid key)
+        {
+            var removed = _effects.Remove(key);
+            _dirty |= removed;
+            return removed;
+        }
+
+        public bool Remove(KeyValuePair<Guid, int> item) => Contains(item) && Remove(item.Key);
+        public IEnumerator<KeyValuePair<Guid, int>> GetEnumerator() => _effects.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
+
+        public void Reset(JournalStreamWriter writer)
+        {
+            _effects.Clear();
+            _dirty = false;
+        }
+
+        public void AppendEntries(JournalStreamWriter writer)
+        {
+            if (_dirty)
+            {
+                AppendSnapshot(writer);
+            }
+        }
+
+        public void AppendSnapshot(JournalStreamWriter writer)
+        {
+            _codec.WriteSnapshot(_effects, writer);
+            _dirty = false;
+        }
+
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
+        void IDurableDictionaryCommandHandler<Guid, int>.ApplySet(Guid key, int value) => _effects[key] = value;
+        void IDurableDictionaryCommandHandler<Guid, int>.ApplyRemove(Guid key) => _effects.Remove(key);
+        void IDurableDictionaryCommandHandler<Guid, int>.ApplyClear() => _effects.Clear();
+        void IDurableDictionaryCommandHandler<Guid, int>.Reset(int capacityHint)
+        {
+            _effects.Clear();
+            _effects.EnsureCapacity(capacityHint);
+        }
+
         public void OnFaulted(Exception exception)
         {
-            Count++;
+            FailureCount++;
             Failure.TrySetResult(exception);
         }
     }
@@ -763,11 +847,11 @@ public sealed class MessagingProviderCutoverTests
     private sealed class RecordHandler(IDurableDictionary<Guid, int> effects) : IInboxHandler
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
-        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             var id = context.Envelope.MessageId;
-            effects[id] = effects.TryGetValue(id, out var count) ? count + 1 : 1;
-            return ValueTask.CompletedTask;
+            var nextCount = effects.TryGetValue(id, out var count) ? count + 1 : 1;
+            return new(() => effects[id] = nextCount);
         }
     }
 
