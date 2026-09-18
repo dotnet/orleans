@@ -106,8 +106,6 @@ namespace Orleans.Runtime.Membership
                 try
                 {
                     await zk.createAsync(this.clusterPath, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await zk.sync(this.clusterPath);
                     //if we got here we know that we've just created the deployment path with version=0
                     LogInformationCreatedNewDeploymentPath(this.clusterPath);
                 }
@@ -161,10 +159,11 @@ namespace Orleans.Runtime.Membership
         internal static async Task<MembershipTableData> ReadCoreAsync(
             NativeOperations zk, SiloAddress? siloAddress, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            await zk.Sync("/");
+            // Retries retain this session's ordered view.
             while (true)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                await zk.Sync("/");
                 cancellationToken.ThrowIfCancellationRequested();
                 Stat before;
                 IEnumerable<SiloAddress> addresses;
@@ -274,12 +273,6 @@ namespace Orleans.Runtime.Membership
             {
                 return false;
             }
-            catch (KeeperException.NoNodeException)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await zk.GetData("/");
-                return false;
-            }
         }
 
         /// <summary>
@@ -387,12 +380,7 @@ namespace Orleans.Runtime.Membership
         public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
         {
             string pathToDelete = "/" + clusterId;
-            return UsingZookeeper(rootConnectionString, async zk =>
-            {
-                await DeleteRecursive(zk, pathToDelete, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                await zk.sync(pathToDelete);
-            }, cancellationToken);
+            return UsingZookeeper(rootConnectionString, zk => DeleteRecursive(zk, pathToDelete, cancellationToken), cancellationToken);
         }
 
         /// <summary>
@@ -540,46 +528,53 @@ namespace Orleans.Runtime.Membership
 
         internal static async Task<bool> CleanupCoreAsync(NativeOperations zk, DateTimeOffset beforeDate, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var children = await zk.GetChildren("/");
             var cutoff = beforeDate.UtcDateTime;
+            await Task.WhenAll(children.Children.Select(child => CleanupRowAsync(zk, "/" + child, cutoff, cancellationToken)));
+            return true;
+        }
+
+        private static async Task CleanupRowAsync(NativeOperations zk, string rowPath, DateTime cutoff, CancellationToken cancellationToken)
+        {
+            var heartbeatPath = rowPath + "/IAmAlive";
             while (true)
             {
-                var table = await ReadCoreAsync(zk, null, cancellationToken);
-                var candidates = table.Members.Where(row => row.Item1.Status == SiloStatus.Dead
-                    && row.Item1.StartTime < cutoff && row.Item1.IAmAliveTime < cutoff
-                    && row.Item1.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) != true).ToList();
-                if (candidates.Count == 0)
+                cancellationToken.ThrowIfCancellationRequested();
+                try
                 {
-                    return true;
-                }
+                    var row = await zk.GetData(rowPath);
+                    var entry = Deserialize<MembershipEntry>(row.Data);
+                    if (entry.Status != SiloStatus.Dead || entry.StartTime >= cutoff
+                        || entry.SuspectTimes?.Any(vote => vote.Item2 >= cutoff) == true)
+                    {
+                        return;
+                    }
 
-                foreach (var (entry, etag) in candidates)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var heartbeat = await zk.GetData(heartbeatPath);
+                    if (Deserialize<DateTime>(heartbeat.Data) >= cutoff)
+                    {
+                        return;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await zk.Multi(
+                    [
+                        Op.delete(heartbeatPath, heartbeat.Stat.getVersion()),
+                        Op.delete(rowPath, row.Stat.getVersion())
+                    ]);
+                    return;
+                }
+                catch (KeeperException.BadVersionException)
+                {
+                    // Re-evaluate only this row: its version and heartbeat version guard eligibility.
+                }
+                catch (KeeperException.NoNodeException)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    try
-                    {
-                        var heartbeatPath = ConvertToRowIAmAlivePath(entry.SiloAddress);
-                        var heartbeat = await zk.GetData(heartbeatPath);
-                        if (Deserialize<DateTime>(heartbeat.Data) >= cutoff)
-                        {
-                            continue;
-                        }
-
-                        cancellationToken.ThrowIfCancellationRequested();
-                        await zk.Multi(
-                        [
-                            Op.delete(heartbeatPath, heartbeat.Stat.getVersion()),
-                            Op.delete(ConvertToRowPath(entry.SiloAddress), int.Parse(etag, CultureInfo.InvariantCulture))
-                        ]);
-                    }
-                    catch (KeeperException.BadVersionException)
-                    {
-                        // Re-evaluate eligibility after a concurrent row or heartbeat update.
-                    }
-                    catch (KeeperException.NoNodeException)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        await zk.GetData("/");
-                    }
+                    await zk.GetData("/");
+                    return;
                 }
             }
         }
