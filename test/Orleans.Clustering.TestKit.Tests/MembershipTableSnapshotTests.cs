@@ -54,7 +54,7 @@ public sealed class MembershipTableSnapshotTests
     [InlineData("FaultZone")]
     [InlineData("StartTime")]
     [InlineData("SuspectTimes")]
-    public void CompareCanonical_IncludesEveryFieldExceptHeartbeat(string field)
+    public void CompareCanonical_IncludesCanonicalFieldsAndIgnoresHeartbeatAndRowMetadata(string field)
     {
         var expected = Snapshot(CreateEntry(1));
         var changed = CreateEntry(1);
@@ -75,7 +75,7 @@ public sealed class MembershipTableSnapshotTests
         var heartbeatOnly = CreateEntry(1);
         heartbeatOnly.IAmAliveTime = T2;
         Assert.Null(expected.CompareCanonical(Snapshot(heartbeatOnly)));
-        Assert.Contains("row ETag", expected.CompareCanonical(Snapshot(heartbeatOnly, rowToken: "heartbeat-token"))!);
+        Assert.Null(expected.CompareCanonical(Snapshot(heartbeatOnly, rowToken: "heartbeat-token")));
         Assert.Contains("IAmAliveTime", expected.CompareComplete(Snapshot(heartbeatOnly, rowToken: "heartbeat-token"))!);
     }
 
@@ -203,11 +203,7 @@ public sealed class MembershipTableSnapshotTests
             Rows = intermediate.Rows.SetItem(live.SiloAddress.ToParsableString(),
                 intermediate.Row(live.SiloAddress) with { Etag = "refreshed-row-token" })
         };
-        if (versioned)
-            MembershipTableTestRunner.AssertCleanup(before, changedToken, T1, requireAllEligible: false);
-        else
-            Assert.Contains("row ETag", Assert.Throws<ClusteringConformanceException>(() =>
-                MembershipTableTestRunner.AssertCleanup(before, changedToken, T1, requireAllEligible: false)).Message);
+        MembershipTableTestRunner.AssertCleanup(before, changedToken, T1, requireAllEligible: false);
 
         var skippedEmptyBatch = intermediate with { Version = 12, TableEtag = "v12" };
         Assert.Contains("cleanup version", Assert.Throws<ClusteringConformanceException>(() =>
@@ -264,7 +260,7 @@ public sealed class MembershipTableSnapshotTests
     }
 
     [Fact]
-    public void CanonicalObservations_AcceptRawHeartbeatLagAndRejectLogicalTokenChanges()
+    public void CanonicalObservations_AcceptHeartbeatLagAndRowMetadataChangesButRejectTableTokenChanges()
     {
         var entry = CreateEntry(1, status: SiloStatus.Active);
         entry.IAmAliveTime = T2;
@@ -272,14 +268,13 @@ public sealed class MembershipTableSnapshotTests
         var history = new MembershipHistory();
         history.Observe(before);
         entry.IAmAliveTime = T0;
-        var lagged = Snapshot(entry);
+        var lagged = Snapshot(entry, rowToken: "physical-token");
 
         MembershipTableTestRunner.AssertHeartbeat(before, lagged);
         history.Observe(lagged);
         Assert.Null(before.CompareCanonical(lagged));
         Assert.Contains("IAmAliveTime", before.CompareComplete(lagged)!);
-        Assert.Contains("row ETag", Assert.Throws<ClusteringConformanceException>(() =>
-            MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry, rowToken: "changed"))).Message);
+        MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry, rowToken: "changed-again"));
         Assert.Contains("table ETag", Assert.Throws<ClusteringConformanceException>(() =>
             MembershipTableTestRunner.AssertHeartbeat(before, Snapshot(entry, tableToken: "changed"))).Message);
         entry.ProxyPort++;

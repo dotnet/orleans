@@ -117,7 +117,7 @@ namespace Orleans.Clustering.TestKit
 
         public System.Threading.Tasks.Task Reads_SameVersion_PreservesRetainedCanonicalFields(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_CurrentTokens_CommitsExactlyOneVersion(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
@@ -125,7 +125,7 @@ namespace Orleans.Clustering.TestKit
 
         public System.Threading.Tasks.Task UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public System.Threading.Tasks.Task UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 

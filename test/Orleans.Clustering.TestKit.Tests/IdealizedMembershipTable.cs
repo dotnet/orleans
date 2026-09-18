@@ -12,6 +12,9 @@ internal sealed class IdealizedMembershipBackend
     internal bool LagHeartbeatReads { get; init; }
     internal int LaggedHeartbeatReads;
     internal bool TableVersionRowEtags { get; init; }
+    internal bool PhysicalRowEtags { get; init; }
+    internal int RowConditionChecks;
+    internal int HeartbeatRowMetadataChanges;
     internal int CleanupBatchSize { get; init; } = int.MaxValue;
     internal bool VersionedCleanup { get; init; } = true;
     internal int CleanupBatches;
@@ -174,8 +177,12 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
         {
             backend.VersionedUpdates++;
             var partition = Partition;
-            if (partition.Etag != tableVersion.VersionEtag || !partition.Rows.TryGetValue(entry.SiloAddress, out var row)
-                || (backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return false;
+            if (partition.Etag != tableVersion.VersionEtag || !partition.Rows.TryGetValue(entry.SiloAddress, out var row)) return false;
+            if (!backend.PhysicalRowEtags)
+            {
+                backend.RowConditionChecks++;
+                if ((backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return false;
+            }
             var stored = Clone(entry);
             if (backend.PreserveHeartbeatOnFullWrite && stored.IAmAliveTime < row.Item1.IAmAliveTime)
                 stored.IAmAliveTime = row.Item1.IAmAliveTime;
@@ -193,6 +200,11 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             backend.HeartbeatWrites.Add((scopeClusterId, this, entry.SiloAddress, entry.IAmAliveTime, row.Item1.Status));
             partition.EarlierHeartbeats.TryAdd(entry.SiloAddress, row.Item1.IAmAliveTime);
             row.Item1.IAmAliveTime = entry.IAmAliveTime;
+            if (backend.PhysicalRowEtags)
+            {
+                partition.Rows[entry.SiloAddress] = Tuple.Create(row.Item1, backend.Token());
+                backend.HeartbeatRowMetadataChanges++;
+            }
         }, cancellationToken);
 
     internal static MembershipEntry Clone(MembershipEntry entry) => new()

@@ -108,13 +108,13 @@ runs the same behavioral assertions.
 | G03 | `Reads_SameVersion_PreservesRetainedCanonicalFields` |
 | G04 | `Reads_MaySkipCommittedVersions_WithoutSkippingHistoryValidation` |
 | G05 | `Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration` |
-| G06 | `UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens` |
+| G06 | `UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion` |
 | G07 | `UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange` |
 | G08 | `UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange` |
 | G09 | `Handles_IndependentlyConstructed_ShareCommittedBackingState` |
 | G10 | `InsertRow_StaleTableToken_ReturnsFalseWithoutSideEffects` |
 | G11 | `UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects` |
-| G12 | `UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects` |
+| G12 | `UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects` |
 | G13 | `InsertRow_DuplicateIdentity_ReturnsFalseWithoutSideEffects` |
 | G14 | `UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects` |
 | G15 | `ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities` |
@@ -139,12 +139,13 @@ The generated fact is conventionally named
 
 The immutable observation captures all public persisted entry fields, nested
 suspect identities/times, full endpoint/generation identity, row ETags, and
-integer/table ETag. Provider observations compare canonical fields and logical
-concurrency tokens independently of raw IAmAliveTime. Retained-object detachment
-also compares the captured object's liveness field. At equal versions the history requires every non-Dead
+integer/table ETag. Provider observations compare canonical fields and the
+table version/ETag independently of raw IAmAliveTime and provider-defined row
+ETags. Retained-object detachment also compares the captured object's liveness
+and row metadata. At equal versions the history requires every non-Dead
 row and every retained canonical field, while allowing previously Dead rows to
 be pruned. IAmAliveTime is independently and inconsistently updated; row ETags
-are opaque logical membership tokens which heartbeat-only writes preserve.
+are opaque provider metadata and can change with a heartbeat or physical rewrite.
 Null/empty suspect lists and suspect/row enumeration order are
 canonicalized, as are null/empty representations of an absent optional role name.
 Optional Azure deployment metadata is explicitly initialized to
@@ -153,10 +154,11 @@ empty role/zero zones, but all these fields remain in every comparison.
 Every successful protocol write supplies the real current `TableVersion.Next()`
 and must advance exactly once. ETags are opaque. The membership protocol supplies
 valid next-version integers and forward status transitions.
-Successful commits can refresh row ETags for unchanged entries, including
-providers which derive row tokens from the table version. Stale-table tests use a
-freshly read row token after the competing commit; stale-row tests pair a saved
-row token with a fresh table candidate. Every unchanged canonical entry field
+Canonical updates atomically validate the table ETag and replace an existing
+row. A provider can additionally validate a canonical row token, or ignore the
+supplied row ETag when table-version CAS protects the update. Stale-table tests
+use freshly read row metadata after a competing cross-row commit and original
+snapshot inputs after a same-row commit. Every unchanged canonical entry field
 is preserved. Full-row writes can overwrite a heartbeat with an earlier value.
 Different reads can skip committed versions. A newer full view can omit a
 previously live identity, establishing its terminal death even when the observer
@@ -167,7 +169,7 @@ Dead-only cleanup can preserve the version and table ETag or use atomic +1
 commits with fresh table ETags. With several eligible rows, the suite accepts
 batches and bounds the total version increase between zero and the number of
 removed rows. Every retained canonical field remains unchanged.
-Empty cleanup preserves the canonical observation and logical tokens.
+Empty cleanup preserves the canonical observation and table version/ETag.
 The cleanup scenario retains a Dead row exactly at the cutoff, repeats that
 cutoff as a no-op, then advances it by one tick and requires that row's deletion.
 Restarts use a strictly newer generation at the same endpoint. The generated
@@ -187,8 +189,8 @@ which scopes remain readable; retired handles receive only owner disposal.
 Each owning silo publishes its own liveness using a single blind column write.
 Heartbeat inputs carry the identity and timestamp. The kit publishes fixed
 whole-second UTC t1, t2, t2 in sequence through one owner while its row is live.
-Each call preserves canonical membership fields, the table version, and both
-logical concurrency tokens. Reads can lag or expose older liveness values.
+Each call preserves canonical membership fields and the table version/ETag.
+Returned row metadata can vary. Reads can lag or expose older liveness values.
 Generated heartbeat operations
 use a fixed owner handle per identity and stay within that row's live lifetime.
 
@@ -198,8 +200,8 @@ blind liveness write**. The kit's observation reads bracket the provider call to
 check resulting fields; native SDK instrumentation establishes the operation
 count. Runtime snapshot merging retains maximum observed liveness.
 
-G07 and G08 capture logical row/table tokens, perform an owner heartbeat, then
-commit a status or suspect-vote change using the original tokens. Each update
+G07 and G08 capture the row ETag and table version, perform an owner heartbeat,
+then commit a status or suspect-vote change using the original inputs. Each update
 succeeds once with an exact +1 version advance. These cases make heartbeat
 noninterference observable at the canonical write boundary. Full-row payloads
 may clobber a newer stored heartbeat; the model's owner-published timestamps
@@ -225,13 +227,14 @@ or streaming boundary. Retain provider-specific pagination tests which force
 those boundaries explicitly.
 Setup uses one initial point read, one insert and verifying point read per row,
 then two full views checked against independently constructed canonical entries.
-Each insertion verifies an exact +1 commit and fresh tokens. For N rows this is
+Each insertion verifies an exact +1 commit, a fresh table token, and expected
+canonical row fields. For N rows this is
 N+1 point reads, N inserts, two full reads, and 3N membership-row observations.
 These count provider API calls; provider-specific instrumentation measures their
 native request costs.
 
 Accordant generates and executes operation sequences using transition coverage.
-Required constrained prefixes reach independent stale row/table modes,
+Required constrained prefixes reach stale table snapshots after cross-row and same-row commits,
 original-token updates after heartbeats, and single- and multi-row Dead compaction followed
 by successor creation. Every generated case acquires fresh scopes;
 the execution context retains real token history separately from the abstract
@@ -242,8 +245,10 @@ timestamp, making the expected Dead-row removals independent of heartbeat lag
 or overwrite. Cleanup outcomes are range-checked and their surviving canonical rows
 validated before the model records a version delta. Final execution checks
 require all eighteen operation kinds. Self-tests exercise both cleanup
-strategies with an independent oracle, alternating liveness lag, full-row
-heartbeat overwrite, and deliberate canonical/token contract-violating mutants.
+strategies with independent oracles for separate canonical row checks,
+table-version-derived row tokens, and physical row metadata with table-only CAS.
+They also cover alternating liveness lag, full-row heartbeat overwrite, cheap
+heartbeat preservation, and deliberate canonical/table-token violations.
 Any fixture teardown failure stops the generated run before another case or
 replay can acquire owners. The original case failure and teardown diagnostics
 remain available together.

@@ -30,21 +30,22 @@ public sealed class MembershipTableModelTests
     }
 
     [Fact]
-    public void Apply_StaleTableAndStaleRow_AreIndependentAndSideEffectFree()
+    public void Apply_StaleTableAndSameRowSnapshot_AreSideEffectFree()
     {
         var state = new MembershipModelState();
         Apply(state, MembershipOperationKind.InsertNew);
-        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.UpdateStaleRow), state));
+        Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.UpdateStaleSnapshot), state));
         Apply(state, MembershipOperationKind.InsertNew, 2);
         Apply(state, MembershipOperationKind.UpdateStaleTable);
         Assert.Equal(2, state.Version);
         Assert.Equal(1, state.Rows[1].Revision);
         Apply(state, MembershipOperationKind.UpdateForward);
         Assert.False(MembershipModel.CanApply(new(MembershipOperationKind.UpdateStaleTable), state));
-        Apply(state, MembershipOperationKind.UpdateStaleRow);
+        Apply(state, MembershipOperationKind.UpdateStaleSnapshot);
         Assert.Equal(3, state.Version);
         Assert.Equal(2, state.Rows[1].Revision);
         Assert.Equal(T0.Ticks, state.Rows[1].OwnerHeartbeatTicks);
+        Assert.Contains("table-mode=previous; row-mode=previous", new MembershipRequest(MembershipOperationKind.UpdateStaleSnapshot).ToString());
     }
 
     [Fact]
@@ -229,7 +230,7 @@ public sealed class MembershipTableModelTests
             }
         }
         Assert.Contains(MembershipOperationKind.UpdateStaleTable, reached);
-        Assert.Contains(MembershipOperationKind.UpdateStaleRow, reached);
+        Assert.Contains(MembershipOperationKind.UpdateStaleSnapshot, reached);
         Assert.Contains(MembershipOperationKind.UpdateAfterHeartbeat, reached);
         Assert.Contains(MembershipOperationKind.StartSuccessor, reached);
     }

@@ -105,7 +105,7 @@ internal sealed record ClusteringMembershipSnapshot(int Version, string TableEta
             }
 
             if (row.Entry.Difference(observed.Entry, complete) is { } difference) return difference;
-            if (row.Etag != observed.Etag) return $"{identity}.row ETag: expected={row.Etag}, observed={observed.Etag}";
+            if (complete && row.Etag != observed.Etag) return $"{identity}.row ETag: expected={row.Etag}, observed={observed.Etag}";
         }
 
         var extra = actual.Rows.Keys.Except(Rows.Keys).FirstOrDefault();

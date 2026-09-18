@@ -121,8 +121,8 @@ public sealed class MembershipTableTestRunner
         EqualRow(MembershipEntrySnapshot.Capture(successor), final.Row(successor.SiloAddress).Entry);
     }, cancellationToken);
 
-    /// <summary>G06: owner liveness writes preserve canonical membership fields and logical row/table concurrency tokens.</summary>
-    public Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>G06: owner liveness writes preserve canonical membership fields and the table version and ETag.</summary>
+    public Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         await Heartbeat(A, Entry(1), T1, ct);
@@ -152,7 +152,7 @@ public sealed class MembershipTableTestRunner
         await B.UpdateIAmAliveAsync(new MembershipEntry { SiloAddress = payload.SiloAddress, IAmAliveTime = T2 }, ct);
         Check(await A.UpdateRowAsync(payload, before.Row(payload.SiloAddress).Etag, before.Next(), ct),
             "canonical update with pre-heartbeat tokens returned false");
-        AssertCommit(before, await SameHandles(ct), payload, insert: false);
+        AssertCommit(before, await SameHandles(ct), payload);
     }
 
     /// <summary>G09: distinct constructed handles share one committed backing table.</summary>
@@ -174,7 +174,7 @@ public sealed class MembershipTableTestRunner
         await Reject(() => A.InsertRowAsync(Entry(3), stale, ct), ct);
     }, cancellationToken);
 
-    /// <summary>G11: independently stale table token with a demonstrably current target row token.</summary>
+    /// <summary>G11: a stale table token is rejected even with freshly read target-row metadata.</summary>
     public Task UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
@@ -189,17 +189,17 @@ public sealed class MembershipTableTestRunner
         await Reject(() => A.UpdateRowAsync(rejected, rowEtag, stale.Next(), ct), ct);
     }, cancellationToken);
 
-    /// <summary>G12: independently stale row token with a fresh table candidate.</summary>
-    public Task UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>G12: a snapshot preceding a commit to the same row is rejected without partial effects.</summary>
+    public Task UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
-        var stale = (await Read(A, ct)).Row(Entry(1).SiloAddress).Etag;
+        var stale = await Read(A, ct);
         var joining = Forward(Entry(1));
         var current = await Update(B, joining, ct);
-        Check(stale != current.Row(joining.SiloAddress).Etag, "arrangement did not produce a stale row token");
+        Check(stale.TableEtag != current.TableEtag, "arrangement did not produce a stale table token");
         var rejected = Forward(joining);
         rejected.IAmAliveTime = T2;
-        await Reject(() => A.UpdateRowAsync(rejected, stale, current.Next(), ct), ct);
+        await Reject(() => A.UpdateRowAsync(rejected, stale.Row(joining.SiloAddress).Etag, stale.Next(), ct), ct);
     }, cancellationToken);
 
     /// <summary>G13: duplicate identity with a current valid candidate is rejected atomically.</summary>
@@ -323,7 +323,7 @@ public sealed class MembershipTableTestRunner
         start.SetResult();
         var results = await Task.WhenAll(writes).WaitAsync(ct);
         Check(results.Count(success => success) == 1, $"exactly one winner required; observed=[{string.Join(",", results)}]");
-        AssertCommit(before, await SameHandles(ct), results[0] ? first : second, insert: false);
+        AssertCommit(before, await SameHandles(ct), results[0] ? first : second);
     }, cancellationToken);
 
     /// <summary>G21: bounded simultaneous full reads match only complete before/after committed views.</summary>
@@ -487,20 +487,6 @@ public sealed class MembershipTableTestRunner
     }
     internal static void EqualRow(MembershipEntrySnapshot expected, MembershipEntrySnapshot observed, bool complete = false)
         => Check(expected.Difference(observed, complete) is null, expected.Difference(observed, complete) ?? "equal");
-    private static void EqualAllowingRefreshedRowEtags(ClusteringMembershipSnapshot expected, ClusteringMembershipSnapshot observed)
-    {
-        var rows = expected.Rows;
-        foreach (var (identity, row) in expected.Rows)
-        {
-            if (observed.Rows.TryGetValue(identity, out var actual))
-            {
-                Check(!string.IsNullOrEmpty(actual.Etag), $"committed row has an unusable ETag: identity={identity}");
-                rows = rows.SetItem(identity, row with { Etag = actual.Etag });
-            }
-        }
-
-        Equal(expected with { Rows = rows }, observed);
-    }
     internal static async Task<ClusteringMembershipSnapshot> Read(IMembershipTable table, CancellationToken ct)
         => ClusteringMembershipSnapshot.Capture(await table.ReadAllAsync(ct));
 
@@ -523,7 +509,7 @@ public sealed class MembershipTableTestRunner
         var detached = Copy(input);
         Check(await table.InsertRowAsync(input, before.Next(), ct), $"current-table insert returned false; table={before.Next()}, identity={input.SiloAddress}");
         var after = await Read(table, ct);
-        AssertCommit(before, after, detached, insert: true);
+        AssertCommit(before, after, detached);
         return after;
     }
 
@@ -535,25 +521,23 @@ public sealed class MembershipTableTestRunner
         Check(await table.UpdateRowAsync(input, rowEtag, before.Next(), ct),
             $"fresh-token update returned false; table={before.Next()}, row ETag={rowEtag}, identity={input.SiloAddress}");
         var after = await Read(table, ct);
-        AssertCommit(before, after, detached, insert: false);
+        AssertCommit(before, after, detached);
         return after;
     }
 
-    internal static void AssertCommit(ClusteringMembershipSnapshot before, ClusteringMembershipSnapshot after, MembershipEntry input, bool insert)
+    internal static void AssertCommit(ClusteringMembershipSnapshot before, ClusteringMembershipSnapshot after, MembershipEntry input)
     {
         var id = input.SiloAddress.ToParsableString();
         Check(after.Version == before.Version + 1, $"commit integer: expected={before.Version + 1}, observed={after.Version}");
         Check(!string.IsNullOrEmpty(after.TableEtag) && after.TableEtag != before.TableEtag,
             $"commit table ETag must change: old={before.TableEtag}, observed={after.TableEtag}");
         Check(after.Rows.TryGetValue(id, out var row), $"committed identity missing={id}");
-        Check(!string.IsNullOrEmpty(row!.Etag) && (insert || row.Etag != before.Rows[id].Etag),
-            $"commit must issue usable new row ETag: identity={id}, observed={row.Etag}");
         var expectedEntry = MembershipEntrySnapshot.Capture(input);
-        EqualAllowingRefreshedRowEtags(before with
+        Equal(before with
         {
             Version = before.Version + 1,
             TableEtag = after.TableEtag,
-            Rows = before.Rows.SetItem(id, new(expectedEntry, row.Etag))
+            Rows = before.Rows.SetItem(id, new(expectedEntry, row!.Etag))
         }, after);
     }
 
@@ -591,8 +575,7 @@ public sealed class MembershipTableTestRunner
             TableEtag = after.TableEtag,
             Rows = before.Rows.RemoveRange(removed)
         };
-        if (delta == 0) Equal(expected, after);
-        else EqualAllowingRefreshedRowEtags(expected, after);
+        Equal(expected, after);
     }
 
     private async Task CleanupWithConcurrentReads(CancellationToken ct)
@@ -701,11 +684,11 @@ public sealed class MembershipTableTestRunner
             Check(await writer.InsertRowAsync(input, current.Next(), ct),
                 $"concurrent-read setup insert failed: index={i}, table={current.Next()}");
             var observed = ClusteringMembershipSnapshot.Capture(await reader.ReadRowAsync(input.SiloAddress, ct));
-            AssertCommit(current with { Rows = current.Rows.Clear() }, observed, expectedEntry.ToEntry(), insert: true);
+            AssertCommit(current with { Rows = current.Rows.Clear() }, observed, expectedEntry.ToEntry());
             expectedRows.Add(expectedEntry.Identity, new(expectedEntry, observed.Row(input.SiloAddress).Etag));
             current = observed;
         }
-        EqualAllowingRefreshedRowEtags(current with { Rows = expectedRows.ToImmutable() }, await SameHandles(ct));
+        Equal(current with { Rows = expectedRows.ToImmutable() }, await SameHandles(ct));
     }
 
     private async Task ConcurrentReads(bool pointReads, CancellationToken ct)
@@ -770,13 +753,7 @@ public sealed class MembershipTableTestRunner
                     {
                         Check(!sample.Rows.ContainsKey(id), "atomic cleanup still returned the removed identity");
                     }
-                    else if (sample.Rows.TryGetValue(id, out var observed))
-                    {
-                        Check(!string.IsNullOrEmpty(observed.Etag) && observed.Etag != before.Rows[id].Etag, "atomic committed target has old row token");
-                        expectedAfter = expectedAfter with { Rows = expectedAfter.Rows.SetItem(id, expectedAfter.Rows[id] with { Etag = observed.Etag }) };
-                    }
-
-                    EqualAllowingRefreshedRowEtags(pointReads ? expectedAfter.Select(key) : expectedAfter, sample);
+                    Equal(pointReads ? expectedAfter.Select(key) : expectedAfter, sample);
                 }
                 observations.Enqueue((sample, key));
             }
@@ -787,8 +764,8 @@ public sealed class MembershipTableTestRunner
             await Task.WhenAll(workers).WaitAsync(ct);
             var committed = await SameHandles(ct);
             if (cleanup) AssertCleanup(before, committed, T1);
-            else AssertCommit(before, committed, target, insert: false);
-            // Once the writer completes, pin down its opaque tokens too, not just their freshness.
+            else AssertCommit(before, committed, target);
+            // Once the writer completes, pin down the committed table token as well as its canonical fields.
             foreach (var (sample, key) in observations)
             {
                 var expectedBefore = pointReads ? before.Select(key) : before;

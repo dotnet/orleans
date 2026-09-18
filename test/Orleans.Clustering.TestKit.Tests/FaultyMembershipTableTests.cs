@@ -6,13 +6,12 @@ public sealed class FaultyMembershipTableTests
 {
     [Theory]
     [InlineData("IgnoreTableToken", "stale-table", "unexpectedly succeeded")]
-    [InlineData("IgnoreRowToken", "stale-row", "unexpectedly succeeded")]
-    [InlineData("FalseWriteChangesMembership", "stale-row", "HostName")]
+    [InlineData("FalseWriteChangesMembership", "stale-snapshot", "HostName")]
     [InlineData("VersionJump", "insert", "commit integer")]
-    [InlineData("HeartbeatChangesRowToken", "heartbeat", "row ETag")]
     [InlineData("HeartbeatChangesTableToken", "heartbeat", "table ETag")]
     [InlineData("HeartbeatChangesMembership", "heartbeat", "ProxyPort")]
-    [InlineData("HeartbeatChangesRowToken", "heartbeat-status", "pre-heartbeat tokens returned false")]
+    [InlineData("HeartbeatInvalidatesRowCondition", "heartbeat-status", "pre-heartbeat tokens returned false")]
+    [InlineData("HeartbeatInvalidatesRowCondition", "heartbeat-vote", "pre-heartbeat tokens returned false")]
     [InlineData("HeartbeatChangesTableToken", "heartbeat-vote", "pre-heartbeat tokens returned false")]
     [InlineData("AliasInsert", "alias-insert", "Status")]
     [InlineData("AliasUpdate", "alias-update", "Status")]
@@ -45,9 +44,9 @@ public sealed class FaultyMembershipTableTests
             return scenario switch
             {
                 "stale-table" => runner.UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(ct),
-                "stale-row" => runner.UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(ct),
+                "stale-snapshot" => runner.UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(ct),
                 "insert" => runner.InsertRow_CurrentTableVersion_CommitsExactlyOneVersion(ct),
-                "heartbeat" => runner.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
+                "heartbeat" => runner.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(ct),
                 "heartbeat-status" => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
                 "alias-insert" => runner.InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
                 "alias-update" => runner.UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
@@ -82,7 +81,7 @@ public sealed class FaultyMembershipTableTests
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
+                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(ct),
             TestContext.Current.CancellationToken));
 
         Assert.Same(control.HeartbeatFailure, failure);
@@ -104,7 +103,7 @@ public sealed class FaultyMembershipTableTests
         using var caller = new CancellationTokenSource();
         var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => control.Fixture().RunAsync(
             (fixture, ct) => new MembershipTableTestRunner(fixture)
-                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTokens(ct),
+                .UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(ct),
             caller.Token));
 
         Assert.Same(expected, failure);
@@ -152,7 +151,7 @@ public sealed class FaultyMembershipTableTests
             return pointRead ? runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct)
                 : runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
         }, TestContext.Current.CancellationToken));
-        Assert.Contains("old row token", failure.Message);
+        Assert.Contains("Status", failure.Message);
         Assert.True(control.ReadStarted.Task.IsCompletedSuccessfully);
         Assert.True(control.Committed.Task.IsCompletedSuccessfully);
         Assert.True(control.Injected > 0);
@@ -180,7 +179,7 @@ public sealed class FaultyMembershipTableTests
     [Fact]
     public async Task GeneratedHeartbeatFailure_ReportsTimestampSentToProvider()
     {
-        var control = new MembershipFaultController(MembershipFault.HeartbeatChangesRowToken);
+        var control = new MembershipFaultController(MembershipFault.HeartbeatChangesTableToken);
         await control.Fixture().RunAsync(async (fixture, ct) =>
         {
             var context = new MembershipModelExecutionContext(fixture, 0, 0, ct, _ => { });
@@ -192,19 +191,42 @@ public sealed class FaultyMembershipTableTests
             Assert.Equal(MembershipTableTestData.T1, write.Time);
             Assert.Contains($"HeartbeatAdvance(key=1; table-mode=current; row-mode=current) [table=", result.Failure);
             Assert.Contains($"owner heartbeat={write.Time:O}]", result.Failure);
-            Assert.Contains("row ETag", result.Failure);
+            Assert.Contains("table ETag", result.Failure);
         }, TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task GeneratedModel_IndependentStaleRowMutant_IsDetectedWithOperationPrefix()
+    public async Task StaleSnapshotAfterSameRowCommit_VersionOnlyCasMutant_IsRejected()
     {
-        var control = new MembershipFaultController(MembershipFault.IgnoreRowToken);
-        var runner = new MembershipTableModelBasedTestRunner(control.Fixture, "model-mutant");
-        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
-        Assert.Contains("UpdateStaleRow", failure.Message);
-        Assert.Contains("row-mode=previous", failure.Message);
-        Assert.Contains("expected conditional false", failure.Message);
+        var control = new MembershipFaultController(MembershipFault.IgnoreTableToken)
+        {
+            Backend = new IdealizedMembershipBackend { PhysicalRowEtags = true }
+        };
+        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => control.Fixture().RunAsync(
+            (fixture, ct) => new MembershipTableTestRunner(fixture).UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(ct),
+            TestContext.Current.CancellationToken));
+        Assert.Contains("unexpectedly succeeded", failure.Message);
+        Assert.True(control.Injected > 0);
+        Assert.Equal(0, control.Backend.RowConditionChecks);
+    }
+
+    [Fact]
+    public async Task GeneratedModel_StaleSnapshotMutant_IsDetectedWithOperationPrefix()
+    {
+        var control = new MembershipFaultController(MembershipFault.IgnoreTableToken)
+        {
+            Backend = new IdealizedMembershipBackend { PhysicalRowEtags = true }
+        };
+        await control.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            var context = new MembershipModelExecutionContext(fixture, 0, 0, ct, _ => { });
+            Assert.Null((await context.ExecuteAsync(new(MembershipOperationKind.InsertNew))).Failure);
+            Assert.Null((await context.ExecuteAsync(new(MembershipOperationKind.UpdateForward))).Failure);
+            var result = await context.ExecuteAsync(new(MembershipOperationKind.UpdateStaleSnapshot));
+            Assert.Contains("UpdateStaleSnapshot", result.Failure);
+            Assert.Contains("table-mode=previous; row-mode=previous", result.Failure);
+            Assert.Contains("expected conditional false", result.Failure);
+        }, TestContext.Current.CancellationToken);
         Assert.True(control.Injected > 0);
     }
 }

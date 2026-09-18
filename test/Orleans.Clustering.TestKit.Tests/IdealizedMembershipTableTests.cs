@@ -52,7 +52,7 @@ public sealed class IdealizedMembershipTableTests
     }
 
     [Fact]
-    public async Task ConditionalWrites_InvalidIndependentTokens_LeaveAllStateUnchanged()
+    public async Task StrongerRowCondition_InvalidIndependentTokens_LeaveAllStateUnchanged()
     {
         var table = new IdealizedMembershipBackend().Create("A");
         var original = await table.ReadAllAsync(Ct);
@@ -71,6 +71,40 @@ public sealed class IdealizedMembershipTableTests
         Assert.Equal(current.Members[0].Item2, after.Members[0].Item2);
         Assert.Equal(SiloStatus.Active, after.Members[0].Item1.Status);
         Assert.Equal(Start.AddSeconds(1), after.Members[0].Item1.IAmAliveTime);
+    }
+
+    [Fact]
+    public async Task VersionOnlyCas_PhysicalRowMetadataChangesPreserveOriginalInputsAndAtomicFailures()
+    {
+        var backend = new IdealizedMembershipBackend { PhysicalRowEtags = true };
+        var table = backend.Create("A");
+        var entry = Entry();
+        Assert.True(await table.InsertRowAsync(entry, (await table.ReadAllAsync(Ct)).Version.Next(), Ct));
+        var original = await table.ReadAllAsync(Ct);
+        var capturedRowEtag = Assert.Single(original.Members).Item2;
+        var reads = backend.Reads;
+        await table.UpdateIAmAliveAsync(new() { SiloAddress = entry.SiloAddress, IAmAliveTime = Start.AddMinutes(2) }, Ct);
+        Assert.Equal(reads, backend.Reads);
+        Assert.Single(backend.HeartbeatWrites);
+        Assert.Equal(1, backend.HeartbeatRowMetadataChanges);
+        var heartbeat = await table.ReadAllAsync(Ct);
+        Assert.Equal(original.Version, heartbeat.Version);
+        Assert.NotEqual(capturedRowEtag, Assert.Single(heartbeat.Members).Item2);
+        entry.Status = SiloStatus.Active;
+        Assert.True(await table.UpdateRowAsync(entry, capturedRowEtag, original.Version.Next(), Ct));
+        var committed = await table.ReadAllAsync(Ct);
+        Assert.Equal(original.Version.Version + 1, committed.Version.Version);
+        Assert.Equal(SiloStatus.Active, Assert.Single(committed.Members).Item1.Status);
+
+        entry.Status = SiloStatus.Stopping;
+        Assert.False(await table.UpdateRowAsync(entry, committed.Members[0].Item2, original.Version.Next(), Ct));
+        Assert.False(await table.UpdateRowAsync(Entry(13003), capturedRowEtag, committed.Version.Next(), Ct));
+        var afterFailures = await table.ReadAllAsync(Ct);
+        Assert.Equal(committed.Version, afterFailures.Version);
+        Assert.Equal(committed.Members[0].Item1.ToFullString(), Assert.Single(afterFailures.Members).Item1.ToFullString());
+        Assert.Equal(committed.Members[0].Item2, afterFailures.Members[0].Item2);
+        Assert.Equal(0, backend.RowConditionChecks);
+        Assert.Equal(3, backend.VersionedUpdates);
     }
 
     [Theory]

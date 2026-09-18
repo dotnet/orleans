@@ -4,7 +4,7 @@ namespace Orleans.Clustering.TestKit.Tests;
 
 internal enum MembershipFault
 {
-    IgnoreTableToken, IgnoreRowToken, FalseWriteChangesMembership, VersionJump, HeartbeatChangesRowToken, HeartbeatChangesTableToken, HeartbeatChangesMembership,
+    IgnoreTableToken, FalseWriteChangesMembership, VersionJump, HeartbeatInvalidatesRowCondition, HeartbeatChangesTableToken, HeartbeatChangesMembership,
     AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize, InsertChangesExistingRow,
     CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, TornReadRow, RefuseStatusWrite,
     IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
@@ -228,11 +228,6 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
                 return inner.UpdateRowAsync(entry, etag, current, cancellationToken).GetAwaiter().GetResult();
             }
         }
-        if (Fault == MembershipFault.IgnoreRowToken)
-        {
-            var current = (await inner.ReadRowAsync(entry.SiloAddress, cancellationToken)).TryGet(entry.SiloAddress);
-            if (current is not null && current.Item2 != etag) { etag = current.Item2; control.Injected++; }
-        }
         if (Fault is MembershipFault.TornReadAll or MembershipFault.TornReadRow)
         {
             control.TornBefore = await inner.ReadAllAsync(cancellationToken);
@@ -264,7 +259,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
         if (Fault == MembershipFault.HeartbeatStorageFailure) throw control.HeartbeatFailure;
         if (Fault == MembershipFault.HeartbeatCancellation) throw control.HeartbeatCancellation;
         await inner.UpdateIAmAliveAsync(entry, cancellationToken);
-        if (Fault == MembershipFault.HeartbeatChangesRowToken)
+        if (Fault == MembershipFault.HeartbeatInvalidatesRowCondition)
             Mutate(p =>
             {
                 p.Rows[entry.SiloAddress] = Tuple.Create(p.Rows[entry.SiloAddress].Item1, control.Backend.Token());

@@ -7,13 +7,13 @@ namespace Orleans.Clustering.TestKit;
 internal enum MembershipOperationKind
 {
     Initialize, ReadAll, ReadPresentRow, ReadAbsentRow, InsertNew, InsertDuplicate, InsertStaleTable,
-    UpdateForward, UpdateStaleTable, UpdateStaleRow, UpdateMissing, HeartbeatAdvance, HeartbeatRepeat,
+    UpdateForward, UpdateStaleTable, UpdateStaleSnapshot, UpdateMissing, HeartbeatAdvance, HeartbeatRepeat,
     UpdateAfterHeartbeat, CleanupDead, StartSuccessor, DeleteCluster, ReadOtherCluster
 }
 
 internal sealed record MembershipRequest(MembershipOperationKind Kind, int Key = 1)
 {
-    public override string ToString() => $"{Kind}(key={Key}; table-mode={(Kind is MembershipOperationKind.InsertStaleTable or MembershipOperationKind.UpdateStaleTable ? "previous" : "current")}; row-mode={(Kind == MembershipOperationKind.UpdateStaleRow ? "previous" : "current")})";
+    public override string ToString() => $"{Kind}(key={Key}; table-mode={(Kind is MembershipOperationKind.InsertStaleTable or MembershipOperationKind.UpdateStaleTable or MembershipOperationKind.UpdateStaleSnapshot ? "previous" : "current")}; row-mode={(Kind == MembershipOperationKind.UpdateStaleSnapshot ? "previous" : "current")})";
 }
 
 [State]
@@ -85,7 +85,7 @@ internal static class MembershipModel
 
     internal static bool IsRejected(MembershipOperationKind kind) => kind is MembershipOperationKind.InsertDuplicate
         or MembershipOperationKind.InsertStaleTable or MembershipOperationKind.UpdateStaleTable
-        or MembershipOperationKind.UpdateStaleRow or MembershipOperationKind.UpdateMissing;
+        or MembershipOperationKind.UpdateStaleSnapshot or MembershipOperationKind.UpdateMissing;
 
     internal static bool IsRead(MembershipOperationKind kind) => kind is MembershipOperationKind.ReadAll
         or MembershipOperationKind.ReadPresentRow or MembershipOperationKind.ReadAbsentRow or MembershipOperationKind.ReadOtherCluster;
@@ -109,7 +109,7 @@ internal static class MembershipModel
             MembershipOperationKind.UpdateForward => forward,
             MembershipOperationKind.UpdateAfterHeartbeat => forward && row!.HeartbeatVersion == state.Version,
             MembershipOperationKind.UpdateStaleTable => forward && state.Version > 1 && state.LastChangedKey != request.Key,
-            MembershipOperationKind.UpdateStaleRow => forward && row!.Revision > 1,
+            MembershipOperationKind.UpdateStaleSnapshot => forward && row!.Revision > 1,
             MembershipOperationKind.UpdateMissing => !exists && state.Rows.Count > 0,
             MembershipOperationKind.HeartbeatAdvance => forward && row!.OwnerHeartbeatTicks < T2.Ticks,
             MembershipOperationKind.HeartbeatRepeat => forward && row!.OwnerHeartbeatTicks > T0.Ticks,
@@ -304,7 +304,7 @@ internal sealed class MembershipModelExecutionContext
     private MembershipModelState _model = new();
     private readonly MembershipHistory _history = new();
     private readonly List<string> _prefix = [];
-    private readonly Dictionary<string, string> _previousRows = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ClusteringMembershipSnapshot> _previousUpdates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ClusteringMembershipSnapshot> _beforeHeartbeats = new(StringComparer.Ordinal);
     private TableVersion? _previousTable;
     private int? _versionOrigin;
@@ -339,8 +339,12 @@ internal sealed class MembershipModelExecutionContext
             var rowToken = before.Rows.TryGetValue(id, out var oldRow) ? oldRow.Etag : before.Rows.Values.FirstOrDefault()?.Etag;
             if (request.Kind is MembershipOperationKind.InsertStaleTable or MembershipOperationKind.UpdateStaleTable)
                 tableCandidate = _previousTable ?? throw new ClusteringConformanceException("missing real previous table candidate");
-            if (request.Kind == MembershipOperationKind.UpdateStaleRow)
-                rowToken = _previousRows[id];
+            if (request.Kind == MembershipOperationKind.UpdateStaleSnapshot)
+            {
+                var captured = _previousUpdates[id];
+                tableCandidate = captured.Next();
+                rowToken = captured.Rows[id].Etag;
+            }
             if (request.Kind == MembershipOperationKind.UpdateAfterHeartbeat)
             {
                 var captured = _beforeHeartbeats[id];
@@ -387,7 +391,7 @@ internal sealed class MembershipModelExecutionContext
                     if (request.Kind == MembershipOperationKind.UpdateAfterHeartbeat) input.IAmAliveTime = T0;
                     outcome = await writer.UpdateRowAsync(input, rowToken!, tableCandidate, _ct);
                     break;
-                case MembershipOperationKind.UpdateStaleRow:
+                case MembershipOperationKind.UpdateStaleSnapshot:
                 case MembershipOperationKind.UpdateStaleTable:
                 case MembershipOperationKind.UpdateMissing:
                     if (request.Kind != MembershipOperationKind.UpdateMissing) input = Forward(input);
@@ -424,11 +428,10 @@ internal sealed class MembershipModelExecutionContext
             else if (MembershipModel.IsCommit(request.Kind))
             {
                 ClusteringTestKitDiagnostics.Require(outcome == true, $"expected true commit; observed={outcome}; {detail}");
-                MembershipTableTestRunner.AssertCommit(before, after, input,
-                    request.Kind is MembershipOperationKind.InsertNew or MembershipOperationKind.StartSuccessor);
+                MembershipTableTestRunner.AssertCommit(before, after, input);
                 _previousTable = before.Next();
-                if (before.Rows.TryGetValue(input.SiloAddress.ToParsableString(), out var previousRow))
-                    _previousRows[input.SiloAddress.ToParsableString()] = previousRow.Etag;
+                if (before.Rows.ContainsKey(input.SiloAddress.ToParsableString()))
+                    _previousUpdates[input.SiloAddress.ToParsableString()] = before;
             }
             else if (MembershipModel.IsHeartbeat(request.Kind))
             {

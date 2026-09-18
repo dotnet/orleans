@@ -68,7 +68,7 @@ public sealed class MembershipTableModelBasedTestRunnerTests
         Assert.Contains("seed=31", summary);
         Assert.Contains("StartSuccessor", summary);
         Assert.Contains("UpdateStaleTable", summary);
-        Assert.Contains("UpdateStaleRow", summary);
+        Assert.Contains("UpdateStaleSnapshot", summary);
         Assert.Contains("UpdateAfterHeartbeat", summary);
     }
 }

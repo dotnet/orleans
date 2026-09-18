@@ -16,10 +16,10 @@ public sealed class ClusteringTestKitDiagnosticsTests
     public void CreateFailure_ReportsExpectedObservedFieldsVersionsAndTokenModes()
     {
         var failure = ClusteringTestKitDiagnostics.CreateFailure("Local", "G12", "a", "A1", 7,
-            "Status expected=Active observed=Joining; version expected=3 observed=4; row-mode=previous; table-mode=current; row ETag=opaque/a");
+            "Status expected=Active observed=Joining; version expected=3 observed=4; row-mode=previous; table-mode=previous; row ETag=opaque/a");
         Assert.Contains("Status expected=Active observed=Joining", failure.Message);
         Assert.Contains("version expected=3 observed=4", failure.Message);
-        Assert.Contains("row-mode=previous; table-mode=current; row ETag=opaque/a", failure.Message);
+        Assert.Contains("row-mode=previous; table-mode=previous; row ETag=opaque/a", failure.Message);
     }
 
     [Fact]
