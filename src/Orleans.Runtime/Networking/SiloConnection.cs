@@ -275,6 +275,12 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
+            if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequestUpdate(msg))
+            {
+                this.messageCenter.SendForwardingUpdate(msg);
+                return;
+            }
+
             if (msg.IsPing())
             {
                 LogWarningFailedPingMessage(this.Log, msg);
@@ -309,6 +315,12 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
+            if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequestUpdate(msg))
+            {
+                this.messageCenter.SendForwardingUpdate(msg);
+                return;
+            }
+
             if (msg.IsPing())
             {
                 LogWarningRetryingPingMessage(this.Log, msg);
