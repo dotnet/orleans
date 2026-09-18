@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using org.apache.zookeeper;
 using org.apache.zookeeper.data;
 using Orleans.Runtime.Membership;
-using Xunit;
 
 namespace UnitTests.MembershipTests;
 
@@ -174,9 +173,15 @@ internal sealed class ZooKeeperNativeFake
         new($"ZooKeeperNativeFake cannot decode {type.FullName}.{methodName}: {detail}. "
             + $"Update the fake for the installed ZooKeeperNetEx API ({typeof(Op).Assembly.FullName}).");
 
-    private static T CreateResult<T>(params object[] arguments) =>
-        Assert.IsType<T>(Activator.CreateInstance(typeof(T), BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null, args: arguments, culture: null));
+    internal static T CreateResult<T>(params object[] arguments)
+    {
+        var parameterTypes = arguments.Select(argument => argument.GetType()).ToArray();
+        var constructor = typeof(T).GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null, types: parameterTypes, modifiers: null)
+            ?? throw ApiMismatch(typeof(T), ".ctor",
+                $"expected a non-public instance constructor accepting ({string.Join(", ", parameterTypes.Select(type => type.FullName))})");
+        return (T)constructor.Invoke(arguments);
+    }
 
     private static Stat CreateStat(Node node) => new(0, 0, 0, 0, node.Version, node.ChildrenVersion, 0, 0, 0, 0, 0);
     private static string Parent(string path) => path.LastIndexOf('/') is var index && index > 0 ? path[..index] : "/";

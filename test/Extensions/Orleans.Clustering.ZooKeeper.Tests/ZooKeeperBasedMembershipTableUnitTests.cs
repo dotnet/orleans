@@ -1067,6 +1067,18 @@ namespace UnitTests.MembershipTests
             Assert.Contains(typeof(Op).Assembly.FullName!, failure.Message, StringComparison.Ordinal);
         }
 
+        [Fact]
+        public void NativeFake_IncompatibleSdkConstructor_ReportsActionableDiagnostic()
+        {
+            var failure = Assert.Throws<InvalidOperationException>(() =>
+                ZooKeeperNativeFake.CreateResult<DataResult>());
+
+            Assert.Contains($"{typeof(DataResult).FullName}..ctor", failure.Message, StringComparison.Ordinal);
+            Assert.Contains("expected a non-public instance constructor accepting ()", failure.Message, StringComparison.Ordinal);
+            Assert.Contains("Update the fake for the installed ZooKeeperNetEx API", failure.Message, StringComparison.Ordinal);
+            Assert.Contains(typeof(Op).Assembly.FullName!, failure.Message, StringComparison.Ordinal);
+        }
+
         private static Task InvokeNative(string operation, ZooKeeperNativeFake fake, MembershipEntry entry, CancellationToken cancellationToken) =>
             operation switch
             {
