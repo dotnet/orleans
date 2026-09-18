@@ -111,7 +111,7 @@ public sealed class AdoNetMembershipSqlTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void InsertMembership_ReservesVersionBeforeRowAndRollsBackConflicts(string engine)
+    public void InsertMembership_AtomicallyChecksVersionAndRollsBackConflicts(string engine)
     {
         var script = ReadScript(engine);
         var queries = Queries(script);
@@ -126,10 +126,19 @@ public sealed class AdoNetMembershipSqlTests
 
         var versionWrite = insert.IndexOf("UPDATE OrleansMembershipVersionTable", StringComparison.Ordinal);
         var rowWrite = insert.IndexOf("INSERT INTO OrleansMembershipTable", StringComparison.Ordinal);
-        Assert.True(versionWrite >= 0 && rowWrite > versionWrite, insert);
+        if (engine == "SQLServer")
+        {
+            Assert.True(rowWrite >= 0 && versionWrite > rowWrite, insert);
+            Assert.Contains("AND @@ROWCOUNT > 0;", insert[versionWrite..], StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.True(versionWrite >= 0 && rowWrite > versionWrite, insert);
+            Assert.Matches(@"WHERE (?:_ROWCOUNT|RowCountVar|rowcount) > 0", insert);
+        }
+
         Assert.Matches(@"Version = (?:@Version|_Version|VersionArg|PARAM_VERSION)", insert);
         Assert.Contains("Version < 2147483647", insert, StringComparison.Ordinal);
-        Assert.Matches(@"WHERE (?:@ROWCOUNT|_ROWCOUNT|RowCountVar|rowcount) > 0", insert);
         AssertRollback(engine, insert);
     }
 

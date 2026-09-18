@@ -139,7 +139,26 @@ public sealed class AdoNetMembershipUpgradeTests
             // Both native scripts are one transaction/batch, including PostgreSQL dollar-quoted functions.
             await storage.ExecuteAsync(migration, cancellationToken);
             AssertUnchanged(beforeUpgrade, await ReadSnapshotAsync(storage, cancellationToken));
-            Assert.True(await legacy.InsertAsync(duringUpgrade, "5"));
+            if (engine == "SQLServer")
+            {
+                var updatedQueries = await ReadQueriesAsync(storage, cancellationToken);
+                var updated = new CachedLegacyClient(storage, updatedQueries, cancellationToken);
+                var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var oldInsert = InsertAfterBarrierAsync(legacy);
+                var newInsert = InsertAfterBarrierAsync(updated);
+                start.SetResult();
+                Assert.Single(await Task.WhenAll(oldInsert, newInsert), inserted => inserted);
+
+                async Task<bool> InsertAfterBarrierAsync(CachedLegacyClient client)
+                {
+                    await start.Task.WaitAsync(cancellationToken);
+                    return await client.InsertAsync(duringUpgrade, "5");
+                }
+            }
+            else
+            {
+                Assert.True(await legacy.InsertAsync(duringUpgrade, "5"));
+            }
         }
 
         var upgraded = await ReadSnapshotAsync(storage, cancellationToken);
@@ -247,6 +266,27 @@ public sealed class AdoNetMembershipUpgradeTests
         AssertReadMatches(afterRestart, await reloadedLegacy.ReadAllAsync());
         AssertReadMatches(afterRestart, await legacy.ReadAllAsync());
         AssertReadMatches(afterRestart, await current.ReadAllAsync(cancellationToken));
+
+        if (engine is "SQLServer" or "MySQL")
+        {
+            // Frozen inline SQL keeps its original semantics until the caller reloads the catalog.
+            Assert.False(await legacy.UpdateAsync(absent, afterRestart.Etag));
+            var afterCachedFailure = await ReadSnapshotAsync(storage, cancellationToken);
+            Assert.Equal(afterRestart.Version + 1, afterCachedFailure.Version);
+            Assert.Equal(afterRestart.Members, afterCachedFailure.Members);
+            Assert.False(await reloadedLegacy.UpdateAsync(absent, afterCachedFailure.Etag));
+            AssertUnchanged(afterCachedFailure, await ReadSnapshotAsync(storage, cancellationToken));
+
+            await reloadedLegacy.CleanupAsync(cutoff);
+            AssertUnchanged(afterCachedFailure, await ReadSnapshotAsync(storage, cancellationToken));
+            await legacy.CleanupAsync(cutoff);
+            var afterCachedCleanup = await ReadSnapshotAsync(storage, cancellationToken);
+            Assert.Equal(afterCachedFailure.Version, afterCachedCleanup.Version);
+            Assert.Equal(afterCachedFailure.VersionTimestamp, afterCachedCleanup.VersionTimestamp);
+            Assert.Equal(
+                afterCachedFailure.Members.Where(member => member.Status == SiloStatus.Active || member.IAmAliveTime >= cutoff),
+                afterCachedCleanup.Members);
+        }
 
         async Task AssertRejectedAsync(Func<Task<bool>> write)
         {
@@ -391,6 +431,13 @@ public sealed class AdoNetMembershipUpgradeTests
                 DeploymentId = ClusterId,
                 SiloAddress = entry.SiloAddress,
                 IAmAliveTime = entry.IAmAliveTime
+            }, cancellationToken: cancellationToken);
+
+        public Task CleanupAsync(DateTime cutoff) =>
+            storage.ExecuteAsync(queries["CleanupDefunctSiloEntriesKey"], command => _ = new DbStoredQueries.Columns(command)
+            {
+                DeploymentId = ClusterId,
+                IAmAliveTime = cutoff
             }, cancellationToken: cancellationToken);
 
         public async Task<MembershipTableData> ReadAllAsync()

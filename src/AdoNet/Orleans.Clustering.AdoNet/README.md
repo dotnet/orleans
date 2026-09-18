@@ -138,6 +138,8 @@ The MySQL update has two phases, separated by `DELIMITER ;`:
 
 Providers load and cache queries during initialization. Roll silos and clients after the SQL update so they load the updated catalog; already-running instances continue using their cached queries until restarted. Existing query parameters and membership storage formats support this rolling upgrade. Retain the updated database objects when rolling binaries back: earlier providers can use the updated catalog, and updated providers still require the captured-row cleanup query.
 
+The corrected SQL Server/MySQL missing-row rollback and cached cleanup queries take effect for each process when it reloads the catalog. During rolling overlap, legacy cached inline updates retain their previous missing-row version-increment behavior, and legacy cleanup retains its broader status filter. Cluster-wide corrected-write guarantees apply once all membership writers use the updated queries. Complete the rolling process replacement to reach that boundary. SQL Server inserts preserve the legacy row-then-version lock order while committing or rolling back the row and version together.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

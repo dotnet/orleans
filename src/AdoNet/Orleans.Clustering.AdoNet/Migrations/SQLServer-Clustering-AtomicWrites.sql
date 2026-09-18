@@ -22,16 +22,7 @@ UPDATE OrleansQuery SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
 	DECLARE @ROWCOUNT AS INT;
 	BEGIN TRANSACTION;
 
-	UPDATE OrleansMembershipVersionTable
-	SET
-		Timestamp = GETUTCDATE(),
-		Version = Version + 1
-	WHERE
-		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
-		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647;
-
-	SET @ROWCOUNT = @@ROWCOUNT;
-
+	-- Preserve the row-then-version lock order used by cached legacy inserts.
 	INSERT INTO OrleansMembershipTable
 	(
 		DeploymentId,
@@ -56,7 +47,7 @@ UPDATE OrleansQuery SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
 		@ProxyPort,
 		@StartTime,
 		@IAmAliveTime
-	WHERE @ROWCOUNT > 0 AND NOT EXISTS
+	WHERE NOT EXISTS
 	(
 		SELECT 1
 		FROM
@@ -67,6 +58,15 @@ UPDATE OrleansQuery SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
 			AND Port = @Port AND @Port IS NOT NULL
 			AND Generation = @Generation AND @Generation IS NOT NULL
 	);
+
+	UPDATE OrleansMembershipVersionTable
+	SET
+		Timestamp = GETUTCDATE(),
+		Version = Version + 1
+	WHERE
+		DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL
+		AND Version = @Version AND @Version IS NOT NULL AND Version < 2147483647
+		AND @@ROWCOUNT > 0;
 
 	SET @ROWCOUNT = @@ROWCOUNT;
 
