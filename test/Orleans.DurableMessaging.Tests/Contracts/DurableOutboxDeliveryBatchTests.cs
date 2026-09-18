@@ -10,6 +10,7 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
+using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
@@ -1132,10 +1133,10 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public void ExplicitEndpointRegistration_RequiresObserverSupport()
+    public void StateRegistration_RequiresManagerCommandCodecs()
     {
-        var error = Assert.Throws<NotSupportedException>(() => new OutboxFixture(supportsObservers: false));
-        Assert.Contains("Observer support", error.Message, StringComparison.Ordinal);
+        var error = Assert.Throws<NotSupportedException>(() => new OutboxFixture(supportsStateCodecs: false));
+        Assert.Contains("command codec", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1259,7 +1260,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task LateIntentDuringPreparation_RemainsOutsideCapturedBatch()
+    public async Task LateIntentDuringPreparation_JoinsPreparedCaptureCohort()
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
@@ -1273,12 +1274,12 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Empty(fixture.Messages);
         jobs.Release();
         await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Single(fixture.Messages);
-        Assert.True(fixture.IsPending(late.MessageId));
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.False(fixture.IsPending(late.MessageId));
         Assert.False(fixture.IsPending(fixture.MessageId));
         using var captured = fixture.Recreate();
-        Assert.Equal(1, captured.Outbox.Count);
-        Assert.False(captured.Outbox.TryGetMessage(late.MessageId, out _));
+        Assert.Equal(2, captured.Outbox.Count);
+        Assert.True(captured.Outbox.TryGetMessage(late.MessageId, out _));
         await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
         Assert.Equal(0, fixture.PendingMessageCount);
@@ -1408,12 +1409,13 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public void EndpointUsesConcreteSynchronousFinalizer()
+    public void SevenRealStateFacets_ReplaceObserverEndpoint()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        Assert.Equal(typeof(void), fixture.Outbox.GetType().GetMethod("FinalizeWrite")!.ReturnType);
+        Assert.Equal(7, fixture.Manager.RegistrationCount);
         Assert.Null(fixture.Outbox.GetType().GetMethod("OnWriteFinalizingAsync"));
-        Assert.Equal(1, fixture.Manager.RegistrationCount);
+        Assert.Null(fixture.Outbox.GetType().GetMethod("OnWritePreparingAsync"));
+        Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(fixture.PrimaryState);
     }
 
     [Theory]
@@ -1457,7 +1459,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             Assert.Equal(2, fixture.Outbox.Messages.Count());
             Assert.Equal(2, fixture.GetOutboxDepth());
             Assert.Equal(2, fixture.PendingMessageCount);
-            Assert.Single(fixture.Messages);
+            Assert.Equal(2, fixture.Messages.Count);
             fixture.Send(fixture.CreateEquivalentEnvelope());
             Assert.Throws<InvalidOperationException>(() => fixture.Send(fixture.CreateConflictingEnvelope()));
             fixture.Send(afterCapture);
@@ -1478,10 +1480,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(3, fixture.Outbox.Messages.Count());
         Assert.Equal(3, fixture.GetOutboxDepth());
         Assert.False(fixture.IsPending(fixture.MessageId));
-        Assert.True(fixture.IsPending(duringPreparation.MessageId));
+        Assert.False(fixture.IsPending(duringPreparation.MessageId));
         Assert.True(fixture.IsPending(afterCapture.MessageId));
         using var captured = fixture.Recreate();
-        Assert.Equal(1, captured.Outbox.Count);
+        Assert.Equal(2, captured.Outbox.Count);
         fixture.Manager.AfterCapture = null;
         await fixture.CommitAsync();
         Assert.Equal(3, fixture.Outbox.Count);
@@ -1645,6 +1647,25 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(0, recovered.GetOutboxDepth());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StateWriteAdmission_SeesStagedOutboxCommands(bool eagerCapture)
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false, eagerCapture: eagerCapture);
+        fixture.Send(fixture.Envelope);
+        await fixture.CommitAsync();
+        Assert.Single(fixture.Messages);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Equal(1, fixture.Outbox.Count);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Equal(2, fixture.Manager.CaptureCount);
+        Assert.Equal(2, fixture.Manager.WriteCompletedCount);
+        Assert.Null(fixture.Manager.Failure);
+    }
+
     private sealed class OutboxFixture : IDisposable
     {
         private static readonly Assembly DurableMessagingAssembly = typeof(IDurableOutbox).Assembly;
@@ -1652,14 +1673,14 @@ public sealed class DurableOutboxDeliveryBatchTests
         private readonly MethodInfo _deliverMethod;
         private readonly Instrument _outboxDepthInstrument;
         private readonly FieldInfo _pendingMessageIdsField;
-        private readonly ServiceProvider _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        private readonly ServiceProvider _services = CreateServices();
 
         public OutboxFixture(
             Func<CancellationToken, ValueTask<DeliveryResult>>? deliver = null,
             int maxDeliveryAttempts = 3,
             Exception? writeException = null,
             bool hasDurableMessage = true,
-            bool supportsObservers = true,
+            bool supportsStateCodecs = true,
             ILocalDurableJobManager? jobManager = null,
             ITimerRegistry? timerRegistry = null,
             TimeProvider? jobTimeProvider = null,
@@ -1668,37 +1689,15 @@ public sealed class DurableOutboxDeliveryBatchTests
             bool hasDurableJobHandle = true,
             bool loopback = false,
             TestStorage? storage = null,
-            DurableEnvelope? envelope = null)
+            DurableEnvelope? envelope = null,
+            bool eagerCapture = false)
         {
             MessageId = envelope?.MessageId ?? Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
             ReceiverId = loopback ? SenderId : GrainId.Create("receiver", "1");
             Envelope = envelope ?? CreateEnvelope(MessageId);
 
-            MessageStates = CreateInternalDictionary("Orleans.DurableMessaging.OutboxMessageState");
-            DeadLetters = CreateInternalDictionary("Orleans.DurableMessaging.OutboxDeadLetter");
-            JobId = new TestDurableValue<string> { Value = durableJobId };
-            Job = new TestDurableValue<DurableJob>();
-            if (durableJobId is not null && hasDurableJobHandle)
-            {
-                Job.Value = CreateJob($"job-{durableJobId}", durableJobId);
-            }
-
-            CompletedJobId = new TestDurableValue<string>();
-            JobSequence = new TestDurableValue<long>();
-            if (hasDurableMessage)
-            {
-                Messages.Add(MessageId, Envelope);
-                var messageState = CreateInternal("Orleans.DurableMessaging.OutboxMessageState");
-                messageState.GetType().GetProperty("EnqueuedAt")!.SetValue(messageState, TimeProvider.System.GetUtcNow());
-                MessageStates.Add(MessageId, messageState);
-            }
-
-            Manager = new TestStateManager(
-                [Messages, MessageStates, DeadLetters, JobId, Job, CompletedJobId, JobSequence],
-                writeException,
-                supportsObservers,
-                storage);
+            Manager = new TestStateManager(_services, writeException, supportsStateCodecs, eagerCapture);
 
             var delivery = deliver ?? (_ => ValueTask.FromResult(DeliveryResult.Accepted()));
             var inbox = Substitute.For<IDurableInboxExtension>();
@@ -1736,51 +1735,100 @@ public sealed class DurableOutboxDeliveryBatchTests
                 nonPublic: true)!;
             var logger = Activator.CreateInstance(typeof(NullLogger<>).MakeGenericType(outboxType))!;
 
-            _outbox = (IDurableOutbox)Activator.CreateInstance(
-                outboxType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                [
-                    Manager,
-                    Messages,
-                    grainFactory,
-                    grainContext,
-                    TimerRegistry,
-                    logger,
-                    instruments,
-                    MessageStates.Instance,
-                    DeadLetters.Instance,
-                    JobId,
-                    Job,
-                    CompletedJobId,
-                    JobSequence,
-                    JobManager,
-                    Substitute.For<IDurableJobHandlerRegistry>(),
-                    pumpResults,
-                    jobTimeProvider ?? TimeProvider.System,
-                    Options.Create(
-                        new DurableInboxOptions
-                        {
-                            BackpressureRetryDelay = backpressureRetryDelay ?? TimeSpan.FromMilliseconds(1),
-                            MaxOutboxRetryAge = TimeSpan.FromMinutes(5),
-                            MaxDeliveryAttempts = maxDeliveryAttempts,
-                            OutboxBatchSize = 8
-                        })
-                ],
-                culture: null)!;
-            var finalize = outboxType.GetMethod("FinalizeWrite")!.CreateDelegate<Action<CancellationToken>>(_outbox);
-            var endpoint = Activator.CreateInstance(GetInternalType("Orleans.DurableMessaging.DurableMessagingJournalEndpoint"),
-                (IJournaledStateObserver)_outbox, finalize)!;
-            Manager.RegisterEndpoint(endpoint);
+            try
+            {
+                _outbox = (IDurableOutbox)Activator.CreateInstance(
+                    outboxType,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    binder: null,
+                    [
+                        Manager,
+                        grainFactory,
+                        grainContext,
+                        TimerRegistry,
+                        logger,
+                        instruments,
+                        JobManager,
+                        Substitute.For<IDurableJobHandlerRegistry>(),
+                        pumpResults,
+                        jobTimeProvider ?? TimeProvider.System,
+                        Options.Create(
+                            new DurableInboxOptions
+                            {
+                                BackpressureRetryDelay = backpressureRetryDelay ?? TimeSpan.FromMilliseconds(1),
+                                MaxOutboxRetryAge = TimeSpan.FromMinutes(5),
+                                MaxDeliveryAttempts = maxDeliveryAttempts,
+                                OutboxBatchSize = 8
+                            })
+                    ],
+                    culture: null)!;
+            }
+            catch (TargetInvocationException exception) when (exception.InnerException is not null)
+            {
+                ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+                throw;
+            }
+            Messages = new TestDurableDictionary<Guid, DurableEnvelope>(Manager.GetState<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox"));
+            MessageStates = WrapInternalDictionary("__orleans.durable-messaging.outbox-message-state", "Orleans.DurableMessaging.OutboxMessageState");
+            DeadLetters = WrapInternalDictionary("__orleans.durable-messaging.outbox-dead-letters", "Orleans.DurableMessaging.OutboxDeadLetter");
+            JobId = new(Manager.GetState<IDurableValue<string>>("__orleans.durable-messaging.outbox-job-id"));
+            Job = new(Manager.GetState<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle"));
+            CompletedJobId = new(Manager.GetState<IDurableValue<string>>("__orleans.durable-messaging.outbox-completed-job-id"));
+            JobSequence = new(Manager.GetState<IDurableValue<long>>("__orleans.durable-messaging.outbox-job-sequence"));
+            outboxType.GetField("_messages", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(_outbox, Messages);
+            outboxType.GetField("_messageStates", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(_outbox, MessageStates.Instance);
+            if (durableJobId is not null)
+            {
+                JobId.Value = durableJobId;
+                if (hasDurableJobHandle) Job.Value = CreateJob($"job-{durableJobId}", durableJobId);
+            }
+            if (hasDurableMessage)
+            {
+                Messages.Add(MessageId, Envelope);
+                var messageState = CreateInternal("Orleans.DurableMessaging.OutboxMessageState");
+                messageState.GetType().GetProperty("EnqueuedAt")!.SetValue(messageState, TimeProvider.System.GetUtcNow());
+                MessageStates.Add(MessageId, messageState);
+            }
+            Manager.BindAdapters([Messages, MessageStates, DeadLetters, JobId, Job, CompletedJobId, JobSequence], storage);
+            Manager.ExternalOwnerCommitted = () =>
+            {
+                outboxType.GetField("_durableOwnershipId", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(_outbox, JobId.Value);
+                outboxType.GetField("_durableJob", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(_outbox, Job.Value);
+                outboxType.GetField("_durableCompletedJobId", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(_outbox, CompletedJobId.Value);
+            };
             Manager.InitializeAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
 
             _deliverMethod = outboxType.GetMethod("DeliverPendingMessagesAsync")!;
             _pendingMessageIdsField = outboxType.GetField("_pendingMessages", BindingFlags.Instance | BindingFlags.NonPublic)!;
         }
 
-        public void Dispose() => _services.Dispose();
+        public void Dispose()
+        {
+            Manager.Dispose();
+            _services.Dispose();
+        }
+
+        private static ServiceProvider CreateServices()
+        {
+            var services = new ServiceCollection().AddSerializer().AddLogging();
+            services.AddKeyedSingleton(JournalingTimeProviderNames.Journaling, TimeProvider.System);
+            services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
+            var silo = Substitute.For<ISiloBuilder>();
+            silo.Services.Returns(services);
+            silo.AddJournalStorage();
+            var storage = new ControlledJournalStorageProvider();
+            storage.Configure(Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
+            services.AddSingleton<IJournalStorageProvider>(storage);
+            return services.BuildServiceProvider();
+        }
+
+        private UntypedDurableDictionary WrapInternalDictionary(string name, string valueType)
+        {
+            var type = typeof(TestDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType(valueType));
+            return new(Activator.CreateInstance(type, Manager.GetState<IJournaledState>(name))!);
+        }
         public IDurableOutbox Outbox => _outbox;
-        public IJournaledStateObserver Observer => (IJournaledStateObserver)_outbox;
+        public IJournaledState PrimaryState => Manager.GetState<IJournaledState>("__orleans.durable-messaging.outbox");
         private object PumpResults => _outbox.GetType().GetField("_pumpResults", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_outbox)!;
         public IDictionary PumpEntries => (IDictionary)PumpResults.GetType().GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(PumpResults)!;
 
@@ -1809,7 +1857,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public GrainId ReceiverId { get; }
         public DurableEnvelope Envelope { get; }
         public int DeliveryCount { get; private set; }
-        public TestDurableDictionary<Guid, DurableEnvelope> Messages { get; } = new();
+        public TestDurableDictionary<Guid, DurableEnvelope> Messages { get; }
         public UntypedDurableDictionary MessageStates { get; }
         public UntypedDurableDictionary DeadLetters { get; }
         public TestStateManager Manager { get; }
@@ -2013,13 +2061,6 @@ public sealed class DurableOutboxDeliveryBatchTests
             .WithContextValue("trace", 2)
             .Build().Data;
 
-        private static UntypedDurableDictionary CreateInternalDictionary(string valueTypeName)
-        {
-            var dictionary = Activator.CreateInstance(
-                typeof(TestDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType(valueTypeName)))!;
-            return new UntypedDurableDictionary(dictionary);
-        }
-
         private static Type GetInternalType(string typeName) =>
             DurableMessagingAssembly.GetType(typeName, throwOnError: true)!;
 
@@ -2071,35 +2112,32 @@ public sealed class DurableOutboxDeliveryBatchTests
         public object[] Snapshots { get; set; } = snapshots;
     }
 
-    private sealed class TestStateManager : IJournaledStateManager
+    private sealed class TestStateManager : IJournaledStateManager, IDisposable
     {
-        private readonly ITestDurableState[] _states;
-        private IJournaledStateObserver _observer = null!;
-        private Action<CancellationToken> _finalize = null!;
+        private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
+        private readonly IJournaledStateManager _codecManager;
+        private readonly IJournalFormat _format;
+        private readonly bool _supportsStateCodecs;
+        private readonly bool _eagerCapture;
+        private ITestDurableState[] _adapters = [];
         private Task _tail = Task.CompletedTask;
-        private readonly object _queueLock = new();
         private ExceptionDispatchInfo? _failure;
         private Exception? _nextWriteException;
         private Exception? _nextPostWriteException;
         private Action? _afterNextWrite;
-        private readonly bool _supportsObservers;
         private bool _initialized;
-        public TestStateManager(IEnumerable<ITestDurableState> states, Exception? writeException, bool supportsObservers, TestStorage? storage)
+
+        public TestStateManager(IServiceProvider services, Exception? writeException, bool supportsStateCodecs, bool eagerCapture)
         {
-            _states = states.ToArray();
+            _codecManager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(new JournalId($"outbox-components/{Guid.NewGuid():N}"));
+            _format = services.GetRequiredKeyedService<IJournalFormat>("orleans-binary");
             _nextWriteException = writeException;
-            _supportsObservers = supportsObservers;
-            Storage = storage ?? new TestStorage(_states.Select(static state => state.Capture()).ToArray());
-            if (storage is not null)
-            {
-                for (var i = 0; i < _states.Length; i++)
-                {
-                    _states[i].Restore(storage.Snapshots[i]);
-                }
-            }
+            _supportsStateCodecs = supportsStateCodecs;
+            _eagerCapture = eagerCapture;
         }
-        public TestStorage Storage { get; }
-        public int RegistrationCount { get; private set; }
+
+        public TestStorage Storage { get; private set; } = null!;
+        public int RegistrationCount => _states.Count;
         public int WriteCount { get; private set; }
         public int CaptureCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
@@ -2109,75 +2147,77 @@ public sealed class DurableOutboxDeliveryBatchTests
         public Action? BeforeFinalization { get; set; }
         public Func<Task>? AfterCapture { get; set; }
         public Exception? RejectNextRequest { get; set; }
+        public Action? ExternalOwnerCommitted { get; set; }
 
-        public void RegisterEndpoint(object endpoint)
+        public void BindAdapters(ITestDurableState[] adapters, TestStorage? storage)
         {
-            RegisterObserver((IJournaledStateObserver)endpoint.GetType().GetProperty("Observer")!.GetValue(endpoint)!);
-            _finalize = endpoint.GetType().GetMethod("FinalizeWrite")!.CreateDelegate<Action<CancellationToken>>(endpoint);
+            _adapters = adapters;
+            Storage = storage ?? new TestStorage(adapters.Select(static state => state.Capture()).ToArray());
         }
-        public void RegisterObserver(IJournaledStateObserver observer)
-        {
-            if (!_supportsObservers)
-            {
-                throw new NotSupportedException("Observer support is required.");
-            }
-            RegistrationCount++;
-            _observer = observer;
-        }
+
+        public T GetState<T>(string name) => (T)_states[name];
+        public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull => _supportsStateCodecs
+            ? _codecManager.GetRequiredCommandCodec<TCodec>()
+            : throw new NotSupportedException("Journal command codec support is required.");
+        public void RegisterState(string name, IJournaledState state) => _states.Add(name, state);
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _failure?.Throw();
             if (!_initialized)
             {
                 _initialized = true;
-                _observer.OnRecoveryStarted();
-                _observer.OnRecoveryCompleted();
+                ResetStates();
+                for (var i = 0; i < _adapters.Length; i++) _adapters[i].Restore(Storage.Snapshots[i]);
+                foreach (var state in _states.Values) state.OnRecoveryCompleted();
             }
             return default;
         }
-        public void RegisterState(string name, IJournaledState state) { }
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
-        {
-            state = null;
-            return false;
-        }
+
         public ValueTask WriteStateAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _failure?.Throw();
-            _observer.OnWriteRequested();
+            foreach (var state in _states.Values) state.ValidateWrite();
             if (RejectNextRequest is { } rejected)
             {
                 RejectNextRequest = null;
                 return ValueTask.FromException(rejected);
             }
-            Task work;
-            lock (_queueLock)
-            {
-                work = RunWriteAsync(_tail);
-                _tail = work;
-            }
+            var work = RunWriteAsync(_tail);
+            _tail = work;
             return new(work.WaitAsync(cancellationToken));
         }
+
         private async Task RunWriteAsync(Task previous)
         {
-            await Task.Yield();
+            if (!_eagerCapture) await Task.Yield();
             await previous.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             _failure?.Throw();
             try
             {
                 WriteCount++;
                 BeforePreparation?.Invoke();
-                await _observer.OnWritePreparingAsync(CancellationToken.None);
-                BeforeFinalization?.Invoke();
-                _finalize(CancellationToken.None);
-                _observer.OnWriteStarted();
-                var snapshot = _states.Select(static state => state.Capture()).ToArray();
-                CaptureCount++;
-                if (AfterCapture is { } afterCapture)
+                while (_states.Values.FirstOrDefault(static state => !state.IsWritePrepared) is { } unprepared)
                 {
-                    await afterCapture();
+                    var preparation = unprepared.PrepareWriteAsync(CancellationToken.None);
+                    var synchronous = preparation.IsCompleted;
+                    await preparation;
+                    if (synchronous && !unprepared.IsWritePrepared)
+                    {
+                        throw new InvalidOperationException("Synchronous state preparation did not establish readiness.");
+                    }
                 }
+                BeforeFinalization?.Invoke();
+                using var writer = _format.CreateWriter();
+                uint id = 1;
+                foreach (var state in _states.Values) state.AppendEntries(writer.CreateJournalStreamWriter(new(id++)));
+                using var buffer = writer.GetBuffer();
+                var snapshot = _adapters.Select(static state => state.Capture()).ToArray();
+                CaptureCount++;
+                if (AfterCapture is { } afterCapture) await afterCapture();
                 if (_nextWriteException is { } exception)
                 {
                     _nextWriteException = null;
@@ -2189,7 +2229,10 @@ public sealed class DurableOutboxDeliveryBatchTests
                     _nextPostWriteException = null;
                     throw postException;
                 }
-                _observer.OnWriteCompleted();
+                if (buffer.Length > 0)
+                {
+                    foreach (var state in _states.Values) state.OnWriteCompleted();
+                }
                 WriteCompletedCount++;
                 var afterWrite = _afterNextWrite;
                 _afterNextWrite = null;
@@ -2201,13 +2244,14 @@ public sealed class DurableOutboxDeliveryBatchTests
                 throw;
             }
         }
+
         public void Fail(Exception exception)
         {
             if (_failure is null)
             {
                 _failure = ExceptionDispatchInfo.Capture(exception);
                 FaultCount++;
-                _observer.OnFaulted(exception);
+                foreach (var state in _states.Values) state.OnFaulted(exception);
             }
         }
         public Task WaitForIdleAsync() => _tail.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -2217,16 +2261,26 @@ public sealed class DurableOutboxDeliveryBatchTests
         public void CommitExternalOwner()
         {
             WriteCount++;
-            _observer.OnWriteStarted();
-            Storage.Snapshots = _states.Select(static state => state.Capture()).ToArray();
-            _observer.OnWriteCompleted();
+            Storage.Snapshots = _adapters.Select(static state => state.Capture()).ToArray();
+            ExternalOwnerCommitted!();
         }
-        public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken)
         {
-            _observer.OnDeleteRequested();
-            await _observer.OnDeletePreparingAsync(cancellationToken);
-            _observer.OnDeleteCompleted();
+            cancellationToken.ThrowIfCancellationRequested();
+            _failure?.Throw();
+            foreach (var state in _states.Values) state.ValidateDelete();
+            foreach (var state in _states.Values) state.OnDeleteStarted();
+            ResetStates();
+            Storage.Snapshots = _adapters.Select(static state => state.Capture()).ToArray();
+            return default;
         }
+        private void ResetStates()
+        {
+            using var writer = _format.CreateWriter();
+            uint id = 1;
+            foreach (var state in _states.Values) state.Reset(writer.CreateJournalStreamWriter(new(id++)));
+        }
+        public void Dispose() => _codecManager.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     private sealed class RecordingJobManager(bool alwaysFail = false) : ILocalDurableJobManager
@@ -2304,27 +2358,26 @@ public sealed class DurableOutboxDeliveryBatchTests
         public void Release() => _release.TrySetResult();
     }
 
-    private sealed class TestDurableValue<T> : IDurableValue<T>, ITestDurableState
+    private sealed class TestDurableValue<T>(IDurableValue<T> inner) : IDurableValue<T>, ITestDurableState
     {
-        private T? _value;
 
         public T? Value
         {
-            get => _value;
+            get => inner.Value;
             set
             {
-                _value = value;
+                inner.Value = value;
                 Version++;
             }
         }
 
         public long Version { get; private set; }
 
-        public object Capture() => new Snapshot(_value);
+        public object Capture() => new Snapshot(inner.Value);
 
         public void Restore(object snapshot)
         {
-            _value = ((Snapshot)snapshot).Value;
+            ((IDurableValueCommandHandler<T>)inner).ApplySet(((Snapshot)snapshot).Value!);
             Version++;
         }
 
@@ -2335,8 +2388,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         : IDurableDictionary<TKey, TValue>, ITestDurableState
         where TKey : notnull
     {
-        private readonly Dictionary<TKey, TValue> _items = [];
+        private readonly IDurableDictionary<TKey, TValue> _items;
         private long _version;
+
+        public TestDurableDictionary(IDurableDictionary<TKey, TValue> inner) => _items = inner;
 
         public TValue this[TKey key]
         {
@@ -2422,10 +2477,12 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         void ITestDurableState.Restore(object snapshot)
         {
-            _items.Clear();
-            foreach (var (key, value) in (Dictionary<TKey, TValue>)snapshot)
+            var handler = (IDurableDictionaryCommandHandler<TKey, TValue>)_items;
+            var values = (Dictionary<TKey, TValue>)snapshot;
+            handler.Reset(values.Count);
+            foreach (var (key, value) in values)
             {
-                _items.Add(key, CloneValue(value));
+                handler.ApplySet(key, CloneValue(value));
             }
 
             _version++;
