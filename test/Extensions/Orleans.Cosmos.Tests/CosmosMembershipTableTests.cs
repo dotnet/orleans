@@ -28,8 +28,11 @@ namespace Tester.Cosmos.Clustering;
 [TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
-    public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
+    private readonly ITestOutputHelper _output;
+
+    public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters())
     {
+        _output = output;
     }
 
     private static LoggerFilterOptions CreateFilters()
@@ -71,8 +74,16 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
-    public void MembershipTable_Cosmos_Init()
+    public async Task MembershipTable_Cosmos_Init()
     {
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        using var client = await options.CreateClient(Services);
+        var account = await client.ReadAccountAsync();
+
+        Assert.Null(client.ClientOptions.ConsistencyLevel);
+        _output.WriteLine("Account default consistency: {0}; client consistency override: inherited; connection mode: {1}",
+            account.Consistency.DefaultConsistencyLevel, client.ClientOptions.ConnectionMode);
     }
 
     [Fact, TestCategory("Functional")]
