@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 09/17/2026
+ms.date: 09/18/2026
 ms.topic: conceptual
 ---
 
@@ -31,20 +31,21 @@ Durable Messaging has the following boundaries:
 
 - Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> creates a local pending
   intent. Outbox inspection includes local intents and journaled messages once per ID.
-  An admitted write prepares the required durable wake-up before applying the envelope,
-  ownership generation, and exact returned job handle synchronously. Journal capture
-  includes those changes with the grain's safe staged effects. Completion releases
-  exactly the captured messages for dispatch; later intents await another write.
+  An ordinary journal write prepares the required durable wake-up before capturing the
+  envelope, ownership generation, and exact returned job handle with the grain's staged
+  effects. State readiness is checked again after asynchronous preparation, so newly
+  staged intents have a viable wake-up before capture. Completion releases exactly the
+  captured messages for dispatch; intents staged during storage I/O await another write.
 - Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
   whether the original is provisional or durable. Reusing that ID with different routing,
   correlation, body, or request-context content throws without changing the outbox.
-- Handlers complete fallible work using local values before staging shared journaled
-  effects. Expected preparation failures produce retry or dead-letter accounting.
-  Each application mutation is safe for a queued journal write to commit.
-- The admitted journal operation prepares its inbox handlers, then the outgoing
-  messages and scheduling prerequisites. Synchronous finalization applies the validated
-  inbox completion, deduplication and outbox ownership. Their capture includes the
-  handler's safe effects. Other queued writes wait for this operation to finish.
+- Handlers prepare local values asynchronously and return a synchronous action.
+  Expected preparation failures produce retry or dead-letter accounting. Messaging
+  invokes the action once for that prepared attempt and stages outgoing intents, inbox
+  completion and deduplication in the same uninterrupted activation turn.
+- Journal capture observes the combined staged effects. The manager serializes
+  prerequisite preparation, capture and storage; each state acknowledges its captured
+  changes after storage succeeds.
 - Deletion requires quiescent messaging operations. Successful deletion clears durable
   messaging state and pending intents before subsequent writes begin.
 - A receiver allocates an ownership token and places it in a scheduled inbox job
@@ -91,17 +92,27 @@ Exact registration preserves handler identity; generic predicates run in registr
 order. Selection keeps shared application state unchanged. Its context exposes envelope
 metadata and grain identity, and validates access to outgoing-message operations.
 
-<xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> prepares fallible computation,
-I/O and envelope serialization using local values before applying shared effects. The
-framework's single messaging observer prepares handlers before outbox prerequisites,
-then validates the admitted ownership and applies both endpoints synchronously in the
-grain turn. The captured set is fixed for that operation. Unexpected owner, generation
-or message invalidation after handler invocation faults the whole admitted operation.
+<xref:Orleans.DurableMessaging.IInboxHandler.PrepareAsync*> performs fallible computation,
+I/O and envelope serialization using operation-local values, then returns a non-null
+synchronous action. The action applies the prepared business mutations and stages
+prepared outgoing envelopes. Messaging validates the current message and ownership
+before invoking it, then stages inbox completion and deduplication before the activation
+turn yields. Earlier journal writes can complete while preparation awaits because the
+prepared attempt's effects are still local.
 
-An admitted preparation, finalization, capture or storage failure permanently fences
-the journal manager, signals both messaging endpoints, faults pending operations and
-requests grain deactivation. A fresh activation creates new state objects and replays
-the actual durable outcome. A failed append response can follow a successful storage
+The registered inbox and outbox states own their capture, acknowledgement, replay and
+reset bookkeeping. The outbox prepares durable wake-up ownership inside the serialized
+journal operation. After every preparation await, the manager checks all states'
+readiness again. A successful readiness pass and capture execute synchronously, so a
+newly staged message is included with a prepared owner. Mutations made during the
+storage await remain pending for the next capture.
+
+A terminal preparation, capture or storage failure fences the journal manager. State
+fault notifications stop messaging work before failed write waiters resume. Unexpected
+application or staging failures also latch the original error in the inbox state and
+drive a journal operation into this terminal path before a queued capture can persist
+partial new effects. A fresh activation creates new state objects and replays the
+actual durable outcome. A failed append response can follow a successful storage
 commit: replay restores that committed envelope and exact ownership handle. A failed
 ownership-clear write follows the same boundary; fresh replay determines whether the
 previous owner remains responsible or cleanup was committed.
@@ -109,7 +120,7 @@ previous owner remains responsible or cleanup was committed.
 Cancellation of a caller's wait for
 <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
 queued write running through capture and acknowledgement. Feature completion tracks
-both the triggering write and its admitted descriptor acknowledgement. A delivery
+both the triggering write and its captured state acknowledgement. A delivery
 caller can also cancel its wait while the owned delivery operation retains admission
 through completion. Activation shutdown drains that operation; late failures are
 observed and logged even after the caller has left. The owner keeps delivery operations,
@@ -131,7 +142,7 @@ After an operator or application has handled a record, remove it with
 <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveInboxDeadLetter*>
 or <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveOutboxDeadLetter*>
 so dead-letter storage remains bounded by the application's retention policy.
-Removal is staged in the grain transaction and becomes durable with the grain's next
+Removal is staged in the grain's journaled state and becomes durable with its next
 journal write.
 
 Malformed typed bodies follow the same retry and dead-letter path during handler
@@ -171,7 +182,7 @@ validated notification count for the inbox's completion write:
 
 Orleans caches messaging selection with each concrete grain type. After construction
 and grain-instance assignment, shared activation setup validates the execution model,
-resolves the activation's scoped endpoints, and registers one composite journal observer.
+resolves the activation's scoped endpoints and their registered journaled states.
 Journal recovery then restores application and messaging state before activation completes.
 With <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*>, the standard manager
 enrolls in the grain lifecycle during grain-bound construction, before resolution returns.
@@ -185,11 +196,11 @@ journal format so opaque envelope bodies and request-context slices recover exac
 Durable Messaging grains use non-reentrant execution. Activation validates the grain's
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,
 or `StatelessWorker` declarations. A single non-interleaving activation owns each grain
-journal and pump, keeping infrastructure writes within their owning transaction.
-The Journaling implementation admits serialized writes with preparation and synchronous
-finalization, and accepts <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*>
-so Durable Messaging receives commit, initial recovery and terminal-fault notifications. Activation reports a
-durable-messaging-specific diagnostic when observer registration is unsupported. Use
+journal and pump. The Journaling implementation prepares registered
+<xref:Orleans.Journaling.IJournaledState> instances before capture, acknowledges their
+persisted changes, and notifies them of terminal failure. State-level deletion checks
+enforce quiescence and successful reset restores local messaging bookkeeping.
+Command codecs are resolved from the owning manager's configured write format. Use
 shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
 journal storage support development and tests.
 
