@@ -718,9 +718,9 @@ public partial class JournaledJobShardManagerTests
     {
         public List<TrackingJournaledStateManager> Managers { get; } = [];
 
-        public IJournaledStateManager Create(JournalId journalId)
+        public IJournaledStateManager CreateStandalone(JournalId journalId)
         {
-            var manager = new TrackingJournaledStateManager(inner.Create(journalId));
+            var manager = new TrackingJournaledStateManager(inner.CreateStandalone(journalId));
             Managers.Add(manager);
             return manager;
         }

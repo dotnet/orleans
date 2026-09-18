@@ -519,7 +519,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
-        var manager = descriptor.Provider.Factory.Create(descriptor.StorageId);
+        var manager = descriptor.Provider.Factory.CreateStandalone(descriptor.StorageId);
         try
         {
             manager.RegisterStateMachine(JournaledJobShardState.StateName, state);

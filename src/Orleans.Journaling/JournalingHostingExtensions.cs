@@ -39,7 +39,6 @@ public static class JournalingHostingExtensions
                 services.GetRequiredService<IJournalStorageProvider>(),
                 services.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IDurableStateManager>(static services => services.GetRequiredService<IJournaledStateManager>());
-        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureGrainTypeComponents, JournalingGrainLifecycle>());
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
                 ?? ActivatorUtilities.CreateInstance<JournaledStateManagerFactory>(services));
@@ -63,51 +62,6 @@ public static class JournalingHostingExtensions
     /// </summary>
     /// <typeparam name="TState">The application state contract.</typeparam>
     /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
-    /// <param name="builder">The silo builder.</param>
-    /// <returns>The silo builder.</returns>
-    /// <remarks>
-    /// Constructor dependencies are resolved from the owning manager's service scope.
-    /// Use the factory overload when construction needs the state name.
-    /// The manager registers the instance; its constructor need not register itself.
-    /// </remarks>
-    public static ISiloBuilder AddDurableState<TState, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
-        this ISiloBuilder builder)
-        where TState : class
-        where TImplementation : class, TState, IStateMachine
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        builder.AddJournaling();
-        builder.Services.AddDurableState<TState, TImplementation>();
-        return builder;
-    }
-
-    /// <summary>
-    /// Registers a factory for a custom durable state contract.
-    /// </summary>
-    /// <typeparam name="TState">The application state contract.</typeparam>
-    /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
-    /// <param name="builder">The silo builder.</param>
-    /// <param name="factory">Creates a state using its owning service scope and stable state name.</param>
-    /// <returns>The silo builder.</returns>
-    /// <remarks>The manager registers each created state and owns its scoped lifetime.</remarks>
-    public static ISiloBuilder AddDurableState<TState, TImplementation>(
-        this ISiloBuilder builder,
-        Func<IServiceProvider, string, TImplementation> factory)
-        where TState : class
-        where TImplementation : class, TState, IStateMachine
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(factory);
-        builder.AddJournaling();
-        builder.Services.AddDurableState<TState, TImplementation>(factory);
-        return builder;
-    }
-
-    /// <summary>
-    /// Registers a custom durable state contract and its state machine implementation.
-    /// </summary>
-    /// <typeparam name="TState">The application state contract.</typeparam>
-    /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection.</returns>
     /// <remarks>
@@ -116,14 +70,14 @@ public static class JournalingHostingExtensions
     /// Use the factory overload when construction needs the state name.
     /// The manager registers the instance; its constructor need not register itself.
     /// </remarks>
-    public static IServiceCollection AddDurableState<TState, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+    public static IServiceCollection AddStateMachine<TState, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
         this IServiceCollection services)
         where TState : class
         where TImplementation : class, TState, IStateMachine
     {
         ArgumentNullException.ThrowIfNull(services);
         var factory = ActivatorUtilities.CreateFactory<TImplementation>([]);
-        return services.AddDurableState<TState, TImplementation>((serviceProvider, _) => factory(serviceProvider, null));
+        return services.AddStateMachine<TState, TImplementation>((serviceProvider, _) => factory(serviceProvider, null));
     }
 
     /// <summary>
@@ -139,7 +93,7 @@ public static class JournalingHostingExtensions
     /// Keyed injection and the manager return the same named instance. The manager registers the state,
     /// and the service scope disposes it. The factory is not invoked for an existing compatible state.
     /// </remarks>
-    public static IServiceCollection AddDurableState<TState, TImplementation>(
+    public static IServiceCollection AddStateMachine<TState, TImplementation>(
         this IServiceCollection services,
         Func<IServiceProvider, string, TImplementation> factory)
         where TState : class

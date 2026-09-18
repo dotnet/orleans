@@ -674,7 +674,7 @@ public class StateManagerTests : JournalingTestBase
             ServiceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(ManagerOptions), TimeProvider.System, ServiceProvider);
         var factory = new JournaledStateManagerFactory(shared, storageProvider);
-        var manager = factory.Create(journalId);
+        var manager = factory.CreateStandalone(journalId);
         var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         value.Value = 1;
@@ -696,7 +696,7 @@ public class StateManagerTests : JournalingTestBase
         Assert.Equal(2, value.Value);
         await manager.DisposeAsync();
 
-        await using var recovered = factory.Create(journalId);
+        await using var recovered = factory.CreateStandalone(journalId);
         var recoveredValue = new DurableValue<int>("value", recovered, CreateValueCodec<int>());
         await recovered.InitializeAsync(TestContext.Current.CancellationToken);
         Assert.Equal(committed ? 2 : 1, recoveredValue.Value);

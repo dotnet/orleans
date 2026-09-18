@@ -30,12 +30,10 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         builder.AddJournaling();
         builder.AddJournaling();
         builder.AddJournaling();
-        builder.Services.AddDurableState<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
+        builder.Services.AddStateMachine<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
 
-        var registration = Assert.Single(builder.Services, descriptor =>
-            descriptor.ServiceType == typeof(IConfigureGrainTypeComponents)
-            && descriptor.ImplementationType == typeof(JournalingGrainLifecycle));
-        Assert.Equal(ServiceLifetime.Singleton, registration.Lifetime);
+        Assert.DoesNotContain(builder.Services, descriptor =>
+            descriptor.ServiceType == typeof(IConfigureGrainTypeComponents));
 
         // Keep the real empty-journal read protocol, while counting reads independently
         // of recovery completion so an extra read cannot hide behind an idempotent observer.
@@ -50,7 +48,7 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
 
         await using var services = builder.Services.BuildServiceProvider();
         var journalId = new JournalId($"lifecycle/{Guid.NewGuid():N}");
-        await using var manager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
+        await using var manager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
         var probe = manager.GetOrAddState<DurableManagerRecoveryProbe>("recovery");
         var lifecycle = Substitute.For<IGrainLifecycle>();
         var subscriptions = new List<(int Stage, ILifecycleObserver Observer)>();
@@ -149,24 +147,6 @@ public sealed class DurableStateManagerGrainTests(DurableStateManagerIntegration
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Lifecycle_LateFirstResolution_RejectsWithoutCreatingManager(bool keyedState)
-    {
-        var grain = fixture.Client.GetGrain<ILateDurableManagerGrain>(Guid.NewGuid());
-        var activationId = await grain.GetActivationId();
-        Assert.False(await grain.HasManager());
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ResolveLate(keyedState));
-
-        Assert.Equal(
-            "The durable state manager must be resolved during grain construction or setup before journaling lifecycle enrollment completes.",
-            error.Message);
-        Assert.False(await grain.HasManager());
-        Assert.Equal(activationId, await grain.GetActivationId());
-    }
-
     private static async Task AwaitLifecycleAsync(Task operation, string phase)
     {
         try
@@ -195,7 +175,7 @@ public sealed class DurableStateManagerIntegrationFixture : IntegrationTestFixtu
         {
             siloBuilder.AddJournaling();
             siloBuilder.AddJournaling();
-            siloBuilder.Services.AddDurableState<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
+            siloBuilder.Services.AddStateMachine<DurableManagerRecoveryProbe, DurableManagerRecoveryProbe>();
         });
     }
 }
@@ -323,37 +303,6 @@ internal sealed class DurableManagerGrainState
         _injectedValue.Value = value;
         _injectedList.Add(item);
         await _manager.WriteStateAsync();
-    }
-}
-
-public interface ILateDurableManagerGrain : IGrainWithGuidKey
-{
-    Task<Guid> GetActivationId();
-    Task<bool> HasManager();
-    Task ResolveLate(bool keyedState);
-}
-
-// Merely configuring journaling must not create a manager for an uninjected grain.
-public sealed class LateDurableManagerGrain(IGrainContext context) : Grain, ILateDurableManagerGrain
-{
-    private readonly Guid _activationId = Guid.NewGuid();
-
-    public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
-
-    public Task<bool> HasManager() => Task.FromResult(context.GetComponent<JournaledStateManager>() is not null);
-
-    public Task ResolveLate(bool keyedState)
-    {
-        if (keyedState)
-        {
-            context.ActivationServices.GetRequiredKeyedService<IDurableValue<int>>("late");
-        }
-        else
-        {
-            context.ActivationServices.GetRequiredService<IDurableStateManager>();
-        }
-
-        return Task.CompletedTask;
     }
 }
 

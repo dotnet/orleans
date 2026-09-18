@@ -24,7 +24,7 @@ public readonly struct JournalReplayContext
     /// </summary>
     /// <remarks>
     /// For activation-owned managers, this is the activation's service provider.
-    /// Factory-created standalone managers have their own service scope.
+    /// Factory-created standalone managers create their owned service scope when services are first requested.
     /// </remarks>
     public IServiceProvider ServiceProvider => Manager.ServiceProvider;
 

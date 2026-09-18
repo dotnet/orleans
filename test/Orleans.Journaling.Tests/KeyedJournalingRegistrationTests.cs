@@ -74,7 +74,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var keyedFactory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME);
         Assert.Same(factory, keyedFactory);
         var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
-        await using (var manager = keyedFactory.Create(journalId))
+        await using (var manager = keyedFactory.CreateStandalone(journalId))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -141,7 +141,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
         var factoryA = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-A");
         var factoryB = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("jobs-B");
-        await using (var manager = factoryA.Create(id))
+        await using (var manager = factoryA.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -149,7 +149,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             await manager.WriteStateAsync(token);
         }
 
-        await using (var manager = factoryB.Create(id))
+        await using (var manager = factoryB.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -159,7 +159,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         }
 
         // Same identity in two physical namespaces must not share factory storage.
-        await using (var manager = factoryA.Create(id))
+        await using (var manager = factoryA.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -168,7 +168,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             Assert.Equal(42, value.Value);
         }
 
-        await using (var manager = factoryB.Create(id))
+        await using (var manager = factoryB.CreateStandalone(id))
         {
             var value = new DurableValue<int>("value", manager, codec);
             await manager.InitializeAsync(token);
@@ -398,7 +398,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         using var serviceProvider = builder.Services.BuildServiceProvider();
         using var scope = serviceProvider.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManagerFactory>()
-            .Create(new JournalId("on-demand-journal"));
+            .CreateStandalone(new JournalId("on-demand-journal"));
         await using (manager.ConfigureAwait(false))
         {
             var codecProvider = scope.ServiceProvider.GetRequiredService<ICodecProvider>();

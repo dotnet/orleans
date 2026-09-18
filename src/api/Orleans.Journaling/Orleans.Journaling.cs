@@ -231,7 +231,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledStateManagerFactory
     {
-        IJournaledStateManager Create(JournalId journalId);
+        IJournaledStateManager CreateStandalone(JournalId journalId);
     }
 
     public partial interface IJournalFormat
@@ -479,22 +479,16 @@ namespace Orleans.Journaling
 
     public static partial class JournalingHostingExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableState<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, string, TImplementation> factory)
-            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
-
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableState<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services)
-            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
-
-        public static Hosting.ISiloBuilder AddDurableState<TState, TImplementation>(this Hosting.ISiloBuilder builder, System.Func<System.IServiceProvider, string, TImplementation> factory)
-            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
-
-        public static Hosting.ISiloBuilder AddDurableState<TState, TImplementation>(this Hosting.ISiloBuilder builder)
-            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
-
         public static Hosting.ISiloBuilder AddJournaling(this Hosting.ISiloBuilder builder) { throw null; }
 
         public static Hosting.ISiloBuilder AddJournalStorage<TProvider>(this Hosting.ISiloBuilder builder, string name, System.Func<System.IServiceProvider, TProvider> factory)
             where TProvider : class, IJournalStorageProvider { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddStateMachine<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Func<System.IServiceProvider, string, TImplementation> factory)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddStateMachine<TState, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+            where TState : class where TImplementation : class, TState, IStateMachine { throw null; }
 
         public static Hosting.ISiloBuilder AddVolatileJournalStorage(this Hosting.ISiloBuilder builder, string name) { throw null; }
 

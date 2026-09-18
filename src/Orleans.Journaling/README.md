@@ -124,9 +124,11 @@ registration factory, enrolling their `ILifecycleParticipant<IGrainLifecycle>` o
 initialization and shutdown callbacks directly.
 
 Shared activation setup actions run synchronously after construction and can first resolve the manager
-or additional states. Enrollment remains open until the lifecycle's `First` stage, so a feature can resolve
-its dependencies and enroll its own participant during setup. After lifecycle startup, first resolution
-of the standard manager fails early. A feature which uses recovered state runs after `SetupState`;
+or additional states. The manager subscribes through the existing lifecycle participation mechanism.
+Resolve grain-owned managers and declare their states during construction or synchronous activation
+setup so their subscriptions are established before lifecycle startup. If lifecycle subscription fails,
+the constructor disposes the failed manager and its writer, then propagates the failure.
+A feature which uses recovered state runs after `SetupState`;
 work required before application activation runs before `Activate`. Flow the caller's cancellation token
 through asynchronous grain and state-manager operations.
 
@@ -153,8 +155,11 @@ For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configu
 ## Custom state and standalone ownership
 
 Register an application contract and its implementation with
-`services.AddDurableState<TState, TImplementation>()`. The implementation implements both `TState`
-and `IStateMachine`. The manager owns construction, registration, and binding; constructors receive
+`services.AddStateMachine<TState, TImplementation>()` on `IServiceCollection`. Both type arguments
+are reference types, and the implementation implements both `TState` and `IStateMachine`.
+In silo configuration, use `siloBuilder.AddJournaling()` for core setup and
+`siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the state mapping. Storage-provider
+registration already calls `AddJournaling` internally. The manager owns construction, registration, and binding; constructors receive
 dependencies and leave registration to the manager. Unsupported application contracts produce an
 explicit registration error at `GetOrAddState`.
 
@@ -177,11 +182,11 @@ routes entries to the state machine for their stream.
 
 `IJournaledStateManager` extends `IDurableStateManager` and `IAsyncDisposable`. Its advanced owner
 API adds `RegisterStateMachine`, `InitializeAsync`, whole-journal `DeleteStateAsync`, and
-`PendingWriteByteCount`. `IJournaledStateManagerFactory.Create(JournalId)` creates a standalone
+`PendingWriteByteCount`. `IJournaledStateManagerFactory.CreateStandalone(JournalId)` creates a standalone
 manager with its own registry and lifetime. Declare states before initializing it:
 
 ```csharp
-await using var manager = factory.Create(journalId);
+await using var manager = factory.CreateStandalone(journalId);
 var count = manager.GetOrAddValue<int>("count");
 await manager.InitializeAsync(cancellationToken);
 
@@ -193,7 +198,18 @@ The factory's provider selection and the manager's configured format apply to ev
 The owner initializes and disposes standalone managers; Orleans performs those operations for
 grain-owned managers.
 
-Managers created with an explicit `JournalId` through `IJournaledStateManagerFactory`, or constructed
+Grain-owned managers use the activation's existing service scope. Standalone creation allocates no DI
+scope. The first missing state resolved through DI, or replay access to
+`JournalReplayContext.ServiceProvider`, lazily creates one manager-owned scope and binds it to that
+manager. The scope supplies isolation, caching, and disposal for scoped dependencies and is reused
+until the manager is disposed.
+
+Manual `RegisterStateMachine` calls and lookups of existing states leave the scope unallocated.
+Initialization and writes using already-supplied same-format codecs also remain scope-free until
+services are needed. This benefits integrations such as Durable Jobs shards which provide their own
+state. A manager disposes only its owned scope; the grain runtime disposes the activation scope.
+
+Managers created with an explicit `JournalId` through `CreateStandalone`, or constructed
 directly from storage without a grain context, retain caller-owned initialization and disposal even when
 created inside a grain call. Register their states and await `InitializeAsync(cancellationToken)` with
 the operation's token before use, or deliberately supply them through a registration which assigns

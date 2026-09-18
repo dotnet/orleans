@@ -87,7 +87,7 @@ Use a unique keyed service name exactly as you would for another durable state. 
 
 ## Implement a custom journaled state
 
-Define an application-facing state contract and an implementation of that contract and <xref:Orleans.Journaling.IStateMachine>. Register the mapping on the service collection with <xref:Orleans.Journaling.JournalingHostingExtensions.AddDurableState*> using the application contract and implementation as its two type arguments. Application code obtains it with `GetOrAddState<TState>(name)` during setup. The manager constructs, registers, and binds the implementation once, using its own format and service lifetime.
+Define an application-facing state contract and an implementation of that contract and <xref:Orleans.Journaling.IStateMachine>. Register the mapping on <xref:Microsoft.Extensions.DependencyInjection.IServiceCollection> with <xref:Orleans.Journaling.JournalingHostingExtensions.AddStateMachine*> using the application contract and implementation as its two type arguments. Both types are reference types. In silo configuration, call `siloBuilder.AddJournaling()` for core setup and `siloBuilder.Services.AddStateMachine<TState, TImplementation>()` for the mapping. A storage-provider registration already performs the core setup. Application code obtains the state with `GetOrAddState<TState>(name)` during setup. The manager constructs, registers, and binds the implementation once, using its configured format and service lifetime.
 
 The parameterless registration overload resolves the implementation's constructor dependencies from dependency injection. When construction needs the state name, use the factory overload: its callback receives the owning service provider and the requested state name and returns the implementation.
 
@@ -108,8 +108,10 @@ An implementation runs on one logical grain thread. Recovery uses fresh instance
 
 <xref:Orleans.Journaling.IJournaledStateManager> extends `IDurableStateManager` with the advanced ownership operations: <xref:Orleans.Journaling.IJournaledStateManager.RegisterStateMachine*>, <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*>, whole-journal <xref:Orleans.Journaling.IJournaledStateManager.DeleteStateAsync*>, asynchronous disposal, and <xref:Orleans.Journaling.IJournaledStateManager.PendingWriteByteCount> diagnostics.
 
-Use <xref:Orleans.Journaling.IJournaledStateManagerFactory> when an integration owns a journal outside a grain activation. Declare its states before initialization, await recovery, and dispose the manager when its work ends:
+Use <xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> when an integration owns a journal independently of a grain activation. Declare its states before initialization, await recovery, and dispose the manager when its work ends:
 
 :::code language="csharp" source="./snippets/journaling/JournalingBasics.cs" id="standalone_durable_state":::
 
-The factory's selected provider and the manager's configured format apply to all states it creates. Each standalone manager owns its registry and lifetime. Grain-owned managers receive initialization and disposal from the activation lifecycle instead.
+The factory's selected provider and the manager's configured format apply to all states it creates. Each standalone manager owns its registry and lifetime. `CreateStandalone` leaves its DI scope unallocated. The first DI-created state, such as the value in this example, creates one manager-owned scope. The manager binds that scope to itself, reuses it for later state-service resolutions, and disposes it with the manager.
+
+Directly registered state machines and existing-state lookups use their supplied instances. Initialization and writes using already-supplied same-format codecs remain scope-free; replay access to <xref:Orleans.Journaling.JournalReplayContext.ServiceProvider> creates the scope when services are needed. This supports integrations such as Durable Jobs shards which supply their own state. Grain-owned managers use the existing activation scope and receive initialization and disposal from the activation lifecycle.

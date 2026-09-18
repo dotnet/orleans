@@ -151,7 +151,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         RuntimeContext.SetExecutionContext(probe.Context, out var previous);
         try
         {
-            manager = factory.Create(id);
+            manager = factory.CreateStandalone(id);
         }
         finally
         {
@@ -172,7 +172,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
             Assert.Equal(new[] { "grain one", "grain two" }, await grain.GetValues());
         }
 
-        await using (var recovered = factory.Create(id))
+        await using (var recovered = factory.CreateStandalone(id))
         {
             var value = new DurableValue<string>("value", recovered, codec);
             await recovered.InitializeAsync(Cancellation);
@@ -207,7 +207,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         {
             builder.Services.AddScoped(services =>
             {
-                var manager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
+                var manager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
                 ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(
                     services.GetRequiredService<IGrainContext>().ObservableLifecycle);
                 return manager;
@@ -240,7 +240,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         await grain.Commit();
         await lifecycle.OnStop(Cancellation);
 
-        await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().Create(journalId);
+        await using var recovered = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journalId);
         var codec = services.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(JsonLinesJournalFormat.JournalFormatKey);
         var recoveredValue = new DurableValue<string>("helper", recovered, codec);
         await recovered.InitializeAsync(Cancellation);
@@ -323,7 +323,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<TimeProvider>());
         builder.AddVolatileJournalStorage().UseJsonJournalFormat(JournalingTestsJsonContext.Default);
-        builder.AddDurableState<IStateMachine, IStateMachine>(static (_, _) => Substitute.For<IStateMachine>());
+        builder.Services.AddStateMachine<IStateMachine, IStateMachine>(static (_, _) => Substitute.For<IStateMachine>());
         return builder;
     }
 

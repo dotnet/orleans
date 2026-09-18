@@ -63,7 +63,7 @@ public static class StandaloneJournaling
         JournalId journalId,
         CancellationToken cancellationToken)
     {
-        await using var manager = factory.Create(journalId);
+        await using var manager = factory.CreateStandalone(journalId);
         var count = manager.GetOrAddValue<int>("count");
         await manager.InitializeAsync(cancellationToken);
 

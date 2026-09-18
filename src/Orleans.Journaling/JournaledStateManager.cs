@@ -22,8 +22,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly IGrainContext? _grainContext;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly AsyncServiceScope? _ownedScope;
+    private readonly IServiceScopeFactory? _serviceScopeFactory;
+    private IServiceProvider _serviceProvider;
+    private AsyncServiceScope? _ownedScope;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -46,7 +47,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         try
         {
             ((ILifecycleParticipant<IGrainLifecycle>)this).Participate(grainContext.ObservableLifecycle);
-            grainContext.SetComponent(this);
         }
         catch
         {
@@ -56,7 +56,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     }
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, JournalId journalId)
-        : this(shared, CreateStorage(storageProvider, journalId))
+        : this(shared, CreateStorage(storageProvider, journalId),
+            scopeFactory: shared.ServiceProvider.GetRequiredService<IServiceScopeFactory>())
     {
     }
 
@@ -64,14 +65,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         JournaledStateManagerShared shared,
         IJournalStorage storage,
         IServiceProvider? serviceProvider = null,
-        AsyncServiceScope? ownedScope = null)
+        IServiceScopeFactory? scopeFactory = null)
     {
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
         _storage = storage;
         _serviceProvider = serviceProvider ?? shared.ServiceProvider;
-        _ownedScope = ownedScope;
+        _serviceScopeFactory = scopeFactory;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(_serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(_serviceProvider, WriteJournalFormatKey);
         _journalWriter = _shared.JournalFormat.CreateWriter();
@@ -90,7 +91,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private static JournalId CreateJournalId(IGrainContext grainContext)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
-        JournalingGrainLifecycle.ThrowIfEnrollmentClosed(grainContext);
         return JournalId.FromGrainId(grainContext.GrainId);
     }
 
@@ -107,7 +107,33 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
 
-    internal IServiceProvider ServiceProvider => _serviceProvider;
+    internal IServiceProvider ServiceProvider
+    {
+        get
+        {
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed != 0, this);
+                if (_serviceScopeFactory is { } scopeFactory && _ownedScope is null)
+                {
+                    var scope = scopeFactory.CreateAsyncScope();
+                    try
+                    {
+                        scope.ServiceProvider.GetRequiredService<JournaledStateManagerBinding>().Manager = this;
+                        _serviceProvider = scope.ServiceProvider;
+                        _ownedScope = scope;
+                    }
+                    catch
+                    {
+                        scope.Dispose();
+                        throw;
+                    }
+                }
+
+                return _serviceProvider;
+            }
+        }
+    }
 
     public TState GetOrAddState<TState>(string name) where TState : class
     {
@@ -120,10 +146,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         // Open generic keyed registrations must use implementation types. Resolving their canonical
         // scoped instance keeps keyed injection and programmatic access on the same construction path.
-        var result = _serviceProvider.GetKeyedService<TState>(name)
+        var result = ServiceProvider.GetKeyedService<TState>(name)
             ?? throw new InvalidOperationException(
                 $"No durable state implementation is registered for contract '{typeof(TState)}' and name '{name}'. " +
-                "Register the contract using AddDurableState<TState, TImplementation>.");
+                "Register the contract using AddStateMachine<TState, TImplementation>.");
         if (result is not IStateMachine stateMachine)
         {
             throw new InvalidOperationException(
@@ -198,7 +224,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
 
             EnsureRegistrationAllowed();
-            var state = factory(_serviceProvider, name)
+            var state = factory(ServiceProvider, name)
                 ?? throw new InvalidOperationException($"The durable state factory for '{typeof(TState)}' returned null for name '{name}'.");
             return RegisterResolvedState<TState>(name, state, state);
         }
@@ -862,7 +888,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return _shared.JournalFormat;
         }
 
-        return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);
+        return JournalFormatServices.GetRequiredJournalFormat(ServiceProvider, journalFormatKey);
     }
 
     private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalMetadata? metadata)
