@@ -20,6 +20,7 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     private ExceptionDispatchInfo? _failure;
     private PreparationBarrier? _nextPreparation;
     public Exception? Failure => _failure?.SourceException;
+    public int SendCalls { get; private set; }
     public IReadOnlyList<Guid> LastCapturedIds { get; private set; } = [];
     public Action? BeforeFinalization { get; set; }
     public Action? AfterWriteCompleted { get; set; }
@@ -50,6 +51,7 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     public IEnumerable<DurableEnvelope> Messages => Values;
     public void Send(DurableEnvelope envelope)
     {
+        SendCalls++;
         _failure?.Throw();
         if (TryGetMessage(envelope.MessageId, out var existing))
         {
