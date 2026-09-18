@@ -9,6 +9,10 @@ inputs:
     description: Build external assets required by the selected tests.
     required: false
     default: 'false'
+  coverage:
+    description: Collect coverage ('true' or 'false'); 'auto' selects Linux .NET 10 jobs.
+    required: false
+    default: 'auto'
   filter-query:
     description: Optional Microsoft Testing Platform query filter.
     required: false
@@ -30,7 +34,7 @@ runs:
   steps:
   - uses: ./.github/actions/setup-test-environment
     with:
-      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
+      coverage: ${{ inputs.coverage == 'true' || (inputs.coverage == 'auto' && runner.os == 'Linux' && inputs.framework == 'net10.0') }}
   - name: Test
     id: test
     continue-on-error: ${{ env.ORLEANS_TEST_RETRY == 'true' }}
@@ -40,7 +44,7 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
-      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
+      coverage: ${{ inputs.coverage == 'true' || (inputs.coverage == 'auto' && runner.os == 'Linux' && inputs.framework == 'net10.0') }}
     env:
       # The nested composite action supplies its own inputs context when continue-on-error is evaluated.
       ORLEANS_TEST_RETRY: ${{ inputs.retry }}
@@ -54,13 +58,13 @@ runs:
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
-      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
+      coverage: ${{ inputs.coverage == 'true' || (inputs.coverage == 'auto' && runner.os == 'Linux' && inputs.framework == 'net10.0') }}
     env:
       BuildExternalAssets: ${{ inputs['build-external-assets'] }}
   - name: Archive test results
     if: always()
     uses: ./.github/actions/archive-test-results
     with:
-      coverage: ${{ runner.os == 'Linux' && inputs.framework == 'net10.0' }}
+      coverage: ${{ inputs.coverage == 'true' || (inputs.coverage == 'auto' && runner.os == 'Linux' && inputs.framework == 'net10.0') }}
       name: ${{ inputs.artifact-name }}
       retention-days: ${{ steps.test.outcome == 'failure' && steps.retry.outcome != 'success' && 14 || 1 }}

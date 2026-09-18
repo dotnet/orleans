@@ -465,6 +465,7 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
         provider: Cosmos
+        coverage: ${{ matrix.framework == 'net10.0' }}
         retry: 'true'
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
