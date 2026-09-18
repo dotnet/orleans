@@ -13,6 +13,7 @@ public sealed class ClusteringConformanceException : Exception
 internal static class ClusteringTestKitDiagnostics
 {
     internal const string CleanupFailureKey = "ClusteringTestKit.CleanupFailure";
+    internal const string CleanupCompletionKey = "ClusteringTestKit.CleanupCompletion";
 
     internal static ClusteringConformanceException CreateFailure(
         string provider, string guarantee, string cluster, string handle, int seed, string detail, Exception? innerException = null)

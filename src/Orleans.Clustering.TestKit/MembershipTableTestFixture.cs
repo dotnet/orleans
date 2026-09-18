@@ -34,6 +34,7 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
     private readonly HashSet<string> _endedClusters = new(StringComparer.Ordinal);
     private bool _initialized;
     private int _disposed;
+    private Task? _disposalTask;
 
     /// <summary>Creates a fixture from a synchronous factory accepting each requested cluster ID.</summary>
     public MembershipTableTestFixture(string providerName, Func<string, IMembershipTable> factory,
@@ -231,34 +232,68 @@ public sealed class MembershipTableTestFixture : IAsyncDisposable
         if (primary is not null) ExceptionDispatchInfo.Capture(primary).Throw();
     }
 
-    /// <summary>Deletes only owned clusters and disposes every acquired owner, with independent bounded cancellation.</summary>
-    public async ValueTask DisposeAsync()
+    /// <summary>Waits up to 30 seconds for cleanup. Owners remain alive until their cleanup operations complete.</summary>
+    public ValueTask DisposeAsync() => DisposeAsync(TimeSpan.FromSeconds(30));
+
+    internal async ValueTask DisposeAsync(TimeSpan waitTimeout)
     {
-        KeyValuePair<string, IMembershipTable>[] clusters;
-        MembershipTableTestHandle[] handles;
+        Task completion;
+        TaskCompletionSource? started = null;
+        KeyValuePair<string, IMembershipTable>[] clusters = [];
+        MembershipTableTestHandle[] handles = [];
         lock (_lifecycleLock)
         {
-            if (_disposed != 0) return;
-            _disposed = 1;
-            clusters = _clusters.Where(pair => !_endedClusters.Contains(pair.Key)).ToArray();
-            handles = _handles.ToArray();
+            if (_disposalTask is null)
+            {
+                _disposed = 1;
+                clusters = _clusters.Where(pair => !_endedClusters.Contains(pair.Key)).ToArray();
+                handles = _handles.ToArray();
+                started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposalTask = started.Task;
+            }
+            completion = _disposalTask;
         }
+
+        if (started is not null) _ = CompleteDisposalAsync(clusters, handles, started);
+        try
+        {
+            await completion.WaitAsync(waitTimeout);
+        }
+        catch (TimeoutException exception) when (!completion.IsCompleted)
+        {
+            exception.Data[ClusteringTestKitDiagnostics.CleanupCompletionKey] = completion;
+            _ = ObserveLateCleanupFailureAsync(completion, exception);
+            throw;
+        }
+    }
+
+    private static async Task CompleteDisposalAsync(
+        KeyValuePair<string, IMembershipTable>[] clusters,
+        MembershipTableTestHandle[] handles,
+        TaskCompletionSource completion)
+    {
         var failures = new List<Exception>();
         foreach (var (cluster, table) in clusters)
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            try { await table.DeleteMembershipTableEntriesAsync(cluster, timeout.Token).WaitAsync(timeout.Token); }
+            // A non-cancellable dispatch retains actual completion for tokenless compatibility providers.
+            try { await table.DeleteMembershipTableEntriesAsync(cluster, CancellationToken.None); }
             catch (Exception exception) { failures.Add(new InvalidOperationException($"cleanup cluster={cluster}", exception)); }
         }
 
         foreach (var handle in handles.AsEnumerable().Reverse())
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            try { await handle.DisposeAsync().AsTask().WaitAsync(timeout.Token); }
+            try { await handle.DisposeAsync(); }
             catch (Exception exception) { failures.Add(exception); }
         }
 
-        if (failures.Count > 0) throw new AggregateException("Membership fixture teardown failed.", failures);
+        if (failures.Count > 0) completion.SetException(new AggregateException("Membership fixture teardown failed.", failures));
+        else completion.SetResult();
+    }
+
+    private static async Task ObserveLateCleanupFailureAsync(Task completion, Exception timeout)
+    {
+        try { await completion; }
+        catch (Exception failure) { ClusteringTestKitDiagnostics.AttachCleanupFailure(timeout, failure); }
     }
 
     private static Func<string, string, CancellationToken, ValueTask<MembershipTableTestHandle>> Wrap(Func<string, IMembershipTable> factory)

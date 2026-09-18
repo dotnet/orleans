@@ -75,9 +75,15 @@ Handle registration and teardown's ownership snapshot share one lifecycle lock.
 An acquisition which finishes after disposal or history retirement disposes its
 returned owner before reporting the lifetime error to its caller.
 Initialization of an additional handle is explicit. `RunAsync` initializes,
-executes, and tears down while preserving the primary failure. Cleanup uses
-independent 30-second bounds per deletion/disposer, deletes only the fixture's
-cluster partitions, and attempts every owner even after a failure. Deleted
+executes, and tears down while preserving the primary failure. Cleanup deletes
+only the fixture's cluster partitions and attempts every owner after the actual
+delete operations complete. Its caller waits at most 30 seconds. A timeout
+retains the owners and shared cleanup task until the operations finish; later
+`DisposeAsync` calls await that same task. The timeout's exception data contains
+`ClusteringTestKit.CleanupCompletion`, and a late cleanup failure is attached as
+`ClusteringTestKit.CleanupFailure`. An operation which never completes retains
+its owner; the bound applies to the caller's wait, while resource release waits
+for operation completion. Deleted
 scopes are retired; teardown disposes their owners directly. A deletion request
 which fails after invocation also retires its handles, since it may have
 committed. Subsequent histories use a new fixture with fresh owners.
