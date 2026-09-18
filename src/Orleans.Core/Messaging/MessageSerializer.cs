@@ -269,7 +269,11 @@ namespace Orleans.Runtime.Messaging
             // Always write RequestContext last
             if (headers.HasFlag(MessageFlags.HasRequestContextData))
             {
-                WriteRequestContext(ref writer, value.RequestContextData!);
+                WriteRequestContext(
+                    ref writer,
+                    value.RequestContextData,
+                    value.GatewayRequestAttempt,
+                    value.GatewayForwardingSource);
             }
         }
 
@@ -311,7 +315,12 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasRequestContextData))
             {
-                result.RequestContextData = ReadRequestContext(ref reader);
+                result.RequestContextData = ReadRequestContext(
+                    ref reader,
+                    out var gatewayRequestAttempt,
+                    out var gatewayForwardingSource);
+                result.GatewayRequestAttempt = gatewayRequestAttempt;
+                result.GatewayForwardingSource = gatewayForwardingSource;
             }
         }
 
@@ -391,18 +400,54 @@ namespace Orleans.Runtime.Messaging
             StringCodec.WriteRaw(ref writer, value, numBytes);
         }
 
-        private static void WriteRequestContext<TBufferWriter>(ref Writer<TBufferWriter> writer, Dictionary<string, object> value) where TBufferWriter : IBufferWriter<byte>
+        private static void WriteRequestContext<TBufferWriter>(
+            ref Writer<TBufferWriter> writer,
+            Dictionary<string, object>? value,
+            long gatewayRequestAttempt,
+            SiloAddress? gatewayForwardingSource) where TBufferWriter : IBufferWriter<byte>
         {
-            writer.WriteVarUInt32((uint)value.Count);
-            foreach (var entry in value)
+            var hasAttemptEntry = value?.ContainsKey(Message.GatewayRequestAttemptKey) is true;
+            var hasForwardingSourceEntry = value?.ContainsKey(Message.GatewayForwardingSourceKey) is true;
+            var count = (value?.Count ?? 0)
+                - (hasAttemptEntry ? 1 : 0)
+                - (hasForwardingSourceEntry ? 1 : 0)
+                + (gatewayRequestAttempt != 0 ? 1 : 0)
+                + (gatewayForwardingSource is not null ? 1 : 0);
+            writer.WriteVarUInt32((uint)count);
+            if (value is not null)
             {
-                WriteString(ref writer, entry.Key);
-                ObjectCodec.WriteField(ref writer, 0, entry.Value);
+                foreach (var entry in value)
+                {
+                    if (entry.Key is Message.GatewayRequestAttemptKey or Message.GatewayForwardingSourceKey)
+                    {
+                        continue;
+                    }
+
+                    WriteString(ref writer, entry.Key);
+                    ObjectCodec.WriteField(ref writer, 0, entry.Value);
+                }
+            }
+
+            if (gatewayRequestAttempt != 0)
+            {
+                WriteString(ref writer, Message.GatewayRequestAttemptKey);
+                ObjectCodec.WriteField(ref writer, 0, gatewayRequestAttempt);
+            }
+
+            if (gatewayForwardingSource is not null)
+            {
+                WriteString(ref writer, Message.GatewayForwardingSourceKey);
+                ObjectCodec.WriteField(ref writer, 0, gatewayForwardingSource);
             }
         }
 
-        private static Dictionary<string, object> ReadRequestContext<TInput>(ref Reader<TInput> reader)
+        private static Dictionary<string, object>? ReadRequestContext<TInput>(
+            ref Reader<TInput> reader,
+            out long gatewayRequestAttempt,
+            out SiloAddress? gatewayForwardingSource)
         {
+            gatewayRequestAttempt = 0;
+            gatewayForwardingSource = null;
             var size = (int)reader.ReadVarUInt32();
             var result = new Dictionary<string, object>(GetRequestContextInitialCapacity(size));
             for (var i = 0; i < size; i++)
@@ -412,10 +457,21 @@ namespace Orleans.Runtime.Messaging
                 var value = ObjectCodec.ReadValue(ref reader, reader.ReadFieldHeader())!;
 
                 Debug.Assert(key is not null);
-                result.Add(key, value);
+                if (key == Message.GatewayRequestAttemptKey && value is long attempt)
+                {
+                    gatewayRequestAttempt = attempt;
+                }
+                else if (key == Message.GatewayForwardingSourceKey && value is SiloAddress forwardingSource)
+                {
+                    gatewayForwardingSource = forwardingSource;
+                }
+                else
+                {
+                    result.Add(key, value);
+                }
             }
 
-            return result;
+            return result.Count > 0 ? result : null;
         }
 
         internal static int GetRequestContextInitialCapacity(int size) => size > MaxRequestContextInitialCapacity ? MaxRequestContextInitialCapacity : size;
