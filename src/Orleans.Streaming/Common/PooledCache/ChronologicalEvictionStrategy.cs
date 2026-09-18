@@ -7,7 +7,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Eviction strategy that evicts data based off of age.
     /// </summary>
-    public partial class ChronologicalEvictionStrategy : IEvictionStrategy
+    public partial class ChronologicalEvictionStrategy : IEvictionStrategy, IDisposable
     {
         private readonly ILogger logger;
         private readonly TimePurgePredicate timePurge;
@@ -19,6 +19,7 @@ namespace Orleans.Providers.Streams.Common
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly PeriodicAction? periodicMonitoring;
+        private IPurgeObservable? purgeObservable;
         private long cacheSizeInByte;
 
         /// <summary>
@@ -52,7 +53,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public IPurgeObservable PurgeObservable { private get; set; } = null!; // Set once by the owning cache immediately after construction.
+        public IPurgeObservable PurgeObservable
+        {
+            private get => purgeObservable!; // Set by the owning cache before purge operations.
+            set => purgeObservable = value;
+        }
 
         /// <inheritdoc />
         public Action<CachedMessage?, CachedMessage?>? OnPurged { get; set; }
@@ -138,6 +143,12 @@ namespace Orleans.Providers.Streams.Common
             }
             else
             {
+                if (IdOfLastPurgedBufferId is null
+                    || !this.inUseBuffers.Any(buffer => buffer.Id == IdOfLastPurgedBufferId))
+                {
+                    return;
+                }
+
                 // All buffers older than the last purged buffer can be returned.
                 while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
                 {
@@ -156,6 +167,32 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
             //report metrics
+            if (memoryReleasedInByte > 0)
+            {
+                this.cacheSizeInByte -= memoryReleasedInByte;
+                this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
+            }
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            if (purgeObservable?.IsEmpty == true)
+            {
+                ReleaseBuffers();
+            }
+        }
+
+        private void ReleaseBuffers()
+        {
+            var memoryReleasedInByte = 0;
+            while (this.inUseBuffers.Count > 0)
+            {
+                var buffer = this.inUseBuffers.Dequeue();
+                memoryReleasedInByte += buffer.SizeInByte;
+                buffer.Dispose();
+            }
+
             if (memoryReleasedInByte > 0)
             {
                 this.cacheSizeInByte -= memoryReleasedInByte;

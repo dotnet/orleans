@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Xunit;
 
@@ -76,10 +77,142 @@ namespace UnitTests.OrleansRuntime.Streams
 #pragma warning restore xUnit2013 // Do not use equality check to check for collection size.
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void ObjectPoolBoundsRetainedObjects()
+        {
+            var created = 0;
+            var pool = new ObjectPool<FixedSizeBuffer>(
+                () =>
+                {
+                    created++;
+                    return new FixedSizeBuffer(TestBlockSize);
+                },
+                maxRetainedObjects: 1);
+
+            var first = pool.Allocate();
+            var second = pool.Allocate();
+            first.Dispose();
+            second.Dispose();
+
+            pool.Allocate();
+            pool.Allocate();
+
+            Assert.Equal(3, created);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EvictionStrategyDoesNotReleaseActiveBuffersOnDispose()
+        {
+            var pool = new MyTestPooled();
+            var buffer = pool.Allocate();
+            var purgeObservable = new TestPurgeObservable { ItemCount = 1 };
+            var strategy = new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero),
+                null,
+                null)
+            {
+                PurgeObservable = purgeObservable
+            };
+            strategy.OnBlockAllocated(buffer);
+
+            strategy.Dispose();
+            Assert.Equal(0, pool.Freed);
+
+            purgeObservable.ItemCount = 0;
+            strategy.Dispose();
+            Assert.Equal(1, pool.Freed);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EvictionStrategyLeavesBuffersWhenPurgedMessageUsesUnknownStorage()
+        {
+            var pool = new MyTestPooled();
+            var buffer = pool.Allocate();
+            var now = DateTime.UtcNow;
+            var purgeObservable = new MessagePurgeObservable(
+            [
+                new CachedMessage
+                {
+                    Segment = new(new byte[1]),
+                    DequeueTimeUtc = now,
+                    EnqueueTimeUtc = now,
+                },
+                new CachedMessage
+                {
+                    Segment = new(new byte[1]),
+                    DequeueTimeUtc = now,
+                    EnqueueTimeUtc = now,
+                },
+            ]);
+            var strategy = new PurgeOneEvictionStrategy
+            {
+                PurgeObservable = purgeObservable
+            };
+            strategy.OnBlockAllocated(buffer);
+
+            strategy.PerformPurge(now);
+
+            Assert.Equal(0, pool.Freed);
+            Assert.Equal(1, purgeObservable.ItemCount);
+        }
+
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)
         {
             Assert.Equal<object>(resource, actualBuffer);
             resource.Dispose();
+        }
+
+        private sealed class TestPurgeObservable : IPurgeObservable
+        {
+            public CachedMessage? Newest => null;
+
+            public CachedMessage? Oldest => null;
+
+            public int ItemCount { get; set; }
+
+            public bool IsEmpty => ItemCount == 0;
+
+            public void RemoveOldestMessage() => ItemCount--;
+        }
+
+        private sealed class MessagePurgeObservable(IEnumerable<CachedMessage> messages) : IPurgeObservable
+        {
+            private readonly Queue<CachedMessage> _messages = new(messages);
+
+            public CachedMessage? Newest => _messages.Count > 0 ? _messages.Last() : null;
+
+            public CachedMessage? Oldest => _messages.Count > 0 ? _messages.Peek() : null;
+
+            public int ItemCount => _messages.Count;
+
+            public bool IsEmpty => _messages.Count == 0;
+
+            public void RemoveOldestMessage() => _messages.Dequeue();
+        }
+
+        private sealed class PurgeOneEvictionStrategy()
+            : ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero),
+                null,
+                null)
+        {
+            private bool _purged;
+
+            protected override bool ShouldPurge(
+                ref CachedMessage cachedMessage,
+                ref CachedMessage newestCachedMessage,
+                DateTime nowUtc)
+            {
+                if (_purged)
+                {
+                    return false;
+                }
+
+                _purged = true;
+                return true;
+            }
         }
     }
 }

@@ -15,7 +15,7 @@ namespace UnitTests.OrleansRuntime.Streams;
 [TestArea("Streaming")]
 public sealed class PooledCacheBufferOwnershipTests
 {
-    [Fact]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public void MemoryCache_EmptyPurgeAllocatesFreshBufferForNextMessage()
     {
         var pool = new TrackingBufferPool();
@@ -39,7 +39,7 @@ public sealed class PooledCacheBufferOwnershipTests
         Assert.Equal(2, pool.AllocateCount);
     }
 
-    [Fact]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public void GeneratorCache_EmptyPurgeAllocatesFreshBufferForNextMessage()
     {
         var pool = new TrackingBufferPool();
