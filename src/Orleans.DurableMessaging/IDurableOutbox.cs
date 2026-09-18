@@ -36,9 +36,7 @@ namespace Orleans.DurableMessaging;
 ///     .WithReplyTo(context.GrainId)
 ///     .Build();
 ///
-/// context.Outbox.Send(envelope);
-///
-/// // The message is staged for persistence with the next journal write.
+/// return () => context.Outbox.Send(envelope);
 /// </code>
 /// </example>
 public interface IDurableOutbox
@@ -70,7 +68,8 @@ public interface IDurableOutbox
     /// <para>
     /// Complete validation and failure-prone preparation before staging messages. Pending journal
     /// changes are shared by all callers using the grain's state manager, so each message must be
-    /// safe to commit as soon as it is enqueued.
+    /// safe to commit as soon as it is enqueued. Inbox handlers stage their prepared messages from
+    /// the synchronous action returned by <see cref="IInboxHandler.PrepareAsync"/>.
     /// </para>
     /// <para>
     /// The message is persisted atomically with grain state when <c>IJournaledStateManager.WriteStateAsync()</c>
@@ -94,7 +93,7 @@ public interface IDurableOutbox
     ///     .WithBody(new OrderConfirmation { OrderId = "order-123" })
     ///     .Build();
     ///
-    /// outbox.Send(envelope);
+    /// return () => outbox.Send(envelope);
     /// </code>
     /// </example>
     /// <exception cref="InvalidOperationException">
