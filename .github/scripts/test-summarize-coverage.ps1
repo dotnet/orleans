@@ -1562,6 +1562,7 @@ exit 0
             $setupCoverageScript `
             'if \(-not \[string\]::IsNullOrWhiteSpace\(\$env:GITHUB_PATH\)\)' `
             'Coverage setup must continue adding the tool to the GitHub Actions path.'
+        Assert-Equal 1 ([regex]::Matches($setupCoverageScript, '--add-source https://api\.nuget\.org/v3/index\.json `\r?\n    --ignore-failed-sources')).Count 'Coverage setup must resolve pinned tool releases from NuGet.org when the repository proxy lags.'
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 
