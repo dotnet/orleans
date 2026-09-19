@@ -57,9 +57,14 @@ namespace Orleans.Runtime
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
         void BreakOutstandingMessagesToSilo(SiloAddress deadSilo);
+    }
 
-        // For testing purposes only.
-        int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType);
+    /// <summary>
+    /// Exposes runtime request state to tests which synchronize request lifecycle transitions.
+    /// </summary>
+    internal interface IRuntimeClientTestAccessor
+    {
+        int GetRunningRequestCount(GrainInterfaceType grainInterfaceType);
     }
 
     /// <summary>
