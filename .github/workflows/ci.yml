@@ -70,6 +70,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: pwsh
       run: ./.github/scripts/test-summarize-coverage.ps1
+    - name: Test performance harness script paths
+      shell: pwsh
+      run: ./.github/scripts/test-dissemination-performance.ps1
     - name: Build
       run: dotnet build -bl
     - name: Pack and validate package compatibility
