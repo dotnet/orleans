@@ -47,7 +47,8 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <typeparam name="TCodec">The command codec service type.</typeparam>
     /// <returns>The codec registered for this manager's write format.</returns>
     /// <remarks>
-    /// Codecs are available before recovery, including for an empty journal. Delegating managers forward
+    /// Codecs are resolved from the owning activation's services for grain-bound managers and from shared
+    /// application services for standalone owners. They are available before recovery, including for an empty journal. Delegating managers forward
     /// this call to their owning manager. The default implementation throws <see cref="NotSupportedException"/>.
     /// </remarks>
     /// <exception cref="NotSupportedException">The manager does not support command codec resolution.</exception>

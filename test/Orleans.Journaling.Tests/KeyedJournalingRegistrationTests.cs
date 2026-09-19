@@ -383,6 +383,49 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task ManagerCommandCodec_UsesActivationScopeBeforeRecovery()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage();
+        builder.Services.Configure<JournaledStateManagerOptions>(options =>
+            options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
+        builder.Services.AddScoped<IGrainContext>(services =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(GrainId.Create("codec-scope", Guid.NewGuid().ToString("N")));
+            context.ActivationServices.Returns(services);
+            context.ObservableLifecycle.Returns(new CompositionTestLifecycle());
+            return context;
+        });
+        builder.Services.AddKeyedScoped<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey,
+            static (services, _) => new OrleansBinaryDurableValueCommandCodec<int>(
+                services.GetRequiredService<ICodecProvider>().GetCodec<int>(),
+                services.GetRequiredService<SerializerSessionPool>()));
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var first = services.CreateAsyncScope();
+        await using var second = services.CreateAsyncScope();
+        var owner = first.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var manager = first.ServiceProvider.GetRequiredService<IDurableStateManager>();
+        Assert.Same(owner, manager);
+        var codec = owner.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>();
+        Assert.Same(first.ServiceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey), codec);
+        Assert.NotSame(codec, second.ServiceProvider.GetRequiredService<IJournaledStateManager>()
+            .GetRequiredCommandCodec<IDurableValueCommandCodec<int>>());
+        Assert.Throws<InvalidOperationException>(() =>
+            services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey));
+        var state = new DurableValue<int>("value", owner, codec);
+        Assert.Same(state, manager.GetOrAddValue<int>("value"));
+        var lifecycle = Assert.IsType<CompositionTestLifecycle>(first.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle);
+        Assert.Equal(1, lifecycle.Subscriptions);
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.Equal(0, state.Value);
+        state.Value = 42;
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, owner.PendingWriteByteCount);
+        await lifecycle.OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ManagerCommandCodec_UsesOwningNamedFormatOnEmptyJournal()
     {
         var builder = CreateNamedProviderBuilder();
