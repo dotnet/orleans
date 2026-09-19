@@ -18,6 +18,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     [TestCategory("Membership"), TestCategory("MySql"), TestCategory("Functional")]
     [TestSuite("Functional")]
+    [TestCategory("ClusteringCurrentSchema")]
     [TestProvider("MySql")]
     [TestArea("Membership")]
     public class MySqlMembershipTableTests : MembershipTableTestsBase
@@ -70,14 +71,14 @@ namespace UnitTests.MembershipTests
             var instance = await RelationalStorageForTesting.SetupInstance(
                 GetAdoInvariant(),
                 testDatabaseName,
-                cancellationToken: TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken,
+                setupSqlScriptFileNames: ["MySQL-Main.sql", "MySQL-Clustering.sql"]);
             return instance.CurrentConnectionString;
         }
 
         [Fact]
-        public void MembershipTable_MySql_Init()
-        {
-        }
+        public Task MembershipTable_MySql_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_MySql_GetGateways()

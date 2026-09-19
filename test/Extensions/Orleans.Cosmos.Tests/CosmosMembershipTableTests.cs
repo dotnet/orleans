@@ -32,6 +32,7 @@ namespace Tester.Cosmos.Clustering;
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
     private readonly ITestOutputHelper _output;
+    private readonly List<CosmosClient> _legacyGatewayClients = [];
 
     public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment, ITestOutputHelper output) : base(fixture, environment, CreateFilters())
     {
@@ -60,6 +61,15 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         return new CosmosMembershipTable(loggerFactory, Services, Options.Create(CreateClusteringOptions()), clusterOptions);
     }
 
+    protected override MembershipTableTestHandle CreateLegacyMembershipTableHandle(ILogger logger)
+    {
+        CosmosTestUtils.CheckCosmosStorage();
+        var clients = new List<CosmosClient>();
+        var table = new CosmosMembershipTable(
+            loggerFactory, Services, Options.Create(CreateOwnedClusteringOptions(clients)), _clusterOptions);
+        return new MembershipTableTestHandle(table, () => DisposeClientsAsync(clients));
+    }
+
     // The SDK's default query page contains at most 100 items.
     protected override int ConformanceConcurrencyRowCount => 101;
 
@@ -82,29 +92,14 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
                         clients.Add(probe);
                     }
 
-                    var options = CreateClusteringOptions();
-                    var createClient = options.CreateClient!;
-                    options.ConfigureCosmosClient(async services =>
-                    {
-                        var client = await createClient(services);
-                        clients.Add(client);
-                        return client;
-                    });
+                    var options = CreateOwnedClusteringOptions(clients);
                     cancellationToken.ThrowIfCancellationRequested();
                     var table = new CosmosMembershipTable(
                         loggerFactory,
                         Services,
                         Options.Create(options),
                         Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }));
-                    return new MembershipTableTestHandle(table, () =>
-                    {
-                        foreach (var client in clients)
-                        {
-                            client.Dispose();
-                        }
-
-                        return ValueTask.CompletedTask;
-                    });
+                    return new MembershipTableTestHandle(table, () => DisposeClientsAsync(clients));
                 }
                 catch
                 {
@@ -120,21 +115,23 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
             {
                 var container = probe!.GetContainer(probeOptions.DatabaseName, probeOptions.ContainerName);
                 // Include ClusterVersion as well as all silo documents in the original partition.
+                // Reads inherit client/account consistency, matching the provider configuration.
                 using var iterator = container.GetItemQueryIterator<string>(
-                    "SELECT VALUE c.id FROM c",
+                    "SELECT TOP 1 VALUE c.id FROM c",
                     requestOptions: new QueryRequestOptions
                     {
-                        PartitionKey = new PartitionKey(clusterId),
-                        ConsistencyLevel = ConsistencyLevel.Session
+                        PartitionKey = new PartitionKey(clusterId)
                     });
-                var empty = true;
                 while (iterator.HasMoreResults)
                 {
                     var page = await iterator.ReadNextAsync(cancellationToken);
-                    empty &= page.Count == 0;
+                    if (page.Count > 0)
+                    {
+                        return false;
+                    }
                 }
 
-                return empty;
+                return true;
             });
     }
 
@@ -146,6 +143,30 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         return options;
     }
 
+    private static CosmosClusteringOptions CreateOwnedClusteringOptions(List<CosmosClient> clients)
+    {
+        var options = CreateClusteringOptions();
+        var createClient = options.CreateClient!;
+        options.ConfigureCosmosClient(async services =>
+        {
+            var client = await createClient(services);
+            clients.Add(client);
+            return client;
+        });
+        return options;
+    }
+
+    private static ValueTask DisposeClientsAsync(List<CosmosClient> clients)
+    {
+        foreach (var client in clients)
+        {
+            client.Dispose();
+        }
+
+        clients.Clear();
+        return ValueTask.CompletedTask;
+    }
+
     /// <summary>
     /// Creates a Cosmos DB-based gateway list provider.
     /// Uses Cosmos DB's querying capabilities to efficiently
@@ -153,10 +174,12 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     /// </summary>
     protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
     {
-        var options = new CosmosClusteringOptions();
-        options.ConfigureTestDefaults();
+        var options = CreateOwnedClusteringOptions(_legacyGatewayClients);
         return new CosmosGatewayListProvider(loggerFactory, Services, Options.Create(options), _clusterOptions, _gatewayOptions);
     }
+
+    protected override ValueTask DisposeLegacyGatewayListProviderAsync(IGatewayListProvider gatewayListProvider)
+        => DisposeClientsAsync(_legacyGatewayClients);
 
     protected override Task<string> GetConnectionString()
     {
@@ -166,6 +189,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_Init()
     {
+        await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
         var options = new CosmosClusteringOptions();
         options.ConfigureTestDefaults();
         using var client = await options.CreateClient(Services);
@@ -180,8 +204,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     public async Task MembershipTable_Cosmos_HeartbeatPreservesMembershipTokens()
     {
         var token = TestContext.Current.CancellationToken;
-        var table = CreateMembershipTable(loggerFactory.CreateLogger<CosmosMembershipTableTests>());
-        await table.InitializeMembershipTableAsync(false, token);
+        var table = await GetLegacyMembershipTableAsync(token);
         var initial = await table.ReadAllAsync(token);
         var entry = new MembershipEntry
         {

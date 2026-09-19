@@ -75,14 +75,13 @@ namespace Tester.Redis.Clustering
             var key = _conformanceKeys[clusterId];
             await using var client = await ConnectionMultiplexer.ConnectAsync(ConfigurationOptions.Parse(connectionString));
             cancellationToken.ThrowIfCancellationRequested();
-            return !await client.GetDatabase().KeyExistsAsync(key, CommandFlags.DemandMaster).WaitAsync(cancellationToken);
+            return !await client.GetDatabase().KeyExistsAsync(key, CommandFlags.DemandMaster);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             return new RedisGatewayListProvider(
-                //(RedisMembershipTable)this.membershipTable,
-                (RedisMembershipTable)CreateMembershipTable(logger),
+                membershipTable,
                 this._gatewayOptions);
         }
 

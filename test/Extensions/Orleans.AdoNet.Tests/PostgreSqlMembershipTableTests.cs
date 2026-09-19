@@ -18,6 +18,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
     [TestSuite("Functional")]
+    [TestCategory("ClusteringCurrentSchema")]
     [TestProvider("PostgreSql")]
     [TestArea("Membership")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
@@ -73,14 +74,14 @@ namespace UnitTests.MembershipTests
             var instance = await RelationalStorageForTesting.SetupInstance(
                 GetAdoInvariant(),
                 testDatabaseName,
-                cancellationToken: TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken,
+                setupSqlScriptFileNames: ["PostgreSQL-Main.sql", "PostgreSQL-Clustering.sql"]);
             return instance.CurrentConnectionString;
         }
 
         [Fact]
-        public void MembershipTable_PostgreSql_Init()
-        {
-        }
+        public Task MembershipTable_PostgreSql_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_PostgreSql_GetGateways()

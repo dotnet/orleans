@@ -17,6 +17,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     [TestCategory("Membership"), TestCategory("SQLServer"), TestCategory("Functional")]
     [TestSuite("Functional")]
+    [TestCategory("ClusteringCurrentSchema")]
     [TestProvider("SqlServer")]
     [TestArea("Membership")]
     public class SqlServerMembershipTableTests : MembershipTableTestsBase
@@ -71,14 +72,14 @@ namespace UnitTests.MembershipTests
             var instance = await RelationalStorageForTesting.SetupInstance(
                 GetAdoInvariant(),
                 testDatabaseName,
-                cancellationToken: TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken,
+                setupSqlScriptFileNames: ["SQLServer-Main.sql", "SQLServer-Clustering.sql"]);
             return instance.CurrentConnectionString;
         }
 
         [Fact]
-        public void MembershipTable_SqlServer_Init()
-        {
-        }
+        public Task MembershipTable_SqlServer_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_SqlServer_GetGateways()

@@ -43,16 +43,16 @@ public abstract class MembershipTableConformanceTestsBase
         => RunConformance((runner, ct) => runner.Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(ct));
 
     [Fact]
-    public Task UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum()
-        => RunConformance((runner, ct) => runner.UpdateIAmAlive_NewerThenOlderAndRepeated_PreservesMaximum(ct));
+    public Task UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion()
+        => RunConformance((runner, ct) => runner.UpdateIAmAlive_OwnerWrites_PreserveCanonicalFieldsAndTableVersion(ct));
 
     [Fact]
-    public Task UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum()
-        => RunConformance((runner, ct) => runner.UpdateRow_FreshTokensAndOldHeartbeat_PreservesMaximum(ct));
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange()
+        => RunConformance((runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct));
 
     [Fact]
-    public Task UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry()
-        => RunConformance((runner, ct) => runner.UpdateRow_HeartbeatOnlyRowEtagConflict_AllowsOneDocumentedRereadRetry(ct));
+    public Task UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange()
+        => RunConformance((runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct));
 
     [Fact]
     public Task Handles_IndependentlyConstructed_ShareCommittedBackingState()
@@ -67,8 +67,8 @@ public abstract class MembershipTableConformanceTestsBase
         => RunConformance((runner, ct) => runner.UpdateRow_StaleTableTokenWithCurrentRowToken_ReturnsFalseWithoutSideEffects(ct));
 
     [Fact]
-    public Task UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects()
-        => RunConformance((runner, ct) => runner.UpdateRow_StaleRowTokenWithFreshTableToken_ReturnsFalseWithoutSideEffects(ct));
+    public Task UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects()
+        => RunConformance((runner, ct) => runner.UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(ct));
 
     [Fact]
     public Task InsertRow_DuplicateIdentity_ReturnsFalseWithoutSideEffects()

@@ -86,6 +86,7 @@ namespace AWSUtils.Tests.MembershipTests
                     {
                         TableName = options.TableName,
                         ConsistentRead = true,
+                        Limit = 1,
                         KeyConditionExpression = "#deployment = :cluster",
                         ExpressionAttributeNames = new()
                         {
@@ -97,17 +98,19 @@ namespace AWSUtils.Tests.MembershipTests
                         },
                         Select = Select.COUNT
                     };
-                    var empty = true;
                     do
                     {
                         // The unfiltered partition query includes VersionRow and follows every continuation key.
                         var page = await probe!.QueryAsync(request, cancellationToken);
-                        empty &= page.Count == 0;
+                        if (page.Count > 0)
+                        {
+                            return false;
+                        }
                         request.ExclusiveStartKey = page.LastEvaluatedKey;
                     }
                     while (request.ExclusiveStartKey is { Count: > 0 });
 
-                    return empty;
+                    return true;
                 });
         }
 
