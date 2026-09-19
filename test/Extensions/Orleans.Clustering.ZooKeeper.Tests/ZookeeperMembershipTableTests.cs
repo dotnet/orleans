@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using Microsoft.Extensions.Logging;
@@ -34,18 +35,25 @@ namespace UnitTests.MembershipTests
     [TestArea("Membership")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase, IAsyncLifetime
     {
-        private readonly NativeSocketDiagnostics _socketDiagnostics = new();
+        private const int MaxSdkMessages = 256;
+        private static readonly SdkDiagnostics Diagnostics = new();
+        private readonly ConcurrentQueue<string> _socketMessages = new();
+        private readonly NativeSocketDiagnostics _socketDiagnostics;
+        private readonly string _socketLog = Path.Combine(AppContext.BaseDirectory, "TestResults", $"zookeeper-sockets-{Guid.NewGuid():N}.log");
+        private int _sdkMessageCount;
 
         static ZookeeperMembershipTableTests()
         {
             ZooKeeper.LogLevel = TraceLevel.Info;
             ZooKeeper.LogToTrace = false;
-            ZooKeeper.CustomLogConsumer = new SdkDiagnostics();
+            ZooKeeper.CustomLogConsumer = Diagnostics;
         }
 
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
             : base(fixture, environment, CreateFilters())
         {
+            _socketDiagnostics = new NativeSocketDiagnostics(_socketMessages.Enqueue);
+            Diagnostics.Message += RecordSdkMessage;
         }
 
         public new async ValueTask DisposeAsync()
@@ -56,7 +64,24 @@ namespace UnitTests.MembershipTests
             }
             finally
             {
+                Diagnostics.Message -= RecordSdkMessage;
                 _socketDiagnostics.Dispose();
+                _socketMessages.Enqueue($"SDK messages observed={Volatile.Read(ref _sdkMessageCount)}; detail-limit={MaxSdkMessages}");
+                System.IO.Directory.CreateDirectory(Path.GetDirectoryName(_socketLog)!);
+                await File.WriteAllLinesAsync(_socketLog, _socketMessages);
+            }
+        }
+
+        private void RecordSdkMessage(string message)
+        {
+            var count = Interlocked.Increment(ref _sdkMessageCount);
+            if (count <= MaxSdkMessages)
+            {
+                _socketMessages.Enqueue(message);
+            }
+            else if (count == MaxSdkMessages + 1)
+            {
+                _socketMessages.Enqueue($"{DateTime.UtcNow:O} SDK message limit reached; subsequent message details are omitted");
             }
         }
 
@@ -145,12 +170,16 @@ namespace UnitTests.MembershipTests
 
         private sealed class SdkDiagnostics : ILogConsumer
         {
+            internal event Action<string>? Message;
+
             public void Log(TraceLevel severity, string className, string message, Exception exception)
             {
                 // The SDK reports transport exceptions at Info, below its default Warning threshold.
                 if (exception is not null || severity <= TraceLevel.Warning)
                 {
-                    Console.Error.WriteLine($"{DateTime.UtcNow:O} [{className}] {severity}: {message}{Environment.NewLine}{exception}");
+                    var record = $"{DateTime.UtcNow:O} [{className}] {severity}: {message}{Environment.NewLine}{exception}";
+                    Console.Error.WriteLine(record);
+                    Message?.Invoke(record);
                 }
             }
         }

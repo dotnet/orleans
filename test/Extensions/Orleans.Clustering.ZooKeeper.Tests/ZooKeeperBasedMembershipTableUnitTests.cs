@@ -25,12 +25,13 @@ namespace UnitTests.MembershipTests
     public sealed class ZooKeeperBasedMembershipTableUnitTests
     {
         [Fact]
-        public async Task NativeSocketDiagnostics_ReportOriginalCompletionError()
+        public async Task NativeSocketDiagnostics_ExistingSourceReportsOriginalCompletionError()
         {
-            var messages = new ConcurrentQueue<string>();
-            using var diagnostics = new ZookeeperMembershipTableTests.NativeSocketDiagnostics(messages.Enqueue);
             using var destination = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             destination.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var messages = new ConcurrentQueue<string>();
+            using var diagnostics = new ZookeeperMembershipTableTests.NativeSocketDiagnostics(messages.Enqueue);
+            Assert.Contains(messages, message => message.EndsWith("Error listener enabled", StringComparison.Ordinal));
             using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             using var operation = new SocketAsyncEventArgs { RemoteEndPoint = destination.LocalEndPoint };
             var completion = new TaskCompletionSource<SocketError>(TaskCreationOptions.RunContinuationsAsynchronously);
