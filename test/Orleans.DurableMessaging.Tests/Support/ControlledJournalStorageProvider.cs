@@ -36,7 +36,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     }
 
     public IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
+        JournalCatalogListOptions? options = null,
         CancellationToken cancellationToken = default) =>
         Inner.ListAsync(options, cancellationToken);
 

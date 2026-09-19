@@ -118,10 +118,10 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         };
     }
     public void Dispose() => Disposals++;
-    public static IEnumerable<IJournaledState> ReadMessagingStates(IJournaledStateManager manager)
+    public static IEnumerable<IStateMachine> ReadMessagingStates(IJournaledStateManager manager)
     {
-        if (manager.TryGetState("__orleans.durable-messaging.inbox", out var inbox)) yield return inbox;
-        if (manager.TryGetState("test-handler-output", out var outbox)) yield return outbox;
+        if (manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox)) yield return inbox;
+        if (manager.TryGetStateMachine("test-handler-output", out var outbox)) yield return outbox;
     }
 
 }

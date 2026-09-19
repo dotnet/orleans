@@ -229,7 +229,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
     private static IEnumerable GetAttemptStates(IGrainContext context)
     {
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
-        Assert.True(manager.TryGetState("__orleans.durable-messaging.inbox-message-state", out var state));
+        Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox-message-state", out var state));
         return Assert.IsAssignableFrom<IEnumerable>(state);
     }
     private int ScheduleCount(IDurableMessagingTestGrain receiver) =>

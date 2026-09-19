@@ -8,7 +8,7 @@ using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
 
-internal class DeferredJournaledDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IJournaledState, IDurableDictionaryCommandHandler<TKey, TValue>
+internal class DeferredJournaledDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue>
     where TKey : notnull
 {
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
@@ -88,7 +88,7 @@ internal class DeferredJournaledDictionary<TKey, TValue> : IDurableDictionary<TK
         MutationVersion = CapturedVersion = AcknowledgedVersion = 0;
     }
 
-    public virtual void AppendEntries(JournalStreamWriter writer)
+    public virtual void WritePendingEntries(JournalStreamWriter writer)
     {
         foreach (var command in _pending)
         {
@@ -110,7 +110,7 @@ internal class DeferredJournaledDictionary<TKey, TValue> : IDurableDictionary<TK
         _pending.Clear();
     }
 
-    public virtual void AppendSnapshot(JournalStreamWriter writer)
+    public virtual void WriteSnapshot(JournalStreamWriter writer)
     {
         _codec.WriteSnapshot(_items, writer);
         CapturedVersion = MutationVersion;
@@ -125,7 +125,6 @@ internal class DeferredJournaledDictionary<TKey, TValue> : IDurableDictionary<TK
     public virtual void ValidateDelete() { }
     public virtual void OnDeleteStarted() { }
     public virtual void OnFaulted(Exception exception) { }
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplySet(TKey key, TValue value) => _items[key] = value;
     void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyRemove(TKey key) => _items.Remove(key);

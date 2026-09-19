@@ -5,7 +5,7 @@ using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
 
-internal class DeferredJournaledValue<T> : IDurableValue<T>, IJournaledState, IDurableValueCommandHandler<T>
+internal class DeferredJournaledValue<T> : IDurableValue<T>, IStateMachine, IDurableValueCommandHandler<T>
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private T? _value;
@@ -39,7 +39,7 @@ internal class DeferredJournaledValue<T> : IDurableValue<T>, IJournaledState, ID
         MutationVersion = CapturedVersion = AcknowledgedVersion = 0;
     }
 
-    public virtual void AppendEntries(JournalStreamWriter writer)
+    public virtual void WritePendingEntries(JournalStreamWriter writer)
     {
         if (HasPendingChanges)
         {
@@ -48,7 +48,7 @@ internal class DeferredJournaledValue<T> : IDurableValue<T>, IJournaledState, ID
         }
     }
 
-    public virtual void AppendSnapshot(JournalStreamWriter writer)
+    public virtual void WriteSnapshot(JournalStreamWriter writer)
     {
         _codec.WriteSet(_value!, writer);
         CapturedVersion = MutationVersion;
@@ -62,6 +62,5 @@ internal class DeferredJournaledValue<T> : IDurableValue<T>, IJournaledState, ID
     public virtual void ValidateDelete() { }
     public virtual void OnDeleteStarted() { }
     public virtual void OnFaulted(Exception exception) { }
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
     void IDurableValueCommandHandler<T>.ApplySet(T value) => _value = value;
 }

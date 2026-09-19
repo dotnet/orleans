@@ -86,6 +86,7 @@ public sealed record DurableDeadLetterSnapshot(
 [GrainType("durable-messaging-inbox-test")]
 public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IDurableJobHandler
 {
+    private readonly IJournaledStateManager _journalOwner;
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
     private readonly IDurableMessagingDiagnostics _diagnostics;
@@ -111,6 +112,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly HashSet<Guid> _failedOnce = [];
 
     public DurableMessagingTestGrain(
+        IJournaledStateManager journalOwner,
         IDurableInbox inbox,
         IDurableOutbox outbox,
         IDurableMessagingDiagnostics diagnostics,
@@ -125,6 +127,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         HandlerProbe handlerProbe,
         SnapshotProbe snapshotProbe)
     {
+        _journalOwner = journalOwner;
         _inbox = inbox;
         _outbox = outbox;
         _diagnostics = diagnostics;
@@ -240,7 +243,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task<DeliveryResult> DeleteJournalThenDeliverAsync(DurableEnvelope envelope)
     {
-        await StateManager.DeleteStateAsync(CancellationToken.None);
+        await _journalOwner.DeleteStateAsync(CancellationToken.None);
         var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
         return await extension.DeliverAsync(envelope);
     }
@@ -272,7 +275,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 await StateManager.WriteStateAsync(attemptCancellationToken);
                 break;
             case "test/delete-journal":
-                await StateManager.DeleteStateAsync(attemptCancellationToken);
+                await _journalOwner.DeleteStateAsync(attemptCancellationToken);
                 break;
             case "test/probe-scheduler":
                 break;
@@ -369,7 +372,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             }
             if (message.DeleteDuringHandling)
             {
-                await StateManager.DeleteStateAsync(cancellationToken);
+                await _journalOwner.DeleteStateAsync(cancellationToken);
             }
             if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && _failedOnce.Add(message.LogicalId)))
             {

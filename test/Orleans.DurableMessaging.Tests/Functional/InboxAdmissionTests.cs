@@ -245,11 +245,11 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var services = Fixture.GetGrainContext(receiver).ActivationServices;
         var manager = services.GetRequiredService<IJournaledStateManager>();
-        Assert.True(manager.TryGetState("__orleans.durable-messaging.inbox", out var inbox));
+        Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
         Assert.Equal("InboxJournalState", inbox.GetType().Name);
         Assert.Same(services.GetRequiredService(ReceiverTestServices.GetImplementationType("InboxJournalState")), inbox);
         Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
-        Assert.True(manager.TryGetState("test-handler-output", out var output));
+        Assert.True(manager.TryGetStateMachine("test-handler-output", out var output));
         Assert.Same(services.GetRequiredService<IDurableOutbox>(), output);
         Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"), output);
     }
