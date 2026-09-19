@@ -218,6 +218,10 @@ public static class LegacyTokenRecoveryFixture
         var handle = CreateHandle(streamId, observer, handshake);
         Add(100, 0);
         var cursor = GetCursor(cache, streamId, handle.GetSequenceToken()!.Token);
+        if (acknowledged)
+        {
+            cache.SetCursorDeliveredThrough(cursor, legacy);
+        }
 
         Assert.False(TryGetNextMessage(cache, cursor, out _));
         foreach (var sequence in new[] { 101L, 102L })
@@ -237,7 +241,6 @@ public static class LegacyTokenRecoveryFixture
 
         Add(501, 0);
         cache.Refresh(cursor, createToken(499, 0));
-        SkipAcknowledgedPosition();
         Assert.True(TryGetNextMessage(cache, cursor, out var first));
         Assert.Equal(500, first.SequenceToken.SequenceNumber);
         Assert.Equal(acknowledged ? 3 : 2, first.SequenceToken.EventIndex);
@@ -249,19 +252,29 @@ public static class LegacyTokenRecoveryFixture
             Assert.Same(legacy, requested!.Token);
             Assert.Empty(observer.Tokens);
             cursor = GetCursor(cache, streamId, requested.Token);
-            SkipAcknowledgedPosition();
+            if (acknowledged)
+            {
+                cache.SetCursorDeliveredThrough(cursor, legacy);
+            }
+
             Assert.True(TryGetNextMessage(cache, cursor, out first));
             Assert.Equal(acknowledged ? 3 : 2, first.SequenceToken.EventIndex);
         }
 
-        // An active refresh keeps its position.
+        // A failed delivery retries the same retained event, while an active refresh keeps its position.
+        cache.RecordDeliveryFailure(cursor);
+        Assert.True(TryGetNextMessage(cache, cursor, out var retried));
+        Assert.Equal(first.SequenceToken, retried.SequenceToken);
         cache.Refresh(cursor, createToken(700, 0));
         cache.Refresh(cursor, createToken(100, 0));
-        Assert.Null(await handle.DeliverBatch(first, handshake));
+        Assert.Null(await handle.DeliverBatch(retried, handshake));
+        cache.RecordDeliverySuccess(cursor);
+        Assert.Equal(retried.SequenceToken, cache.GetSafeSequenceToken(cursor));
 
         while (TryGetNextMessage(cache, cursor, out var batch))
         {
             Assert.Null(await handle.DeliverBatch(batch, handle.GetSequenceToken()));
+            cache.RecordDeliverySuccess(cursor);
         }
 
         Assert.Equal(
@@ -274,18 +287,6 @@ public static class LegacyTokenRecoveryFixture
         Assert.Equal(0, finalToken.EventIndex);
         Assert.Equal(500, legacy.SequenceNumber);
         Assert.Equal(2, legacy.EventIndex);
-
-        void SkipAcknowledgedPosition()
-        {
-            if (!acknowledged)
-            {
-                return;
-            }
-
-            Assert.True(TryGetNextMessage(cache, cursor, out var duplicate));
-            Assert.Equal(0, EventSequenceTokenCompatibility.Compare(legacy, duplicate.SequenceToken));
-            Assert.Equal(0, EventSequenceTokenCompatibility.Compare(duplicate.SequenceToken, legacy));
-        }
 
         void Add(long sequence, int index)
         {

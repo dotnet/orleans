@@ -8,5 +8,6 @@ namespace Orleans.Runtime.GrainDirectory
     {
         bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out List<GrainAddress>? addresses);
         ValueTask<List<GrainAddress>> Lookup(GrainId grainId);
+        void InvalidateCache(GrainId grainId);
     }
 }

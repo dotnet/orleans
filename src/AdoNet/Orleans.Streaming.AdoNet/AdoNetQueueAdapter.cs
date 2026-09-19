@@ -3,17 +3,48 @@ namespace Orleans.Streaming.AdoNet;
 /// <summary>
 /// Stream queue storage adapter for ADO.NET providers.
 /// </summary>
-internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, AdoNetStreamQueueMapper mapper, RelationalOrleansQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapter> logger, IServiceProvider serviceProvider) : IQueueAdapter
+internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
 {
-    private readonly ILogger<AdoNetQueueAdapter> _logger = logger;
+    private readonly AdoNetStreamOptions _streamOptions;
+    private readonly ClusterOptions _clusterOptions;
+    private readonly SimpleQueueCacheOptions _cacheOptions;
+    private readonly AdoNetStreamQueueMapper _mapper;
+    private readonly RelationalOrleansQueries _queries;
+    private readonly Serializer<AdoNetBatchContainer> _serializer;
+    private readonly ILogger<AdoNetQueueAdapter> _logger;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly QueueAdapterReceiverRegistry<AdoNetQueueAdapterReceiver> _receivers;
+
+    public AdoNetQueueAdapter(
+        string name,
+        AdoNetStreamOptions streamOptions,
+        ClusterOptions clusterOptions,
+        SimpleQueueCacheOptions cacheOptions,
+        AdoNetStreamQueueMapper mapper,
+        RelationalOrleansQueries queries,
+        Serializer<AdoNetBatchContainer> serializer,
+        ILogger<AdoNetQueueAdapter> logger,
+        IServiceProvider serviceProvider)
+    {
+        Name = name;
+        _streamOptions = streamOptions;
+        _clusterOptions = clusterOptions;
+        _cacheOptions = cacheOptions;
+        _mapper = mapper;
+        _queries = queries;
+        _serializer = serializer;
+        _logger = logger;
+        _serviceProvider = serviceProvider;
+        _receivers = new QueueAdapterReceiverRegistry<AdoNetQueueAdapterReceiver>(CreateReceiverCore);
+    }
 
     /// <summary>
     /// Maps to the ProviderId in the database.
     /// </summary>
-    public string Name { get; } = name;
+    public string Name { get; }
 
     /// <summary>
-    /// The ADO.NET provider is not yet rewindable.
+    /// The ADO.NET partitioned stream provider resumes from its durable partition checkpoint.
     /// </summary>
     public bool IsRewindable => false;
 
@@ -23,49 +54,65 @@ internal partial class AdoNetQueueAdapter(string name, AdoNetStreamOptions strea
     public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
-    {
-        // map the queue id
-        var adoNetQueueId = mapper.GetAdoNetQueueId(queueId);
+        => _receivers.GetOrCreate(queueId);
 
-        // create the receiver
-        return ReceiverFactory(serviceProvider, [Name, adoNetQueueId, streamOptions, clusterOptions, cacheOptions, queries]);
-    }
+    public IQueueCache CreateQueueCache(QueueId queueId)
+        => _receivers.GetOrCreate(queueId);
 
-    public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken? token, Dictionary<string, object>? requestContext)
+    public async Task QueueMessageBatchAsync<T>(
+        StreamId streamId,
+        IEnumerable<T> events,
+        StreamSequenceToken? token,
+        Dictionary<string, object>? requestContext)
     {
-        // the ADO.NET provider is not rewindable so we do not support user supplied tokens
+        // Producer-supplied tokens are not supported. Replay positions are consumer-side tokens.
         if (token is not null)
         {
             throw new ArgumentException($"{nameof(AdoNetQueueAdapter)} does not support a user supplied {nameof(StreamSequenceToken)}.");
         }
 
-        // map the Orleans stream id to the corresponding queue id
-        var queueId = mapper.GetAdoNetQueueId(streamId);
+        var queueId = _mapper.GetAdoNetQueueId(streamId);
+        var payload = AdoNetBatchContainer.ToMessagePayload(
+            _serializer,
+            streamId,
+            events.Cast<object>().ToList(),
+            requestContext);
 
-        // create the payload from the events
-        var payload = AdoNetBatchContainer.ToMessagePayload(serializer, streamId, events.Cast<object>().ToList(), requestContext);
-
-        // we can enqueue the message now
         try
         {
-            await queries.QueueStreamMessageAsync(clusterOptions.ServiceId, Name, queueId, payload, streamOptions.ExpiryTimeout.TotalSecondsCeiling());
+            await _queries.AppendStreamMessageAsync(
+                _clusterOptions.ServiceId,
+                Name,
+                queueId,
+                streamId.FullKey.ToArray(),
+                streamId.Namespace.Length,
+                payload);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            LogFailedToQueueStreamMessage(ex, clusterOptions.ServiceId, Name, queueId);
+            LogFailedToAppendStreamMessage(
+                exception,
+                _clusterOptions.ServiceId,
+                Name,
+                queueId);
             throw;
         }
     }
 
-    /// <summary>
-    /// The receiver factory.
-    /// </summary>
-    private static readonly ObjectFactory<AdoNetQueueAdapterReceiver> ReceiverFactory = ActivatorUtilities.CreateFactory<AdoNetQueueAdapterReceiver>([typeof(string), typeof(string), typeof(AdoNetStreamOptions), typeof(ClusterOptions), typeof(SimpleQueueCacheOptions), typeof(RelationalOrleansQueries)]);
+    private AdoNetQueueAdapterReceiver CreateReceiverCore(QueueId queueId)
+    {
+        var receiver = ActivatorUtilities.CreateInstance<AdoNetQueueAdapterReceiver>(
+            _serviceProvider,
+            Name,
+            _mapper.GetAdoNetQueueId(queueId),
+            _streamOptions,
+            _clusterOptions,
+            _cacheOptions,
+            _queries);
+        receiver.OnShutdown = current => _receivers.Remove(queueId, current);
+        return receiver;
+    }
 
-    #region Logging
-
-    [LoggerMessage(1, LogLevel.Error, "Failed to queue stream message with ({ServiceId}, {ProviderId}, {QueueId})")]
-    private partial void LogFailedToQueueStreamMessage(Exception ex, string serviceId, string providerId, string queueId);
-
-    #endregion Logging
+    [LoggerMessage(1, LogLevel.Error, "Failed to append stream message with ({ServiceId}, {ProviderId}, {QueueId})")]
+    private partial void LogFailedToAppendStreamMessage(Exception ex, string serviceId, string providerId, string queueId);
 }

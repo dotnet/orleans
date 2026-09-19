@@ -1,7 +1,7 @@
 # Microsoft Orleans Streaming for ADO.NET
 
 ## Introduction
-Microsoft Orleans Streaming for ADO.NET provides a stream provider implementation for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
+Microsoft Orleans Streaming for ADO.NET provides a partitioned stream provider for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -47,6 +47,30 @@ var builder = Host.CreateApplicationBuilder(args)
 // Run the host
 await builder.RunAsync();
 ```
+
+The provider stores each queue as an immutable, ordered stream partition. Its stream partition pipeline appends records, reads partition history, and advances an ownership-fenced checkpoint. Configure it with:
+
+- `StartFromNow`: initialize a new checkpoint at the current partition history tail instead of before the earliest retained record.
+- `FaultOnDeliveryFailure`: optionally fault a failing subscription while preserving the shared partition records.
+- `MaxMessagesPerRead`: bound each ordered storage read.
+- `CheckpointPersistInterval`: throttle durable checkpoint updates.
+- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default).
+- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap.
+- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
+
+`RetentionPeriod`, `CleanupInterval`, and `MaximumRetentionPeriod` (when set) must be at least one second. For valid intervals, storage routines round fractional seconds upward to the next whole second.
+
+The partitioned stream provider resumes strictly after the durable, ownership-fenced queue checkpoint and can redeliver records after a crash without skipping uncheckpointed data. The checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. Subscription starts attach to the live partition position. Partition state retains the next message identifier, so recovery detects a hard-retention gap even when the purge leaves no records.
+
+Partition acquisition is cancellation-aware. A receiver whose acquisition command is still completing retains its queue reservation, so a late database result settles before a replacement receiver acquires a newer ownership epoch.
+
+Message creation and checkpoint-eligibility timestamps are sampled after the partition lock is acquired. Lock contention therefore does not consume the configured retention window.
+
+## Alpha schema upgrade
+
+The current streaming scripts use schema version 2 and are intentionally incompatible with the former queue, visibility-timeout, confirmation, and dead-letter schema. The provider fails during initialization when it detects old or mixed streaming query keys.
+
+There is no in-place migration for this alpha package. Stop producers and consumers, drop `OrleansStreamMessage`, `OrleansStreamDeadLetter`, `OrleansStreamControl`, `OrleansStreamMessageSequence`, the old streaming routines, and their `OrleansQuery` rows. Drop `OrleansStreamPartition` too after a partial version 2 installation. Then apply the current SQL Server, PostgreSQL, or MySQL streaming script. Existing alpha rows are not read or silently converted, so export payloads first if they must be retained.
 
 ## Example - Using ADO.NET Streams in a Grain
 ```csharp
@@ -110,9 +134,9 @@ public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
 
 ## Receiver shutdown
 
-During shutdown or queue reassignment, each receiver closes admission and waits for accepted dequeue and confirmation operations to finish, including batch conversion and receipt bookkeeping. It then releases its pending messages using their current receipts so another receiver can dequeue them promptly.
+During shutdown or queue reassignment, the pulling agent closes processing admission and drains admitted queue reads, registrations, delivery, and durable subscription retirement. It preserves pending-registration and handshake checkpoint barriers before the receiver flushes durable progress and releases its pooled cache resources.
 
-The shutdown timeout bounds the drain wait and the subsequent release query separately. If the drain times out, the receiver logs a warning and pending messages become eligible for redelivery through their database visibility timeout.
+Cancellation before shutdown admission preserves the receiver and its registration. An admitted shutdown uses the first caller's timeout and completes cleanup independently of later caller cancellation; concurrent shutdown calls share that operation. Receiver replacement waits for cleanup and outstanding partition acquisition to settle. The next receiver acquires a fresh ownership epoch and resumes after the durable checkpoint, with retained history governed by the configured retention policy.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
