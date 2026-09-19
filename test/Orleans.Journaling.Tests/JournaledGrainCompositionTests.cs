@@ -336,7 +336,12 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<TimeProvider>());
         builder.AddVolatileJournalStorage().UseJsonJournalFormat(JournalingTestsJsonContext.Default);
-        builder.Services.AddStateMachine<IStateMachine, IStateMachine>(static (_, _) => Substitute.For<IStateMachine>());
+        builder.Services.AddStateMachine<IStateMachine, IStateMachine>(static (_, _) =>
+        {
+            var state = Substitute.For<IStateMachine>();
+            state.IsWritePrepared.Returns(true);
+            return state;
+        });
         return builder;
     }
 
