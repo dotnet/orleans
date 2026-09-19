@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Journaling;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
@@ -223,6 +224,17 @@ public sealed class AlwaysInterleaveBootstrapGrain(BootstrapObservation observat
     : BootstrapControlGrain(observation), IInterleavingBootstrapControlGrain, IDurableMessagingGrain
 {
     public Task InterleaveAsync() => Task.CompletedTask;
+}
+
+[ExecutionProperty(WellKnownGrainTypeProperties.Reentrant, "true")]
+public sealed class MetadataReentrantBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain;
+
+[ExecutionProperty(WellKnownGrainTypeProperties.MayInterleavePredicate, nameof(Interleave))]
+public sealed class MetadataMayInterleaveBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain
+{
+    public static bool Interleave(IInvokable request) => true;
 }
 
 public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture

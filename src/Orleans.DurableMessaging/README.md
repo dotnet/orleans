@@ -28,7 +28,9 @@ inbox, outbox, and registered journaled messaging states.
 
 Setup validates the grain's execution model after the runtime assigns the constructed
 grain instance and before lifecycle startup, journal initialization, or replay. Supported
-activations use a single, noninterleaving grain execution model. Grain construction and
+activations use a single, noninterleaving grain execution model. Validation uses
+the resolved grain properties which configure runtime interleaving, including
+properties supplied by custom grain metadata attributes. Grain construction and
 local state registration precede validation. The standard state manager enrolls in the
 grain lifecycle during grain-bound construction. Standard `IDurableStateManager`
 and `IJournaledStateManager` services alias that same scoped manager. Application
