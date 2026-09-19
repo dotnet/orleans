@@ -128,6 +128,9 @@ the inbox's latched failure before capture.
 A delivery caller can cancel its wait while the owned operation retains admission
 through completion. Activation shutdown drains that operation, and delivery failures
 are logged and observed even after the caller has left.
+Shutdown logs application cancellation-callback failures and completes inbox pump,
+result-registration, metric, and cancellation-source cleanup. An existing terminal
+failure remains the cause reported to operation waiters.
 
 Retained duplicates return `Duplicate`; expiry permits
 acceptance again. Capacity limits return `Backpressured` before persistence.
