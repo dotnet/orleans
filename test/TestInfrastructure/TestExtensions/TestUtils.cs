@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;
 
@@ -13,32 +14,60 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if ((UseAadAuthentication && (TableEndpoint == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
+            if (UseAadAuthentication)
             {
-                throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
-            }
+                GetValue(nameof(TableEndpoint), out var tableEndpoint);
+                GetValue(nameof(DataBlobUri), out var dataBlobUri);
+                GetValue(nameof(DataQueueUri), out var dataQueueUri);
+                if (GetAzureStorageAadConfigurationError(tableEndpoint, dataBlobUri, dataQueueUri) is { } error)
+                {
+                    throw Xunit.Sdk.SkipException.ForSkip(error);
+                }
 
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
+            if (UseAzurite)
             {
-                string errorMsg = "Azure Storage Emulator could not be started.";
-                Console.WriteLine(errorMsg);
-                throw Xunit.Sdk.SkipException.ForSkip(errorMsg);
+                AzuriteContainerManager.EnsureStarted();
+                return;
+            }
+
+            var usingLocalStorageEmulator = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+            if (usingLocalStorageEmulator && !StorageEmulator.TryStart())
+            {
+                const string errorMessage = "Azure Storage Emulator could not be started.";
+                Console.WriteLine(errorMessage);
+                throw Xunit.Sdk.SkipException.ForSkip(errorMessage);
+            }
+        }
+
+        internal static string? GetAzureStorageAadConfigurationError(
+            string? tableEndpoint,
+            string? dataBlobUri,
+            string? dataQueueUri)
+        {
+            var invalidSettings = new List<string>(3);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(TableEndpoint), tableEndpoint);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(DataBlobUri), dataBlobUri);
+            AddInvalidAbsoluteUri(invalidSettings, nameof(DataQueueUri), dataQueueUri);
+
+            return invalidSettings.Count == 0
+                ? null
+                : $"AAD Azure Storage tests require valid absolute service endpoints. Missing or invalid settings: {string.Join(", ", invalidSettings)}.";
+        }
+
+        private static void AddInvalidAbsoluteUri(List<string> invalidSettings, string settingName, string? value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out _))
+            {
+                invalidSettings.Add(settingName);
             }
         }
 
         public static void CheckForEventHub()
         {
-            if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
+            if ((UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubFullyQualifiedNamespace)) ||
                 (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
             {
                 throw Xunit.Sdk.SkipException.ForSkip("No connection string found. Skipping");
