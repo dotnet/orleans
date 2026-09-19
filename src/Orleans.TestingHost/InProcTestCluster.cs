@@ -565,8 +565,14 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="silosToStart">Number of silos to start.</param>
     /// <param name="cancellationToken">The token used to cancel silo startup.</param>
     /// <returns>List of silo handles for the newly started silos.</returns>
-    public async Task<List<InProcessSiloHandle>> StartSilosAsync(
+    public Task<List<InProcessSiloHandle>> StartSilosAsync(
         int silosToStart,
+        CancellationToken cancellationToken)
+        => StartSilosAsync(silosToStart, configureSilo: null, cancellationToken);
+
+    internal async Task<List<InProcessSiloHandle>> StartSilosAsync(
+        int silosToStart,
+        Action<int, InProcessTestSiloSpecificOptions>? configureSilo,
         CancellationToken cancellationToken)
     {
         var instances = new List<InProcessSiloHandle>();
@@ -578,7 +584,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 : silos.Max(static silo => silo.InstanceNumber) + 1;
             var siloStartTasks = Enumerable.Range(firstInstanceNumber, silosToStart)
                 .Select(instanceNumber => Task.Run(
-                    () => StartSiloAsync((short)instanceNumber, Options, cancellationToken),
+                    () => StartSiloAsync(
+                        (short)instanceNumber,
+                        Options,
+                        configureSilo,
+                        cancellationToken),
                     cancellationToken))
                 .ToArray();
 
@@ -995,6 +1005,22 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 });
 
                 var host = appBuilder.Build();
+                if (siloOptions.RingHashCode is { } ringHashCode)
+                {
+                    // Apply the override before any startup service can cache the address's natural ring hashes.
+                    var siloAddress = host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress;
+                    siloAddress.InternalSetConsistentHashCode(unchecked((int)ringHashCode));
+                    var ringOptions = host.Services.GetRequiredService<IOptions<ConsistentRingOptions>>().Value;
+                    if (ringOptions.UseVirtualBucketsConsistentRing)
+                    {
+                        var uniformHashCodes = siloAddress
+                            .GetUniformHashCodes(ringOptions.NumVirtualBucketsConsistentRing)
+                            .ToArray();
+                        uniformHashCodes[0] = ringHashCode;
+                        siloAddress.InternalSetUniformHashCodes(uniformHashCodes);
+                    }
+                }
+
                 TestClusterFatalErrorHandler.Attach(host);
                 InitializeTestHooksSystemTarget(host);
                 try
@@ -1080,8 +1106,20 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         int instanceNumber,
         InProcessTestClusterOptions clusterOptions,
         CancellationToken cancellationToken)
+        => await StartSiloAsync(
+            instanceNumber,
+            clusterOptions,
+            configureSilo: null,
+            cancellationToken);
+
+    private async Task<InProcessSiloHandle> StartSiloAsync(
+        int instanceNumber,
+        InProcessTestClusterOptions clusterOptions,
+        Action<int, InProcessTestSiloSpecificOptions>? configureSilo,
+        CancellationToken cancellationToken)
     {
         var siloOptions = InProcessTestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, assignNewPort: true);
+        configureSilo?.Invoke(instanceNumber, siloOptions);
         var handle = await CreateSiloAsync(siloOptions, cancellationToken);
         handle.InstanceNumber = (short)instanceNumber;
         Interlocked.Increment(ref _startedInstances);
