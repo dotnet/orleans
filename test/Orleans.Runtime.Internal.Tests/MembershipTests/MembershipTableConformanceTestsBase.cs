@@ -14,6 +14,18 @@ public abstract class MembershipTableConformanceTestsBase
     protected virtual void WriteConformanceOutput(string message)
         => TestContext.Current.TestOutputHelper?.WriteLine(message);
 
+    protected MembershipTableModelBasedTestRunner CreateModelBasedRunner()
+        => new(
+            CreateConformanceFixture,
+            new MembershipTableModelBasedConformanceOptions
+            {
+                ProviderName = GetType().Name,
+                Seed = 17,
+                MaxDepth = 3,
+                MaxSequenceLength = 3
+            },
+            output: WriteConformanceOutput);
+
     private Task RunConformance(Func<MembershipTableTestRunner, CancellationToken, Task> scenario)
         => CreateConformanceFixture().RunAsync(
             (fixture, cancellationToken) => scenario(
@@ -132,18 +144,11 @@ public abstract class MembershipTableConformanceTestsBase
     [Fact]
     public Task DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster()
         => RunConformance((runner, ct) => runner.DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct));
+}
 
+public abstract class MembershipTableFullConformanceTestsBase : MembershipTableConformanceTestsBase
+{
     [Fact, TestCategory("ModelBased")]
     public Task MembershipTable_ModelBased_GeneratedConformance()
-        => new MembershipTableModelBasedTestRunner(
-            CreateConformanceFixture,
-            new MembershipTableModelBasedConformanceOptions
-            {
-                ProviderName = GetType().Name,
-                Seed = 17,
-                MaxDepth = 3,
-                MaxSequenceLength = 3
-            },
-            output: WriteConformanceOutput)
-            .RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
+        => CreateModelBasedRunner().RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
 }

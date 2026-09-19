@@ -20,7 +20,7 @@ namespace Tester.Cassandra.Clustering;
 [TestSuite("Functional")]
 [TestProvider("Cassandra")]
 [TestArea("Membership")]
-public sealed partial class CassandraClusteringTableTests : MembershipTableConformanceTestsBase, IClassFixture<CassandraContainer>, IAsyncDisposable
+public sealed partial class CassandraClusteringTableTests : MembershipTableFullConformanceTestsBase, IClassFixture<CassandraContainer>, IAsyncDisposable
 {
     private readonly CassandraContainer _cassandraContainer;
     private readonly ITestOutputHelper _testOutputHelper;

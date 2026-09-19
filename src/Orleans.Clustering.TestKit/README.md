@@ -142,6 +142,9 @@ The generated fact is conventionally named
 `MembershipTableModelBasedTestRunner.RunGeneratedConformanceTests`.
 Generated cases await fixture initialization and disposal through Accordant's
 asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
+The public runner executes the complete generated suite. Repository hosted
+system-target tests distribute the same seed-17 manifest across four xUnit cases
+(240, 240, 240, and 239 histories), preserving every history and operation count.
 
 ## Comparison and protocol rules
 

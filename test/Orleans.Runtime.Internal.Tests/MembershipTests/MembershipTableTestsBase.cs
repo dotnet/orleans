@@ -25,7 +25,7 @@ namespace UnitTests.MembershipTests
 
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("Functional")]
-    public abstract class MembershipTableTestsBase : MembershipTableConformanceTestsBase, IAsyncLifetime, IClassFixture<ConnectionStringFixture>
+    public abstract class MembershipTableTestsBase : MembershipTableFullConformanceTestsBase, IAsyncLifetime, IClassFixture<ConnectionStringFixture>
     {
         private static readonly string hostName = Dns.GetHostName();
         private readonly ILogger logger;
