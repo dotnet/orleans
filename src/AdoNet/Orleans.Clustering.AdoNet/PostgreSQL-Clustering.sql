@@ -115,7 +115,8 @@ CREATE FUNCTION insert_membership(
     ProxyPortArg    OrleansMembershipTable.ProxyPort%TYPE,
     StartTimeArg    OrleansMembershipTable.StartTime%TYPE,
     IAmAliveTimeArg OrleansMembershipTable.IAmAliveTime%TYPE,
-    VersionArg      OrleansMembershipVersionTable.Version%TYPE)
+    VersionArg      OrleansMembershipVersionTable.Version%TYPE,
+    SuspectTimesArg OrleansMembershipTable.SuspectTimes%TYPE)
   RETURNS TABLE(row_count integer) AS
 $func$
 DECLARE
@@ -144,7 +145,8 @@ BEGIN
             Status,
             ProxyPort,
             StartTime,
-            IAmAliveTime
+            IAmAliveTime,
+            SuspectTimes
         )
         SELECT
             DeploymentIdArg,
@@ -156,7 +158,8 @@ BEGIN
             StatusArg,
             ProxyPortArg,
             StartTimeArg,
-            IAmAliveTimeArg
+            IAmAliveTimeArg,
+            SuspectTimesArg
         WHERE RowCountVar > 0
         ON CONFLICT (DeploymentId, Address, Port, Generation) DO
             NOTHING;
@@ -193,7 +196,8 @@ VALUES
         @ProxyPort,
         @StartTime,
         @IAmAliveTime,
-        @Version
+        @Version,
+        @SuspectTimes
     );
 ');
 

@@ -398,7 +398,8 @@ namespace Orleans.Tests.SqlUtils
                     StartTime = membershipEntry.StartTime,
                     Status = membershipEntry.Status,
                     ProxyPort = membershipEntry.ProxyPort,
-                    Version = etag
+                    Version = etag,
+                    SuspectTimes = membershipEntry.SuspectTimes
                 }, ret => ret.First(), cancellationToken);
         }
 
