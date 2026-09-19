@@ -142,6 +142,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true, true)]
         public async Task UpdateIAmAlive_OneCommandPreservesOtherBytesAndExpiry(bool hasVersion, bool expires)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -210,6 +211,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true)]
         public async Task CanonicalWrite_UsesOriginalTokensAfterOwnerHeartbeat(bool insert)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -277,6 +279,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true, 10)]
         public async Task CanonicalWrite_RejectsNonSequentialVersionInOneCommand(bool insert, int proposedVersion)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -345,6 +348,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true)]
         public async Task Cleanup_OneScanAndAtomicCandidateCommands_PreserveRacingChanges(bool refreshCandidate)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
