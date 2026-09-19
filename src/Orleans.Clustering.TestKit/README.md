@@ -140,6 +140,8 @@ runs the same behavioral assertions.
 The generated fact is conventionally named
 `MembershipTable_ModelBased_GeneratedConformance`; it calls
 `MembershipTableModelBasedTestRunner.RunGeneratedConformanceTests`.
+Generated cases await fixture initialization and disposal through Accordant's
+asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
 
 ## Comparison and protocol rules
 
