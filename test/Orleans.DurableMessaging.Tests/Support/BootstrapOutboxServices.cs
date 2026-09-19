@@ -26,6 +26,8 @@ internal static class BootstrapOutboxServices
     {
         var outboxType = ReceiverTestServices.GetImplementationType("DurableOutbox");
         services.RemoveAll<IDurableOutbox>();
+        services.RemoveAllKeyed<IDurableOutbox>(KeyedService.AnyKey);
+        services.RemoveAllKeyed<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output");
         services.TryAddScoped(outboxType);
         services.AddScoped<IDurableOutbox>(provider => (IDurableOutbox)provider.GetRequiredService(outboxType));
         AddAlias(typeof(IDurableDictionary<Guid, DurableEnvelope>), StateNames[0], "MessageState");
@@ -76,7 +78,7 @@ public interface IBootstrapOutputGrain : IGrainWithStringKey
 
 [GrainType("bootstrap-output")]
 public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurableMessagingGrain, IInboxHandler,
-    IJournaledState, IDurableDictionaryCommandHandler<Guid, int>
+    IStateMachine, IDurableDictionaryCommandHandler<Guid, int>
 {
     private readonly Dictionary<Guid, int> _values = [];
     private readonly List<(GrainId Sender, Guid MessageId, int Value)> _pending = [];
@@ -88,7 +90,7 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     {
         _probe = probe;
         _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
-        manager.RegisterState("bootstrap-output-values", this);
+        manager.RegisterStateMachine("bootstrap-output-values", this);
         inbox.RegisterHandler("output", this);
     }
 
@@ -108,13 +110,13 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     }
 
     public Task<int> GetMessageCountAsync() => Task.FromResult(_values.Count);
-    public void AppendEntries(JournalStreamWriter writer)
+    public void WritePendingEntries(JournalStreamWriter writer)
     {
         _captured = _pending.ToArray();
         _pending.Clear();
         foreach (var item in _captured) _codec.WriteSet(item.MessageId, item.Value, writer);
     }
-    public void AppendSnapshot(JournalStreamWriter writer)
+    public void WriteSnapshot(JournalStreamWriter writer)
     {
         _captured = _pending.ToArray();
         _pending.Clear();
@@ -133,7 +135,7 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     }
     public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
-    public IJournaledState DeepCopy() => throw new NotSupportedException();
+
     public void ApplySet(Guid key, int value) => _values[key] = value;
     public void ApplyRemove(Guid key) => _values.Remove(key);
     public void ApplyClear() => _values.Clear();

@@ -362,9 +362,9 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var applicationManager = services.GetRequiredService<IDurableStateManager>();
         Assert.Same(observation.Manager, applicationManager);
         Assert.Same(observation.Value, applicationManager.GetOrAddState<IDurableValue<int>>("bootstrap-value"));
-        Assert.True(applicationManager.TryGetState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output", out var applicationOutbox));
-        Assert.Same(((JournaledTestOutbox)observation.Outbox!).StoredMessages, applicationOutbox);
-        Assert.Same(applicationOutbox, applicationManager.GetOrAddState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"));
+        Assert.True(applicationManager.TryGetState<IDurableDictionary<Guid, DurableEnvelope>>(BootstrapOutboxServices.StateName, out var applicationOutbox));
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>(BootstrapOutboxServices.StateName), applicationOutbox);
+        Assert.Same(applicationOutbox, applicationManager.GetOrAddState<IDurableDictionary<Guid, DurableEnvelope>>(BootstrapOutboxServices.StateName));
         Assert.Same(observation.Value, services.GetRequiredKeyedService<IDurableValue<int>>("bootstrap-value"));
         Assert.Same(observation.Inbox, services.GetRequiredService<IDurableInbox>());
         Assert.Same(observation.Outbox, services.GetRequiredService<IDurableOutbox>());

@@ -1815,7 +1815,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
             var silo = Substitute.For<ISiloBuilder>();
             silo.Services.Returns(services);
-            silo.AddJournalStorage();
+            silo.AddJournaling();
             var storage = new ControlledJournalStorageProvider();
             storage.Configure(Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
             services.AddSingleton<IJournalStorageProvider>(storage);
@@ -1825,10 +1825,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         private UntypedDurableDictionary WrapInternalDictionary(string name, string valueType)
         {
             var type = typeof(TestDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType(valueType));
-            return new(Activator.CreateInstance(type, Manager.GetState<IJournaledState>(name))!);
+            return new(Activator.CreateInstance(type, Manager.GetState<IStateMachine>(name))!);
         }
         public IDurableOutbox Outbox => _outbox;
-        public IJournaledState PrimaryState => Manager.GetState<IJournaledState>("__orleans.durable-messaging.outbox");
+        public IStateMachine PrimaryState => Manager.GetState<IStateMachine>("__orleans.durable-messaging.outbox");
         private object PumpResults => _outbox.GetType().GetField("_pumpResults", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_outbox)!;
         public IDictionary PumpEntries => (IDictionary)PumpResults.GetType().GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(PumpResults)!;
 
@@ -2114,7 +2114,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
     private sealed class TestStateManager : IJournaledStateManager, IDisposable
     {
-        private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
         private readonly IJournaledStateManager _codecManager;
         private readonly IJournalFormat _format;
         private readonly bool _supportsStateCodecs;
@@ -2129,7 +2129,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public TestStateManager(IServiceProvider services, Exception? writeException, bool supportsStateCodecs, bool eagerCapture)
         {
-            _codecManager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(new JournalId($"outbox-components/{Guid.NewGuid():N}"));
+            _codecManager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(new JournalId($"outbox-components/{Guid.NewGuid():N}"));
             _format = services.GetRequiredKeyedService<IJournalFormat>("orleans-binary");
             _nextWriteException = writeException;
             _supportsStateCodecs = supportsStateCodecs;
@@ -2159,8 +2159,8 @@ public sealed class DurableOutboxDeliveryBatchTests
         public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull => _supportsStateCodecs
             ? _codecManager.GetRequiredCommandCodec<TCodec>()
             : throw new NotSupportedException("Journal command codec support is required.");
-        public void RegisterState(string name, IJournaledState state) => _states.Add(name, state);
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
+        public void RegisterStateMachine(string name, IStateMachine state) => _states.Add(name, state);
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? state) => _states.TryGetValue(name, out state);
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken)
         {
@@ -2213,7 +2213,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 BeforeFinalization?.Invoke();
                 using var writer = _format.CreateWriter();
                 uint id = 1;
-                foreach (var state in _states.Values) state.AppendEntries(writer.CreateJournalStreamWriter(new(id++)));
+                foreach (var state in _states.Values) state.WritePendingEntries(writer.CreateJournalStreamWriter(new(id++)));
                 using var buffer = writer.GetBuffer();
                 var snapshot = _adapters.Select(static state => state.Capture()).ToArray();
                 CaptureCount++;

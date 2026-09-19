@@ -285,7 +285,7 @@ public sealed class OutboxCodecBoundaryTests
         await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation, snapshot: snapshot);
         Assert.Equal(7, fixture.States.StateCount);
         Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(
-            fixture.States.GetState<IJournaledState>("__orleans.durable-messaging.outbox"));
+            fixture.States.GetState<IStateMachine>("__orleans.durable-messaging.outbox"));
         var first = fixture.CreateEnvelope();
         fixture.Outbox.Send(first);
         var storage = fixture.Storage.BlockWrite(fixture.JournalId);
@@ -399,7 +399,7 @@ public sealed class OutboxCodecBoundaryTests
         public override void ValidateWrite() { RequestCount++; throw Failure; }
     }
 
-    private class ProbeState : IJournaledState, IDurableValueCommandHandler<int>
+    private class ProbeState : IStateMachine, IDurableValueCommandHandler<int>
     {
         private IDurableValueCommandCodec<int> _codec = null!;
         private int _value;
@@ -410,14 +410,13 @@ public sealed class OutboxCodecBoundaryTests
         public virtual void ValidateWrite() { }
         public void Reset(JournalStreamWriter writer) => _value = 0;
         public void OnRecoveryCompleted() { }
-        public void AppendEntries(JournalStreamWriter writer) { }
-        public void AppendSnapshot(JournalStreamWriter writer) => _codec.WriteSet(_value, writer);
+        public void WritePendingEntries(JournalStreamWriter writer) { }
+        public void WriteSnapshot(JournalStreamWriter writer) => _codec.WriteSet(_value, writer);
         public void OnWriteCompleted() { }
         public void OnFaulted(Exception exception) => FaultCount++;
         public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
         public void ApplySet(int value) => _value = value;
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class PreparationProbe : ProbeState
@@ -490,7 +489,7 @@ public sealed class OutboxCodecBoundaryTests
         {
             get
             {
-                var entries = States.GetState<IJournaledState>("__orleans.durable-messaging.outbox-dead-letters");
+                var entries = States.GetState<IStateMachine>("__orleans.durable-messaging.outbox-dead-letters");
                 return (int)entries.GetType().GetProperty("Count")!.GetValue(entries)!;
             }
         }
@@ -518,9 +517,9 @@ public sealed class OutboxCodecBoundaryTests
             services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
             var silo = Substitute.For<ISiloBuilder>();
             silo.Services.Returns(services);
-            silo.AddJournalStorage();
+            silo.AddJournaling();
             services.AddSingleton<IJournalStorageProvider>(snapshot ? new SnapshotStorageProvider(Storage) : Storage);
-            services.AddScoped(sp => new StateTrackingManager(sp.GetRequiredService<IJournaledStateManagerFactory>().Create(JournalId), Probe));
+            services.AddScoped(sp => new StateTrackingManager(sp.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(JournalId), Probe));
             services.AddScoped<IJournaledStateManager>(sp => sp.GetRequiredService<StateTrackingManager>());
             var context = Context = Substitute.For<IGrainContext>();
             context.GrainId.Returns(GrainId.Create("sender", "codec-boundary"));
@@ -562,7 +561,7 @@ public sealed class OutboxCodecBoundaryTests
             if (additionalState is not null)
             {
                 additionalState.Bind(Manager);
-                Manager.RegisterState("codec-probe-value", additionalState);
+                Manager.RegisterStateMachine("codec-probe-value", additionalState);
             }
             States.RegisterStates(stateOrder);
             Messages = States.GetState<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox");
@@ -584,11 +583,10 @@ public sealed class OutboxCodecBoundaryTests
 
         public async Task SeedOwnerlessJournalAsync(JournalId journal, DurableEnvelope envelope)
         {
-            await using var manager = _services.GetRequiredService<IJournaledStateManagerFactory>().Create(journal);
-            var type = typeof(IJournaledStateManager).Assembly.GetType("Orleans.Journaling.DurableDictionary`2", throwOnError: true)!
-                .MakeGenericType(typeof(Guid), typeof(DurableEnvelope));
-            var messages = (IDurableDictionary<Guid, DurableEnvelope>)ActivatorUtilities.CreateInstance(_scope.ServiceProvider, type,
-                "__orleans.durable-messaging.outbox", manager);
+            await using var manager = _services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(journal);
+            var state = ReceiverTestServices.CreateStandardDictionary<Guid, DurableEnvelope>(manager);
+            manager.RegisterStateMachine("__orleans.durable-messaging.outbox", state);
+            var messages = (IDurableDictionary<Guid, DurableEnvelope>)state;
             await manager.InitializeAsync(TestContext.Current.CancellationToken);
             messages.Add(envelope.MessageId, envelope);
             await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -615,27 +613,27 @@ public sealed class OutboxCodecBoundaryTests
 
     private sealed class StateTrackingManager(IJournaledStateManager inner, CodecProbe probe) : IJournaledStateManager
     {
-        private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
         public Exception? Failure { get; private set; }
         public int StateCount => _states.Count;
-        public void RegisterState(string name, IJournaledState state) => _states.Add(name, state);
+        public void RegisterStateMachine(string name, IStateMachine state) => _states.Add(name, state);
         public void RegisterStates(int rotation)
         {
             var entries = _states.ToArray();
             foreach (var entry in entries.Skip(rotation).Concat(entries.Take(rotation)))
             {
-                inner.RegisterState(entry.Key, new TrackedState(this, entry.Value, probe));
+                inner.RegisterStateMachine(entry.Key, new TrackedState(this, entry.Value, probe));
             }
         }
         public T GetState<T>(string name) => (T)_states[name];
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? state) => _states.TryGetValue(name, out state);
         public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull => inner.GetRequiredCommandCodec<TCodec>();
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
         public ValueTask DisposeAsync() => inner.DisposeAsync();
 
-        private sealed class TrackedState(StateTrackingManager owner, IJournaledState state, CodecProbe probe) : IJournaledState
+        private sealed class TrackedState(StateTrackingManager owner, IStateMachine state, CodecProbe probe) : IStateMachine
         {
             public bool IsWritePrepared => state.IsWritePrepared;
             public async ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
@@ -646,14 +644,13 @@ public sealed class OutboxCodecBoundaryTests
             public void ValidateWrite() => state.ValidateWrite();
             public void ValidateDelete() => state.ValidateDelete();
             public void OnDeleteStarted() => state.OnDeleteStarted();
-            public void AppendEntries(JournalStreamWriter writer) { probe.Phase = "capture"; state.AppendEntries(writer); }
-            public void AppendSnapshot(JournalStreamWriter writer) { probe.Phase = "capture"; state.AppendSnapshot(writer); }
+            public void WritePendingEntries(JournalStreamWriter writer) { probe.Phase = "capture"; state.WritePendingEntries(writer); }
+            public void WriteSnapshot(JournalStreamWriter writer) { probe.Phase = "capture"; state.WriteSnapshot(writer); }
             public void OnWriteCompleted() => state.OnWriteCompleted();
             public void Reset(JournalStreamWriter writer) => state.Reset(writer);
             public void OnRecoveryCompleted() => state.OnRecoveryCompleted();
             public void ReplayEntry(JournalEntry entry, JournalReplayContext context) => state.ReplayEntry(entry, context);
             public void OnFaulted(Exception exception) { owner.Failure ??= exception; state.OnFaulted(exception); }
-            public IJournaledState DeepCopy() => throw new NotSupportedException();
         }
     }
 
