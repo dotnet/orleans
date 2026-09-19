@@ -92,8 +92,9 @@ namespace Consul.Tests
         {
             cancellationToken.ThrowIfCancellationRequested();
             using var client = new ConsulClient(options => options.Address = new Uri(connectionString));
-            var response = await client.KV.List(
+            var response = await client.KV.Keys(
                 $"orleans/{clusterId}/",
+                separator: null,
                 new QueryOptions { Consistency = ConsistencyMode.Consistent },
                 cancellationToken);
             if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.NotFound))
