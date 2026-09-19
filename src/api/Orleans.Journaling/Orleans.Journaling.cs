@@ -224,6 +224,7 @@ namespace Orleans.Journaling
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken = default);
+        TCodec GetRequiredCommandCodec<TCodec>();
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken = default);
         void RegisterStateMachine(string name, IStateMachine stateMachine);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
@@ -305,10 +306,17 @@ namespace Orleans.Journaling
 
     public partial interface IStateMachine
     {
+        bool IsWritePrepared { get; }
+
+        void OnDeleteStarted();
+        void OnFaulted(System.Exception exception);
         void OnRecoveryCompleted();
         void OnWriteCompleted();
+        System.Threading.Tasks.ValueTask PrepareWriteAsync(System.Threading.CancellationToken cancellationToken);
         void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         void Reset(JournalStreamWriter writer);
+        void ValidateDelete();
+        void ValidateWrite();
         void WritePendingEntries(JournalStreamWriter writer);
         void WriteSnapshot(JournalStreamWriter writer);
     }
