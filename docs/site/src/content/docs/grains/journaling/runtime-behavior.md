@@ -107,7 +107,8 @@ or repair the backing data before creating a fresh manager or retrying activatio
 Custom <xref:Orleans.Journaling.IStateMachine> implementations share the manager's single logical execution thread.
 Resolve write codecs through <xref:Orleans.Journaling.IJournaledStateManager.GetRequiredCommandCodec*> to use the
 owning manager's configured format, including before recovery of an empty journal. Delegating managers forward
-codec resolution to that owner.
+codec resolution to that owner. Grain-bound managers resolve codecs from the activation's services;
+standalone owners use shared application services.
 
 <xref:Orleans.Journaling.IStateMachine.ValidateWrite*> and <xref:Orleans.Journaling.IStateMachine.ValidateDelete*>
 perform pure validation in the requesting caller's context. An admission rejection leaves the manager healthy.

@@ -382,8 +382,8 @@ public partial class StateManagerTests
         await using var manager = CreateTestSystem(storage).Manager;
         var first = new HookState();
         var second = new HookState();
-        manager.RegisterState("first", first);
-        manager.RegisterState("second", second);
+        manager.RegisterStateMachine("first", first);
+        manager.RegisterStateMachine("second", second);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         var current = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await WaitFor(storage.BlockedAppendStarted.Task);
@@ -395,7 +395,7 @@ public partial class StateManagerTests
             workerReady.SetResult();
             await WaitFor(callbackEntered.Task);
             return (ThreadId: Environment.CurrentManagedThreadId,
-                Failure: Record.Exception(() => manager.RegisterState("late", new HookState())));
+                Failure: Record.Exception(() => manager.RegisterStateMachine("late", new HookState())));
         }, TestContext.Current.CancellationToken);
         await WaitFor(workerReady.Task);
         Exception? callbackError = null;
@@ -430,7 +430,8 @@ public partial class StateManagerTests
         Assert.Equal(["first", "second"], notifications);
         Assert.Equal(1, first.FaultCount);
         Assert.Equal(1, second.FaultCount);
-        Assert.False(manager.TryGetState("late", out _));
+        var lookup = Assert.Throws<InvalidOperationException>(() => manager.TryGetStateMachine("late", out _));
+        Assert.Same(expected, lookup.InnerException);
     }
 
     [Fact]
