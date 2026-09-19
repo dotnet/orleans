@@ -35,6 +35,7 @@ internal sealed class IdealizedMembershipBackend
     internal int PointReads;
     internal int RowsObserved;
     internal int Inserts;
+    internal int InsertsWithSuspectVotes;
     internal readonly List<(string Cluster, IdealizedMembershipTable Owner, SiloAddress Identity, DateTime Time, SiloStatus Status)> HeartbeatWrites = [];
 
     internal string Token() => $"opaque/{++Tokens:x}/token";
@@ -167,6 +168,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             backend.Inserts++;
             var partition = Partition;
             if (partition.Etag != tableVersion.VersionEtag || partition.Rows.ContainsKey(entry.SiloAddress)) return false;
+            if (entry.SuspectTimes is { Count: > 0 }) backend.InsertsWithSuspectVotes++;
             var stored = Clone(entry);
             if (backend.SeparateHeartbeatStorage) stored.IAmAliveTime = stored.StartTime;
             partition.Rows.Add(entry.SiloAddress, Tuple.Create(stored, backend.Token()));
