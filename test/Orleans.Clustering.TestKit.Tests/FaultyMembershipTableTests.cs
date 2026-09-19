@@ -1,3 +1,4 @@
+using Orleans.Runtime;
 using Xunit;
 
 namespace Orleans.Clustering.TestKit.Tests;
@@ -151,10 +152,84 @@ public sealed class FaultyMembershipTableTests
             return pointRead ? runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct)
                 : runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
         }, TestContext.Current.CancellationToken));
+        TestContext.Current.TestOutputHelper!.WriteLine(failure.ToString());
         Assert.Contains("Status", failure.Message);
         Assert.True(control.ReadStarted.Task.IsCompletedSuccessfully);
         Assert.True(control.Committed.Task.IsCompletedSuccessfully);
         Assert.True(control.Injected > 0);
+    }
+
+    [Theory]
+    [InlineData(false, "readers-first")]
+    [InlineData(true, "readers-first")]
+    [InlineData(false, "writer-first")]
+    [InlineData(true, "writer-first")]
+    [InlineData(false, "target-reader-first")]
+    [InlineData(true, "target-reader-first")]
+    public async Task AtomicObservation_ControlledReaderOrder_AlwaysInjectsTornTarget(bool pointRead, string schedule)
+    {
+        var control = new MembershipFaultController(pointRead ? MembershipFault.TornReadRow : MembershipFault.TornReadAll);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        await control.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            await new MembershipTableTestRunner(fixture, concurrencyRowCount: 5).SeedConcurrentRows(ct);
+            var before = await MembershipTableTestRunner.Read(fixture.First, ct);
+            MembershipTableTestRunner.Equal(before, await MembershipTableTestRunner.Read(fixture.Second, ct));
+            var target = MembershipTableTestData.Forward(MembershipTableTestData.CreateEntry(1));
+            var keys = new[] { target.SiloAddress, MembershipTableTestData.CreateEntry(3).SiloAddress, MembershipTableTestData.CreateEntry(6).SiloAddress };
+            Task<MembershipTableData> Read(int index) => pointRead
+                ? fixture.First.ReadRowAsync(keys[index], ct)
+                : fixture.First.ReadAllAsync(ct);
+            Task<bool> Write() => fixture.Second.UpdateRowAsync(target, before.Row(target.SiloAddress).Etag, before.Next(), ct);
+
+            Task<bool> writer;
+            Task<MembershipTableData>[] readers;
+            bool earlyReadersPending;
+            if (schedule == "writer-first")
+            {
+                writer = Write();
+                earlyReadersPending = !writer.IsCompleted;
+                readers = [Read(0), Read(1), Read(2)];
+            }
+            else if (schedule == "target-reader-first")
+            {
+                var targetRead = Read(0);
+                earlyReadersPending = !targetRead.IsCompleted;
+                writer = Write();
+                readers = [targetRead, Read(1), Read(2)];
+            }
+            else
+            {
+                readers = [Read(0), Read(1), Read(2)];
+                earlyReadersPending = readers.All(read => !read.IsCompleted);
+                writer = Write();
+            }
+
+            // Join the actual operations before fixture teardown, including on cancellation.
+            await Task.WhenAll(readers.Cast<Task>().Append(writer));
+            Assert.True(earlyReadersPending, $"{schedule}: the first operations must wait for their counterpart.");
+            Assert.True(await writer);
+            Assert.True(control.WriterArmed.Task.IsCompletedSuccessfully);
+            Assert.True(control.ReadStarted.Task.IsCompletedSuccessfully);
+            Assert.True(control.Committed.Task.IsCompletedSuccessfully);
+            for (var i = 0; i < readers.Length; i++)
+            {
+                var sample = ClusteringMembershipSnapshot.Capture(await readers[i]);
+                Assert.Equal(before.Version + 1, sample.Version);
+                Assert.NotEqual(before.TableEtag, sample.TableEtag);
+                var oldRows = pointRead ? before.Select(keys[i]) : before;
+                MembershipTableTestRunner.Equal(oldRows with { Version = sample.Version, TableEtag = sample.TableEtag }, sample);
+            }
+
+            var tornTarget = ClusteringMembershipSnapshot.Capture(await readers[0]);
+            var failure = Assert.Throws<ClusteringConformanceException>(() => MembershipTableTestRunner.EqualRow(
+                MembershipEntrySnapshot.Capture(target), tornTarget.Row(target.SiloAddress).Entry));
+            Assert.Contains("Status", failure.Message);
+            Assert.True(control.Injected > 0);
+        }, timeout.Token);
+        Assert.Equal(control.Backend.CreatedHandles, control.Backend.DisposedHandles);
+        Assert.Empty(control.Backend.Partitions);
     }
 
     [Theory]
