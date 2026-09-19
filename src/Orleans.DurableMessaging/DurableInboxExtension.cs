@@ -777,6 +777,11 @@ internal sealed partial class DurableInboxExtension :
         _failure ??= ExceptionDispatchInfo.Capture(exception);
         _pumpCoordinator.Reset();
         _pumpResults.Clear(JobName);
+        CancelProcessing();
+    }
+
+    private void CancelProcessing()
+    {
         try
         {
             _shutdownCts.Cancel();
@@ -796,7 +801,7 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "An inbox cancellation callback failed while stopping terminal processing.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "An inbox cancellation callback failed while stopping processing.")]
     private static partial void LogCancellationCallbackFailure(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after an inbox persistence failure failed.")]
@@ -890,12 +895,18 @@ internal sealed partial class DurableInboxExtension :
 
     internal void StopProcessing()
     {
-        _shutdownCts.Cancel();
-        _pumpCoordinator.Reset();
-        _pumpResults.Clear(JobName);
-        if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
+        try
         {
-            _instruments.OnInboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
+            CancelProcessing();
+        }
+        finally
+        {
+            _pumpCoordinator.Reset();
+            _pumpResults.Clear(JobName);
+            if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
+            {
+                _instruments.OnInboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
+            }
         }
     }
 
@@ -903,8 +914,14 @@ internal sealed partial class DurableInboxExtension :
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
-            StopProcessing();
-            _shutdownCts.Dispose();
+            try
+            {
+                StopProcessing();
+            }
+            finally
+            {
+                _shutdownCts.Dispose();
+            }
         }
     }
 
