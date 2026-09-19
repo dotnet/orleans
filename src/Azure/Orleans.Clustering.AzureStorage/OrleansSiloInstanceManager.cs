@@ -219,7 +219,7 @@ namespace Orleans.AzureUtils
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId, cancellationToken);
 
-            await DeleteEntriesBatch(entries, cancellationToken);
+            await DeleteEntriesBatch(entries, storage.DeleteTableEntriesAsync, cancellationToken);
 
             return entries.Count;
         }
@@ -227,7 +227,8 @@ namespace Orleans.AzureUtils
         /// <summary>
         /// Deletes Dead entries whose latest start, heartbeat, and suspicion times precede the cutoff,
         /// using row etags to protect concurrent updates and preserving the membership version.
-        /// The caller schedules subsequent attempts after native contention.
+        /// Confirmed entity absence removes that candidate from the remaining conditional batch.
+        /// The caller schedules subsequent attempts after propagated native contention.
         /// </summary>
         public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
@@ -238,7 +239,7 @@ namespace Orleans.AzureUtils
                     && GetEffectiveUpdateTime(entry.Entity) < beforeDate.UtcDateTime)
                 .ToList();
 
-            await DeleteEntriesBatch(defunct, cancellationToken);
+            await DeleteEntriesBatch(defunct, DeleteCleanupBatch, cancellationToken);
         }
 
         private static DateTime GetEffectiveUpdateTime(SiloInstanceTableEntry entry)
@@ -262,17 +263,43 @@ namespace Orleans.AzureUtils
             return result;
         }
 
-        private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList, CancellationToken cancellationToken)
+        private async Task DeleteCleanupBatch(List<(SiloInstanceTableEntry, string)> entries, CancellationToken cancellationToken)
+        {
+            while (entries.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await storage.DeleteTableEntriesAsync(entries, cancellationToken);
+                    return;
+                }
+                catch (TableTransactionFailedException exception) when (
+                    exception.Status == 404
+                    && exception.ErrorCode is "ResourceNotFound" or "EntityNotFound"
+                    && exception.FailedTransactionActionIndex is int index
+                    && index >= 0 && index < entries.Count)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    // The failed transaction committed nothing. Each retry removes one confirmed-absent candidate.
+                    entries.RemoveAt(index);
+                }
+            }
+        }
+
+        private async Task DeleteEntriesBatch(
+            List<(SiloInstanceTableEntry, string)> entriesList,
+            Func<List<(SiloInstanceTableEntry, string)>, CancellationToken, Task> deleteBatch,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (entriesList.Count <= this.storagePolicyOptions.MaxBulkUpdateRows)
             {
-                await storage.DeleteTableEntriesAsync(entriesList, cancellationToken);
+                await deleteBatch(entriesList, cancellationToken);
             }
             else
             {
                 await TaskUtilities.WhenAllWithAggregateException(entriesList.BatchIEnumerable(this.storagePolicyOptions.MaxBulkUpdateRows)
-                    .Select(batch => storage.DeleteTableEntriesAsync(batch, cancellationToken)));
+                    .Select(batch => deleteBatch(batch, cancellationToken)));
             }
         }
 
