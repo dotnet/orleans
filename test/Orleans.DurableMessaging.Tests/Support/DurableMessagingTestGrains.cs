@@ -205,7 +205,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task DeleteThenWriteStateAsync()
     {
-        await StateManager.DeleteStateAsync(CancellationToken.None);
+        await _journalOwner.DeleteStateAsync(CancellationToken.None);
         await WriteStateAsync();
     }
 

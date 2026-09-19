@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ using NSubstitute;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Xunit;
 
@@ -158,7 +160,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new ReentrantTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(ReentrantTestGrain))]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("non-reentrant", diagnostic.Message, StringComparison.Ordinal);
@@ -178,7 +180,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new InterleavableTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(InterleavableTestGrain))]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("interleavable method", diagnostic.Message, StringComparison.Ordinal);
@@ -198,7 +200,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new StatelessWorkerTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(StatelessWorkerTestGrain))]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("one activation", diagnostic.Message, StringComparison.Ordinal);
@@ -252,6 +254,14 @@ public sealed class PublicDurableMessagingRegistrationTests
         public override DateTimeOffset GetUtcNow() => utcNow;
     }
 
+    private static GrainProperties GetGrainProperties(Type grainType)
+    {
+        var values = new Dictionary<string, string>();
+        new AttributeGrainPropertiesProvider(Substitute.For<IServiceProvider>())
+            .Populate(grainType, GrainType.Create("public-registration"), values);
+        return new GrainProperties(values.ToImmutableDictionary(StringComparer.Ordinal));
+    }
+
     private sealed class TestSiloBuilder : ISiloBuilder
     {
         public IServiceCollection Services { get; } = new ServiceCollection();
@@ -286,8 +296,8 @@ public sealed class PublicDurableMessagingRegistrationTests
     private sealed class ConstructionTestStateManager : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
-        public void RegisterState(string name, IJournaledState state) { }
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        public void RegisterStateMachine(string name, IStateMachine state) { }
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? state)
         {
             state = null;
             return false;

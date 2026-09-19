@@ -32,7 +32,7 @@ public sealed class MessagingProviderCutoverTests
     public async Task PublicHosting_NamedFactories_CommitsCompositeEndpointsAndRecoversFreshActivation()
     {
         var state = new ControlledJournalStorageProvider();
-        var snapshots = new SnapshotProbe();
+        var snapshots = new NamedFactoryMessagingProbe();
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, silo) =>
         {
@@ -45,31 +45,41 @@ public sealed class MessagingProviderCutoverTests
             silo.AddVolatileJournalStorage("jobs");
             silo.UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
             silo.AddDurableMessaging();
-            silo.Services.AddSingleton<HandlerProbe>();
             silo.Services.AddSingleton(snapshots);
-            ReceiverTestServices.AddObservedStateProbes(silo.Services);
+            silo.Services.AddKeyedScoped<IDurableDictionary<Guid, DurableEffect>>("cutover-effects", (services, _) =>
+            {
+                var owner = services.GetRequiredService<IJournaledStateManager>();
+                var effects = new ObservedJournalDictionary<Guid, DurableEffect>(owner);
+                owner.RegisterStateMachine("cutover-effects", effects);
+                return effects;
+            });
             silo.Services.AddScoped<IJournaledStateManager>(services =>
             {
                 var context = services.GetRequiredService<IGrainContext>();
                 var manager = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("state")
-                    .Create(JournalId.FromGrainId(context.GrainId));
+                    .CreateStandalone(JournalId.FromGrainId(context.GrainId));
                 ((ILifecycleParticipant<IGrainLifecycle>)manager).Participate(context.ObservableLifecycle);
                 return manager;
             });
         });
         await using var cluster = builder.Build();
         await cluster.DeployAsync(Token);
-        var sender = cluster.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
-        var receiver = cluster.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
-        var sink = cluster.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
+        var sender = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
+        var receiver = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
+        var sink = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
         var logicalId = Guid.NewGuid();
+        var receivedTask = snapshots.WaitAsync(receiver.GetGrainId(), Token);
+        var forwardedTask = snapshots.WaitAsync(sink.GetGrainId(), Token);
         await sender.SendAsync(receiver.GetGrainId(), "messages/record", new DurableTestMessage(logicalId, 1, "composite", sink.GetGrainId()));
-        var received = await snapshots.WaitAsync(receiver.GetGrainId(), snapshot => snapshot.Effects.Count == 1 && snapshot.OutboxCount == 0);
-        var forwarded = await snapshots.WaitAsync(sink.GetGrainId(), snapshot => snapshot.Effects.Count == 1);
+        var received = await receivedTask;
+        var forwarded = await forwardedTask;
+        Assert.Equal(0, received.OutboxCount);
+        Assert.Equal(0, forwarded.OutboxCount);
         Assert.Equal(new DurableEffect(logicalId, 1, 1, "composite"), Assert.Single(received.Effects));
         Assert.Equal(Assert.Single(received.Effects), Assert.Single(forwarded.Effects));
         Assert.True(cluster.TryGetGrainContext(receiver.GetGrainId(), out var oldContext));
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        Assert.False(oldManager is IDurableStateManager);
         await receiver.RequestDeactivationAsync();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
         var recovered = await receiver.GetSnapshotAsync();
@@ -89,12 +99,12 @@ public sealed class MessagingProviderCutoverTests
         await fixture.InitializeAsync();
         var services = fixture.Services;
         var id = new JournalId("integration/non-grain-state");
-        var valueType = typeof(IDurableValue<>).Assembly.GetType("Orleans.Journaling.DurableValue`1", throwOnError: true)!.MakeGenericType(typeof(int));
         foreach (var (provider, expected) in new[] { ("A", 11), ("B", 22) })
         {
             var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(provider);
-            await using var manager = factory.Create(id);
-            var value = (IDurableValue<int>)ActivatorUtilities.CreateInstance(services, valueType, "value", manager);
+            await using var manager = factory.CreateStandalone(id);
+            var value = new ObservedJournalValue<int>(manager);
+            manager.RegisterStateMachine("value", value);
             await manager.InitializeAsync(Token);
             Assert.Equal(0, value.Value);
             value.Value = expected;
@@ -109,8 +119,9 @@ public sealed class MessagingProviderCutoverTests
         foreach (var (provider, expected) in new[] { ("A", 11), ("B", 22) })
         {
             var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(provider);
-            await using var manager = factory.Create(id);
-            var value = (IDurableValue<int>)ActivatorUtilities.CreateInstance(services, valueType, "value", manager);
+            await using var manager = factory.CreateStandalone(id);
+            var value = new ObservedJournalValue<int>(manager);
+            manager.RegisterStateMachine("value", value);
             await manager.InitializeAsync(Token);
             Assert.Equal(expected, value.Value);
         }
@@ -156,7 +167,7 @@ public sealed class MessagingProviderCutoverTests
         Assert.Null(await fixture.Services.GetRequiredService<IJournalStorageProvider>().CreateStorage(id).GetMetadataAsync(Token));
         foreach (var name in new[] { "__orleans.durable-messaging.outbox", "__orleans.durable-messaging.inbox" })
         {
-            Assert.True(a.Manager.TryGetState(name, out var messagingState));
+            Assert.True(a.Manager.TryGetStateMachine(name, out var messagingState));
             Assert.Equal(typeof(IDurableOutbox).Assembly, messagingState.GetType().Assembly);
         }
     }
@@ -471,7 +482,7 @@ public sealed class MessagingProviderCutoverTests
             services.AddScoped<IJournaledStateManager>(sp =>
             {
                 var binding = sp.GetRequiredService<EndpointBinding>();
-                return sp.GetRequiredKeyedService<IJournaledStateManagerFactory>(binding.Provider).Create(binding.Id);
+                return sp.GetRequiredKeyedService<IJournaledStateManagerFactory>(binding.Provider).CreateStandalone(binding.Id);
             });
             services.AddScoped<ManualTimers>();
             services.AddScoped<ITimerRegistry>(sp => sp.GetRequiredService<ManualTimers>());
@@ -630,7 +641,7 @@ public sealed class MessagingProviderCutoverTests
             Assert.Equal(0, status.OwnedShardCount);
             Assert.Equal(0, status.PoisonedShardCount);
             Assert.Equal(0, status.UnrecognizedShardCount);
-            await foreach (var entry in A.ListAsync(new ListOptions { Prefix = JournalId.Create("jobs", "shards") }, Token))
+            await foreach (var entry in A.ListAsync(new JournalCatalogListOptions { Prefix = JournalId.Create("jobs", "shards") }, Token))
             {
                 Assert.Fail($"Retired provider retained job shard {entry.Id}.");
             }
@@ -672,6 +683,7 @@ public sealed class MessagingProviderCutoverTests
             var services = scope.ServiceProvider;
             Manager = services.GetRequiredService<IJournaledStateManager>();
             Fault = new FaultTrackingEffects(Manager);
+            Manager.RegisterStateMachine("effects", Fault);
             Inbox = services.GetRequiredService<IDurableInbox>();
             Outbox = services.GetRequiredService<IDurableOutbox>();
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
@@ -749,7 +761,7 @@ public sealed class MessagingProviderCutoverTests
         }
     }
 
-    private sealed class FaultTrackingEffects : IDurableDictionary<Guid, int>, IJournaledState, IDurableDictionaryCommandHandler<Guid, int>
+    private sealed class FaultTrackingEffects : IDurableDictionary<Guid, int>, IStateMachine, IDurableDictionaryCommandHandler<Guid, int>
     {
         private readonly Dictionary<Guid, int> _effects = [];
         private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
@@ -758,7 +770,6 @@ public sealed class MessagingProviderCutoverTests
         public FaultTrackingEffects(IJournaledStateManager manager)
         {
             _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
-            manager.RegisterState("effects", this);
         }
 
         public TaskCompletionSource<Exception> Failure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -814,21 +825,20 @@ public sealed class MessagingProviderCutoverTests
             _dirty = false;
         }
 
-        public void AppendEntries(JournalStreamWriter writer)
+        public void WritePendingEntries(JournalStreamWriter writer)
         {
             if (_dirty)
             {
-                AppendSnapshot(writer);
+                WriteSnapshot(writer);
             }
         }
 
-        public void AppendSnapshot(JournalStreamWriter writer)
+        public void WriteSnapshot(JournalStreamWriter writer)
         {
             _codec.WriteSnapshot(_effects, writer);
             _dirty = false;
         }
 
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
         void IDurableDictionaryCommandHandler<Guid, int>.ApplySet(Guid key, int value) => _effects[key] = value;
         void IDurableDictionaryCommandHandler<Guid, int>.ApplyRemove(Guid key) => _effects.Remove(key);
         void IDurableDictionaryCommandHandler<Guid, int>.ApplyClear() => _effects.Clear();

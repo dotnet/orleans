@@ -195,20 +195,30 @@ Orleans caches messaging selection with each concrete grain type. After construc
 and grain-instance assignment, shared activation setup validates the execution model,
 resolves the activation's scoped endpoints and their registered journaled states.
 Journal recovery then restores application and messaging state before activation completes.
-With <xref:Orleans.Journaling.HostingExtensions.AddJournalStorage*>, the standard manager
+With <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*>, the standard manager
 enrolls in the grain lifecycle during grain-bound construction, before resolution returns.
 An application-supplied manager establishes one enrollment owner in its constructor or
 registration factory. A scoped factory assigning an explicit-<xref:Orleans.Journaling.JournalId>
 manager to a grain lifecycle performs that enrollment before returning it. Standalone
 managers retain caller-owned initialization and disposal.
 
+Standard activation services resolve <xref:Orleans.Journaling.IDurableStateManager>
+and <xref:Orleans.Journaling.IJournaledStateManager> to the same manager.
+Grain code uses the former for named state access and commits; integrations use the
+latter for state-machine registration, recovery, and full deletion.
+<xref:Orleans.Journaling.IJournaledStateManagerFactory.CreateStandalone*> creates an
+explicit journal owner whose state components and dependencies have caller-assigned
+lifetimes. An ordinary grain selecting messaging can use that owner by registering
+its states and enrolling the owner in the grain lifecycle.
+
 Durable Messaging selects the built-in `orleans-binary`
 journal format so opaque envelope bodies and request-context slices recover exactly.
 Durable Messaging grains use non-reentrant execution. Activation validates the grain's
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,
-or `StatelessWorker` declarations. A single non-interleaving activation owns each grain
+or `StatelessWorker` declarations. Resolved grain properties govern the reentrancy checks,
+including properties supplied by custom attributes. A single non-interleaving activation owns each grain
 journal and pump. The Journaling implementation prepares registered
-<xref:Orleans.Journaling.IJournaledState> instances before capture, acknowledges their
+<xref:Orleans.Journaling.IStateMachine> instances before capture, acknowledges their
 persisted changes, and notifies them of terminal failure. State-level deletion checks
 enforce quiescence and successful reset restores local messaging bookkeeping.
 Command codecs are resolved from the owning manager's configured write format. Use

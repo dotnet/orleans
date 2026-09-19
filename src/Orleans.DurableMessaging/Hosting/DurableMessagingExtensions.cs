@@ -55,7 +55,7 @@ public static class DurableMessagingExtensions
         services.PostConfigure<JournaledStateManagerOptions>(
             options =>
             {
-                if (string.Equals(options.JournalFormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
+                if (string.Equals(options.JournalFormatKey, JsonLinesJournalFormat.JournalFormatKey, StringComparison.Ordinal))
                 {
                     options.JournalFormatKey = DurableMessagingJournalFormatKey;
                 }
@@ -94,7 +94,7 @@ public static class DurableMessagingExtensions
         {
             var manager = sp.GetRequiredService<IJournaledStateManager>();
             var state = new InboxJournalState(manager);
-            manager.RegisterState(DurableMessagingStateNames.Inbox, state);
+            manager.RegisterStateMachine(DurableMessagingStateNames.Inbox, state);
             return state;
         });
         services.TryAddKeyedScoped<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
@@ -196,7 +196,7 @@ public static class DurableMessagingExtensions
         {
             var manager = sp.GetRequiredService<IJournaledStateManager>();
             var state = new DeferredJournaledDictionary<TKey, TValue>(manager);
-            manager.RegisterState(name, state);
+            manager.RegisterStateMachine(name, state);
             return state;
         });
     }
