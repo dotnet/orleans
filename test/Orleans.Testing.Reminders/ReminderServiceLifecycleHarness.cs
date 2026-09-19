@@ -124,13 +124,16 @@ public sealed class ReminderServiceLifecycleHarness
 
     /// <inheritdoc />
     public bool IsOwner(SiloAddress siloAddress, GrainId grainId)
+        => GetOwnedRange(siloAddress).InRange(grainId);
+
+    /// <inheritdoc />
+    public IRingRange GetOwnedRange(SiloAddress siloAddress)
     {
         var silo = _cluster.GetSiloForAddress(siloAddress)
             ?? throw new InvalidOperationException($"Silo {siloAddress} is not active.");
         return silo.ServiceProvider
             .GetRequiredService<IConsistentRingProvider>()
-            .GetMyRange()
-            .InRange(grainId);
+            .GetMyRange();
     }
 
     /// <inheritdoc />
