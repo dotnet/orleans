@@ -310,6 +310,32 @@ public sealed class FaultyReminderServiceLifecycleTests
             });
     }
 
+    [Fact]
+    public void OwnedIdentitySelectionSearchesBeyondUShortCandidateSpace()
+    {
+        // Reproduces the narrow joined-silo range from #11325, whose first matching candidate is 85,916.
+        var ownerRange = RangeFactory.CreateRange(0x4341E660, 0x434393A0);
+        var grainType = GrainType.Create("reminderservicetest");
+        var attempts = 0;
+
+        var key = ReminderServiceLifecycleTestRunner.FindOwnedGrainKey(
+            seed: 42,
+            providerName: "IdealizedReminderTable",
+            label: nameof(ReminderServiceLifecycleTestRunner.ReminderService_OneSiloJoinLeaveTransfersOwnership),
+            ordinal: 1,
+            isOwned: candidate =>
+            {
+                attempts++;
+                var grainId = GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(candidate));
+                return ownerRange.InRange(grainId);
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(new Guid("8dd62ce3-228e-67e4-5301-c5f75f92e1a5"), key);
+        Assert.Equal(85_917, attempts);
+        Assert.True(attempts > ushort.MaxValue);
+    }
+
     private static async Task RunFaultAsync(
         Func<IReminderServiceLifecycleHarness, LifecycleRunner> createRunner,
         Func<LifecycleRunner, CancellationToken, Task> scenario,
@@ -358,6 +384,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public virtual Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
         public virtual IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => Inner.GetOwners(grainId, reminderName);
         public bool IsOwner(SiloAddress siloAddress, GrainId grainId) => Inner.IsOwner(siloAddress, grainId);
+        public IRingRange GetOwnedRange(SiloAddress siloAddress) => Inner.GetOwnedRange(siloAddress);
         public virtual Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => Inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
         public virtual int GetLocalStartCount(GrainId grainId, string reminderName) => Inner.GetLocalStartCount(grainId, reminderName);
         public int GetLocalStopCount(GrainId grainId, string reminderName) => Inner.GetLocalStopCount(grainId, reminderName);

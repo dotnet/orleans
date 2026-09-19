@@ -55,6 +55,9 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Returns whether a silo's current ring range owns a grain identity.</summary>
     bool IsOwner(SiloAddress siloAddress, GrainId grainId);
 
+    /// <summary>Gets a snapshot of a silo's current ring range.</summary>
+    IRingRange GetOwnedRange(SiloAddress siloAddress);
+
     /// <summary>Waits until the current owner has armed its persisted schedule.</summary>
     Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken);
 
@@ -120,6 +123,7 @@ public interface IReminderServiceLifecycleRegistrationTarget
 public abstract class ReminderServiceLifecycleTestRunner
 {
     private static readonly TimeSpan CleanupPhaseTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan IdentitySelectionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan Period = TimeSpan.FromMinutes(2);
     private readonly IReminderServiceLifecycleHarness _harness;
     private readonly int _seed;
@@ -412,7 +416,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 try
                 {
                     joined = await _harness.JoinOneSiloAsync(cancellationToken);
-                    var grain = CreateGrainOwnedBy(joined, Guarantee);
+                    var grain = CreateGrainOwnedBy(joined, Guarantee, cancellationToken);
                     const string Name = "stale-owner-registration";
                     reminders.Add((grain, Name));
                     staleOwner = _harness.ActiveSilos
@@ -590,7 +594,7 @@ public abstract class ReminderServiceLifecycleTestRunner
             {
                 joined = await _harness.JoinOneSiloAsync(cancellationToken);
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                var grain = CreateGrainOwnedBy(joined, Guarantee);
+                var grain = CreateGrainOwnedBy(joined, Guarantee, cancellationToken);
                 const string Name = "join-leave-owner";
                 reminders.Add((grain, Name));
                 var due = TimeSpan.FromSeconds(3);
@@ -694,26 +698,101 @@ public abstract class ReminderServiceLifecycleTestRunner
         return _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
     }
 
-    private IReminderServiceTestGrain CreateGrainOwnedBy(SiloAddress owner, string label)
+    private IReminderServiceTestGrain CreateGrainOwnedBy(
+        SiloAddress owner,
+        string label,
+        CancellationToken cancellationToken)
     {
         var ordinal = Interlocked.Increment(ref _grainCounter);
-        for (var candidate = 0; candidate < ushort.MaxValue; candidate++)
+        var grainType = _harness.GrainFactory
+            .GetGrain<IReminderServiceTestGrain>(Guid.Empty)
+            .GetGrainId()
+            .Type;
+        var ownerRange = _harness.GetOwnedRange(owner);
+        var attempts = 0;
+        Guid? key;
+        using var selectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        selectionCancellation.CancelAfter(IdentitySelectionTimeout);
+        try
         {
-            var key = ReminderTestData.CreateGuid(
+            key = FindOwnedGrainKey(
                 _seed,
-                $"{ProviderName}/{label}/{ordinal}/{candidate.ToString(CultureInfo.InvariantCulture)}");
-            var grain = _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
-            if (_harness.IsOwner(owner, grain.GetGrainId()))
+                ProviderName,
+                label,
+                ordinal,
+                candidateKey =>
+                {
+                    attempts++;
+                    var grainId = GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(candidateKey));
+                    return ownerRange.InRange(grainId);
+                },
+                selectionCancellation.Token);
+        }
+        catch (OperationCanceledException exception) when (selectionCancellation.IsCancellationRequested)
+        {
+            if (cancellationToken.IsCancellationRequested)
             {
-                return grain;
+                throw new OperationCanceledException(
+                    $"Reminder identity selection for {owner} was canceled after "
+                    + $"{attempts.ToString("N0", CultureInfo.InvariantCulture)} deterministic candidates.",
+                    exception,
+                    cancellationToken);
+            }
+
+            Fail(label, "identity selection")
+                .WithExpected($"a deterministic grain identity owned by {owner}")
+                .WithObserved(
+                    $"no owned identity after {attempts.ToString("N0", CultureInfo.InvariantCulture)} candidates "
+                    + $"within {IdentitySelectionTimeout}")
+                .Throw();
+            return null!;
+        }
+
+        if (key is null)
+        {
+            Fail(label, "identity selection")
+                .WithExpected($"a deterministic grain identity owned by {owner}")
+                .WithObserved(
+                    $"no owned identity in {int.MaxValue.ToString("N0", CultureInfo.InvariantCulture)} "
+                    + "deterministic candidates")
+                .Throw();
+            return null!;
+        }
+
+        var grain = _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key.Value);
+        if (!_harness.IsOwner(owner, grain.GetGrainId()))
+        {
+            Fail(label, "identity selection")
+                .WithIdentity(grain.GetGrainId(), null)
+                .WithExpected($"the selected grain remains owned by {owner}")
+                .WithObserved("the owner range changed during identity selection")
+                .Throw();
+        }
+
+        return grain;
+    }
+
+    internal static Guid? FindOwnedGrainKey(
+        int seed,
+        string providerName,
+        string label,
+        int ordinal,
+        Func<Guid, bool> isOwned,
+        CancellationToken cancellationToken)
+    {
+        for (var candidate = 0; candidate < int.MaxValue; candidate++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var key = ReminderTestData.CreateGuid(
+                seed,
+                $"{providerName}/{label}/{ordinal}/{candidate.ToString(CultureInfo.InvariantCulture)}");
+            if (isOwned(key))
+            {
+                return key;
             }
         }
 
-        Fail(label, "identity selection")
-            .WithExpected($"a deterministic grain identity owned by {owner}")
-            .WithObserved("no owned identity in 65,535 deterministic candidates")
-            .Throw();
-        return null!;
+        return null;
     }
 
     private async Task ExecuteWithCleanupAsync(
