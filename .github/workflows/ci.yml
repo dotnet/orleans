@@ -531,6 +531,12 @@ jobs:
         provider: ZooKeeper
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
+    - name: ZooKeeper failure diagnostics
+      if: failure()
+      continue-on-error: true
+      run: |
+        docker logs zookeeper
+        docker inspect --format '{{json .State}}' zookeeper
     - name: Clean up ZooKeeper
       if: always()
       run: docker rm -f zookeeper || true
