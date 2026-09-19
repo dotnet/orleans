@@ -116,6 +116,7 @@ public sealed class MembershipTableConformanceTests
         Assert.Equal(6, backend.CleanupBatches);
         Assert.Equal(14, backend.HeartbeatWrites.Count);
         Assert.Equal(9, backend.VersionedUpdates);
+        Assert.Equal(0, backend.InsertsWithSuspectVotes);
         Assert.All(backend.HeartbeatWrites, write => Assert.NotEqual(SiloStatus.Dead, write.Status));
         Assert.All(backend.HeartbeatWrites.GroupBy(write => (write.Cluster, write.Identity)),
             writes => Assert.Single(writes.Select(write => write.Owner).Distinct()));
@@ -176,6 +177,7 @@ public sealed class MembershipTableConformanceTests
         }
         Assert.Equal(0, backend.OperationsAfterDeletion);
         if (lagHeartbeatReads) Assert.True(backend.LaggedHeartbeatReads > 0);
+        Assert.Equal(0, backend.InsertsWithSuspectVotes);
         if (physicalRowEtags)
         {
             Assert.Equal(0, backend.RowConditionChecks);
@@ -368,6 +370,7 @@ public sealed class MembershipTableConformanceTests
                 TestContext.Current.CancellationToken);
 
         Assert.Equal(27, scenarios.Length);
+        Assert.Equal(0, backend.InsertsWithSuspectVotes);
         Assert.Equal(0, backend.RowConditionChecks);
         Assert.True(backend.HeartbeatRowMetadataChanges > 0);
         Assert.True(backend.LaggedHeartbeatReads > 0);

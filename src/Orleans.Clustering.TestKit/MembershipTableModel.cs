@@ -71,11 +71,7 @@ internal partial class MembershipModelRecord : State
         HostName = $"host-{key}",
         SiloName = $"silo-{key}",
         ProxyPort = 22000 + key,
-        Suspects = new()
-        {
-            ["127.0.0.1:11001@10"] = T0.AddSeconds(-10).Ticks,
-            ["127.0.0.1:11002@11"] = T0.AddSeconds(-5).Ticks
-        }
+        Suspects = []
     };
 }
 
@@ -326,7 +322,7 @@ internal sealed class MembershipModelExecutionContext
             var writer = (MembershipModel.IsHeartbeat(request.Kind) ? request.Key % 2 == 1 : _prefix.Count % 2 == 0)
                 ? _fixture.First : _fixture.Second;
             var reader = ReferenceEquals(writer, _fixture.First) ? _fixture.Second : _fixture.First;
-            _otherBaseline ??= await MembershipTableTestRunner.Insert(_fixture.OtherCluster, CreateEntry(1, _seed), _ct);
+            _otherBaseline ??= await MembershipTableTestRunner.Insert(_fixture.OtherCluster, CreateInitialEntry(1, _seed), _ct);
             var before = await MembershipTableTestRunner.Read(reader, _ct);
             _versionOrigin ??= before.Version;
             ValidateModel(before);

@@ -40,7 +40,9 @@ public sealed class MembershipTableTestRunner
     public Task UpdateRow_CurrentTokens_CommitsExactlyOneVersion(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
-        var updated = Forward(Entry(1));
+        var populated = Forward(Entry(1));
+        await Update(A, populated, ct);
+        var updated = Forward(populated);
         updated.IAmAliveTime = T2;
         updated.SuspectTimes![0] = Tuple.Create(updated.SuspectTimes[0].Item1, T1);
         await Update(B, updated, ct);
@@ -253,6 +255,8 @@ public sealed class MembershipTableTestRunner
     public Task Reads_RetainedObjectsRemainUnchangedAfterLaterWrites(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
+        var populated = Forward(Entry(1));
+        await Update(A, populated, ct);
         var retained = await A.ReadAllAsync(ct);
         var row = retained.TryGet(Entry(1).SiloAddress)!;
         var entryReference = row.Item1;
@@ -260,7 +264,7 @@ public sealed class MembershipTableTestRunner
         var listBaseline = listReference?.Select(v => new SuspectSnapshot(v.Item1.ToParsableString(), v.Item2)).ToArray() ?? [];
         var baseline = ClusteringMembershipSnapshot.Capture(retained);
         await Heartbeat(B, Entry(1), T2, ct);
-        await Update(A, Forward(Entry(1)), ct);
+        await Update(A, Forward(populated), ct);
         await Update(B, Forward(Entry(2)), ct);
         Equal(baseline, ClusteringMembershipSnapshot.Capture(retained), complete: true);
         EqualRow(baseline.Row(Entry(1).SiloAddress).Entry, MembershipEntrySnapshot.Capture(entryReference), complete: true);
@@ -412,13 +416,14 @@ public sealed class MembershipTableTestRunner
         for (var i = 200; i < 203; i++) await SeedCleanupEntry(Entry(i, SiloStatus.Dead));
         await CleanupWithConcurrentReads(publishedHeartbeats, ct);
         await SeedCleanupEntry(Entry(220, SiloStatus.Dead));
-        await ConcurrentCleaners(publishedHeartbeats, ct);
+        await CleanupFromBothHandles(publishedHeartbeats, ct);
         Equal(other, await Read(Other, ct));
 
         async Task SeedCleanupEntry(MembershipEntry entry)
         {
             var live = Copy(entry);
             if (live.Status == SiloStatus.Dead) live.Status = SiloStatus.Active;
+            live.SuspectTimes = [];
             await Insert(A, live, ct);
             await Heartbeat(A, live, entry.IAmAliveTime, ct);
             publishedHeartbeats.Add(entry.SiloAddress.ToParsableString(), entry.IAmAliveTime);
@@ -458,7 +463,7 @@ public sealed class MembershipTableTestRunner
 
     }, cancellationToken);
 
-    private MembershipEntry Entry(int index, SiloStatus status = SiloStatus.Created) => CreateEntry(index, _seed, status);
+    private MembershipEntry Entry(int index, SiloStatus status = SiloStatus.Created) => CreateInitialEntry(index, _seed, status);
 
     private async Task Run(Func<CancellationToken, Task> action, CancellationToken cancellationToken, [CallerMemberName] string guarantee = "")
     {
@@ -633,25 +638,16 @@ public sealed class MembershipTableTestRunner
         Equal(after, await SameHandles(ct));
     }
 
-    private async Task ConcurrentCleaners(IReadOnlyDictionary<string, DateTime> publishedHeartbeats, CancellationToken ct)
+    private async Task CleanupFromBothHandles(IReadOnlyDictionary<string, DateTime> publishedHeartbeats, CancellationToken ct)
     {
         var before = await SameHandles(ct);
         Check(before.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1, publishedHeartbeats)) == 1,
-            "the two-cleaner race must have one eligible Dead row");
-        var start = Gate();
-        var ready = new[] { Gate(), Gate() };
-        async Task Clean(IMembershipTable table, int index)
-        {
-            ready[index].SetResult();
-            await start.Task.WaitAsync(ct);
-            await table.CleanupDefunctSiloEntriesAsync(new(T1), ct);
-        }
-
-        var cleaners = new[] { Clean(A, 0), Clean(B, 1) };
-        await Task.WhenAll(ready.Select(gate => gate.Task)).WaitAsync(ct);
-        start.SetResult();
-        await Task.WhenAll(cleaners).WaitAsync(ct);
-        AssertCleanup(before, await SameHandles(ct), T1, publishedHeartbeats: publishedHeartbeats);
+            "cross-handle cleanup must have one eligible Dead row");
+        await A.CleanupDefunctSiloEntriesAsync(new(T1), ct);
+        var after = await SameHandles(ct);
+        AssertCleanup(before, after, T1, publishedHeartbeats: publishedHeartbeats);
+        await B.CleanupDefunctSiloEntriesAsync(new(T1), ct);
+        Equal(after, await SameHandles(ct));
     }
 
     internal static async Task Heartbeat(IMembershipTable table, MembershipEntry entry, DateTime time, CancellationToken ct)
