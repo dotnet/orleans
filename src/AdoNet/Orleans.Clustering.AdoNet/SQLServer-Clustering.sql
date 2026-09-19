@@ -97,7 +97,8 @@ SELECT
 		Status,
 		ProxyPort,
 		StartTime,
-		IAmAliveTime
+		IAmAliveTime,
+		SuspectTimes
 	)
 	SELECT
 		@DeploymentId,
@@ -109,7 +110,8 @@ SELECT
 		@Status,
 		@ProxyPort,
 		@StartTime,
-		@IAmAliveTime
+		@IAmAliveTime,
+		@SuspectTimes
 	WHERE NOT EXISTS
 	(
 		SELECT 1

@@ -297,6 +297,11 @@ public sealed class RelationalOrleansQueriesUnitTests
             ProxyPort = 30_001,
             StartTime = startTime,
             IAmAliveTime = aliveTime,
+            SuspectTimes =
+            [
+                Tuple.Create(SiloAddress.New(IPAddress.Parse("10.20.30.50"), 12_346, 8), startTime.AddMilliseconds(1123)),
+                Tuple.Create(SiloAddress.New(IPAddress.Parse("10.20.30.60"), 12_347, 9), startTime.AddMilliseconds(2456)),
+            ],
         };
         var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
             .ExpectRead(
@@ -319,7 +324,8 @@ public sealed class RelationalOrleansQueriesUnitTests
             ("StartTime", startTime),
             ("Status", (int)SiloStatus.Joining),
             ("ProxyPort", 30_001),
-            ("Version", 73));
+            ("Version", 73),
+            ("SuspectTimes", "10.20.30.50:12346@8,2026-08-27 08:00:01.123 GMT|10.20.30.60:12347@9,2026-08-27 08:00:02.456 GMT"));
         storage.VerifyComplete();
     }
 

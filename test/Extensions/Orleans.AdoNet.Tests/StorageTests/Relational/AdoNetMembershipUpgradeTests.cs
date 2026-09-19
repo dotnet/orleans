@@ -64,6 +64,7 @@ public sealed class AdoNetMembershipUpgradeTests
         var storage = database.Storage;
         var queries = await ReadQueriesAsync(storage, cancellationToken);
         Assert.Equal(enhanced, queries.ContainsKey("CleanupDefunctSiloEntryKey"));
+        Assert.Equal(enhanced, queries["InsertMembershipKey"].Contains("@SuspectTimes", StringComparison.Ordinal));
         var connectionString = database.CurrentConnectionString;
         if (enhanced && engine == "PostgreSQL")
         {
@@ -92,6 +93,11 @@ public sealed class AdoNetMembershipUpgradeTests
         var dead = Entry(2, SiloStatus.Dead);
         var suspected = Entry(3, SiloStatus.Dead);
         var joining = Entry(4, SiloStatus.Joining);
+        suspected.SuspectTimes =
+        [
+            Tuple.Create(active.SiloAddress, StartTime.AddMinutes(1)),
+            Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(2))
+        ];
         var startingAtCutoff = Entry(5, SiloStatus.Dead);
         startingAtCutoff.StartTime = cutoff;
         var heartbeatAtCutoff = Entry(6, SiloStatus.Dead);
@@ -103,12 +109,41 @@ public sealed class AdoNetMembershipUpgradeTests
             Assert.True(await current.InsertRowAsync(entries[version], new TableVersion(version + 1, version.ToString(CultureInfo.InvariantCulture)), cancellationToken));
         }
 
-        suspected.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff)];
+        var inserted = await ReadSnapshotAsync(storage, cancellationToken);
+        Assert.Equal(entries.Length, inserted.Version);
+        var expectedInserted = StoredMember.FromEntry(suspected);
+        if (!enhanced)
+        {
+            // The original catalog accepts the unused input parameter but its insert does not store votes.
+            expectedInserted = expectedInserted with { SuspectTimes = null };
+        }
+
+        Assert.Equal(expectedInserted, Assert.Single(inserted.Members, row => row.SiloAddress.Equals(suspected.SiloAddress)));
+        var insertedRow = Assert.Single((await current.ReadRowAsync(suspected.SiloAddress, cancellationToken)).Members).Item1;
+        Assert.Equal(expectedInserted, StoredMember.FromEntry(insertedRow));
+        if (enhanced)
+        {
+            Assert.Equal(suspected.SuspectTimes, insertedRow.SuspectTimes);
+        }
+        else
+        {
+            Assert.Null(insertedRow.SuspectTimes);
+        }
+
+        AssertReadMatches(inserted, await current.ReadAllAsync(cancellationToken));
+
+        suspected.SuspectTimes =
+        [
+            Tuple.Create(active.SiloAddress, cutoff),
+            Tuple.Create(joining.SiloAddress, cutoff.AddSeconds(-1))
+        ];
         oldSuspect.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff.AddSeconds(-1))];
         foreach (var entry in new[] { suspected, oldSuspect })
         {
             var row = await current.ReadRowAsync(entry.SiloAddress, cancellationToken);
             Assert.True(await current.UpdateRowAsync(entry, Assert.Single(row.Members).Item2, row.Version.Next(), cancellationToken));
+            var updatedRow = Assert.Single((await current.ReadRowAsync(entry.SiloAddress, cancellationToken)).Members).Item1;
+            Assert.Equal(entry.SuspectTimes, updatedRow.SuspectTimes);
         }
 
         // A populated original installation supports package upgrades without any catalog edits.
