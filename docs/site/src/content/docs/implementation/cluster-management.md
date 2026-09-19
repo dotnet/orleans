@@ -101,14 +101,16 @@ These values are protocol parameters, not independent timers: indirect probing, 
 
 ## Membership-table contract <a name="membership-table"></a>
 
-An <xref:Orleans.IMembershipTable> implementation is more than a list of endpoints. It must support:
+An <xref:Orleans.IMembershipTable> implementation coordinates canonical membership changes through:
 
 - insertion of a new silo row;
 - optimistic, conditional update of a silo row;
 - atomic advancement of the table version with a row mutation;
-- reads which return rows and the corresponding version;
+- atomic full-table snapshots containing rows and their corresponding version;
 - periodic `IAmAlive` updates; and
 - durable availability appropriate for cluster coordination.
+
+<xref:Orleans.IMembershipTable.ReadAllAsync*> obtains a coherent snapshot, and <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag within that view. Conditional mutations can also return a <xref:Orleans.MembershipTableWriteReceipt> containing their committed table version and row metadata. Callers can use the returned table token for a subsequent mutation while retaining an independent expected membership view. A later writer can make that token stale; snapshot refreshes observe the current table state.
 
 Table unavailability favors safety over liveness. Existing silos can continue processing calls, but they cannot durably admit a member or declare a failed member dead. A provider must not synthesize successful updates when its backing store is unavailable.
 

@@ -101,6 +101,8 @@ namespace Orleans.Runtime.MembershipService
 
         public System.Threading.Tasks.Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         [System.Obsolete("Use ReadAllAsync instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadAll() { throw null; }
 
@@ -120,5 +122,7 @@ namespace Orleans.Runtime.MembershipService
         public System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) { throw null; }
 
         public System.Threading.Tasks.Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }

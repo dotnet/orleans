@@ -73,7 +73,7 @@ Ownership must be explicit. If the application supplies a keyed SDK client, the 
 
 The persistent stream provider illustrates staged lifecycle composition: it creates the adapter during initialization, starts pulling agents at the active stage, then stops agents before closing. See <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider.Participate*?displayProperty=nameWithType> and its [implementation](https://github.com/dotnet/orleans/blob/main/src/Orleans.Streaming/PersistentStreams/PersistentStreamProvider.cs).
 
-Membership callers use the `Async`-suffixed, cancellation-aware methods of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. Built-in providers forward tokens to backend APIs which support cancellation and bound waits on tokenless SDK operations while observing late faults. Custom providers can implement these methods directly; their default implementations adapt existing tokenless providers by canceling the caller's wait while the operation completes. The original tokenless method names remain as obsolete compatibility entry points. Cancellation can race with a committed write, so conditional writes and table versions continue to govern subsequent updates.
+Membership callers use the `Async`-suffixed, cancellation-aware methods of <xref:Orleans.IMembershipTable> for initialization, reads, and writes. Built-in providers forward tokens to backend APIs which support cancellation and bound waits on tokenless SDK operations while observing late faults. Custom providers can implement these methods directly. The compatibility defaults for tokenless operations cancel the caller's wait while the operation completes and observe late faults. The original tokenless method names remain as obsolete compatibility entry points. Cancellation can race with a committed write, so conditional writes and table versions continue to govern subsequent updates.
 
 Return completed backend results, and observe cancellation before starting further I/O. Mapping an already-returned result preserves that operation's outcome.
 
@@ -82,6 +82,20 @@ Shared membership refreshes live until the membership manager is disposed. Each 
 Membership table RPCs retain their existing operation aliases and application-argument payloads, with cancellation propagated separately. The original generated request types remain available for calls through obsolete tokenless methods. During rolling upgrades, each receiver uses its implementation's cancellation behavior.
 
 When a lifecycle callback must execute its cancellation or cleanup logic, schedule it with <xref:System.Threading.Tasks.Task.Run*> and pass the cancellation token to the operation inside the callback. The callback then owns how cancellation completes its work.
+
+## Membership snapshots and mutation results
+
+Use <xref:Orleans.IMembershipTable.ReadAllAsync*> to obtain the membership rows and their corresponding table version in one atomic snapshot. <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag from that snapshot.
+
+<xref:Orleans.IMembershipTable.InsertRowWithResultAsync*> and <xref:Orleans.IMembershipTable.UpdateRowWithResultAsync*> return a <xref:Orleans.MembershipTableWriteResult>. Its success status records the conditional write's outcome. When the provider supplies a <xref:Orleans.MembershipTableWriteReceipt>, the receipt contains the table version and written row's ETag from that specific commit. Providers obtain this metadata from their native write result or the values which the conditional mutation committed.
+
+The default implementations call the corresponding bool-returning operation once and return its outcome with an absent receipt. A caller which needs current state can explicitly refresh with a full snapshot. That snapshot describes the read's observation; the receipt describes the originating write.
+
+During isolated setup, callers can maintain expected membership locally and use <xref:Orleans.TableVersion.Next*> on each returned receipt's version to supply the next write's table condition. Full snapshots at the end validate the stored canonical fields. Concurrent canonical writes can make a returned table token stale, so a later conditional failure requires a fresh view before selecting another mutation.
+
+Row ETags follow each provider's metadata policy and can change during heartbeat-only activity. Canonical updates require an existing row and a matching table ETag; additional row conditions remain heartbeat-neutral. A receipt supplies exact commit metadata rather than a promise that every row ETag remains stable.
+
+The receipt-returning RPCs have their own operation identities and require a receiver which implements them. Existing bool-returning calls retain their wire contracts during mixed-version deployments.
 
 ## Testing a provider
 
