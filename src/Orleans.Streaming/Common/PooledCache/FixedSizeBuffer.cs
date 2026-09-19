@@ -22,6 +22,15 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         public object Id => buffer;
 
+        internal int Position => count;
+
+        internal void ResetTo(int position)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(position);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(position, count);
+            count = position;
+        }
+
         /// <summary>
         /// Manages access to a fixed size byte buffer.
         /// </summary>

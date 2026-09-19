@@ -127,7 +127,7 @@ namespace Orleans.Providers
                 new EventSequenceTokenV2(queueMessage.SequenceNumber));
         }
 
-        private class Cursor : IQueueCacheCursor
+        private class Cursor : IQueueCacheCursor, IQueueCacheCursorProgress
         {
             private readonly PooledQueueCache cache;
             private readonly object cursor;
@@ -187,8 +187,24 @@ namespace Orleans.Providers
             }
 
             public void RecordDeliveryFailure()
+                => cache.AbandonPendingDelivery(cursor);
+
+            void IQueueCacheCursorProgress.RecordDeliveryFailure()
             {
+                current = null;
+                cache.RecordDeliveryFailure(cursor);
             }
+
+            void IQueueCacheCursorProgress.EnableDeliveryProgress() => cache.EnableDeliveryProgress(cursor);
+
+            StreamSequenceToken? IQueueCacheCursorProgress.SafeSequenceToken
+                => cache.GetSafeSequenceToken(cursor);
+
+            void IQueueCacheCursorProgress.SetDeliveredThrough(StreamSequenceToken token)
+                => cache.SetCursorDeliveredThrough(cursor, token);
+
+            void IQueueCacheCursorProgress.RecordDeliveryCompletion()
+                => cache.RecordDeliveryCompletion(cursor);
 
             private static object GetCursorOrThrow(
                 PooledQueueCache cache,
