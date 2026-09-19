@@ -85,7 +85,7 @@ public sealed class MembershipTableModelBasedTestRunner
                 var results = await spec.RunTests(context, initial, cases, new TestExecutionOptions
                 {
                     StopOnFirstFailure = true,
-                    BeforeEach = info =>
+                    BeforeEachAsync = async info =>
                     {
                         ct.ThrowIfCancellationRequested();
                         if (cleanupFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
@@ -93,13 +93,13 @@ public sealed class MembershipTableModelBasedTestRunner
                         current = _factory() ?? throw new InvalidOperationException("The model fixture factory returned null.");
                         ClusteringTestKitDiagnostics.Require(scopes.Add(current.ClusterId), "model factory reused a fixture/scope between cases");
                         ReportProgress("initialize", current);
-                        // Accordant 0.1.6 hooks are synchronous. Bound the bridge; never use async-void callbacks.
+                        // Preserve the caller's bound when a provider callback blocks synchronously.
                         var fixture = current;
-                        Task.Run(() => fixture.InitializeAsync(ct).AsTask(), ct).WaitAsync(ct).GetAwaiter().GetResult();
+                        await Task.Run(() => fixture.InitializeAsync(ct).AsTask(), ct).WaitAsync(ct);
                         ReportProgress("initialized", current);
                         info.Context.Register(new MembershipModelExecutionContext(current, _options.Seed, currentCase, ct, kind => covered.Add(kind), _output));
                     },
-                    AfterEach = info =>
+                    AfterEachAsync = async info =>
                     {
                         if (!info.Success)
                             primary ??= new ClusteringConformanceException($"provider={_options.ProviderName}; seed={_options.Seed}; executed cases={caseNumber}; {info.FailureMessage}");
@@ -108,7 +108,7 @@ public sealed class MembershipTableModelBasedTestRunner
                             if (current is { } fixture)
                             {
                                 try { ReportProgress("dispose", fixture); }
-                                finally { Task.Run(() => fixture.DisposeAsync().AsTask()).GetAwaiter().GetResult(); }
+                                finally { await fixture.DisposeAsync(); }
                                 ReportProgress("disposed", fixture);
                             }
                         }
@@ -132,13 +132,13 @@ public sealed class MembershipTableModelBasedTestRunner
             catch (Exception exception) { primary ??= exception; }
             finally
             {
-                if (current is not null)
+                if (current is { } fixture)
                 {
                     try
                     {
-                        try { ReportProgress("dispose", current); }
-                        finally { await current.DisposeAsync(); }
-                        ReportProgress("disposed", current);
+                        try { ReportProgress("dispose", fixture); }
+                        finally { await fixture.DisposeAsync(); }
+                        ReportProgress("disposed", fixture);
                     }
                     catch (Exception exception) { cleanupFailure ??= exception; }
                 }
