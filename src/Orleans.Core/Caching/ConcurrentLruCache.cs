@@ -64,6 +64,12 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     {
     }
 
+    protected virtual void UpdateItem(LruItem item, V value) => item.Value = value;
+
+    protected virtual void OnItemRemoved(LruItem item)
+    {
+    }
+
     /// <summary>
     /// Initializes a new instance of the ConcurrentLruCore class with the specified capacity and expire-after-access time to live.
     /// </summary>
@@ -161,15 +167,25 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     ///<inheritdoc/>
     public bool TryGet(K key, [MaybeNullWhen(false)] out V value)
     {
-        if (_dictionary.TryGetValue(key, out var item))
+        if (TryGetItem(key, out var item))
         {
             value = item.Value;
-            Touch(item);
-            _telemetryPolicy.IncrementHit();
             return true;
         }
 
         value = default;
+        return false;
+    }
+
+    protected bool TryGetItem(K key, [NotNullWhen(true)] out LruItem? item)
+    {
+        if (_dictionary.TryGetValue(key, out item))
+        {
+            TouchItem(item);
+            _telemetryPolicy.IncrementHit();
+            return true;
+        }
+
         _telemetryPolicy.IncrementMiss();
         return false;
     }
@@ -327,6 +343,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
         // from the queue.
         item.WasAccessed = false;
         item.WasRemoved = true;
+        OnItemRemoved(item);
 
         if (reason == ItemRemovedReason.Evicted)
         {
@@ -352,7 +369,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
                 {
                     var oldValue = existing.Value;
 
-                    existing.Value = value;
+                    UpdateItem(existing, value);
                     UpdateTimestamp(existing);
 
                     _telemetryPolicy.IncrementUpdated();
@@ -855,7 +872,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     /// <param name="timestamp">The timestamp of the item's most recent access.</param>
     // NOTE: Internal for testing
     [DebuggerDisplay("[{Key}] = {Value}")]
-    internal sealed class LruItem(K key, V value, long timestamp = 0)
+    internal class LruItem(K key, V value, long timestamp = 0)
     {
         private V _data = value;
 
@@ -1059,11 +1076,13 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
         }
     }
 
-    private LruItem CreateItem(K key, V value) =>
-        new(key, value, _expiresAfterAccess ? _timeProvider.GetTimestamp() : 0);
+    protected virtual LruItem CreateItem(K key, V value) =>
+        new(key, value, GetCurrentTimestamp());
+
+    protected long GetCurrentTimestamp() => _expiresAfterAccess ? _timeProvider.GetTimestamp() : 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Touch(LruItem item)
+    protected void TouchItem(LruItem item)
     {
         if (_expiresAfterAccess)
         {
