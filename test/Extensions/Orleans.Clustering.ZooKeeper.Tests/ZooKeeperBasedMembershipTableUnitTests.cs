@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,6 +24,28 @@ namespace UnitTests.MembershipTests
     [TestArea("Membership")]
     public sealed class ZooKeeperBasedMembershipTableUnitTests
     {
+        [Fact]
+        public async Task NativeSocketDiagnostics_ReportOriginalCompletionError()
+        {
+            var messages = new ConcurrentQueue<string>();
+            using var diagnostics = new ZookeeperMembershipTableTests.NativeSocketDiagnostics(messages.Enqueue);
+            using var destination = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            destination.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            using var operation = new SocketAsyncEventArgs { RemoteEndPoint = destination.LocalEndPoint };
+            var completion = new TaskCompletionSource<SocketError>(TaskCreationOptions.RunContinuationsAsynchronously);
+            operation.Completed += (_, result) => completion.TrySetResult(result.SocketError);
+
+            if (!client.ConnectAsync(operation))
+            {
+                completion.TrySetResult(operation.SocketError);
+            }
+
+            Assert.Equal(SocketError.ConnectionRefused, await completion.Task.WaitAsync(TestContext.Current.CancellationToken));
+            Assert.Contains(messages, message =>
+                message.Contains($"Socket#{client.GetHashCode()}; UpdateStatusAfterSocketError; errorCode:ConnectionRefused", StringComparison.Ordinal));
+        }
+
         [Fact]
         public void Constructor_NullLogger_ThrowsArgumentNullException()
         {

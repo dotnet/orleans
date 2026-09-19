@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,8 +32,10 @@ namespace UnitTests.MembershipTests
     [TestSuite("Functional")]
     [TestProvider("ZooKeeper")]
     [TestArea("Membership")]
-    public class ZookeeperMembershipTableTests : MembershipTableTestsBase
+    public class ZookeeperMembershipTableTests : MembershipTableTestsBase, IAsyncLifetime
     {
+        private readonly NativeSocketDiagnostics _socketDiagnostics = new();
+
         static ZookeeperMembershipTableTests()
         {
             ZooKeeper.LogLevel = TraceLevel.Info;
@@ -43,6 +46,18 @@ namespace UnitTests.MembershipTests
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
             : base(fixture, environment, CreateFilters())
         {
+        }
+
+        public new async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await base.DisposeAsync();
+            }
+            finally
+            {
+                _socketDiagnostics.Dispose();
+            }
         }
 
         private static LoggerFilterOptions CreateFilters()
@@ -87,6 +102,45 @@ namespace UnitTests.MembershipTests
         private sealed class ConformanceWatcher : Watcher
         {
             public override Task process(WatchedEvent @event) => Task.CompletedTask;
+        }
+
+        internal sealed class NativeSocketDiagnostics(Action<string>? write = null) : EventListener
+        {
+            private const int MaxLoggedEvents = 256;
+            private readonly Action<string> _write = write ?? Console.Error.WriteLine;
+            private int _eventCount;
+
+            protected override void OnEventSourceCreated(EventSource eventSource)
+            {
+                if (eventSource.Name == "Private.InternalDiagnostics.System.Net.Sockets")
+                {
+                    // Native completion errors precede the SDK's own SocketError assignment.
+                    EnableEvents(eventSource, EventLevel.Error, (EventKeywords)1);
+                    _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Error listener enabled");
+                }
+            }
+
+            protected override void OnEventWritten(EventWrittenEventArgs eventData)
+            {
+                if (eventData.EventName is "ErrorMessage" or "EventSourceMessage")
+                {
+                    var count = Interlocked.Increment(ref _eventCount);
+                    if (count <= MaxLoggedEvents)
+                    {
+                        _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] {eventData.EventName}: {string.Join("; ", eventData.Payload!)}");
+                    }
+                    else if (count == MaxLoggedEvents + 1)
+                    {
+                        _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Event limit reached; subsequent event details are omitted");
+                    }
+                }
+            }
+
+            public override void Dispose()
+            {
+                base.Dispose();
+                _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Listener disposed; observed-events={Volatile.Read(ref _eventCount)}; detail-limit={MaxLoggedEvents}");
+            }
         }
 
         private sealed class SdkDiagnostics : ILogConsumer
