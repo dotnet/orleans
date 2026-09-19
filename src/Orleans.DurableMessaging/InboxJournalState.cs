@@ -41,16 +41,16 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
         _owner?.ResetState();
     }
 
-    public override void AppendEntries(JournalStreamWriter writer)
+    public override void WritePendingEntries(JournalStreamWriter writer)
     {
-        base.AppendEntries(writer);
+        base.WritePendingEntries(writer);
         Owner.CaptureWrites();
         _captured = true;
     }
 
-    public override void AppendSnapshot(JournalStreamWriter writer)
+    public override void WriteSnapshot(JournalStreamWriter writer)
     {
-        base.AppendSnapshot(writer);
+        base.WriteSnapshot(writer);
         Owner.CaptureWrites();
         _captured = true;
     }

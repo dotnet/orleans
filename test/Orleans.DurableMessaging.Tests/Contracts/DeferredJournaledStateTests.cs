@@ -29,7 +29,7 @@ public sealed class DeferredJournaledStateTests
         Assert.Equal(1, Version(state, "AcknowledgedVersion"));
         Assert.Equal(2, Version(state, "MutationVersion"));
         Assert.Equal(2, items.Count);
-        state.AppendEntries(default);
+        state.WritePendingEntries(default);
         Assert.Equal("set:later=2", codec.Commands[1]);
         Assert.Equal(2, codec.Commands.Count);
         state.OnWriteCompleted();
@@ -49,7 +49,7 @@ public sealed class DeferredJournaledStateTests
         items.Clear();
         items.Add("last", 3);
         Assert.Empty(codec.Commands);
-        state.AppendEntries(default);
+        state.WritePendingEntries(default);
         Assert.Equal(new[] { "set:key=1", "set:key=2", "remove:key", "clear", "set:last=3" }, codec.Commands);
         Assert.Equal(new KeyValuePair<string, int>("last", 3), Assert.Single(items));
         Assert.Equal(5, Version(state, "CapturedVersion"));
@@ -79,10 +79,10 @@ public sealed class DeferredJournaledStateTests
         var state = CreateDictionary(codec);
         var items = (IDurableDictionary<string, int>)state;
         items.Add("captured", 1);
-        state.AppendEntries(default);
+        state.WritePendingEntries(default);
         items.Add("later", 2);
         state.Reset(default);
-        state.AppendEntries(default);
+        state.WritePendingEntries(default);
         Assert.Empty(items);
         Assert.Single(codec.Commands);
         Assert.Equal(0, Version(state, "MutationVersion"));
@@ -107,7 +107,7 @@ public sealed class DeferredJournaledStateTests
         state.OnWriteCompleted();
         Assert.Equal(1, Version(state, "AcknowledgedVersion"));
         Assert.Equal(2, value.Value);
-        state.AppendEntries(default);
+        state.WritePendingEntries(default);
         state.OnWriteCompleted();
         Assert.Equal(new[] { 1, 2 }, codec.Values);
         Assert.Equal(2, Version(state, "AcknowledgedVersion"));
@@ -116,20 +116,20 @@ public sealed class DeferredJournaledStateTests
         Assert.Equal(0, Version(state, "MutationVersion"));
     }
 
-    private static IJournaledState CreateDictionary(DictionaryCodec codec)
+    private static IStateMachine CreateDictionary(DictionaryCodec codec)
     {
         var manager = Substitute.For<IJournaledStateManager>();
         manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>().Returns(codec);
         return ReceiverTestServices.CreateDeferredDictionary<string, int>(manager);
     }
 
-    private static void Capture(IJournaledState state, bool snapshot)
+    private static void Capture(IStateMachine state, bool snapshot)
     {
-        if (snapshot) state.AppendSnapshot(default);
-        else state.AppendEntries(default);
+        if (snapshot) state.WriteSnapshot(default);
+        else state.WritePendingEntries(default);
     }
 
-    private static long Version(IJournaledState state, string name) =>
+    private static long Version(IStateMachine state, string name) =>
         (long)state.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(state)!;
 
     private sealed class DictionaryCodec : IDurableDictionaryCommandCodec<string, int>
