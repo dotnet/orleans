@@ -2,13 +2,14 @@ using System;
 using System.Linq;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
 
 internal static class DurableMessagingActivationValidator
 {
-    public static void Validate(IGrainContext grainContext)
+    public static void Validate(IGrainContext grainContext, GrainProperties properties)
     {
         var grain = grainContext.GrainInstance
             ?? throw new InvalidOperationException("Durable Messaging activation requires an initialized grain instance.");
@@ -19,8 +20,8 @@ internal static class DurableMessagingActivationValidator
                 $"Durable Messaging requires one activation per grain identity, but grain type '{grainType}' is a stateless worker.");
         }
 
-        if (grainType.IsDefined(typeof(ReentrantAttribute), inherit: true)
-            || grainType.IsDefined(typeof(MayInterleaveAttribute), inherit: true))
+        if (properties.Properties.TryGetValue(WellKnownGrainTypeProperties.Reentrant, out var reentrant) && bool.Parse(reentrant)
+            || properties.Properties.ContainsKey(WellKnownGrainTypeProperties.MayInterleavePredicate))
         {
             throw new InvalidOperationException(
                 $"Durable Messaging requires non-reentrant grain execution, but grain type '{grainType}' enables interleaving.");
