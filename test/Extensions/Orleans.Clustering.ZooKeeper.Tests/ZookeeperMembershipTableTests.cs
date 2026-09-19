@@ -113,6 +113,37 @@ namespace UnitTests.MembershipTests
         protected override MembershipTableTestFixture CreateConformanceFixture()
             => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task MembershipTable_ZooKeeper_RepeatedSnapshotReadCompatibility(bool pointRead)
+        {
+            for (var iteration = 0; iteration < 3; iteration++)
+            {
+                var started = Stopwatch.GetTimestamp();
+                await CreateConformanceFixture().RunAsync(async (fixture, cancellationToken) =>
+                {
+                    var runner = new MembershipTableTestRunner(
+                        fixture, seed: 17, concurrencyRowCount: ConformanceConcurrencyRowCount);
+                    if (pointRead)
+                    {
+                        await runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
+                    else
+                    {
+                        await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
+
+                    var readStarted = Stopwatch.GetTimestamp();
+                    var snapshot = await fixture.First.ReadAllAsync(cancellationToken);
+                    TestContext.Current.TestOutputHelper?.WriteLine(
+                        $"Stable snapshot rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
+                }, TestContext.Current.CancellationToken);
+                TestContext.Current.TestOutputHelper?.WriteLine(
+                    $"Snapshot compatibility pass {iteration + 1}/3; pointRead={pointRead}; elapsed={Stopwatch.GetElapsedTime(started)}");
+            }
+        }
+
         private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

@@ -145,6 +145,10 @@ namespace Orleans.Runtime.Membership
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Membership rows are read sequentially on an operation-owned connection.
+        /// Table and child-version checks fence the complete snapshot.
+        /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
             return ReadAllAsync(this.deploymentConnectionString, this.watcher, cancellationToken);
@@ -179,36 +183,36 @@ namespace Orleans.Runtime.Membership
                     addresses = [siloAddress];
                 }
 
-                var pendingRows = Task.WhenAll(addresses.Select(address => GetRow(zk, address, siloAddress is not null, cancellationToken)));
-                Tuple<MembershipEntry, string>?[] rows;
-                try
+                var rows = new List<Tuple<MembershipEntry, string>>();
+                KeeperException.NoNodeException? missingRow = null;
+                // ZooKeeperNetEx can falsely reset connections while processing pipelined responses.
+                // Keep application row reads sequential on this operation-owned connection.
+                foreach (var address in addresses)
                 {
-                    rows = await pendingRows;
-                }
-                catch (KeeperException.NoNodeException)
-                {
-                    // Observe every parallel read: a removed row must not hide another request's failure.
-                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(exception => exception is not KeeperException.NoNodeException);
-                    if (failure is not null)
+                    try
                     {
-                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                        if (await GetRow(zk, address, siloAddress is not null, cancellationToken) is { } row)
+                        {
+                            rows.Add(row);
+                        }
                     }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var current = await zk.GetData("/");
-                    if (SameVersion(before, current.Stat))
+                    catch (KeeperException.NoNodeException exception)
                     {
-                        throw;
+                        // A removed row must not hide another row's native failure.
+                        missingRow ??= exception;
                     }
-
-                    continue;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var after = await zk.GetData("/");
                 if (SameVersion(before, after.Stat))
                 {
-                    return new MembershipTableData(rows.OfType<Tuple<MembershipEntry, string>>().ToList(), ConvertToTableVersion(after.Stat));
+                    if (missingRow is not null)
+                    {
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(missingRow).Throw();
+                    }
+
+                    return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
                 }
             }
         }
