@@ -9,6 +9,7 @@ internal sealed class IdealizedMembershipBackend
     internal readonly Dictionary<string, Partition> Partitions = new(StringComparer.Ordinal);
     internal long Tokens;
     internal bool PreserveHeartbeatOnFullWrite { get; init; }
+    internal bool SeparateHeartbeatStorage { get; init; }
     internal bool LagHeartbeatReads { get; init; }
     internal int LaggedHeartbeatReads;
     internal bool TableVersionRowEtags { get; init; }
@@ -166,7 +167,9 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             backend.Inserts++;
             var partition = Partition;
             if (partition.Etag != tableVersion.VersionEtag || partition.Rows.ContainsKey(entry.SiloAddress)) return false;
-            partition.Rows.Add(entry.SiloAddress, Tuple.Create(Clone(entry), backend.Token()));
+            var stored = Clone(entry);
+            if (backend.SeparateHeartbeatStorage) stored.IAmAliveTime = stored.StartTime;
+            partition.Rows.Add(entry.SiloAddress, Tuple.Create(stored, backend.Token()));
             partition.Version = tableVersion.Version;
             partition.Etag = backend.Token();
             return true;
@@ -184,7 +187,8 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
                 if ((backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return false;
             }
             var stored = Clone(entry);
-            if (backend.PreserveHeartbeatOnFullWrite && stored.IAmAliveTime < row.Item1.IAmAliveTime)
+            if (backend.SeparateHeartbeatStorage
+                || (backend.PreserveHeartbeatOnFullWrite && stored.IAmAliveTime < row.Item1.IAmAliveTime))
                 stored.IAmAliveTime = row.Item1.IAmAliveTime;
             partition.Rows[stored.SiloAddress] = Tuple.Create(stored, backend.Token());
             partition.Version = tableVersion.Version;

@@ -179,12 +179,16 @@ removed rows. Every retained canonical field remains unchanged.
 Empty cleanup preserves the canonical observation and table version/ETag.
 The cleanup scenario retains a Dead row exactly at the cutoff, repeats that
 cutoff as a no-op, then advances it by one tick and requires that row's deletion.
+Setup publishes each heartbeat through its live owner before transitioning the
+target row to Dead, supplying the same timestamp with that transition.
+Eligibility uses those controlled publications and the canonical start/vote
+timestamps, accepting lagged raw heartbeat observations.
 Restarts use a strictly newer generation at the same endpoint. The generated
 model chooses legal forward lifecycle operations.
 
 Own-cluster deletion removes that cluster's data and preserves other clusters.
 Deletion ends the stored history. G26 verifies native deletion and the other
-cluster's complete view. G27 checks unused and foreign cluster IDs, verifying
+cluster's complete view. G27 uses a populated foreign cluster, verifying
 the configured cluster's complete view throughout.
 For a foreign cluster ID, a scoped provider can leave that scope unchanged or
 reject it with `ArgumentException` naming `clusterId`. The suite verifies complete
