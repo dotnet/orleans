@@ -157,6 +157,8 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     [InlineData(typeof(StatelessBootstrapGrain), "one activation")]
     [InlineData(typeof(MayInterleaveBootstrapGrain), "non-reentrant")]
     [InlineData(typeof(AlwaysInterleaveBootstrapGrain), "interleavable method")]
+    [InlineData(typeof(MetadataReentrantBootstrapGrain), "non-reentrant")]
+    [InlineData(typeof(MetadataMayInterleaveBootstrapGrain), "non-reentrant")]
     public async Task UnsupportedMarkedModel_FailsBeforeStorageAndCleansScope(Type grainClass, string diagnostic)
     {
         var grain = Fixture.Client.GetGrain<IBootstrapControlGrain>(Guid.NewGuid(), grainClass.FullName!);

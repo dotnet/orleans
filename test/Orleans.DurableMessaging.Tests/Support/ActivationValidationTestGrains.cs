@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Journaling;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
@@ -115,3 +116,31 @@ public sealed class AlwaysInterleaveActivationValidationTestGrain(
 {
     public Task InterleaveAsync() => Task.CompletedTask;
 }
+
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+public sealed class ExecutionPropertyAttribute(string key, string value) : Attribute, IGrainPropertiesProviderAttribute
+{
+    public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties) =>
+        properties[key] = value;
+}
+
+[ExecutionProperty(WellKnownGrainTypeProperties.Reentrant, "TrUe")]
+public sealed class MetadataReentrantActivationValidationGrain(
+    IGrainContext context, ActivationValidationProbe probe,
+    [FromKeyedServices("activation-validation")] IDurableValue<int> value)
+    : ActivationValidationTestGrain(context, probe, value);
+
+[ExecutionProperty(WellKnownGrainTypeProperties.MayInterleavePredicate, nameof(Interleave))]
+public sealed class MetadataMayInterleaveActivationValidationGrain(
+    IGrainContext context, ActivationValidationProbe probe,
+    [FromKeyedServices("activation-validation")] IDurableValue<int> value)
+    : ActivationValidationTestGrain(context, probe, value)
+{
+    public static bool Interleave(IInvokable request) => true;
+}
+
+[ExecutionProperty(WellKnownGrainTypeProperties.Reentrant, "false")]
+public sealed class MetadataNonReentrantActivationValidationGrain(
+    IGrainContext context, ActivationValidationProbe probe,
+    [FromKeyedServices("activation-validation")] IDurableValue<int> value)
+    : ActivationValidationTestGrain(context, probe, value);

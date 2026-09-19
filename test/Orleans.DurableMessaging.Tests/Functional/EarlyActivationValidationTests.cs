@@ -1,4 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
 using Orleans.DurableMessaging.Tests.Support;
+using Orleans.Metadata;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Xunit;
@@ -19,6 +22,25 @@ public sealed class EarlyActivationValidationTests : DurableMessagingBehaviorTes
     public async Task UnsupportedModel_FailsBeforeJournalInitializationReplayAndWork(Type grainType, string diagnostic)
     {
         var grain = Fixture.Client.GetGrain<IActivationValidationTestGrain>(Guid.NewGuid(), grainType.FullName!);
+        await AssertRejectedBeforeRecoveryAsync(grain, grainType, diagnostic);
+    }
+
+    [Theory]
+    [InlineData(typeof(MetadataReentrantActivationValidationGrain), WellKnownGrainTypeProperties.Reentrant, "TrUe")]
+    [InlineData(typeof(MetadataMayInterleaveActivationValidationGrain), WellKnownGrainTypeProperties.MayInterleavePredicate, "Interleave")]
+    public async Task ResolvedInterleavingMetadata_FailsBeforeJournalRecovery(Type grainType, string key, string value)
+    {
+        Assert.False(grainType.IsDefined(typeof(ReentrantAttribute), inherit: true));
+        Assert.False(grainType.IsDefined(typeof(MayInterleaveAttribute), inherit: true));
+        var grain = Fixture.Client.GetGrain<IActivationValidationTestGrain>(Guid.NewGuid(), grainType.FullName!);
+        var properties = Fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<GrainPropertiesResolver>()
+            .GetGrainProperties(grain.GetGrainId().Type);
+        Assert.Equal(value, properties.Properties[key]);
+        await AssertRejectedBeforeRecoveryAsync(grain, grainType, "non-reentrant");
+    }
+
+    private async Task AssertRejectedBeforeRecoveryAsync(IActivationValidationTestGrain grain, Type grainType, string diagnostic)
+    {
         var failure = await Assert.ThrowsAnyAsync<Exception>(() => grain.IncrementAsync());
         Assert.Contains(diagnostic, failure.ToString(), StringComparison.Ordinal);
         Assert.Contains(grainType.Name, failure.ToString(), StringComparison.Ordinal);
@@ -39,7 +61,18 @@ public sealed class EarlyActivationValidationTests : DurableMessagingBehaviorTes
     [Fact]
     public async Task SupportedModel_InitializesAndReplaysFreshActivationNormally()
     {
-        var grain = Fixture.Client.GetGrain<IActivationValidationTestGrain>(Guid.NewGuid(), typeof(SupportedActivationValidationTestGrain).FullName!);
+        await AssertSupportedReplayAsync(typeof(SupportedActivationValidationTestGrain));
+    }
+
+    [Fact]
+    public async Task ResolvedNonReentrantMetadata_InitializesAndReplaysNormally()
+    {
+        await AssertSupportedReplayAsync(typeof(MetadataNonReentrantActivationValidationGrain));
+    }
+
+    private async Task AssertSupportedReplayAsync(Type grainType)
+    {
+        var grain = Fixture.Client.GetGrain<IActivationValidationTestGrain>(Guid.NewGuid(), grainType.FullName!);
         Assert.Equal(1, await grain.IncrementAsync());
         var first = Assert.Single(Fixture.ActivationProbe.Get(grain.GetGrainId()));
         Assert.False(first.InstanceAvailableDuringConstruction);
