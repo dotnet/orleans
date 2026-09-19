@@ -11,71 +11,144 @@ public sealed partial class CassandraClusteringTableTests
 {
     private const int ConformancePageSize = 32;
     private readonly ConcurrentBag<(IMembershipTable Table, string ClusterId, ServiceProvider Services)> _legacyMembershipHandles = [];
-    private readonly Dictionary<string, (string PartitionKey, ISession Session)> _conformanceScopes = [];
-    private Task<(Cluster Cluster, ISession Session, ISession ProbeSession)>? _conformanceSession;
 
     protected override int ConformanceConcurrencyRowCount => ConformancePageSize + 1;
 
     protected override MembershipTableTestFixture CreateConformanceFixture()
-        => new("Cassandra", CreateConformanceHandleAsync, IsConformanceClusterDeletedAsync);
-
-    private async ValueTask<MembershipTableTestHandle> CreateConformanceHandleAsync(
-        string serviceId,
-        string clusterId,
-        CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var (_, session, probeSession) = await (_conformanceSession ??= CreateConformanceSessionAsync(cancellationToken));
-        _conformanceScopes[clusterId] = ($"{serviceId}-{clusterId}", probeSession);
-        var services = CreateMembershipServices(serviceId, clusterId, () => Task.FromResult(session), cassandraTtl: false);
-        var table = services.GetRequiredService<CassandraClusteringTable>();
-        return new MembershipTableTestHandle(table, services.DisposeAsync);
+        var scope = new ConformanceScope(_cassandraContainer);
+        return new("Cassandra", scope.CreateHandleAsync, scope.IsDeletedAsync);
     }
 
-    private async Task<(Cluster Cluster, ISession Session, ISession ProbeSession)> CreateConformanceSessionAsync(CancellationToken cancellationToken)
+    private sealed class ConformanceScope(CassandraContainer container)
     {
-        var container = await _cassandraContainer.RunImage(cancellationToken);
-        var cluster = Cluster.Builder()
-            .WithDefaultKeyspace("orleans")
-            .AddContactPoints(new IPEndPoint(IPAddress.Loopback, container.exposedPort))
-            .WithQueryOptions(new QueryOptions().SetPageSize(ConformancePageSize))
-            .Build();
-        try
-        {
-            var session = await cluster.ConnectAsync("orleans");
-            cancellationToken.ThrowIfCancellationRequested();
-            return (cluster, session, container.session);
-        }
-        catch
-        {
-            cluster.Dispose();
-            throw;
-        }
-    }
+        private readonly object _lock = new();
+        private readonly Dictionary<string, (string PartitionKey, ISession Session)> _scopes = [];
+        private Task<(Cluster Cluster, ISession Session, ISession ProbeSession)>? _session;
+        private int _handleCount;
+        private bool _disposed;
 
-    private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var (partitionKey, session) = _conformanceScopes[clusterId];
-        var statement = new SimpleStatement("SELECT * FROM membership WHERE partition_key = ?", partitionKey)
-            .SetConsistencyLevel(ConsistencyLevel.Serial)
-            .SetPageSize(ConformancePageSize);
-        var rows = await session.ExecuteAsync(statement).WaitAsync(cancellationToken);
-        while (true)
+        public async ValueTask<MembershipTableTestHandle> CreateHandleAsync(
+            string serviceId,
+            string clusterId,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // A static-version-only row still means the original partition has not been deleted.
-            if (rows.GetAvailableWithoutFetching() > 0)
+            Task<(Cluster Cluster, ISession Session, ISession ProbeSession)> creation;
+            lock (_lock)
             {
-                return false;
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                // Pending factories reserve ownership too, including a first connection which completes after timeout.
+                _handleCount++;
+                creation = _session ??= CreateSessionAsync(cancellationToken);
             }
 
-            if (rows.IsFullyFetched)
+            ServiceProvider? services = null;
+            try
             {
-                return true;
+                var (_, session, probeSession) = await creation;
+                lock (_lock)
+                {
+                    _scopes[clusterId] = ($"{serviceId}-{clusterId}", probeSession);
+                }
+
+                services = CreateMembershipServices(serviceId, clusterId, () => Task.FromResult(session), cassandraTtl: false);
+                var table = services.GetRequiredService<CassandraClusteringTable>();
+                return new MembershipTableTestHandle(table, () => DisposeHandleAsync(services));
+            }
+            catch (Exception failure)
+            {
+                try
+                {
+                    await DisposeHandleAsync(services);
+                }
+                catch (Exception cleanup)
+                {
+                    failure.Data["ConformanceHandleDisposalFailure"] = cleanup;
+                }
+
+                throw;
+            }
+        }
+
+        private async Task<(Cluster Cluster, ISession Session, ISession ProbeSession)> CreateSessionAsync(CancellationToken cancellationToken)
+        {
+            var backend = await container.RunImage(cancellationToken);
+            var cluster = Cluster.Builder()
+                .WithDefaultKeyspace("orleans")
+                .AddContactPoints(new IPEndPoint(IPAddress.Loopback, backend.exposedPort))
+                .WithQueryOptions(new QueryOptions().SetPageSize(ConformancePageSize))
+                .Build();
+            try
+            {
+                var session = await cluster.ConnectAsync("orleans");
+                cancellationToken.ThrowIfCancellationRequested();
+                return (cluster, session, backend.session);
+            }
+            catch
+            {
+                cluster.Dispose();
+                throw;
+            }
+        }
+
+        public async ValueTask<bool> IsDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            (string PartitionKey, ISession Session) scope;
+            lock (_lock)
+            {
+                scope = _scopes[clusterId];
             }
 
-            await rows.FetchMoreResultsAsync().WaitAsync(cancellationToken);
+            var statement = new SimpleStatement("SELECT * FROM membership WHERE partition_key = ? LIMIT 1", scope.PartitionKey)
+                .SetConsistencyLevel(ConsistencyLevel.Serial)
+                .SetPageSize(1);
+            var rows = await scope.Session.ExecuteAsync(statement);
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                // A static-version-only row still means the original partition has not been deleted.
+                if (rows.GetAvailableWithoutFetching() > 0)
+                {
+                    return false;
+                }
+
+                if (rows.IsFullyFetched)
+                {
+                    return true;
+                }
+
+                await rows.FetchMoreResultsAsync();
+            }
+        }
+
+        private async ValueTask DisposeHandleAsync(ServiceProvider? services)
+        {
+            try
+            {
+                if (services is not null)
+                {
+                    await services.DisposeAsync();
+                }
+            }
+            finally
+            {
+                Cluster? cluster = null;
+                lock (_lock)
+                {
+                    if (--_handleCount == 0)
+                    {
+                        _disposed = true;
+                        if (_session is { IsCompletedSuccessfully: true })
+                        {
+                            cluster = _session.Result.Cluster;
+                        }
+                    }
+                }
+
+                cluster?.Dispose();
+            }
         }
     }
 
@@ -86,8 +159,7 @@ public sealed partial class CassandraClusteringTableTests
         {
             try
             {
-                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                await table.DeleteMembershipTableEntriesAsync(clusterId, cleanup.Token).WaitAsync(cleanup.Token);
+                await table.DeleteMembershipTableEntriesAsync(clusterId, CancellationToken.None);
             }
             catch (Exception exception)
             {
@@ -97,18 +169,6 @@ public sealed partial class CassandraClusteringTableTests
             try
             {
                 await services.DisposeAsync();
-            }
-            catch (Exception exception)
-            {
-                failures.Add(exception);
-            }
-        }
-
-        if (_conformanceSession is { IsCompletedSuccessfully: true } session)
-        {
-            try
-            {
-                (await session).Cluster.Dispose();
             }
             catch (Exception exception)
             {

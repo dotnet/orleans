@@ -34,6 +34,8 @@ namespace Consul.Tests
     [TestArea("Membership")]
     public class ConsulMembershipTableTest : MembershipTableTestsBase
     {
+        private IConsulClient _legacyGatewayClient = null!;
+
         public ConsulMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
@@ -80,6 +82,9 @@ namespace Consul.Tests
             });
         }
 
+        protected override MembershipTableTestHandle CreateLegacyMembershipTableHandle(ILogger logger)
+            => CreateConformanceHandle(logger, _clusterOptions);
+
         protected override MembershipTableTestFixture CreateConformanceFixture()
             => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
 
@@ -111,8 +116,17 @@ namespace Consul.Tests
             var address = new Uri(this.connectionString);
 
             options.ConfigureConsulClient(address);
+            var client = options.CreateClient();
+            _legacyGatewayClient = client;
+            options.ConfigureConsulClient(() => client);
 
             return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this._gatewayOptions, this._clusterOptions);
+        }
+
+        protected override ValueTask DisposeLegacyGatewayListProviderAsync(IGatewayListProvider gatewayListProvider)
+        {
+            _legacyGatewayClient.Dispose();
+            return ValueTask.CompletedTask;
         }
 
         protected override async Task<string> GetConnectionString()

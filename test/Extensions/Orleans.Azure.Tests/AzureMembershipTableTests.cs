@@ -82,17 +82,20 @@ namespace Tester.AzureUtils
                 },
                 async (clusterId, cancellationToken) =>
                 {
-                    var empty = true;
                     // The partition contains both silo entities and the membership version row.
                     await foreach (var page in probe.QueryAsync<TableEntity>(
                         TableClient.CreateQueryFilter($"PartitionKey eq {clusterId}"),
+                        maxPerPage: 1,
                         select: [nameof(TableEntity.PartitionKey), nameof(TableEntity.RowKey)],
                         cancellationToken: cancellationToken).AsPages())
                     {
-                        empty &= page.Values.Count == 0;
+                        if (page.Values.Count > 0)
+                        {
+                            return false;
+                        }
                     }
 
-                    return empty;
+                    return true;
                 });
         }
 
@@ -115,9 +118,8 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
-        public void MembershipTable_Azure_Init()
-        {
-        }
+        public Task MembershipTable_Azure_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_GetGateways()

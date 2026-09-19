@@ -66,11 +66,12 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             },
             async (clusterId, cancellationToken) =>
             {
-                // GetSnapshotAsync consumes the complete RunQuery stream, including the cluster version document.
+                // Any document, including the cluster version, proves that this scope remains populated.
                 // The parent "Cluster" document is a shared header, not cluster-owned membership metadata.
                 var snapshot = await probe.Collection(options.RootCollectionName)
                     .Document("Cluster")
                     .Collection(Utils.SanitizeId(clusterId))
+                    .Limit(1)
                     .GetSnapshotAsync(cancellationToken);
                 return snapshot.Count == 0;
             });

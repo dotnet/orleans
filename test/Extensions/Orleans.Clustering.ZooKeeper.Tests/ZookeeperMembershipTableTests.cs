@@ -72,7 +72,7 @@ namespace UnitTests.MembershipTests
                 await client.sync("/");
                 cancellationToken.ThrowIfCancellationRequested();
                 return await client.existsAsync("/" + clusterId, false) is null;
-            }).WaitAsync(cancellationToken);
+            });
         }
 
         private sealed class ConformanceWatcher : Watcher
@@ -100,9 +100,8 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public void MembershipTable_ZooKeeper_Init()
-        {
-        }
+        public Task MembershipTable_ZooKeeper_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_ZooKeeper_GetGateways()
