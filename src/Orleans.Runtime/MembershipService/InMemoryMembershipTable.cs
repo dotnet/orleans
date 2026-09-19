@@ -43,28 +43,34 @@ namespace Orleans.Runtime.MembershipService
             return tableVersion;
         }
 
-        public bool Insert(MembershipEntry entry, TableVersion version)
+        public bool Insert(MembershipEntry entry, TableVersion version) => InsertWithResult(entry, version).Succeeded;
+
+        public MembershipTableWriteResult InsertWithResult(MembershipEntry entry, TableVersion version)
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
-            if (data != null) return false;
-            if (!tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
+            if (data != null) return default;
+            if (!tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return default;
 
+            var rowETag = NewETag();
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), rowETag);
             tableVersion = new TableVersion(version.Version, NewETag());
-            return true;
+            return new(true, new(tableVersion, rowETag));
         }
 
-        public bool Update(MembershipEntry entry, string etag, TableVersion version)
+        public bool Update(MembershipEntry entry, string etag, TableVersion version) => UpdateWithResult(entry, etag, version).Succeeded;
+
+        public MembershipTableWriteResult UpdateWithResult(MembershipEntry entry, string etag, TableVersion version)
         {
             siloTable.TryGetValue(entry.SiloAddress, out var data);
-            if (data == null) return false;
-            if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return false;
+            if (data == null) return default;
+            if (!data.Item2.Equals(etag, StringComparison.Ordinal) || !tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal)) return default;
 
+            var rowETag = NewETag();
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(
-                entry.Copy(), lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                entry.Copy(), rowETag);
             tableVersion = new TableVersion(version.Version, NewETag());
-            return true;
+            return new(true, new(tableVersion, rowETag));
         }
 
         public void UpdateIAmAlive(MembershipEntry entry)

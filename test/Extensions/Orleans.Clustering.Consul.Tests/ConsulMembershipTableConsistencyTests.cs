@@ -21,6 +21,133 @@ public class ConsulMembershipTableConsistencyTests
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MutationReceiptUsesMatchingNativeResultKeysAndIndependentIndices(bool update)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable(root: "membership/nested");
+        var entry = Entry();
+        const string prefix = "membership/nested/orleans/cluster/";
+        var rowKey = prefix + entry.SiloAddress.ToParsableString();
+        store.TransactionResults = results =>
+        {
+            Assert.Equal(2, results.Count);
+            Assert.All(results, result => Assert.Null(result.Value));
+            return
+            [
+                new(prefix + "version") { ModifyIndex = 91 },
+                new(rowKey) { ModifyIndex = 73 }
+            ];
+        };
+        if (update)
+        {
+            store.Set(rowKey, Encoding.UTF8.GetBytes("{}"));
+        }
+
+        var result = update
+            ? await table.UpdateRowWithResultAsync(entry, "1", new TableVersion(12, "0"), CancellationToken)
+            : await table.InsertRowWithResultAsync(entry, new TableVersion(12, "0"), CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Receipt);
+        Assert.Equal(new TableVersion(12, "91"), result.Receipt.Version);
+        Assert.Equal("73", result.Receipt.RowETag);
+        Assert.Equal(1, store.RequestCount);
+        Assert.Single(store.Transactions);
+        Assert.Empty(store.Reads);
+    }
+
+    [Fact]
+    public async Task MutationReceiptsChainWithoutReadsAndConflictsHaveNoReceipt()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var entry = Entry();
+        var inserted = await table.InsertRowWithResultAsync(entry, new TableVersion(1, "0"), CancellationToken);
+        Assert.True(inserted.Succeeded);
+        var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+        entry.Status = SiloStatus.ShuttingDown;
+        var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), CancellationToken);
+        Assert.True(updated.Succeeded);
+        var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
+        Assert.Equal(2, second.Version.Version);
+        Assert.NotEqual(first.RowETag, second.RowETag);
+        Assert.NotEqual(first.Version.VersionEtag, second.Version.VersionEtag);
+        var stale = await table.UpdateRowWithResultAsync(entry, first.RowETag, second.Version.Next(), CancellationToken);
+        Assert.False(stale.Succeeded);
+        Assert.Null(stale.Receipt);
+        var duplicate = await table.InsertRowWithResultAsync(entry, second.Version.Next(), CancellationToken);
+        Assert.False(duplicate.Succeeded);
+        Assert.Null(duplicate.Receipt);
+        var missingToken = await table.UpdateRowWithResultAsync(entry, "0", second.Version.Next(), CancellationToken);
+        Assert.False(missingToken.Succeeded);
+        Assert.Null(missingToken.Receipt);
+        Assert.Equal(4, store.RequestCount);
+        Assert.Equal(4, store.Transactions.Count);
+        Assert.Empty(store.Reads);
+        var snapshot = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(second.Version, snapshot.Version);
+        Assert.Equal(second.RowETag, snapshot.TryGet(entry.SiloAddress)!.Item2);
+        Assert.Equal(entry.Status, snapshot.TryGet(entry.SiloAddress)!.Item1.Status);
+    }
+
+    [Theory]
+    [InlineData(false, "empty")]
+    [InlineData(false, "missing-version")]
+    [InlineData(false, "duplicate")]
+    [InlineData(false, "zero")]
+    [InlineData(true, "empty")]
+    [InlineData(true, "missing-version")]
+    [InlineData(true, "duplicate")]
+    [InlineData(true, "zero")]
+    public async Task MutationMalformedSuccessFailsWithoutFallbackRead(bool update, string kind)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        var entry = Entry();
+        if (update)
+        {
+            store.Seed(entry, heartbeat: false);
+        }
+
+        store.TransactionResults = results => kind switch
+        {
+            "empty" => [],
+            "missing-version" => [results[0]],
+            "duplicate" => [results[0], results[0], results[1]],
+            "zero" => [new(results[0].Key), results[1]],
+            _ => throw new InvalidOperationException(kind)
+        };
+        var failure = await Assert.ThrowsAsync<OrleansException>(() => update
+            ? table.UpdateRowWithResultAsync(entry, "1", new TableVersion(1, "0"), CancellationToken)
+            : table.InsertRowWithResultAsync(entry, new TableVersion(1, "0"), CancellationToken));
+        Assert.Contains("commit metadata", failure.Message);
+        Assert.Equal(1, store.RequestCount);
+        Assert.Single(store.Transactions);
+        Assert.Empty(store.Reads);
+    }
+
+    [Theory]
+    [InlineData("insert")]
+    [InlineData("update")]
+    public async Task ReceiptWritesPreCanceledIssueNoRequests(string operation)
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        cancellation.Cancel();
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation switch
+        {
+            "insert" => table.InsertRowWithResultAsync(Entry(), new TableVersion(1, "0"), cancellation.Token),
+            "update" => table.UpdateRowWithResultAsync(Entry(), "1", new TableVersion(1, "0"), cancellation.Token),
+            _ => throw new InvalidOperationException(operation)
+        });
+        Assert.Equal(cancellation.Token, failure.CancellationToken);
+        Assert.Equal(0, store.RequestCount);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("membership/nested")]
     public async Task InitializationUsesOneNativeCASAndPreservesExistingVersion(string? root)
@@ -145,6 +272,14 @@ public class ConsulMembershipTableConsistencyTests
     [InlineData("update", "storage")]
     [InlineData("update", "mixed")]
     [InlineData("update", "empty")]
+    [InlineData("insert-result", "permission")]
+    [InlineData("insert-result", "storage")]
+    [InlineData("insert-result", "mixed")]
+    [InlineData("insert-result", "empty")]
+    [InlineData("update-result", "permission")]
+    [InlineData("update-result", "storage")]
+    [InlineData("update-result", "mixed")]
+    [InlineData("update-result", "empty")]
     [InlineData("cleanup", "permission")]
     [InlineData("cleanup", "storage")]
     [InlineData("cleanup", "mixed")]
@@ -176,6 +311,8 @@ public class ConsulMembershipTableConsistencyTests
         {
             "insert" => table.InsertRowAsync(Entry(2), first.Version.Next(), CancellationToken),
             "update" => table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken),
+            "insert-result" => table.InsertRowWithResultAsync(Entry(2), first.Version.Next(), CancellationToken),
+            "update-result" => table.UpdateRowWithResultAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken),
             "cleanup" => table.CleanupDefunctSiloEntriesAsync(Epoch.AddDays(1), CancellationToken),
             _ => throw new InvalidOperationException(operation)
         });
@@ -933,6 +1070,7 @@ public class ConsulMembershipTableConsistencyTests
         public (int OpIndex, string What)[]? TransactionErrors { get; set; }
         public bool DeleteResult { get; set; } = true;
         public bool PutResult { get; set; } = true;
+        public Func<List<KVPair>, List<KVPair>>? TransactionResults { get; set; }
 
         public ConsulBasedMembershipTable CreateTable(string cluster = "cluster", string? root = null)
         {
@@ -1042,7 +1180,13 @@ public class ConsulMembershipTableConsistencyTests
                 }
 
                 _rows = next;
-                return Response(HttpStatusCode.OK, "{\"Results\":[]}");
+                var results = operations.Where(operation => operation.Verb.Equals(KVTxnVerb.CAS))
+                    .Select(operation => new KVPair(operation.Key) { ModifyIndex = next[operation.Key].ModifyIndex }).ToList();
+                results = TransactionResults?.Invoke(results) ?? results;
+                return Response(HttpStatusCode.OK, JsonConvert.SerializeObject(new
+                {
+                    Results = results.Select(result => new { KV = result })
+                }));
             }
 
             Assert.StartsWith("/v1/kv/", uri.AbsolutePath);

@@ -218,6 +218,10 @@ internal partial class CosmosMembershipTable : IMembershipTable
     public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
     public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken).ConfigureAwait(false)).Succeeded;
+
+    /// <inheritdoc/>
+    public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -234,11 +238,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 .CreateItem(siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
-            return IsSuccessfulMembershipBatch(response, allowMissingRow: false);
+            return IsSuccessfulMembershipBatch(response, allowMissingRow: false)
+                ? new(true, new(new TableVersion(tableVersion.Version, response[0].ETag), response[0].ETag))
+                : new(false);
         }
         catch (CosmosException exc)
         {
-            if (exc.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed) return false;
+            if (exc.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed) return new(false);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -248,11 +254,15 @@ internal partial class CosmosMembershipTable : IMembershipTable
     public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken).ConfigureAwait(false)).Succeeded;
+
+    /// <inheritdoc/>
+    public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
         {
-            return false;
+            return new(false);
         }
 
         try
@@ -269,11 +279,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
-            return IsSuccessfulMembershipBatch(response, allowMissingRow: true);
+            return IsSuccessfulMembershipBatch(response, allowMissingRow: true)
+                ? new(true, new(new TableVersion(tableVersion.Version, response[0].ETag), response[0].ETag))
+                : new(false);
         }
         catch (CosmosException exc)
         {
-            if (exc.StatusCode == HttpStatusCode.PreconditionFailed) return false;
+            if (exc.StatusCode == HttpStatusCode.PreconditionFailed) return new(false);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }

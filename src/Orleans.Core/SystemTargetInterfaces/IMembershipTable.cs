@@ -171,6 +171,26 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Atomically inserts a membership entry and advances the table version, returning optional commit metadata.
+        /// </summary>
+        /// <remarks>
+        /// The default implementation invokes <see cref="InsertRowAsync"/> once and returns its success status
+        /// with no receipt. Providers can supply the table version and row entity tag from the committed mutation.
+        /// A caller which requires a current snapshot can use <see cref="ReadAllAsync"/> when no receipt is supplied.
+        /// </remarks>
+        /// <param name="entry">The membership entry to insert.</param>
+        /// <param name="tableVersion">The new table version and its expected entity tag.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        /// <returns>The mutation outcome and any metadata supplied from its commit.</returns>
+        [Alias("InsertRowWithResult")]
+        async Task<MembershipTableWriteResult> InsertRowWithResultAsync(
+            MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(await InsertRowAsync(entry, tableVersion, cancellationToken));
+        }
+
+        /// <summary>
         /// Atomically tries to update the MembershipEntry for one silo and also update the TableVersion.
         /// If operation succeeds, the following changes would be made to the table:
         /// 1) The MembershipEntry for this silo will be updated using the supplied entry.
@@ -211,6 +231,27 @@ namespace Orleans
 #pragma warning restore CS0618
             operation.Ignore();
             return await operation.WaitAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Atomically updates an existing membership entry and advances the table version, returning optional commit metadata.
+        /// </summary>
+        /// <remarks>
+        /// The default implementation invokes <see cref="UpdateRowAsync"/> once and returns its success status
+        /// with no receipt. A supplied receipt describes this mutation's commit, including its provider-defined row metadata.
+        /// Additional row conditions follow the heartbeat-neutral contract of <see cref="UpdateRowAsync"/>.
+        /// </remarks>
+        /// <param name="entry">The membership entry to update.</param>
+        /// <param name="etag">The provider-defined row entity tag obtained from a membership read or write receipt.</param>
+        /// <param name="tableVersion">The new table version and its expected entity tag.</param>
+        /// <param name="cancellationToken">A token which cancels the operation.</param>
+        /// <returns>The mutation outcome and any metadata supplied from its commit.</returns>
+        [Alias("UpdateRowWithResult")]
+        async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(
+            MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(await UpdateRowAsync(entry, etag, tableVersion, cancellationToken));
         }
 
         /// <summary>

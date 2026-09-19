@@ -195,6 +195,10 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
     public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+
+    /// <inheritdoc/>
+    public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -208,21 +212,23 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
+            MembershipTableWriteResult result;
             try
             {
                 var batch = collection.Database.StartBatch();
                 batch.Create(siloReference, silo);
                 batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
-                result = true;
+                var writes = await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
+                result = new(true, new(
+                    new TableVersion(tableVersion.Version, Utils.FormatTimestamp(writes[1].UpdateTime)),
+                    Utils.FormatTimestamp(writes[0].UpdateTime)));
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                result = new(false);
             }
 
-            if (result == false)
+            if (!result.Succeeded)
                 LogInsertContention(entry, tableVersion);
             return result;
         }
@@ -237,6 +243,10 @@ internal partial class FirestoreMembershipTable : IMembershipTable
     public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+    /// <inheritdoc/>
+    public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -250,22 +260,24 @@ internal partial class FirestoreMembershipTable : IMembershipTable
             var collection = this._storage.GetCollection();
             var siloReference = collection.Document(silo.Id);
             var versionReference = collection.Document(this._partitionId);
-            bool result;
+            MembershipTableWriteResult result;
             try
             {
                 var batch = collection.Database.StartBatch();
                 // The version guards canonical changes; heartbeat writes can change the row ETag.
                 batch.Update(siloReference, silo.GetFields(), Precondition.MustExist);
                 batch.Update(versionReference, version.GetFields(), Precondition.LastUpdated(version.ETag.Value));
-                await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
-                result = true;
+                var writes = await FirestoreDataManager.ExecuteWithCancellation(batch.CommitAsync(cancellationToken), cancellationToken);
+                result = new(true, new(
+                    new TableVersion(tableVersion.Version, Utils.FormatTimestamp(writes[1].UpdateTime)),
+                    Utils.FormatTimestamp(writes[0].UpdateTime)));
             }
             catch (RpcException exception) when (IsContention(exception))
             {
-                result = false;
+                result = new(false);
             }
 
-            if (result == false)
+            if (!result.Succeeded)
                 LogUpdateContention(entry, etag, tableVersion);
             return result;
         }

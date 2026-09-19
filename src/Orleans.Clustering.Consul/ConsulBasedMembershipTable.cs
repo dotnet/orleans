@@ -147,6 +147,10 @@ namespace Orleans.Runtime.Membership
 
         /// <inheritdoc />
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -160,10 +164,10 @@ namespace Orleans.Runtime.Membership
                 if (!IsTransactionSuccessful(responses.Response))
                 {
                     LogDebugConsulMembershipProviderFailedToInsertRow(entry.SiloAddress);
-                    return false;
+                    return new(false);
                 }
 
-                return true;
+                return CreateWriteResult(responses.Response, insertKV.Key, tableVersion.Version);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -178,6 +182,10 @@ namespace Orleans.Runtime.Membership
 
         /// <inheritdoc />
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -187,7 +195,7 @@ namespace Orleans.Runtime.Membership
                 if (expectedIndex == 0)
                 {
                     LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
-                    return false;
+                    return new(false);
                 }
 
                 var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
@@ -201,10 +209,10 @@ namespace Orleans.Runtime.Membership
                 if (!IsTransactionSuccessful(response.Response))
                 {
                     LogDebugConsulMembershipProviderFailedCASCheck(entry.SiloAddress);
-                    return false;
+                    return new(false);
                 }
 
-                return true;
+                return CreateWriteResult(response.Response, updateKV.Key, tableVersion.Version);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -265,6 +273,25 @@ namespace Orleans.Runtime.Membership
             var index = ulong.Parse(version.VersionEtag, CultureInfo.InvariantCulture);
             var versionBytes = Encoding.UTF8.GetBytes(version.Version.ToString(CultureInfo.InvariantCulture));
             return new KVTxnOp(this.versionKey, KVTxnVerb.CAS) { Index = index, Value = versionBytes };
+        }
+
+        private MembershipTableWriteResult CreateWriteResult(KVTxnResponse response, string rowKey, int version)
+        {
+            if (response.Results is null || response.Results.Any(result => result is null))
+            {
+                throw new OrleansException("Consul membership transaction succeeded without row and table commit metadata.");
+            }
+
+            var rows = response.Results.Where(result => string.Equals(result.Key, rowKey, StringComparison.Ordinal)).ToArray();
+            var versions = response.Results.Where(result => string.Equals(result.Key, versionKey, StringComparison.Ordinal)).ToArray();
+            if (rows.Length != 1 || versions.Length != 1 || rows[0].ModifyIndex == 0 || versions[0].ModifyIndex == 0)
+            {
+                throw new OrleansException("Consul membership transaction succeeded without valid row and table commit metadata.");
+            }
+
+            return new(true, new(
+                new TableVersion(version, versions[0].ModifyIndex.ToString(CultureInfo.InvariantCulture)),
+                rows[0].ModifyIndex.ToString(CultureInfo.InvariantCulture)));
         }
 
         private static bool IsTransactionSuccessful(KVTxnResponse response)

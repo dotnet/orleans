@@ -162,32 +162,51 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
     Task<bool> IMembershipTable.InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
     public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+
+    /// <inheritdoc />
+    public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetExpectedVersion(tableVersion, out var version))
         {
-            return false;
+            return new(false);
         }
 
         var query = await Queries.ExecuteAsync(await Queries.InsertMembership(
             _identifier, entry, version, cancellationToken), cancellationToken);
-        return (bool)query.First()["[applied]"];
+        return (bool)query.First()["[applied]"]
+            ? CreateWriteResult(version)
+            : new(false);
     }
 
     [Obsolete("Use UpdateRowAsync instead.")]
     Task<bool> IMembershipTable.UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+    /// <inheritdoc />
+    public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetExpectedVersion(tableVersion, out var expectedVersion) || !string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
         {
-            return false;
+            return new(false);
         }
 
         var query = await Queries.ExecuteAsync(await Queries.UpdateMembership(
             _identifier, entry, expectedVersion, cancellationToken), cancellationToken);
-        return (bool)query.First()["[applied]"];
+        return (bool)query.First()["[applied]"]
+            ? CreateWriteResult(expectedVersion)
+            : new(false);
+    }
+
+    private static MembershipTableWriteResult CreateWriteResult(int expectedVersion)
+    {
+        var committedVersion = checked(expectedVersion + 1);
+        var etag = committedVersion.ToString(CultureInfo.InvariantCulture);
+        return new(true, new(new TableVersion(committedVersion, etag), etag));
     }
 
     private static bool TryGetExpectedVersion(TableVersion tableVersion, out int version) =>

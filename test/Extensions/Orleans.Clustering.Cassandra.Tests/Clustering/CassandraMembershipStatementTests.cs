@@ -70,6 +70,112 @@ public sealed class CassandraMembershipStatementTests
         Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
     }
 
+    [Theory]
+    [InlineData(false, SiloStatus.Active)]
+    [InlineData(false, SiloStatus.Dead)]
+    [InlineData(true, SiloStatus.Active)]
+    [InlineData(true, SiloStatus.Dead)]
+    public async Task MembershipWriteReceipts_ChainConditionalBatchTokensWithoutReads(bool ttl, SiloStatus status)
+    {
+        var backend = new Backend { Version = 5 };
+        backend.OnExecute = command =>
+        {
+            Assert.StartsWith("BEGIN BATCH", command.Cql);
+            Assert.Equal(backend.Version, command.Values["expected_version"]);
+            Assert.Equal(backend.Version + 1, command.Values["new_version"]);
+            Assert.Equal(ttl && status == SiloStatus.Dead ? 60 : 0, command.Values["ttl"]);
+            backend.Version++;
+            return Task.FromResult<RowSet>(Rows.Applied(true));
+        };
+        using var table = await backend.CreateTable(ttl);
+        var entry = Entry(status);
+        var token = TestContext.Current.CancellationToken;
+
+        var inserted = await table.InsertRowWithResultAsync(entry, new TableVersion(6, "5"), token);
+
+        Assert.True(inserted.Succeeded);
+        var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+        Assert.Equal(new TableVersion(6, "6"), first.Version);
+        Assert.Equal("6", first.RowETag);
+        Assert.Equal(backend.Version, first.Version.Version);
+        var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
+        Assert.True(updated.Succeeded);
+        var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
+        Assert.Equal(new TableVersion(7, "7"), second.Version);
+        Assert.Equal("7", second.RowETag);
+        Assert.Equal(backend.Version, second.Version.Version);
+        Assert.Equal(new TableVersion(6, "6"), first.Version);
+        Assert.Collection(backend.Executed,
+            command => Assert.EndsWith("IF start_time = null; APPLY BATCH;", command.Cql),
+            command => Assert.EndsWith("IF start_time != null; APPLY BATCH;", command.Cql));
+        Assert.All(backend.Executed, command =>
+        {
+            Assert.Equal(ConsistencyLevel.Serial, command.Statement.SerialConsistencyLevel);
+            Assert.Equal(ConsistencyLevel.Quorum, command.Statement.ConsistencyLevel);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipWriteReceipts_UnappliedBatchHasNoReceipt(bool update)
+    {
+        var backend = new Backend { OnExecute = _ => Task.FromResult<RowSet>(Rows.Applied(false)) };
+        using var table = await backend.CreateTable();
+        var entry = Entry(SiloStatus.Active);
+        var token = TestContext.Current.CancellationToken;
+
+        var result = update
+            ? await table.UpdateRowWithResultAsync(entry, "5", new TableVersion(6, "5"), token)
+            : await table.InsertRowWithResultAsync(entry, new TableVersion(6, "5"), token);
+
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Receipt);
+        Assert.StartsWith("BEGIN BATCH", Assert.Single(backend.Executed).Cql);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipWriteReceipts_StorageErrorPropagatesWithoutReads(bool update)
+    {
+        var failure = new InvalidOperationException("Cassandra write failed.");
+        var backend = new Backend { OnExecute = _ => Task.FromException<RowSet>(failure) };
+        using var table = await backend.CreateTable();
+        var entry = Entry(SiloStatus.Active);
+        var token = TestContext.Current.CancellationToken;
+
+        var operation = update
+            ? table.UpdateRowWithResultAsync(entry, "5", new TableVersion(6, "5"), token)
+            : table.InsertRowWithResultAsync(entry, new TableVersion(6, "5"), token);
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => operation));
+        Assert.StartsWith("BEGIN BATCH", Assert.Single(backend.Executed).Cql);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipWriteReceipts_CanceledDuringExecute_DoesNotReturnSuccess(bool update)
+    {
+        var execution = new TaskCompletionSource<RowSet>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var backend = new Backend { OnExecute = _ => execution.Task };
+        using var table = await backend.CreateTable();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var entry = Entry(SiloStatus.Active);
+        var operation = update
+            ? table.UpdateRowWithResultAsync(entry, "5", new TableVersion(6, "5"), cancellation.Token)
+            : table.InsertRowWithResultAsync(entry, new TableVersion(6, "5"), cancellation.Token);
+        Assert.False(operation.IsCompleted);
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.StartsWith("BEGIN BATCH", Assert.Single(backend.Executed).Cql);
+        Assert.False(execution.Task.IsCompleted);
+        execution.SetResult(Rows.Applied(true));
+    }
+
     [Fact]
     public async Task ClusterVersionProbe_BoundsTheStaticValueRead()
     {
@@ -210,6 +316,12 @@ public sealed class CassandraMembershipStatementTests
 
         Assert.False(await table.InsertRowAsync(entry, new TableVersion(version, etag), token));
         Assert.False(await table.UpdateRowAsync(entry, etag, new TableVersion(version, etag), token));
+        var insert = await table.InsertRowWithResultAsync(entry, new TableVersion(version, etag), token);
+        Assert.False(insert.Succeeded);
+        Assert.Null(insert.Receipt);
+        var update = await table.UpdateRowWithResultAsync(entry, etag, new TableVersion(version, etag), token);
+        Assert.False(update.Succeeded);
+        Assert.Null(update.Receipt);
         Assert.Empty(backend.Executed);
     }
 
@@ -220,6 +332,10 @@ public sealed class CassandraMembershipStatementTests
         using var table = await backend.CreateTable();
         Assert.False(await table.UpdateRowAsync(
             Entry(SiloStatus.Dead), "3", new TableVersion(5, "4"), TestContext.Current.CancellationToken));
+        var result = await table.UpdateRowWithResultAsync(
+            Entry(SiloStatus.Dead), "3", new TableVersion(5, "4"), TestContext.Current.CancellationToken);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Receipt);
         Assert.Empty(backend.Executed);
     }
 

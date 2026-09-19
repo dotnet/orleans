@@ -74,10 +74,11 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
 
     public static TransactionalBatchResponse BatchResponse(params HttpStatusCode[] statuses)
     {
-        var results = statuses.Select(status =>
+        var results = statuses.Select((status, index) =>
         {
             var result = Substitute.For<TransactionalBatchOperationResult>();
             result.StatusCode.Returns(status);
+            result.ETag.Returns(index == 0 ? "committed-version" : "physical-row");
             return result;
         }).ToList();
         var response = Substitute.For<TransactionalBatchResponse>();

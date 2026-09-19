@@ -1506,6 +1506,13 @@ namespace NonSilo.Tests.Membership
             var grainFactory = Substitute.For<IInternalGrainFactory>();
             grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, Arg.Any<SiloAddress>())
                 .Returns(membershipTarget);
+            if (backingTable is IMembershipTableSystemTarget suppliedTarget)
+            {
+                // Rich-RPC tests own the receiver substitute; ordinary backing-table forwarding stays unchanged.
+                grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, Arg.Any<SiloAddress>())
+                    .Returns(suppliedTarget);
+            }
+
             var services = Substitute.For<IServiceProvider>();
             services.GetService(typeof(IOptions<DevelopmentClusterMembershipOptions>)).Returns(
                 Options.Create(new DevelopmentClusterMembershipOptions { PrimarySiloEndpoint = primarySilo.Endpoint }));
@@ -2013,6 +2020,189 @@ namespace NonSilo.Tests.Membership
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset iAmAliveTime)
         {
             return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime = iAmAliveTime.UtcDateTime, StartTime = iAmAliveTime.UtcDateTime };
+        }
+
+        [Theory]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        public async Task DevelopmentMembershipWriteResult_ForwardsExactlyOnce(bool update, bool succeeded)
+        {
+            var target = Substitute.For<IMembershipTableSystemTarget>();
+            var provider = CreateSystemTargetBasedMembershipTable(target);
+            await provider.InitializeMembershipTableAsync(true, TestContext.Current.CancellationToken);
+            using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var entry = Entry(this.localSilo, SiloStatus.ShuttingDown, DateTimeOffset.UnixEpoch.AddMinutes(3));
+            entry.HostName = "rich-write-host";
+            entry.SiloName = "rich-write-silo";
+            var requestedVersion = new TableVersion(37, "table/input:opaque");
+            const string rowETag = "row/condition:opaque";
+            var suppliedReceipt = succeeded
+                ? new MembershipTableWriteReceipt(new TableVersion(37, "table/committed:opaque"), "row/committed:distinct")
+                : null;
+            var supplied = new MembershipTableWriteResult(succeeded, suppliedReceipt);
+            var rpcTask = Task.FromResult(supplied);
+            if (update)
+            {
+                target.UpdateRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<string>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+                    .Returns(rpcTask);
+            }
+            else
+            {
+                target.InsertRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+                    .Returns(rpcTask);
+            }
+
+            target.ClearReceivedCalls();
+            var operation = update
+                ? provider.UpdateRowWithResultAsync(entry, rowETag, requestedVersion, caller.Token)
+                : provider.InsertRowWithResultAsync(entry, requestedVersion, caller.Token);
+            Assert.Same(rpcTask, operation);
+            var actual = await operation;
+
+            Assert.Equal(succeeded, actual.Succeeded);
+            Assert.Same(suppliedReceipt, actual.Receipt);
+            if (succeeded)
+            {
+                var receipt = Assert.IsType<MembershipTableWriteReceipt>(actual.Receipt);
+                Assert.Equal(new TableVersion(37, "table/committed:opaque"), receipt.Version);
+                Assert.Equal("row/committed:distinct", receipt.RowETag);
+            }
+            else
+            {
+                Assert.Null(actual.Receipt);
+            }
+
+            AssertOnlyRichWriteCall(target, update, entry, rowETag, requestedVersion, caller.Token);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Theory]
+        [InlineData(false, "synchronous")]
+        [InlineData(true, "synchronous")]
+        [InlineData(false, "faulted-task")]
+        [InlineData(true, "faulted-task")]
+        [InlineData(false, "receiver-missing")]
+        [InlineData(true, "receiver-missing")]
+        [InlineData(false, "canceled")]
+        [InlineData(true, "canceled")]
+        public async Task DevelopmentMembershipWriteResult_RpcFailureDoesNotReplayBoolWrite(bool update, string failure)
+        {
+            var target = Substitute.For<IMembershipTableSystemTarget>();
+            var provider = CreateSystemTargetBasedMembershipTable(target);
+            await provider.InitializeMembershipTableAsync(true, TestContext.Current.CancellationToken);
+            using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var entry = Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UnixEpoch.AddMinutes(2));
+            entry.HostName = "rpc-failure-host";
+            entry.SiloName = "rpc-failure-silo";
+            var version = new TableVersion(23, "table/request:opaque");
+            const string rowETag = "row/request:distinct";
+            // This is a representative RPC fault, not a test against a historical receiver binary.
+            Exception suppliedError = failure == "receiver-missing"
+                ? new NotSupportedException("Receiver does not implement the new rich membership RPC.")
+                : new InvalidOperationException("Rich membership RPC failed.");
+            var started = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = new TaskCompletionSource<MembershipTableWriteResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            async Task<MembershipTableWriteResult> CancelCooperatively(CancellationToken token)
+            {
+                using var registration = token.Register(() => completion.TrySetCanceled(token));
+                started.TrySetResult(token);
+                return await completion.Task;
+            }
+
+            Task<MembershipTableWriteResult> Rpc(NSubstitute.Core.CallInfo call)
+            {
+                if (failure == "synchronous")
+                {
+                    throw suppliedError;
+                }
+
+                return failure == "canceled"
+                    ? CancelCooperatively(call.ArgAt<CancellationToken>(update ? 3 : 2))
+                    : Task.FromException<MembershipTableWriteResult>(suppliedError);
+            }
+
+            if (update)
+            {
+                target.UpdateRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<string>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+                    .Returns(call => Rpc(call));
+            }
+            else
+            {
+                target.InsertRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+                    .Returns(call => Rpc(call));
+            }
+
+            target.ClearReceivedCalls();
+            Task<MembershipTableWriteResult> Invoke() => update
+                ? provider.UpdateRowWithResultAsync(entry, rowETag, version, caller.Token)
+                : provider.InsertRowWithResultAsync(entry, version, caller.Token);
+
+            if (failure == "synchronous")
+            {
+                var error = Assert.Throws<InvalidOperationException>(() => { _ = Invoke(); });
+                Assert.Same(suppliedError, error);
+            }
+            else
+            {
+                var operation = Invoke();
+                if (failure == "canceled")
+                {
+                    try
+                    {
+                        var forwardedToken = await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                        Assert.Equal(caller.Token, forwardedToken);
+                        Assert.False(forwardedToken.IsCancellationRequested);
+                        Assert.False(operation.IsCompleted);
+                        caller.Cancel();
+
+                        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                            () => operation.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+                        Assert.Equal(caller.Token, error.CancellationToken);
+                        Assert.True(completion.Task.IsCanceled);
+                    }
+                    finally
+                    {
+                        caller.Cancel();
+                    }
+                }
+                else
+                {
+                    var error = await Assert.ThrowsAsync(suppliedError.GetType(), () => operation);
+                    Assert.Same(suppliedError, error);
+                }
+            }
+
+            AssertOnlyRichWriteCall(target, update, entry, rowETag, version, caller.Token);
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        private static void AssertOnlyRichWriteCall(
+            IMembershipTableSystemTarget target,
+            bool update,
+            MembershipEntry entry,
+            string rowETag,
+            TableVersion version,
+            CancellationToken cancellationToken)
+        {
+            // Counting all calls also excludes retries, the other rich RPC, every old bool
+            // (including tokenless) RPC, and both row/full reads.
+            var call = Assert.Single(target.ReceivedCalls());
+            Assert.Equal(
+                update ? nameof(IMembershipTable.UpdateRowWithResultAsync) : nameof(IMembershipTable.InsertRowWithResultAsync),
+                call.GetMethodInfo().Name);
+            var arguments = call.GetArguments();
+            Assert.Equal(update ? 4 : 3, arguments.Length);
+            Assert.Same(entry, arguments[0]);
+            if (update)
+            {
+                Assert.Equal(rowETag, Assert.IsType<string>(arguments[1]));
+            }
+
+            Assert.Same(version, arguments[update ? 2 : 1]);
+            Assert.Equal(cancellationToken, Assert.IsType<CancellationToken>(arguments[update ? 3 : 2]));
         }
     }
 }

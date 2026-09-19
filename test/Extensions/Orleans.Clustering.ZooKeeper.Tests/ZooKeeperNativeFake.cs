@@ -69,7 +69,7 @@ internal sealed class ZooKeeperNativeFake
         }
     }
 
-    internal async Task Multi(List<Op> operations)
+    internal async Task<List<OpResult>> Multi(List<Op> operations)
     {
         Calls.Add("multi");
         var requests = operations.Select(ToRequest).ToList();
@@ -81,6 +81,7 @@ internal sealed class ZooKeeperNativeFake
 
         // Apply against a copy so failed native preconditions roll back every earlier operation.
         var next = new Dictionary<string, Node>(Nodes, StringComparer.Ordinal);
+        var results = new List<OpResult>();
         foreach (var request in requests)
         {
             switch (request)
@@ -95,9 +96,11 @@ internal sealed class ZooKeeperNativeFake
 
                     next.Add(create.Path, new(create.Data, Flags: create.Flags));
                     next[parent] = parentNode with { ChildrenVersion = parentNode.ChildrenVersion + 1 };
+                    results.Add(CreateResult<OpResult.CreateResult>(create.Path));
                     break;
                 case SetDataRequest set:
                     Set(next, set.Path, set.Data, set.Version);
+                    results.Add(CreateResult<OpResult.SetDataResult>(CreateStat(next[set.Path])));
                     break;
                 case DeleteRequest delete:
                     CheckVersion(next, delete.Path, delete.Version);
@@ -110,6 +113,7 @@ internal sealed class ZooKeeperNativeFake
                     var parentPath = Parent(delete.Path);
                     var owner = GetNode(next, parentPath);
                     next[parentPath] = owner with { ChildrenVersion = owner.ChildrenVersion + 1 };
+                    results.Add(CreateResult<OpResult.DeleteResult>());
                     break;
                 default:
                     throw new InvalidOperationException($"Unexpected native request: {request.GetType().Name}");
@@ -117,6 +121,7 @@ internal sealed class ZooKeeperNativeFake
         }
 
         Nodes = next;
+        return results;
     }
 
     internal async Task<Stat> SetData(string path, byte[] data, int version)

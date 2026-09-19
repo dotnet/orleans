@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -114,7 +115,14 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => InsertRowCoreAsync(entry, tableVersion, cancellationToken);
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => CreateWriteResult(await InsertRowCoreAsync(entry, tableVersion, cancellationToken), tableVersion.VersionEtag);
+
+        private async Task<bool> InsertRowCoreAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceInsertRow(entry, tableVersion);
@@ -151,7 +159,14 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
-        public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => UpdateRowCoreAsync(entry, etag, tableVersion, cancellationToken);
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => CreateWriteResult(await UpdateRowCoreAsync(entry, etag, tableVersion, cancellationToken), tableVersion.VersionEtag);
+
+        private async Task<bool> UpdateRowCoreAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceUpdateRow(entry, etag, tableVersion);
@@ -187,6 +202,19 @@ namespace Orleans.Runtime.MembershipService
                 LogDebugUpdateRowFailed(ex);
                 throw;
             }
+        }
+
+        private static MembershipTableWriteResult CreateWriteResult(bool succeeded, string expectedVersion)
+        {
+            if (!succeeded)
+            {
+                return new(false);
+            }
+
+            // Installed membership queries increment the matched version once, ignoring the supplied numeric version.
+            var version = checked(int.Parse(expectedVersion, CultureInfo.InvariantCulture) + 1);
+            var etag = version.ToString(CultureInfo.InvariantCulture);
+            return new(true, new(new TableVersion(version, etag), etag));
         }
 
         /// <inheritdoc />

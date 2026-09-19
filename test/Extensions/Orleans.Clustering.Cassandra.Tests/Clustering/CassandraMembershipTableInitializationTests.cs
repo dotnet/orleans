@@ -21,6 +21,27 @@ public sealed class CassandraMembershipTableInitializationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task MembershipWriteReceipts_PreCanceled_DoNotCreateSession(bool update)
+    {
+        var backend = new InitializationBackend();
+        using var table = backend.CreateTable(false);
+        backend.Session.ClearReceivedCalls();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.Cancel();
+        var version = new TableVersion(1, "0");
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => update
+            ? table.UpdateRowWithResultAsync(null!, "0", version, cancellation.Token)
+            : table.InsertRowWithResultAsync(null!, version, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Equal(0, backend.FactoryCalls);
+        Assert.Empty(backend.Session.ReceivedCalls());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Initialize_ConfiguredTtl_CreatesPersistentTable(bool gateway)
     {
         var backend = new InitializationBackend { SchemaRead = () => Task.FromResult<RowSet>(new BufferedRowSet()) };

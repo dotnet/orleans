@@ -291,12 +291,11 @@ public class MembershipTableCancellationTests
         services.AddSerializer(builder => builder.AddAssembly(typeof(IMembershipTable).Assembly));
         if (useLegacyMetadata)
         {
-            var operations = typeof(IMembershipTable).GetMethods()
-                .Where(method => method.Name.EndsWith("Async", StringComparison.Ordinal))
-                .Select(method =>
+            var operations = WireOperations
+                .Select(row =>
                 {
-                    var legacyId = Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias;
-                    return (Id: legacyId, Legacy: GetLegacyInvokerType(legacyId), Current: GetCurrentInvokerType(method.Name));
+                    var (methodName, legacyId) = row.Data;
+                    return (Id: legacyId, Legacy: GetLegacyInvokerType(legacyId), Current: GetCurrentInvokerType(methodName));
                 }).ToArray();
             services.AddSingleton<ITypeConverter>(new LegacyInvokerTypeFormatter(
                 operations.ToDictionary(operation => operation.Legacy, operation => GetLegacyAlias(operation.Id))));
@@ -469,6 +468,162 @@ public class MembershipTableCancellationTests
             cancellationToken.ThrowIfCancellationRequested();
             ReceivedToken = cancellationToken;
             return Task.FromResult(Data);
+        }
+    }
+
+    public static TheoryData<string, string> RichWireOperations { get; } = new()
+    {
+        { nameof(IMembershipTable.InsertRowWithResultAsync), "InsertRowWithResult" },
+        { nameof(IMembershipTable.UpdateRowWithResultAsync), "UpdateRowWithResult" },
+    };
+
+    [Theory]
+    [MemberData(nameof(RichWireOperations))]
+    public void WriteResultMethods_HaveAdditiveAliasesAndCancellationLast(string operation, string alias)
+    {
+        var isInsert = operation == nameof(IMembershipTable.InsertRowWithResultAsync);
+        Type[] applicationTypes = isInsert
+            ? [typeof(MembershipEntry), typeof(TableVersion)]
+            : [typeof(MembershipEntry), typeof(string), typeof(TableVersion)];
+        string[] applicationNames = isInsert ? ["entry", "tableVersion"] : ["entry", "etag", "tableVersion"];
+        var method = Assert.Single(typeof(IMembershipTable).GetMethods(), candidate => candidate.Name == operation);
+        var parameters = method.GetParameters();
+
+        Assert.Equal(typeof(Task<MembershipTableWriteResult>), method.ReturnType);
+        Assert.Equal(applicationTypes.Append(typeof(CancellationToken)), parameters.Select(parameter => parameter.ParameterType));
+        Assert.Equal(applicationNames.Append("cancellationToken"), parameters.Select(parameter => parameter.Name));
+        Assert.All(parameters[..^1], parameter => Assert.False(parameter.IsOptional));
+        Assert.True(parameters[^1].IsOptional);
+        Assert.True(parameters[^1].HasDefaultValue);
+        Assert.Null(parameters[^1].DefaultValue); // Reflection represents default(CancellationToken) as null.
+        Assert.Equal(alias, Assert.Single(method.GetCustomAttributes<AliasAttribute>()).Alias);
+        Assert.NotEqual("FEF3AC5A", alias);
+        Assert.NotEqual("E06D3DBC", alias);
+        Assert.NotEqual("D851FB33", alias);
+
+        var boolMethodName = isInsert ? nameof(IMembershipTable.InsertRowAsync) : nameof(IMembershipTable.UpdateRowAsync);
+        var boolMethod = Assert.Single(typeof(IMembershipTable).GetMethods(), candidate => candidate.Name == boolMethodName);
+        Assert.Equal(typeof(Task<bool>), boolMethod.ReturnType);
+        Assert.Equal(applicationTypes.Append(typeof(CancellationToken)), boolMethod.GetParameters().Select(parameter => parameter.ParameterType));
+        Assert.Equal(isInsert ? "FEF3AC5A" : "E06D3DBC", Assert.Single(boolMethod.GetCustomAttributes<AliasAttribute>()).Alias);
+        var tokenlessMethod = typeof(IMembershipTable).GetMethod(boolMethodName[..^"Async".Length], applicationTypes);
+        Assert.NotNull(tokenlessMethod);
+        Assert.Equal(typeof(Task<bool>), tokenlessMethod.ReturnType);
+    }
+
+    [Theory]
+    [MemberData(nameof(RichWireOperations))]
+    public async Task GeneratedRichProxyCalls_UseAdditiveWireIdentityAndPayload(string operation, string alias)
+    {
+        using var services = CreateSerializerServices();
+        var serializer = services.GetRequiredService<Serializer>();
+        var converter = services.GetRequiredService<TypeConverter>();
+        var entry = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.FromParsableString("127.0.0.1:11112@83"),
+            Status = SiloStatus.Active,
+            HostName = "rich-wire-host",
+            SiloName = "rich-wire-silo",
+            StartTime = DateTime.UnixEpoch.AddHours(2),
+            IAmAliveTime = DateTime.UnixEpoch.AddHours(3),
+        };
+        var version = new TableVersion(42, "table/expected:\"opaque\"");
+        object[] arguments = operation == nameof(IMembershipTable.InsertRowWithResultAsync)
+            ? [entry, version]
+            : [entry, "row/expected:\u03BB", version];
+        using var firstCancellation = new CancellationTokenSource();
+        using var secondCancellation = new CancellationTokenSource();
+        using var firstRequest = await CaptureProxyCall(services, operation, [.. arguments, firstCancellation.Token]);
+        using var secondRequest = await CaptureProxyCall(services, operation, [.. arguments, secondCancellation.Token]);
+        var requestType = GetCurrentInvokerType(operation);
+        var wireIdentity = $"(\"inv\",[GrainRef],[Orleans.IMembershipTable,Orleans.Core],\"{alias}\")";
+
+        Assert.Equal(wireIdentity, converter.Format(requestType));
+        Assert.Equal(requestType, converter.Parse(wireIdentity));
+        Assert.NotEqual(GetCurrentInvokerType(nameof(IMembershipTable.InsertRowAsync)), requestType);
+        Assert.NotEqual(GetCurrentInvokerType(nameof(IMembershipTable.UpdateRowAsync)), requestType);
+        Assert.NotEqual(firstCancellation.Token, secondCancellation.Token);
+        AssertRequest(firstRequest, firstCancellation.Token);
+        AssertRequest(secondRequest, secondCancellation.Token);
+
+        var bytes = serializer.SerializeToArray<object>(firstRequest);
+        Assert.Equal(bytes, serializer.SerializeToArray<object>(secondRequest));
+        firstCancellation.Cancel();
+        Assert.Equal(bytes, serializer.SerializeToArray<object>(firstRequest));
+        using var received = Assert.IsAssignableFrom<IInvokable>(serializer.Deserialize<object>(bytes));
+        AssertRequest(received, CancellationToken.None);
+
+        // This is a new receiver returning its raw commit result, not a simulated historical rich receiver.
+        var committedVersion = new TableVersion(42, "table/committed:\"different\"");
+        var receipt = new MembershipTableWriteReceipt(committedVersion, "row/committed:\u03A9");
+        var target = new RichWriteProvider(new MembershipTableWriteResult(true, receipt));
+        target.Completion.SetResult(false);
+        received.SetTarget(new MembershipTargetHolder(target));
+        // SetTarget creates receiver-local cancellation state; no caller token crossed the wire.
+        var receiverToken = received.GetCancellationToken();
+        Assert.True(receiverToken.CanBeCanceled);
+        Assert.False(receiverToken.IsCancellationRequested);
+        Assert.NotEqual(firstCancellation.Token, receiverToken);
+        Assert.NotEqual(secondCancellation.Token, receiverToken);
+
+        using var response = await received.Invoke();
+
+        Assert.Null(response.Exception);
+        var result = Assert.IsType<MembershipTableWriteResult>(response.Result);
+        Assert.True(result.Succeeded);
+        var returnedReceipt = Assert.IsType<MembershipTableWriteReceipt>(result.Receipt);
+        Assert.Same(receipt, returnedReceipt);
+        Assert.Same(committedVersion, returnedReceipt.Version);
+        Assert.Equal(42, returnedReceipt.Version.Version);
+        Assert.Equal("table/committed:\"different\"", returnedReceipt.Version.VersionEtag);
+        Assert.Equal("row/committed:\u03A9", returnedReceipt.RowETag);
+        var call = Assert.Single(target.RichCalls);
+        Assert.Equal(operation, call.Method);
+        Assert.Equal(receiverToken, call.Token);
+        AssertRichArguments(call.Arguments);
+        Assert.Empty(target.Calls);
+
+        void AssertRequest(IInvokable request, CancellationToken token)
+        {
+            Assert.Equal(requestType, request.GetType());
+            Assert.Equal(operation, request.GetMethodName());
+            Assert.Equal(typeof(IMembershipTable).GetMethod(operation), request.GetMethod());
+            Assert.Equal(typeof(IMembershipTable), request.GetInterfaceType());
+            Assert.True(request.IsCancellable);
+            Assert.Equal(arguments.Length + 1, request.GetArgumentCount());
+            Assert.Equal(token, request.GetCancellationToken());
+            Assert.Equal(token, Assert.IsType<CancellationToken>(request.GetArgument(arguments.Length)));
+            AssertRichArguments(Enumerable.Range(0, arguments.Length).Select(request.GetArgument).ToArray());
+        }
+
+        void AssertRichArguments(object?[] actual)
+        {
+            AssertArguments(arguments, actual);
+            var actualEntry = Assert.IsType<MembershipEntry>(actual[0]);
+            Assert.Equal(SiloStatus.Active, actualEntry.Status);
+            Assert.Equal("rich-wire-host", actualEntry.HostName);
+            Assert.Equal("rich-wire-silo", actualEntry.SiloName);
+            Assert.Equal(DateTime.UnixEpoch.AddHours(2), actualEntry.StartTime);
+            Assert.Equal(DateTime.UnixEpoch.AddHours(3), actualEntry.IAmAliveTime);
+        }
+    }
+
+    private sealed class RichWriteProvider(MembershipTableWriteResult result) : LegacyProvider, IMembershipTable
+    {
+        public List<(string Method, object[] Arguments, CancellationToken Token)> RichCalls { get; } = [];
+
+        public Task<MembershipTableWriteResult> InsertRowWithResultAsync(
+            MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            RichCalls.Add((nameof(InsertRowWithResultAsync), [entry, tableVersion], cancellationToken));
+            return Task.FromResult(result);
+        }
+
+        public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(
+            MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            RichCalls.Add((nameof(UpdateRowWithResultAsync), [entry, etag, tableVersion], cancellationToken));
+            return Task.FromResult(result);
         }
     }
 }

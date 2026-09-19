@@ -138,4 +138,202 @@ public sealed class MembershipTableSystemTargetTests : IDisposable
         _target.Dispose();
         _services.Dispose();
     }
+
+    [Fact]
+    public async Task WriteResults_CaptureReceiptsInOriginalSchedulerTurn()
+    {
+        var context = (IGrainContext)_target;
+        var first = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 2),
+            HostName = "first-host",
+            SiloName = "first-silo",
+            Status = SiloStatus.Joining,
+            StartTime = DateTime.UnixEpoch,
+            IAmAliveTime = DateTime.UnixEpoch.AddMinutes(1)
+        };
+        var second = new MembershipEntry
+        {
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 3),
+            HostName = "second-host",
+            SiloName = "second-silo",
+            Status = SiloStatus.Active,
+            StartTime = DateTime.UnixEpoch.AddMinutes(2),
+            IAmAliveTime = DateTime.UnixEpoch.AddMinutes(3)
+        };
+        MembershipTableWriteResult inserted = default;
+        MembershipTableWriteResult updated = default;
+        MembershipTableWriteResult secondInserted = default;
+        MembershipTableWriteResult laterUpdated = default;
+        (int Version, string TableTag, string RowTag) insertBaseline = default;
+        (int Version, string TableTag, string RowTag) updateBaseline = default;
+        (int Version, string TableTag, string RowTag) secondBaseline = default;
+
+        await context.QueueTask(async () =>
+        {
+            Assert.Same(context, RuntimeContext.Current);
+            await _target.InitializeMembershipTableAsync(true, _cancellationToken);
+            var seed = await _target.ReadAllAsync(_cancellationToken);
+            Assert.Empty(seed.Members);
+            Assert.Equal(new TableVersion(0, "0"), seed.Version);
+
+            // Capture the native result here, before another mutation or scheduler turn.
+            var insertTask = _target.InsertRowWithResultAsync(first, seed.Version.Next(), _cancellationToken);
+            Assert.True(insertTask.IsCompletedSuccessfully);
+            inserted = await insertTask;
+            Assert.True(inserted.Succeeded);
+            var insertReceipt = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+            insertBaseline = (insertReceipt.Version.Version, insertReceipt.Version.VersionEtag, insertReceipt.RowETag);
+            Assert.Equal((1, "2", "1"), insertBaseline);
+
+            first.Status = SiloStatus.ShuttingDown;
+            var updateTask = _target.UpdateRowWithResultAsync(
+                first, insertReceipt.RowETag, insertReceipt.Version.Next(), _cancellationToken);
+            Assert.True(updateTask.IsCompletedSuccessfully);
+            updated = await updateTask;
+            Assert.True(updated.Succeeded);
+            var updateReceipt = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
+            updateBaseline = (updateReceipt.Version.Version, updateReceipt.Version.VersionEtag, updateReceipt.RowETag);
+            Assert.Equal((2, "4", "3"), updateBaseline);
+
+            var secondTask = _target.InsertRowWithResultAsync(second, updateReceipt.Version.Next(), _cancellationToken);
+            Assert.True(secondTask.IsCompletedSuccessfully);
+            secondInserted = await secondTask;
+            Assert.True(secondInserted.Succeeded);
+            var secondReceipt = Assert.IsType<MembershipTableWriteReceipt>(secondInserted.Receipt);
+            secondBaseline = (secondReceipt.Version.Version, secondReceipt.Version.VersionEtag, secondReceipt.RowETag);
+            Assert.Equal((3, "6", "5"), secondBaseline);
+            Assert.Same(context, RuntimeContext.Current);
+        });
+
+        await context.QueueTask(async () =>
+        {
+            Assert.Same(context, RuntimeContext.Current);
+            first.IAmAliveTime = DateTime.UnixEpoch.AddMinutes(5);
+            await _target.UpdateIAmAliveAsync(first, _cancellationToken);
+            second.Status = SiloStatus.Dead;
+            var receipt = Assert.IsType<MembershipTableWriteReceipt>(secondInserted.Receipt);
+            var writeTask = _target.UpdateRowWithResultAsync(
+                second, receipt.RowETag, receipt.Version.Next(), _cancellationToken);
+            Assert.True(writeTask.IsCompletedSuccessfully);
+            laterUpdated = await writeTask;
+            Assert.Same(context, RuntimeContext.Current);
+        });
+
+        // No read occurred between any writes. These are the raw receipts retained above.
+        var originalInsert = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+        var originalUpdate = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
+        var originalSecond = Assert.IsType<MembershipTableWriteReceipt>(secondInserted.Receipt);
+        Assert.Equal(insertBaseline, (originalInsert.Version.Version, originalInsert.Version.VersionEtag, originalInsert.RowETag));
+        Assert.Equal(updateBaseline, (originalUpdate.Version.Version, originalUpdate.Version.VersionEtag, originalUpdate.RowETag));
+        Assert.Equal(secondBaseline, (originalSecond.Version.Version, originalSecond.Version.VersionEtag, originalSecond.RowETag));
+        Assert.True(laterUpdated.Succeeded);
+        var finalReceipt = Assert.IsType<MembershipTableWriteReceipt>(laterUpdated.Receipt);
+        Assert.Equal(new TableVersion(4, "8"), finalReceipt.Version);
+        Assert.Equal("7", finalReceipt.RowETag);
+
+        var final = await _target.ReadAllAsync(_cancellationToken);
+        Assert.Equal(finalReceipt.Version, final.Version);
+        Assert.Equal(2, final.Members.Count);
+        var firstRow = Assert.IsType<Tuple<MembershipEntry, string>>(final.TryGet(first.SiloAddress));
+        Assert.Equal(originalUpdate.RowETag, firstRow.Item2);
+        Assert.Equal("first-host", firstRow.Item1.HostName);
+        Assert.Equal("first-silo", firstRow.Item1.SiloName);
+        Assert.Equal(SiloStatus.ShuttingDown, firstRow.Item1.Status);
+        Assert.Equal(DateTime.UnixEpoch, firstRow.Item1.StartTime);
+        Assert.Equal(DateTime.UnixEpoch.AddMinutes(5), firstRow.Item1.IAmAliveTime);
+        var secondRow = Assert.IsType<Tuple<MembershipEntry, string>>(final.TryGet(second.SiloAddress));
+        Assert.Equal(finalReceipt.RowETag, secondRow.Item2);
+        Assert.Equal("second-host", secondRow.Item1.HostName);
+        Assert.Equal("second-silo", secondRow.Item1.SiloName);
+        Assert.Equal(SiloStatus.Dead, secondRow.Item1.Status);
+        Assert.Equal(DateTime.UnixEpoch.AddMinutes(2), secondRow.Item1.StartTime);
+        Assert.Equal(DateTime.UnixEpoch.AddMinutes(3), secondRow.Item1.IAmAliveTime);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WriteResult_ConditionalFailure_ReturnsNoReceipt(bool update)
+    {
+        var before = await SeedTable();
+        var row = Assert.Single(before.Members);
+        var changed = row.Item1.Copy();
+        changed.Status = SiloStatus.ShuttingDown;
+        changed.HostName = "changed-host";
+        changed.IAmAliveTime = DateTime.UnixEpoch.AddMinutes(4);
+        var context = (IGrainContext)_target;
+        MembershipTableWriteResult rejected = default;
+
+        await context.QueueTask(async () =>
+        {
+            // Duplicate insert with current table CAS, or valid row guard with stale table CAS.
+            var operation = update
+                ? _target.UpdateRowWithResultAsync(
+                    changed, row.Item2, new TableVersion(before.Version.Version + 1, "stale-table-tag"), _cancellationToken)
+                : _target.InsertRowWithResultAsync(changed, before.Version.Next(), _cancellationToken);
+            Assert.True(operation.IsCompletedSuccessfully);
+            rejected = await operation;
+        });
+
+        Assert.False(rejected.Succeeded);
+        Assert.Null(rejected.Receipt);
+        AssertUnchanged(before, await _target.ReadAllAsync(_cancellationToken));
+
+        MembershipTableWriteResult committed = default;
+        await context.QueueTask(async () =>
+        {
+            var operation = _target.UpdateRowWithResultAsync(changed, row.Item2, before.Version.Next(), _cancellationToken);
+            Assert.True(operation.IsCompletedSuccessfully);
+            committed = await operation;
+        });
+
+        Assert.True(committed.Succeeded);
+        var receipt = Assert.IsType<MembershipTableWriteReceipt>(committed.Receipt);
+        Assert.Equal(new TableVersion(2, "4"), receipt.Version);
+        Assert.Equal("3", receipt.RowETag);
+        AssertUnchanged(
+            new MembershipTableData(Tuple.Create(changed, receipt.RowETag), receipt.Version),
+            await _target.ReadAllAsync(_cancellationToken));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task PreCanceledWriteResult_PreservesTable(bool update, bool terminallyDeleted)
+    {
+        var before = await SeedTable();
+        var row = Assert.Single(before.Members);
+        var changed = row.Item1.Copy();
+        changed.Status = SiloStatus.Dead;
+        changed.HostName = "must-not-be-stored";
+        if (!update)
+        {
+            changed.SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 2);
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        cancellation.Cancel();
+        var context = (IGrainContext)_target;
+
+        async Task AssertCanceledWrite()
+        {
+            var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => update
+                ? _target.UpdateRowWithResultAsync(changed, row.Item2, before.Version.Next(), cancellation.Token)
+                : _target.InsertRowWithResultAsync(changed, before.Version.Next(), cancellation.Token));
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+        }
+
+        await context.QueueTask(AssertCanceledWrite);
+        AssertUnchanged(before, await _target.ReadAllAsync(_cancellationToken));
+
+        if (terminallyDeleted)
+        {
+            await _target.DeleteMembershipTableEntriesAsync(ClusterId, _cancellationToken);
+            await context.QueueTask(AssertCanceledWrite);
+            await Assert.ThrowsAsync<NullReferenceException>(() => _target.ReadAllAsync(_cancellationToken));
+        }
+    }
 }

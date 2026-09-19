@@ -313,6 +313,21 @@ namespace Orleans.Runtime.Membership
 
         internal static async Task<bool> InsertRowCoreAsync(
             NativeOperations zk, MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
+            => (await InsertRowWithResultCoreAsync(zk, entry, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(tableVersion);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return UsingZookeeper(zk => InsertRowWithResultCoreAsync(zk, entry, tableVersion, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<MembershipTableWriteResult> InsertRowWithResultCoreAsync(
+            NativeOperations zk, MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string rowPath = ConvertToRowPath(entry.SiloAddress);
@@ -324,17 +339,19 @@ namespace Orleans.Runtime.Membership
 
             try
             {
-                await zk.Multi(
+                var results = await zk.Multi(
                 [
                     Op.setData("/", null, expectedTableVersion),
                     Op.create(rowPath, newRowData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT),
                     Op.create(rowIAmAlivePath, newRowIAmAliveData, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
                 ]);
-                return true;
+                var version = ((OpResult.SetDataResult)results[0]).getStat();
+                // Creating the heartbeat child changes cversion, not the new row's data version.
+                return new(true, new(ConvertToTableVersion(version), "0"));
             }
             catch (KeeperException e) when (e is KeeperException.NodeExistsException or KeeperException.BadVersionException)
             {
-                return false;
+                return new(false);
             }
         }
 
@@ -380,6 +397,22 @@ namespace Orleans.Runtime.Membership
 
         internal static async Task<bool> UpdateRowCoreAsync(
             NativeOperations zk, MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
+            => (await UpdateRowWithResultCoreAsync(zk, entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(etag);
+            ArgumentNullException.ThrowIfNull(tableVersion);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return UsingZookeeper(zk => UpdateRowWithResultCoreAsync(zk, entry, etag, tableVersion, cancellationToken),
+                this.deploymentConnectionString, this.watcher, cancellationToken);
+        }
+
+        internal static async Task<MembershipTableWriteResult> UpdateRowWithResultCoreAsync(
+            NativeOperations zk, MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string rowPath = ConvertToRowPath(entry.SiloAddress);
@@ -389,22 +422,24 @@ namespace Orleans.Runtime.Membership
 
             try
             {
-                await zk.Multi(
+                var results = await zk.Multi(
                 [
                     Op.setData("/", null, expectedTableVersion),
                     Op.setData(rowPath, newRowData, expectedRowVersion)
                 ]);
-                return true;
+                var version = ((OpResult.SetDataResult)results[0]).getStat();
+                var rowVersion = ((OpResult.SetDataResult)results[1]).getStat();
+                return new(true, new(ConvertToTableVersion(version), rowVersion.getVersion().ToString(CultureInfo.InvariantCulture)));
             }
             catch (KeeperException.BadVersionException)
             {
-                return false;
+                return new(false);
             }
             catch (KeeperException.NoNodeException)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await zk.GetData("/");
-                return false;
+                return new(false);
             }
         }
 
@@ -488,13 +523,13 @@ namespace Orleans.Runtime.Membership
             Func<string, Task<DataResult>> getData,
             Func<string, Task<ChildrenResult>> getChildren,
             Func<string, Task> sync,
-            Func<List<Op>, Task> multi,
+            Func<List<Op>, Task<List<OpResult>>> multi,
             Func<string, byte[], int, Task<Stat>> setData)
         {
             internal Func<string, Task<DataResult>> GetData { get; } = getData;
             internal Func<string, Task<ChildrenResult>> GetChildren { get; } = getChildren;
             internal Func<string, Task> Sync { get; } = sync;
-            internal Func<List<Op>, Task> Multi { get; } = multi;
+            internal Func<List<Op>, Task<List<OpResult>>> Multi { get; } = multi;
             internal Func<string, byte[], int, Task<Stat>> SetData { get; } = setData;
         }
 

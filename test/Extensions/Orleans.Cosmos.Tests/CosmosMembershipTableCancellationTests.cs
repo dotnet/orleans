@@ -26,6 +26,8 @@ public class CosmosMembershipTableCancellationTests
     [InlineData("ReadAll")]
     [InlineData("Insert")]
     [InlineData("Update")]
+    [InlineData("InsertWithResult")]
+    [InlineData("UpdateWithResult")]
     [InlineData("Heartbeat")]
     public async Task CanceledOperationsDoNotAccessStorage(string operation)
     {
@@ -47,6 +49,8 @@ public class CosmosMembershipTableCancellationTests
             "ReadAll" => table.ReadAllAsync(token),
             "Insert" => table.InsertRowAsync(entry, version, token),
             "Update" => table.UpdateRowAsync(entry, "etag", version, token),
+            "InsertWithResult" => table.InsertRowWithResultAsync(entry, version, token),
+            "UpdateWithResult" => table.UpdateRowWithResultAsync(entry, "etag", version, token),
             "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -321,20 +325,35 @@ public class CosmosMembershipTableCancellationTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipWritesUseAtomicCanonicalVersionConditions(bool update)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task MembershipWritesUseAtomicCanonicalVersionConditions(bool update, bool rich)
     {
         using var storage = new CosmosMembershipTestStorage();
         var batch = storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.OK);
         var entry = Entry();
         var version = new TableVersion(8, "v7");
 
-        var result = update
-            ? await storage.Table.UpdateRowAsync(entry, "v7", version, Token)
-            : await storage.Table.InsertRowAsync(entry, version, Token);
+        if (rich)
+        {
+            var result = update
+                ? await storage.Table.UpdateRowWithResultAsync(entry, "v7", version, Token)
+                : await storage.Table.InsertRowWithResultAsync(entry, version, Token);
+            Assert.True(result.Succeeded);
+            Assert.NotNull(result.Receipt);
+            Assert.Equal(new TableVersion(8, "committed-version"), result.Receipt.Version);
+            Assert.Equal("committed-version", result.Receipt.RowETag);
+            Assert.NotEqual("physical-row", result.Receipt.RowETag);
+        }
+        else
+        {
+            Assert.True(update
+                ? await storage.Table.UpdateRowAsync(entry, "v7", version, Token)
+                : await storage.Table.InsertRowAsync(entry, version, Token));
+        }
 
-        Assert.True(result);
         storage.Container.Received(1).CreateTransactionalBatch(Partition);
         batch.Received(1).ReplaceItem(
             "ClusterVersion", Arg.Is<ClusterVersionEntity>(value => value.ClusterVersion == 8 && value.ClusterId == "cluster"),
@@ -372,10 +391,11 @@ public class CosmosMembershipTableCancellationTests
             : [status, HttpStatusCode.FailedDependency]);
 
         var result = update
-            ? await storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
-            : await storage.Table.InsertRowAsync(Entry(), new TableVersion(8, "v7"), Token);
+            ? await storage.Table.UpdateRowWithResultAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
+            : await storage.Table.InsertRowWithResultAsync(Entry(), new TableVersion(8, "v7"), Token);
 
-        Assert.False(result);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Receipt);
     }
 
     [Theory]
@@ -434,7 +454,9 @@ public class CosmosMembershipTableCancellationTests
     {
         using var storage = new CosmosMembershipTestStorage();
 
-        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "stale", new TableVersion(8, "v7"), Token));
+        var result = await storage.Table.UpdateRowWithResultAsync(Entry(), "stale", new TableVersion(8, "v7"), Token);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Receipt);
 
         Assert.Empty(storage.Container.ReceivedCalls());
     }
@@ -445,7 +467,9 @@ public class CosmosMembershipTableCancellationTests
         using var storage = new CosmosMembershipTestStorage();
         storage.SetBatch(HttpStatusCode.FailedDependency, HttpStatusCode.NotFound);
 
-        Assert.False(await storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token));
+        var result = await storage.Table.UpdateRowWithResultAsync(Entry(), "v7", new TableVersion(8, "v7"), Token);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Receipt);
 
         Assert.Equal("CreateTransactionalBatch", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
@@ -461,10 +485,70 @@ public class CosmosMembershipTableCancellationTests
         storage.SetBatch(status, HttpStatusCode.FailedDependency);
 
         var exception = await Assert.ThrowsAsync<WrappedException>(() => update
-            ? storage.Table.UpdateRowAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
-            : storage.Table.InsertRowAsync(Entry(), new TableVersion(8, "v7"), Token));
+            ? storage.Table.UpdateRowWithResultAsync(Entry(), "v7", new TableVersion(8, "v7"), Token)
+            : storage.Table.InsertRowWithResultAsync(Entry(), new TableVersion(8, "v7"), Token));
 
         Assert.Contains("native batch failure", exception.ToString());
+    }
+
+    [Fact]
+    public async Task ReceiptChainsWithoutReadbackAndRetainsOwnCommitMetadata()
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        var batch = storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.Created);
+        var insertedResponse = BatchResponse(HttpStatusCode.OK, HttpStatusCode.Created);
+        insertedResponse[0].ETag.Returns("version-8");
+        insertedResponse[1].ETag.Returns("physical-row-8");
+        var updatedResponse = BatchResponse(HttpStatusCode.OK, HttpStatusCode.OK);
+        updatedResponse[0].ETag.Returns("version-9");
+        updatedResponse[1].ETag.Returns("physical-row-9");
+        batch.ExecuteAsync(Token).Returns(insertedResponse, updatedResponse);
+        using var heartbeatResponse = new ResponseMessage(HttpStatusCode.OK);
+        storage.Container.PatchItemStreamAsync(
+            Arg.Any<string>(), Arg.Any<PartitionKey>(), Arg.Any<IReadOnlyList<PatchOperation>>(),
+            Arg.Any<PatchItemRequestOptions>(), Token).Returns(heartbeatResponse);
+        var entry = Entry();
+
+        var inserted = await storage.Table.InsertRowWithResultAsync(entry, new TableVersion(8, "v7"), Token);
+        Assert.True(inserted.Succeeded);
+        var receipt = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+        await storage.Table.UpdateIAmAliveAsync(entry, Token);
+        entry.Status = SiloStatus.Dead;
+        var updated = await storage.Table.UpdateRowWithResultAsync(entry, receipt.RowETag, receipt.Version.Next(), Token);
+
+        Assert.True(updated.Succeeded);
+        Assert.Equal(new TableVersion(9, "version-9"), updated.Receipt!.Version);
+        Assert.Equal("version-9", updated.Receipt.RowETag);
+        Assert.Equal(new TableVersion(8, "version-8"), receipt.Version);
+        Assert.Equal("version-8", receipt.RowETag);
+        batch.Received(1).ReplaceItem("ClusterVersion",
+            Arg.Is<ClusterVersionEntity>(value => value.ClusterVersion == 9),
+            Arg.Is<TransactionalBatchItemRequestOptions>(options => options.IfMatchEtag == "version-8"));
+        Assert.Equal(new[] { "CreateTransactionalBatch", "PatchItemStreamAsync", "CreateTransactionalBatch" },
+            storage.Container.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceiptWritePreservesNativeCancellation(bool update)
+    {
+        using var storage = new CosmosMembershipTestStorage();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var batch = storage.SetBatch(HttpStatusCode.OK, HttpStatusCode.OK);
+        batch.ExecuteAsync(cancellation.Token).Returns(_ =>
+        {
+            cancellation.Cancel();
+            return Task.FromCanceled<TransactionalBatchResponse>(cancellation.Token);
+        });
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => update
+            ? storage.Table.UpdateRowWithResultAsync(Entry(), "v7", new TableVersion(8, "v7"), cancellation.Token)
+            : storage.Table.InsertRowWithResultAsync(Entry(), new TableVersion(8, "v7"), cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        await batch.Received(1).ExecuteAsync(cancellation.Token);
+        Assert.Equal("CreateTransactionalBatch", Assert.Single(storage.Container.ReceivedCalls()).GetMethodInfo().Name);
     }
 
     [Fact]
