@@ -523,6 +523,9 @@ jobs:
         echo "Waiting for ZooKeeper to accept TCP connections..."
         timeout 60 bash -c 'until nc -z localhost 2181; do sleep 1; done'
         echo "ZooKeeper is accepting TCP connections"
+    - name: Start ZooKeeper transport capture
+      shell: bash
+      run: bash .github/scripts/zookeeper-transport-capture.sh start "$RUNNER_TEMP/zookeeper-transport"
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -531,6 +534,18 @@ jobs:
         provider: ZooKeeper
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
+    - name: Stop ZooKeeper transport capture
+      if: always()
+      shell: bash
+      run: bash .github/scripts/zookeeper-transport-capture.sh stop "$RUNNER_TEMP/zookeeper-transport"
+    - name: Archive ZooKeeper transport diagnostics
+      if: always()
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: zookeeper_transport_${{ matrix.framework }}
+        retention-days: 14
+        if-no-files-found: error
+        path: ${{ runner.temp }}/zookeeper-transport/*.log
     - name: ZooKeeper failure diagnostics
       if: failure()
       continue-on-error: true
