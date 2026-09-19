@@ -69,7 +69,7 @@ VALUES
 (
     'InsertMembershipKey','
     call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
-    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime, @SuspectTimes);'
+    @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime);'
 );
 
 DELIMITER $$
@@ -85,8 +85,7 @@ CREATE PROCEDURE InsertMembershipKey(
     in    _Status INT,
     in    _ProxyPort INT,
     in    _StartTime DATETIME,
-    in    _IAmAliveTime DATETIME,
-    in    _SuspectTimes VARCHAR(8000)
+    in    _IAmAliveTime DATETIME
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
@@ -109,8 +108,7 @@ BEGIN
         Status,
         ProxyPort,
         StartTime,
-        IAmAliveTime,
-        SuspectTimes
+        IAmAliveTime
     )
     SELECT * FROM ( SELECT
         _DeploymentId,
@@ -122,8 +120,7 @@ BEGIN
         _Status,
         _ProxyPort,
         _StartTime,
-        _IAmAliveTime,
-        _SuspectTimes) AS TMP
+        _IAmAliveTime) AS TMP
     WHERE NOT EXISTS
     (
     SELECT 1

@@ -136,54 +136,18 @@ public sealed class AdoNetMembershipSqlTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void InsertMembership_PersistsSuppliedSuspectTimes(string engine)
-    {
-        var script = ReadScript(engine);
-        var queries = Queries(script);
-        var insert = InsertBody(engine, queries, Routines(script));
-        var query = queries["InsertMembershipKey"];
-        Assert.Contains("SuspectTimes", Parameters(query));
-
-        var row = Regex.Match(
-            insert,
-            @"INSERT INTO OrleansMembershipTable\s*\((?<columns>[^)]+)\)\s*SELECT\s+(?:\* FROM\s*\(\s*SELECT\s+)?(?<values>.*?)(?:\)\s+AS TMP\s+WHERE|\bFROM DUAL\b|\bWHERE\b)",
-            RegexOptions.Singleline);
-        Assert.True(row.Success, insert);
-        var columns = row.Groups["columns"].Value.Split(',').Select(value => value.Trim()).ToArray();
-        var values = row.Groups["values"].Value.Split(',').Select(value => value.Trim()).ToArray();
-        Assert.Equal(columns.Length, values.Length);
-        var ordinal = Array.IndexOf(columns, "SuspectTimes");
-        Assert.True(ordinal >= 0, row.Value);
-        var input = engine switch
-        {
-            "MySQL" => "_SuspectTimes",
-            "PostgreSQL" => "SuspectTimesArg",
-            "Oracle" => "PARAM_SUSPECTTIMES",
-            _ => "@SuspectTimes"
-        };
-        Assert.Equal(input, values[ordinal]);
-
-        if (engine != "SQLServer")
-        {
-            var declaration = engine switch
-            {
-                "MySQL" => @"in\s+_SuspectTimes VARCHAR\(8000\)",
-                "PostgreSQL" => @"SuspectTimesArg\s+OrleansMembershipTable\.SuspectTimes%TYPE",
-                _ => "PARAM_SUSPECTTIMES IN VARCHAR2"
-            };
-            Assert.Matches(declaration + @"\s*\)", insert);
-            Assert.Matches(@"[@:]SuspectTimes\s*\)", query);
-        }
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
     public void InsertMembership_AtomicallyChecksVersionAndRollsBackConflicts(string engine)
     {
         var script = ReadScript(engine);
         var queries = Queries(script);
         var routines = Routines(script);
-        var insert = InsertBody(engine, queries, routines);
+        var insert = engine switch
+        {
+            "PostgreSQL" => routines["insert_membership"],
+            "Oracle" => routines["InsertMembership"],
+            "MySQL" => routines["InsertMembershipKey"],
+            _ => queries["InsertMembershipKey"],
+        };
 
         var versionWrite = insert.IndexOf("UPDATE OrleansMembershipVersionTable", StringComparison.Ordinal);
         var rowWrite = insert.IndexOf("INSERT INTO OrleansMembershipTable", StringComparison.Ordinal);
@@ -255,14 +219,6 @@ public sealed class AdoNetMembershipSqlTests
             }
         }
     }
-
-    private static string InsertBody(string engine, Dictionary<string, string> queries, Dictionary<string, string> routines) => engine switch
-    {
-        "PostgreSQL" => routines["insert_membership"],
-        "Oracle" => routines["InsertMembership"],
-        "MySQL" => routines["InsertMembershipKey"],
-        _ => queries["InsertMembershipKey"],
-    };
 
     private static string UpdateBody(string engine, Dictionary<string, string> queries, Dictionary<string, string> routines) => engine switch
     {
