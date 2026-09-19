@@ -147,13 +147,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _completedJobId = completedJobId;
         _jobSequence = jobSequence;
         _states = [messages, messageStates, deadLetters, jobId, job, completedJobId, jobSequence];
-        manager.RegisterState(DurableMessagingStateNames.Outbox, messages);
-        manager.RegisterState(DurableMessagingStateNames.OutboxMessageState, messageStates);
-        manager.RegisterState(DurableMessagingStateNames.OutboxDeadLetters, deadLetters);
-        manager.RegisterState(DurableMessagingStateNames.OutboxJobId, jobId);
-        manager.RegisterState(DurableMessagingStateNames.OutboxJobHandle, job);
-        manager.RegisterState(DurableMessagingStateNames.OutboxCompletedJobId, completedJobId);
-        manager.RegisterState(DurableMessagingStateNames.OutboxJobSequence, jobSequence);
+        manager.RegisterStateMachine(DurableMessagingStateNames.Outbox, messages);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxMessageState, messageStates);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxDeadLetters, deadLetters);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxJobId, jobId);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxJobHandle, job);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxCompletedJobId, completedJobId);
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxJobSequence, jobSequence);
         jobHandlers.Register(this);
 
         var lifecycle = grainContext.ObservableLifecycle;

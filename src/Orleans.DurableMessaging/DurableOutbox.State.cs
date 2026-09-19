@@ -20,7 +20,7 @@ internal sealed partial class DurableOutbox
         All = Messages | MessageStates | DeadLetters | JobId | Job | CompletedJobId | JobSequence
     }
 
-    private interface IOutboxState : IJournaledState
+    private interface IOutboxState : IStateMachine
     {
         bool HasChanges { get; }
     }
@@ -35,17 +35,17 @@ internal sealed partial class DurableOutbox
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();
 
-        public override void AppendEntries(JournalStreamWriter writer)
+        public override void WritePendingEntries(JournalStreamWriter writer)
         {
             owner.CaptureWrite(snapshot: false);
-            base.AppendEntries(writer);
+            base.WritePendingEntries(writer);
             owner.OnStateCaptured(slot);
         }
 
-        public override void AppendSnapshot(JournalStreamWriter writer)
+        public override void WriteSnapshot(JournalStreamWriter writer)
         {
             owner.CaptureWrite(snapshot: true);
-            base.AppendSnapshot(writer);
+            base.WriteSnapshot(writer);
             owner.OnStateCaptured(slot);
         }
 
@@ -84,17 +84,17 @@ internal sealed partial class DurableOutbox
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();
 
-        public override void AppendEntries(JournalStreamWriter writer)
+        public override void WritePendingEntries(JournalStreamWriter writer)
         {
             owner.CaptureWrite(snapshot: false);
-            base.AppendEntries(writer);
+            base.WritePendingEntries(writer);
             owner.OnStateCaptured(slot);
         }
 
-        public override void AppendSnapshot(JournalStreamWriter writer)
+        public override void WriteSnapshot(JournalStreamWriter writer)
         {
             owner.CaptureWrite(snapshot: true);
-            base.AppendSnapshot(writer);
+            base.WriteSnapshot(writer);
             owner.OnStateCaptured(slot);
         }
 
