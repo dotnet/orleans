@@ -92,7 +92,14 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
     }
 
     [Fact]
-    public async Task OrdinaryHandlerFailures_RetryUntilExactConfiguredAttemptLimit()
+    public Task OrdinaryHandlerFailures_RetryUntilExactConfiguredAttemptLimit() =>
+        RetryUntilExactConfiguredAttemptLimitAsync(startBackgroundBeforeDuplicate: false);
+
+    [Fact]
+    public Task RetryDuplicateDelivery_QueuedBehindActiveHandler_DoesNotDeadlock() =>
+        RetryUntilExactConfiguredAttemptLimitAsync(startBackgroundBeforeDuplicate: true);
+
+    private async Task RetryUntilExactConfiguredAttemptLimitAsync(bool startBackgroundBeforeDuplicate)
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(191, "retry-limit") with { ThrowDuringPreparation = true });
@@ -111,15 +118,30 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 1, now + TimeSpan.FromMinutes(1));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
 
+        Task<DurableJobRunResult>? background = null;
+        using var tick = startBackgroundBeforeDuplicate
+            ? Fixture.Clock.CreateTimer(_ => background = RunPumpAsync(receiver, job), null, TimeSpan.FromMinutes(1), Timeout.InfiniteTimeSpan)
+            : null;
         using (var runningLocalDrain = ArmHandlerBeforeAdvance(receiver.GetGrainId(), envelope.Value.RouteKey, TimeSpan.FromMinutes(1)))
         {
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+            if (startBackgroundBeforeDuplicate)
+            {
+                await runningLocalDrain.WaitUntilEnteredAsync();
+            }
+            var duplicate = DeliverAsync(receiver, envelope.Value);
             await runningLocalDrain.WaitUntilEnteredAsync();
-            var retry = RunPumpAsync(receiver, job);
+            var retry = startBackgroundBeforeDuplicate
+                ? Assert.IsAssignableFrom<Task<DurableJobRunResult>>(background)
+                : RunPumpAsync(receiver, job);
             await OnTurnAsync(context, static () => { });
             await AssertUnrelatedTimerDoesNotCompleteAsync(context, events, retry);
+            if (startBackgroundBeforeDuplicate)
+            {
+                Assert.False(duplicate.IsCompleted);
+            }
             runningLocalDrain.Release();
             Assert.Equal(DurableJobRunStatus.RescheduleRequested, (await retry).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         }
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
         using var runningRequestedPump = ArmHandlerBeforeAdvance(receiver.GetGrainId(), envelope.Value.RouteKey, TimeSpan.FromMinutes(2));
