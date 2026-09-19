@@ -102,6 +102,34 @@ storage outcome, so the caller reconciles that outcome before retrying the comma
 An initialization failure preserves stored data for diagnosis. Restore the required format/codec registration
 or repair the backing data before creating a fresh manager or retrying activation.
 
+## Custom state lifecycle
+
+Custom <xref:Orleans.Journaling.IStateMachine> implementations share the manager's single logical execution thread.
+Resolve write codecs through <xref:Orleans.Journaling.IJournaledStateManager.GetRequiredCommandCodec*> to use the
+owning manager's configured format, including before recovery of an empty journal. Delegating managers forward
+codec resolution to that owner. Grain-bound managers resolve codecs from the activation's services;
+standalone owners use shared application services.
+
+<xref:Orleans.Journaling.IStateMachine.ValidateWrite*> and <xref:Orleans.Journaling.IStateMachine.ValidateDelete*>
+perform pure validation in the requesting caller's context. An admission rejection leaves the manager healthy.
+Deletion validates all states again in serialized execution, then calls
+<xref:Orleans.Journaling.IStateMachine.OnDeleteStarted*> on every state before awaiting storage deletion.
+Successful deletion resets states before completing callers.
+
+Before each append or snapshot capture, the manager checks <xref:Orleans.Journaling.IStateMachine.IsWritePrepared>
+and awaits <xref:Orleans.Journaling.IStateMachine.PrepareWriteAsync*> for each unprepared state. Preparation
+establishes that state's readiness and retains valid state-owned prerequisites across rechecks. Every await
+is followed by another all-state readiness pass. The final successful pass flows directly into synchronous
+capture in the same work-loop continuation. This also applies to writes which flush only committed entries
+or produce zero bytes. Preparation uses the manager's shutdown token; caller cancellation only ends that caller's wait.
+
+After storage acknowledges captured bytes, <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted*>
+performs durable-completion bookkeeping. A zero-byte write completes without this callback.
+An admitted preparation, validation, capture, or storage failure fences the manager, records the original
+exception, and calls <xref:Orleans.Journaling.IStateMachine.OnFaulted*> on every registered state before
+faulting current and queued waiters. Notification failures are logged while the original failure remains
+the operation's outcome. Idle shutdown completes normally; cancellation during admitted work is terminal.
+
 ## Compaction
 
 Each provider reports when its journal crosses a configured storage threshold. The next `WriteStateAsync`:
