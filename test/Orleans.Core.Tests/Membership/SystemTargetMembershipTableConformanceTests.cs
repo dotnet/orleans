@@ -33,6 +33,14 @@ public sealed class SystemTargetMembershipTableConformanceTests : MembershipTabl
     private long _modelPhaseStarted = Stopwatch.GetTimestamp();
     private long _nativePhaseStarted = Stopwatch.GetTimestamp();
 
+    [Theory, TestCategory("ModelBased")]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public Task MembershipTable_ModelBased_GeneratedConformance(int partition)
+        => CreateModelBasedRunner().RunGeneratedConformanceTests(partition, 4, TestContext.Current.CancellationToken);
+
     public ValueTask InitializeAsync()
     {
         System.IO.Directory.CreateDirectory(Path.GetDirectoryName(_progressFile)!);

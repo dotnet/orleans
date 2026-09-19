@@ -9,7 +9,7 @@ namespace Orleans.TestingHost.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("TestingHost")]
-public sealed class InProcessMembershipTableConformanceTests : MembershipTableConformanceTestsBase
+public sealed class InProcessMembershipTableConformanceTests : MembershipTableFullConformanceTestsBase
 {
     protected override MembershipTableTestFixture CreateConformanceFixture()
     {

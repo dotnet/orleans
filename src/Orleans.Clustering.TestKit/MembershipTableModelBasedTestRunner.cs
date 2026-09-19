@@ -39,40 +39,53 @@ public sealed class MembershipTableModelBasedTestRunner
     }
 
     /// <summary>Generates legal transitions, required reachable prefixes, and verifies every operation's expected state.</summary>
-    public async Task RunGeneratedConformanceTests(CancellationToken cancellationToken = default)
+    public Task RunGeneratedConformanceTests(CancellationToken cancellationToken = default)
+        => RunGeneratedConformanceTests(0, 1, cancellationToken);
+
+    internal async Task RunGeneratedConformanceTests(int partitionIndex, int partitionCount, CancellationToken cancellationToken)
     {
+        ValidatePartition(partitionIndex, partitionCount);
         cancellationToken.ThrowIfCancellationRequested();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(15));
         var ct = timeout.Token;
+        var batches = SelectPartition(GenerateBatches(ct), partitionIndex, partitionCount);
+        var expectedCases = batches.SelectMany(batch => batch.Cases).ToArray();
+        var expectedOperations = Enum.GetValues<MembershipOperationKind>().ToDictionary(kind => kind, _ => 0);
+        foreach (var testCase in expectedCases)
+        {
+            foreach (var call in testCase.TestCase.OperationCalls)
+                expectedOperations[((MembershipRequest)call.OperationInput.Request).Kind]++;
+        }
+        var executedCases = new Dictionary<int, int>();
+        var executedOperations = Enum.GetValues<MembershipOperationKind>().ToDictionary(kind => kind, _ => 0);
         var covered = new HashSet<MembershipOperationKind>();
         var scopes = new HashSet<string>(StringComparer.Ordinal);
         var caseNumber = 0;
-        await RunBatch(null);
-        foreach (var prefix in RequiredPrefixes()) await RunBatch(prefix);
-        var missing = Enum.GetValues<MembershipOperationKind>().Except(covered).ToArray();
-        ClusteringTestKitDiagnostics.Require(missing.Length == 0,
-            $"provider={_options.ProviderName}; seed={_options.Seed}; generated execution missed required operations: {string.Join(", ", missing)}");
-        _output?.Invoke($"provider={_options.ProviderName}; seed={_options.Seed}; Accordant cases={caseNumber}; operations={string.Join(",", covered.Order())}");
+        foreach (var batch in batches) await RunBatch(batch);
+        ClusteringTestKitDiagnostics.Require(caseNumber == expectedCases.Length
+            && executedCases.Count == expectedCases.Length
+            && expectedCases.All(testCase => executedCases.GetValueOrDefault(testCase.Index) == 1),
+            $"provider={_options.ProviderName}; seed={_options.Seed}; partition={partitionIndex}/{partitionCount}; expected cases={expectedCases.Length}, executed cases={caseNumber}");
+        foreach (var (kind, expected) in expectedOperations)
+        {
+            ClusteringTestKitDiagnostics.Require(executedOperations[kind] == expected,
+                $"provider={_options.ProviderName}; seed={_options.Seed}; partition={partitionIndex}/{partitionCount}; operation={kind}; expected count={expected}, executed count={executedOperations[kind]}");
+        }
+        if (partitionCount == 1)
+        {
+            var missing = Enum.GetValues<MembershipOperationKind>().Except(covered).ToArray();
+            ClusteringTestKitDiagnostics.Require(missing.Length == 0,
+                $"provider={_options.ProviderName}; seed={_options.Seed}; generated execution missed required operations: {string.Join(", ", missing)}");
+        }
+        _output?.Invoke($"provider={_options.ProviderName}; seed={_options.Seed}; Accordant cases={caseNumber}; operations={string.Join(",", covered.Order())}; partition={partitionIndex}/{partitionCount}; operation-counts={string.Join(",", executedOperations.Select(pair => $"{pair.Key}:{pair.Value}"))}");
 
-        async Task RunBatch(MembershipRequest[]? prefix)
+        async Task RunBatch(GeneratedBatch batch)
         {
             ct.ThrowIfCancellationRequested();
-            var spec = new MembershipBehavioralSpec();
-            var initial = new MembershipModelState();
-            var cases = spec.GenerateTests(initial, spec.CreateInputSet(prefix?.Distinct()), new TestGenerationOptions
-            {
-                // Accordant counts the initial state toward exploration depth.
-                MaxDepth = prefix is null ? _options.MaxDepth : prefix.Length + 1,
-                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(prefix?.Length ?? _options.MaxSequenceLength),
-                ShouldApply = (input, state) =>
-                {
-                    var request = (MembershipRequest)input.Request;
-                    var model = (MembershipModelState)state;
-                    return MembershipModel.CanApply(request, model)
-                        && (prefix is null || (model.Steps < prefix.Length && prefix[model.Steps] == request));
-                }
-            });
+            var spec = batch.Spec;
+            var initial = batch.InitialState;
+            var cases = batch.TestCases;
             var context = spec.CreateTestingContext();
             context.RequestPrinter = request => request?.ToString() ?? "<null>";
             context.ResponsePrinter = response => response?.ToString() ?? "<null>";
@@ -89,7 +102,10 @@ public sealed class MembershipTableModelBasedTestRunner
                     {
                         ct.ThrowIfCancellationRequested();
                         if (cleanupFailure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
-                        currentCase = caseNumber++;
+                        var generated = batch.Cases[info.TestIndex];
+                        currentCase = generated.Index;
+                        caseNumber++;
+                        executedCases[generated.Index] = executedCases.GetValueOrDefault(generated.Index) + 1;
                         current = _factory() ?? throw new InvalidOperationException("The model fixture factory returned null.");
                         ClusteringTestKitDiagnostics.Require(scopes.Add(current.ClusterId), "model factory reused a fixture/scope between cases");
                         ReportProgress("initialize", current);
@@ -97,7 +113,11 @@ public sealed class MembershipTableModelBasedTestRunner
                         var fixture = current;
                         await Task.Run(() => fixture.InitializeAsync(ct).AsTask(), ct).WaitAsync(ct);
                         ReportProgress("initialized", current);
-                        info.Context.Register(new MembershipModelExecutionContext(current, _options.Seed, currentCase, ct, kind => covered.Add(kind), _output));
+                        info.Context.Register(new MembershipModelExecutionContext(current, _options.Seed, currentCase, ct, kind =>
+                        {
+                            covered.Add(kind);
+                            executedOperations[kind]++;
+                        }, _output));
                     },
                     AfterEachAsync = async info =>
                     {
@@ -154,6 +174,90 @@ public sealed class MembershipTableModelBasedTestRunner
             void ReportProgress(string phase, MembershipTableTestFixture fixture)
                 => _output?.Invoke($"seed={_options.Seed}; case={currentCase}; phase={phase}; cluster={fixture.ClusterId}");
         }
+    }
+
+    internal sealed record GeneratedCase(int Index, string Identity, SequentialTestCase TestCase);
+
+    internal sealed record GeneratedBatch(
+        MembershipBehavioralSpec Spec,
+        MembershipModelState InitialState,
+        IList<SequentialTestCase> TestCases,
+        IReadOnlyList<GeneratedCase> Cases);
+
+    internal IReadOnlyList<GeneratedBatch> GenerateBatches(CancellationToken cancellationToken)
+    {
+        var result = new List<GeneratedBatch>();
+        var caseIndex = 0;
+        GenerateBatch(null);
+        foreach (var prefix in RequiredPrefixes()) GenerateBatch(prefix);
+        return result;
+
+        void GenerateBatch(MembershipRequest[]? prefix)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var spec = new MembershipBehavioralSpec();
+            var initial = new MembershipModelState();
+            var cases = spec.GenerateTests(initial, spec.CreateInputSet(prefix?.Distinct()), new TestGenerationOptions
+            {
+                // Accordant counts the initial state toward exploration depth.
+                MaxDepth = prefix is null ? _options.MaxDepth : prefix.Length + 1,
+                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(prefix?.Length ?? _options.MaxSequenceLength),
+                ShouldApply = (input, state) =>
+                {
+                    var request = (MembershipRequest)input.Request;
+                    var model = (MembershipModelState)state;
+                    return MembershipModel.CanApply(request, model)
+                        && (prefix is null || (model.Steps < prefix.Length && prefix[model.Steps] == request));
+                }
+            });
+            var manifest = CreateCaseManifest(result.Count, caseIndex, cases);
+            caseIndex += cases.Count;
+            result.Add(new(spec, initial, cases, manifest));
+        }
+    }
+
+    internal static IReadOnlyList<GeneratedCase> CreateCaseManifest(
+        int batchIndex, int firstCaseIndex, IList<SequentialTestCase> cases)
+    {
+        var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        var manifest = new List<GeneratedCase>(cases.Count);
+        foreach (var testCase in cases)
+        {
+            var operations = string.Join(";", testCase.OperationCalls.Select(call =>
+            {
+                var request = (MembershipRequest)call.OperationInput.Request;
+                return FormattableString.Invariant($"{call.OperationInput.Operation.Name}:{(int)request.Kind}:{request.Key}");
+            }));
+            var occurrence = occurrences.GetValueOrDefault(operations);
+            occurrences[operations] = occurrence + 1;
+            var identity = FormattableString.Invariant($"{batchIndex:D2}|{operations}|{occurrence:D4}");
+            manifest.Add(new(firstCaseIndex++, identity, testCase));
+        }
+        return manifest;
+    }
+
+    internal static IReadOnlyList<GeneratedBatch> SelectPartition(
+        IReadOnlyList<GeneratedBatch> batches, int partitionIndex, int partitionCount)
+    {
+        ValidatePartition(partitionIndex, partitionCount);
+        var cases = batches.SelectMany(batch => batch.Cases).OrderBy(testCase => testCase.Identity, StringComparer.Ordinal).ToArray();
+        if (partitionCount > cases.Length)
+            throw new ArgumentOutOfRangeException(nameof(partitionCount), "Partition count cannot exceed the generated case count.");
+        if (partitionCount == 1) return batches;
+        // Ranking canonical identities balances whole cases without relying on process-randomized hash codes.
+        var selected = cases.Where((_, index) => index % partitionCount == partitionIndex)
+            .Select(testCase => testCase.Identity).ToHashSet(StringComparer.Ordinal);
+        return batches.Select(batch =>
+        {
+            var partition = batch.Cases.Where(testCase => selected.Contains(testCase.Identity)).ToArray();
+            return batch with { Cases = partition, TestCases = partition.Select(testCase => testCase.TestCase).ToList() };
+        }).Where(batch => batch.Cases.Count > 0).ToArray();
+    }
+
+    private static void ValidatePartition(int partitionIndex, int partitionCount)
+    {
+        if (partitionCount < 1) throw new ArgumentOutOfRangeException(nameof(partitionCount));
+        if (partitionIndex < 0 || partitionIndex >= partitionCount) throw new ArgumentOutOfRangeException(nameof(partitionIndex));
     }
 
     internal static IEnumerable<MembershipRequest[]> RequiredPrefixes()
