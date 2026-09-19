@@ -143,9 +143,11 @@ The generated fact is conventionally named
 
 ## Comparison and protocol rules
 
-Required histories begin with the runtime's insertion shape: a new membership
-entry has an empty suspicion history. Suspicion votes are established and
-changed through canonical updates to existing rows.
+Required histories begin with normal silo registration: a new membership
+entry has an empty suspicion history. These histories establish and change
+suspicion votes through canonical updates to existing rows.
+Forward updates change status and suspicion votes while retaining the activation's
+identity, endpoint, host/silo names, start time, and deployment metadata.
 
 The immutable observation captures all public persisted entry fields, nested
 suspect identities/times, full endpoint/generation identity, row ETags, and

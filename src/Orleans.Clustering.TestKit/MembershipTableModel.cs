@@ -140,9 +140,6 @@ internal static class MembershipModel
                 var row = next.Rows[request.Key];
                 row.Status++;
                 row.Revision++;
-                row.HostName += "-updated";
-                row.SiloName += "-updated";
-                row.ProxyPort++;
                 row.Suspects["127.0.0.1:11003@12"] = T0.Ticks;
                 if (row.Status == (int)SiloStatus.Dead) next.TerminalGenerations[request.Key] = row.GenerationOffset;
                 break;
@@ -297,6 +294,7 @@ internal sealed class MembershipModelExecutionContext
     private readonly int _case;
     private readonly CancellationToken _ct;
     private readonly Action<MembershipOperationKind> _executed;
+    private readonly Action<string>? _progress;
     private MembershipModelState _model = new();
     private readonly MembershipHistory _history = new();
     private readonly List<string> _prefix = [];
@@ -307,15 +305,17 @@ internal sealed class MembershipModelExecutionContext
     private ClusteringMembershipSnapshot? _otherBaseline;
 
     internal MembershipModelExecutionContext(MembershipTableTestFixture fixture, int seed, int caseNumber,
-        CancellationToken cancellationToken, Action<MembershipOperationKind> executed)
+        CancellationToken cancellationToken, Action<MembershipOperationKind> executed, Action<string>? progress = null)
     {
         _fixture = fixture; _seed = seed; _case = caseNumber; _ct = cancellationToken; _executed = executed;
+        _progress = progress;
     }
 
     internal async Task<MembershipModelResult> ExecuteAsync(MembershipRequest request)
     {
         _ct.ThrowIfCancellationRequested();
         _prefix.Add(request.ToString());
+        ReportProgress(request, "observe-before");
         try
         {
             ClusteringTestKitDiagnostics.Require(MembershipModel.CanApply(request, _model), $"generated illegal operation {request}");
@@ -357,6 +357,7 @@ internal sealed class MembershipModelExecutionContext
             }
             var detail = $"table={tableCandidate}; row ETag={rowToken}; owner heartbeat={input.IAmAliveTime:O}";
             _prefix[^1] += $" [{detail}]";
+            ReportProgress(request, "invoke");
             switch (request.Kind)
             {
                 case MembershipOperationKind.Initialize:
@@ -408,12 +409,14 @@ internal sealed class MembershipModelExecutionContext
                     MembershipTableTestRunner.Equal(_otherBaseline, await MembershipTableTestRunner.Read(_fixture.OtherCluster, _ct));
                     _model = next;
                     _executed(request.Kind);
+                    ReportProgress(request, "completed");
                     return new(null, HistoryDeleted: true);
                 case MembershipOperationKind.ReadOtherCluster:
                     MembershipTableTestRunner.Equal(_otherBaseline, await MembershipTableTestRunner.Read(_fixture.OtherCluster, _ct));
                     break;
             }
 
+            ReportProgress(request, "observe-after");
             var after = await MembershipTableTestRunner.Read(reader, _ct);
             var cleanupVersionDelta = 0;
             if (MembershipModel.IsRejected(request.Kind))
@@ -450,6 +453,7 @@ internal sealed class MembershipModelExecutionContext
             MembershipTableTestRunner.Equal(after, await MembershipTableTestRunner.Read(writer, _ct));
             MembershipTableTestRunner.Equal(_otherBaseline, await MembershipTableTestRunner.Read(_fixture.OtherCluster, _ct));
             _executed(request.Kind);
+            ReportProgress(request, "completed");
             return new(null, after, _seed, _versionOrigin.Value, cleanupVersionDelta);
         }
         catch (OperationCanceledException) { throw; }
@@ -459,6 +463,9 @@ internal sealed class MembershipModelExecutionContext
                 $"provider={_fixture.ProviderName}; cluster={_fixture.ClusterId}; handles=A1/A2/B1; {exception.GetType().Name}: {exception.Message}"));
         }
     }
+
+    private void ReportProgress(MembershipRequest request, string phase)
+        => _progress?.Invoke($"seed={_seed}; case={_case}; step={_prefix.Count}; operation={request}; phase={phase}");
 
     private void ValidateModel(ClusteringMembershipSnapshot actual)
     {

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -21,8 +22,76 @@ namespace UnitTests.MembershipTests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Runtime")]
-public sealed class SystemTargetMembershipTableConformanceTests : MembershipTableConformanceTestsBase
+public sealed class SystemTargetMembershipTableConformanceTests : MembershipTableConformanceTestsBase, IAsyncLifetime
 {
+    private readonly object _progressLock = new();
+    private readonly string _progressFile = Path.Combine(AppContext.BaseDirectory, "TestResults", $"hosted-membership-{Guid.NewGuid():N}.log");
+    private readonly PeriodicTimer _progressTimer = new(TimeSpan.FromSeconds(1));
+    private Task _progressWriter = Task.CompletedTask;
+    private string _modelProgress = "case not started";
+    private string _nativeProgress = "host not started";
+    private long _modelPhaseStarted = Stopwatch.GetTimestamp();
+    private long _nativePhaseStarted = Stopwatch.GetTimestamp();
+
+    public ValueTask InitializeAsync()
+    {
+        System.IO.Directory.CreateDirectory(Path.GetDirectoryName(_progressFile)!);
+        _progressWriter = WriteProgressPeriodically();
+        return ValueTask.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _progressTimer.Dispose();
+        await _progressWriter;
+        await WriteProgress();
+    }
+
+    protected override void WriteConformanceOutput(string message)
+    {
+        lock (_progressLock)
+        {
+            _modelProgress = $"{message}; previous-phase-elapsed-ms={Stopwatch.GetElapsedTime(_modelPhaseStarted).TotalMilliseconds:F1}";
+            _modelPhaseStarted = Stopwatch.GetTimestamp();
+        }
+        if (!message.Contains("; phase=", StringComparison.Ordinal))
+        {
+            base.WriteConformanceOutput(message);
+        }
+    }
+
+    private void ReportNativeProgress(string message)
+    {
+        lock (_progressLock)
+        {
+            _nativeProgress = $"{message}; previous-phase-elapsed-ms={Stopwatch.GetElapsedTime(_nativePhaseStarted).TotalMilliseconds:F1}";
+            _nativePhaseStarted = Stopwatch.GetTimestamp();
+        }
+    }
+
+    private async Task WriteProgressPeriodically()
+    {
+        do
+        {
+            await WriteProgress();
+        }
+        while (await _progressTimer.WaitForNextTickAsync());
+    }
+
+    private Task WriteProgress()
+    {
+        string snapshot;
+        lock (_progressLock)
+        {
+            snapshot = $"{DateTime.UtcNow:O}{Environment.NewLine}"
+                + $"{_modelProgress}; elapsed-ms={Stopwatch.GetElapsedTime(_modelPhaseStarted).TotalMilliseconds:F1}{Environment.NewLine}"
+                + $"{_nativeProgress}; elapsed-ms={Stopwatch.GetElapsedTime(_nativePhaseStarted).TotalMilliseconds:F1}{Environment.NewLine}";
+        }
+
+        // Sample the latest phase for watchdog artifacts without adding file I/O to each operation.
+        return File.WriteAllTextAsync(_progressFile, snapshot);
+    }
+
     protected override MembershipTableTestFixture CreateConformanceFixture()
     {
         var targets = new Dictionary<string, TargetScope>(StringComparer.Ordinal);
@@ -33,7 +102,7 @@ public sealed class SystemTargetMembershipTableConformanceTests : MembershipTabl
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!targets.TryGetValue(clusterId, out var target))
                 {
-                    target = await TargetScope.CreateAsync(serviceId, clusterId, cancellationToken);
+                    target = await TargetScope.CreateAsync(serviceId, clusterId, ReportNativeProgress, cancellationToken);
                     targets.Add(clusterId, target);
                 }
 
@@ -50,18 +119,22 @@ public sealed class SystemTargetMembershipTableConformanceTests : MembershipTabl
         private readonly InProcessTestCluster _cluster;
         private readonly InProcessSiloHandle _silo;
         private readonly MembershipTableSystemTarget _target;
+        private readonly Action<string> _progress;
+        private readonly string _clusterId;
         private int _clientCount;
 
-        private TargetScope(InProcessTestCluster cluster)
+        private TargetScope(InProcessTestCluster cluster, string clusterId, Action<string> progress)
         {
             _cluster = cluster;
+            _clusterId = clusterId;
+            _progress = progress;
             _silo = Assert.Single(cluster.Silos);
             _target = _silo.ServiceProvider.GetRequiredService<MembershipTableSystemTarget>();
             Assert.Equal(typeof(InMemoryMembershipTable), TableField.FieldType);
             Assert.IsType<InMemoryMembershipTable>(TableField.GetValue(_target));
         }
 
-        public static async Task<TargetScope> CreateAsync(string serviceId, string clusterId, CancellationToken cancellationToken)
+        public static async Task<TargetScope> CreateAsync(string serviceId, string clusterId, Action<string> progress, CancellationToken cancellationToken)
         {
             var builder = new InProcessTestClusterBuilder(1);
             builder.Options.ServiceId = serviceId;
@@ -82,20 +155,27 @@ public sealed class SystemTargetMembershipTableConformanceTests : MembershipTabl
             var cluster = builder.Build();
             try
             {
+                progress($"cluster={clusterId}; phase=host-deploy");
                 await cluster.DeployAsync(cancellationToken);
-                var scope = new TargetScope(cluster);
+                var scope = new TargetScope(cluster, clusterId, progress);
+                progress($"cluster={clusterId}; phase=host-deployed");
+                progress($"cluster={clusterId}; phase=host-verify");
                 await scope.AssertHostMembershipIsIntact(cancellationToken);
                 var proxy = scope.GetGrainFactory().GetSystemTarget<IMembershipTableSystemTarget>(
                     Constants.SystemMembershipTableType, SiloAddress.New(scope._silo.SiloAddress.Endpoint, 0));
                 Assert.IsAssignableFrom<GrainReference>(proxy);
+                progress($"cluster={clusterId}; phase=target-verify");
                 Assert.Empty((await proxy.ReadAllAsync(cancellationToken)).Members);
+                progress($"cluster={clusterId}; phase=host-ready");
                 return scope;
             }
             catch (Exception failure)
             {
                 try
                 {
+                    progress($"cluster={clusterId}; phase=failed-host-dispose");
                     await cluster.DisposeAsync();
+                    progress($"cluster={clusterId}; phase=failed-host-disposed");
                 }
                 catch (Exception cleanup)
                 {
@@ -138,11 +218,14 @@ public sealed class SystemTargetMembershipTableConformanceTests : MembershipTabl
                     {
                         try
                         {
+                            _progress($"cluster={_clusterId}; phase=host-verify-before-dispose; clients={_clientCount}");
                             await AssertHostMembershipIsIntact(CancellationToken.None);
                         }
                         finally
                         {
+                            _progress($"cluster={_clusterId}; phase=host-dispose; clients={_clientCount}");
                             await _cluster.DisposeAsync();
+                            _progress($"cluster={_clusterId}; phase=host-disposed; clients={_clientCount}");
                         }
                     }
                 }
