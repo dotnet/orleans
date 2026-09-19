@@ -85,6 +85,45 @@ public sealed class MembershipTableConformanceTests
     [Fact]
     public Task CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows() => Run((r, ct) => r.CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct));
 
+    [Theory]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, true, false, true)]
+    public async Task Cleanup_PublishedHeartbeats_PreserveEligibilityAcrossStorageModels(
+        bool versionedCleanup, bool lagHeartbeatReads, bool separateHeartbeatStorage, bool preserveHeartbeatOnFullWrite)
+    {
+        var backend = new IdealizedMembershipBackend
+        {
+            SeparateHeartbeatStorage = separateHeartbeatStorage,
+            PreserveHeartbeatOnFullWrite = preserveHeartbeatOnFullWrite,
+            VersionedCleanup = versionedCleanup,
+            CleanupBatchSize = 1,
+            LagHeartbeatReads = lagHeartbeatReads
+        };
+        await backend.Fixture().RunAsync(
+            (fixture, ct) => new MembershipTableTestRunner(fixture).CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(6, backend.CleanupBatches);
+        Assert.Equal(14, backend.HeartbeatWrites.Count);
+        Assert.Equal(9, backend.VersionedUpdates);
+        Assert.All(backend.HeartbeatWrites, write => Assert.NotEqual(SiloStatus.Dead, write.Status));
+        Assert.All(backend.HeartbeatWrites.GroupBy(write => (write.Cluster, write.Identity)),
+            writes => Assert.Single(writes.Select(write => write.Owner).Distinct()));
+        if (lagHeartbeatReads) Assert.True(backend.LaggedHeartbeatReads > 0);
+        Assert.Empty(backend.Partitions);
+        Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
+    }
+
     [Fact]
     public async Task Cleanup_SeparateAtomicBatches_AdvanceVersionForEachDeletion()
     {
@@ -186,7 +225,7 @@ public sealed class MembershipTableConformanceTests
                 .DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct),
             TestContext.Current.CancellationToken);
         Assert.Empty(secondOwner.Partitions);
-        Assert.Equal(3, secondOwner.Deletes);
+        Assert.Equal(2, secondOwner.Deletes);
         Assert.Equal(0, secondOwner.OperationsAfterDeletion);
         Assert.Equal(firstOwner.CreatedHandles, firstOwner.DisposedHandles);
         Assert.Equal(secondOwner.CreatedHandles, secondOwner.DisposedHandles);
@@ -200,7 +239,7 @@ public sealed class MembershipTableConformanceTests
             (fixture, ct) => new MembershipTableTestRunner(fixture)
                 .DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(ct),
             TestContext.Current.CancellationToken);
-        Assert.Equal(2, backend.ForeignClusterDeletionRejections);
+        Assert.Equal(1, backend.ForeignClusterDeletionRejections);
         Assert.Equal(0, backend.OperationsAfterDeletion);
         Assert.Empty(backend.Partitions);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
