@@ -33,7 +33,12 @@ namespace UnitTests.MembershipTests
     [TestArea("Membership")]
     public class ZookeeperMembershipTableTests : MembershipTableTestsBase
     {
-        static ZookeeperMembershipTableTests() => ZooKeeper.CustomLogConsumer = new SdkDiagnostics();
+        static ZookeeperMembershipTableTests()
+        {
+            ZooKeeper.LogLevel = TraceLevel.Info;
+            ZooKeeper.LogToTrace = false;
+            ZooKeeper.CustomLogConsumer = new SdkDiagnostics();
+        }
 
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
             : base(fixture, environment, CreateFilters())
@@ -87,7 +92,13 @@ namespace UnitTests.MembershipTests
         private sealed class SdkDiagnostics : ILogConsumer
         {
             public void Log(TraceLevel severity, string className, string message, Exception exception)
-                => Console.Error.WriteLine($"{DateTime.UtcNow:O} [{className}] {severity}: {message}{Environment.NewLine}{exception}");
+            {
+                // The SDK reports transport exceptions at Info, below its default Warning threshold.
+                if (exception is not null || severity <= TraceLevel.Warning)
+                {
+                    Console.Error.WriteLine($"{DateTime.UtcNow:O} [{className}] {severity}: {message}{Environment.NewLine}{exception}");
+                }
+            }
         }
 
         /// <summary>

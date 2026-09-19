@@ -11,13 +11,16 @@ public abstract class MembershipTableConformanceTestsBase
 
     protected virtual int ConformanceConcurrencyRowCount => 128;
 
+    protected virtual void WriteConformanceOutput(string message)
+        => TestContext.Current.TestOutputHelper?.WriteLine(message);
+
     private Task RunConformance(Func<MembershipTableTestRunner, CancellationToken, Task> scenario)
         => CreateConformanceFixture().RunAsync(
             (fixture, cancellationToken) => scenario(
                 new MembershipTableTestRunner(
                     fixture,
                     seed: 17,
-                    output: message => TestContext.Current.TestOutputHelper?.WriteLine(message),
+                    output: WriteConformanceOutput,
                     concurrencyRowCount: ConformanceConcurrencyRowCount),
                 cancellationToken),
             TestContext.Current.CancellationToken);
@@ -141,6 +144,6 @@ public abstract class MembershipTableConformanceTestsBase
                 MaxDepth = 3,
                 MaxSequenceLength = 3
             },
-            output: message => TestContext.Current.TestOutputHelper?.WriteLine(message))
+            output: WriteConformanceOutput)
             .RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
 }

@@ -22,8 +22,10 @@ public sealed class MembershipTableModelTests
         Apply(state, MembershipOperationKind.UpdateForward);
         Assert.Equal(3, state.Version);
         Assert.Equal((int)SiloStatus.Joining, state.Rows[1].Status);
-        Assert.Equal("host-1-updated", state.Rows[1].HostName);
-        Assert.Equal(22002, state.Rows[1].ProxyPort);
+        Assert.Equal("host-1", state.Rows[1].HostName);
+        Assert.Equal("silo-1", state.Rows[1].SiloName);
+        Assert.Equal(22001, state.Rows[1].ProxyPort);
+        Assert.Single(state.Rows[1].Suspects);
         Assert.Equal((int)SiloStatus.Created, state.Rows[2].Status);
         Assert.Equal("host-2", state.Rows[2].HostName);
         Assert.Equal(1, state.LastChangedKey);

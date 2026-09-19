@@ -54,9 +54,6 @@ internal static class MembershipTableTestData
         ClusteringTestKitDiagnostics.Require(entry.Status is >= SiloStatus.Created and < SiloStatus.Dead,
             $"no legal forward transition for {entry.Status}");
         result.Status = entry.Status + 1;
-        result.HostName += "-updated";
-        result.SiloName += "-updated";
-        result.ProxyPort++;
         result.AddOrUpdateSuspector(SiloAddress.New(IPAddress.Loopback, 11003, 12), T0, maxVotes: 10);
         return result;
     }
