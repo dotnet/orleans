@@ -47,6 +47,51 @@ public sealed class MembershipTableModelBasedTestRunnerTests
     }
 
     [Fact]
+    public async Task RunGeneratedCases_ReturnsWhileAsyncInitializationIsPending()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        var ct = timeout.Token;
+        var backend = new IdealizedMembershipBackend();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var returned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acquisitions = 0;
+        var runner = new MembershipTableModelBasedTestRunner(() => new("async-initialization", async (_, cluster, _) =>
+        {
+            if (Interlocked.Increment(ref acquisitions) == 1)
+            {
+                entered.TrySetResult();
+                await release.Task.WaitAsync(ct);
+            }
+
+            return new MembershipTableTestHandle(backend.Create(cluster), () => backend.DisposeHandleAsync(cluster));
+        }, backend.IsDeletedAsync), "async-initialization");
+        Task execution = Task.CompletedTask;
+        var caller = Task.Run(() =>
+        {
+            execution = runner.RunGeneratedConformanceTests(ct);
+            returned.TrySetResult();
+        }, CancellationToken.None);
+        try
+        {
+            await entered.Task.WaitAsync(ct);
+            await returned.Task.WaitAsync(ct);
+            Assert.False(execution.IsCompleted);
+            Assert.Equal(0, backend.CreatedHandles);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await caller;
+            await execution;
+        }
+
+        Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
+        Assert.Empty(backend.Partitions);
+    }
+
+    [Fact]
     public async Task RunGeneratedCases_HaveFreshScopesAndDisposeEveryAcquiredHandle()
     {
         var backend = new IdealizedMembershipBackend { LagHeartbeatReads = true };
@@ -60,10 +105,21 @@ public sealed class MembershipTableModelBasedTestRunnerTests
             return fixture;
         }, new MembershipTableModelBasedConformanceOptions { ProviderName = "owned-model", Seed = 31 }, messages.Add);
         await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
-        Assert.True(scopes.Count > 2);
+        Assert.Equal(959 * 2, scopes.Count);
         Assert.Equal(scopes.Count / 2 * 3, backend.CreatedHandles);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
         Assert.Empty(backend.Partitions);
+        var firstCase = messages.Where(m => m.StartsWith("seed=31; case=0;", StringComparison.Ordinal)).ToArray();
+        Assert.StartsWith("seed=31; case=0; phase=initialize;", firstCase[0]);
+        Assert.StartsWith("seed=31; case=0; phase=initialized;", firstCase[1]);
+        Assert.StartsWith("seed=31; case=0; phase=dispose;", firstCase[^2]);
+        Assert.StartsWith("seed=31; case=0; phase=disposed;", firstCase[^1]);
+        var firstStep = firstCase.Where(m => m.Contains("; step=1;", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(4, firstStep.Length);
+        Assert.EndsWith("; phase=observe-before", firstStep[0]);
+        Assert.EndsWith("; phase=invoke", firstStep[1]);
+        Assert.EndsWith("; phase=observe-after", firstStep[2]);
+        Assert.EndsWith("; phase=completed", firstStep[3]);
         var summary = Assert.Single(messages, m => m.Contains("Accordant cases=", StringComparison.Ordinal));
         Assert.Contains("seed=31", summary);
         Assert.Contains("StartSuccessor", summary);

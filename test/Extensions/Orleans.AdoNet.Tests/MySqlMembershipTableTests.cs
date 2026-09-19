@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MySql.Data.MySqlClient;
+using Orleans.Clustering.TestKit;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
@@ -16,6 +18,7 @@ namespace UnitTests.MembershipTests
     /// </summary>
     [TestCategory("Membership"), TestCategory("MySql"), TestCategory("Functional")]
     [TestSuite("Functional")]
+    [TestCategory("ClusteringCurrentSchema")]
     [TestProvider("MySql")]
     [TestArea("Membership")]
     public class MySqlMembershipTableTests : MembershipTableTestsBase
@@ -34,14 +37,24 @@ namespace UnitTests.MembershipTests
         }
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             var options = new AdoNetClusteringSiloOptions()
             {
                 Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this._clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
+            return new AdoNetClusteringTable(this.Services, clusterOptions, Options.Create(options), loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+            => AdoNetMembershipTableConformanceProbe.IsDeletedAsync(
+                new MySqlConnection(connectionString), clusterId, cancellationToken);
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
@@ -58,14 +71,14 @@ namespace UnitTests.MembershipTests
             var instance = await RelationalStorageForTesting.SetupInstance(
                 GetAdoInvariant(),
                 testDatabaseName,
-                cancellationToken: TestContext.Current.CancellationToken);
+                cancellationToken: TestContext.Current.CancellationToken,
+                setupSqlScriptFileNames: ["MySQL-Main.sql", "MySQL-Clustering.sql"]);
             return instance.CurrentConnectionString;
         }
 
         [Fact]
-        public void MembershipTable_MySql_Init()
-        {
-        }
+        public Task MembershipTable_MySql_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_MySql_GetGateways()

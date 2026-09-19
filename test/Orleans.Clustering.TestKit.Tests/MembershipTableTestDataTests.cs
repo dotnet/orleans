@@ -7,6 +7,36 @@ namespace Orleans.Clustering.TestKit.Tests;
 public sealed class MembershipTableTestDataTests
 {
     [Fact]
+    public void CreateInitialEntry_UsesIndependentEmptySuspicionHistories()
+    {
+        var first = CreateInitialEntry(1);
+        var second = CreateInitialEntry(1);
+        Assert.Empty(first.SuspectTimes!);
+        Assert.Empty(second.SuspectTimes!);
+        Assert.NotSame(first.SuspectTimes, second.SuspectTimes);
+        first.AddSuspector(CreateEntry(2).SiloAddress, T1);
+        Assert.Empty(second.SuspectTimes!);
+    }
+
+    [Fact]
+    public void Forward_ChangesStatusAndVotesWhilePreservingActivationMetadata()
+    {
+        var initial = CreateInitialEntry(1);
+        var updated = Forward(initial);
+        Assert.Equal(SiloStatus.Joining, updated.Status);
+        Assert.Single(updated.SuspectTimes!);
+        Assert.Empty(initial.SuspectTimes!);
+        Assert.Equal(initial.SiloAddress, updated.SiloAddress);
+        Assert.Equal(initial.HostName, updated.HostName);
+        Assert.Equal(initial.SiloName, updated.SiloName);
+        Assert.Equal(initial.ProxyPort, updated.ProxyPort);
+        Assert.Equal(initial.StartTime, updated.StartTime);
+        Assert.Equal(initial.RoleName, updated.RoleName);
+        Assert.Equal(initial.UpdateZone, updated.UpdateZone);
+        Assert.Equal(initial.FaultZone, updated.FaultZone);
+    }
+
+    [Fact]
     public void CreateEntry_SameSeedProducesDetachedWholeSecondUtcData()
     {
         var first = CreateEntry(4, 19);

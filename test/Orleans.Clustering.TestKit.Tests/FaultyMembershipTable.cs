@@ -10,7 +10,8 @@ internal enum MembershipFault
     IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatStorageFailure,
     CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow,
-    DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation
+    DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation,
+    IgnoreHeartbeatWrite
 }
 
 internal sealed class MembershipFaultController(MembershipFault fault)
@@ -256,6 +257,11 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
 
     public async Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)
     {
+        if (Fault == MembershipFault.IgnoreHeartbeatWrite)
+        {
+            control.Injected++;
+            return;
+        }
         if (Fault == MembershipFault.HeartbeatStorageFailure) throw control.HeartbeatFailure;
         if (Fault == MembershipFault.HeartbeatCancellation) throw control.HeartbeatCancellation;
         await inner.UpdateIAmAliveAsync(entry, cancellationToken);

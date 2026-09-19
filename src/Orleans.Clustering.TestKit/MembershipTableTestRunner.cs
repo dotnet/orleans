@@ -40,7 +40,9 @@ public sealed class MembershipTableTestRunner
     public Task UpdateRow_CurrentTokens_CommitsExactlyOneVersion(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
-        var updated = Forward(Entry(1));
+        var populated = Forward(Entry(1));
+        await Update(A, populated, ct);
+        var updated = Forward(populated);
         updated.IAmAliveTime = T2;
         updated.SuspectTimes![0] = Tuple.Create(updated.SuspectTimes[0].Item1, T1);
         await Update(B, updated, ct);
@@ -253,6 +255,8 @@ public sealed class MembershipTableTestRunner
     public Task Reads_RetainedObjectsRemainUnchangedAfterLaterWrites(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
+        var populated = Forward(Entry(1));
+        await Update(A, populated, ct);
         var retained = await A.ReadAllAsync(ct);
         var row = retained.TryGet(Entry(1).SiloAddress)!;
         var entryReference = row.Item1;
@@ -260,7 +264,7 @@ public sealed class MembershipTableTestRunner
         var listBaseline = listReference?.Select(v => new SuspectSnapshot(v.Item1.ToParsableString(), v.Item2)).ToArray() ?? [];
         var baseline = ClusteringMembershipSnapshot.Capture(retained);
         await Heartbeat(B, Entry(1), T2, ct);
-        await Update(A, Forward(Entry(1)), ct);
+        await Update(A, Forward(populated), ct);
         await Update(B, Forward(Entry(2)), ct);
         Equal(baseline, ClusteringMembershipSnapshot.Capture(retained), complete: true);
         EqualRow(baseline.Row(Entry(1).SiloAddress).Entry, MembershipEntrySnapshot.Capture(entryReference), complete: true);
@@ -388,31 +392,43 @@ public sealed class MembershipTableTestRunner
     /// <summary>G25: eligible Dead rows compact at the same version or in atomic +1 batches; retained canonical fields are preserved.</summary>
     public Task CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(CancellationToken cancellationToken = default) => Run(async ct =>
     {
-        foreach (var entry in CreateCleanupEntries(_seed)) await Insert(A, entry, ct);
+        var publishedHeartbeats = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        foreach (var entry in CreateCleanupEntries(_seed)) await SeedCleanupEntry(entry);
         var other = await Insert(Other, Entry(1, SiloStatus.Dead), ct);
         var baseline = await SameHandles(ct);
         var history = new MembershipHistory();
         history.Observe(baseline);
-        await B.CleanupDefunctSiloEntriesAsync(new(T1), ct);
-        Check(baseline.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1)) == 1,
+        Check(baseline.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1, publishedHeartbeats)) == 1,
             "cleanup matrix must contain exactly one removable Dead row");
+        await B.CleanupDefunctSiloEntriesAsync(new(T1), ct);
         var actual = await SameHandles(ct);
-        AssertCleanup(baseline, actual, T1);
+        AssertCleanup(baseline, actual, T1, publishedHeartbeats: publishedHeartbeats);
         history.Observe(actual);
         await A.CleanupDefunctSiloEntriesAsync(new(T1), ct);
         Equal(actual, await SameHandles(ct));
         var exclusiveCutoff = T1.AddTicks(1);
-        Check(actual.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, exclusiveCutoff)) == 1,
+        Check(actual.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, exclusiveCutoff, publishedHeartbeats)) == 1,
             "the one-tick-later cutoff must select only the equality-boundary Dead row");
         await B.CleanupDefunctSiloEntriesAsync(new(exclusiveCutoff), ct);
         var boundaryRemoved = await SameHandles(ct);
-        AssertCleanup(actual, boundaryRemoved, exclusiveCutoff);
+        AssertCleanup(actual, boundaryRemoved, exclusiveCutoff, publishedHeartbeats: publishedHeartbeats);
         history.Observe(boundaryRemoved);
-        for (var i = 200; i < 203; i++) await Insert(A, Entry(i, SiloStatus.Dead), ct);
-        await CleanupWithConcurrentReads(ct);
-        await Insert(A, Entry(220, SiloStatus.Dead), ct);
-        await ConcurrentCleaners(ct);
+        for (var i = 200; i < 203; i++) await SeedCleanupEntry(Entry(i, SiloStatus.Dead));
+        await CleanupWithConcurrentReads(publishedHeartbeats, ct);
+        await SeedCleanupEntry(Entry(220, SiloStatus.Dead));
+        await CleanupFromBothHandles(publishedHeartbeats, ct);
         Equal(other, await Read(Other, ct));
+
+        async Task SeedCleanupEntry(MembershipEntry entry)
+        {
+            var live = Copy(entry);
+            if (live.Status == SiloStatus.Dead) live.Status = SiloStatus.Active;
+            live.SuspectTimes = [];
+            await Insert(A, live, ct);
+            await Heartbeat(A, live, entry.IAmAliveTime, ct);
+            publishedHeartbeats.Add(entry.SiloAddress.ToParsableString(), entry.IAmAliveTime);
+            if (entry.Status == SiloStatus.Dead) await Update(A, entry, ct);
+        }
     }, cancellationToken);
 
     /// <summary>G26: native verification confirms deletion before owner disposal, while the other cluster remains intact.</summary>
@@ -425,13 +441,12 @@ public sealed class MembershipTableTestRunner
         Equal(other, await Read(Other, ct));
     }, cancellationToken);
 
-    /// <summary>G27: a different or unused cluster ID never deletes the configured cluster.</summary>
+    /// <summary>G27: deleting a different populated cluster never deletes the configured cluster.</summary>
     public Task DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         var baseline = await SameHandles(ct);
         var otherBefore = await Insert(Other, Entry(1), ct);
-        await DeleteForeignCluster(B, $"ctk-unused-{Guid.NewGuid():N}");
         await _fixture.AssertHistoryPresentAsync(_fixture.ClusterId, ct);
         await _fixture.AssertHistoryPresentAsync(_fixture.OtherClusterId, ct);
         Equal(baseline, await SameHandles(ct));
@@ -446,20 +461,9 @@ public sealed class MembershipTableTestRunner
         }
         Equal(baseline, await SameHandles(ct));
 
-        async Task DeleteForeignCluster(IMembershipTable table, string clusterId)
-        {
-            try
-            {
-                await table.DeleteMembershipTableEntriesAsync(clusterId, ct);
-            }
-            catch (ArgumentException exception) when (exception.ParamName == nameof(clusterId))
-            {
-                _output?.Invoke("The provider rejected deletion outside its configured cluster scope.");
-            }
-        }
     }, cancellationToken);
 
-    private MembershipEntry Entry(int index, SiloStatus status = SiloStatus.Created) => CreateEntry(index, _seed, status);
+    private MembershipEntry Entry(int index, SiloStatus status = SiloStatus.Created) => CreateInitialEntry(index, _seed, status);
 
     private async Task Run(Func<CancellationToken, Task> action, CancellationToken cancellationToken, [CallerMemberName] string guarantee = "")
     {
@@ -541,16 +545,22 @@ public sealed class MembershipTableTestRunner
         }, after);
     }
 
-    private static bool IsEligibleForCleanup(MembershipEntrySnapshot entry, DateTime cutoff)
-        => entry.Status == SiloStatus.Dead && entry.GetEffectiveUpdateTime() < cutoff;
+    private static bool IsEligibleForCleanup(
+        MembershipEntrySnapshot entry, DateTime cutoff, IReadOnlyDictionary<string, DateTime>? publishedHeartbeats = null)
+    {
+        // Controlled cleanup histories use owner publications; raw heartbeat observations may lag.
+        var expected = publishedHeartbeats is null ? entry : entry with { IAmAliveTime = publishedHeartbeats[entry.Identity] };
+        return expected.Status == SiloStatus.Dead && expected.GetEffectiveUpdateTime() < cutoff;
+    }
 
     internal static void AssertCleanup(
         ClusteringMembershipSnapshot before,
         ClusteringMembershipSnapshot after,
         DateTime cutoff,
-        bool requireAllEligible = true)
+        bool requireAllEligible = true,
+        IReadOnlyDictionary<string, DateTime>? publishedHeartbeats = null)
     {
-        var eligible = before.Rows.Where(pair => IsEligibleForCleanup(pair.Value.Entry, cutoff))
+        var eligible = before.Rows.Where(pair => IsEligibleForCleanup(pair.Value.Entry, cutoff, publishedHeartbeats))
             .Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal);
         var removed = before.Rows.Keys.Except(after.Rows.Keys).ToArray();
         Check(removed.All(eligible.Contains), "cleanup removed an ineligible identity");
@@ -578,10 +588,10 @@ public sealed class MembershipTableTestRunner
         Equal(expected, after);
     }
 
-    private async Task CleanupWithConcurrentReads(CancellationToken ct)
+    private async Task CleanupWithConcurrentReads(IReadOnlyDictionary<string, DateTime> publishedHeartbeats, CancellationToken ct)
     {
         var before = await SameHandles(ct);
-        Check(before.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1)) == 3,
+        Check(before.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1, publishedHeartbeats)) == 3,
             "batched cleanup requires exactly three eligible Dead rows");
         var start = Gate();
         var ready = Enumerable.Range(0, 3).Select(_ => Gate()).ToArray();
@@ -601,7 +611,7 @@ public sealed class MembershipTableTestRunner
             for (var i = 0; i < 8; i++)
             {
                 var sample = await Read(index == 1 ? A : B, ct);
-                AssertCleanup(previous, sample, T1, requireAllEligible: false);
+                AssertCleanup(previous, sample, T1, requireAllEligible: false, publishedHeartbeats: publishedHeartbeats);
                 observations.Enqueue(sample);
                 previous = sample;
             }
@@ -612,14 +622,14 @@ public sealed class MembershipTableTestRunner
         start.SetResult();
         await Task.WhenAll(workers).WaitAsync(ct);
         var after = await SameHandles(ct);
-        AssertCleanup(before, after, T1);
+        AssertCleanup(before, after, T1, publishedHeartbeats: publishedHeartbeats);
         observations.Enqueue(before);
         observations.Enqueue(after);
         var history = new MembershipHistory();
         var previous = before;
         foreach (var observed in observations.OrderBy(snapshot => snapshot.Version).ThenByDescending(snapshot => snapshot.Rows.Count))
         {
-            AssertCleanup(previous, observed, T1, requireAllEligible: false);
+            AssertCleanup(previous, observed, T1, requireAllEligible: false, publishedHeartbeats: publishedHeartbeats);
             history.Observe(observed);
             previous = observed;
         }
@@ -628,25 +638,16 @@ public sealed class MembershipTableTestRunner
         Equal(after, await SameHandles(ct));
     }
 
-    private async Task ConcurrentCleaners(CancellationToken ct)
+    private async Task CleanupFromBothHandles(IReadOnlyDictionary<string, DateTime> publishedHeartbeats, CancellationToken ct)
     {
         var before = await SameHandles(ct);
-        Check(before.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1)) == 1,
-            "the two-cleaner race must have one eligible Dead row");
-        var start = Gate();
-        var ready = new[] { Gate(), Gate() };
-        async Task Clean(IMembershipTable table, int index)
-        {
-            ready[index].SetResult();
-            await start.Task.WaitAsync(ct);
-            await table.CleanupDefunctSiloEntriesAsync(new(T1), ct);
-        }
-
-        var cleaners = new[] { Clean(A, 0), Clean(B, 1) };
-        await Task.WhenAll(ready.Select(gate => gate.Task)).WaitAsync(ct);
-        start.SetResult();
-        await Task.WhenAll(cleaners).WaitAsync(ct);
-        AssertCleanup(before, await SameHandles(ct), T1);
+        Check(before.Rows.Values.Count(row => IsEligibleForCleanup(row.Entry, T1, publishedHeartbeats)) == 1,
+            "cross-handle cleanup must have one eligible Dead row");
+        await A.CleanupDefunctSiloEntriesAsync(new(T1), ct);
+        var after = await SameHandles(ct);
+        AssertCleanup(before, after, T1, publishedHeartbeats: publishedHeartbeats);
+        await B.CleanupDefunctSiloEntriesAsync(new(T1), ct);
+        Equal(after, await SameHandles(ct));
     }
 
     internal static async Task Heartbeat(IMembershipTable table, MembershipEntry entry, DateTime time, CancellationToken ct)

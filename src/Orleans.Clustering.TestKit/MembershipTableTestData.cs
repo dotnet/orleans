@@ -28,6 +28,13 @@ internal static class MembershipTableTestData
 
     internal static MembershipEntry Copy(MembershipEntry entry) => MembershipEntrySnapshot.Capture(entry).ToEntry();
 
+    internal static MembershipEntry CreateInitialEntry(int index, int seed = 0, SiloStatus status = SiloStatus.Created)
+    {
+        var entry = CreateEntry(index, seed, status);
+        entry.SuspectTimes = [];
+        return entry;
+    }
+
     internal static MembershipEntry CreateSuccessor(MembershipEntry predecessor)
     {
         var result = Copy(predecessor);
@@ -47,9 +54,6 @@ internal static class MembershipTableTestData
         ClusteringTestKitDiagnostics.Require(entry.Status is >= SiloStatus.Created and < SiloStatus.Dead,
             $"no legal forward transition for {entry.Status}");
         result.Status = entry.Status + 1;
-        result.HostName += "-updated";
-        result.SiloName += "-updated";
-        result.ProxyPort++;
         result.AddOrUpdateSuspector(SiloAddress.New(IPAddress.Loopback, 11003, 12), T0, maxVotes: 10);
         return result;
     }
@@ -58,14 +62,14 @@ internal static class MembershipTableTestData
     {
         var result = Enum.GetValues<SiloStatus>()
             .Where(status => status != SiloStatus.None)
-            .Select(status => CreateEntry(100 + (int)status, seed, status)).ToList();
-        var start = CreateEntry(110, seed, SiloStatus.Dead);
+            .Select(status => CreateInitialEntry(100 + (int)status, seed, status)).ToList();
+        var start = CreateInitialEntry(110, seed, SiloStatus.Dead);
         start.StartTime = T2;
-        var heartbeat = CreateEntry(111, seed, SiloStatus.Dead);
+        var heartbeat = CreateInitialEntry(111, seed, SiloStatus.Dead);
         heartbeat.IAmAliveTime = T2;
-        var vote = CreateEntry(112, seed, SiloStatus.Dead);
+        var vote = CreateInitialEntry(112, seed, SiloStatus.Dead);
         vote.SuspectTimes!.Insert(0, Tuple.Create(CreateEntry(1).SiloAddress, T2));
-        var boundary = CreateEntry(113, seed, SiloStatus.Dead);
+        var boundary = CreateInitialEntry(113, seed, SiloStatus.Dead);
         boundary.IAmAliveTime = T1;
         result.AddRange([start, heartbeat, vote, boundary]);
         return result;

@@ -1,9 +1,15 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Clustering.TestKit;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using Orleans.Configuration;
+using org.apache.zookeeper;
+using org.apache.utils;
 using TestExtensions;
 using Xunit;
 using Tester.ZooKeeperUtils;
@@ -27,11 +33,56 @@ namespace UnitTests.MembershipTests
     [TestSuite("Functional")]
     [TestProvider("ZooKeeper")]
     [TestArea("Membership")]
-    public class ZookeeperMembershipTableTests : MembershipTableTestsBase
+    public class ZookeeperMembershipTableTests : MembershipTableTestsBase, IAsyncLifetime
     {
+        private const int MaxSdkMessages = 256;
+        private static readonly SdkDiagnostics Diagnostics = new();
+        private readonly ConcurrentQueue<string> _socketMessages = new();
+        private readonly NativeSocketDiagnostics _socketDiagnostics;
+        private readonly string _socketLog = Path.Combine(AppContext.BaseDirectory, "TestResults", $"zookeeper-sockets-{Guid.NewGuid():N}.log");
+        private int _sdkMessageCount;
+
+        static ZookeeperMembershipTableTests()
+        {
+            ZooKeeper.LogLevel = TraceLevel.Info;
+            ZooKeeper.LogToTrace = false;
+            ZooKeeper.CustomLogConsumer = Diagnostics;
+        }
+
         public ZookeeperMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
             : base(fixture, environment, CreateFilters())
         {
+            _socketDiagnostics = new NativeSocketDiagnostics(_socketMessages.Enqueue);
+            Diagnostics.Message += RecordSdkMessage;
+        }
+
+        public new async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await base.DisposeAsync();
+            }
+            finally
+            {
+                Diagnostics.Message -= RecordSdkMessage;
+                _socketDiagnostics.Dispose();
+                _socketMessages.Enqueue($"SDK messages observed={Volatile.Read(ref _sdkMessageCount)}; detail-limit={MaxSdkMessages}");
+                System.IO.Directory.CreateDirectory(Path.GetDirectoryName(_socketLog)!);
+                await File.WriteAllLinesAsync(_socketLog, _socketMessages);
+            }
+        }
+
+        private void RecordSdkMessage(string message)
+        {
+            var count = Interlocked.Increment(ref _sdkMessageCount);
+            if (count <= MaxSdkMessages)
+            {
+                _socketMessages.Enqueue(message);
+            }
+            else if (count == MaxSdkMessages + 1)
+            {
+                _socketMessages.Enqueue($"{DateTime.UtcNow:O} SDK message limit reached; subsequent message details are omitted");
+            }
         }
 
         private static LoggerFilterOptions CreateFilters()
@@ -47,13 +98,121 @@ namespace UnitTests.MembershipTests
         /// table that uses ZooKeeper's hierarchical namespace for storage.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             var options = new ZooKeeperClusteringSiloOptions();
             options.ConnectionString = this.connectionString;
 
             var typedLogger = this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>();
             Assert.NotNull(typedLogger);
-            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), this._clusterOptions);
+            return new ZooKeeperBasedMembershipTable(typedLogger, Options.Create(options), clusterOptions);
+        }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task MembershipTable_ZooKeeper_RepeatedSnapshotReadCompatibility(bool pointRead)
+        {
+            for (var iteration = 0; iteration < 3; iteration++)
+            {
+                var started = Stopwatch.GetTimestamp();
+                await CreateConformanceFixture().RunAsync(async (fixture, cancellationToken) =>
+                {
+                    var runner = new MembershipTableTestRunner(
+                        fixture, seed: 17, concurrencyRowCount: ConformanceConcurrencyRowCount);
+                    if (pointRead)
+                    {
+                        await runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
+                    else
+                    {
+                        await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
+
+                    var readStarted = Stopwatch.GetTimestamp();
+                    var snapshot = await fixture.First.ReadAllAsync(cancellationToken);
+                    TestContext.Current.TestOutputHelper?.WriteLine(
+                        $"Stable snapshot rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
+                }, TestContext.Current.CancellationToken);
+                TestContext.Current.TestOutputHelper?.WriteLine(
+                    $"Snapshot compatibility pass {iteration + 1}/3; pointRead={pointRead}; elapsed={Stopwatch.GetElapsedTime(started)}");
+            }
+        }
+
+        private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await ZooKeeper.Using(connectionString, 10_000, new ConformanceWatcher(), async client =>
+            {
+                await client.sync("/");
+                cancellationToken.ThrowIfCancellationRequested();
+                return await client.existsAsync("/" + clusterId, false) is null;
+            });
+        }
+
+        private sealed class ConformanceWatcher : Watcher
+        {
+            public override Task process(WatchedEvent @event) => Task.CompletedTask;
+        }
+
+        internal sealed class NativeSocketDiagnostics(Action<string>? write = null) : EventListener
+        {
+            private const int MaxLoggedEvents = 256;
+            private readonly Action<string> _write = write ?? Console.Error.WriteLine;
+            private int _eventCount;
+
+            protected override void OnEventSourceCreated(EventSource eventSource)
+            {
+                if (eventSource.Name == "Private.InternalDiagnostics.System.Net.Sockets")
+                {
+                    // Native completion errors precede the SDK's own SocketError assignment.
+                    EnableEvents(eventSource, EventLevel.Error, (EventKeywords)1);
+                    _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Error listener enabled");
+                }
+            }
+
+            protected override void OnEventWritten(EventWrittenEventArgs eventData)
+            {
+                if (eventData.EventName is "ErrorMessage" or "EventSourceMessage")
+                {
+                    var count = Interlocked.Increment(ref _eventCount);
+                    if (count <= MaxLoggedEvents)
+                    {
+                        _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] {eventData.EventName}: {string.Join("; ", eventData.Payload!)}");
+                    }
+                    else if (count == MaxLoggedEvents + 1)
+                    {
+                        _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Event limit reached; subsequent event details are omitted");
+                    }
+                }
+            }
+
+            public override void Dispose()
+            {
+                base.Dispose();
+                _write($"{DateTime.UtcNow:O} [NativeSockets#{GetHashCode()}] Listener disposed; observed-events={Volatile.Read(ref _eventCount)}; detail-limit={MaxLoggedEvents}");
+            }
+        }
+
+        private sealed class SdkDiagnostics : ILogConsumer
+        {
+            internal event Action<string>? Message;
+
+            public void Log(TraceLevel severity, string className, string message, Exception exception)
+            {
+                // The SDK reports transport exceptions at Info, below its default Warning threshold.
+                if (exception is not null || severity <= TraceLevel.Warning)
+                {
+                    var record = $"{DateTime.UtcNow:O} [{className}] {severity}: {message}{Environment.NewLine}{exception}";
+                    Console.Error.WriteLine(record);
+                    Message?.Invoke(record);
+                }
+            }
         }
 
         /// <summary>
@@ -76,9 +235,8 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public void MembershipTable_ZooKeeper_Init()
-        {
-        }
+        public Task MembershipTable_ZooKeeper_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact]
         public async Task MembershipTable_ZooKeeper_GetGateways()
