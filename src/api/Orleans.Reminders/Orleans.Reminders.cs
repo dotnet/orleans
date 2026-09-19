@@ -61,6 +61,7 @@ namespace Orleans
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId grainId, System.Threading.CancellationToken cancellationToken);
         [Alias("GetReminders")]
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId grainId);
+        System.Threading.Tasks.Task<bool> ReconcileReminder(Runtime.GrainId grainId, string reminderName, int remainingHops);
         [Alias("1281C86D")]
         System.Threading.Tasks.Task<Runtime.IGrainReminder> RegisterOrUpdateReminder(Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, System.Threading.CancellationToken cancellationToken);
         [Alias("RegisterOrUpdateReminder")]

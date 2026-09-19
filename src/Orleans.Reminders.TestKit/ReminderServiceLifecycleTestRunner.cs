@@ -443,12 +443,19 @@ public abstract class ReminderServiceLifecycleTestRunner
 
                     var ownersBeforeRefresh = _harness.GetOwners(grainId, Name);
                     var startsBeforeRefresh = _harness.GetLocalStartCount(grainId, Name);
-                    if (ownersBeforeRefresh.Count != 0 || startsBeforeRefresh != 0)
+                    var persistedForRefresh = ownersBeforeRefresh.Count == 0 && startsBeforeRefresh == 0;
+                    var eagerlyReconciled = ownersBeforeRefresh.Count == 1
+                        && ownersBeforeRefresh.Contains(joined)
+                        && !ownersBeforeRefresh.Contains(staleOwner)
+                        && startsBeforeRefresh == 1;
+                    var eagerlyStartedTemporaryOwner = ownersBeforeRefresh.Count == 1
+                        && startsBeforeRefresh == 1;
+                    if (!persistedForRefresh && !eagerlyReconciled && !eagerlyStartedTemporaryOwner)
                     {
                         Fail(Guarantee, "stale-owner registration")
                             .WithIdentity(grainId, Name)
                             .WithExpected(
-                                $"directed non-owner {staleOwner} persists the row without starting a local owner before refresh")
+                                $"directed non-owner {staleOwner} persists the row for refresh or starts exactly one temporary/final owner")
                             .WithObserved(
                                 $"currentOwner={joined}, owners=[{string.Join(", ", ownersBeforeRefresh)}], "
                                 + $"localStarts={startsBeforeRefresh}")
@@ -456,9 +463,17 @@ public abstract class ReminderServiceLifecycleTestRunner
                     }
 
                     phase = "owner reconciliation";
-                    var ownerWait = _harness.WaitForOwnerCountAsync(grainId, Name, 1, cancellationToken);
-                    await _harness.RefreshAsync(cancellationToken);
-                    await ownerWait;
+                    if (persistedForRefresh)
+                    {
+                        var ownerWait = _harness.WaitForOwnerCountAsync(grainId, Name, 1, cancellationToken);
+                        await _harness.RefreshAsync(cancellationToken);
+                        await ownerWait;
+                    }
+                    else if (eagerlyStartedTemporaryOwner)
+                    {
+                        await _harness.RefreshAsync(cancellationToken);
+                    }
+
                     var owners = _harness.GetOwners(grainId, Name);
                     if (owners.Count != 1 || !owners.Contains(joined) || owners.Contains(staleOwner))
                     {
