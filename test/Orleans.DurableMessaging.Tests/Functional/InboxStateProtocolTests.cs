@@ -73,7 +73,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         {
             Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
             Assert.True(manager.PendingWriteByteCount > 0);
-            Assert.True(manager.TryGetState("__orleans.durable-messaging.inbox", out var inbox));
+            Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
             Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => inbox.IsWritePrepared));
         });
         preparation.Release();

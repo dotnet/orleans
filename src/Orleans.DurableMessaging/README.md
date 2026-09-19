@@ -30,10 +30,25 @@ Setup validates the grain's execution model after the runtime assigns the constr
 grain instance and before lifecycle startup, journal initialization, or replay. Supported
 activations use a single, noninterleaving grain execution model. Grain construction and
 local state registration precede validation. The standard state manager enrolls in the
-grain lifecycle during grain-bound construction; messaging registers its actual
-persisted states with that enrolled manager. A scoped factory using an explicit
-`JournalId` enrolls its manager in the grain lifecycle before returning it. Standalone managers have
-caller-owned initialization and disposal.
+grain lifecycle during grain-bound construction. Standard `IDurableStateManager`
+and `IJournaledStateManager` services alias that same scoped manager. Application
+code uses the typed named-state API and ordinary writes; messaging uses the journal
+owner for state-machine registration and persistence. Shared setup resolves the
+complete messaging graph before recovery closes registration.
+
+The persisted inbox facets implement `IStateMachine`. Their `WritePendingEntries`
+and `WriteSnapshot` callbacks retain the existing stream names, command codecs,
+and capture/acknowledgement boundaries. Custom `AddStateMachine` factories construct
+components and the manager registers their canonical named instances. Deferred
+helpers resolve command codecs through their owning manager, using activation
+services for grain-bound owners and shared services for standalone owners.
+
+`IJournaledStateManagerFactory.CreateStandalone` creates an owner for an explicit
+`JournalId`. Its caller constructs and registers the state machines before
+initialization and owns their dependency lifetimes. Initialization and disposal
+remain caller-owned; a grain factory deliberately enrolls such an owner in the
+lifecycle when integrating it with activation startup. Full journal deletion uses
+the advanced owner and the existing quiescence boundary.
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job

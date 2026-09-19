@@ -4,10 +4,10 @@ using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
-internal abstract class ObservedJournalState(IJournaledState state) : IJournaledState
+internal abstract class ObservedJournalState(IStateMachine state) : IStateMachine
 {
     private bool _initialized;
-    protected IJournaledState State { get; } = state;
+    protected IStateMachine State { get; } = state;
     public Action? Initializing { get; set; }
     public Action? Resetting { get; set; }
     public Action? Recovered { get; set; }
@@ -34,17 +34,16 @@ internal abstract class ObservedJournalState(IJournaledState state) : IJournaled
         }
     }
     public virtual void OnRecoveryCompleted() { State.OnRecoveryCompleted(); Recovered?.Invoke(); }
-    public virtual void AppendEntries(JournalStreamWriter writer) { Capturing?.Invoke(); State.AppendEntries(writer); }
-    public virtual void AppendSnapshot(JournalStreamWriter writer) { Capturing?.Invoke(); State.AppendSnapshot(writer); }
+    public virtual void WritePendingEntries(JournalStreamWriter writer) { Capturing?.Invoke(); State.WritePendingEntries(writer); }
+    public virtual void WriteSnapshot(JournalStreamWriter writer) { Capturing?.Invoke(); State.WriteSnapshot(writer); }
     public virtual void OnWriteCompleted() { State.OnWriteCompleted(); Written?.Invoke(); }
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
 
 internal class ObservedJournalDictionary<TKey, TValue> : ObservedJournalState, IDurableDictionary<TKey, TValue> where TKey : notnull
 {
     private IDurableDictionary<TKey, TValue> Items => (IDurableDictionary<TKey, TValue>)State;
-    public ObservedJournalDictionary(IJournaledStateManager manager, string name, bool deferred = false)
-        : base(deferred ? ReceiverTestServices.CreateDeferredDictionary<TKey, TValue>(manager) : ReceiverTestServices.CreateStandardDictionary<TKey, TValue>(manager)) => manager.RegisterState(name, this);
+    public ObservedJournalDictionary(IJournaledStateManager manager, bool deferred = false)
+        : base(deferred ? ReceiverTestServices.CreateDeferredDictionary<TKey, TValue>(manager) : ReceiverTestServices.CreateStandardDictionary<TKey, TValue>(manager)) { }
     public TValue this[TKey key] { get => Items[key]; set => Items[key] = value; }
     public int Count => Items.Count;
     public ICollection<TKey> Keys => Items.Keys;
@@ -65,7 +64,7 @@ internal class ObservedJournalDictionary<TKey, TValue> : ObservedJournalState, I
 
 internal sealed class ObservedJournalValue<T> : ObservedJournalState, IDurableValue<T>
 {
-    public ObservedJournalValue(IJournaledStateManager manager, string name)
-        : base(ReceiverTestServices.CreateDeferredValue<T>(manager)) => manager.RegisterState(name, this);
+    public ObservedJournalValue(IJournaledStateManager manager)
+        : base(ReceiverTestServices.CreateDeferredValue<T>(manager)) { }
     public T? Value { get => ((IDurableValue<T>)State).Value; set => ((IDurableValue<T>)State).Value = value; }
 }

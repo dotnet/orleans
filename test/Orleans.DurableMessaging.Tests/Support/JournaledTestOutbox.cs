@@ -7,7 +7,7 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 // Captures handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
 internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
-    : ObservedJournalDictionary<Guid, DurableEnvelope>(manager, "test-handler-output", deferred: true), IDurableOutbox
+    : ObservedJournalDictionary<Guid, DurableEnvelope>(manager, deferred: true), IDurableOutbox
 {
     private static readonly Func<DurableEnvelope, DurableEnvelope, bool> AreEquivalent = ReceiverTestServices
         .GetImplementationType("DurableEnvelopeEquivalence")
@@ -99,15 +99,15 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
         _preparing = false;
     }
 
-    public override void AppendEntries(JournalStreamWriter writer)
+    public override void WritePendingEntries(JournalStreamWriter writer)
     {
-        base.AppendEntries(writer);
+        base.WritePendingEntries(writer);
         Capture();
     }
 
-    public override void AppendSnapshot(JournalStreamWriter writer)
+    public override void WriteSnapshot(JournalStreamWriter writer)
     {
-        base.AppendSnapshot(writer);
+        base.WriteSnapshot(writer);
         Capture();
     }
 
