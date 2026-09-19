@@ -200,7 +200,12 @@ Serialized null bodies remain valid; route selection supplies delivery and dead-
 outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
 context bytes, and declared type metadata.
 
-The outbox owns seven journaled state facets under the existing stream names.
+The outbox owns seven `IStateMachine` facets under the existing stream names.
+Its advanced `IJournaledStateManager` registers those facets and resolves their
+command codecs for the owning journal's configured format. Grain-facing
+`IDurableStateManager` writes share that same owner and acknowledgement boundary.
+Standalone fixtures use `CreateStandalone`, explicitly register their state machines,
+and retain caller ownership of initialization, dependencies, and disposal.
 Ordinary journal writes prepare durable wakeup ownership before capturing pending
 commands. Readiness is rechecked after every state preparation await, so late sends
 join the final capture cohort with an acknowledged owner. Healthy owners retain
