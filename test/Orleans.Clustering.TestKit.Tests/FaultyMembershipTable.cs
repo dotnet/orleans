@@ -315,17 +315,18 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
                 return new(control.TornBefore!.Members.Where(row => key is null || row.Item1.SiloAddress.Equals(key)).ToList(), current.Version);
             }
         }
-        var torn = (key is null && Fault == MembershipFault.TornReadAll) || (key is not null && Fault == MembershipFault.TornReadRow);
-        if (torn)
+        if (Fault is MembershipFault.TornReadAll or MembershipFault.TornReadRow)
         {
-            // Two setup validation reads and two round-boundary reads precede the gated race.
+            // Both fault modes observe two full setup validation reads and two full
+            // round-boundary reads before holding the selected readers at the writer barrier.
             var current = await inner.ReadAllAsync(ct);
             var fullReads = key is null && current.Version.Version == 5
                 ? Interlocked.Increment(ref control.ReadsAtFiveRows)
                 : Volatile.Read(ref control.ReadsAtFiveRows);
-            if (fullReads > 4 || (key is not null && fullReads >= 4))
+            var torn = (key is null && Fault == MembershipFault.TornReadAll) || (key is not null && Fault == MembershipFault.TornReadRow);
+            if (torn && (fullReads > 4 || (key is not null && fullReads >= 4)))
                 await control.WriterArmed.Task.WaitAsync(ct);
-            if (Volatile.Read(ref control.TornArmed) != 0)
+            if (torn && Volatile.Read(ref control.TornArmed) != 0)
             {
                 control.ReadStarted.TrySetResult();
                 await control.Committed.Task.WaitAsync(ct);
