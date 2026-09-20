@@ -214,7 +214,11 @@ Feature preparation serializes wakeup acquisition and shares the viable exact ow
 between live batches. It releases the acquisition gate before returning each handle,
 so callers can prepare several batches before applying them. Healthy owners retain
 their exact handles. Ordinary journal writes synchronously validate and capture
-already-prepared commands. The first facet captured seals the complete cohort, including
+already-prepared commands. Every outbox facet forwards `ValidatePendingChanges` to
+the aggregate's pure synchronous failure, generation, and exact-owner checks. The
+journal executes this guard before all capture paths, including snapshot, empty-buffer,
+and committed-prefix writes. `ValidateWrite` remains the request-admission boundary.
+The first facet captured seals the complete cohort, including
 the ownership generation, returned DurableJob, envelopes, retry state and dead letters.
 Every facet writes that cohort to its own stream. Storage acknowledgement releases
 exactly that cohort's delivery fences after all seven facets acknowledge; mutations

@@ -448,15 +448,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private bool IsWritePrepared
-    {
-        get
-        {
-            ValidatePendingChanges();
-            return true;
-        }
-    }
-
     private void ValidatePendingChanges()
     {
         ValidateReady();
