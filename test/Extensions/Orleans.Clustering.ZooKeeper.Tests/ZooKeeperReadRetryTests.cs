@@ -557,6 +557,91 @@ public sealed class ZooKeeperReadRetryTests
 
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeFixture_CanceledCleanup_PreservesAdmissionAndOwnsClose(bool fail)
+    {
+        var harness = await Harness.CreateAsync();
+        foreach (var entry in harness.Entries)
+        {
+            entry.Status = SiloStatus.Dead;
+            var path = ZooKeeperNativeFake.RowPath(entry.SiloAddress);
+            harness.Fake.Nodes[path] = harness.Fake.Nodes[path] with { Data = ZooKeeperBasedMembershipTable.Serialize(entry) };
+        }
+        var first = Gate();
+        var second = Gate();
+        var firstCompleted = Gate();
+        var closeStarted = Gate();
+        var releaseClose = Gate();
+        var failure = new KeeperException.NoAuthException();
+        var firstPath = ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress);
+        var secondPath = ZooKeeperNativeFake.RowPath(harness.Entries[1].SiloAddress);
+        harness.Fake.BeforeRead = async path =>
+        {
+            if (path == firstPath)
+                await first.Task;
+            if (path == secondPath)
+            {
+                await second.Task;
+                if (fail)
+                    throw failure;
+            }
+        };
+        harness.Fake.AfterRead = path =>
+        {
+            if (path == firstPath)
+                firstCompleted.SetResult();
+            return Task.CompletedTask;
+        };
+        using var cancellation = new CancellationTokenSource();
+        async Task<bool> NativeOperation()
+        {
+            try
+            {
+                return await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                    harness.Fake.Operations, DateTimeOffset.UnixEpoch.AddDays(3), cancellation.Token);
+            }
+            finally
+            {
+                closeStarted.SetResult();
+                await releaseClose.Task;
+            }
+        }
+        var native = NativeOperation();
+        Task? observed = null;
+        var caller = ZooKeeperBasedMembershipTable.AwaitOperationAsync(native, cancellation.Token, operation => observed = operation);
+        try
+        {
+            Assert.Same(native, observed);
+            Assert.Equal(new[] { "children /", "read " + firstPath, "read " + secondPath }, harness.Fake.Calls);
+            cancellation.Cancel();
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller);
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+            Assert.False(observed!.IsCompleted);
+            first.SetResult();
+            await firstCompleted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.False(closeStarted.Task.IsCompleted);
+            second.SetResult();
+            await closeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.False(observed.IsCompleted);
+        }
+        finally
+        {
+            first.TrySetResult();
+            second.TrySetResult();
+            releaseClose.TrySetResult();
+            await Record.ExceptionAsync(() => native);
+        }
+        var actual = await Record.ExceptionAsync(() => observed!);
+        if (fail)
+            Assert.Same(failure, actual);
+        else
+            Assert.Equal(cancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(actual).CancellationToken);
+        Assert.Empty(harness.Fake.Transactions);
+        Assert.Equal(new[] { "children /", "read " + firstPath, "read " + secondPath }, harness.Fake.Calls);
+    }
+
     private sealed class Harness
     {
         internal ZooKeeperNativeFake Fake { get; } = new();

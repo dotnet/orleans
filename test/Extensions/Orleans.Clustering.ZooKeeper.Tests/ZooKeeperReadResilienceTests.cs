@@ -20,6 +20,7 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
     private readonly ZooKeeperNativeDiagnostics _diagnostics = new();
     private readonly ConcurrentBag<ZooKeeperSession> _sessions = [];
     private readonly List<MembershipTableTestFixture> _fixtures = [];
+    private readonly ConcurrentBag<Task> _legacyOperations = [];
     private readonly ConcurrentBag<Task> _probes = [];
     private readonly string _socketLog = Path.Combine(AppContext.BaseDirectory, "TestResults", $"zookeeper-sockets-{Guid.NewGuid():N}.log");
     private readonly ILoggerFactory _loggerFactory = TestingUtils.CreateDefaultLoggerFactory(
@@ -45,6 +46,7 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
             // Fixture teardown and canceled caller waits can return before native close.
             await Task.WhenAll(_fixtures.Select(fixture => DrainFixtureAsync(fixture.DisposeAsync))
                 .Concat(_sessions.Select(session => session.Completion))
+                .Concat(_legacyOperations)
                 .Concat(_probes));
         }
         finally
@@ -112,6 +114,7 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
             cancellationToken.ThrowIfCancellationRequested();
             var logger = _loggerFactory.CreateLogger<ZooKeeperBasedMembershipTable>();
             var sessions = new ConcurrentBag<ZooKeeperSession>();
+            var legacyOperations = new ConcurrentBag<Task>();
             var table = new ZooKeeperBasedMembershipTable(
                 logger,
                 Options.Create(new ZooKeeperClusteringSiloOptions { ConnectionString = _connectionString }),
@@ -124,9 +127,14 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
                     _sessions.Add(session);
                     return session;
                 },
-                null);
+                null,
+                operation =>
+                {
+                    legacyOperations.Add(operation);
+                    _legacyOperations.Add(operation);
+                });
             return ValueTask.FromResult(new MembershipTableTestHandle(table,
-                () => new ValueTask(Task.WhenAll(sessions.Select(session => session.Completion)))));
+                () => new ValueTask(Task.WhenAll(sessions.Select(session => session.Completion).Concat(legacyOperations)))));
         }, IsConformanceClusterDeletedAsync);
         _fixtures.Add(fixture);
         return fixture;

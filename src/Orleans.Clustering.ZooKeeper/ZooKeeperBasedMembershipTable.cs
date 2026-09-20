@@ -46,6 +46,7 @@ namespace Orleans.Runtime.Membership
         private readonly ZooKeeperWatcher watcher;
         private readonly Func<bool, ZooKeeperSession> _createSession;
         private readonly ResiliencePipeline _readRetryPipeline;
+        private readonly Action<Task>? _observeOperation;
 
         /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
@@ -85,7 +86,8 @@ namespace Orleans.Runtime.Membership
             IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions,
             Func<bool, ZooKeeperSession>? createSession,
-            ResiliencePipeline? readRetryPipeline)
+            ResiliencePipeline? readRetryPipeline,
+            Action<Task>? observeOperation = null)
         {
             ArgumentNullException.ThrowIfNull(logger);
             ArgumentNullException.ThrowIfNull(membershipTableOptions);
@@ -99,6 +101,7 @@ namespace Orleans.Runtime.Membership
             deploymentConnectionString = options.ConnectionString + this.clusterPath;
             _createSession = createSession ?? (readOnly => CreateSession(deploymentConnectionString, watcher, readOnly));
             _readRetryPipeline = readRetryPipeline ?? ZooKeeperReadRetryPolicy.CreatePipeline(logger, TimeProvider.System);
+            _observeOperation = observeOperation;
         }
 
         /// <summary>
@@ -478,7 +481,7 @@ namespace Orleans.Runtime.Membership
             internal Func<string, byte[], int, Task<Stat>> SetData { get; } = setData;
         }
 
-        private static async Task<T> UsingZookeeper<T>(Func<NativeOperations, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken, bool canBeReadOnly = false)
+        private async Task<T> UsingZookeeper<T>(Func<NativeOperations, Task<T>> zkMethod, string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken, bool canBeReadOnly = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var operation = ZooKeeper.Using(deploymentConnectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, zk =>
@@ -489,13 +492,15 @@ namespace Orleans.Runtime.Membership
                     operations => zk.multiAsync(operations), zk.setDataAsync));
             }, canBeReadOnly);
 
-            return await AwaitOperationAsync(operation, cancellationToken);
+            return await AwaitOperationAsync(operation, cancellationToken, _observeOperation);
         }
 
-        internal static async Task<T> AwaitOperationAsync<T>(Task<T> operation, CancellationToken cancellationToken)
+        internal static async Task<T> AwaitOperationAsync<T>(
+            Task<T> operation, CancellationToken cancellationToken, Action<Task>? observeOperation = null)
         {
             // ZooKeeperNetEx is tokenless. Keep the client alive until pending requests and
             // asynchronous disposal finish, observing failures even if the caller stops waiting.
+            observeOperation?.Invoke(operation);
             operation.Ignore();
             return await operation.WaitAsync(cancellationToken);
         }
@@ -509,6 +514,7 @@ namespace Orleans.Runtime.Membership
                 return zkMethod(zk);
             });
 
+            _observeOperation?.Invoke(operation);
             operation.Ignore();
             await operation.WaitAsync(cancellationToken);
         }
