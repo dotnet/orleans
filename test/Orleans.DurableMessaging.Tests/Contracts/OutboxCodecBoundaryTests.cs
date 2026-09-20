@@ -395,6 +395,52 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, fixture.Outbox.Count);
     }
 
+    [Theory]
+    [InlineData("append")]
+    [InlineData("snapshot")]
+    [InlineData("committed-prefix")]
+    [InlineData("empty-prefix")]
+    public async Task ActualManager_OutboxGuardFencesEveryCapturePathBeforeEncoding(string path)
+    {
+        var probe = new ProbeState();
+        await using var fixture = await CodecFixture.CreateAsync(additionalState: probe);
+        if (path == "empty-prefix") await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        if (path == "snapshot") fixture.Storage.RequestSnapshot(fixture.JournalId);
+        using var batch = await fixture.Outbox.PrepareSendAsync([fixture.CreateEnvelope()], TestContext.Current.CancellationToken);
+        fixture.Outbox.Send(batch);
+        fixture.Outbox.GetType().GetField("_preparedOwnership", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(fixture.Outbox, null);
+        var captures = fixture.States.CaptureCount;
+        var writes = fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId);
+        var operation = path is "committed-prefix" or "empty-prefix"
+            ? WriteWhileEntryOpen()
+            : fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => operation);
+        Assert.Contains("acknowledged durable job ownership", failure.Message, StringComparison.Ordinal);
+        Assert.Same(failure, fixture.States.Failure);
+        Assert.Equal(1, probe.FaultCount);
+        Assert.Equal(captures, fixture.States.CaptureCount);
+        Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Empty(fixture.Messages);
+        Assert.Null(fixture.Job.Value);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(0, fixture.Probe.Count(nameof(DurableEnvelope)));
+        Assert.Equal(0, fixture.Probe.Count(nameof(DurableJob)));
+        Assert.Single(fixture.Jobs.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILocalDurableJobManager.ScheduleJobAsync));
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Same(failure, rejected.InnerException);
+
+        Task WriteWhileEntryOpen()
+        {
+            using var entry = probe.Writer.BeginEntry();
+            var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            using var completed = new ManualResetEventSlim();
+            write.GetAwaiter().OnCompleted(completed.Set);
+            Assert.True(completed.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken),
+                $"Outbox pending validation must finish while the {path} entry remains open.");
+            return write;
+        }
+    }
+
     private sealed class RequestVetoState : ProbeState
     {
         public int RequestCount { get; private set; }
@@ -407,10 +453,10 @@ public sealed class OutboxCodecBoundaryTests
         private IDurableValueCommandCodec<int> _codec = null!;
         private int _value;
         public int FaultCount { get; private set; }
+        public JournalStreamWriter Writer { get; private set; }
         public void Bind(IJournaledStateManager manager) => _codec = manager.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>();
-        public virtual bool IsWritePrepared => true;
         public virtual void ValidateWrite() { }
-        public void Reset(JournalStreamWriter writer) => _value = 0;
+        public void Reset(JournalStreamWriter writer) { _value = 0; Writer = writer; }
         public void OnRecoveryCompleted() { }
         public void WritePendingEntries(JournalStreamWriter writer) { }
         public void WriteSnapshot(JournalStreamWriter writer) => _codec.WriteSet(_value, writer);
@@ -610,6 +656,7 @@ public sealed class OutboxCodecBoundaryTests
         private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
         public Exception? Failure { get; private set; }
         public int StateCount => _states.Count;
+        public int CaptureCount { get; private set; }
         public void RegisterStateMachine(string name, IStateMachine state) => _states.Add(name, state);
         public void RegisterStates(int rotation)
         {
@@ -629,14 +676,12 @@ public sealed class OutboxCodecBoundaryTests
 
         private sealed class TrackedState(StateTrackingManager owner, IStateMachine state, CodecProbe probe) : IStateMachine
         {
-            public bool IsWritePrepared => state.IsWritePrepared;
-            public ValueTask PrepareWriteAsync(CancellationToken cancellationToken) =>
-                throw new InvalidOperationException("Outbox feature preparation must finish before journal execution.");
+            public void ValidatePendingChanges() => state.ValidatePendingChanges();
             public void ValidateWrite() => state.ValidateWrite();
             public void ValidateDelete() => state.ValidateDelete();
             public void OnDeleteStarted() => state.OnDeleteStarted();
-            public void WritePendingEntries(JournalStreamWriter writer) { probe.Phase = "capture"; state.WritePendingEntries(writer); }
-            public void WriteSnapshot(JournalStreamWriter writer) { probe.Phase = "capture"; state.WriteSnapshot(writer); }
+            public void WritePendingEntries(JournalStreamWriter writer) { owner.CaptureCount++; probe.Phase = "capture"; state.WritePendingEntries(writer); }
+            public void WriteSnapshot(JournalStreamWriter writer) { owner.CaptureCount++; probe.Phase = "capture"; state.WriteSnapshot(writer); }
             public void OnWriteCompleted() => state.OnWriteCompleted();
             public void Reset(JournalStreamWriter writer) => state.Reset(writer);
             public void OnRecoveryCompleted() => state.OnRecoveryCompleted();

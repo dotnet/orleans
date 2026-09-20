@@ -27,7 +27,7 @@ internal sealed partial class DurableOutbox
         : DeferredJournaledDictionary<Guid, TValue>(owner._stateManager), IOutboxState
     {
         public bool HasChanges => HasPendingChanges;
-        public override bool IsWritePrepared => owner.IsWritePrepared;
+        public override void ValidatePendingChanges() => owner.ValidatePendingChanges();
         public override void ValidateWrite() => owner.ValidateWrite();
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();
@@ -75,7 +75,7 @@ internal sealed partial class DurableOutbox
         : DeferredJournaledValue<TValue>(owner._stateManager), IOutboxState
     {
         public bool HasChanges => HasPendingChanges;
-        public override bool IsWritePrepared => owner.IsWritePrepared;
+        public override void ValidatePendingChanges() => owner.ValidatePendingChanges();
         public override void ValidateWrite() => owner.ValidateWrite();
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();

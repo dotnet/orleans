@@ -2101,6 +2101,49 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(1, recovered.Outbox.Count);
     }
 
+    [Theory]
+    [InlineData("__orleans.durable-messaging.outbox")]
+    [InlineData("__orleans.durable-messaging.outbox-message-state")]
+    [InlineData("__orleans.durable-messaging.outbox-dead-letters")]
+    [InlineData("__orleans.durable-messaging.outbox-job-id")]
+    [InlineData("__orleans.durable-messaging.outbox-job-handle")]
+    [InlineData("__orleans.durable-messaging.outbox-completed-job-id")]
+    [InlineData("__orleans.durable-messaging.outbox-job-sequence")]
+    public async Task EveryOutboxFacet_ForwardsPurePendingOwnershipAndFatalValidation(string stateName)
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        var state = fixture.Manager.GetState<IStateMachine>(stateName);
+        state.ValidatePendingChanges();
+        using var batch = await fixture.PrepareAsync(fixture.Envelope);
+        state.ValidatePendingChanges();
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        fixture.Outbox.Send(batch);
+        state.ValidatePendingChanges();
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        fixture.ClearPreparedOwnership();
+        state.ValidateWrite();
+        var error = Assert.Throws<InvalidOperationException>(state.ValidatePendingChanges);
+        Assert.Contains("acknowledged durable job ownership", error.Message, StringComparison.Ordinal);
+        Assert.Equal(1, jobs.AttemptCount);
+        Assert.Equal(0, fixture.Manager.WriteCount);
+        Assert.Equal(0, fixture.Manager.CaptureCount);
+        Assert.Equal(0, fixture.Manager.FaultCount);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        Assert.Null(fixture.JobId.Value);
+        Assert.Null(fixture.Job.Value);
+        Assert.Equal(0, fixture.JobSequence.Value);
+        var failure = new IOException("Original aggregate terminal failure.");
+        state.OnFaulted(failure);
+        Assert.Same(failure, Assert.Throws<IOException>(state.ValidatePendingChanges));
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+    }
+
     private sealed class ExceptionLogger<T>(List<Exception> exceptions) : ILogger<T>
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -2605,7 +2648,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int WriteCompletedCount { get; private set; }
         public int FaultCount { get; private set; }
         public Exception? Failure => _failure?.SourceException;
-        public Action? BeforePreparation { get; set; }
+        public Action? BeforeValidation { get; set; }
         public Action? BeforeFinalization { get; set; }
         public Func<Task>? AfterCapture { get; set; }
         public Exception? RejectNextRequest { get; set; }
@@ -2661,10 +2704,10 @@ public sealed class DurableOutboxDeliveryBatchTests
             try
             {
                 WriteCount++;
-                BeforePreparation?.Invoke();
+                BeforeValidation?.Invoke();
                 foreach (var state in _states.Values)
                 {
-                    Assert.True(state.IsWritePrepared, "Feature prerequisites must be prepared before journal execution.");
+                    state.ValidatePendingChanges();
                 }
                 BeforeFinalization?.Invoke();
                 using var writer = _format.CreateWriter();
