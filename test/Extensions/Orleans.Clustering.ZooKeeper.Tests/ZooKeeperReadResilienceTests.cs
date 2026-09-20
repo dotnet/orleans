@@ -67,20 +67,26 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
             var started = Stopwatch.GetTimestamp();
             await CreateFixture().RunAsync(async (fixture, cancellationToken) =>
             {
-                var runner = new MembershipTableTestRunner(fixture, seed: 17, concurrencyRowCount: 128);
-                if (pointRead)
+                var phase = "concurrent scenario";
+                await CapturePrimaryScenarioFailureAsync(async () =>
                 {
-                    await runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(cancellationToken);
-                }
-                else
-                {
-                    await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
-                }
+                    var runner = new MembershipTableTestRunner(fixture, seed: 17, concurrencyRowCount: 128);
+                    if (pointRead)
+                    {
+                        await runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
+                    else
+                    {
+                        await runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
+                    }
 
-                var readStarted = Stopwatch.GetTimestamp();
-                var snapshot = await fixture.First.ReadAllAsync(cancellationToken);
-                TestContext.Current.TestOutputHelper?.WriteLine(
-                    $"Stable snapshot rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
+                    phase = "stable ReadAll";
+                    var readStarted = Stopwatch.GetTimestamp();
+                    var snapshot = await fixture.First.ReadAllAsync(cancellationToken);
+                    TestContext.Current.TestOutputHelper?.WriteLine(
+                        $"Stable snapshot rows={snapshot.Members.Count}; elapsed={Stopwatch.GetElapsedTime(readStarted)}");
+                }, failure => RecordPrimaryFailure(
+                    $"Primary snapshot failure; pointRead={pointRead}; repetition={iteration + 1}/3; phase={phase}", failure));
             }, TestContext.Current.CancellationToken);
             TestContext.Current.TestOutputHelper?.WriteLine(
                 $"Snapshot compatibility pass {iteration + 1}/3; pointRead={pointRead}; elapsed={Stopwatch.GetElapsedTime(started)}");
@@ -90,9 +96,32 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
     [Fact]
     public Task MembershipTable_ZooKeeper_DeletionProbe_PreservesOriginalScope() =>
         CreateFixture().RunAsync((fixture, cancellationToken) =>
-            new MembershipTableTestRunner(fixture, seed: 17)
-                .DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(cancellationToken),
+            CapturePrimaryScenarioFailureAsync(
+                () => new MembershipTableTestRunner(fixture, seed: 17)
+                    .DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(cancellationToken),
+                failure => RecordPrimaryFailure("Primary deletion-probe failure", failure)),
             TestContext.Current.CancellationToken);
+
+    private void RecordPrimaryFailure(string context, string failure)
+    {
+        var record = context + Environment.NewLine + failure;
+        _loggerFactory.CreateLogger<ZooKeeperReadResilienceTests>().LogError("{PrimaryFailure}", record);
+        TestContext.Current.TestOutputHelper?.WriteLine(record);
+    }
+
+    internal static async Task CapturePrimaryScenarioFailureAsync(Func<Task> action, Action<string> record)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception exception)
+        {
+            // Keep the caller stack before teardown re-observes retained operation failures.
+            record(exception.ToString());
+            throw;
+        }
+    }
 
     internal static async Task DrainFixtureAsync(Func<ValueTask> dispose)
     {

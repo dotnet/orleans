@@ -656,6 +656,43 @@ public sealed class ZooKeeperReadRetryTests
 
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    [Fact]
+    public async Task NativeFixture_PrimaryFailure_IsCapturedBeforeTeardownAndRethrownUnchanged()
+    {
+        var harness = await Harness.CreateAsync();
+        var primary = new KeeperException.NoAuthException();
+        harness.BeforeRequest = _ => Task.FromException(primary);
+        var events = new List<string>();
+        string captured = null!;
+        async Task PrimaryReadScenario()
+        {
+            await harness.Read(TestContext.Current.CancellationToken);
+        }
+        async Task RunWithTeardown()
+        {
+            try
+            {
+                await ZooKeeperReadResilienceTests.CapturePrimaryScenarioFailureAsync(PrimaryReadScenario, text =>
+                {
+                    events.Add("capture");
+                    Assert.Equal(primary.ToString(), text);
+                    captured = text;
+                });
+            }
+            finally
+            {
+                events.Add("teardown");
+                Assert.Same(primary, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
+            }
+        }
+
+        Assert.Same(primary, await Record.ExceptionAsync(RunWithTeardown));
+        Assert.Equal(new[] { "capture", "teardown" }, events);
+        Assert.Contains(nameof(KeeperException.NoAuthException), captured, StringComparison.Ordinal);
+        Assert.Contains(nameof(PrimaryReadScenario), captured, StringComparison.Ordinal);
+        harness.AssertOneOwner(readOnly: true);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
