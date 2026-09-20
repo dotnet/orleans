@@ -85,6 +85,18 @@ public interface IDurableOutbox
     /// Retain a batch for the returned action. Ordinary callers must await every preparation operation and
     /// dispose each successfully returned batch, keeping its scope through staging and the journal write.
     /// </para>
+    /// <para>
+    /// Handler preparation consumes each returned completion and handles or propagates failures before
+    /// returning its action. Retrieving a failed result counts as consumption even when retrieval throws;
+    /// status inspection leaves the result unconsumed. The runtime rejects unfinished acquisitions and
+    /// failed or canceled completions which remain unconsumed.
+    /// </para>
+    /// <para>
+    /// Task conversion, such as <c>AsTask()</c>, retrieves the <see cref="ValueTask{TResult}"/> result on behalf
+    /// of the resulting task. That task belongs to the caller, which awaits or handles its outcome before
+    /// returning the action. Runtime consumption tracking applies to the returned value task; handling
+    /// the converted task's outcome remains the caller's responsibility.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="messages"/> is null.</exception>
     /// <exception cref="InvalidOperationException">The envelopes conflict with pending message identities or the preparation scope is invalid.</exception>

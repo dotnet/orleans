@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
@@ -345,6 +346,255 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Null(rig.Outbox.NextSendFailure);
         Assert.False(Assert.Single(rig.Outbox.PreparedBatches).IsStaged);
         await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedSendCalls: 1);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CompletedUnconsumedPreparation_RejectsBeforeAction(bool synchronous, bool canceled)
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        Exception providerFailure = canceled
+            ? new OperationCanceledException("Unconsumed canceled acquisition.", new CancellationToken(canceled: true))
+            : new IOException("Unconsumed failed acquisition.");
+        handler.Remainder = async (self, token) =>
+        {
+            var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            if (!synchronous)
+            {
+                // Completion notification and status inspection leave GetResult unconsumed.
+                var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                preparation.GetAwaiter().OnCompleted(() => completed.TrySetResult());
+                await completed.Task.WaitAsync(token);
+            }
+            Assert.True(preparation.IsCompleted);
+            Assert.False(preparation.IsCompletedSuccessfully);
+            Assert.Equal(canceled, preparation.IsCanceled);
+            Assert.Equal(!canceled, preparation.IsFaulted);
+            return self.ApplyEffect;
+        };
+        using var input = await DeliverToHandlerAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation();
+        if (synchronous) acquisition.Fail(providerFailure);
+        var writes = WriteCount(rig);
+        var ack = ObserveNextAck(rig);
+        handler.Continue.TrySetResult();
+        await acquisition.WaitAsync();
+        if (!synchronous) acquisition.Fail(providerFailure);
+        var outcome = await WaitAsync(Task.WhenAny(rig.Grain.Faulted.Task, ack));
+        Assert.Equal(0, handler.Applied);
+        Assert.Same(rig.Grain.Faulted.Task, outcome);
+        var failure = Assert.IsType<InvalidOperationException>(await rig.Grain.Faulted.Task);
+        Assert.Contains("consume", failure.Message, StringComparison.Ordinal);
+        if (canceled)
+            Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
+                Assert.IsAssignableFrom<OperationCanceledException>(failure.InnerException).CancellationToken);
+        else
+            Assert.Same(providerFailure, failure.InnerException);
+        Assert.False(ack.IsCompleted);
+        Assert.Empty(rig.Effects);
+        Assert.Equal(1, rig.Outbox.PreparationsStarted);
+        Assert.Equal(1, rig.Outbox.PreparationsCompleted);
+        await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedBatchCount: 0);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task ConsumedPreparationFailure_AllowsCaughtAlternativeWithPreservedContext(bool synchronous, bool canceled, bool asTask)
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        Exception providerFailure = canceled
+            ? new OperationCanceledException("Caught canceled acquisition.", new CancellationToken(canceled: true))
+            : new IOException("Caught failed acquisition.");
+        Exception? caught = null;
+        handler.Remainder = async (self, token) =>
+        {
+            var scheduler = TaskScheduler.Current;
+            try
+            {
+                var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+                if (asTask) await preparation.AsTask();
+                else await preparation;
+            }
+            catch (Exception exception) when (exception is IOException or OperationCanceledException)
+            {
+                caught = exception;
+            }
+            Assert.Same(scheduler, TaskScheduler.Current);
+            Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
+            var alternative = await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
+            self.UnusedBatch = alternative;
+            return () =>
+            {
+                self.ApplyEffect();
+                self.Context.Send(alternative);
+            };
+        };
+        using var input = await DeliverToHandlerAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation();
+        if (synchronous) acquisition.Fail(providerFailure);
+        var ack = ObserveNextAck(rig);
+        handler.Continue.TrySetResult();
+        await acquisition.WaitAsync();
+        if (!synchronous) acquisition.Fail(providerFailure);
+        var acknowledged = await WaitAsync(ack);
+        if (canceled && asTask)
+            Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
+                Assert.IsAssignableFrom<OperationCanceledException>(caught).CancellationToken);
+        else
+            Assert.Same(providerFailure, caught);
+        AssertAcknowledgedIds(acknowledged, input.Value);
+        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 1);
+        Assert.Equal(handler.UnusedOutput.MessageId, Assert.Single(rig.Outbox).Key);
+        Assert.Equal(1, handler.Applied);
+        Assert.Equal(1, rig.Outbox.SendCalls);
+        Assert.Equal(2, rig.Outbox.PreparationsStarted);
+        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
+        Assert.Equal(new[] { 0 }, acknowledged.DisposeCalls);
+        await AssertHealthyWriteAsync(rig);
+        await DeactivateAsync(rig);
+        AssertDisposed(rig.Outbox, 1);
+        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TaskConversion_ConsumesValueTaskButLeavesTaskFailureToCaller(bool canceled)
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        Exception providerFailure = canceled
+            ? new OperationCanceledException("Task-owned cancellation.", new CancellationToken(canceled: true))
+            : new IOException("Task-owned failure.");
+        Task<IPreparedOutboxBatch>? callerOwnedTask = null;
+        handler.Remainder = (self, token) =>
+        {
+            callerOwnedTask = self.Context.Outbox.PrepareSendAsync([self.Output], token).AsTask();
+            Assert.True(callerOwnedTask.IsCompleted);
+            Assert.Equal(canceled, callerOwnedTask.IsCanceled);
+            Assert.Equal(!canceled, callerOwnedTask.IsFaulted);
+            return ValueTask.FromResult<Action>(self.ApplyEffect);
+        };
+        using var input = await DeliverToHandlerAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation();
+        acquisition.Fail(providerFailure);
+        var ack = ObserveNextAck(rig);
+        handler.Continue.TrySetResult();
+        var acknowledged = await WaitAsync(ack);
+        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
+        Assert.Equal(1, handler.Applied);
+        Assert.Equal(0, rig.Outbox.SendCalls);
+        Assert.NotNull(callerOwnedTask);
+        if (canceled)
+        {
+            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => callerOwnedTask);
+            Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken, failure.CancellationToken);
+        }
+        else
+        {
+            Assert.Same(providerFailure, await Assert.ThrowsAsync<IOException>(() => callerOwnedTask));
+        }
+        Assert.Empty(rig.Outbox.PreparedBatches);
+        await AssertHealthyWriteAsync(rig);
+        await DeactivateAsync(rig);
+        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 0);
+    }
+
+    [Fact]
+    public async Task CompletedUnconsumedSuccessfulPreparation_RetiresUnusedBatchAfterAck()
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        handler.Remainder = (self, token) =>
+        {
+            var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            Assert.True(preparation.IsCompletedSuccessfully);
+            return ValueTask.FromResult<Action>(self.ApplyEffect);
+        };
+        using var input = await DeliverToHandlerAsync(rig);
+        var ack = ObserveNextAck(rig);
+        handler.Continue.TrySetResult();
+        var acknowledged = await WaitAsync(ack);
+        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
+        Assert.Equal(new[] { 0 }, acknowledged.DisposeCalls);
+        Assert.Equal(1, handler.Applied);
+        Assert.Equal(0, rig.Outbox.SendCalls);
+        Assert.False(Assert.Single(rig.Outbox.PreparedBatches).IsStaged);
+        await AssertHealthyWriteAsync(rig);
+        await DeactivateAsync(rig);
+        AssertDisposed(rig.Outbox, 1);
+        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 0);
+    }
+
+    [Fact]
+    public async Task CanceledBeforePreparation_SubmitCompletesWithoutStagingOrWaitingForAck()
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        using var input = CreateEnvelope(rig.Receiver, NewMessage(452, "canceled-before-prepare"), "prepared/lifecycle");
+        const string ownershipId = "canceled-before-prepare:1";
+        var job = new DurableJob
+        {
+            Id = "canceled-before-prepare-physical",
+            ShardId = "canceled-before-prepare-shard",
+            Name = ReceiverTestServices.InboxJobName,
+            TargetGrainId = rig.Receiver.GetGrainId(),
+            DueTime = Fixture.Clock.GetUtcNow(),
+            Metadata = new Dictionary<string, string> { ["orleans.messaging.ownership-id"] = ownershipId }
+        };
+        await rig.Receiver.SeedInboxStateAsync(input.Value, ownershipId, job);
+        var writes = WriteCount(rig);
+        var ack = ObserveNextAck(rig);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await OnTurnAsync(rig.Context, async () =>
+        {
+            var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+            var extension = rig.Context.ActivationServices.GetRequiredService(type);
+            var generation = type.GetField("_stateGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
+            var owner = Activator.CreateInstance(type.GetNestedType("PumpOwner", BindingFlags.NonPublic)!,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null,
+                args: [ownershipId, job, generation], culture: null)!;
+            var handlerWrite = type.GetNestedType("HandlerWrite", BindingFlags.NonPublic)!;
+            var operation = Activator.CreateInstance(handlerWrite,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null,
+                args: [owner, input.Value, cancellation.Token], culture: null)!;
+            Assert.Equal(0, rig.Manager.PendingWriteByteCount);
+            var submission = (ValueTask)type.GetMethod("SubmitAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(extension, [operation])!;
+            Assert.True(submission.IsCompletedSuccessfully);
+            await submission;
+            Assert.True((bool)handlerWrite.GetProperty("Skipped")!.GetValue(operation)!);
+            foreach (var name in new[] { "_pendingWrites", "_stagedWrites", "_admittedWrites" })
+            {
+                var operations = (System.Collections.IEnumerable)type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(extension)!;
+                Assert.Empty(operations.Cast<object>());
+            }
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(new JobContext(job), cancellation.Token));
+        });
+        Assert.False(handler.Ready.Task.IsCompleted);
+        Assert.Equal(0, handler.Applied);
+        Assert.Equal(0, rig.Outbox.PreparationsStarted);
+        Assert.Equal(writes, WriteCount(rig));
+        Assert.False(ack.IsCompleted);
+        Assert.Empty(rig.Effects);
+        Assert.Single(rig.InboxState);
+        Assert.Empty(rig.ProcessedState);
+        await AssertHealthyWriteAsync(rig);
     }
 
     [Theory]

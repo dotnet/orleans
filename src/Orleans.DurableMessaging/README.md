@@ -54,6 +54,16 @@ disposed, or foreign handles are rejected before mutation.
 Envelope identity/equivalence checks retain the existing routing, payload and declared-type
 metadata semantics.
 
+Handlers consume preparation results and handle or propagate failures before returning
+their action. Retrieving a failed result counts as consumption even when it throws;
+status inspection leaves it unconsumed. The runtime rejects unfinished preparations
+and failed or canceled returned completions which remain unconsumed. Its raw-task
+cleanup retains acquisition ownership independently of that caller-consumption check.
+Task conversion such as `AsTask()` retrieves the value-task result on behalf of a
+caller-owned task. The caller awaits or handles that task before returning the action;
+the runtime tracks consumption of the returned value task, and application code owns
+the converted task's outcome.
+
 `IDurableMessagingGrain` is a local capability which selects durable messaging activation
 setup. Implement it on a grain class, an application base class, or an application grain
 interface. Existing `DurableGrain` implementations receive the same setup automatically.
@@ -177,6 +187,8 @@ with existing Journaling and DurableJobs services using test-only registration;
 outbound dispatch and public hosting composition are assembled in later layers.
 
 Message outcome counters group by grain type and delivery or processing status.
+Each successful duplicate delivery records one received duplicate outcome, whether
+the message is pending in the inbox or retained as processed.
 The sent-message counter and latency histograms group by grain type. Orphaned-job
 metrics retain the job name, and depth gauges report aggregate pending work. Route
 keys continue to select handlers and remain available in message diagnostics.
