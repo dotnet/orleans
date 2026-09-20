@@ -47,7 +47,6 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, captured.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(captured.Effects).Count);
         Assert.Single(attempt.Outbox.LastCapturedIds);
-        Assert.Equal(0, attempt.Outbox.JournalPreparationCalls);
         Assert.Equal(0, Assert.Single(attempt.Outbox.PreparedBatches).DisposeCalls);
         Assert.False(queued.IsCompleted);
         storage.Release();
@@ -274,6 +273,9 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     [Fact]
     public async Task MessagingPrimaryStates_AreTheRegisteredScopedDataInstances()
     {
+        var executionGuard = typeof(IStateMachine).GetMethod(nameof(IStateMachine.ValidatePendingChanges))!;
+        Assert.Equal(typeof(void), executionGuard.ReturnType);
+        Assert.Empty(executionGuard.GetParameters());
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var services = Fixture.GetGrainContext(receiver).ActivationServices;

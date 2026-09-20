@@ -1,6 +1,4 @@
 using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
@@ -56,8 +54,7 @@ internal class DeferredJournaledValue<T> : IDurableValue<T>, IStateMachine, IDur
 
     public virtual void OnWriteCompleted() => AcknowledgedVersion = CapturedVersion;
     public virtual void OnRecoveryCompleted() { }
-    public virtual bool IsWritePrepared => true;
-    public virtual ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => default;
+    public virtual void ValidatePendingChanges() { }
     public virtual void ValidateWrite() { }
     public virtual void ValidateDelete() { }
     public virtual void OnDeleteStarted() { }

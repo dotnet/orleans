@@ -97,7 +97,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         if (rejectWrite)
         {
             Assert.Same(rejection, await Assert.ThrowsAsync<InvalidOperationException>(() => delivery.AsTask()));
-            Assert.Same(rejection, Assert.Throws<InvalidOperationException>(() => primary.IsWritePrepared));
+            Assert.Same(rejection, Assert.Throws<InvalidOperationException>(primary.ValidatePendingChanges));
             Assert.Equal(1, manager.Requests);
             Assert.Equal(0, manager.Writes);
             Assert.False(manager.IsFenced);
@@ -170,7 +170,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             foreach (var state in States) state.OnRecoveryCompleted();
             return default;
         }
-        public async ValueTask WriteStateAsync(CancellationToken token)
+        public ValueTask WriteStateAsync(CancellationToken token)
         {
             Requests++;
             _failure?.Throw();
@@ -178,8 +178,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             foreach (var state in States) state.ValidateWrite();
             try
             {
-                while (States.FirstOrDefault(state => !state.IsWritePrepared) is { } unready)
-                    await unready.PrepareWriteAsync(token);
+                foreach (var state in States) state.ValidatePendingChanges();
                 BeforeCapture?.Invoke();
                 foreach (var state in States) state.WritePendingEntries(_writer.CreateJournalStreamWriter(new(_ids[state])));
                 using var buffer = _writer.GetBuffer();
@@ -190,6 +189,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
                     foreach (var state in States) state.OnWriteCompleted();
                 }
                 Writes++;
+                return ValueTask.CompletedTask;
             }
             catch (Exception exception)
             {

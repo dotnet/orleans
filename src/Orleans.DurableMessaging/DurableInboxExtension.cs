@@ -522,21 +522,16 @@ internal sealed partial class DurableInboxExtension :
 
     public void OnDeleteStarted() => _deleting = true;
 
-    public bool IsWritePrepared
+    public void ValidatePendingChanges()
     {
-        get
+        _failure?.Throw();
+        foreach (var operation in _stagedWrites)
         {
-            _failure?.Throw();
-            foreach (var operation in _stagedWrites)
+            ValidateGeneration(operation.Generation);
+            if (operation is HandlerWrite handler)
             {
-                ValidateGeneration(operation.Generation);
-                if (operation is HandlerWrite handler)
-                {
-                    ValidateOwner(handler.Owner);
-                }
+                ValidateOwner(handler.Owner);
             }
-
-            return true;
         }
     }
 

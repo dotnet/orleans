@@ -79,6 +79,15 @@ components and the manager registers their canonical named instances. Deferred
 helpers resolve command codecs through their owning manager, using activation
 services for grain-bound owners and shared services for standalone owners.
 
+The primary inbox state forwards `ValidatePendingChanges` to its runtime owner.
+This pure synchronous check raises the original failure and validates staged
+generations and physical ownership inside admitted journal execution, before
+append, snapshot, committed-prefix, or zero-byte capture. `ValidateWrite` guards
+request admission in the handler's logical execution context. Independent writes
+remain valid while another operation prepares local values. A partial-apply failure
+reaches the journal's terminal failure boundary through an ordinary write, including
+when no earlier write was queued; an already captured cohort retains its own ACK.
+
 `IJournaledStateManagerFactory.CreateStandalone` creates an owner for an explicit
 `JournalId`. Its caller constructs and registers the state machines before
 initialization and owns their dependency lifetimes. Initialization and disposal

@@ -515,7 +515,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             Assert.Equal(expectedPreparations, rig.Outbox.PreparationsCompleted);
             Assert.Equal(expectedPreparations, rig.Outbox.PreparedBatches.Count);
             Assert.All(rig.Outbox.PreparedBatches, batch => Assert.False(batch.IsStaged));
-            Assert.Equal(0, rig.Outbox.JournalPreparationCalls);
             await rig.Receiver.GetSnapshotAsync();
             var recovered = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
             AssertDeadLetter(recovered, input.Value, processedBefore: processedBefore);
@@ -652,7 +651,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         });
         Assert.False(rig.Grain.Faulted.Task.IsCompleted);
         Assert.Null(rig.Outbox.Failure);
-        Assert.Equal(0, rig.Outbox.JournalPreparationCalls);
     }
 
     private static async Task DeactivateAsync(Harness rig)
@@ -692,7 +690,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             Assert.Equal(1, batch.DisposeCalls);
             Assert.Same(batch, outbox.Preparations.Single(operation => operation.Id == batch.PreparationId).Batch);
         });
-        Assert.Equal(0, outbox.JournalPreparationCalls);
     }
 
     private static IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> Processed(IGrainContext context) =>

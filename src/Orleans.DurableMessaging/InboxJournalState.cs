@@ -23,7 +23,7 @@ internal sealed class InboxJournalState(IJournaledStateManager manager)
         _owner = owner;
     }
 
-    public override bool IsWritePrepared => Owner.IsWritePrepared;
+    public override void ValidatePendingChanges() => Owner.ValidatePendingChanges();
     public override void ValidateWrite() => Owner.ValidateWrite();
     public override void ValidateDelete() => Owner.ValidateDelete();
     public override void OnDeleteStarted() => Owner.OnDeleteStarted();
