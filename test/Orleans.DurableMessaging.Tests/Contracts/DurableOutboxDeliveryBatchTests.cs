@@ -4,7 +4,7 @@ using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -273,9 +273,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.False(attempt.IsCompleted);
 
         var replacement = fixture.CreateJobForTest("replacement-physical-job", ownershipId);
+        Task stopping = Task.CompletedTask;
         if (stopActivation)
         {
-            await fixture.StopAsync();
+            stopping = fixture.StopAsync();
+            Assert.False(stopping.IsCompleted);
         }
         else
         {
@@ -290,8 +292,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(token.IsCancellationRequested);
         Assert.False(attempt.IsCompleted);
-        Assert.Throws<ObjectDisposedException>(() => cancellation.Token);
-        Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
+        Assert.Equal(token, cancellation.Token);
+        Assert.True(token.WaitHandle.WaitOne(0));
+        var drained = fixture.GetPendingBatchDrainTask();
         release.SetResult();
         if (failDelivery)
         {
@@ -305,6 +308,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         }
 
         await Task.WhenAll(batchAttempts).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await drained.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Throws<ObjectDisposedException>(() => cancellation.Token);
+        Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
         Assert.Equal(2, callbacks);
         Assert.Equal(1, fixture.DeliveryCount);
         Assert.Single(fixture.Messages);
@@ -336,6 +343,171 @@ public sealed class DurableOutboxDeliveryBatchTests
             {
                 throw lateFailure;
             }
+            return DeliveryResult.Accepted();
+        }
+    }
+
+    [Theory]
+    [InlineData("replacement", false)]
+    [InlineData("replacement", true)]
+    [InlineData("stop", false)]
+    [InlineData("stop", true)]
+    [InlineData("fault", false)]
+    [InlineData("fault", true)]
+    public async Task PendingBatchCancellation_DrainsBeforeDisposalAndPreservesCleanup(string trigger, bool callbackThrows)
+    {
+        const string ownershipId = "owner:1";
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbacks = 0;
+        var lateCallbacks = 0;
+        var callbackFailure = new InvalidOperationException("Remote cancellation callback failed.");
+        var terminalFailure = new IOException("Original terminal journal failure.");
+        using var fixture = new OutboxFixture(token => new(RemoteAsync(token)), durableJobId: ownershipId);
+        await fixture.StartAsync();
+        await fixture.ExecuteJobAsync(ownershipId);
+        await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+        var (source, attempts) = fixture.GetPendingBatchState();
+        var token = source.Token;
+        var waitHandle = token.WaitHandle;
+        Task stopping = Task.CompletedTask;
+        try
+        {
+            if (trigger == "replacement")
+            {
+                var replacement = fixture.CreateJobForTest("replacement", ownershipId);
+                fixture.Job.Value = replacement;
+                fixture.Manager.CommitExternalOwner();
+                fixture.TimerRegistry.ClearReceivedCalls();
+                await fixture.ExecuteJobAsync(replacement, "replacement-run", TestContext.Current.CancellationToken);
+                await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+                Assert.True((await fixture.ExecuteJobAsync(replacement, "replacement-run", TestContext.Current.CancellationToken)).IsInProgress);
+                Assert.Equal(1, fixture.GetOutboxDepth());
+            }
+            else
+            {
+                if (trigger == "fault") fixture.Manager.Fail(terminalFailure);
+                stopping = fixture.StopAsync();
+                Assert.Equal(0, fixture.GetOutboxDepth());
+                Assert.Empty(fixture.PumpEntries);
+                Assert.False(stopping.IsCompleted);
+            }
+            await canceled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(2, callbacks);
+            Assert.All(attempts, attempt => Assert.False(attempt.IsCompleted));
+            Assert.Equal(token, source.Token);
+            Assert.Same(waitHandle, token.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            using var lateRegistration = token.Register(() => lateCallbacks++);
+            Assert.Equal(1, lateCallbacks);
+            Assert.Single(fixture.Messages);
+            Assert.Equal(0, fixture.MessageStates.GetProperty<int>(fixture.MessageId, "AttemptCount"));
+        }
+        finally
+        {
+            release.TrySetResult();
+            await Task.WhenAll(attempts).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await stopping.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        await fixture.StopAsync();
+        await fixture.StopAsync();
+        Assert.Throws<ObjectDisposedException>(() => source.Token);
+        Assert.Throws<ObjectDisposedException>(() => token.WaitHandle);
+        Assert.Equal(2, callbacks);
+        Assert.Equal(2, lateCallbacks);
+        var cancellationErrors = fixture.LoggedExceptions.OfType<AggregateException>().ToArray();
+        if (callbackThrows) Assert.Same(callbackFailure, Assert.Single(Assert.Single(cancellationErrors).Flatten().InnerExceptions));
+        else Assert.Empty(cancellationErrors);
+        Assert.Equal(0, fixture.GetOutboxDepth());
+        Assert.Empty(fixture.PumpEntries);
+        Assert.Single(fixture.Messages);
+        Assert.Equal(trigger == "replacement" ? 1 : 0, fixture.Manager.WriteCount);
+        Assert.Equal(trigger == "fault" ? 1 : 0, fixture.Manager.FaultCount);
+        if (trigger == "fault") Assert.Same(terminalFailure, await Assert.ThrowsAsync<IOException>(() => fixture.CommitAsync().AsTask()));
+
+        async Task<DeliveryResult> RemoteAsync(CancellationToken cancellationToken)
+        {
+            using var observe = cancellationToken.Register(() => { callbacks++; canceled.TrySetResult(); });
+            using var throwing = cancellationToken.Register(() =>
+            {
+                callbacks++;
+                if (callbackThrows) throw callbackFailure;
+            });
+            await release.Task;
+            using var late = cancellationToken.Register(() => lateCallbacks++);
+            return DeliveryResult.Accepted();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoopbackTurnCancellation_DrainsRemoteAttemptWithoutMaskingOriginalCause(bool callbackThrows)
+    {
+        var remoteStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loopbackStarted = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var remoteCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemote = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLoopback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var callbacks = 0;
+        var callbackFailure = new InvalidOperationException("Remote callback during loopback retirement.");
+        using var fixture = new OutboxFixture(token => new(DeliverControlledAsync(token)), durableJobId: "owner:1");
+        await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()) with { ReceiverId = fixture.SenderId });
+        await fixture.CommitAsync();
+        using var timer = new CancellationTokenSource();
+        await fixture.ExecuteJobAsync("owner:1");
+        var turn = fixture.RunRegisteredTimerAsync(timer.Token);
+        var remoteToken = await remoteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var loopbackToken = await loopbackStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var waitHandle = remoteToken.WaitHandle;
+        try
+        {
+            timer.Cancel();
+            Assert.False(remoteToken.IsCancellationRequested);
+            Assert.True(loopbackToken.IsCancellationRequested);
+            releaseLoopback.TrySetResult();
+            await remoteCanceled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.False(turn.IsCompleted);
+            Assert.Same(waitHandle, remoteToken.WaitHandle);
+            Assert.True(waitHandle.WaitOne(0));
+            Assert.Equal(1, callbacks);
+            Assert.Equal(2, fixture.Outbox.Count);
+        }
+        finally
+        {
+            releaseLoopback.TrySetResult();
+            releaseRemote.TrySetResult();
+            await turn.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.ExecuteJobAsync("owner:1").AsTask());
+        Assert.Equal(loopbackToken, failure.CancellationToken);
+        var cancellationErrors = fixture.LoggedExceptions.OfType<AggregateException>().ToArray();
+        if (callbackThrows) Assert.Same(callbackFailure, Assert.Single(Assert.Single(cancellationErrors).Flatten().InnerExceptions));
+        else Assert.Empty(cancellationErrors);
+        Assert.Throws<ObjectDisposedException>(() => remoteToken.WaitHandle);
+        Assert.Equal(1, callbacks);
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.Equal(1, fixture.Manager.WriteCount);
+        Assert.Equal(0, fixture.Manager.FaultCount);
+
+        async Task<DeliveryResult> DeliverControlledAsync(CancellationToken token)
+        {
+            if (++calls == 1)
+            {
+                using var registration = token.Register(() =>
+                {
+                    callbacks++;
+                    remoteCanceled.TrySetResult();
+                    if (callbackThrows) throw callbackFailure;
+                });
+                remoteStarted.TrySetResult(token);
+                await releaseRemote.Task;
+                return DeliveryResult.Accepted();
+            }
+            loopbackStarted.TrySetResult(token);
+            await releaseLoopback.Task;
+            token.ThrowIfCancellationRequested();
             return DeliveryResult.Accepted();
         }
     }
@@ -1929,6 +2101,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(1, recovered.Outbox.Count);
     }
 
+    private sealed class ExceptionLogger<T>(List<Exception> exceptions) : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (exception is not null) exceptions.Add(exception);
+        }
+    }
+
     private sealed class OutboxFixture : IDisposable
     {
         private static readonly Assembly DurableMessagingAssembly = typeof(IDurableOutbox).Assembly;
@@ -1996,7 +2178,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             var pumpResults = Activator.CreateInstance(
                 GetInternalType("Orleans.DurableMessaging.DurableMessagingPumpResults"),
                 nonPublic: true)!;
-            var logger = Activator.CreateInstance(typeof(NullLogger<>).MakeGenericType(outboxType))!;
+            var logger = Activator.CreateInstance(typeof(ExceptionLogger<>).MakeGenericType(outboxType), LoggedExceptions)!;
 
             try
             {
@@ -2120,6 +2302,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public GrainId ReceiverId { get; }
         public DurableEnvelope Envelope { get; }
         public int DeliveryCount { get; private set; }
+        public List<Exception> LoggedExceptions { get; } = [];
         public TestDurableDictionary<Guid, DurableEnvelope> Messages { get; }
         public UntypedDurableDictionary MessageStates { get; }
         public UntypedDurableDictionary DeadLetters { get; }
@@ -2213,6 +2396,12 @@ public sealed class DurableOutboxDeliveryBatchTests
             return (ValueTask<DurableJobRunResult>)_outbox.GetType()
                 .GetMethod("ExecuteJobAsync", BindingFlags.Instance | BindingFlags.Public)!
                 .Invoke(_outbox, [context, cancellationToken])!;
+        }
+
+        public Task GetPendingBatchDrainTask()
+        {
+            var batch = _outbox.GetType().GetField("_pendingDeliveryBatch", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_outbox)!;
+            return (Task)batch.GetType().GetField("_drain", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(batch)!;
         }
 
         public (CancellationTokenSource Source, Task[] Attempts) GetPendingBatchState()
