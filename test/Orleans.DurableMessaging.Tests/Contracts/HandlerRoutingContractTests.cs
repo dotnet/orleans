@@ -313,6 +313,112 @@ public sealed class HandlerRoutingContractTests : IDisposable
         Assert.Equal(1, applyCount);
     }
 
+    [Fact]
+    public void PreparedOutboxBatch_ExposesOnlyDisposal()
+    {
+        var type = typeof(IPreparedOutboxBatch);
+
+        Assert.Equal([typeof(IDisposable)], type.GetInterfaces());
+        Assert.Empty(type.GetMembers(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void HandlerContext_Send_ForwardsBatchAndPreservesOwnership(int sends)
+    {
+        using var input = CreatePreparedContext();
+        using var batch = new TestBatch();
+        var outbox = new RecordingOutbox();
+        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+
+        for (var i = 0; i < sends; i++)
+        {
+            context.Send(batch);
+        }
+
+        Assert.Same(outbox, context.Outbox);
+        Assert.Equal(sends, outbox.Sent.Count);
+        Assert.All(outbox.Sent, actual => Assert.Same(batch, actual));
+        Assert.Equal(0, batch.DisposeCount);
+    }
+
+    [Fact]
+    public void HandlerContext_Send_PropagatesOutboxFailure()
+    {
+        using var input = CreatePreparedContext();
+        using var batch = new TestBatch();
+        var expected = new InvalidOperationException("Batch rejected.");
+        var outbox = new RecordingOutbox { SendFailure = expected };
+        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+
+        var actual = Assert.Throws<InvalidOperationException>(() => context.Send(batch));
+
+        Assert.Same(expected, actual);
+        Assert.Empty(outbox.Sent);
+        Assert.Equal(0, batch.DisposeCount);
+    }
+
+    [Fact]
+    public void SelectionContext_Send_RejectsPreparedBatch()
+    {
+        using var input = CreatePreparedContext();
+        using var batch = new TestBatch();
+        var context = new InboxHandlerSelectionContext(input.Envelope, input.GrainId);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => context.Send(batch));
+
+        Assert.Contains("read-only", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, batch.DisposeCount);
+        Assert.Equal(input.Envelope, context.Envelope);
+        Assert.Equal(input.GrainId, context.GrainId);
+    }
+
+    [Theory]
+    [InlineData("exact")]
+    [InlineData("prefix")]
+    [InlineData("correlation")]
+    [InlineData("untyped")]
+    [InlineData("typed")]
+    public async Task PrepareAsync_PreparedBatch_RemainsLocalUntilApply(string kind)
+    {
+        using var input = CreatePreparedContext();
+        using var batch = new TestBatch();
+        using var cancellation = new CancellationTokenSource();
+        var outbox = new RecordingOutbox();
+        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+        IReadOnlyList<DurableEnvelope> messages = [input.Envelope];
+        var applyCount = 0;
+        var handler = CreatePreparedHandler(kind, async (actualContext, token) =>
+        {
+            var prepared = await actualContext.Outbox.PrepareSendAsync(messages, token);
+            return () =>
+            {
+                applyCount++;
+                actualContext.Send(prepared);
+            };
+        });
+
+        var preparation = handler.PrepareAsync(context, cancellation.Token);
+
+        Assert.False(preparation.IsCompleted);
+        Assert.Same(messages, outbox.PreparedMessages);
+        Assert.Equal(cancellation.Token, outbox.PreparationToken);
+        Assert.Empty(outbox.Sent);
+        Assert.Equal(0, applyCount);
+        outbox.Preparation.SetResult(batch);
+        var apply = await preparation;
+        Assert.Empty(outbox.Sent);
+        Assert.Equal(0, applyCount);
+        Assert.Equal(0, batch.DisposeCount);
+
+        apply();
+
+        Assert.Equal(1, applyCount);
+        Assert.Same(batch, Assert.Single(outbox.Sent));
+        Assert.Equal(0, batch.DisposeCount);
+    }
+
     public void Dispose() => _services.Dispose();
 
     private TestContext CreateContext(string route, HierarchicalKey? correlation = null, object? body = null)
@@ -425,13 +531,49 @@ public sealed class HandlerRoutingContractTests : IDisposable
         }
     }
 
+    private sealed class TestBatch : IPreparedOutboxBatch
+    {
+        public int DisposeCount { get; private set; }
+        public void Dispose() => DisposeCount++;
+    }
+
+    private sealed class RecordingOutbox : IDurableOutbox
+    {
+        public TaskCompletionSource<IPreparedOutboxBatch> Preparation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyList<DurableEnvelope>? PreparedMessages { get; private set; }
+        public CancellationToken PreparationToken { get; private set; }
+        public List<IPreparedOutboxBatch> Sent { get; } = [];
+        public Exception? SendFailure { get; init; }
+        public int Count => throw new NotSupportedException();
+        public IEnumerable<DurableEnvelope> Messages => throw new NotSupportedException();
+
+        public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
+        {
+            PreparedMessages = messages;
+            PreparationToken = cancellationToken;
+            return new(Preparation.Task);
+        }
+
+        public void Send(IPreparedOutboxBatch batch)
+        {
+            if (SendFailure is { } failure)
+            {
+                throw failure;
+            }
+
+            Sent.Add(batch);
+        }
+
+        public bool TryGetMessage(Guid messageId, out DurableEnvelope envelope) => throw new NotSupportedException();
+    }
+
     private sealed class TestContext(DurableEnvelope envelope, GrainId grainId) : IInboxHandlerContext, IDisposable
     {
         public DurableEnvelope Envelope { get; } = envelope;
         public GrainId GrainId { get; } = grainId;
         public IDurableOutbox Outbox => throw new NotSupportedException();
         public DurableEnvelopeBuilder CreateEnvelope() => throw new NotSupportedException();
-        public void Send(DurableEnvelope envelope) => throw new NotSupportedException();
+        public void Send(IPreparedOutboxBatch batch) => throw new NotSupportedException();
         public void Dispose()
         {
         }
