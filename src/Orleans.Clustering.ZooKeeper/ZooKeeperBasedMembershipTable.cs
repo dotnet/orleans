@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Host;
+using Polly;
 
 namespace Orleans.Runtime.Membership
 {
@@ -43,6 +44,8 @@ namespace Orleans.Runtime.Membership
         private const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
 
         private readonly ZooKeeperWatcher watcher;
+        private readonly Func<bool, ZooKeeperSession> _createSession;
+        private readonly ResiliencePipeline _readRetryPipeline;
 
         /// <summary>
         /// The deployment connection string. for eg. "192.168.1.1,192.168.1.2/ClusterId"
@@ -73,6 +76,16 @@ namespace Orleans.Runtime.Membership
             ILogger<ZooKeeperBasedMembershipTable> logger,
             IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
             IOptions<ClusterOptions> clusterOptions)
+            : this(logger, membershipTableOptions, clusterOptions, null, null)
+        {
+        }
+
+        internal ZooKeeperBasedMembershipTable(
+            ILogger<ZooKeeperBasedMembershipTable> logger,
+            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions,
+            IOptions<ClusterOptions> clusterOptions,
+            Func<bool, ZooKeeperSession>? createSession,
+            ResiliencePipeline? readRetryPipeline)
         {
             ArgumentNullException.ThrowIfNull(logger);
             ArgumentNullException.ThrowIfNull(membershipTableOptions);
@@ -84,6 +97,8 @@ namespace Orleans.Runtime.Membership
             this.clusterPath = "/" + clusterOptions.Value.ClusterId;
             rootConnectionString = options.ConnectionString;
             deploymentConnectionString = options.ConnectionString + this.clusterPath;
+            _createSession = createSession ?? (readOnly => CreateSession(deploymentConnectionString, watcher, readOnly));
+            _readRetryPipeline = readRetryPipeline ?? ZooKeeperReadRetryPolicy.CreatePipeline(logger, TimeProvider.System);
         }
 
         /// <summary>
@@ -128,10 +143,13 @@ namespace Orleans.Runtime.Membership
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Connection-loss failures in native reads are retried up to four times on the operation's session.
+        /// The table and child versions fence each complete snapshot pass.
+        /// </remarks>
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
-            return UsingZookeeper(zk => ReadCoreAsync(zk, siloAddress, cancellationToken),
-                this.deploymentConnectionString, this.watcher, cancellationToken, canBeReadOnly: true);
+            return ReadAsync(() => _createSession(true), _readRetryPipeline, siloAddress, cancellationToken);
         }
 
         /// <summary>
@@ -145,15 +163,36 @@ namespace Orleans.Runtime.Membership
         public Task<MembershipTableData> ReadAll() => ReadAllAsync(CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Rows are read concurrently on an operation-owned connection,
+        /// with each membership record read before its heartbeat.
+        /// Table and child-version checks fence the complete snapshot.
+        /// Connection-loss failures in native reads are retried up to four times on the same session.
+        /// Caller cancellation stops further requests while admitted requests and client close complete.
+        /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         {
-            return ReadAllAsync(this.deploymentConnectionString, this.watcher, cancellationToken);
+            return ReadAsync(() => _createSession(true), _readRetryPipeline, null, cancellationToken);
         }
 
-        internal static Task<MembershipTableData> ReadAllAsync(string deploymentConnectionString, ZooKeeperWatcher watcher, CancellationToken cancellationToken)
+        internal static Task<MembershipTableData> ReadAsync(
+            Func<ZooKeeperSession> createSession,
+            ResiliencePipeline pipeline,
+            SiloAddress? siloAddress,
+            CancellationToken cancellationToken)
         {
-            return UsingZookeeper(zk => ReadCoreAsync(zk, null, cancellationToken),
-                deploymentConnectionString, watcher, cancellationToken, canBeReadOnly: true);
+            return ZooKeeperSession.ExecuteAsync(createSession,
+                native => ReadCoreAsync(ZooKeeperReadRetryPolicy.Wrap(native, pipeline, cancellationToken), siloAddress, cancellationToken),
+                cancellationToken);
+        }
+
+        internal static ZooKeeperSession CreateSession(string connectionString, ZooKeeperWatcher watcher, bool readOnly)
+        {
+            var client = new ZooKeeper(connectionString, ZOOKEEPER_SESSION_TIMEOUT, watcher, readOnly);
+            return new ZooKeeperSession(
+                new NativeOperations(path => client.getDataAsync(path), path => client.getChildrenAsync(path),
+                    client.sync, operations => client.multiAsync(operations), client.setDataAsync),
+                client.closeAsync);
         }
 
         internal static async Task<MembershipTableData> ReadCoreAsync(
@@ -179,36 +218,36 @@ namespace Orleans.Runtime.Membership
                     addresses = [siloAddress];
                 }
 
+                var rows = new List<Tuple<MembershipEntry, string>>();
+                KeeperException.NoNodeException? missingRow = null;
+                cancellationToken.ThrowIfCancellationRequested();
                 var pendingRows = Task.WhenAll(addresses.Select(address => GetRow(zk, address, siloAddress is not null, cancellationToken)));
-                Tuple<MembershipEntry, string>?[] rows;
                 try
                 {
-                    rows = await pendingRows;
+                    rows.AddRange((await pendingRows).OfType<Tuple<MembershipEntry, string>>());
                 }
-                catch (KeeperException.NoNodeException)
+                catch (KeeperException.NoNodeException exception)
                 {
-                    // Observe every parallel read: a removed row must not hide another request's failure.
-                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(exception => exception is not KeeperException.NoNodeException);
+                    // Join every admitted read so a missing row cannot hide another native failure.
+                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(error => error is not KeeperException.NoNodeException);
                     if (failure is not null)
                     {
                         System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
                     }
 
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var current = await zk.GetData("/");
-                    if (SameVersion(before, current.Stat))
-                    {
-                        throw;
-                    }
-
-                    continue;
+                    missingRow = exception;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
                 var after = await zk.GetData("/");
                 if (SameVersion(before, after.Stat))
                 {
-                    return new MembershipTableData(rows.OfType<Tuple<MembershipEntry, string>>().ToList(), ConvertToTableVersion(after.Stat));
+                    if (missingRow is not null)
+                    {
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(missingRow).Throw();
+                    }
+
+                    return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
                 }
             }
         }
@@ -238,14 +277,18 @@ namespace Orleans.Runtime.Membership
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// The conditional transaction is submitted once. Connection loss propagates when its
+        /// commit outcome is unknown, preserving the caller's ability to resolve that outcome.
+        /// </remarks>
         public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(entry);
             ArgumentNullException.ThrowIfNull(tableVersion);
             cancellationToken.ThrowIfCancellationRequested();
 
-            return UsingZookeeper(zk => InsertRowCoreAsync(zk, entry, tableVersion, cancellationToken),
-                this.deploymentConnectionString, this.watcher, cancellationToken);
+            return ZooKeeperSession.ExecuteAsync(() => _createSession(false),
+                zk => InsertRowCoreAsync(zk, entry, tableVersion, cancellationToken), cancellationToken);
         }
 
         internal static async Task<bool> InsertRowCoreAsync(
@@ -300,6 +343,10 @@ namespace Orleans.Runtime.Membership
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// The conditional transaction is submitted once. Connection loss propagates when its
+        /// commit outcome is unknown, preserving the caller's ability to resolve that outcome.
+        /// </remarks>
         public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(entry);
@@ -307,8 +354,8 @@ namespace Orleans.Runtime.Membership
             ArgumentNullException.ThrowIfNull(tableVersion);
             cancellationToken.ThrowIfCancellationRequested();
 
-            return UsingZookeeper(zk => UpdateRowCoreAsync(zk, entry, etag, tableVersion, cancellationToken),
-                this.deploymentConnectionString, this.watcher, cancellationToken);
+            return ZooKeeperSession.ExecuteAsync(() => _createSession(false),
+                zk => UpdateRowCoreAsync(zk, entry, etag, tableVersion, cancellationToken), cancellationToken);
         }
 
         internal static async Task<bool> UpdateRowCoreAsync(
