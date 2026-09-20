@@ -314,6 +314,21 @@ public sealed class HandlerRoutingContractTests : IDisposable
     }
 
     [Fact]
+    public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
+    {
+        var sourceAssembly = typeof(IDurableInbox).Assembly;
+        var consumerName = typeof(HandlerRoutingContractTests).Assembly.GetName().Name;
+        var friendDeclarations = sourceAssembly
+            .GetCustomAttributesData()
+            .Where(attribute => attribute.AttributeType.FullName == "System.Runtime.CompilerServices.InternalsVisibleToAttribute")
+            .Select(attribute => attribute.ConstructorArguments[0].Value?.ToString())
+            .ToArray();
+
+        Assert.DoesNotContain(friendDeclarations, declaration =>
+            declaration?.StartsWith(consumerName!, StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
     public void PreparedOutboxBatch_ExposesOnlyDisposal()
     {
         var type = typeof(IPreparedOutboxBatch);
@@ -330,7 +345,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
         using var input = CreatePreparedContext();
         using var batch = new TestBatch();
         var outbox = new RecordingOutbox();
-        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+        var context = CreateInternalContext("InboxHandlerContext", input.Envelope, input.GrainId, outbox, _sessions);
 
         for (var i = 0; i < sends; i++)
         {
@@ -350,7 +365,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
         using var batch = new TestBatch();
         var expected = new InvalidOperationException("Batch rejected.");
         var outbox = new RecordingOutbox { SendFailure = expected };
-        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+        var context = CreateInternalContext("InboxHandlerContext", input.Envelope, input.GrainId, outbox, _sessions);
 
         var actual = Assert.Throws<InvalidOperationException>(() => context.Send(batch));
 
@@ -364,7 +379,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
     {
         using var input = CreatePreparedContext();
         using var batch = new TestBatch();
-        var context = new InboxHandlerSelectionContext(input.Envelope, input.GrainId);
+        var context = CreateInternalContext("InboxHandlerSelectionContext", input.Envelope, input.GrainId);
 
         var exception = Assert.Throws<InvalidOperationException>(() => context.Send(batch));
 
@@ -386,7 +401,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
         using var batch = new TestBatch();
         using var cancellation = new CancellationTokenSource();
         var outbox = new RecordingOutbox();
-        var context = new InboxHandlerContext(input.Envelope, input.GrainId, outbox, _sessions);
+        var context = CreateInternalContext("InboxHandlerContext", input.Envelope, input.GrainId, outbox, _sessions);
         IReadOnlyList<DurableEnvelope> messages = [input.Envelope];
         var applyCount = 0;
         var handler = CreatePreparedHandler(kind, async (actualContext, token) =>
@@ -420,6 +435,12 @@ public sealed class HandlerRoutingContractTests : IDisposable
     }
 
     public void Dispose() => _services.Dispose();
+
+    private static IInboxHandlerContext CreateInternalContext(string typeName, params object[] arguments)
+    {
+        var type = typeof(IInboxHandlerContext).Assembly.GetType($"Orleans.DurableMessaging.{typeName}", throwOnError: true)!;
+        return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, arguments));
+    }
 
     private TestContext CreateContext(string route, HierarchicalKey? correlation = null, object? body = null)
     {
