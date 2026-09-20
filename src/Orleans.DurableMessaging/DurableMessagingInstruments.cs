@@ -10,7 +10,6 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
 {
     private const string MillisecondsUnit = "ms";
     private const string GrainTypeTagName = "grain_type";
-    private const string RouteKeyTagName = "route_key";
     private const string StatusTagName = "status";
 
     private readonly Counter<long> _inboxMessagesReceived = instruments.Meter.CreateCounter<long>("orleans-durable-messaging-inbox-messages-received");
@@ -29,28 +28,28 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
 
     internal void OnOutboxDepthChanged(int delta) => _outboxDepth.Adjust(delta);
 
-    internal void OnInboxMessageReceived(string grainType, string routeKey, string status) =>
-        Add(_inboxMessagesReceived, grainType, routeKey, status);
+    internal void OnInboxMessageReceived(string grainType, string status) =>
+        Add(_inboxMessagesReceived, grainType, status);
 
-    internal void OnInboxMessageProcessed(string grainType, string routeKey, string status) =>
-        Add(_inboxMessagesProcessed, grainType, routeKey, status);
+    internal void OnInboxMessageProcessed(string grainType, string status) =>
+        Add(_inboxMessagesProcessed, grainType, status);
 
-    internal void OnInboxProcessingDuration(TimeSpan duration, string grainType, string routeKey) =>
-        Record(_inboxProcessingDuration, duration, grainType, routeKey);
+    internal void OnInboxProcessingDuration(TimeSpan duration, string grainType) =>
+        Record(_inboxProcessingDuration, duration, grainType);
 
-    internal void OnOutboxMessageSent(string grainType, string routeKey)
+    internal void OnOutboxMessageSent(string grainType)
     {
         if (_outboxMessagesSent.Enabled)
         {
-            _outboxMessagesSent.Add(1, CreateTags(grainType, routeKey));
+            _outboxMessagesSent.Add(1, CreateTags(grainType));
         }
     }
 
-    internal void OnOutboxMessageDelivered(string grainType, string routeKey, string status) =>
-        Add(_outboxMessagesDelivered, grainType, routeKey, status);
+    internal void OnOutboxMessageDelivered(string grainType, string status) =>
+        Add(_outboxMessagesDelivered, grainType, status);
 
-    internal void OnOutboxDeliveryDuration(TimeSpan duration, string grainType, string routeKey) =>
-        Record(_outboxDeliveryDuration, duration, grainType, routeKey);
+    internal void OnOutboxDeliveryDuration(TimeSpan duration, string grainType) =>
+        Record(_outboxDeliveryDuration, duration, grainType);
 
     internal void OnOrphanedJobReclaimed(string grainType, string jobName)
     {
@@ -65,7 +64,7 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
         }
     }
 
-    private static void Add(Counter<long> counter, string grainType, string routeKey, string status)
+    private static void Add(Counter<long> counter, string grainType, string status)
     {
         if (counter.Enabled)
         {
@@ -73,24 +72,22 @@ internal sealed class DurableMessagingInstruments(OrleansInstruments instruments
                 1,
                 [
                     new(GrainTypeTagName, grainType),
-                    new(RouteKeyTagName, routeKey),
                     new(StatusTagName, status)
                 ]);
         }
     }
 
-    private static void Record(Histogram<double> histogram, TimeSpan duration, string grainType, string routeKey)
+    private static void Record(Histogram<double> histogram, TimeSpan duration, string grainType)
     {
         if (histogram.Enabled)
         {
-            histogram.Record(Math.Max(0, duration.TotalMilliseconds), CreateTags(grainType, routeKey));
+            histogram.Record(Math.Max(0, duration.TotalMilliseconds), CreateTags(grainType));
         }
     }
 
-    private static KeyValuePair<string, object?>[] CreateTags(string grainType, string routeKey) =>
+    private static KeyValuePair<string, object?>[] CreateTags(string grainType) =>
         [
-            new(GrainTypeTagName, grainType),
-            new(RouteKeyTagName, routeKey)
+            new(GrainTypeTagName, grainType)
         ];
 
     private sealed class DirectMeterFactory : IMeterFactory

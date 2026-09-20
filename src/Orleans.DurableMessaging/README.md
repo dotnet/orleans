@@ -163,3 +163,8 @@ and stage their removal for the next journal write.
 This intermediate project remains non-packable. Receiver tests compose the runtime
 with existing Journaling and DurableJobs services using test-only registration;
 outbound dispatch and public hosting composition are assembled in later layers.
+
+Message outcome counters group by grain type and delivery or processing status.
+The sent-message counter and latency histograms group by grain type. Orphaned-job
+metrics retain the job name, and depth gauges report aggregate pending work. Route
+keys continue to select handlers and remain available in message diagnostics.

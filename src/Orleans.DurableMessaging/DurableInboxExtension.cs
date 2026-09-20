@@ -261,7 +261,7 @@ internal sealed partial class DurableInboxExtension :
             if (_processed.TryGetValue(key, out var processedAt)
                 && !DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), processedAt, _deduplicationWindow))
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "duplicate");
+                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "duplicate");
                 return DeliveryResult.Duplicate();
             }
 
@@ -274,13 +274,13 @@ internal sealed partial class DurableInboxExtension :
 
             if (_inboxDict.Count >= _maxCapacity)
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "backpressured");
+                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "backpressured");
                 return DeliveryResult.Backpressured();
             }
 
             if (!TryFindHandlerWithinMutationBoundary(new InboxHandlerSelectionContext(envelope, _grainContext.GrainId), out _))
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "route_not_found");
+                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "route_not_found");
                 return DeliveryResult.RouteNotFound(envelope.RouteKey);
             }
 
@@ -298,7 +298,7 @@ internal sealed partial class DurableInboxExtension :
                 await SubmitAsync(operation).ConfigureAwait(true);
                 ValidateReady();
                 ScheduleLocalDrain();
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "accepted");
+                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "accepted");
                 LogMessageAccepted(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
                 return DeliveryResult.Accepted();
             }
@@ -1182,8 +1182,8 @@ internal sealed partial class DurableInboxExtension :
                 cancellationToken.ThrowIfCancellationRequested();
             }
             var status = operation.Error is null ? "success" : operation.DeadLetter ? "dead_lettered" : "retry";
-            _instruments.OnInboxMessageProcessed(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, status);
-            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, _grainContext.GrainId.Type.ToString(), envelope.RouteKey);
+            _instruments.OnInboxMessageProcessed(_grainContext.GrainId.Type.ToString(), status);
+            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, _grainContext.GrainId.Type.ToString());
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
