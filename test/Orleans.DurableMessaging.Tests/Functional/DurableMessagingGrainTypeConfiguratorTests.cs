@@ -124,6 +124,138 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     }
 
     [Fact]
+    public async Task OrdinaryPreparedSend_ConfirmsWakeupBeforeBusinessMutationAndDispatchesAfterAck()
+    {
+        var grain = CreateGrain(typeof(PlainBootstrapGrain));
+        await grain.SetValueAsync(11);
+        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+        var journal = JournalId.FromGrainId(grain.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        using var scheduling = Fixture.JobManagerProbe.BlockNext(BootstrapOutboxServices.JobName);
+        var operation = grain.SendValueAsync(42);
+        await scheduling.WaitUntilEnteredAsync();
+        Assert.Equal(11, observation.Value!.Value);
+        Assert.Equal(0, observation.Outbox!.Count);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        var storage = Fixture.Storage.BlockWrite(journal);
+        var delivered = Delivery.WaitForOutputAsync(grain.GetGrainId());
+        Delivery.Release();
+        scheduling.Continue();
+        await storage.WaitUntilEnteredAsync();
+        Assert.Equal(42, observation.Value.Value);
+        Assert.Single(observation.Outbox.Messages);
+        Assert.False(delivered.IsCompleted);
+        Assert.Equal(1, Fixture.JobManagerProbe.GetSuccessCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
+        storage.Release();
+        await operation;
+        var receipt = await delivered;
+        Assert.Equal(42, receipt.Value);
+        Assert.Equal(42, await grain.GetValueAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OrdinaryPreparedSend_SchedulingFailurePreservesBusinessState(bool ambiguous)
+    {
+        var grain = CreateGrain(typeof(PlainBootstrapGrain));
+        await grain.SetValueAsync(11);
+        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+        var journal = JournalId.FromGrainId(grain.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        if (ambiguous) Fixture.JobManagerProbe.FailAfterNext(BootstrapOutboxServices.JobName);
+        else Fixture.JobManagerProbe.FailNext(BootstrapOutboxServices.JobName);
+        await Assert.ThrowsAsync<IOException>(() => grain.SendValueAsync(42));
+        Assert.Equal(11, await grain.GetValueAsync());
+        Assert.Equal(0, observation.Outbox!.Count);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(ambiguous ? 1 : 0, Fixture.JobManagerProbe.GetScheduledJobs(BootstrapOutboxServices.JobName, grain.GetGrainId()).Count);
+        await grain.SendValueAsync(43);
+        Assert.Equal(43, await grain.GetValueAsync());
+        Assert.True(Assert.Single(observation.Outbox.Messages).Data.TryGetBody<int>(out var body));
+        Assert.Equal(43, body);
+        Assert.Equal(2, Fixture.JobManagerProbe.GetAttemptCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OrdinaryPreparedSend_FreshReplayResolvesActualWriteOutcome(bool committed)
+    {
+        var grain = CreateGrain(typeof(PlainBootstrapGrain));
+        await grain.SetValueAsync(11);
+        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+        var journal = JournalId.FromGrainId(grain.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        if (committed) Fixture.Storage.FailAfterWrite(journal);
+        else Fixture.Storage.FailWrite(journal);
+        await Assert.ThrowsAsync<IOException>(() => grain.SendValueAsync(42));
+        Assert.Equal(writes + (committed ? 1 : 0), Fixture.Storage.GetSuccessfulWriteCount(journal));
+        var scheduled = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(BootstrapOutboxServices.JobName, grain.GetGrainId()));
+        await grain.DeactivateAsync();
+        await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        Assert.Equal(committed ? 42 : 11, await grain.GetValueAsync());
+        var recovered = Probe.Get(grain.GetGrainId())[^1];
+        Assert.NotSame(observation.Context, recovered.Context);
+        Assert.Equal(committed ? 1 : 0, recovered.Outbox!.Count);
+        var owner = recovered.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle").Value;
+        if (committed)
+        {
+            Assert.Equal(scheduled.Id, owner!.Id);
+            Assert.Equal(scheduled.ShardId, owner.ShardId);
+            Assert.True(Assert.Single(recovered.Outbox.Messages).Data.TryGetBody<int>(out var value));
+            Assert.Equal(42, value);
+        }
+        else Assert.Null(owner);
+        Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RealOutbox_PartialHandlerApplyFencesUncapturedWorkAndPreservesPriorAck(bool precedingWrite)
+    {
+        var grain = CreateGrain(typeof(PlainBootstrapGrain));
+        await grain.SetValueAsync(11);
+        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+        var state = observation.Context.ActivationServices.GetRequiredService<BootstrapState>();
+        var journal = JournalId.FromGrainId(grain.GetGrainId());
+        using var handler = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
+        Assert.Equal(DeliveryStatus.Accepted,
+            (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(CreateEnvelope(grain), Cancellation)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var failure = new IOException("Real outbox handler partial apply failure.");
+        var onTurn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        observation.Context.Scheduler.QueueAction(() =>
+        {
+            state.ApplyFailure = failure;
+            if (precedingWrite) observation.Value!.Value = 20;
+            onTurn.SetResult();
+        });
+        await onTurn.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        var storage = precedingWrite ? Fixture.Storage.BlockWrite(journal) : null;
+        var previous = precedingWrite ? observation.Manager!.WriteStateAsync(Cancellation).AsTask() : Task.CompletedTask;
+        if (storage is not null) await storage.WaitUntilEnteredAsync();
+        var queued = precedingWrite ? observation.Manager!.WriteStateAsync(Cancellation).AsTask() : null;
+        handler.Release();
+        await state.ApplyAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        Assert.Equal(precedingWrite ? 21 : 12, observation.Value!.Value);
+        Assert.Equal(1, observation.Outbox!.Count);
+        Assert.Equal(1, Fixture.JobManagerProbe.GetSuccessCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
+        storage?.Release();
+        await previous;
+        if (queued is not null) Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => queued));
+        Assert.Same(failure, await state.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => observation.Manager!.WriteStateAsync(Cancellation).AsTask());
+        Assert.Same(failure, rejected.InnerException);
+        Assert.Equal(writes + (precedingWrite ? 1 : 0), Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Empty(GetProcessed(observation.Context));
+        Assert.Equal(1, observation.Inbox!.Count);
+        storage?.Dispose();
+    }
+
+    [Fact]
     public async Task SelectedWithoutConstructorDependencies_MaterializesPrimaryStateBeforeRead()
     {
         var grain = Control<EagerBootstrapGrain>();
@@ -274,8 +406,9 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
             Assert.Same(observation.Context.ActivationServices.GetRequiredKeyedService<
                 IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
-            Assert.True(manager.TryGetStateMachine("test-handler-output", out var outbox));
-            Assert.Same(((JournaledTestOutbox)observation.Context.ActivationServices.GetRequiredService<IDurableOutbox>()).StoredMessages, outbox);
+            Assert.True(manager.TryGetStateMachine(BootstrapOutboxServices.StateName, out var outbox));
+            Assert.Same(observation.Context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>(
+                BootstrapOutboxServices.StateName), outbox);
             Assert.Single(GetSetup(observation.Context).GetInvocationList());
         }
         finally

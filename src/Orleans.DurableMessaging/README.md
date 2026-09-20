@@ -188,8 +188,12 @@ over generic handler selection. Operational diagnostics expose retained dead let
 and stage their removal for the next journal write.
 
 The builder encodes the body and request context into an envelope buffer which the
-outbox reuses as a local pending intent with the owning grain as sender. Journal
-codecs serialize pending outbox commands during state capture. `Count`, `Messages`,
+outbox reuses with the owning grain as sender. `PrepareSendAsync` snapshots and validates
+the complete batch, reserves its message identities, and confirms a durable self-wakeup.
+The returned activation-local batch retains those prerequisites. Preparation leaves
+journaled state and visible message depth unchanged. `Send(batch)` synchronously stages
+the prepared intents alongside application changes before ordinary persistence. Journal
+codecs serialize staged outbox commands during state capture. `Count`, `Messages`,
 and `TryGetMessage` include local intents and journaled messages once per ID. `Count` and depth metrics combine the journaled count
 with the number of local intents awaiting capture in constant time. Captured
 intents remain delivery-fenced until their exact capture is acknowledged. Repeated
@@ -206,10 +210,11 @@ command codecs for the owning journal's configured format. Grain-facing
 `IDurableStateManager` writes share that same owner and acknowledgement boundary.
 Standalone fixtures use `CreateStandalone`, explicitly register their state machines,
 and retain caller ownership of initialization, dependencies, and disposal.
-Ordinary journal writes prepare durable wakeup ownership before capturing pending
-commands. Readiness is rechecked after every state preparation await, so late sends
-join the final capture cohort with an acknowledged owner. Healthy owners retain
-their exact handles. The first facet captured seals the complete cohort, including
+Feature preparation serializes wakeup acquisition and shares the viable exact owner
+between live batches. It releases the acquisition gate before returning each handle,
+so callers can prepare several batches before applying them. Healthy owners retain
+their exact handles. Ordinary journal writes synchronously validate and capture
+already-prepared commands. The first facet captured seals the complete cohort, including
 the ownership generation, returned DurableJob, envelopes, retry state and dead letters.
 Every facet writes that cohort to its own stream. Storage acknowledgement releases
 exactly that cohort's delivery fences after all seven facets acknowledge; mutations
@@ -233,7 +238,30 @@ persisted work. Admitted failures retain the journal manager's terminal-fault pa
 Fresh instances replay the actual durable outcome, including ambiguous append
 acknowledgements. Canceling a caller's wait leaves an admitted write running through
 capture and acknowledgement. Deletion
-requires quiescent messaging operations and clears pending intents after success.
+requires released preparation handles, completed owned acquisitions and quiescent
+pending/captured operations, and clears persisted intents after success.
+
+Ordinary callers await each preparation and dispose the returned batch after the
+staging/write scope. The handler facade owns batches through attempt completion,
+including late preparation outcomes. Disposing an unused handle releases only its
+reservation; disposing a staged handle leaves its cohort owned through the actual ACK.
+Equivalent overlapping batches share intent identity, including a completed delivery
+while another live batch still references it. Repeated `Send` of a live staged batch
+is idempotent within its valid scope. Every call validates owner, epoch and lifetime.
+
+A callback defers while scheduling or a provisional commit is unresolved. Once unused
+preparation is released, a wakeup with no corresponding durable work retires harmlessly.
+Caller cancellation ends its wait while scheduling retains resources through the actual
+outcome, including releasing an unclaimed result. Activation shutdown drains owned
+acquisition, preserves callback-error cleanup, and invalidates remaining handles.
+Wholly absent ownership pairs are repaired by feature scheduling before an ordinary
+ownership write; malformed pairs report their existing explicit error. Scheduling
+errors before staging leave application and journaled state unchanged.
+
+Framework-owned handler Action failures retain the original cause and use the ordinary
+terminal-flush path to fence future capture. Already-captured cohorts acknowledge only
+their own snapshot. Ordinary application methods own their prepared business mutations
+and persistence calls.
 
 This intermediate project remains non-packable. Receiver tests compose the inbox
 with existing Journaling and DurableJobs services and a journaled test outbox for

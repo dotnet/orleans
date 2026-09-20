@@ -1,6 +1,4 @@
 using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
@@ -30,7 +28,6 @@ internal sealed partial class DurableOutbox
     {
         public bool HasChanges => HasPendingChanges;
         public override bool IsWritePrepared => owner.IsWritePrepared;
-        public override ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => owner.PrepareWriteAsync(cancellationToken);
         public override void ValidateWrite() => owner.ValidateWrite();
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();
@@ -79,7 +76,6 @@ internal sealed partial class DurableOutbox
     {
         public bool HasChanges => HasPendingChanges;
         public override bool IsWritePrepared => owner.IsWritePrepared;
-        public override ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => owner.PrepareWriteAsync(cancellationToken);
         public override void ValidateWrite() => owner.ValidateWrite();
         public override void ValidateDelete() => owner.ValidateDelete();
         public override void OnDeleteStarted() => owner.OnDeleteStarted();

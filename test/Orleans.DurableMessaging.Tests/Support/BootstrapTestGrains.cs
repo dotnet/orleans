@@ -69,11 +69,24 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public object? GrainAtActivation { get; private set; }
     public int ActivationValue { get; private set; }
     public int HandlerCalls { get; private set; }
+    public Exception? ApplyFailure { get; set; }
+    public TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource<Exception> Faulted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public int Disposals { get; private set; }
     public Task<int> Read() => Task.FromResult(Observation.Value!.Value);
     public async Task Set(int value)
     {
         Observation.Value!.Value = value;
+        await Observation.Manager!.WriteStateAsync(CancellationToken.None);
+    }
+    public async Task SendValue(int value)
+    {
+        var context = Observation.Context;
+        var envelope = new DurableEnvelopeBuilder(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId)
+            .To(OutputTarget, "output").WithBody(value).Build();
+        using var batch = await Observation.Outbox!.PrepareSendAsync([envelope]);
+        Observation.Value!.Value = value;
+        Observation.Outbox.Send(batch);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
     }
     public Task Activate()
@@ -100,6 +113,8 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
             Observation.Value.Value = value;
             context.Send(batch);
             HandlerCalls++;
+            ApplyAttempted.TrySetResult();
+            if (ApplyFailure is { } failure) throw failure;
         };
     }
     public void Dispose() => Disposals++;
@@ -118,6 +133,7 @@ public interface IBootstrapTestGrain : IGrainWithGuidKey
 {
     Task<int> GetValueAsync();
     Task SetValueAsync(int value);
+    Task SendValueAsync(int value);
     Task DeactivateAsync();
 }
 public interface IMarkedBootstrapTestGrain : IBootstrapTestGrain, IDurableMessagingGrain;
@@ -134,6 +150,7 @@ public abstract class BootstrapGrainBase : Grain, IBootstrapTestGrain, IDisposab
     public override Task OnActivateAsync(CancellationToken cancellationToken) => _state.Activate();
     public Task<int> GetValueAsync() => _state.Read();
     public Task SetValueAsync(int value) => _state.Set(value);
+    public Task SendValueAsync(int value) => _state.SendValue(value);
     public Task DeactivateAsync() { DeactivateOnIdle(); return Task.CompletedTask; }
     public void Dispose() => _state.Observation.GrainDisposals++;
 }
@@ -154,6 +171,7 @@ public class LegacyBootstrapGrain : DurableGrain, IBootstrapTestGrain, IDisposab
     public override Task OnActivateAsync(CancellationToken cancellationToken) => _state.Activate();
     public Task<int> GetValueAsync() => _state.Read();
     public Task SetValueAsync(int value) => _state.Set(value);
+    public Task SendValueAsync(int value) => _state.SendValue(value);
     public Task DeactivateAsync() { DeactivateOnIdle(); return Task.CompletedTask; }
     public void Dispose() => _state.Observation.GrainDisposals++;
 }

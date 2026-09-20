@@ -32,8 +32,8 @@ public sealed class OutboxCodecBoundaryTests
         var envelope = fixture.CreateEnvelope();
         Assert.Equal(1, fixture.Probe.Count(nameof(Payload)));
 
-        fixture.Outbox.Send(envelope);
-        fixture.Outbox.Send(envelope);
+        await fixture.SendAsync(envelope);
+        await fixture.SendAsync(envelope);
 
         Assert.Equal(0, fixture.Probe.Count(nameof(DurableEnvelope)));
         Assert.Equal(0, fixture.Probe.Count("OutboxMessageState"));
@@ -58,7 +58,7 @@ public sealed class OutboxCodecBoundaryTests
     public async Task DeadLetter_EncodesAtJournalApplicationWithoutPayloadPreflight()
     {
         await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound("missing"));
-        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
 
@@ -76,7 +76,7 @@ public sealed class OutboxCodecBoundaryTests
     public async Task RetryState_EncodesOnceWhenApplied()
     {
         await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.Backpressured(), maxAttempts: 3);
-        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
 
@@ -109,7 +109,7 @@ public sealed class OutboxCodecBoundaryTests
         await using var fixture = await CodecFixture.CreateAsync();
         var envelope = fixture.CreateEnvelope();
         fixture.Probe.FailureType = failedType;
-        fixture.Outbox.Send(envelope);
+        await fixture.SendAsync(envelope);
         Assert.Equal(0, fixture.Probe.Count(failedType));
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
@@ -119,7 +119,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(new[] { phase }, fixture.Probe.Phases(failedType));
         Assert.Equal(stagedMessages, fixture.Messages.Count);
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(envelope)));
+        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken)));
         var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(error, rejected.InnerException);
 
@@ -133,7 +133,7 @@ public sealed class OutboxCodecBoundaryTests
     {
         await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound("missing"));
         var envelope = fixture.CreateEnvelope();
-        fixture.Outbox.Send(envelope);
+        await fixture.SendAsync(envelope);
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         fixture.Probe.FailureType = "OutboxDeadLetter";
 
@@ -166,7 +166,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Single(fixture.Messages);
         Assert.Null(fixture.Job.Value);
         Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        Assert.Single(fixture.Jobs.ReceivedCalls(), call => call.GetMethodInfo().Name == "ScheduleJobAsync");
         var deactivation = Assert.Single(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
         var reason = Assert.IsType<DeactivationReason>(deactivation.GetArguments()[0]);
         Assert.Equal(DeactivationReasonCode.ApplicationError, reason.ReasonCode);
@@ -182,7 +182,7 @@ public sealed class OutboxCodecBoundaryTests
     }
 
     [Fact]
-    public async Task AdmittedRepairSchedulingFailure_UsesExistingTerminalFault()
+    public async Task FeatureRepairSchedulingFailure_RequestsDeactivationWithoutJournalMutation()
     {
         await using var seed = await CodecFixture.CreateAsync();
         var journal = new JournalId($"repair-fault/{Guid.NewGuid():N}");
@@ -195,12 +195,12 @@ public sealed class OutboxCodecBoundaryTests
 
         await fixture.RunRepairTimerAsync();
 
-        Assert.Same(failure, fixture.States.Failure);
+        Assert.Null(fixture.States.Failure);
         Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Single(fixture.Jobs.ReceivedCalls(), call => call.GetMethodInfo().Name == "ScheduleJobAsync");
-        Assert.DoesNotContain(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
-        var fenced = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.Same(failure, fenced.InnerException);
+        var deactivation = Assert.Single(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
+        Assert.Same(failure, Assert.IsType<DeactivationReason>(deactivation.GetArguments()[0]).Exception);
+        Assert.Null(fixture.Job.Value);
         await using var recovered = await CodecFixture.CreateAsync(seed.Storage, journal);
         await recovered.RunRepairTimerAsync();
         Assert.NotNull(recovered.Job.Value);
@@ -218,7 +218,7 @@ public sealed class OutboxCodecBoundaryTests
     {
         await using var fixture = await CodecFixture.CreateAsync();
         var valid = fixture.CreateEnvelope();
-        if (existingIntent) { fixture.Outbox.Send(valid); }
+        if (existingIntent) { await fixture.SendAsync(valid); }
         var invalid = field switch
         {
             "message" => valid with { MessageId = Guid.Empty },
@@ -227,12 +227,12 @@ public sealed class OutboxCodecBoundaryTests
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
-        var error = Assert.ThrowsAny<ArgumentException>(() => fixture.Outbox.Send(invalid));
+        var error = Assert.ThrowsAny<ArgumentException>(() => fixture.Outbox.PrepareSendAsync([invalid], TestContext.Current.CancellationToken));
 
-        Assert.Equal("envelope", error.ParamName);
+        Assert.Equal(field == "receiver" ? "messages" : "envelope", error.ParamName);
         Assert.Equal(existingIntent ? 1 : 0, fixture.Outbox.Count);
         Assert.Empty(fixture.Messages);
-        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(existingIntent ? 1 : 0, fixture.Jobs.ReceivedCalls().Count());
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Equal(0, fixture.Probe.Count(nameof(DurableEnvelope)));
         Assert.Null(fixture.States.Failure);
@@ -254,7 +254,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.True(message.Data.TryGetBody<string>(out var body));
         Assert.Null(body);
 
-        fixture.Outbox.Send(message);
+        await fixture.SendAsync(message);
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(message.MessageId, Assert.Single(fixture.Messages).Key);
         await fixture.DeliverAsync();
@@ -287,12 +287,12 @@ public sealed class OutboxCodecBoundaryTests
         Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(
             fixture.States.GetState<IStateMachine>("__orleans.durable-messaging.outbox"));
         var first = fixture.CreateEnvelope();
-        fixture.Outbox.Send(first);
+        await fixture.SendAsync(first);
         var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.WaitUntilEnteredAsync();
         var later = fixture.CreateEnvelope();
-        fixture.Outbox.Send(later);
+        await fixture.SendAsync(later);
         Assert.Equal(2, fixture.Outbox.Count);
         Assert.Equal(first.MessageId, Assert.Single(fixture.Messages).Key);
         storage.Release();
@@ -316,7 +316,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, recovered.Outbox.Count);
         Assert.Empty(recovered.Messages);
         Assert.Null(recovered.Job.Value);
-        recovered.Outbox.Send(recovered.CreateEnvelope());
+        await recovered.SendAsync(recovered.CreateEnvelope());
         await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(recovered.Messages);
         Assert.NotNull(recovered.Job.Value);
@@ -327,22 +327,25 @@ public sealed class OutboxCodecBoundaryTests
     [InlineData(6, false)]
     [InlineData(0, true)]
     [InlineData(6, true)]
-    public async Task OtherStateAwait_LateSendJoinsFinalCohortWithOneWakeup(int rotation, bool alreadyPending)
+    public async Task PreparedLease_StagingDuringStorageAwaitBelongsToNextCohort(int rotation, bool alreadyPending)
     {
-        var preparation = new PreparationProbe();
-        await using var fixture = await CodecFixture.CreateAsync(additionalState: preparation, stateOrder: rotation);
-        if (alreadyPending) fixture.Outbox.Send(fixture.CreateEnvelope());
+        await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation);
+        using var prepared = await fixture.Outbox.PrepareSendAsync([fixture.CreateEnvelope()], TestContext.Current.CancellationToken);
+        if (alreadyPending) await fixture.SendAsync(fixture.CreateEnvelope());
+        var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        await preparation.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        fixture.Outbox.Send(fixture.CreateEnvelope());
-        Assert.Empty(fixture.Messages);
-        Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
-        preparation.Release.TrySetResult();
-        await write;
-
+        await storage.WaitUntilEnteredAsync();
+        Assert.Equal(alreadyPending ? 1 : 0, fixture.Messages.Count);
+        fixture.Outbox.Send(prepared);
+        prepared.Dispose();
         Assert.Equal(alreadyPending ? 2 : 1, fixture.Outbox.Count);
-        Assert.Equal(fixture.Outbox.Count, fixture.Messages.Count);
-        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        storage.Release();
+        await write;
+        Assert.Equal(alreadyPending ? 1 : 0, fixture.Messages.Count);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(alreadyPending ? 2 : 1, fixture.Messages.Count);
+        Assert.Equal(2, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Single(fixture.Jobs.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILocalDurableJobManager.ScheduleJobAsync));
         var job = Assert.IsType<DurableJob>(fixture.Job.Value);
         Assert.Equal("opaque-shard", job.ShardId);
@@ -361,7 +364,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Equal(0, fixture.Outbox.Count);
         Assert.Empty(fixture.Jobs.ReceivedCalls());
-        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Messages);
         Assert.NotNull(fixture.Job.Value);
@@ -371,18 +374,18 @@ public sealed class OutboxCodecBoundaryTests
     [Theory]
     [InlineData(0)]
     [InlineData(6)]
-    public async Task CanceledCallerDuringStatePreparation_PreservesOwnedCaptureAndAck(int rotation)
+    public async Task CanceledCallerDuringStorageAck_PreservesOwnedCaptureAndAck(int rotation)
     {
-        var preparation = new PreparationProbe();
-        await using var fixture = await CodecFixture.CreateAsync(additionalState: preparation, stateOrder: rotation);
-        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation);
+        await fixture.SendAsync(fixture.CreateEnvelope());
+        var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         using var cancellation = new CancellationTokenSource();
         var write = fixture.Manager.WriteStateAsync(cancellation.Token).AsTask();
-        await preparation.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await storage.WaitUntilEnteredAsync();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
-        preparation.Release.TrySetResult();
+        storage.Release();
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Messages);
         Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
@@ -406,7 +409,6 @@ public sealed class OutboxCodecBoundaryTests
         public int FaultCount { get; private set; }
         public void Bind(IJournaledStateManager manager) => _codec = manager.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>();
         public virtual bool IsWritePrepared => true;
-        public virtual ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => default;
         public virtual void ValidateWrite() { }
         public void Reset(JournalStreamWriter writer) => _value = 0;
         public void OnRecoveryCompleted() { }
@@ -417,20 +419,6 @@ public sealed class OutboxCodecBoundaryTests
         public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
         public void ApplySet(int value) => _value = value;
-    }
-
-    private sealed class PreparationProbe : ProbeState
-    {
-        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private bool _prepared;
-        public override bool IsWritePrepared => _prepared;
-        public override async ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
-        {
-            Entered.TrySetResult();
-            await Release.Task.WaitAsync(cancellationToken);
-            _prepared = true;
-        }
     }
 
     [GenerateSerializer]
@@ -601,6 +589,12 @@ public sealed class OutboxCodecBoundaryTests
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
 
+        public async Task SendAsync(DurableEnvelope envelope)
+        {
+            using var batch = await Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken);
+            Outbox.Send(batch);
+        }
+
         public Task DeliverAsync() => _deliver(TestContext.Current.CancellationToken);
         public async ValueTask DisposeAsync()
         {
@@ -636,11 +630,8 @@ public sealed class OutboxCodecBoundaryTests
         private sealed class TrackedState(StateTrackingManager owner, IStateMachine state, CodecProbe probe) : IStateMachine
         {
             public bool IsWritePrepared => state.IsWritePrepared;
-            public async ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
-            {
-                probe.Phase = "preparation";
-                await state.PrepareWriteAsync(cancellationToken);
-            }
+            public ValueTask PrepareWriteAsync(CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("Outbox feature preparation must finish before journal execution.");
             public void ValidateWrite() => state.ValidateWrite();
             public void ValidateDelete() => state.ValidateDelete();
             public void OnDeleteStarted() => state.OnDeleteStarted();

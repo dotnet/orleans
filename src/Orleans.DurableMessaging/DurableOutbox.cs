@@ -20,7 +20,7 @@ namespace Orleans.DurableMessaging;
 
 /// <summary>
 /// Prepares outbound intents and delivery outcomes for an admitted journal operation.
-/// Its registered journaled states prepare durable wakeups and capture one shared mutation cohort.
+/// Feature preparation confirms durable wakeups; registered states synchronously capture one shared mutation cohort.
 /// </summary>
 internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver
 {
@@ -58,10 +58,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private int _unfinalizedMessageCount;
     private readonly List<OutboxWrite> _pendingWrites = [];
     private PendingMessage[] _capturedMessages = [];
-    private OutboxWrite[] _preparedWrites = [];
     private OutboxWrite[] _capturedWrites = [];
-    private long _writeRevision;
-    private long _preparedWriteRevision = -1;
     private readonly IOutboxState[] _states;
     private StateSlot _capturedStates;
     private StateSlot _acknowledgedStates;
@@ -74,7 +71,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private Dictionary<Guid, OutboxDeadLetter>? _preparedDeadLetters;
     private OwnershipProposal? _preparedOwnership;
     private string? _preparingOwnershipId;
-    private bool _preparing;
+    private int _activePreparations;
+    private int _liveBatches;
+    private TaskCompletionSource? _preparationsDrained;
     private string? _committingOwnershipId;
     private DurableJob? _committingJob;
     private string? _committingCompletedJobId;
@@ -171,11 +170,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public int Count => _messages.Count + _unfinalizedMessageCount;
 
     public IEnumerable<DurableEnvelope> Messages => _messages.Values.Concat(
-        _pendingMessages.Where(pair => !_messages.ContainsKey(pair.Key)).Select(static pair => pair.Value.Envelope));
+        _pendingMessages.Where(static pair => pair.Value.Staged && !pair.Value.Materialized).Select(static pair => pair.Value.Envelope));
 
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
-        if (_pendingMessages.TryGetValue(messageId, out var pending))
+        if (_pendingMessages.TryGetValue(messageId, out var pending) && pending.Staged && !pending.Acknowledged)
         {
             envelope = pending.Envelope;
             return true;
@@ -183,34 +182,257 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         return _messages.TryGetValue(messageId, out envelope);
     }
 
-    public void Send(DurableEnvelope envelope)
+    public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
+        IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
         ValidateReady();
-        if (envelope.SenderId != _grainContext.GrainId)
+        var unique = new Dictionary<Guid, DurableEnvelope>(messages.Count);
+        foreach (var envelope in messages)
         {
-            throw new InvalidOperationException(
-                $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
-        }
-        DurableEnvelopeValidation.Validate(envelope);
-        if (envelope.ReceiverId.IsDefault)
-        {
-            throw new ArgumentException("The envelope receiver must not be the default grain ID.", nameof(envelope));
-        }
-        if (TryGetMessage(envelope.MessageId, out var existing))
-        {
-            if (!DurableEnvelopeEquivalence.AreEquivalent(existing, envelope))
+            if (envelope.SenderId != _grainContext.GrainId)
             {
                 throw new InvalidOperationException(
-                    $"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
+                    $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
             }
+            DurableEnvelopeValidation.Validate(envelope);
+            if (envelope.ReceiverId.IsDefault)
+            {
+                throw new ArgumentException("The envelope receiver must not be the default grain ID.", nameof(messages));
+            }
+            if (unique.TryGetValue(envelope.MessageId, out var existing))
+            {
+                ValidateEquivalent(existing, envelope);
+            }
+            else
+            {
+                unique.Add(envelope.MessageId, envelope);
+            }
+        }
+        return PrepareBatchAsync(unique.Values.ToArray(), cancellationToken);
+    }
+
+    private async ValueTask<IPreparedOutboxBatch> PrepareBatchAsync(DurableEnvelope[] messages, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        StartPreparation();
+        var operation = PrepareUnderGateAsync(messages);
+        try
+        {
+            var batch = await operation.WaitAsync(cancellationToken).ConfigureAwait(true);
+            CompletePreparation();
+            return batch;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ReleaseUnclaimedAsync(operation).Ignore();
+            throw;
+        }
+        catch
+        {
+            CompletePreparation();
+            throw;
+        }
+    }
+
+    private async Task ReleaseUnclaimedAsync(Task<IPreparedOutboxBatch> operation)
+    {
+        try
+        {
+            (await operation.ConfigureAwait(true)).Dispose();
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            LogPreparationFailed(_logger, exception);
+        }
+        finally
+        {
+            CompletePreparation();
+        }
+    }
+
+    private async Task<IPreparedOutboxBatch> PrepareUnderGateAsync(DurableEnvelope[] messages)
+    {
+        PendingMessage[]? entries = null;
+        var reserved = false;
+        try
+        {
+            ValidateReady();
+            entries = new PendingMessage[messages.Length];
+            for (var i = 0; i < messages.Length; i++)
+            {
+                var envelope = messages[i];
+                if (_pendingMessages.TryGetValue(envelope.MessageId, out var pending))
+                {
+                    ValidateEquivalent(pending.Envelope, envelope);
+                }
+                else
+                {
+                    var existing = _messages.TryGetValue(envelope.MessageId, out var current);
+                    if (existing)
+                    {
+                        ValidateEquivalent(current, envelope);
+                    }
+                    pending = new(envelope) { Staged = existing, Materialized = existing, Acknowledged = existing };
+                }
+                entries[i] = pending;
+            }
+            foreach (var pending in entries)
+            {
+                _pendingMessages[pending.Envelope.MessageId] = pending;
+                pending.References++;
+            }
+            reserved = true;
+            if (messages.Length > 0)
+            {
+                await PrepareOwnershipAsync(replaceExisting: false).ConfigureAwait(true);
+            }
+            ValidateReady();
+            _liveBatches++;
+            reserved = false;
+            return new PreparedBatch(this, _stateGeneration, entries);
+        }
+        finally
+        {
+            if (reserved)
+            {
+                foreach (var entry in entries!)
+                {
+                    entry.References--;
+                    ReleaseEntry(entry);
+                }
+            }
+            _gate.Release();
+            ReleaseUnusedOwnership();
+        }
+    }
+
+    private async ValueTask PrepareOwnershipAsync(bool replaceExisting)
+    {
+        if (HasPreparedOwnership() || HasCommittedOwnership() && (!replaceExisting || _liveBatches > 0))
+        {
             return;
         }
-        var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
-        _pendingMessages.Add(envelope.MessageId, new(envelope, state));
-        _unfinalizedMessageCount++;
-        EnsureMetricsActive();
-        ReconcileOutboxDepth();
-        _instruments.OnOutboxMessageSent(_grainContext.GrainId.Type.ToString(), envelope.RouteKey);
+        var previousOwner = CurrentOwner;
+        var sequence = checked(++_reservedSequence);
+        var id = DurableMessagingJobOwnership.CreateId(_ownershipEpoch, sequence);
+        _preparingOwnershipId = id;
+        try
+        {
+            var job = await _jobManager.ScheduleJobAsync(new ScheduleJobRequest
+            {
+                Target = _grainContext.GrainId,
+                JobName = JobName,
+                DueTime = _jobTimeProvider.GetUtcNow(),
+                Metadata = DurableMessagingJobOwnership.CreateMetadata(id)
+            }, _shutdown.Token).ConfigureAwait(true);
+            ValidateOwner(previousOwner);
+            _preparedOwnership = new(id, sequence, job, previousOwner);
+        }
+        catch
+        {
+            _failure?.Throw();
+            throw;
+        }
+        finally
+        {
+            _preparingOwnershipId = null;
+        }
+    }
+
+    public void Send(IPreparedOutboxBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        ValidateReady();
+        if (batch is not PreparedBatch prepared || !ReferenceEquals(prepared.Owner, this))
+        {
+            throw new InvalidOperationException("The prepared batch belongs to another outbox.");
+        }
+        ObjectDisposedException.ThrowIf(prepared.Disposed, batch);
+        ValidateGeneration(prepared.Generation);
+        if (prepared.Entries.Length > 0 && !HasCommittedOwnership() && !HasPreparedOwnership())
+        {
+            throw new InvalidOperationException("The prepared batch lost its acknowledged durable job ownership.");
+        }
+        if (prepared.Staged)
+        {
+            return;
+        }
+        foreach (var pending in prepared.Entries)
+        {
+            if (pending.Staged)
+            {
+                continue;
+            }
+            pending.Staged = true;
+            pending.State = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
+            _unfinalizedMessageCount++;
+            EnsureMetricsActive();
+            ReconcileOutboxDepth();
+            _instruments.OnOutboxMessageSent(_grainContext.GrainId.Type.ToString());
+        }
+        prepared.Staged = true;
+    }
+
+    private static void ValidateEquivalent(DurableEnvelope existing, DurableEnvelope envelope)
+    {
+        if (!DurableEnvelopeEquivalence.AreEquivalent(existing, envelope))
+        {
+            throw new InvalidOperationException(
+                $"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
+        }
+    }
+
+    private void ReleaseBatch(PreparedBatch batch)
+    {
+        if (batch.Generation != _stateGeneration)
+        {
+            return;
+        }
+        foreach (var pending in batch.Entries)
+        {
+            pending.References--;
+            ReleaseEntry(pending);
+        }
+        _liveBatches--;
+        ReleaseUnusedOwnership();
+    }
+
+    private void ReleaseEntry(PendingMessage pending)
+    {
+        if (pending.References == 0 && (!pending.Staged || pending.Acknowledged))
+        {
+            _pendingMessages.Remove(pending.Envelope.MessageId);
+        }
+    }
+
+    private void StartPreparation()
+    {
+        if (_activePreparations++ == 0)
+        {
+            _preparationsDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    private void CompletePreparation()
+    {
+        if (--_activePreparations == 0)
+        {
+            _preparationsDrained!.TrySetResult();
+        }
+        ReleaseUnusedOwnership();
+    }
+
+    private void ReleaseUnusedOwnership()
+    {
+        if (_liveBatches == 0 && _activePreparations == 0 && _unfinalizedMessageCount == 0 && !_captureStarted && _gate.CurrentCount != 0)
+        {
+            _preparedOwnership = null;
+        }
     }
 
     private void ValidateWrite() => ValidateReady();
@@ -218,7 +440,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private void ValidateDelete()
     {
         ValidateReady();
-        if (_preparing || _captureStarted || _pendingWrites.Count != 0
+        if (_activePreparations != 0 || _liveBatches != 0 || _unfinalizedMessageCount != 0 || _captureStarted || _pendingWrites.Count != 0
             || _activePumpTurns != 0 || _ensureJobScheduledQueued != 0
             || _pendingDeliveryBatch is not null || _deliveryGate.CurrentCount == 0 || _gate.CurrentCount == 0)
         {
@@ -230,48 +452,48 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         get
         {
-            ValidateReady();
-            if (_pendingWrites.Count != 0 && _preparedWriteRevision != _writeRevision)
-            {
-                return false;
-            }
-            foreach (var operation in _pendingWrites)
-            {
-                ValidateGeneration(operation.Generation);
-                if (operation is DeliveryWrite delivery)
-                {
-                    ValidateOwner(delivery.Owner);
-                }
-                else if (operation is ClearOwnerWrite clear)
-                {
-                    ValidateOwner(clear.Owner);
-                }
-            }
-            return !NeedsOwnership() || HasPreparedOwnership();
+            ValidatePendingChanges();
+            return true;
         }
     }
 
-    private bool NeedsOwnership() => Count > _preparedDeliveries.Count(static result => result.Remove)
+    private void ValidatePendingChanges()
+    {
+        ValidateReady();
+        foreach (var operation in _pendingWrites)
+        {
+            ValidateGeneration(operation.Generation);
+            if (operation is DeliveryWrite delivery)
+            {
+                ValidateOwner(delivery.Owner);
+            }
+            else if (operation is ClearOwnerWrite clear)
+            {
+                ValidateOwner(clear.Owner);
+            }
+        }
+        if (NeedsOwnership() && !HasPreparedOwnership())
+        {
+            throw new InvalidOperationException("Outbox capture requires acknowledged durable job ownership.");
+        }
+    }
+
+    private bool NeedsOwnership() => (_unfinalizedMessageCount > 0 || _pendingWrites.OfType<OwnershipWrite>().Any())
         && (!HasCommittedOwnership() || _pendingWrites.OfType<OwnershipWrite>().Any(static write => write.ReplaceExisting));
 
     private bool HasPreparedOwnership() => _preparedOwnership is { } proposal
         && proposal.PreviousOwner.Generation == _stateGeneration
-        && string.Equals(proposal.PreviousOwner.Id, _jobId.Value, StringComparison.Ordinal)
-        && (proposal.PreviousOwner.Job is null && _job.Value is null
-            || DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.PreviousOwner.Job, _job.Value));
+        && ((string.Equals(proposal.PreviousOwner.Id, _jobId.Value, StringComparison.Ordinal)
+            && (proposal.PreviousOwner.Job is null && _job.Value is null
+                || DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.PreviousOwner.Job, _job.Value)))
+            || (string.Equals(proposal.Id, _jobId.Value, StringComparison.Ordinal)
+                && DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.Job, _job.Value)));
 
-    private async ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
+    private void PrepareCapture()
     {
-        if (IsWritePrepared)
-        {
-            return;
-        }
-        _preparing = true;
-        _preparedWrites = _pendingWrites.ToArray();
-        _preparedWriteRevision = _writeRevision;
         _preparedDeadLetters = null;
         var deliveries = new List<PreparedDelivery>();
-        foreach (var operation in _preparedWrites)
+        foreach (var operation in _pendingWrites)
         {
             ValidateGeneration(operation.Generation);
             if (operation is DeliveryWrite delivery)
@@ -295,23 +517,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             }
         }
         _preparedDeliveries = deliveries.ToArray();
-        if (NeedsOwnership() && !HasPreparedOwnership())
-        {
-            var previousOwner = CurrentOwner;
-            var sequence = checked(++_reservedSequence);
-            var id = DurableMessagingJobOwnership.CreateId(_ownershipEpoch, sequence);
-            _preparingOwnershipId = id;
-            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
-            var job = await _jobManager.ScheduleJobAsync(new ScheduleJobRequest
-            {
-                Target = _grainContext.GrainId,
-                JobName = JobName,
-                DueTime = _jobTimeProvider.GetUtcNow(),
-                Metadata = DurableMessagingJobOwnership.CreateMetadata(id)
-            }, cancellation.Token).ConfigureAwait(true);
-            ValidateOwner(previousOwner);
-            _preparedOwnership = new(id, sequence, job, previousOwner);
-        }
     }
 
     private void CaptureWrite(bool snapshot)
@@ -320,16 +525,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             return;
         }
-        if (!IsWritePrepared)
-        {
-            throw new InvalidOperationException("Outbox capture requires acknowledged durable job ownership for the complete current cohort.");
-        }
+        ValidatePendingChanges();
+        PrepareCapture();
         _captureStarted = true;
-        _capturedMessages = _pendingMessages.Values.ToArray();
+        _capturedMessages = _pendingMessages.Values.Where(static entry => entry.Staged && !entry.Materialized).ToArray();
         _capturedWrites = _pendingWrites.ToArray();
         var needsOwnership = NeedsOwnership();
         _pendingWrites.Clear();
-        _writeRevision++;
         foreach (var message in _capturedMessages)
         {
             if (_messages.ContainsKey(message.Envelope.MessageId))
@@ -353,7 +555,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             _messages.Add(message.Envelope.MessageId, message.Envelope);
             _unfinalizedMessageCount--;
-            _messageStates.Add(message.Envelope.MessageId, message.State);
+            message.Materialized = true;
+            _messageStates.Add(message.Envelope.MessageId, message.State!);
         }
         foreach (var result in _preparedDeliveries)
         {
@@ -427,7 +630,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _durableCompletedJobId = _committingCompletedJobId;
             foreach (var message in _capturedMessages)
             {
-                _pendingMessages.Remove(message.Envelope.MessageId);
+                message.Acknowledged = true;
+                ReleaseEntry(message);
             }
         }
         if (_preparedDeliveries.Length > 0)
@@ -443,17 +647,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         _capturedMessages = [];
         _capturedWrites = [];
-        _preparedWrites = [];
         _preparedDeliveries = [];
         _preparedDeadLetters = null;
-        _preparedOwnership = null;
-        _preparingOwnershipId = null;
-        _preparedWriteRevision = -1;
-        _preparing = false;
         _captureStarted = false;
         _captureHasChanges = false;
         _capturedStates = 0;
         _acknowledgedStates = 0;
+        ReleaseUnusedOwnership();
     }
 
     private void OnFaulted(Exception exception)
@@ -514,6 +714,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _reservedSequence = 0;
             _pendingMessages.Clear();
             _unfinalizedMessageCount = 0;
+            _liveBatches = 0;
+            _preparedOwnership = null;
             _durableOwnershipId = null;
             _durableJob = null;
             _durableCompletedJobId = null;
@@ -534,7 +736,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         ValidateReady();
         _pendingWrites.Add(operation);
-        _writeRevision++;
         try
         {
             await Task.WhenAll(WriteAsync(), operation.Completed.Task).ConfigureAwait(true);
@@ -542,10 +743,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
-            if (_pendingWrites.Remove(operation))
-            {
-                _writeRevision++;
-            }
+            _pendingWrites.Remove(operation);
         }
         async Task WriteAsync()
         {
@@ -616,13 +814,18 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private bool IsOwnershipTransitionPending(string ownershipId) =>
         string.Equals(ownershipId, _preparingOwnershipId, StringComparison.Ordinal)
+        || (_preparedOwnership is { } proposal && string.Equals(ownershipId, proposal.Id, StringComparison.Ordinal)
+            && (!HasCommittedOwnership() || !DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.Job, _job.Value)))
         || !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
         || (_job.Value is not null && !DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value));
+
+    private bool IsPendingAcknowledgement(Guid id) =>
+        _pendingMessages.TryGetValue(id, out var pending) && pending.Staged && !pending.Acknowledged;
 
     private DeliveryCandidate[] SelectMessages()
     {
         var now = _jobTimeProvider.GetUtcNow();
-        var selected = _messages.Values.Where(envelope => !_pendingMessages.ContainsKey(envelope.MessageId) && IsReadyForAttempt(envelope, now))
+        var selected = _messages.Values.Where(envelope => !IsPendingAcknowledgement(envelope.MessageId) && IsReadyForAttempt(envelope, now))
             .Take(_batchSize).Select(envelope => new DeliveryCandidate(envelope,
                 _messageStates.TryGetValue(envelope.MessageId, out var state) ? CopyState(state) : null)).ToArray();
         if (selected.Length == 0)
@@ -646,7 +849,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private void ValidateCandidate(DeliveryCandidate candidate)
     {
-        if (_pendingMessages.ContainsKey(candidate.Envelope.MessageId)
+        if (IsPendingAcknowledgement(candidate.Envelope.MessageId)
             || !_messages.TryGetValue(candidate.Envelope.MessageId, out var current)
             || !DurableEnvelopeEquivalence.AreEquivalent(candidate.Envelope, current))
         {
@@ -854,8 +1057,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         var envelope = outcome.Candidate.Envelope;
         var status = outcome.Result?.Status;
         var metricStatus = status == DeliveryStatus.RouteNotFound ? "route_not_found" : status?.ToString().ToLowerInvariant() ?? "error";
-        _instruments.OnOutboxMessageDelivered(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, metricStatus);
-        _instruments.OnOutboxDeliveryDuration(outcome.Duration, _grainContext.GrainId.Type.ToString(), envelope.RouteKey);
+        _instruments.OnOutboxMessageDelivered(_grainContext.GrainId.Type.ToString(), metricStatus);
+        _instruments.OnOutboxDeliveryDuration(outcome.Duration, _grainContext.GrainId.Type.ToString());
         switch (status)
         {
             case DeliveryStatus.Accepted:
@@ -922,20 +1125,39 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    public Task OnStop(CancellationToken cancellationToken = default)
+    public async Task OnStop(CancellationToken cancellationToken = default)
     {
-        Stop();
-        return Task.CompletedTask;
+        try
+        {
+            Stop();
+        }
+        finally
+        {
+            if (_preparationsDrained is { } drain)
+            {
+                await drain.Task.ConfigureAwait(true);
+            }
+        }
     }
 
     private void Stop()
     {
         _stateGeneration++;
+        _liveBatches = 0;
+        _preparedOwnership = null;
+        foreach (var entry in _pendingMessages.Values.Where(static entry => !entry.Staged).ToArray())
+        {
+            _pendingMessages.Remove(entry.Envelope.MessageId);
+        }
         _pumpCoordinator.Reset();
         _pumpResults.Clear(JobName);
         try
         {
             _shutdown.Cancel();
+        }
+        catch (AggregateException exception)
+        {
+            LogCancellationFailed(_logger, exception);
         }
         finally
         {
@@ -988,17 +1210,20 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     internal async Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        StartPreparation();
         try
         {
             ValidateReady();
-            if (_messages.Count > 0 && (replaceExisting || !HasCommittedOwnership()))
+            if (_messages.Count > 0 && ((replaceExisting && _liveBatches == 0) || !HasCommittedOwnership()))
             {
+                await PrepareOwnershipAsync(replaceExisting).ConfigureAwait(true);
                 await SubmitAsync(new OwnershipWrite(_stateGeneration, replaceExisting)).ConfigureAwait(true);
             }
         }
         finally
         {
             _gate.Release();
+            CompletePreparation();
         }
     }
 
@@ -1192,7 +1417,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             {
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
-            if (Count == 0)
+            if (Count == 0 && _liveBatches == 0 && _activePreparations == 0)
             {
                 await SubmitAsync(new ClearOwnerWrite(new(jobId, job, stateGeneration))).ConfigureAwait(true);
                 if (_jobId.Value is null)
@@ -1200,7 +1425,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     return DurableJobRunResult.Completed;
                 }
             }
-            if (_pendingMessages.Count > 0)
+            if (_unfinalizedMessageCount > 0 || (Count == 0 && _liveBatches > 0))
             {
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
@@ -1214,6 +1439,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _gate.Release();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An unclaimed outbox preparation failed.")]
+    private static partial void LogPreparationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An outbox cancellation callback failed during shutdown.")]
+    private static partial void LogCancellationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
@@ -1300,7 +1531,32 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     private readonly record struct PumpOwner(string? Id, DurableJob? Job, long Generation);
-    private sealed record PendingMessage(DurableEnvelope Envelope, OutboxMessageState State);
+    private sealed class PendingMessage(DurableEnvelope envelope)
+    {
+        public DurableEnvelope Envelope { get; } = envelope;
+        public OutboxMessageState? State { get; set; }
+        public int References { get; set; }
+        public bool Staged { get; set; }
+        public bool Materialized { get; set; }
+        public bool Acknowledged { get; set; }
+    }
+
+    private sealed class PreparedBatch(DurableOutbox owner, long generation, PendingMessage[] entries) : IPreparedOutboxBatch
+    {
+        public DurableOutbox Owner { get; } = owner;
+        public long Generation { get; } = generation;
+        public PendingMessage[] Entries { get; } = entries;
+        public bool Staged { get; set; }
+        public bool Disposed { get; private set; }
+        public void Dispose()
+        {
+            if (!Disposed)
+            {
+                Disposed = true;
+                Owner.ReleaseBatch(this);
+            }
+        }
+    }
     private sealed record OwnershipProposal(string Id, long Sequence, DurableJob Job, PumpOwner PreviousOwner);
     private sealed record DeliveryCandidate(DurableEnvelope Envelope, OutboxMessageState? State);
     private sealed record DeliveryOutcome(DeliveryCandidate Candidate, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);
