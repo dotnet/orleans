@@ -65,8 +65,7 @@ grain instance and before lifecycle startup, journal initialization, or replay. 
 activations use a single, noninterleaving grain execution model. Validation uses
 the resolved grain properties which configure runtime interleaving and the runtime's
 resolved placement strategy, including custom metadata and keyed placement aliases.
-Grain construction and
-local state registration precede validation. The standard state manager enrolls in the
+Grain construction and local state registration precede validation. The standard state manager enrolls in the
 grain lifecycle during grain-bound construction. Standard `IDurableStateManager`
 and `IJournaledStateManager` services alias that same scoped manager. Application
 code uses the typed named-state API and ordinary writes; messaging uses the journal
@@ -98,19 +97,22 @@ container before duplicate lookup or admission. Serialized null message bodies r
 valid payloads. Empty-owner clearing shares the inbox admission gate with delivery,
 so direct interleaved delivery proceeds after the clear's durable outcome.
 
-Handlers prepare local values asynchronously and return a non-null synchronous action.
-Messaging invokes the action once for its prepared attempt and stages inbox completion
-and `(SenderId, MessageId)` deduplication in the same uninterrupted activation turn.
-The action can stage outgoing messages using `Send`. The handler context and its
-outbox view permit sending only during that attempt's synchronous action. Preparation
-can build envelopes and inspect pending output. A preparation-time send violation
-retains the original error and prevents the returned action from running, even when
-the handler catches the rejection. An action-time violation stops capture and recovers
-through a fresh activation. The registered outbox state prepares durable wakeup
-prerequisites inside the serialized journal operation before capture.
-Readiness is rechecked after asynchronous preparation, so late staged work joins a
-capture only when its prerequisites are ready. Expected handler preparation failures
-produce bounded retry or dead-letter accounting.
+The handler context's outbox permits preparation during that attempt's `PrepareAsync`
+call and sending its own batches during the returned action. Every call checks the
+current attempt and phase before applying repeated-send semantics. A caught or replaced
+scope violation retains its original cause and prevents a successful completion commit.
+An action-time failure stops capture and recovers through a fresh activation.
+
+Preparation keeps business state, outgoing intents, and inbox completion unchanged.
+Independent journal writes can persist previously staged changes while preparation
+awaits. The runtime revalidates inbox ownership before applying business effects,
+staging prepared output, and recording `(SenderId, MessageId)` deduplication in one
+synchronous turn. Scheduling failures during preparation follow the ordinary bounded
+retry/dead-letter policy; handlers can catch them and prepare a safe alternative outcome.
+Each started acquisition remains owned through its actual result. Attempt cleanup
+drains outstanding acquisitions and disposes unused results, including preparations
+which user code failed to await. Successfully acquired handles remain owned through
+the attempt's persistence outcome.
 An accepted message whose handler is absent on a later activation completes immediately
 into dead-letter storage. Its processed marker suppresses duplicates through the
 configured deduplication window.
@@ -118,8 +120,8 @@ configured deduplication window.
 Acceptance and ownership repair retain local proposals until scheduling is acknowledged
 before synchronously staging the complete envelope and ownership pair. Journaled
 state callbacks encode the staged changes and acknowledge only the captured cohort.
-An unexpected apply failure is latched before yielding; journal readiness raises the
-original failure before capture. A journal failure permanently fences the activation,
+An unexpected apply failure is latched before yielding; synchronous journal validation
+raises the original failure before capture. A journal failure permanently fences the activation,
 signals pending
 preparations and callbacks, and faults its waiters. A fresh activation replays the actual
 durable outcome, including commits whose acknowledgement failed. A persistence-request

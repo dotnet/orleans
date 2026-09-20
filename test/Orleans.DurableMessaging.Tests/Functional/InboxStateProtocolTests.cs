@@ -47,7 +47,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task ApplyFailure_FencesAnEarlierPreparingWriteBeforePartialCapture()
+    public async Task ApplyFailure_FencesQueuedUncapturedWriteBeforePartialCapture()
     {
         var receiver = NewGrain();
         const string route = "messages/apply-failure";
@@ -59,30 +59,93 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-        using var preparation = outbox.BlockNextPreparation();
-        var earlier = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        await preparation.WaitAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
         Assert.Equal(0, manager.PendingWriteByteCount);
+        await OnTurnAsync(context, () =>
+            context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-cohort");
+        using var storage = Fixture.Storage.BlockWrite(journal);
+        var preceding = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.WaitUntilEnteredAsync();
+        // The manager lends C's committed buffer to storage until its ACK. Queuing a
+        // second write must add no bytes beyond that already-captured borrowed buffer.
+        var capturedBytes = manager.PendingWriteByteCount;
+        Assert.True(capturedBytes > 0);
+        var captures = grain.Captures.Count;
+        var earlier = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        Assert.Equal(capturedBytes, manager.PendingWriteByteCount);
+        var acknowledgements = 0;
+        outbox.AfterWriteCompleted = () => acknowledgements++;
         var failure = new InvalidOperationException("Injected synchronous apply failure.");
         await OnTurnAsync(context, () => grain.NextApplyFailure = failure);
-        var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
         handler.Release();
         await grain.ApplyAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await OnTurnAsync(context, () =>
         {
             Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
-            Assert.True(manager.PendingWriteByteCount > 0);
+            Assert.True(manager.PendingWriteByteCount > capturedBytes);
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
             Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => inbox.IsWritePrepared));
         });
-        preparation.Release();
+        Assert.Equal(captures, grain.Captures.Count);
+        Assert.Equal(0, acknowledgements);
+        storage.Release();
+        await preceding;
         Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => earlier));
         Assert.Same(failure, await grain.Faulted.Task);
         Assert.Same(failure, outbox.Failure);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(1, acknowledgements);
+        Assert.Equal(captures, grain.Captures.Count);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
         Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
         Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
+        var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
+        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(0, recovered.InboxCount);
+    }
+
+    [Fact]
+    public async Task ApplyFailure_WithoutEarlierWrite_FencesBeforeAnyPartialCapture()
+    {
+        var receiver = NewGrain();
+        const string route = "messages/no-earlier-write";
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
+        using var envelope = CreateEnvelope(receiver, NewMessage(203, "no-earlier-write"), route);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        var captures = grain.Captures.Count;
+        var failure = new IOException("Partial Apply must trigger its own execution fence.");
+        await OnTurnAsync(context, () =>
+        {
+            Assert.Equal(0, manager.PendingWriteByteCount);
+            grain.NextApplyFailure = failure;
+        });
+
+        // No earlier Write is queued: the receiver must admit its terminal flush outside
+        // the handler's read-only admission context and fence during execution validation.
+        handler.Release();
+        Assert.Same(failure, await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        Assert.Same(failure, outbox.Failure);
+        var fenced = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken));
+        Assert.Same(failure, fenced.InnerException);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(captures, grain.Captures.Count);
+        Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
+        Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
+        Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);

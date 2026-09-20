@@ -170,10 +170,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return result;
     }
 
-    public Task StageOutputAsync(DurableEnvelope envelope)
+    public async Task StageOutputAsync(DurableEnvelope envelope)
     {
-        _outbox.Send(envelope);
-        return Task.CompletedTask;
+        using var batch = await _outbox.PrepareSendAsync([envelope]);
+        _outbox.Send(batch);
     }
 
     public Task StageEffectAsync(DurableEffect effect)
@@ -330,6 +330,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     internal List<DurableEndpointSnapshot> Captures { get; } = [];
     private DurableEndpointSnapshot? _capturedSnapshot;
     internal Exception? NextApplyFailure { get; set; }
+    internal Action? AfterApply { get; set; }
     internal TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public void OnWriteStarted() => Captures.Add(_capturedSnapshot = CreateSnapshot());
@@ -379,11 +380,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }
 
-            DurableEnvelope? outgoing = null;
+            IPreparedOutboxBatch? outgoing = null;
             if (message.ForwardTo is { } target)
             {
-                outgoing = context.CreateEnvelope().To(target, "messages/forwarded")
+                var envelope = context.CreateEnvelope().To(target, "messages/forwarded")
                     .WithBody(message with { ForwardTo = null, ThrowDuringPreparation = false }).Build();
+                outgoing = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
             }
             return () =>
             {
@@ -403,6 +405,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                         context.Send(output);
                     }
                 }
+                AfterApply?.Invoke();
             };
         }
         finally
@@ -520,11 +523,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                     .To(context.GrainId, "messages/record")
                     .WithBody(new DurableTestMessage(Guid.NewGuid(), 81, "selection-side-effect"))
                     .Build();
-                context.Send(outgoing);
-                if (context.Envelope.RouteKey == "messages/duplicate-output")
+                var preparation = context.Outbox.PrepareSendAsync([outgoing]);
+                // The selection guard must reject before starting provider work. Never block a
+                // grain turn on an incomplete operation just to observe that rejection.
+                if (!preparation.IsCompleted)
                 {
-                    context.Send(outgoing);
+                    throw new InvalidOperationException("Handler selection preparation did not reject synchronously.");
                 }
+                _ = preparation.GetAwaiter().GetResult();
+                throw new InvalidOperationException("Handler selection unexpectedly allowed outgoing preparation.");
             }
 
             return true;

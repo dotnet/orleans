@@ -111,6 +111,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         }
 
         _writePlans.TryRemove(new KeyValuePair<JournalId, WritePlan>(journalId, plan));
+        plan.EntryScheduler = TaskScheduler.Current;
+        plan.EntryContext = ReceiverTestServices.CurrentGrainContext;
         plan.Entered.TrySetResult();
         if (plan.Fail)
         {
@@ -153,18 +155,23 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         public int Target { get; } = target;
         public bool Fail { get; } = fail;
         public int Seen;
+        public TaskScheduler? EntryScheduler;
+        public IGrainContext? EntryContext;
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    public sealed class WriteBarrier
+    public sealed class WriteBarrier : IDisposable
     {
         private readonly WritePlan _plan;
 
         internal WriteBarrier(WritePlan plan) => _plan = plan;
 
+        public TaskScheduler? EntryScheduler => _plan.EntryScheduler;
+        public IGrainContext? EntryContext => _plan.EntryContext;
         public Task WaitUntilEnteredAsync() => _plan.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         public void Release() => _plan.Release.TrySetResult();
+        public void Dispose() => Release();
         public void Fail() => _plan.Release.TrySetException(new IOException("Injected blocked journal write failure."));
     }
 

@@ -61,6 +61,8 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(0, handler.Applied);
         Assert.Empty(grain.GetSnapshotForTest().InboxDeadLetters);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(recovered.Effects);
@@ -101,11 +103,10 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         await OnTurnAsync(context, () =>
         {
-            var late = handler.Context!.CreateEnvelope().To(receiver.GetGrainId(), "late").WithBody(9).Build();
-            Assert.True(handler.Context.Outbox.TryGetMessage(handler.Output.MessageId, out var stored));
+            Assert.True(handler.Context!.Outbox.TryGetMessage(handler.Output.MessageId, out var stored));
             Assert.Equal(handler.Output.MessageId, stored.MessageId);
             Assert.Equal(handler.Output.MessageId, Assert.Single(handler.Context.Outbox.Messages).MessageId);
-            Assert.Throws<InvalidOperationException>(() => handler.Send(late));
+            Assert.Throws<InvalidOperationException>(() => handler.Send(handler.Batch));
             Assert.Equal(1, outbox.SendCalls);
             Assert.Single(outbox);
         });
@@ -117,6 +118,8 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(handler.Output.MessageId, Assert.Single(Fixture.GetStagedOutput(receiver)).MessageId);
         Assert.Equal(1, replayed.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(replayed.Effects).Count);
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
     }
 
     [Theory]
@@ -128,16 +131,31 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-        var handler = new SelectionHandler(throughOutbox);
-        await OnTurnAsync(context, () => context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler(handler));
-        using var envelope = CreateEnvelope(receiver, NewMessage(303, "selection"), "guarded/selection");
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, envelope.Value));
-        Assert.Contains("selection is read-only", failure.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.IsType<InvalidOperationException>(handler.Rejection);
-        Assert.Equal(0, handler.Prepared);
-        Assert.Equal(0, outbox.SendCalls);
-        Assert.Empty(outbox);
-        Assert.Empty(Fixture.GetStagedOutput(receiver));
+        // Application-owned raw capability: selection must reject its phase before ownership.
+        using var output = CreateEnvelope(receiver, NewMessage(307, "selection-output"), "output");
+        var batch = await OnTurnAsync(context, async () =>
+            await outbox.PrepareSendAsync([output.Value], TestContext.Current.CancellationToken));
+        try
+        {
+            var handler = new SelectionHandler(throughOutbox, batch);
+            await OnTurnAsync(context, () => context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler(handler));
+            using var envelope = CreateEnvelope(receiver, NewMessage(303, "selection"), "guarded/selection");
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, envelope.Value));
+            Assert.Contains("selection is read-only", failure.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.IsType<InvalidOperationException>(handler.Rejection);
+            Assert.Equal(0, handler.Prepared);
+            Assert.Equal(1, outbox.PreparationsStarted);
+            Assert.Equal(1, outbox.PreparationsCompleted);
+            var observation = Assert.Single(outbox.PreparedBatches);
+            Assert.Equal(output.Value.MessageId, Assert.Single(observation.MessageIds));
+            Assert.Equal(0, observation.DisposeCalls);
+            Assert.Equal(0, outbox.SendCalls);
+            Assert.Empty(outbox);
+            Assert.Empty(Fixture.GetStagedOutput(receiver));
+        }
+        finally { batch.Dispose(); }
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
     }
 
     [Theory]
@@ -165,11 +183,13 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(1, handler.Applied);
         Assert.Equal(1, outbox.SendCalls);
         Assert.Single(outbox);
-        Assert.Throws<InvalidOperationException>(() => handler.Send(handler.Output));
+        Assert.Throws<InvalidOperationException>(() => handler.Send(handler.Batch));
         Assert.Equal(1, outbox.SendCalls);
         Assert.Same(failure, outbox.Failure);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(recovered.Effects);
@@ -207,10 +227,13 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         using var two = CreateEnvelope(receiver, NewMessage(306, "second"), "guarded/second");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, two.Value)).Status);
         await second.Prepared.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(2, outbox.PreparedBatches.Count);
+        Assert.Equal(1, outbox.PreparedBatches[0].DisposeCalls);
+        Assert.Equal(0, outbox.PreparedBatches[1].DisposeCalls);
         Exception? rejection = null;
         await OnTurnAsync(context, () => second.Applying = () =>
         {
-            try { first.Send(second.Output); }
+            try { first.Send(second.Batch); }
             catch (InvalidOperationException exception)
             {
                 rejection = exception;
@@ -228,6 +251,9 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(first.Output.MessageId, Assert.Single(outbox).Key);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(2, outbox.PreparedBatches.Count);
+        Assert.All(outbox.PreparedBatches, batch => Assert.Equal(1, batch.DisposeCalls));
+        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Equal(one.Value.MessageId, Assert.Single(recovered.Effects).LogicalId);
@@ -244,6 +270,7 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         public TaskCompletionSource FinishPreparation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public IInboxHandlerContext? Context { get; private set; }
         public DurableEnvelope Output { get; private set; }
+        public IPreparedOutboxBatch Batch { get; private set; } = null!;
         public Exception? Rejection { get; private set; }
         public int Applied { get; private set; }
         public Exception? ApplyFailure { get; set; }
@@ -255,11 +282,12 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
             Context = context;
             _outbox = context.Outbox;
             Output = context.CreateEnvelope().To(context.GrainId, "output").WithBody(42).Build();
+            Batch = await context.Outbox.PrepareSendAsync([Output], cancellationToken);
             Prepared.TrySetResult();
             await BeginSend.Task.WaitAsync(cancellationToken);
             if (sendDuringPreparation)
             {
-                try { Send(Output); }
+                try { Send(Batch); }
                 catch (InvalidOperationException exception) { Rejection = exception; }
             }
             SendAttempted.TrySetResult();
@@ -270,19 +298,19 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
                 Applied++;
                 effects[context.Envelope.MessageId] = new DurableEffect(context.Envelope.MessageId, 1, 302, "apply-send");
                 Applying?.Invoke();
-                Send(Output);
+                Send(Batch);
                 if (ApplyFailure is { } failure) throw failure;
             };
         }
-        public void Send(DurableEnvelope envelope)
+        public void Send(IPreparedOutboxBatch batch)
         {
-            if (throughOutbox) _outbox!.Send(envelope);
-            else Context!.Send(envelope);
+            if (throughOutbox) _outbox!.Send(batch);
+            else Context!.Send(batch);
         }
         public void Dispose() { BeginSend.TrySetResult(); FinishPreparation.TrySetResult(); }
     }
 
-    private sealed class SelectionHandler(bool throughOutbox) : IInboxHandler
+    private sealed class SelectionHandler(bool throughOutbox, IPreparedOutboxBatch batch) : IInboxHandler
     {
         public Exception? Rejection { get; private set; }
         public int Prepared { get; private set; }
@@ -290,8 +318,8 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         {
             try
             {
-                if (throughOutbox) context.Outbox.Send(context.Envelope);
-                else context.Send(context.Envelope);
+                if (throughOutbox) context.Outbox.Send(batch);
+                else context.Send(batch);
             }
             catch (InvalidOperationException exception) { Rejection = exception; throw; }
             return true;
@@ -300,6 +328,19 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         {
             Prepared++;
             return ValueTask.FromResult<Action>(() => { });
+        }
+    }
+
+    private static Task<T> OnTurnAsync<T>(IGrainContext context, Func<Task<T>> action)
+    {
+        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() => { _ = CompleteAsync(); });
+        return completion.Task;
+
+        async Task CompleteAsync()
+        {
+            try { completion.SetResult(await action()); }
+            catch (Exception exception) { completion.SetException(exception); }
         }
     }
 

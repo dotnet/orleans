@@ -82,8 +82,20 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                 Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery(context, probe.Extension, queued.Value, Cancellation)).Status);
             }
             var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-            using var preparation = outbox.BlockNextPreparation();
-            var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+            var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+            var journal = JournalId.FromGrainId(receiver.GetGrainId());
+            await OnTurnAsync(context, () =>
+                context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "preceding-count-cohort");
+            var precedingStorage = Fixture.Storage.BlockWrite(journal);
+            var preceding = manager.WriteStateAsync(Cancellation).AsTask();
+            await precedingStorage.WaitUntilEnteredAsync();
+            var admitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            outbox.ValidateWriting = () =>
+            {
+                outbox.ValidateWriting = null;
+                admitted.TrySetResult();
+            };
+            var storage = Fixture.Storage.BlockWrite(journal);
             try
             {
                 using var scheduling = existing == 0 ? Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName) : null;
@@ -96,17 +108,18 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                     await AssertCountsAsync(context, probe, new(0, 0, 0));
                     scheduling.Continue();
                 }
-                await preparation.WaitAsync();
+                await admitted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
                 await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 var duplicate = StartDelivery(context, probe.Extension, envelope.Value, Cancellation);
-                preparation.Release();
+                Assert.False(delivery.IsCompleted);
+                precedingStorage.Release();
+                await preceding;
                 await storage.WaitUntilEnteredAsync();
                 await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 cancellation.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery);
                 await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 Assert.False(duplicate.IsCompleted);
-                var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
                 await OnTurnAsync(context, () =>
                 {
                     var error = Assert.Throws<InvalidOperationException>(() => manager.DeleteStateAsync(Cancellation).GetAwaiter().GetResult());
@@ -126,7 +139,9 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
             }
             finally
             {
+                precedingStorage.Release();
                 storage.Release();
+                outbox.ValidateWriting = null;
             }
         }
         finally

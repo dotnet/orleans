@@ -111,10 +111,11 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         }
         var value = Observation.Value!.Value + 1;
         var outgoing = context.CreateEnvelope().To(GrainId.Create("bootstrap-output", "capture"), "output").WithBody(value).Build();
+        var batch = await context.Outbox.PrepareSendAsync([outgoing], cancellationToken);
         return () =>
         {
             Observation.Value.Value = value;
-            context.Send(outgoing);
+            context.Send(batch);
             HandlerCalls++;
         };
     }
