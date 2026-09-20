@@ -726,7 +726,9 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         var before = fixture.GetOwnershipEpoch();
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        await fixture.CommitAsync();
         await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
         Assert.NotEqual(before, fixture.GetOwnershipEpoch());
         Assert.Equal(0, fixture.Outbox.Count);
@@ -823,19 +825,18 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task QueuedWriteWaitsForAdmittedOwnershipPreparation()
+    public async Task QueuedWriteDuringFeaturePreparation_CapturesOnlyPreviouslyStagedState()
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs, durableJobId: "owner:1");
         var scheduling = fixture.EnsureJobScheduledAsync(true, TestContext.Current.CancellationToken);
         await jobs.WaitUntilScheduledAsync();
-        var nextWrite = fixture.CommitAsync().AsTask();
-        Assert.False(nextWrite.IsCompleted);
+        await fixture.CommitAsync();
         Assert.Equal("owner:1", fixture.JobId.Value);
-        Assert.Equal(0, fixture.Manager.CaptureCount);
+        Assert.Equal(1, fixture.Manager.CaptureCount);
         Assert.True((await fixture.ExecuteJobAsync(jobs.OwnershipId!)).IsInProgress);
         jobs.Release();
-        await Task.WhenAll(scheduling, nextWrite).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await scheduling.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(jobs.OwnershipId, fixture.JobId.Value);
         Assert.Equal(2, fixture.Manager.WriteCompletedCount);
     }
@@ -853,17 +854,21 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task AdmittedSchedulingFailure_FencesWithoutCaptureOrBackoffRetry()
+    public async Task FeatureSchedulingFailure_LeavesJournalHealthyAndUnchanged()
     {
         var jobs = new RecordingJobManager(alwaysFail: true);
         using var fixture = new OutboxFixture(jobManager: jobs, jobTimeProvider: new FakeTimeProvider());
-        await Assert.ThrowsAsync<IOException>(() => fixture.CommitAsync().AsTask());
+        await Assert.ThrowsAsync<IOException>(() => fixture.SendAsync(fixture.Envelope));
         Assert.Equal(1, jobs.AttemptCount);
         Assert.Equal(0, fixture.Manager.CaptureCount);
-        Assert.Equal(1, fixture.Manager.FaultCount);
+        Assert.Equal(0, fixture.Manager.FaultCount);
+        Assert.Equal(0, fixture.PendingMessageCount);
         Assert.Null(fixture.JobId.Value);
         Assert.Null(fixture.Job.Value);
         Assert.Equal(0, fixture.JobSequence.Value);
+        await fixture.CommitAsync();
+        Assert.Null(fixture.Manager.Failure);
+        Assert.Equal(1, jobs.AttemptCount);
     }
 
     [Fact]
@@ -923,11 +928,11 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task DuplicateAfterCommitRemainsDeliverableAndUnfenced()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         var duplicate = fixture.CreateEquivalentEnvelope();
 
-        fixture.Send(duplicate);
+        await fixture.SendAsync(duplicate);
 
         Assert.NotSame(fixture.Envelope.Data, duplicate.Data);
         Assert.Equal(0, fixture.PendingMessageCount);
@@ -944,7 +949,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             Guid.NewGuid(),
             senderId: GrainId.Create("sender", "spoofed"));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => fixture.Send(envelope));
+        var exception = Assert.Throws<InvalidOperationException>(() => fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken));
 
         Assert.Contains("does not match the owning grain", exception.Message, StringComparison.Ordinal);
         Assert.Empty(fixture.Messages);
@@ -955,7 +960,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture();
 
-        fixture.Send(fixture.CreateEquivalentEnvelope());
+        await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
         await fixture.CommitAsync();
 
         Assert.Equal(1, fixture.Manager.WriteCompletedCount);
@@ -969,8 +974,8 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
 
-        fixture.Send(fixture.Envelope);
-        fixture.Send(fixture.CreateEquivalentEnvelope());
+        await fixture.SendAsync(fixture.Envelope);
+        await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
 
         Assert.Equal(1, fixture.Outbox.Count);
         Assert.Empty(fixture.Messages);
@@ -991,14 +996,14 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task ConflictingDuplicateFailsWithoutMutatingDurableOrProvisionalMessage(bool commitFirst)
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         if (commitFirst)
         {
             await fixture.CommitAsync();
         }
 
-        var exception = Assert.Throws<InvalidOperationException>(
-            () => fixture.Send(fixture.CreateConflictingEnvelope()));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.SendAsync(fixture.CreateConflictingEnvelope()));
 
         Assert.Contains(fixture.MessageId.ToString(), exception.Message, StringComparison.Ordinal);
         Assert.True(fixture.Outbox.TryGetMessage(fixture.MessageId, out var stored));
@@ -1010,11 +1015,11 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task FreshActivationDiscardsUncommittedIntentAndCanSendAgain()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         await fixture.StopAsync();
         using var recovered = fixture.Recreate();
         Assert.Equal(0, recovered.Outbox.Count);
-        recovered.Send(fixture.Envelope);
+        await recovered.SendAsync(fixture.Envelope);
         await recovered.CommitAsync();
         Assert.Single(recovered.Messages);
         Assert.Equal(0, recovered.PendingMessageCount);
@@ -1024,9 +1029,9 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task MessageAddedAfterWriteCaptureRemainsFencedForNextCommit()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         var late = fixture.CreateEnvelope(Guid.NewGuid());
-        fixture.Manager.AfterCapture = () => { fixture.Send(late); return Task.CompletedTask; };
+        fixture.Manager.AfterCapture = () => fixture.SendAsync(late);
         await fixture.CommitAsync();
         Assert.False(fixture.IsPending(fixture.MessageId));
         Assert.True(fixture.IsPending(late.MessageId));
@@ -1211,26 +1216,24 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs);
-        var original = fixture.Envelope;
         var outgoing = fixture.CreateEnvelope(Guid.NewGuid());
-        fixture.Send(outgoing);
-        var write = fixture.CommitAsync().AsTask();
+        var preparation = fixture.PrepareAsync(outgoing).AsTask();
         await jobs.WaitUntilScheduledAsync();
-
-        Assert.Equal(2, fixture.Outbox.Count);
-        Assert.Equal(2, fixture.Outbox.Messages.Count());
-        Assert.True(fixture.Outbox.TryGetMessage(outgoing.MessageId, out var visible));
-        Assert.Equal(outgoing, visible);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Single(fixture.Outbox.Messages);
+        Assert.False(fixture.Outbox.TryGetMessage(outgoing.MessageId, out _));
         Assert.Single(fixture.Messages);
-        Assert.Equal(original, fixture.Messages[original.MessageId]);
         Assert.Null(fixture.JobId.Value);
         Assert.Null(fixture.Job.Value);
         Assert.Equal(0, fixture.JobSequence.Value);
         Assert.Equal(0, fixture.Manager.CaptureCount);
-        Assert.False(write.IsCompleted);
-
+        Assert.False(preparation.IsCompleted);
         jobs.Release();
-        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        using (var batch = await preparation)
+        {
+            fixture.Outbox.Send(batch);
+        }
+        await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
         Assert.Equal(jobs.OwnershipId, fixture.JobId.Value);
         Assert.Equal("replacement", fixture.Job.Value?.Id);
@@ -1247,11 +1250,11 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task RecoveredNonemptyOutboxWithoutNewIntent_AcquiresOwnerOnWrite()
+    public async Task RecoveredNonemptyOutboxWithoutNewIntent_PreparesRepairBeforeWrite()
     {
         var jobs = new RecordingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs);
-        await fixture.CommitAsync();
+        await fixture.EnsureJobScheduledAsync(false, TestContext.Current.CancellationToken);
         Assert.Single(fixture.Messages);
         Assert.Equal(1, jobs.AttemptCount);
         Assert.Same(jobs.LastJob, fixture.Job.Value);
@@ -1260,36 +1263,36 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task LateIntentDuringPreparation_JoinsPreparedCaptureCohort()
+    public async Task ConcurrentPreparation_SharesOwnerBeforeSynchronousStaging()
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
-        fixture.Send(fixture.Envelope);
-        var write = fixture.CommitAsync().AsTask();
+        var first = fixture.PrepareAsync(fixture.Envelope).AsTask();
         await jobs.WaitUntilScheduledAsync();
         var late = fixture.CreateEnvelope(Guid.NewGuid());
-        fixture.Send(late);
-        fixture.Send(fixture.CreateEquivalentEnvelope());
-        Assert.Equal(2, fixture.Outbox.Count);
+        var second = fixture.PrepareAsync(late, fixture.CreateEquivalentEnvelope()).AsTask();
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Outbox.Messages);
         Assert.Empty(fixture.Messages);
         jobs.Release();
-        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        using (var batch = await first) fixture.Outbox.Send(batch);
+        using (var batch = await second) fixture.Outbox.Send(batch);
+        Assert.Equal(2, fixture.Outbox.Count);
+        await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
-        Assert.False(fixture.IsPending(late.MessageId));
-        Assert.False(fixture.IsPending(fixture.MessageId));
+        Assert.Equal(0, fixture.PendingMessageCount);
         using var captured = fixture.Recreate();
         Assert.Equal(2, captured.Outbox.Count);
         Assert.True(captured.Outbox.TryGetMessage(late.MessageId, out _));
         await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
-        Assert.Equal(0, fixture.PendingMessageCount);
     }
 
     [Fact]
     public async Task CancelledCallerWait_PreservesQueuedCaptureAndAcknowledgement()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Manager.AfterCapture = () => { entered.TrySetResult(); return release.Task; };
@@ -1319,7 +1322,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task RequestVeto_PreservesLocalIntentAndHealthyRetry()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         var rejected = new InvalidOperationException("Request rejected before admission.");
         fixture.Manager.RejectNextRequest = rejected;
         Assert.Same(rejected, await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.CommitAsync().AsTask()));
@@ -1336,7 +1339,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task MissingPreparedWakeup_FinalizationFaultsBeforeApplyingIntent()
     {
         using var fixture = new OutboxFixture();
-        fixture.Send(fixture.CreateEnvelope(Guid.NewGuid()));
+        await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()));
         fixture.Manager.BeforeFinalization = () => fixture.ClearPreparedOwnership();
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.CommitAsync().AsTask());
         Assert.Contains("acknowledged durable job ownership", error.Message, StringComparison.Ordinal);
@@ -1352,11 +1355,11 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
-        fixture.Send(fixture.Envelope);
-        var write = fixture.CommitAsync().AsTask();
+        var preparation = fixture.PrepareAsync(fixture.Envelope).AsTask();
         await jobs.WaitUntilScheduledAsync();
-        fixture.Manager.Fail(new IOException("Terminal operation fault."));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+        var failure = new IOException("Terminal operation fault.");
+        fixture.Manager.Fail(failure);
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => preparation));
         Assert.Empty(fixture.Messages);
         Assert.Null(fixture.JobId.Value);
         Assert.Null(fixture.Job.Value);
@@ -1371,7 +1374,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var jobs = new RecordingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs, durableJobId: "owner:1");
         var handle = fixture.Job.Value;
-        fixture.Send(fixture.CreateEnvelope(Guid.NewGuid()));
+        await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()));
         await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
         Assert.Same(handle, fixture.Job.Value);
@@ -1393,7 +1396,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             return await release.Task;
         }, durableJobId: "owner:1");
         var second = fixture.CreateEnvelope(Guid.NewGuid());
-        fixture.Send(second);
+        await fixture.SendAsync(second);
         await fixture.CommitAsync();
         var delivery = fixture.DeliverWithCancellationAsync(cancellation.Token);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -1430,7 +1433,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var lookupCalls = fixture.Messages.TryGetValueCalls;
         for (var i = 0; i < batchSize; i++)
         {
-            fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+            await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
             Assert.Equal(i + 2, fixture.Outbox.Count);
         }
 
@@ -1450,31 +1453,31 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
-        fixture.Send(fixture.Envelope);
+        var preparation = fixture.PrepareAsync(fixture.Envelope).AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        Assert.Equal(0, fixture.Outbox.Count);
+        jobs.Release();
+        using (var batch = await preparation) fixture.Outbox.Send(batch);
         var duringPreparation = fixture.Envelope with { MessageId = Guid.NewGuid() };
         var afterCapture = fixture.Envelope with { MessageId = Guid.NewGuid() };
-        fixture.Manager.AfterCapture = () =>
+        fixture.Manager.AfterCapture = async () =>
         {
             Assert.Equal(2, fixture.Outbox.Count);
             Assert.Equal(2, fixture.Outbox.Messages.Count());
             Assert.Equal(2, fixture.GetOutboxDepth());
             Assert.Equal(2, fixture.PendingMessageCount);
             Assert.Equal(2, fixture.Messages.Count);
-            fixture.Send(fixture.CreateEquivalentEnvelope());
-            Assert.Throws<InvalidOperationException>(() => fixture.Send(fixture.CreateConflictingEnvelope()));
-            fixture.Send(afterCapture);
+            await fixture.SendAsync(fixture.CreateEquivalentEnvelope());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.SendAsync(fixture.CreateConflictingEnvelope()));
+            await fixture.SendAsync(afterCapture);
             Assert.Equal(3, fixture.Outbox.Count);
             Assert.Equal(3, fixture.GetOutboxDepth());
-            return Task.CompletedTask;
         };
-        var write = fixture.CommitAsync().AsTask();
-        await jobs.WaitUntilScheduledAsync();
-        fixture.Send(duringPreparation);
+        await fixture.SendAsync(duringPreparation);
         Assert.Equal(2, fixture.Outbox.Count);
         Assert.Equal(2, fixture.GetOutboxDepth());
         Assert.Empty(fixture.Messages);
-        jobs.Release();
-        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await fixture.CommitAsync();
 
         Assert.Equal(3, fixture.Outbox.Count);
         Assert.Equal(3, fixture.Outbox.Messages.Count());
@@ -1501,7 +1504,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task Depth_FailedCaptureRemovesMetricContributionAndFreshReplayUsesDurableOutcome(bool committed)
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         var late = fixture.Envelope with { MessageId = Guid.NewGuid() };
         var failure = new IOException("Outbox depth append failure.");
         if (committed)
@@ -1512,12 +1515,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             fixture.Manager.FailNextWrite(failure);
         }
-        fixture.Manager.AfterCapture = () =>
+        fixture.Manager.AfterCapture = async () =>
         {
-            fixture.Send(late);
+            await fixture.SendAsync(late);
             Assert.Equal(2, fixture.Outbox.Count);
             Assert.Equal(2, fixture.GetOutboxDepth());
-            return Task.CompletedTask;
         };
 
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => fixture.CommitAsync().AsTask()));
@@ -1539,8 +1541,8 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task Depth_PartialFinalizationCountsEachIntentOnceBeforeTerminalFailure()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
-        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        await fixture.SendAsync(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
         var failure = new IOException("Message state insertion failed.");
         fixture.MessageStates.BeforeAdd = () =>
         {
@@ -1580,7 +1582,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         using var fixture = new OutboxFixture(_ => ValueTask.FromResult(result),
             maxDeliveryAttempts: status == DeliveryStatus.RouteNotFound ? 1 : 3, durableJobId: "owner:1");
         var outgoing = fixture.Envelope with { MessageId = Guid.NewGuid() };
-        fixture.Send(outgoing);
+        await fixture.SendAsync(outgoing);
         Assert.Equal(2, fixture.GetOutboxDepth());
         var expected = status == DeliveryStatus.Backpressured ? 2 : 1;
         fixture.Manager.AfterCapture = () =>
@@ -1608,17 +1610,19 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task Depth_QuiescentDeleteDiscardsLocalIntentsAndStartsNewEpoch()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
-        fixture.Send(fixture.Envelope);
-        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        await fixture.SendAsync(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
         var epoch = fixture.GetOwnershipEpoch();
         Assert.Equal(2, fixture.GetOutboxDepth());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        await fixture.CommitAsync();
         await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(0, fixture.Outbox.Count);
         Assert.Empty(fixture.Outbox.Messages);
         Assert.Equal(0, fixture.GetOutboxDepth());
         Assert.NotEqual(epoch, fixture.GetOwnershipEpoch());
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         Assert.Equal(1, fixture.Outbox.Count);
         Assert.Equal(1, fixture.GetOutboxDepth());
@@ -1632,7 +1636,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.StartAsync();
         Assert.Equal(1, fixture.Outbox.Count);
         Assert.Equal(1, fixture.GetOutboxDepth());
-        fixture.Send(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
         Assert.Equal(2, fixture.GetOutboxDepth());
         await fixture.StopAsync();
         Assert.Equal(2, fixture.Outbox.Count);
@@ -1653,7 +1657,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     public async Task StateWriteAdmission_SeesStagedOutboxCommands(bool eagerCapture)
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false, eagerCapture: eagerCapture);
-        fixture.Send(fixture.Envelope);
+        await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         Assert.Single(fixture.Messages);
         Assert.Equal(0, fixture.PendingMessageCount);
@@ -1664,6 +1668,265 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(2, fixture.Manager.CaptureCount);
         Assert.Equal(2, fixture.Manager.WriteCompletedCount);
         Assert.Null(fixture.Manager.Failure);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_SnapshotsCollectionBeforeAwaitAndDefersEarlyCallback()
+    {
+        var jobs = new BlockingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        var original = fixture.Envelope;
+        var messages = new[] { original };
+        var preparing = fixture.Outbox.PrepareSendAsync(messages, TestContext.Current.CancellationToken).AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        messages[0] = fixture.CreateConflictingEnvelope();
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Outbox.Messages);
+        Assert.False(fixture.Outbox.TryGetMessage(original.MessageId, out _));
+        Assert.True((await fixture.ExecuteJobAsync(jobs.OwnershipId!)).IsInProgress);
+        await fixture.CommitAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Null(fixture.Job.Value);
+        jobs.Release();
+        using var batch = await preparing;
+        Assert.True((await fixture.ExecuteJobAsync(jobs.LastJob!, "prepared", TestContext.Current.CancellationToken)).IsInProgress);
+        fixture.Outbox.Send(batch);
+        fixture.Outbox.Send(batch);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(original, Assert.Single(fixture.Outbox.Messages));
+        await fixture.CommitAsync();
+        Assert.Equal(original, Assert.Single(fixture.Messages).Value);
+        Assert.Same(jobs.LastJob, fixture.Job.Value);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_SequentialLiveBatchesShareExactOwnerWithoutHoldingGate()
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        using var first = await fixture.PrepareAsync(fixture.Envelope);
+        using var second = await fixture.PrepareAsync(fixture.CreateEquivalentEnvelope(), fixture.CreateEnvelope(Guid.NewGuid()));
+        Assert.Equal(1, jobs.AttemptCount);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Outbox.Messages);
+        fixture.Outbox.Send(first);
+        fixture.Outbox.Send(second);
+        first.Dispose();
+        second.Dispose();
+        await fixture.CommitAsync();
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Same(jobs.LastJob, fixture.Job.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedBatch_ConflictsRejectWholePreparationBeforeScheduling(bool withinBatch)
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        using var reserved = withinBatch ? null : await fixture.PrepareAsync(fixture.Envelope);
+        var envelopes = withinBatch
+            ? new[] { fixture.Envelope, fixture.CreateConflictingEnvelope() }
+            : new[] { fixture.CreateEnvelope(Guid.NewGuid()), fixture.CreateConflictingEnvelope() };
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await fixture.PrepareAsync(envelopes));
+        Assert.Equal(withinBatch ? 0 : 1, jobs.AttemptCount);
+        Assert.Equal(withinBatch ? 0 : 1, fixture.PendingMessageCount);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.Manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_DisposingUnusedOwnerAllowsOrphanRetirement()
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        var batch = await fixture.PrepareAsync(fixture.Envelope);
+        var job = Assert.IsType<DurableJob>(jobs.LastJob);
+        Assert.True((await fixture.ExecuteJobAsync(job, "live", TestContext.Current.CancellationToken)).IsInProgress);
+        batch.Dispose();
+        batch.Dispose();
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Equal(DurableJobRunStatus.Completed,
+            (await fixture.ExecuteJobAsync(job, "abandoned", TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(0, fixture.Manager.WriteCount);
+        Assert.Null(fixture.Job.Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedBatch_CanceledWaitRetainsResourcesUntilActualScheduleOutcome(bool fail)
+    {
+        var jobs = new BlockingJobManager { IgnoreCancellation = true, Failure = fail ? new IOException("Lost schedule response") : null };
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        using var cancellation = new CancellationTokenSource();
+        var preparation = fixture.Outbox.PrepareSendAsync([fixture.Envelope], cancellation.Token).AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => preparation);
+        Assert.True((await fixture.ExecuteJobAsync(jobs.OwnershipId!)).IsInProgress);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        var drained = fixture.PreparationsDrained;
+        jobs.Release();
+        await drained.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Null(fixture.Manager.Failure);
+        Assert.Equal(DurableJobRunStatus.Completed,
+            (await fixture.ExecuteJobAsync(jobs.LastJob!, "resolved", TestContext.Current.CancellationToken)).Status);
+        await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PreparedBatch_ShutdownDrainsLateScheduleWithoutLeakingHandle(bool callbackThrows)
+    {
+        var jobs = new BlockingJobManager { IgnoreCancellation = true, ThrowOnCancellation = callbackThrows };
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        var preparation = fixture.PrepareAsync(fixture.Envelope).AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        var stop = fixture.StopAsync();
+        Assert.False(stop.IsCompleted);
+        jobs.Release();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => preparation);
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.Manager.WriteCount);
+        Assert.Equal(callbackThrows ? 1 : 0, jobs.CancellationCallbacks);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_ExistingEquivalentMessageRemainsDispatchableAndDoesNotResurrect()
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(jobManager: jobs, durableJobId: "owner:1");
+        using var batch = await fixture.PrepareAsync(fixture.CreateEquivalentEnvelope());
+        var owner = fixture.Job.Value!;
+        await fixture.DeliverAsync();
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.True((await fixture.ExecuteJobAsync(owner, "leased", TestContext.Current.CancellationToken)).IsInProgress);
+        await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+        Assert.Same(owner, fixture.Job.Value);
+        fixture.Outbox.Send(batch);
+        fixture.Outbox.Send(batch);
+        await fixture.CommitAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Equal(0, jobs.AttemptCount);
+        batch.Dispose();
+        await fixture.ExecuteJobAsync(owner, "retire", TestContext.Current.CancellationToken);
+        await fixture.RunRegisteredTimerAtAsync(1);
+        Assert.Null(fixture.Job.Value);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_DisposeAfterStagePreservesAckAndLaterCohort()
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        var first = await fixture.PrepareAsync(fixture.Envelope);
+        using var later = await fixture.PrepareAsync(fixture.CreateEnvelope(Guid.NewGuid()));
+        fixture.Outbox.Send(first);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Manager.AfterCapture = () => { entered.SetResult(); return release.Task; };
+        var write = fixture.CommitAsync().AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        first.Dispose();
+        fixture.Outbox.Send(later);
+        later.Dispose();
+        await fixture.DeliverAsync();
+        Assert.Equal(0, fixture.DeliveryCount);
+        Assert.Equal(2, fixture.Outbox.Count);
+        release.SetResult();
+        await write;
+        Assert.Equal(1, fixture.PendingMessageCount);
+        Assert.Single(fixture.Messages);
+        fixture.Manager.AfterCapture = null;
+        await fixture.CommitAsync();
+        Assert.Equal(2, fixture.Messages.Count);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        await fixture.DeliverAsync();
+        Assert.Equal(2, fixture.DeliveryCount);
+        Assert.Empty(fixture.Messages);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_EmptyAndInvalidHandlesPreserveState()
+    {
+        var jobs = new RecordingJobManager();
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        using var other = new OutboxFixture(hasDurableMessage: false);
+        var empty = await fixture.PrepareAsync();
+        fixture.Outbox.Send(empty);
+        fixture.Outbox.Send(empty);
+        Assert.Throws<InvalidOperationException>(() => other.Outbox.Send(empty));
+        empty.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => fixture.Outbox.Send(empty));
+        await fixture.CommitAsync();
+        var writes = fixture.Manager.WriteCompletedCount;
+        await fixture.CommitAsync();
+        Assert.Equal(writes + 1, fixture.Manager.WriteCompletedCount);
+        Assert.Equal(0, jobs.AttemptCount);
+        Assert.Equal(0, fixture.Outbox.Count);
+        using var live = await fixture.PrepareAsync(fixture.Envelope);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        live.Dispose();
+        await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+        live.Dispose();
+        using var next = await fixture.PrepareAsync(fixture.Envelope);
+        fixture.Outbox.Send(next);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(2, jobs.AttemptCount);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_CanceledWaitSharesLateCandidateWithQueuedPeer()
+    {
+        var jobs = new BlockingJobManager { IgnoreCancellation = true };
+        using var fixture = new OutboxFixture(hasDurableMessage: false, jobManager: jobs);
+        using var cancellation = new CancellationTokenSource();
+        var abandoned = fixture.Outbox.PrepareSendAsync([fixture.Envelope], cancellation.Token).AsTask();
+        await jobs.WaitUntilScheduledAsync();
+        var peer = fixture.PrepareAsync(fixture.CreateEquivalentEnvelope()).AsTask();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
+        jobs.Release();
+        using var batch = await peer;
+        await fixture.PreparationsDrained.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(1, fixture.PendingMessageCount);
+        Assert.Equal(0, fixture.Outbox.Count);
+        fixture.Outbox.Send(batch);
+        batch.Dispose();
+        await fixture.CommitAsync();
+        Assert.Single(fixture.Messages);
+        Assert.Same(jobs.LastJob, fixture.Job.Value);
+        Assert.Equal(0, fixture.PendingMessageCount);
+    }
+
+    [Fact]
+    public async Task PreparedBatch_StoppedLiveHandleCannotStageOrReleaseNewOwnership()
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        var batch = await fixture.PrepareAsync(fixture.Envelope);
+        await fixture.StopAsync();
+        Assert.ThrowsAny<OperationCanceledException>(() => fixture.Outbox.Send(batch));
+        batch.Dispose();
+        batch.Dispose();
+        Assert.Equal(0, fixture.Outbox.Count);
+        Assert.Equal(0, fixture.PendingMessageCount);
+        Assert.Empty(fixture.Messages);
+        using var recovered = fixture.Recreate();
+        using var fresh = await recovered.PrepareAsync(recovered.Envelope);
+        Assert.Throws<InvalidOperationException>(() => recovered.Outbox.Send(batch));
+        recovered.Outbox.Send(fresh);
+        Assert.Equal(1, recovered.Outbox.Count);
     }
 
     private sealed class OutboxFixture : IDisposable
@@ -1867,6 +2130,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         public TestDurableValue<DurableJob> Job { get; }
         public TestDurableValue<string> CompletedJobId { get; }
         public TestDurableValue<long> JobSequence { get; }
+        public Task PreparationsDrained => ((TaskCompletionSource)_outbox.GetType()
+            .GetField("_preparationsDrained", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_outbox)!).Task;
+
         public int PendingMessageCount => GetPendingMessageIds().Count;
 
         public Task DeliverAsync() =>
@@ -2026,7 +2292,14 @@ public sealed class DurableOutboxDeliveryBatchTests
             return result ?? throw new InvalidOperationException("The outbox depth gauge did not report a value.");
         }
 
-        public void Send(DurableEnvelope envelope) => _outbox.Send(envelope);
+        public async Task SendAsync(DurableEnvelope envelope)
+        {
+            using var batch = await _outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken);
+            _outbox.Send(batch);
+        }
+
+        public ValueTask<IPreparedOutboxBatch> PrepareAsync(params DurableEnvelope[] envelopes) =>
+            _outbox.PrepareSendAsync(envelopes, TestContext.Current.CancellationToken);
 
         public ValueTask CommitAsync() => Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
@@ -2200,15 +2473,9 @@ public sealed class DurableOutboxDeliveryBatchTests
             {
                 WriteCount++;
                 BeforePreparation?.Invoke();
-                while (_states.Values.FirstOrDefault(static state => !state.IsWritePrepared) is { } unprepared)
+                foreach (var state in _states.Values)
                 {
-                    var preparation = unprepared.PrepareWriteAsync(CancellationToken.None);
-                    var synchronous = preparation.IsCompleted;
-                    await preparation;
-                    if (synchronous && !unprepared.IsWritePrepared)
-                    {
-                        throw new InvalidOperationException("Synchronous state preparation did not establish readiness.");
-                    }
+                    Assert.True(state.IsWritePrepared, "Feature prerequisites must be prepared before journal execution.");
                 }
                 BeforeFinalization?.Invoke();
                 using var writer = _format.CreateWriter();
@@ -2330,6 +2597,11 @@ public sealed class DurableOutboxDeliveryBatchTests
         private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public string? OwnershipId { get; private set; }
+        public DurableJob? LastJob { get; private set; }
+        public bool IgnoreCancellation { get; init; }
+        public bool ThrowOnCancellation { get; init; }
+        public Exception? Failure { get; init; }
+        public int CancellationCallbacks { get; private set; }
 
         public async Task<DurableJob> ScheduleJobAsync(
             ScheduleJobRequest request,
@@ -2337,8 +2609,13 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             OwnershipId = request.Metadata!["orleans.messaging.ownership-id"];
             _attempted.TrySetResult();
-            await _release.Task.WaitAsync(cancellationToken);
-            return new DurableJob
+            using var registration = ThrowOnCancellation ? cancellationToken.Register(() =>
+            {
+                CancellationCallbacks++;
+                throw new InvalidOperationException("Application cancellation callback failure.");
+            }) : default;
+            await _release.Task.WaitAsync(IgnoreCancellation ? CancellationToken.None : cancellationToken);
+            LastJob = new DurableJob
             {
                 Id = "replacement",
                 Name = request.JobName,
@@ -2347,6 +2624,8 @@ public sealed class DurableOutboxDeliveryBatchTests
                 ShardId = "test",
                 Metadata = request.Metadata
             };
+            if (Failure is { } failure) throw failure;
+            return LastJob;
         }
 
         public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
