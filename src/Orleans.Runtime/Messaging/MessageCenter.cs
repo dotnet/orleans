@@ -590,6 +590,8 @@ namespace Orleans.Runtime.Messaging
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {
+            if (!MayForward(message, this.messagingOptions)) return false;
+
             Action<Message, Connection?, Exception?>? sendMessage = null;
             if (Gateway?.TryGetClientState(message, out var client) is true)
             {
@@ -598,20 +600,6 @@ namespace Orleans.Runtime.Messaging
             else if (IsForwardedClientRequest(message, _siloAddress))
             {
                 sendMessage = SendForwardedClientRequest;
-            }
-
-            if (!MayForward(message, this.messagingOptions))
-            {
-                if (sendMessage is null)
-                {
-                    return false;
-                }
-
-                sendMessage(
-                    message,
-                    null,
-                    new SiloUnavailableException($"The maximum forwarding count of {messagingOptions.MaxForwardCount} was reached."));
-                return true;
             }
 
             message.ForwardCount = message.ForwardCount + 1;
