@@ -528,6 +528,33 @@ public sealed class ZooKeeperReadRetryTests
         Assert.Same(native.SetData, wrapped.SetData);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeFixture_TeardownTimeout_JoinsActualCompletion(bool fail)
+    {
+        var nativeCompletion = Gate();
+        var timeout = new TimeoutException("fixture teardown wait expired");
+        timeout.Data["ClusteringTestKit.CleanupCompletion"] = nativeCompletion.Task;
+        var nativeFailure = new KeeperException.ConnectionLossException();
+        var drain = ZooKeeperReadResilienceTests.DrainFixtureAsync(() => ValueTask.FromException(timeout));
+
+        try
+        {
+            Assert.False(drain.IsCompleted);
+        }
+        finally
+        {
+            if (fail)
+                nativeCompletion.SetException(nativeFailure);
+            else
+                nativeCompletion.SetResult();
+        }
+
+        Assert.Same(fail ? (Exception)nativeFailure : timeout, await Record.ExceptionAsync(() => drain));
+        Assert.True(nativeCompletion.Task.IsCompleted);
+    }
+
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private sealed class Harness

@@ -8,7 +8,6 @@ using Orleans.Runtime.Membership;
 using Orleans.TestingHost.Utils;
 using org.apache.zookeeper;
 using TestExtensions;
-using Tester.ZooKeeperUtils;
 using Xunit;
 
 namespace UnitTests.MembershipTests;
@@ -20,6 +19,8 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
 {
     private readonly ZooKeeperNativeDiagnostics _diagnostics = new();
     private readonly ConcurrentBag<ZooKeeperSession> _sessions = [];
+    private readonly List<MembershipTableTestFixture> _fixtures = [];
+    private readonly ConcurrentBag<Task> _probes = [];
     private readonly string _socketLog = Path.Combine(AppContext.BaseDirectory, "TestResults", $"zookeeper-sockets-{Guid.NewGuid():N}.log");
     private readonly ILoggerFactory _loggerFactory = TestingUtils.CreateDefaultLoggerFactory(
         $"zookeeper-reads-{Guid.NewGuid():N}.log", new LoggerFilterOptions());
@@ -27,17 +28,24 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        Assert.True(await ZookeeperTestUtils.EnsureZooKeeperAsync(TestContext.Current.CancellationToken),
-            "ZooKeeper resilience tests require the configured ZooKeeper service.");
+        Assert.False(string.IsNullOrWhiteSpace(TestDefaultConfiguration.ZooKeeperConnectionString),
+            "ZooKeeper resilience tests require a configured connection string.");
         _connectionString = TestDefaultConfiguration.ZooKeeperConnectionString!;
+        var probe = ZooKeeper.Using(_connectionString, 2000, new ConformanceWatcher(),
+            async client => await client.existsAsync("/", false) is not null);
+        _probes.Add(probe);
+        Assert.True(await probe.WaitAsync(TestContext.Current.CancellationToken),
+            "ZooKeeper resilience tests require the configured ZooKeeper service.");
     }
 
     public async ValueTask DisposeAsync()
     {
         try
         {
-            // A canceled caller wait can finish before its native requests and close.
-            await Task.WhenAll(_sessions.Select(session => session.Completion));
+            // Fixture teardown and canceled caller waits can return before native close.
+            await Task.WhenAll(_fixtures.Select(fixture => DrainFixtureAsync(fixture.DisposeAsync))
+                .Concat(_sessions.Select(session => session.Completion))
+                .Concat(_probes));
         }
         finally
         {
@@ -84,8 +92,22 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
                 .DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(cancellationToken),
             TestContext.Current.CancellationToken);
 
-    private MembershipTableTestFixture CreateFixture() =>
-        new(nameof(ZooKeeperReadResilienceTests), (serviceId, clusterId, cancellationToken) =>
+    internal static async Task DrainFixtureAsync(Func<ValueTask> dispose)
+    {
+        try
+        {
+            await dispose();
+        }
+        catch (TimeoutException exception) when (exception.Data["ClusteringTestKit.CleanupCompletion"] is Task completion)
+        {
+            await completion;
+            throw;
+        }
+    }
+
+    private MembershipTableTestFixture CreateFixture()
+    {
+        var fixture = new MembershipTableTestFixture(nameof(ZooKeeperReadResilienceTests), (serviceId, clusterId, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
             var logger = _loggerFactory.CreateLogger<ZooKeeperBasedMembershipTable>();
@@ -106,16 +128,21 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
             return ValueTask.FromResult(new MembershipTableTestHandle(table,
                 () => new ValueTask(Task.WhenAll(sessions.Select(session => session.Completion)))));
         }, IsConformanceClusterDeletedAsync);
+        _fixtures.Add(fixture);
+        return fixture;
+    }
 
     private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return await ZooKeeper.Using(_connectionString, 10_000, new ConformanceWatcher(), async client =>
+        var probe = ZooKeeper.Using(_connectionString, 10_000, new ConformanceWatcher(), async client =>
         {
             await client.sync("/");
             cancellationToken.ThrowIfCancellationRequested();
             return await client.existsAsync("/" + clusterId, false) is null;
         });
+        _probes.Add(probe);
+        return await probe;
     }
 
     private sealed class ConformanceWatcher : Watcher
