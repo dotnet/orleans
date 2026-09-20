@@ -37,13 +37,15 @@ and stages inbox completion in the same turn before ordinary journal persistence
 Each applied effect is safe to commit with shared pending changes. External dispatch
 starts after the corresponding captured intents are acknowledged.
 
-The handler runtime tracks acquired batches and disposes them at attempt end, including
-on failure. Keep the batch alive for the returned action. Ordinary callers use a disposal
-scope spanning preparation, synchronous business mutations and `Send(batch)`, and the
-ordinary journal-write await. Disposal abandons unstaged preparation; staged wakeup and
-intent ownership stays with its pending/captured/acknowledged cohort through the actual
-persistence outcome. Cancellation of a caller's wait preserves owned scheduling, which
-cleans up any unclaimed batch after its actual outcome.
+The handler runtime tracks preparations from their start and owns resulting batches
+through attempt completion, including late results after cancellation or failure. Keep
+the batch alive for the returned action. Ordinary callers must await every preparation
+operation and dispose each successfully returned batch. Their disposal scope spans
+synchronous business mutations, `Send(batch)`, and the ordinary journal-write await.
+Disposal abandons unstaged preparation; staged wakeup and intent ownership stays with
+its pending/captured/acknowledged cohort through the actual persistence outcome. When
+a caller cancels its wait, owned scheduling continues and releases the unclaimed batch
+after its actual outcome. Activation retirement cleans up remaining owned preparation.
 
 Repeatedly sending the same live already-staged batch has no additional effect within
 a valid current scope. Every call requires the owning activation and scope; handler
