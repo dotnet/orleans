@@ -237,12 +237,32 @@ public sealed class MetadataMayInterleaveBootstrapGrain(BootstrapObservation obs
     public static bool Interleave(IInvokable request) => true;
 }
 
+[ExecutionProperty(WellKnownGrainTypeProperties.PlacementStrategy, "StatelessWorkerPlacement")]
+public sealed class MetadataStatelessPlacementBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain;
+
+[ExecutionProperty(WellKnownGrainTypeProperties.PlacementStrategy, BootstrapClusterFixture.StatelessPlacementAlias)]
+public sealed class AliasedStatelessPlacementBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain;
+
+[ExecutionProperty(WellKnownGrainTypeProperties.PlacementStrategy, nameof(RandomPlacement))]
+public sealed class MetadataOrdinaryPlacementBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain;
+
+[ExecutionProperty(WellKnownGrainTypeProperties.PlacementStrategy, BootstrapClusterFixture.OrdinaryPlacementAlias)]
+public sealed class AliasedOrdinaryPlacementBootstrapGrain(BootstrapObservation observation)
+    : BootstrapControlGrain(observation), IDurableMessagingGrain;
+
 public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
 {
+    public const string StatelessPlacementAlias = "bootstrap-worker-alias";
+    public const string OrdinaryPlacementAlias = "bootstrap-directory-alias";
     public BootstrapProbe Probe { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
         ReceiverTestServices.Add(services, ConfigureOptions);
+        services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
+        services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();

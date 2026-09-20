@@ -4,6 +4,7 @@ using Orleans.Concurrency;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 using Xunit;
@@ -15,10 +16,10 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 [TestArea("DurableMessaging")]
 public sealed class ActivationValidationTests
 {
-    private static readonly Action<IGrainContext, GrainProperties> ValidateActivation = ReceiverTestServices
+    private static readonly Action<IGrainContext, GrainProperties, PlacementStrategy> ValidateActivation = ReceiverTestServices
         .GetImplementationType("DurableMessagingActivationValidator")
         .GetMethod("Validate")!
-        .CreateDelegate<Action<IGrainContext, GrainProperties>>();
+        .CreateDelegate<Action<IGrainContext, GrainProperties, PlacementStrategy>>();
 
     [Fact]
     public void ExternalConsumerAssembly_HasNoFriendAccessToDurableMessaging()
@@ -57,7 +58,10 @@ public sealed class ActivationValidationTests
         new AttributeGrainPropertiesProvider(Substitute.For<IServiceProvider>())
             .Populate(grain.GetType(), GrainType.Create("activation-validation"), values);
         var properties = new GrainProperties(values.ToImmutableDictionary(StringComparer.Ordinal));
-        var exception = Assert.Throws<InvalidOperationException>(() => ValidateActivation(context, properties));
+        var placement = model == "stateless"
+            ? new StatelessWorkerAttribute().PlacementStrategy
+            : new RandomPlacementAttribute().PlacementStrategy;
+        var exception = Assert.Throws<InvalidOperationException>(() => ValidateActivation(context, properties, placement));
 
         Assert.Contains(expected, exception.Message, StringComparison.Ordinal);
         Assert.Contains(grain.GetType().ToString(), exception.Message, StringComparison.Ordinal);
@@ -69,7 +73,8 @@ public sealed class ActivationValidationTests
         var context = Substitute.For<IGrainContext>();
 
         var properties = new GrainProperties(ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal));
-        var exception = Assert.Throws<InvalidOperationException>(() => ValidateActivation(context, properties));
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ValidateActivation(context, properties, new RandomPlacementAttribute().PlacementStrategy));
 
         Assert.Contains("initialized grain instance", exception.Message, StringComparison.Ordinal);
     }
