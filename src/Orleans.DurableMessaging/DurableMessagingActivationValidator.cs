@@ -9,12 +9,15 @@ namespace Orleans.DurableMessaging;
 
 internal static class DurableMessagingActivationValidator
 {
-    public static void Validate(IGrainContext grainContext, GrainProperties properties)
+    // The public attribute exposes the runtime's internal, sealed strategy type.
+    private static readonly Type _statelessWorkerPlacementType = new StatelessWorkerAttribute().PlacementStrategy.GetType();
+
+    public static void Validate(IGrainContext grainContext, GrainProperties properties, PlacementStrategy placementStrategy)
     {
         var grain = grainContext.GrainInstance
             ?? throw new InvalidOperationException("Durable Messaging activation requires an initialized grain instance.");
         var grainType = grain.GetType();
-        if (grainType.IsDefined(typeof(StatelessWorkerAttribute), inherit: true))
+        if (placementStrategy.GetType() == _statelessWorkerPlacementType)
         {
             throw new InvalidOperationException(
                 $"Durable Messaging requires one activation per grain identity, but grain type '{grainType}' is a stateless worker.");

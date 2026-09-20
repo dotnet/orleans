@@ -1,8 +1,11 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
+using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
 using Xunit;
 
@@ -174,6 +177,90 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Equal(1, observation.Disposals);
         Assert.Equal(0, Fixture.Storage.GetCreationCount(JournalId.FromGrainId(grain.GetGrainId())));
         AssertNoStorageWork(grain.GetGrainId());
+        AssertNoScheduledJobs(grain.GetGrainId());
+    }
+
+    [Theory]
+    [InlineData(typeof(MetadataStatelessPlacementBootstrapGrain), "StatelessWorkerPlacement")]
+    [InlineData(typeof(AliasedStatelessPlacementBootstrapGrain), BootstrapClusterFixture.StatelessPlacementAlias)]
+    public async Task ResolvedStatelessPlacement_FailsBeforeStorageAndCleansScope(Type grainClass, string placementKey)
+    {
+        Assert.False(grainClass.IsDefined(typeof(StatelessWorkerAttribute), inherit: true));
+        var grain = Fixture.Client.GetGrain<IBootstrapControlGrain>(Guid.NewGuid(), grainClass.FullName!);
+        var services = Fixture.Cluster.Silos[0].ServiceProvider;
+        var properties = services.GetRequiredService<GrainPropertiesResolver>().GetGrainProperties(grain.GetGrainId().Type);
+        Assert.Equal(placementKey, properties.Properties[WellKnownGrainTypeProperties.PlacementStrategy]);
+        var placement = services.GetRequiredService<PlacementStrategyResolver>().GetPlacementStrategy(grain.GetGrainId().Type);
+        Assert.Equal(new StatelessWorkerAttribute().PlacementStrategy.GetType(), placement.GetType());
+        Assert.False(placement.IsUsingGrainDirectory);
+        if (placementKey == BootstrapClusterFixture.StatelessPlacementAlias)
+        {
+            Assert.Same(services.GetRequiredKeyedService<PlacementStrategy>(placementKey), placement);
+        }
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => grain.PingAsync());
+        Assert.Contains("one activation", exception.ToString(), StringComparison.Ordinal);
+        Assert.Contains(grainClass.Name, exception.ToString(), StringComparison.Ordinal);
+        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+        await observation.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        Assert.False(observation.InstanceAvailableInConstructor);
+        Assert.IsType(grainClass, observation.ConstructedGrain);
+        Assert.Equal(0, observation.Activations);
+        Assert.Equal(1, observation.GrainDisposals);
+        Assert.Equal(1, observation.Disposals);
+        Assert.Equal(0, Fixture.Storage.GetCreationCount(JournalId.FromGrainId(grain.GetGrainId())));
+        AssertNoStorageWork(grain.GetGrainId());
+        AssertNoScheduledJobs(grain.GetGrainId());
+    }
+
+    [Theory]
+    [InlineData(typeof(MetadataOrdinaryPlacementBootstrapGrain), nameof(RandomPlacement))]
+    [InlineData(typeof(AliasedOrdinaryPlacementBootstrapGrain), BootstrapClusterFixture.OrdinaryPlacementAlias)]
+    public async Task ResolvedOrdinaryPlacement_WithoutMessagingConstructorDependencies_InitializesNormally(Type grainClass, string placementKey)
+    {
+        Assert.False(grainClass.IsDefined(typeof(StatelessWorkerAttribute), inherit: true));
+        var grain = Fixture.Client.GetGrain<IBootstrapControlGrain>(Guid.NewGuid(), grainClass.FullName!);
+        var services = Fixture.Cluster.Silos[0].ServiceProvider;
+        var properties = services.GetRequiredService<GrainPropertiesResolver>().GetGrainProperties(grain.GetGrainId().Type);
+        Assert.Equal(placementKey, properties.Properties[WellKnownGrainTypeProperties.PlacementStrategy]);
+        var placement = services.GetRequiredService<PlacementStrategyResolver>().GetPlacementStrategy(grain.GetGrainId().Type);
+        Assert.IsType<RandomPlacement>(placement);
+        Assert.True(placement.IsUsingGrainDirectory);
+        if (placementKey == BootstrapClusterFixture.OrdinaryPlacementAlias)
+        {
+            Assert.Same(services.GetRequiredKeyedService<PlacementStrategy>(placementKey), placement);
+        }
+
+        var journal = JournalId.FromGrainId(grain.GetGrainId());
+        var read = Fixture.Storage.BlockRead(journal);
+        var activation = grain.PingAsync();
+        BootstrapObservation observation;
+        try
+        {
+            await read.WaitUntilEnteredAsync();
+            observation = Assert.Single(Probe.Get(grain.GetGrainId()));
+            Assert.False(observation.InstanceAvailableInConstructor);
+            Assert.IsType(grainClass, observation.ConstructedGrain);
+            Assert.Same(observation.ConstructedGrain, observation.Context.GrainInstance);
+            Assert.Equal(0, observation.Activations);
+            var manager = observation.Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+            Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
+            Assert.Same(observation.Context.ActivationServices.GetRequiredService(
+                ReceiverTestServices.GetImplementationType("InboxJournalState")), inbox);
+            Assert.True(manager.TryGetStateMachine("test-handler-output", out var outbox));
+            Assert.Same(observation.Context.ActivationServices.GetRequiredService<IDurableOutbox>(), outbox);
+            Assert.Single(GetSetup(observation.Context).GetInvocationList());
+        }
+        finally
+        {
+            read.Release();
+        }
+
+        await activation;
+        Assert.Equal(1, observation.Activations);
+        Assert.Equal(1, Fixture.Storage.GetCreationCount(journal));
+        Assert.Equal(1, Fixture.Storage.GetReadCount(journal));
+        Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(journal));
         AssertNoScheduledJobs(grain.GetGrainId());
     }
 

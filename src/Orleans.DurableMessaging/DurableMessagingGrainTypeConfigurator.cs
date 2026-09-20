@@ -17,9 +17,10 @@ internal sealed class DurableMessagingGrainTypeConfigurator(GrainClassMap grainC
 
         if (typeof(DurableGrain).IsAssignableFrom(grainClass) || typeof(IDurableMessagingGrain).IsAssignableFrom(grainClass))
         {
+            var placementStrategy = shared.PlacementStrategy;
             shared.AddActivationSetup(context =>
             {
-                DurableMessagingActivationValidator.Validate(context, properties);
+                DurableMessagingActivationValidator.Validate(context, properties, placementStrategy);
                 var services = context.ActivationServices;
                 _ = services.GetRequiredService<IJournaledStateManager>();
                 _ = services.GetRequiredService<IDurableInbox>();
