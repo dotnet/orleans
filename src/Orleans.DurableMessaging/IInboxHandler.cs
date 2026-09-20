@@ -90,13 +90,16 @@ public interface IInboxHandler
     /// <remarks>
     /// <para>
     /// Perform validation, asynchronous I/O, and other failure-prone work using operation-local values.
-    /// Prepare outbound envelopes during this phase. Keep journaled state unchanged until the returned
-    /// action is invoked, and call <see cref="IInboxHandlerContext.Send"/> from that action.
+    /// Build outbound envelopes and await <see cref="IDurableOutbox.PrepareSendAsync"/> through the context
+    /// outbox during this phase. Revalidate local results after asynchronous preparation. Apply shared
+    /// business mutations and call <see cref="IInboxHandlerContext.Send"/> with the batch from the returned action.
     /// </para>
     /// <para>
     /// Messaging awaits preparation and invokes the returned action once for that prepared attempt.
     /// Use a synchronous lambda or method group which applies already-prepared business mutations and
-    /// stages prepared messages. An attempt with no effects returns an empty synchronous action.
+    /// stages prepared batches. An attempt with no effects returns an empty synchronous action. The runtime
+    /// disposes batches acquired through the handler outbox when the attempt ends, including on failure;
+    /// keep their lifetime open through the returned action. Staged ownership continues through persistence.
     /// </para>
     /// <para>
     /// Every applied mutation and outbound message must already be safe to commit. Pending journal
@@ -127,22 +130,21 @@ public interface IInboxHandler
 ///     PaymentRequest message, IInboxHandlerContext context, CancellationToken ct)
 /// {
 ///     var prepared = await PreparePaymentAsync(message, ct);
-///     DurableEnvelope? response = null;
+///     var messages = new List&lt;DurableEnvelope&gt;();
 ///     if (context.Envelope.ReplyTo is { } replyTo)
 ///     {
-///         response = context.CreateEnvelope()
+///         var response = context.CreateEnvelope()
 ///             .To(replyTo, "payment/response")
 ///             .WithBody(prepared.Response)
 ///             .Build();
+///         messages.Add(response);
 ///     }
 ///
+///     var batch = await context.Outbox.PrepareSendAsync(messages, ct);
 ///     return () =&gt;
 ///     {
 ///         ApplyPayment(prepared);
-///         if (response is { } envelope)
-///         {
-///             context.Send(envelope);
-///         }
+///         context.Send(batch);
 ///     };
 /// }
 /// </code>

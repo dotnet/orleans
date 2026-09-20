@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Durable outbox for sending messages.
-/// Uses dictionary storage (no ordering guarantees).
-/// Non-generic interface - use <see cref="DurableEnvelopeBuilder"/> to create envelopes.
+/// Prepares and stages durable messages for delivery.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,13 +22,13 @@ namespace Orleans.DurableMessaging;
 /// <see cref="DeliveryStatus.DeadLettered"/>.
 /// </para>
 /// <para>
-/// The outbox does NOT guarantee ordering of messages. If ordering is required, it must be implemented at
-/// a higher level (e.g., using sequence numbers or correlation keys).
+/// Messages are independently dispatched from dictionary storage. Applications establish ordering
+/// with sequence numbers or correlation keys when needed.
 /// </para>
 /// </remarks>
 /// <example>
 /// <code>
-/// // Create and send a message via outbox
+/// // Prepare a batch during handler preparation.
 /// var envelope = context.CreateEnvelope()
 ///     .To(targetGrain, "payment/process")
 ///     .WithBody(new PaymentRequest { Amount = 100.00m })
@@ -36,7 +36,8 @@ namespace Orleans.DurableMessaging;
 ///     .WithReplyTo(context.GrainId)
 ///     .Build();
 ///
-/// return () => context.Outbox.Send(envelope);
+/// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
+/// return () => context.Send(batch);
 /// </code>
 /// </example>
 public interface IDurableOutbox
@@ -60,46 +61,71 @@ public interface IDurableOutbox
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
-    /// Stages a fully built, safe-to-commit envelope for delivery.
-    /// Use <see cref="DurableEnvelopeBuilder"/> to create the envelope.
+    /// Prepares outgoing messages and confirms a viable durable self-wakeup before staging.
     /// </summary>
-    /// <param name="envelope">The envelope to send.</param>
+    /// <param name="messages">The fully built envelopes to prepare.</param>
+    /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
+    /// <returns>An activation-local batch which can be synchronously staged using <see cref="Send"/>.</returns>
     /// <remarks>
     /// <para>
-    /// Complete validation and failure-prone preparation before staging messages. Pending journal
-    /// changes are shared by all callers using the grain's state manager, so each message must be
-    /// safe to commit as soon as it is enqueued. Inbox handlers stage their prepared messages from
-    /// the synchronous action returned by <see cref="IInboxHandler.PrepareAsync"/>.
+    /// Preparation copies the input collection and validates the envelopes before its first asynchronous wait.
+    /// Complete this operation before applying shared business or journaled mutations. An empty collection
+    /// produces a valid no-op batch and requires no new wakeup. Duplicate and orphan wakeups are resolved
+    /// using the grain's durable state; a wakeup arriving during unresolved preparation or persistence defers.
     /// </para>
     /// <para>
-    /// The message is persisted atomically with grain state when <c>IJournaledStateManager.WriteStateAsync()</c>
-    /// is called. The message remains in the outbox until the infrastructure confirms durable inbox acceptance.
+    /// Once preparation is owned, cancellation ends only the caller's wait. Scheduling retains its resources
+    /// through the actual outcome, and the implementation releases any batch which the caller did not receive.
     /// </para>
     /// <para>
-    /// Repeatedly sending an equivalent envelope with the same message ID is an idempotent no-op.
-    /// Sending a different envelope with an ID which is already present throws <see cref="InvalidOperationException"/>.
-    /// Envelope equivalence includes routing and correlation fields, creation time, body bytes, and request-context bytes.
+    /// Inbox handlers acquire batches through <see cref="IInboxHandlerContext.Outbox"/> during
+    /// <see cref="IInboxHandler.PrepareAsync"/>. The runtime tracks those batches through the attempt and
+    /// disposes them when the attempt ends, including preparation or apply failure. Retain a batch for the
+    /// returned action. Ordinary callers own disposal and keep their scope through the journal write.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="messages"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">The envelopes conflict with pending message identities or the preparation scope is invalid.</exception>
+    /// <exception cref="OperationCanceledException">The caller's wait was canceled.</exception>
+    ValueTask<IPreparedOutboxBatch> PrepareSendAsync(IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronously stages a prepared batch alongside safe-to-commit business mutations.
+    /// </summary>
+    /// <param name="batch">The live batch prepared by this outbox.</param>
+    /// <remarks>
+    /// <para>
+    /// After preparation and revalidation, apply business mutations and call this method in one synchronous
+    /// block, then request ordinary journal persistence. Staging transfers wakeup and intent ownership to
+    /// the outbox's pending, captured, and acknowledged cohorts. Disposing a staged batch preserves that
+    /// ownership through the actual persistence outcome. External dispatch begins after acknowledgement
+    /// of the captured intents; messages remain pending until durable inbox acceptance.
     /// </para>
     /// <para>
-    /// To create an envelope, use <c>context.CreateEnvelope()</c> in a handler, or create a
-    /// <see cref="DurableEnvelopeBuilder"/> directly with the appropriate <c>SerializerSessionPool</c>
-    /// and <c>SenderId</c>.
+    /// Repeatedly sending the same live, already-staged batch has no additional effect within a valid
+    /// current scope. Every call requires the batch's owning activation and scope. Handler calls require
+    /// the matching returned action, via its context or outbox. Outside-scope, stale, wrong-attempt,
+    /// disposed, or foreign handles are rejected before any mutation.
+    /// </para>
+    /// <para>
+    /// Existing equivalent envelopes with the same message ID are preserved. Conflicting identities are
+    /// rejected. Equivalence includes routing and correlation fields, creation time, declared body type,
+    /// body bytes, and request-context bytes and type metadata.
     /// </para>
     /// </remarks>
     /// <example>
     /// <code>
-    /// var envelope = context.CreateEnvelope()
-    ///     .To(targetGrain, "order/confirm")
-    ///     .WithBody(new OrderConfirmation { OrderId = "order-123" })
-    ///     .Build();
-    ///
-    /// return () => outbox.Send(envelope);
+    /// // Ordinary application code keeps ownership through the journal write.
+    /// using var batch = await outbox.PrepareSendAsync([envelope], ct);
+    /// ApplyPreparedBusinessChanges();
+    /// outbox.Send(batch);
+    /// await stateManager.WriteStateAsync(ct);
     /// </code>
     /// </example>
-    /// <exception cref="InvalidOperationException">
-    /// An envelope with the same message ID but different content is already present.
-    /// </exception>
-    void Send(DurableEnvelope envelope);
+    /// <exception cref="ArgumentNullException"><paramref name="batch"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The batch has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">The batch belongs to another owner or attempt, its scope is invalid, or an envelope conflicts with an existing message.</exception>
+    void Send(IPreparedOutboxBatch batch);
 
     /// <summary>
     /// Tries to get a specific outbox message.
