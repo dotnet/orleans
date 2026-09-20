@@ -119,7 +119,8 @@ public interface IStateMachine
     /// <remarks>
     /// The manager is already fenced when this callback runs. Every registered state is notified even if
     /// another notification throws; notification errors are logged and the original failure is preserved.
-    /// Idle shutdown completes normally. Cancellation during admitted validation or storage work is terminal.
+    /// Owner shutdown during initial recovery and idle shutdown complete through normal shutdown.
+    /// Cancellation during admitted validation or write/delete storage work is terminal.
     /// </remarks>
     void OnFaulted(Exception exception) { }
 

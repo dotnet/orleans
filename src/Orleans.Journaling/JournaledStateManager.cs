@@ -194,6 +194,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         {
             await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
         }
+        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+        {
+            return;
+        }
         catch (Exception exception)
         {
             Fence(exception);

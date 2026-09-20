@@ -102,6 +102,10 @@ storage outcome, so the caller reconciles that outcome before retrying the comma
 An initialization failure preserves stored data for diagnosis. Restore the required format/codec registration
 or repair the backing data before creating a fresh manager or retrying activation.
 
+Owner shutdown which cancels initial recovery cancels all initialization waiters and leaves the manager
+stopped. Disposal waits for the owned read to finish before releasing journal resources. Cancelling an
+individual initialization caller's token ends only its wait; owned recovery continues for other callers.
+
 ## Custom state lifecycle
 
 Custom <xref:Orleans.Journaling.IStateMachine> implementations share the manager's single logical execution thread.
@@ -134,7 +138,8 @@ performs durable-completion bookkeeping. A zero-byte write completes without thi
 An admitted validation, capture, or storage failure fences the manager, records the original
 exception, and calls <xref:Orleans.Journaling.IStateMachine.OnFaulted*> on every registered state before
 faulting current and queued waiters. Notification failures are logged while the original failure remains
-the operation's outcome. Idle shutdown completes normally; cancellation during admitted work is terminal.
+the operation's outcome. Owner-canceled initial recovery and idle shutdown complete through normal shutdown.
+Cancellation during admitted validation or write/delete storage work is terminal.
 
 ## Compaction
 

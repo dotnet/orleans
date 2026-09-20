@@ -2330,9 +2330,12 @@ public partial class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public CancellationToken ReadToken { get; private set; }
+
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
+            ReadToken = cancellationToken;
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _readCount) == _blockedReadNumber)
             {
