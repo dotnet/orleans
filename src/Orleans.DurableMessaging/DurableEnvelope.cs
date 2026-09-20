@@ -35,7 +35,8 @@ namespace Orleans.DurableMessaging;
 ///     .WithReplyTo(context.GrainId)
 ///     .Build();
 ///
-/// context.Send(envelope);
+/// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
+/// return () => context.Send(batch);
 /// </code>
 /// </example>
 [GenerateSerializer, Alias("Orleans.DurableMessaging.DurableEnvelope")]
@@ -177,7 +178,8 @@ public readonly struct DurableEnvelope
     ///     .WithReplyTo(context.GrainId)  // Specify where to send response
     ///     .Build();
     ///
-    /// context.Send(request);
+    /// var requestBatch = await context.Outbox.PrepareSendAsync([request], ct);
+    /// return () => context.Send(requestBatch);
     ///
     /// // Handler prepares a reply for synchronous application
     /// public async ValueTask&lt;Action&gt; PrepareAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
@@ -192,7 +194,8 @@ public readonly struct DurableEnvelope
     ///             .WithCorrelationKey(context.Envelope.CorrelationKey)  // Preserve correlation
     ///             .Build();
     ///
-    ///         return () => context.Send(response);
+    ///         var batch = await context.Outbox.PrepareSendAsync([response], ct);
+    ///         return () => context.Send(batch);
     ///     }
     ///
     ///     return static () => { };

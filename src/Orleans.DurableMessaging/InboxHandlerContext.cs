@@ -13,8 +13,8 @@ namespace Orleans.DurableMessaging;
 /// envelope and outbox, and provides a factory method for creating pre-configured envelope builders.
 /// </para>
 /// <para>
-/// The implementation is immutable and thread-safe. Envelope builders created via <see cref="CreateEnvelope"/>
-/// are independent instances and can be used concurrently (though individual builders are not thread-safe).
+/// The context and its outbox are used in the owning activation and handler attempt. Envelope builders
+/// created via <see cref="CreateEnvelope"/> are independent local preparation values.
 /// </para>
 /// </remarks>
 internal sealed class InboxHandlerContext : IInboxHandlerContext
@@ -61,8 +61,8 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
 
     /// <inheritdoc />
     /// <remarks>
-    /// Direct access to the outbox is provided for advanced scenarios. Most handlers should use
-    /// <see cref="Send"/> instead of calling <c>Outbox.Send()</c> directly.
+    /// Prepare outgoing batches through this handler-scoped outbox, then stage them through
+    /// <see cref="Send"/> or the outbox from the matching apply action.
     /// </remarks>
     public IDurableOutbox Outbox { get; }
 
@@ -101,12 +101,8 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///     .WithBody(new AuditEvent { Action = "OrderConfirmed", OrderId = orderId })
     ///     .Build();
     ///
-    /// return () =>
-    /// {
-    ///     context.Send(envelope);
-    ///     context.Send(notification);
-    ///     context.Send(audit);
-    /// };
+    /// var batch = await context.Outbox.PrepareSendAsync([envelope, notification, audit], ct);
+    /// return () => context.Send(batch);
     /// </code>
     /// </example>
     public DurableEnvelopeBuilder CreateEnvelope()
@@ -136,16 +132,13 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///         .WithBody(result)
     ///         .Build();
     ///
-    ///     return () =>
-    ///     {
-    ///         context.Send(confirmation);
-    ///         context.Send(fulfillment);
-    ///     };
+    ///     var batch = await context.Outbox.PrepareSendAsync([confirmation, fulfillment], ct);
+    ///     return () => context.Send(batch);
     /// }
     /// </code>
     /// </example>
-    public void Send(DurableEnvelope envelope)
+    public void Send(IPreparedOutboxBatch batch)
     {
-        Outbox.Send(envelope);
+        Outbox.Send(batch);
     }
 }
