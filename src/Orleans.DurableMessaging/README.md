@@ -228,8 +228,11 @@ the local inbox; remote batches yield between timer turns and retain the durable
 attempt's cancellation lifetime. Callbacks coalesce by logical ownership and perform
 idempotent terminal cleanup. Obsolete timer turns release their matching waiting
 results and cancellation registrations; stale polls retire only that run's completed
-result. Outbox stop, fault, and deletion clear only outbox result entries. Diagnostics
-expose retained outbox dead letters and stage their removal for the next journal write.
+result. Outbox stop, fault, and deletion clear only outbox result entries. Batch
+cancellation logs callback failures and retains its token source through the actual
+completion of all delivery attempts. Shutdown drains in-flight delivery and preparation;
+retired batches release their resources once, preserving the original operation failure.
+Diagnostics expose retained outbox dead letters and stage their removal for the next journal write.
 
 A terminal journal fault stops outbox preparation and callbacks while preserving the
 failed activation's journaled objects. An ownership-repair request veto before

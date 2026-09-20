@@ -934,7 +934,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 if (batch.Owner.Generation != generation || !DurableMessagingJobOwnership.IsSamePhysicalJob(batch.Owner.Job, job)
                     || batch.Cancellation.IsCancellationRequested)
                 {
-                    CancelPendingDeliveryBatch();
+                    CancelPendingDeliveryBatchAsync().Ignore();
                     return;
                 }
                 if (batch.Attempts.Any(static task => !task.IsCompleted))
@@ -970,7 +970,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         ValidateReady();
                         if (!IsCurrentPump(job, generation))
                         {
-                            pending.Cancel();
+                            await pending.CancelAsync(_logger).ConfigureAwait(true);
                             return;
                         }
                         pending.Attempts.Add(Task.FromResult(result));
@@ -997,7 +997,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             }
             catch
             {
-                pending.Cancel();
+                await pending.CancelAsync(_logger).ConfigureAwait(true);
                 throw;
             }
         }
@@ -1096,12 +1096,21 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         return retryAt <= expiresAt ? retryAt : expiresAt;
     }
 
-    private void CancelPendingDeliveryBatch()
+    private async Task CancelPendingDeliveryBatchAsync()
     {
         if (_pendingDeliveryBatch is { } batch)
         {
-            _pendingDeliveryBatch = null;
-            batch.Cancel();
+            try
+            {
+                await batch.CancelAsync(_logger).ConfigureAwait(true);
+            }
+            finally
+            {
+                if (ReferenceEquals(_pendingDeliveryBatch, batch))
+                {
+                    _pendingDeliveryBatch = null;
+                }
+            }
         }
     }
 
@@ -1133,9 +1142,24 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
-            if (_preparationsDrained is { } drain)
+            try
             {
-                await drain.Task.ConfigureAwait(true);
+                await _deliveryGate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+                try
+                {
+                    await CancelPendingDeliveryBatchAsync().ConfigureAwait(true);
+                }
+                finally
+                {
+                    _deliveryGate.Release();
+                }
+            }
+            finally
+            {
+                if (_preparationsDrained is { } drain)
+                {
+                    await drain.Task.ConfigureAwait(true);
+                }
             }
         }
     }
@@ -1161,7 +1185,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
-            CancelPendingDeliveryBatch();
+            CancelPendingDeliveryBatchAsync().Ignore();
             if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
             {
                 _instruments.OnOutboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
@@ -1443,7 +1467,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     [LoggerMessage(Level = LogLevel.Error, Message = "An unclaimed outbox preparation failed.")]
     private static partial void LogPreparationFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "An outbox cancellation callback failed during shutdown.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "An outbox cancellation callback failed during cleanup.")]
     private static partial void LogCancellationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
@@ -1585,29 +1609,43 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private sealed class PendingDeliveryBatch(PumpOwner owner, CancellationTokenSource cancellation) : IDisposable
     {
         private bool _disposed;
+        private Task? _drain;
         public PumpOwner Owner { get; } = owner;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public List<Task<DeliveryOutcome>> Attempts { get; } = [];
-        public void Cancel()
+        public Task CancelAsync(ILogger<DurableOutbox> logger)
         {
+            if (_drain is { } drain)
+            {
+                return drain;
+            }
             if (_disposed)
             {
-                return;
+                return Task.CompletedTask;
             }
-            foreach (var attempt in Attempts)
-            {
-                _ = attempt.ContinueWith(static task => _ = task.Exception, CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
-            }
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _drain = completion.Task;
             try
             {
                 Cancellation.Cancel();
             }
-            finally
+            catch (AggregateException exception)
             {
-                Dispose();
+                LogCancellationFailed(logger, exception);
             }
+            DrainAsync(completion).Ignore();
+            return _drain;
         }
+
+        private async Task DrainAsync(TaskCompletionSource completion)
+        {
+            // Delivery already logs transport failures. Retirement observes every outcome before releasing the token source.
+            await ((Task)Task.WhenAll(Attempts)).ConfigureAwait(
+                ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            Dispose();
+            completion.TrySetResult();
+        }
+
         public void Dispose()
         {
             if (!_disposed)
