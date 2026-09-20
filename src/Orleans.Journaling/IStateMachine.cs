@@ -15,7 +15,7 @@ namespace Orleans.Journaling;
 /// </item>
 /// <item>
 /// When the application requests a write, the journaled state manager validates the request,
-/// prepares all states, and calls
+/// validates the pending changes of all states, and calls
 /// <see cref="WritePendingEntries"/> (and occasionally <see cref="WriteSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
@@ -69,36 +69,25 @@ public interface IStateMachine
     void OnRecoveryCompleted() { }
 
     /// <summary>
-    /// Gets whether this state has the prerequisites required for synchronous write capture.
-    /// The default is <see langword="true"/>.
+    /// Validates this state's pending changes immediately before an admitted write captures journal entries or a snapshot.
+    /// The default implementation accepts the pending changes.
     /// </summary>
     /// <remarks>
-    /// This synchronous check is pure. The manager evaluates it inside the admitted operation's
-    /// failure boundary, including writes which only flush committed entries or produce zero bytes.
-    /// An unrecoverable state-local error can be reported by throwing, which fences the manager.
+    /// Validation is pure and synchronous. All registered states pass validation before any state is captured,
+    /// including writes which only flush committed entries or produce zero bytes. Validation and capture run
+    /// in the same work-loop continuation. Throwing reports a terminal state-local failure and fences the manager.
+    /// Callers acquire asynchronous prerequisites before staging changes. Independent operation-local preparation
+    /// can proceed while previously staged valid changes are captured.
     /// </remarks>
-    bool IsWritePrepared => true;
-
-    /// <summary>
-    /// Acquires state-owned prerequisites for synchronous write capture when <see cref="IsWritePrepared"/> is false.
-    /// The default implementation completes synchronously.
-    /// </summary>
-    /// <param name="cancellationToken">The manager operation and shutdown token.</param>
-    /// <returns>A task which completes when this state is prepared.</returns>
-    /// <remarks>
-    /// Completion must establish this state's readiness. Retain valid prepared resources across readiness
-    /// rechecks. After preparation awaits, the manager rechecks every state and captures synchronously
-    /// in the same continuation as the final ready pass. Caller wait cancellation leaves preparation running.
-    /// Preparation failures fence the manager.
-    /// </remarks>
-    ValueTask PrepareWriteAsync(CancellationToken cancellationToken) => default;
+    void ValidatePendingChanges() { }
 
     /// <summary>
     /// Validates a write request in the public caller's context before it is queued.
     /// The default implementation accepts the request.
     /// </summary>
     /// <remarks>
-    /// Validation is pure. Throwing rejects this request and leaves the manager healthy.
+    /// Validation is pure and runs only at request admission. Throwing rejects this request and leaves the manager healthy.
+    /// Use <see cref="ValidatePendingChanges"/> to report a terminal state-local failure inside admitted execution.
     /// </remarks>
     void ValidateWrite() { }
 
@@ -130,7 +119,7 @@ public interface IStateMachine
     /// <remarks>
     /// The manager is already fenced when this callback runs. Every registered state is notified even if
     /// another notification throws; notification errors are logged and the original failure is preserved.
-    /// Idle shutdown completes normally. Cancellation during admitted preparation or storage work is terminal.
+    /// Idle shutdown completes normally. Cancellation during admitted validation or storage work is terminal.
     /// </remarks>
     void OnFaulted(Exception exception) { }
 

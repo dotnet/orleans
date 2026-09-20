@@ -306,16 +306,14 @@ namespace Orleans.Journaling
 
     public partial interface IStateMachine
     {
-        bool IsWritePrepared { get; }
-
         void OnDeleteStarted();
         void OnFaulted(System.Exception exception);
         void OnRecoveryCompleted();
         void OnWriteCompleted();
-        System.Threading.Tasks.ValueTask PrepareWriteAsync(System.Threading.CancellationToken cancellationToken);
         void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         void Reset(JournalStreamWriter writer);
         void ValidateDelete();
+        void ValidatePendingChanges();
         void ValidateWrite();
         void WritePendingEntries(JournalStreamWriter writer);
         void WriteSnapshot(JournalStreamWriter writer);

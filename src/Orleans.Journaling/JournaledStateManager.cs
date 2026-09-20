@@ -256,30 +256,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             case AppendJournalWorkItem:
                             case WriteSnapshotWorkItem:
                                 {
-                                    // Keep the final readiness pass and synchronous capture in this continuation.
-                                    bool prepared;
-                                    do
+                                    foreach (var state in _states.Values)
                                     {
-                                        prepared = true;
-                                        foreach (var (name, state) in _states)
-                                        {
-                                            if (state.IsWritePrepared)
-                                            {
-                                                continue;
-                                            }
-
-                                            await state.PrepareWriteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-                                            if (!state.IsWritePrepared)
-                                            {
-                                                throw new InvalidOperationException(
-                                                    $"Journaled state '{name}' completed write preparation without becoming prepared.");
-                                            }
-
-                                            prepared = false;
-                                            break;
-                                        }
+                                        state.ValidatePendingChanges();
                                     }
-                                    while (!prepared);
 
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.

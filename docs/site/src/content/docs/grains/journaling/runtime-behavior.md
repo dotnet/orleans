@@ -116,16 +116,22 @@ Deletion validates all states again in serialized execution, then calls
 <xref:Orleans.Journaling.IStateMachine.OnDeleteStarted*> on every state before awaiting storage deletion.
 Successful deletion resets states before completing callers.
 
-Before each append or snapshot capture, the manager checks <xref:Orleans.Journaling.IStateMachine.IsWritePrepared>
-and awaits <xref:Orleans.Journaling.IStateMachine.PrepareWriteAsync*> for each unprepared state. Preparation
-establishes that state's readiness and retains valid state-owned prerequisites across rechecks. Every await
-is followed by another all-state readiness pass. The final successful pass flows directly into synchronous
-capture in the same work-loop continuation. This also applies to writes which flush only committed entries
-or produce zero bytes. Preparation uses the manager's shutdown token; caller cancellation only ends that caller's wait.
+Before each append or snapshot capture, the manager calls
+<xref:Orleans.Journaling.IStateMachine.ValidatePendingChanges*> on every registered state.
+This pure synchronous check validates state-owned failure latches and pending-change invariants inside
+the admitted operation's failure boundary. Every state passes before capture begins in the same work-loop
+continuation, including writes which flush only committed entries or produce zero bytes.
+
+Features acquire asynchronous prerequisites before staging their changes, then apply prepared mutations
+synchronously and request an ordinary write. Independent operation-local preparation can continue while
+the manager captures previously staged valid changes. `ValidateWrite` remains caller-context admission
+validation; a terminal state-local error belongs in `ValidatePendingChanges` so the manager fences even
+when the reporting write is its first admitted operation. A previously captured write retains its actual
+storage outcome and acknowledgement bookkeeping.
 
 After storage acknowledges captured bytes, <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted*>
 performs durable-completion bookkeeping. A zero-byte write completes without this callback.
-An admitted preparation, validation, capture, or storage failure fences the manager, records the original
+An admitted validation, capture, or storage failure fences the manager, records the original
 exception, and calls <xref:Orleans.Journaling.IStateMachine.OnFaulted*> on every registered state before
 faulting current and queued waiters. Notification failures are logged while the original failure remains
 the operation's outcome. Idle shutdown completes normally; cancellation during admitted work is terminal.

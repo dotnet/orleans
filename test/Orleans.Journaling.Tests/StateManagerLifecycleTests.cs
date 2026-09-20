@@ -12,8 +12,7 @@ public partial class StateManagerTests
     public async Task StateHooks_DefaultsAcceptExistingStates()
     {
         IStateMachine state = new AlwaysWritingState();
-        Assert.True(state.IsWritePrepared);
-        Assert.True(state.PrepareWriteAsync(CancellationToken.None).IsCompletedSuccessfully);
+        state.ValidatePendingChanges();
         state.ValidateWrite();
         state.ValidateDelete();
         state.OnDeleteStarted();
@@ -156,78 +155,73 @@ public partial class StateManagerTests
     [InlineData("bca", true)]
     [InlineData("cab", true)]
     [InlineData("cba", true)]
-    public async Task Readiness_RechecksAllStatesAfterAwaitBeforeFirstCapture(string order, bool snapshot)
+    public async Task PendingValidation_ValidatesAllStatesBeforeAnyCapture(string order, bool snapshot)
     {
         var storage = new CapturingStorage { IsCompactionRequested = snapshot };
-        await using var manager = CreateTestSystem(storage).Manager;
-        var entered = NewSignal();
-        var release = NewSignal();
-        var first = new HookState();
-        var blocking = new HookState { Prepared = false };
-        var retained = new HookState { Prepared = false };
-        var states = new Dictionary<char, HookState> { ['a'] = first, ['b'] = blocking, ['c'] = retained };
-        blocking.PrepareAction = async token =>
-        {
-            entered.SetResult();
-            await release.Task.WaitAsync(token);
-            blocking.Prepared = true;
-        };
+        var format = new TrackingJournalFormat(SessionPool);
+        await using var manager = CreateTestSystem(storage, journalFormat: format).Manager;
+        var states = new Dictionary<char, HookState> { ['a'] = new(), ['b'] = new(), ['c'] = new() };
+        var events = new List<string>();
         foreach (var key in order)
         {
             var state = states[key];
             manager.RegisterStateMachine(key.ToString(), state);
-            state.CaptureAction = () => Assert.All(states.Values, value => Assert.True(value.Prepared));
+            state.CaptureAction = () =>
+            {
+                Assert.All(states.Values, value => Assert.Equal(1, value.PendingValidationCount));
+                events.Add($"capture {key}");
+            };
         }
 
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        await WaitFor(entered.Task);
-        Assert.All(states.Values, state => Assert.Equal(0, state.CaptureCount));
-        first.Prepared = false;
-        release.SetResult();
-        await WaitFor(write);
+        var initialWriter = Assert.Single(format.Writers);
+        var initialEntries = initialWriter.BeganEntryIds.Count;
+        foreach (var key in order)
+        {
+            states[key].PendingValidationAction = () =>
+            {
+                Assert.Same(initialWriter, Assert.Single(format.Writers));
+                Assert.Equal(initialEntries, initialWriter.BeganEntryIds.Count);
+                Assert.All(states.Values, value => Assert.Equal(0, value.CaptureCount));
+                events.Add($"validate {key}");
+            };
+        }
+
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.All(states.Values, state =>
         {
-            Assert.Equal(1, state.PrepareCount);
+            Assert.Equal(1, state.PendingValidationCount);
             Assert.Equal(1, state.CaptureCount);
             Assert.Equal(1, state.WriteCompletedCount);
         });
+        Assert.Equal(order.Select(key => $"validate {key}").Concat(order.Select(key => $"capture {key}")), events);
         Assert.Equal(snapshot ? 1 : 0, storage.Replaces.Count);
         Assert.Equal(snapshot ? 0 : 1, storage.Appends.Count);
     }
 
     [Fact]
-    public async Task Readiness_FinalPassAndCaptureShareSchedulerTurn()
+    public async Task PendingValidation_AndCaptureShareSchedulerTurn()
     {
         var context = new QueuedSynchronizationContext();
         await context.Run(async () =>
         {
             await using var manager = CreateTestSystem().Manager;
-            var state = new HookState { Prepared = false };
-            var readyTurn = -1;
-            state.PrepareAction = async _ =>
-            {
-                await Task.Yield();
-                state.Prepared = true;
-            };
-            state.ReadinessAction = () =>
-            {
-                if (state.Prepared) readyTurn = context.Turn;
-                return state.Prepared;
-            };
-            state.CaptureAction = () => Assert.Equal(readyTurn, context.Turn);
+            var state = new HookState();
+            var validationTurn = -1;
+            state.PendingValidationAction = () => validationTurn = context.Turn;
+            state.CaptureAction = () => Assert.Equal(validationTurn, context.Turn);
             manager.RegisterStateMachine("state", state);
             await manager.InitializeAsync(TestContext.Current.CancellationToken);
             await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(1, state.PrepareCount);
+            Assert.Equal(1, state.PendingValidationCount);
             Assert.Equal(1, state.CaptureCount);
             Assert.Equal(1, state.WriteCompletedCount);
         });
     }
 
     [Fact]
-    public async Task ZeroByteWrite_PreparesStateWithoutWriteCompleted()
+    public async Task ZeroByteWrite_ValidatesPendingChangesWithoutWriteCompleted()
     {
         var storage = new CapturingStorage();
         await using var manager = CreateTestSystem(storage).Manager;
@@ -237,66 +231,205 @@ public partial class StateManagerTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, manager.PendingWriteByteCount);
         Assert.Equal(1, state.WriteCompletedCount);
-        state.Prepared = false;
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, state.PrepareCount);
+        Assert.Equal(2, state.PendingValidationCount);
         Assert.Equal(2, state.CaptureCount);
         Assert.Equal(1, state.WriteCompletedCount);
         Assert.Single(storage.Appends);
     }
 
     [Theory]
-    [InlineData("readiness")]
-    [InlineData("prepare")]
-    [InlineData("incomplete")]
-    public async Task PreparationFailure_FencesBeforeCapture(string failure)
+    [InlineData("append", false, false)]
+    [InlineData("append", false, true)]
+    [InlineData("append", true, false)]
+    [InlineData("append", true, true)]
+    [InlineData("snapshot", false, false)]
+    [InlineData("snapshot", false, true)]
+    [InlineData("snapshot", true, false)]
+    [InlineData("snapshot", true, true)]
+    [InlineData("empty-buffer", false, false)]
+    [InlineData("empty-buffer", false, true)]
+    [InlineData("empty-buffer", true, false)]
+    [InlineData("empty-buffer", true, true)]
+    public async Task PartialApplyFailure_FencesBeforeCapture(string path, bool previouslyAdmitted, bool stateFirst)
     {
-        var storage = new CapturingStorage();
-        await using var manager = CreateTestSystem(storage).Manager;
-        var expected = new InvalidOperationException("Preparation failed.");
-        var state = new HookState { Prepared = false };
-        manager.RegisterStateMachine("state", state);
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        if (failure == "readiness") state.ReadinessAction = () => throw expected;
-        else if (failure == "prepare") state.PrepareAction = _ => throw expected;
-        else state.PrepareAction = _ => default;
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new CapturingStorage();
+            var format = new TrackingJournalFormat(SessionPool);
+            await using var manager = CreateTestSystem(storage, journalFormat: format).Manager;
+            var state = new HookState { EmitEntry = false };
+            var other = new HookState { EmitEntry = false };
+            if (stateFirst) manager.RegisterStateMachine("state", state);
+            var value = new DurableValue<int>("business", manager, CreateValueCodec<int>());
+            manager.RegisterStateMachine("other", other);
+            if (!stateFirst) manager.RegisterStateMachine("state", state);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            if (path == "empty-buffer")
+            {
+                await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(0, manager.PendingWriteByteCount);
+            }
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            WaitFor(manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()));
-        if (failure == "incomplete") Assert.Contains("without becoming prepared", exception.Message);
-        else Assert.Same(expected, exception);
-        Assert.Same(exception, state.Failure);
-        Assert.Equal(failure == "readiness" ? 0 : 1, state.PrepareCount);
-        Assert.Equal(0, state.CaptureCount);
-        Assert.Equal(0, state.WriteCompletedCount);
-        Assert.Empty(storage.Appends);
-        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.Same(exception, rejected.InnerException);
+            storage.IsCompactionRequested = path == "snapshot";
+            var previousWrites = storage.Appends.Count;
+            var previousCaptures = state.CaptureCount;
+            var previousAcks = state.WriteCompletedCount;
+            var initialWriter = Assert.Single(format.Writers);
+            var initialEntries = initialWriter.BeganEntryIds.Count;
+            var waiters = new List<Task>();
+            var expected = new InvalidOperationException("Synchronous apply failed after changing business state.");
+            Exception? latchedFailure = null;
+            var handlerContext = new AsyncLocal<bool>();
+            var admissions = 0;
+            state.ValidateWriteAction = () =>
+            {
+                Assert.False(handlerContext.Value);
+                admissions++;
+            };
+            state.PendingValidationAction = () =>
+            {
+                Assert.Same(initialWriter, Assert.Single(format.Writers));
+                Assert.Equal(initialEntries, initialWriter.BeganEntryIds.Count);
+                Assert.Same(expected, latchedFailure);
+                throw latchedFailure!;
+            };
+            if (previouslyAdmitted) waiters.Add(manager.WriteStateAsync(CancellationToken.None).AsTask());
+            handlerContext.Value = true;
+            try
+            {
+                value.Value = 42;
+                throw expected;
+            }
+            catch (InvalidOperationException exception)
+            {
+                latchedFailure = exception;
+            }
+            finally
+            {
+                handlerContext.Value = false;
+            }
+
+            if (path == "empty-buffer") Assert.Equal(0, manager.PendingWriteByteCount);
+            waiters.Add(manager.WriteStateAsync(CancellationToken.None).AsTask());
+            waiters.Add(manager.DeleteStateAsync(CancellationToken.None).AsTask());
+            waiters.Add(manager.InitializeAsync(CancellationToken.None).AsTask());
+            var notifications = new List<string>();
+            var stateOwnedWaiter = NewSignal();
+            state.FaultAction = exception =>
+            {
+                Assert.Same(expected, exception);
+                Assert.All(waiters, waiter => Assert.False(waiter.IsCompleted));
+                stateOwnedWaiter.TrySetException(exception);
+                notifications.Add("state");
+            };
+            other.FaultAction = exception =>
+            {
+                Assert.Same(expected, exception);
+                Assert.All(waiters, waiter => Assert.False(waiter.IsCompleted));
+                notifications.Add("other");
+            };
+            Assert.Equal(previouslyAdmitted ? 2 : 1, admissions);
+            foreach (var waiter in waiters)
+            {
+                Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(waiter)));
+            }
+
+            Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(stateOwnedWaiter.Task)));
+            Assert.Equal(stateFirst ? new[] { "state", "other" } : ["other", "state"], notifications);
+            Assert.Equal(42, value.Value);
+            Assert.Equal(previousCaptures, state.CaptureCount);
+            Assert.Equal(previousAcks, state.WriteCompletedCount);
+            Assert.Equal(previousWrites, storage.Appends.Count);
+            Assert.Empty(storage.Replaces);
+            Assert.Equal(0, storage.DeleteCount);
+            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+            Assert.Same(expected, rejected.InnerException);
+        });
     }
 
     [Fact]
-    public async Task CommittedOnlyWrite_ChecksLatchedStateFailure()
+    public async Task PendingValidation_AllowsIndependentWriteDuringLocalPreparation()
+    {
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new CapturingStorage();
+            await using var manager = CreateTestSystem(storage).Manager;
+            var state = new HookState();
+            manager.RegisterStateMachine("state", state);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            var handlerContext = new AsyncLocal<bool>();
+            var preparing = false;
+            var admissionCalls = 0;
+            var rejected = new InvalidOperationException("Handler preparation cannot commit state.");
+            state.ValidateWriteAction = () =>
+            {
+                admissionCalls++;
+                if (handlerContext.Value) throw rejected;
+            };
+            state.PendingValidationAction = () =>
+            {
+                Assert.True(preparing);
+                Assert.False(handlerContext.Value);
+                Assert.Equal(2, admissionCalls);
+            };
+
+            var independent = manager.WriteStateAsync(CancellationToken.None).AsTask();
+            preparing = true;
+            handlerContext.Value = true;
+            Assert.Same(rejected, await Record.ExceptionAsync(() => manager.WriteStateAsync(CancellationToken.None).AsTask()));
+            await independent;
+            Assert.Equal(1, state.PendingValidationCount);
+            Assert.Equal(1, state.WriteCompletedCount);
+            Assert.Single(storage.Appends);
+            Assert.Null(state.Failure);
+
+            handlerContext.Value = false;
+            preparing = false;
+            state.PendingValidationAction = null;
+            await manager.WriteStateAsync(CancellationToken.None);
+            Assert.Equal(3, admissionCalls);
+            Assert.Equal(2, state.WriteCompletedCount);
+            Assert.Null(state.Failure);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CommittedOnlyWrite_ChecksLatchedStateFailure(bool emptyPrefix)
     {
         var storage = new CapturingStorage();
         await using var manager = CreateTestSystem(storage).Manager;
         var state = new HookState();
         manager.RegisterStateMachine("state", state);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        if (emptyPrefix)
+        {
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(0, manager.PendingWriteByteCount);
+        }
+
+        var previousCaptures = state.CaptureCount;
+        var previousWrites = storage.Appends.Count;
         var expected = new IOException("Latched state failure.");
-        state.ReadinessAction = () => throw expected;
+        state.PendingValidationAction = () => throw expected;
         var write = StartWhileEntryIsOpen();
         Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(write)));
         Assert.Same(expected, state.Failure);
-        Assert.Equal(0, state.CaptureCount);
-        Assert.Empty(storage.Appends);
+        Assert.Equal(previousCaptures, state.CaptureCount);
+        Assert.Equal(previousWrites, storage.Appends.Count);
 
         Task StartWhileEntryIsOpen()
         {
             using var entry = state.Writer.BeginEntry();
             var result = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-            Assert.True(SpinWait.SpinUntil(() => result.IsCompleted, TimeSpan.FromSeconds(10)),
-                "The committed-only write must observe readiness while the lexical entry is open.");
+            using var completed = new ManualResetEventSlim();
+            result.GetAwaiter().OnCompleted(completed.Set);
+            Assert.True(completed.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken),
+                "The committed-only write must validate pending changes while the lexical entry is open.");
             return result;
         }
     }
@@ -304,74 +437,70 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Fault_NotifiesEveryStateBeforeWaitersAndPreservesOriginal(bool failPreparation)
+    public async Task Fault_NotifiesEveryStateBeforeWaitersAndPreservesOriginal(bool failValidation)
     {
-        var expected = new IOException("Original failure.");
-        var notificationFailure = new InvalidOperationException("Notification failed.");
-        var storage = new CapturingStorage { BlockNextAppend = !failPreparation, NextAppendException = expected };
-        var logger = Substitute.For<ILogger>();
-        logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
-        var loggerFactory = Substitute.For<ILoggerFactory>();
-        loggerFactory.CreateLogger(Arg.Any<string>()).Returns(logger);
-        var shared = new JournaledStateManagerShared(new Logger<JournaledStateManager>(loggerFactory),
-            Options.Create(ManagerOptions), TimeProvider.System, ServiceProvider);
-        await using var manager = new JournaledStateManager(shared, storage);
-        var entered = NewSignal();
-        var release = NewSignal();
-        var first = new HookState { Prepared = !failPreparation };
-        var second = new HookState();
-        manager.RegisterStateMachine("first", first);
-        manager.RegisterStateMachine("second", second);
-        first.PrepareAction = async token =>
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
         {
-            entered.SetResult();
-            await release.Task.WaitAsync(token);
-            throw expected;
-        };
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        var current = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        await WaitFor(failPreparation ? entered.Task : storage.BlockedAppendStarted.Task);
-        var queued = new[]
-        {
-            current,
-            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(),
-            manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask(),
-            manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
-        };
-        var notified = new List<string>();
-        first.FaultAction = exception =>
-        {
-            Assert.Same(expected, exception);
-            Assert.All(queued, task => Assert.False(task.IsCompleted));
-            notified.Add("first");
-            throw notificationFailure;
-        };
-        second.FaultAction = exception =>
-        {
-            Assert.Same(expected, exception);
-            Assert.All(queued, task => Assert.False(task.IsCompleted));
-            var rejected = Assert.Throws<InvalidOperationException>(() => manager.RegisterStateMachine("late", new HookState()));
-            Assert.Same(expected, rejected.InnerException);
-            notified.Add("second");
-        };
+            var expected = new IOException("Original failure.");
+            var notificationFailure = new InvalidOperationException("Notification failed.");
+            var storage = new CapturingStorage { BlockNextAppend = !failValidation, NextAppendException = expected };
+            var logger = Substitute.For<ILogger>();
+            logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+            var loggerFactory = Substitute.For<ILoggerFactory>();
+            loggerFactory.CreateLogger(Arg.Any<string>()).Returns(logger);
+            var shared = new JournaledStateManagerShared(new Logger<JournaledStateManager>(loggerFactory),
+                Options.Create(ManagerOptions), TimeProvider.System, ServiceProvider);
+            await using var manager = new JournaledStateManager(shared, storage);
+            var first = new HookState();
+            var second = new HookState();
+            manager.RegisterStateMachine("first", first);
+            manager.RegisterStateMachine("second", second);
+            if (failValidation) first.PendingValidationAction = () => throw expected;
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            var current = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            if (!failValidation) await WaitFor(storage.BlockedAppendStarted.Task);
+            var queued = new[]
+            {
+                current,
+                manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask(),
+                manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask(),
+                manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
+            };
+            var notified = new List<string>();
+            first.FaultAction = exception =>
+            {
+                Assert.Same(expected, exception);
+                Assert.All(queued, task => Assert.False(task.IsCompleted));
+                notified.Add("first");
+                throw notificationFailure;
+            };
+            second.FaultAction = exception =>
+            {
+                Assert.Same(expected, exception);
+                Assert.All(queued, task => Assert.False(task.IsCompleted));
+                var rejected = Assert.Throws<InvalidOperationException>(() => manager.RegisterStateMachine("late", new HookState()));
+                Assert.Same(expected, rejected.InnerException);
+                notified.Add("second");
+            };
 
-        if (failPreparation) release.SetResult();
-        else storage.ReleaseAppend.SetResult();
-        foreach (var task in queued)
-        {
-            Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(task)));
-        }
+            if (!failValidation) storage.ReleaseAppend.SetResult();
+            foreach (var task in queued)
+            {
+                Assert.Same(expected, await Record.ExceptionAsync(() => WaitFor(task)));
+            }
 
-        Assert.Equal(["first", "second"], notified);
-        Assert.Equal(1, first.FaultCount);
-        Assert.Equal(1, second.FaultCount);
-        Assert.Contains(logger.ReceivedCalls(), call =>
-            call.GetMethodInfo().Name == nameof(ILogger.Log)
-            && Equals(call.GetArguments()[0], LogLevel.Error)
-            && ReferenceEquals(call.GetArguments()[3], notificationFailure));
-        var late = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(CancellationToken.None).AsTask());
-        Assert.Same(expected, late.InnerException);
-        Assert.Empty(storage.Appends);
+            Assert.Equal(["first", "second"], notified);
+            Assert.Equal(1, first.FaultCount);
+            Assert.Equal(1, second.FaultCount);
+            Assert.Contains(logger.ReceivedCalls(), call =>
+                call.GetMethodInfo().Name == nameof(ILogger.Log)
+                && Equals(call.GetArguments()[0], LogLevel.Error)
+                && ReferenceEquals(call.GetArguments()[3], notificationFailure));
+            var late = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(CancellationToken.None).AsTask());
+            Assert.Same(expected, late.InnerException);
+            Assert.Empty(storage.Appends);
+        });
     }
 
     [Fact]
@@ -445,7 +574,7 @@ public partial class StateManagerTests
         var capturedWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await WaitFor(storage.BlockedAppendStarted.Task);
         var expected = new IOException("Failure after capture.");
-        state.ReadinessAction = () => throw expected;
+        state.PendingValidationAction = () => throw expected;
         var failingWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         Assert.Null(state.Failure);
         Assert.Equal(0, state.WriteCompletedCount);
@@ -489,22 +618,21 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AdmittedShutdownCancellation_NotifiesAndFaultsWaiters(bool preparation)
+    public async Task AdmittedShutdownCancellation_NotifiesAndFaultsWaiters(bool snapshot)
     {
-        var storage = new CapturingStorage { BlockNextAppend = !preparation };
+        var storage = new CapturingStorage
+        {
+            IsCompactionRequested = snapshot,
+            BlockNextAppend = !snapshot,
+            BlockNextReplace = snapshot
+        };
         var sut = CreateTestSystem(storage);
         await using var manager = sut.Manager;
-        var state = new HookState { Prepared = !preparation };
-        var entered = NewSignal();
-        state.PrepareAction = async token =>
-        {
-            entered.SetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, token);
-        };
+        var state = new HookState();
         manager.RegisterStateMachine("state", state);
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        await WaitFor(preparation ? entered.Task : storage.BlockedAppendStarted.Task);
+        await WaitFor(snapshot ? storage.ReplaceEntered.Task : storage.BlockedAppendStarted.Task);
         var queued = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(write));
@@ -517,57 +645,64 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CallerCancellation_PreservesOwnedPreparationStorageAndAck(bool cancelDuringPreparation)
+    public async Task CallerCancellation_PreservesOwnedStorageAndAck(bool snapshot)
     {
-        var storage = new CapturingStorage { BlockNextAppend = true };
-        await using var manager = CreateTestSystem(storage).Manager;
-        var state = new HookState { Prepared = false };
-        var entered = NewSignal();
-        var release = NewSignal();
-        var acknowledged = NewSignal();
-        var ownedToken = CancellationToken.None;
-        state.PrepareAction = async token =>
+        var storage = new CapturingStorage
         {
-            ownedToken = token;
-            entered.SetResult();
-            await release.Task.WaitAsync(token);
-            state.Prepared = true;
+            IsCompactionRequested = snapshot,
+            BlockNextAppend = !snapshot,
+            BlockNextReplace = snapshot
         };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var state = new HookState();
+        var acknowledged = NewSignal();
         state.WriteCompletedAction = () => acknowledged.SetResult();
         manager.RegisterStateMachine("state", state);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         using var caller = new CancellationTokenSource();
         var write = manager.WriteStateAsync(caller.Token).AsTask();
-        await WaitFor(entered.Task);
-        Assert.True(ownedToken.CanBeCanceled);
-        Assert.NotEqual(caller.Token, ownedToken);
-        if (cancelDuringPreparation)
-        {
-            caller.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
-            Assert.False(ownedToken.IsCancellationRequested);
-        }
-
-        release.SetResult();
-        await WaitFor(storage.BlockedAppendStarted.Task);
-        if (!cancelDuringPreparation)
-        {
-            caller.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
-        }
-
-        Assert.False(ownedToken.IsCancellationRequested);
+        await WaitFor(snapshot ? storage.ReplaceEntered.Task : storage.BlockedAppendStarted.Task);
+        caller.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
         Assert.False(acknowledged.Task.IsCompleted);
         state.EmitEntry = false;
+        storage.IsCompactionRequested = false;
         var nextWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        storage.ReleaseAppend.SetResult();
+        if (snapshot) storage.ReleaseReplace.SetResult();
+        else storage.ReleaseAppend.SetResult();
         await WaitFor(acknowledged.Task);
         await WaitFor(nextWrite);
-        Assert.Equal(1, state.PrepareCount);
+        Assert.Equal(2, state.PendingValidationCount);
         Assert.Equal(1, state.WriteCompletedCount);
         Assert.Equal(0, manager.PendingWriteByteCount);
         Assert.Null(state.Failure);
-        Assert.Single(storage.Appends);
+        Assert.Equal(snapshot ? 0 : 1, storage.Appends.Count);
+        Assert.Equal(snapshot ? 1 : 0, storage.Replaces.Count);
+    }
+
+    [Fact]
+    public async Task CallerCancellation_PreservesQueuedWrite()
+    {
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new CapturingStorage();
+            await using var manager = CreateTestSystem(storage).Manager;
+            var state = new HookState();
+            manager.RegisterStateMachine("state", state);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            using var caller = new CancellationTokenSource();
+            var write = manager.WriteStateAsync(caller.Token).AsTask();
+            Assert.Equal(0, state.PendingValidationCount);
+            caller.Cancel();
+            var remainingWaiter = manager.WriteStateAsync(CancellationToken.None).AsTask();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+            await remainingWaiter;
+            Assert.Single(storage.Appends);
+            Assert.Equal(1, state.PendingValidationCount);
+            Assert.Equal(1, state.WriteCompletedCount);
+            Assert.Null(state.Failure);
+        });
     }
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -614,10 +749,8 @@ public partial class StateManagerTests
 
     private sealed class HookState : IStateMachine
     {
-        public bool Prepared { get; set; } = true;
         public bool EmitEntry { get; set; } = true;
-        public Func<bool>? ReadinessAction { get; set; }
-        public Func<CancellationToken, ValueTask>? PrepareAction { get; set; }
+        public Action? PendingValidationAction { get; set; }
         public Action? ValidateWriteAction { get; set; }
         public Action? ValidateDeleteAction { get; set; }
         public Action? DeleteStartedAction { get; set; }
@@ -627,20 +760,16 @@ public partial class StateManagerTests
         public Action<Exception>? FaultAction { get; set; }
         public JournalStreamWriter Writer { get; private set; }
         public int ResetCount { get; private set; }
-        public int PrepareCount { get; private set; }
+        public int PendingValidationCount { get; private set; }
         public int CaptureCount { get; private set; }
         public int DeleteStartedCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
         public int FaultCount { get; private set; }
         public Exception? Failure { get; private set; }
-        public bool IsWritePrepared => ReadinessAction?.Invoke() ?? Prepared;
-
-        public ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
+        public void ValidatePendingChanges()
         {
-            PrepareCount++;
-            if (PrepareAction is { } prepare) return prepare(cancellationToken);
-            Prepared = true;
-            return default;
+            PendingValidationCount++;
+            PendingValidationAction?.Invoke();
         }
 
         public void ValidateWrite() => ValidateWriteAction?.Invoke();
