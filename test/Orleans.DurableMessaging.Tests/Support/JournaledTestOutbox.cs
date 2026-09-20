@@ -26,7 +26,6 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     public int PreparationsCompleted { get; private set; }
     public IReadOnlyList<PreparationOperation> Preparations => _preparations;
     public IReadOnlyList<BatchObservation> PreparedBatches => _batches;
-    public int JournalPreparationCalls { get; private set; }
     public IReadOnlyList<Guid> LastCapturedIds { get; private set; } = [];
     public Action? AfterWriteCompleted { get; set; }
 
@@ -214,23 +213,7 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
         TryGetValue(messageId, out envelope);
 
-    public override bool IsWritePrepared
-    {
-        get
-        {
-            _failure?.Throw();
-            return true;
-        }
-    }
-
-    public override ValueTask PrepareWriteAsync(CancellationToken cancellationToken)
-    {
-        // Temporary foundation bridge: no outgoing acquisition belongs to journal execution.
-        JournalPreparationCalls++;
-        _failure?.Throw();
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.CompletedTask;
-    }
+    public override void ValidatePendingChanges() => _failure?.Throw();
 
     public override void WritePendingEntries(JournalStreamWriter writer)
     {

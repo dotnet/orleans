@@ -85,7 +85,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
             Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
             Assert.True(manager.PendingWriteByteCount > capturedBytes);
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
-            Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => inbox.IsWritePrepared));
+            Assert.Same(failure, Assert.Throws<InvalidOperationException>(inbox.ValidatePendingChanges));
         });
         Assert.Equal(captures, grain.Captures.Count);
         Assert.Equal(0, acknowledgements);
@@ -97,7 +97,6 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(1, acknowledgements);
         Assert.Equal(captures, grain.Captures.Count);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
         Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -145,7 +144,6 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
         Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
         Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);

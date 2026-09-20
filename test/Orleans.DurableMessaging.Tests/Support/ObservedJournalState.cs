@@ -16,8 +16,7 @@ internal abstract class ObservedJournalState(IStateMachine state) : IStateMachin
     public Action? ValidateWriting { get; set; }
     public Action? ValidateDeleting { get; set; }
     public Action<Exception>? Faulted { get; set; }
-    public virtual bool IsWritePrepared => State.IsWritePrepared;
-    public virtual ValueTask PrepareWriteAsync(CancellationToken token) => State.PrepareWriteAsync(token);
+    public virtual void ValidatePendingChanges() => State.ValidatePendingChanges();
     public virtual void ValidateWrite() { State.ValidateWrite(); ValidateWriting?.Invoke(); }
     public virtual void ValidateDelete() { State.ValidateDelete(); ValidateDeleting?.Invoke(); }
     public virtual void OnDeleteStarted() => State.OnDeleteStarted();

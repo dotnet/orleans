@@ -179,7 +179,6 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         await owner.RetryWriteStateAsync();
         Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), outbox.LastCapturedIds.Order());
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         await owner.RequestDeactivationAsync();
         Assert.Equal(2, (await owner.GetSnapshotAsync()).OutboxCount);
         Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), Fixture.GetStagedOutput(owner).Select(static item => item.MessageId).Order());
@@ -257,7 +256,6 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         Assert.Empty(after.InboxDeadLetters);
         Assert.Null(after.InboxJobId);
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         // Controlled collaborator only: production outbox wakeup ownership is tested downstream.
         Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount("orleans.messaging.outbox-drain", owner.GetGrainId()));
     }

@@ -62,7 +62,6 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Empty(grain.GetSnapshotForTest().InboxDeadLetters);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(recovered.Effects);
@@ -119,7 +118,6 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(1, replayed.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(replayed.Effects).Count);
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
     }
 
     [Theory]
@@ -155,7 +153,6 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         }
         finally { batch.Dispose(); }
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
     }
 
     [Theory]
@@ -189,7 +186,6 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(recovered.Effects);
@@ -253,7 +249,6 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(2, outbox.PreparedBatches.Count);
         Assert.All(outbox.PreparedBatches, batch => Assert.Equal(1, batch.DisposeCalls));
-        Assert.Equal(0, outbox.JournalPreparationCalls);
         await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Equal(one.Value.MessageId, Assert.Single(recovered.Effects).LogicalId);
