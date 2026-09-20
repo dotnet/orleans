@@ -15,29 +15,40 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
 {
     [Fact]
-    public async Task HandlerAndOutgoingPreparation_BlockQueuedWritesUntilAtomicCapture()
+    public async Task ExplicitPreparation_AllowsPriorStateWriteThenCapturesAppliedCohortAtomically()
     {
         using var attempt = await PrepareAttemptAsync("atomic-admission");
         var state = attempt.Grain.GetSnapshotForTest();
-        Assert.Equal(0, state.InboxCount);
-        Assert.Equal(1, state.ProcessedMessageCount);
-        Assert.Equal(1, Assert.Single(state.Effects).Count);
-        Assert.Single(attempt.Outbox);
+        Assert.Equal(1, state.InboxCount);
+        Assert.Equal(0, state.ProcessedMessageCount);
+        Assert.Empty(state.Effects);
+        Assert.Empty(attempt.Outbox);
+        await OnTurnAsync(attempt.Context, () =>
+            attempt.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "previous-state");
+        await attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var priorCapture = attempt.Grain.Captures[^1];
+        Assert.Empty(priorCapture.Effects);
+        Assert.Equal(1, priorCapture.InboxCount);
+        Assert.Equal(0, priorCapture.ProcessedMessageCount);
+        Assert.Equal(0, priorCapture.OutboxCount);
+        Assert.False(attempt.Grain.ApplyAttempted.Task.IsCompleted);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
-        var storage = Fixture.Storage.BlockWrite(attempt.JournalId);
+        using var storage = Fixture.Storage.BlockWrite(attempt.JournalId);
+        attempt.Preparation.Release();
+        await storage.WaitUntilEnteredAsync();
         var queued = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         var coalesced = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         Assert.False(queued.IsCompleted);
         Assert.False(coalesced.IsCompleted);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
 
-        attempt.Preparation.Release();
-        await storage.WaitUntilEnteredAsync();
         var captured = attempt.Grain.GetSnapshotForTest();
         Assert.Equal(0, captured.InboxCount);
         Assert.Equal(1, captured.ProcessedMessageCount);
         Assert.Equal(1, Assert.Single(captured.Effects).Count);
         Assert.Single(attempt.Outbox.LastCapturedIds);
+        Assert.Equal(0, attempt.Outbox.JournalPreparationCalls);
+        Assert.Equal(0, Assert.Single(attempt.Outbox.PreparedBatches).DisposeCalls);
         Assert.False(queued.IsCompleted);
         storage.Release();
         await Task.WhenAll(queued, coalesced);
@@ -48,17 +59,35 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(1, recovered.OutboxCount);
         Assert.Equal(0, recovered.InboxCount);
+        Assert.Equal(1, Assert.Single(attempt.Outbox.PreparedBatches).DisposeCalls);
     }
 
     [Fact]
-    public async Task OutgoingPreparationFault_FencesBothEndpointsBeforeQueuedWaitersResume()
+    public async Task PendingChangesValidationFault_FencesBothEndpointsBeforeQueuedWaitersResume()
     {
         using var attempt = await PrepareAttemptAsync("fault-ordering");
         var extension = attempt.Context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+        var failure = new IOException("Injected pending-state validation failure.");
+        await OnTurnAsync(attempt.Context, () =>
+        {
+            attempt.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-captured";
+            attempt.Grain.AfterApply = () => attempt.Outbox.OnFaulted(failure);
+        });
+        using var storage = Fixture.Storage.BlockWrite(attempt.JournalId);
+        var preceding = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.WaitUntilEnteredAsync();
         var queued = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        var failure = new IOException("Injected outgoing prerequisite failure.");
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
-        attempt.Preparation.Fail(failure);
+        attempt.Preparation.Release();
+        await attempt.Grain.ApplyAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await OnTurnAsync(attempt.Context, () =>
+        {
+            Assert.Same(failure, attempt.Outbox.Failure);
+            Assert.Single(attempt.Grain.GetSnapshotForTest().Effects);
+        });
+        Assert.False(queued.IsCompleted);
+        storage.Release();
+        await preceding;
 
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => queued));
         Assert.Same(failure, await attempt.Grain.Faulted.Task);
@@ -66,7 +95,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         await attempt.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(async () =>
             await ((IDurableInboxExtension)extension).DeliverAsync(attempt.Envelope, TestContext.Current.CancellationToken)));
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
         var failed = attempt.Grain.GetSnapshotForTest();
         Assert.Single(failed.Effects);
         Assert.Equal(0, failed.InboxCount);
@@ -84,7 +113,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         using var attempt = await PrepareAttemptAsync("owner-invalidation");
         var value = attempt.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.inbox-job-handle");
         var previous = value.Value!;
-        attempt.Outbox.BeforeFinalization = () => value.Value = new DurableJob
+        attempt.Grain.AfterApply = () => value.Value = new DurableJob
         {
             Id = previous.Id,
             ShardId = "different-physical-shard",
@@ -94,9 +123,9 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
             DueTime = previous.DueTime
         };
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
-        var queued = attempt.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         attempt.Preparation.Release();
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => queued);
+        var failure = Assert.IsType<InvalidOperationException>(
+            await attempt.Grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         Assert.Contains("acknowledged physical job", failure.Message, StringComparison.Ordinal);
         Assert.Same(failure, attempt.Outbox.Failure);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
@@ -127,7 +156,11 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var write = Fixture.WriteStateAsync(receiver).AsTask();
         await storage.WaitUntilEnteredAsync();
-        await OnTurnAsync(context, () => outbox.Send(late));
+        await OnTurnTaskAsync(context, async () =>
+        {
+            using var batch = await outbox.PrepareSendAsync([late], TestContext.Current.CancellationToken);
+            outbox.Send(batch);
+        });
         Assert.Equal(new[] { first.MessageId }, outbox.LastCapturedIds);
         Assert.Equal(2, outbox.Count);
         storage.Release();
@@ -321,6 +354,17 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
             catch (Exception exception) { completion.SetException(exception); }
         });
         return completion.Task;
+    }
+
+    private static Task OnTurnTaskAsync(IGrainContext context, Func<Task> action)
+    {
+        var started = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() =>
+        {
+            try { started.SetResult(action()); }
+            catch (Exception exception) { started.SetException(exception); }
+        });
+        return started.Task.Unwrap();
     }
 
     private sealed record Attempt(IDurableMessagingTestGrain Receiver, IGrainContext Context, JournaledTestOutbox Outbox,

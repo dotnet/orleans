@@ -26,14 +26,22 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var outbox = GetOutbox(context);
-        using var barrier = outbox.BlockNextPreparation();
+        using var barrier = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        TaskScheduler? continuationScheduler = null;
+        IGrainContext? continuationContext = null;
+        outbox.AfterWriteCompleted = () =>
+        {
+            continuationScheduler = TaskScheduler.Current;
+            continuationContext = ReceiverTestServices.CurrentGrainContext;
+        };
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner)).Status);
-        await barrier.WaitAsync();
-        var scheduler = outbox.PreparationScheduler;
+        await barrier.WaitUntilEnteredAsync();
+        var scheduler = barrier.EntryScheduler;
         Assert.NotSame(TaskScheduler.Default, scheduler);
-        Assert.Same(context, outbox.PreparationContext);
-        var admitted = GetStaged(context);
+        Assert.Same(context, barrier.EntryContext);
+        var admitted = GetAdmitted(context);
+        Assert.Empty(GetStaged(context));
         Assert.Equal("ClearOwnerWrite", Assert.Single(admitted.Cast<object>()).GetType().Name);
 
         Assert.Equal(DurableJobRunStatus.Completed, (await InvokeJobAsync(receiver, CreateJob(receiver, "test/probe-scheduler"))).Status);
@@ -42,15 +50,17 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         for (var attempt = 2; attempt <= 4; attempt++)
         {
             Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner, attempt)).Status);
-            Assert.Same(admitted, GetStaged(context));
+            Assert.Same(admitted, GetAdmitted(context));
+            Assert.Empty(GetStaged(context));
         }
         Assert.Single(events.Events, item => item.Payload is GrainTimerEvents.Created created && ReferenceEquals(created.GrainContext, context));
         barrier.Release();
         await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(), static snapshot => snapshot.InboxJobId is null);
         _ = await receiver.GetSnapshotAsync();
-        Assert.Same(scheduler, outbox.ContinuationScheduler);
-        Assert.Same(context, outbox.ContinuationContext);
+        Assert.Same(scheduler, continuationScheduler);
+        Assert.Same(context, continuationContext);
         Assert.Empty(GetStaged(context));
+        Assert.Empty(GetAdmitted(context));
         Assert.Equal(DurableJobRunStatus.Completed, (await InvokeJobAsync(receiver, owner, 5)).Status);
         Assert.False(grain.Faulted.Task.IsCompleted);
     }
@@ -139,12 +149,12 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        using var blocked = GetOutbox(context).BlockNextPreparation();
+        using var blocked = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var first = CreateEnvelope(receiver, NewMessage(163, "owned-after-cancel"));
         using var second = CreateEnvelope(receiver, NewMessage(164, "gate-waiter"));
         using var cancellation = new CancellationTokenSource();
         var delivery = DeliverWithCancellationAsync(receiver, first.Value, cancellation.Token);
-        await blocked.WaitAsync();
+        await blocked.WaitUntilEnteredAsync();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery);
         _ = await receiver.GetSnapshotAsync();
@@ -186,10 +196,11 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         await receiver.SetControlEnvelopeAsync(incoming.Value);
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
-        using var preparation = GetOutbox(context).BlockNextPreparation();
+        using var preparation = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeJobAsync(receiver, owner)).Status);
-        await preparation.WaitAsync();
-        Assert.Equal("ClearOwnerWrite", Assert.Single(GetStaged(context).Cast<object>()).GetType().Name);
+        await preparation.WaitUntilEnteredAsync();
+        Assert.Equal("ClearOwnerWrite", Assert.Single(GetAdmitted(context).Cast<object>()).GetType().Name);
+        Assert.Empty(GetStaged(context));
         Task delivery;
         if (interleaved)
         {
@@ -324,6 +335,13 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
 
     private static JournaledTestOutbox GetOutbox(IGrainContext context) =>
         (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+
+    private static IList GetAdmitted(IGrainContext context)
+    {
+        var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+        return (IList)type.GetField("_admittedWrites", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(context.ActivationServices.GetRequiredService(type))!;
+    }
 
     private static IList GetStaged(IGrainContext context)
     {

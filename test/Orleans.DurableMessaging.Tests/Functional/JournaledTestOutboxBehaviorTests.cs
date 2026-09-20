@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableMessaging.Tests.Support;
+using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -126,6 +127,188 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
         Assert.Equal(output.MessageId, Assert.Single(Fixture.GetStagedOutput(receiver)).MessageId);
         Assert.Empty(recovered.InboxDeadLetters);
+    }
+
+    [Fact]
+    public async Task ApplicationPreparation_CopiesBatchAndStagesOnlyOnSendBeforeExplicitWrite()
+    {
+        var owner = NewGrain();
+        _ = await owner.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(owner);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var journal = JournalId.FromGrainId(owner.GetGrainId());
+        var first = CreateOutput(owner);
+        var second = CreateOutput(owner);
+        var replaced = CreateOutput(owner);
+        var messages = new[] { first, second };
+        using var preparation = outbox.BlockNextPreparation();
+        var acquisition = OnTurnAsync(context, () => outbox.PrepareSendAsync(messages, TestContext.Current.CancellationToken));
+        await preparation.WaitAsync();
+        messages[0] = replaced;
+        Assert.Empty(outbox.Messages);
+        Assert.Equal(0, ((IDurableOutbox)outbox).Count);
+        Assert.Empty(outbox.PreparedBatches);
+        await OnTurnAsync(context, () =>
+            context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-only");
+        await Fixture.WriteStateAsync(owner);
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        Assert.Empty(outbox.LastCapturedIds);
+        Assert.Equal(0, ((DurableMessagingTestGrain)context.GrainInstance!).Captures[^1].OutboxCount);
+
+        preparation.Release();
+        using (var batch = await acquisition)
+        {
+            Assert.Empty(outbox.Messages);
+            Assert.Equal(0, ((IDurableOutbox)outbox).Count);
+            Assert.Equal(new[] { first.MessageId, second.MessageId }, Assert.Single(outbox.PreparedBatches).MessageIds);
+            await Fixture.WriteStateAsync(owner);
+            Assert.Empty(outbox.LastCapturedIds);
+            Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+            await OnTurnAsync(context, () =>
+            {
+                outbox.Send(batch);
+                outbox.Send(batch);
+            });
+            Assert.Equal(2, outbox.Count);
+            Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), outbox.Messages.Select(static item => item.MessageId).Order());
+            Assert.DoesNotContain(outbox.Messages, item => item.MessageId == replaced.MessageId);
+            Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        }
+
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        await owner.RetryWriteStateAsync();
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), outbox.LastCapturedIds.Order());
+        Assert.Equal(0, outbox.JournalPreparationCalls);
+        await owner.RequestDeactivationAsync();
+        Assert.Equal(2, (await owner.GetSnapshotAsync()).OutboxCount);
+        Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), Fixture.GetStagedOutput(owner).Select(static item => item.MessageId).Order());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApplicationPreparationFailure_BeforeMutation_KeepsManagerHealthy(bool priorAcquisition)
+    {
+        var owner = NewGrain();
+        _ = await owner.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(owner);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var output = CreateOutput(owner);
+        var journal = JournalId.FromGrainId(owner.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        IPreparedOutboxBatch? unused = priorAcquisition
+            ? await OnTurnAsync(context, () => outbox.PrepareSendAsync([CreateOutput(owner)]))
+            : null;
+        using var preparation = outbox.BlockNextPreparation();
+        var acquisition = OnTurnAsync(context, () => outbox.PrepareSendAsync([output]));
+        await preparation.WaitAsync();
+        var failure = new IOException("Ordinary application preparation failed before mutation.");
+        preparation.Fail(failure);
+        Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => acquisition));
+        unused?.Dispose();
+        Assert.Empty(outbox.Messages);
+        Assert.Empty(grain.GetSnapshotForTest().Effects);
+        Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.False(grain.Faulted.Task.IsCompleted);
+        Assert.Null(outbox.Failure);
+        Assert.All(outbox.PreparedBatches, static batch => Assert.Equal(1, batch.DisposeCalls));
+
+        await OnTurnAsync(context, () =>
+            context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy-after-preparation-failure");
+        await Fixture.WriteStateAsync(owner);
+        Assert.Same(context, Fixture.GetGrainContext(owner));
+        Assert.False(grain.Faulted.Task.IsCompleted);
+        await owner.StageOutputAsync(output);
+        await owner.RetryWriteStateAsync();
+        Assert.Equal(output.MessageId, Assert.Single(outbox.Messages).MessageId);
+        Assert.Equal(writes + 2, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.All(outbox.PreparedBatches, static batch => Assert.Equal(1, batch.DisposeCalls));
+    }
+
+    [Fact]
+    public async Task EmptyPreparedBatch_SendDoesNotStageOutputOrChangeReceiverState()
+    {
+        var owner = NewGrain();
+        var before = await owner.GetSnapshotAsync();
+        // Persist initial state-directory enrollment before measuring an empty batch's work.
+        await owner.RetryWriteStateAsync();
+        var context = Fixture.GetGrainContext(owner);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var journal = JournalId.FromGrainId(owner.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        using (var batch = await OnTurnAsync(context, () => outbox.PrepareSendAsync([])))
+        {
+            await OnTurnAsync(context, () => { outbox.Send(batch); outbox.Send(batch); });
+            Assert.Empty(outbox.Messages);
+            Assert.Empty(Assert.Single(outbox.PreparedBatches).MessageIds);
+            Assert.True(Assert.Single(outbox.PreparedBatches).IsStaged);
+        }
+        await owner.RetryWriteStateAsync();
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        var after = await owner.GetSnapshotAsync();
+        Assert.Equal(before.ActivationId, after.ActivationId);
+        Assert.Equal(0, after.InboxCount);
+        Assert.Equal(0, after.OutboxCount);
+        Assert.Equal(0, after.ProcessedMessageCount);
+        Assert.Empty(after.Effects);
+        Assert.Empty(after.InboxDeadLetters);
+        Assert.Null(after.InboxJobId);
+        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
+        Assert.Equal(0, outbox.JournalPreparationCalls);
+        // Controlled collaborator only: production outbox wakeup ownership is tested downstream.
+        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount("orleans.messaging.outbox-drain", owner.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task PreparedBatch_ConflictIntroducedAfterPreparation_DoesNotStagePartialPrefix()
+    {
+        var owner = NewGrain();
+        _ = await owner.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(owner);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var first = CreateOutput(owner);
+        var original = CreateOutput(owner);
+        var conflict = original with { RouteKey = "other-output" };
+        using var prepared = await OnTurnAsync(context, () => outbox.PrepareSendAsync([first, conflict]));
+        await owner.StageOutputAsync(original);
+        await owner.RetryWriteStateAsync();
+        var retained = Assert.Single(outbox.Messages);
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => OnTurnAsync(context, () => outbox.Send(prepared)));
+        Assert.Contains(original.MessageId.ToString(), failure.Message, StringComparison.Ordinal);
+        Assert.Equal(original.MessageId, Assert.Single(outbox.Messages).MessageId);
+        Assert.Same(retained.Data, Assert.Single(outbox.Messages).Data);
+        Assert.False(outbox.TryGetMessage(first.MessageId, out _));
+        Assert.False(outbox.PreparedBatches[0].IsStaged);
+        Assert.Null(outbox.Failure);
+        await owner.RetryWriteStateAsync();
+        await owner.RequestDeactivationAsync();
+        Assert.Equal(1, (await owner.GetSnapshotAsync()).OutboxCount);
+        Assert.Equal(original.RouteKey, Assert.Single(Fixture.GetStagedOutput(owner)).RouteKey);
+    }
+
+    private static Task<T> OnTurnAsync<T>(IGrainContext context, Func<ValueTask<T>> action)
+    {
+        var started = new TaskCompletionSource<Task<T>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() =>
+        {
+            try { started.SetResult(action().AsTask()); }
+            catch (Exception exception) { started.SetException(exception); }
+        });
+        return started.Task.Unwrap();
+    }
+
+    private static Task OnTurnAsync(IGrainContext context, Action action)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() =>
+        {
+            try { action(); done.SetResult(); }
+            catch (Exception exception) { done.SetException(exception); }
+        });
+        return done.Task;
     }
 
     private DurableEnvelope CreateOutput(IDurableMessagingTestGrain owner, string difference = "none", bool reverseContext = false)

@@ -412,7 +412,17 @@ internal sealed partial class DurableInboxExtension :
         }
         finally
         {
-            _pendingWrites.Remove(operation);
+            try
+            {
+                if (operation is HandlerWrite { Execution: { } execution })
+                {
+                    await execution.RetireAsync().ConfigureAwait(true);
+                }
+            }
+            finally
+            {
+                _pendingWrites.Remove(operation);
+            }
         }
 
         async Task WriteAsync()
@@ -561,8 +571,10 @@ internal sealed partial class DurableInboxExtension :
             }
 
             operation.HandlerInvoked = true;
+            execution.Phase = HandlerPhase.Preparing;
             operation.Apply = await handler!.PrepareAsync(new InboxHandlerContext(operation.Envelope, _grainContext.GrainId, execution, _sessionPool), cancellation.Token).ConfigureAwait(true);
             ThrowIfHandlerOperationRejected(execution);
+            execution.ValidatePreparationCompleted();
         }
         catch (Exception) when (execution.SendFailure is not null)
         {
@@ -578,6 +590,7 @@ internal sealed partial class DurableInboxExtension :
         }
         finally
         {
+            execution.Phase = HandlerPhase.Prepared;
             _handlerExecution.Value = previous;
         }
 
@@ -711,7 +724,7 @@ internal sealed partial class DurableInboxExtension :
         var previous = _handlerExecution.Value;
         var execution = operation.Execution!;
         ThrowIfHandlerOperationRejected(execution);
-        execution.IsApplying = true;
+        execution.Phase = HandlerPhase.Applying;
         _handlerExecution.Value = execution;
         try
         {
@@ -725,7 +738,7 @@ internal sealed partial class DurableInboxExtension :
         }
         finally
         {
-            execution.IsApplying = false;
+            execution.Phase = HandlerPhase.Completed;
             _handlerExecution.Value = previous;
         }
     }
@@ -927,32 +940,128 @@ internal sealed partial class DurableInboxExtension :
 
     private sealed class HandlerExecution(DurableInboxExtension owner) : IDurableOutbox
     {
+        private readonly List<Task<IPreparedOutboxBatch>> _preparations = [];
+        private readonly List<HandlerBatch> _batches = [];
+
         public DurableInboxExtension Owner { get; } = owner;
         public bool WriteRejected { get; set; }
-        public bool IsApplying { get; set; }
+        public HandlerPhase Phase { get; set; }
         public ExceptionDispatchInfo? SendFailure { get; private set; }
         public int Count => Owner._outbox.Count;
         public IEnumerable<DurableEnvelope> Messages => Owner._outbox.Messages;
         public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
             Owner._outbox.TryGetMessage(messageId, out envelope);
 
-        public void Send(DurableEnvelope envelope)
+        public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
+            IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
         {
-            if (!IsApplying || !ReferenceEquals(_handlerExecution.Value, this))
+            ValidateScope(HandlerPhase.Preparing,
+                "Handler batches can be prepared only during that attempt's PrepareAsync call.");
+            var preparation = AcquireBatchAsync(messages, cancellationToken);
+            _preparations.Add(preparation);
+            preparation.Ignore();
+            return new(preparation);
+        }
+
+        private async Task<IPreparedOutboxBatch> AcquireBatchAsync(
+            IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken)
+        {
+            var prepared = await Owner._outbox.PrepareSendAsync(messages, cancellationToken).ConfigureAwait(true);
+            try
             {
-                SendFailure ??= ExceptionDispatchInfo.Capture(new InvalidOperationException(
-                    "Handler messages can be sent only from that attempt's synchronous apply action."));
-                if (_handlerExecution.Value is { } current && ReferenceEquals(current.Owner, Owner))
+                ValidateScope(HandlerPhase.Preparing,
+                    "Handler batch preparation must complete before that attempt's PrepareAsync call returns.");
+                Owner.ValidateReady();
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = new HandlerBatch(this, prepared);
+                _batches.Add(batch);
+                return batch;
+            }
+            catch
+            {
+                prepared.Dispose();
+                throw;
+            }
+        }
+
+        public void ValidatePreparationCompleted()
+        {
+            if (_preparations.Any(static task => !task.IsCompleted))
+            {
+                RejectOperation(new InvalidOperationException(
+                    "Inbox handlers must await every batch preparation before returning their synchronous apply action."));
+            }
+        }
+
+        public void Send(IPreparedOutboxBatch batch)
+        {
+            ValidateScope(HandlerPhase.Applying,
+                "Handler messages can be sent only from that attempt's synchronous apply action.");
+            try
+            {
+                ArgumentNullException.ThrowIfNull(batch);
+                if (batch is not HandlerBatch owned || !ReferenceEquals(owned.Execution, this))
                 {
-                    current.SendFailure ??= SendFailure;
+                    throw new InvalidOperationException("The prepared batch belongs to another outbox or handler attempt.");
                 }
-                SendFailure.Throw();
+
+                Owner._outbox.Send(owned.Prepared);
+            }
+            catch (Exception exception)
+            {
+                RejectOperation(exception);
+                throw;
+            }
+        }
+
+        public async ValueTask RetireAsync()
+        {
+            Phase = HandlerPhase.Completed;
+            foreach (var preparation in _preparations)
+            {
+                await ((Task)preparation).ConfigureAwait(
+                    ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            }
+
+            foreach (var batch in _batches)
+            {
+                batch.Dispose();
+            }
+        }
+
+        private void ValidateScope(HandlerPhase phase, string message)
+        {
+            if (Phase != phase || !ReferenceEquals(_handlerExecution.Value, this))
+            {
+                RejectOperation(new InvalidOperationException(message));
             }
 
             ThrowIfHandlerOperationRejected(this);
-            Owner._outbox.Send(envelope);
+        }
+
+        [DoesNotReturn]
+        private void RejectOperation(Exception exception)
+        {
+            SendFailure ??= ExceptionDispatchInfo.Capture(exception);
+            if (_handlerExecution.Value is { } current && ReferenceEquals(current.Owner, Owner))
+            {
+                current.SendFailure ??= SendFailure;
+            }
+            SendFailure.Throw();
+        }
+
+        private sealed class HandlerBatch(HandlerExecution execution, IPreparedOutboxBatch prepared) : IPreparedOutboxBatch
+        {
+            private IPreparedOutboxBatch? _prepared = prepared;
+            public HandlerExecution Execution { get; } = execution;
+            public IPreparedOutboxBatch Prepared =>
+                _prepared ?? throw new ObjectDisposedException(nameof(IPreparedOutboxBatch));
+
+            public void Dispose() => Interlocked.Exchange(ref _prepared, null)?.Dispose();
         }
     }
+
+    private enum HandlerPhase { Selecting, Preparing, Prepared, Applying, Completed }
 
     private readonly record struct PumpOwner(string Id, DurableJob Job, long Generation);
     private sealed record OwnershipProposal(string Id, long Sequence, DurableJob Job, long Generation, string? PreviousId, DurableJob? PreviousJob);
