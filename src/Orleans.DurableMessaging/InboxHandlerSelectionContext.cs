@@ -17,6 +17,6 @@ internal sealed class InboxHandlerSelectionContext(
     public DurableEnvelopeBuilder CreateEnvelope() =>
         throw new InvalidOperationException("Handler selection is read-only and cannot create outbound envelopes.");
 
-    public void Send(DurableEnvelope envelope) =>
+    public void Send(IPreparedOutboxBatch batch) =>
         throw new InvalidOperationException("Handler selection is read-only and cannot send outbound messages.");
 }

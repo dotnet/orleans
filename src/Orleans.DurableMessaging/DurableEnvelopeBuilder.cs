@@ -31,7 +31,8 @@ namespace Orleans.DurableMessaging;
 ///     .WithReplyTo(context.GrainId)
 ///     .WithContextValue("trace-id", "abc-123")
 ///     .Build();
-/// context.Send(envelope);
+/// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
+/// return () => context.Send(batch);
 /// </code>
 /// </para>
 /// </remarks>
@@ -205,7 +206,8 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     ///         .WithCorrelationKey(context.Envelope.CorrelationKey)
     ///         .WithBody(response)
     ///         .Build();
-    ///     context.Send(reply);
+    ///     var batch = await context.Outbox.PrepareSendAsync([reply], ct);
+    ///     return () => context.Send(batch);
     /// }
     /// </code>
     /// </example>

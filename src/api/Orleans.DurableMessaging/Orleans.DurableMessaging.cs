@@ -221,7 +221,8 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
-        void Send(DurableEnvelope envelope);
+        System.Threading.Tasks.ValueTask<IPreparedOutboxBatch> PrepareSendAsync(System.Collections.Generic.IReadOnlyList<DurableEnvelope> messages, System.Threading.CancellationToken cancellationToken = default);
+        void Send(IPreparedOutboxBatch batch);
         bool TryGetMessage(System.Guid messageId, out DurableEnvelope envelope);
     }
 
@@ -240,7 +241,7 @@ namespace Orleans.DurableMessaging
         IDurableOutbox Outbox { get; }
 
         DurableEnvelopeBuilder CreateEnvelope();
-        void Send(DurableEnvelope envelope);
+        void Send(IPreparedOutboxBatch batch);
     }
 
     public partial interface IInboxHandler<TMessage> : IInboxHandler
@@ -248,6 +249,10 @@ namespace Orleans.DurableMessaging
         bool IInboxHandler.CanHandle(IInboxHandlerContext context);
         System.Threading.Tasks.ValueTask<System.Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(TMessage message, IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface IPreparedOutboxBatch : System.IDisposable
+    {
     }
 
     public abstract partial class RouteKeyHandler : IInboxHandler
