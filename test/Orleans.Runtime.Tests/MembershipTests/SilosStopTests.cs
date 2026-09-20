@@ -148,6 +148,40 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
+        public async Task MaxForwardCountRejectionStopsGatewayRequestTracking()
+        {
+            var gateway = GetGateway();
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var trackingStoppedTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.RequestTrackingStopped),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                    && stopped.ClientId.Equals(clientId),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
+            var grain = GrainFactory.GetGrain<IDeactivatingWhileActivatingTestGrain>(Random.Shared.Next());
+
+            RequestContext.Set(
+                IPlacementDirector.PlacementHintKey,
+                HostedCluster.SecondarySilos[0].SiloAddress);
+            try
+            {
+                var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => grain.DoSomething());
+                Assert.StartsWith("Forwarding failed:", exception.Message);
+            }
+            finally
+            {
+                RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+            }
+
+            var trackingStopped = Assert.IsType<GatewayEvents.RequestTrackingStopped>(
+                (await trackingStoppedTask).Payload);
+            Assert.Equal(HostedCluster.Primary!.SiloAddress, trackingStopped.SiloAddress);
+            Assert.Equal(clientId, trackingStopped.ClientId);
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Fact, TestCategory("Liveness")]
         public async Task GatewayForwardedRequestCancellationAndSiloDeathRaceClearsTracking()
         {
             var gateway = GetGateway();
