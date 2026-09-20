@@ -24,7 +24,7 @@ public sealed class ZooKeeperReadResilienceTests : IAsyncLifetime
     private readonly ConcurrentBag<Task> _probes = [];
     private readonly string _socketLog = Path.Combine(AppContext.BaseDirectory, "TestResults", $"zookeeper-sockets-{Guid.NewGuid():N}.log");
     private readonly ILoggerFactory _loggerFactory = TestingUtils.CreateDefaultLoggerFactory(
-        $"zookeeper-reads-{Guid.NewGuid():N}.log", new LoggerFilterOptions());
+        TestingUtils.CreateTraceFileName("zookeeper-reads", Guid.NewGuid().ToString("N")), new LoggerFilterOptions());
     private string _connectionString = null!;
 
     public async ValueTask InitializeAsync()
