@@ -4,11 +4,22 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Membership;
 
-internal sealed class ZooKeeperSession(
-    ZooKeeperBasedMembershipTable.NativeOperations operations,
-    Func<Task> close)
+internal sealed class ZooKeeperSession
 {
-    internal Task Completion { get; private set; } = Task.CompletedTask;
+    private readonly ZooKeeperBasedMembershipTable.NativeOperations _operations;
+    private readonly Func<Task> _close;
+    // Bind synchronously; the owned task supplies the completion semantics.
+    private readonly TaskCompletionSource<Task> _completion = new();
+
+    internal ZooKeeperSession(ZooKeeperBasedMembershipTable.NativeOperations operations, Func<Task> close)
+    {
+        _operations = operations;
+        _close = close;
+        Completion = _completion.Task.Unwrap();
+        Completion.Ignore();
+    }
+
+    internal Task Completion { get; }
 
     internal static Task<T> ExecuteAsync<T>(
         Func<ZooKeeperSession> createSession,
@@ -18,20 +29,33 @@ internal sealed class ZooKeeperSession(
         cancellationToken.ThrowIfCancellationRequested();
         var session = createSession();
         var completion = session.RunAsync(operation);
-        session.Completion = completion;
+        session._completion.SetResult(completion);
         return ZooKeeperBasedMembershipTable.AwaitOperationAsync(completion, cancellationToken);
     }
 
     private async Task<T> RunAsync<T>(Func<ZooKeeperBasedMembershipTable.NativeOperations, Task<T>> operation)
     {
+        T result;
         try
         {
-            return await operation(operations);
+            result = await operation(_operations);
         }
-        finally
+        catch (Exception primary)
         {
-            // The callback joins native requests before this tokenless close.
-            await close();
+            try
+            {
+                await _close();
+            }
+            catch (Exception secondary)
+            {
+                throw new AggregateException("The ZooKeeper operation and its close both failed.", primary, secondary);
+            }
+
+            throw;
         }
+
+        // The callback joins native requests before this tokenless close.
+        await _close();
+        return result;
     }
 }

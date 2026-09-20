@@ -257,6 +257,76 @@ public sealed class ZooKeeperReadRetryTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadOwner_CompletionIsPendingAtPublicationAndSynchronousPrefix(bool checkAtPublication)
+    {
+        var harness = await Harness.CreateAsync();
+        var release = Gate();
+        Task completionAtPublication = null!;
+        Task snapshotDrain = null!;
+        harness.OnSessionCreated = session =>
+        {
+            completionAtPublication = session.Completion;
+            snapshotDrain = Task.WhenAll(harness.Sessions.Select(owned => owned.Completion));
+            if (checkAtPublication)
+            {
+                Assert.False(completionAtPublication.IsCompleted);
+                Assert.False(snapshotDrain.IsCompleted);
+            }
+        };
+        harness.BeforeRequest = request =>
+        {
+            if (request == "Sync /")
+            {
+                Assert.Same(completionAtPublication, Assert.Single(harness.Sessions).Completion);
+                Assert.False(completionAtPublication.IsCompleted);
+                Assert.False(snapshotDrain.IsCompleted);
+                return release.Task;
+            }
+            return Task.CompletedTask;
+        };
+        var read = harness.Read(TestContext.Current.CancellationToken);
+        try
+        {
+            Assert.False(read.IsCompleted);
+            Assert.False(snapshotDrain.IsCompleted);
+            Assert.Equal(0, harness.CloseCount);
+            Assert.Same(completionAtPublication, Assert.Single(harness.Sessions).Completion);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        harness.AssertSnapshot(await read, harness.Entries, 2);
+        await snapshotDrain.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(harness.ExpectedReadCalls(), harness.Calls);
+        Assert.Same(completionAtPublication, Assert.Single(harness.Sessions).Completion);
+        harness.AssertOneOwner(readOnly: true);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReadOwner_CallbackAndCloseFailures_PreserveBothExceptions(bool point)
+    {
+        var harness = await Harness.CreateAsync();
+        var primary = new KeeperException.NoAuthException();
+        var secondary = new KeeperException.ConnectionLossException();
+        harness.BeforeRequest = _ => Task.FromException(primary);
+        harness.Close = () => Task.FromException(secondary);
+
+        var actual = await Assert.ThrowsAsync<AggregateException>(() => harness.Read(point, TestContext.Current.CancellationToken));
+
+        Assert.Equal(new Exception[] { primary, secondary }, actual.InnerExceptions);
+        Assert.Same(actual, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
+        Assert.Equal("Sync /", Assert.Single(harness.Calls));
+        Assert.Empty(harness.Logger.Warnings);
+        harness.AssertOneOwner(readOnly: true);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -517,6 +587,35 @@ public sealed class ZooKeeperReadRetryTests
         harness.AssertOneOwner(readOnly: false);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConditionalWrite_CallbackAndCloseFailures_PreserveBothExceptions(bool update)
+    {
+        var harness = await Harness.CreateAsync(1);
+        var entry = update ? harness.Entries[0] : Harness.Entry(1);
+        entry.Status = SiloStatus.Dead;
+        var primary = new KeeperException.ConnectionLossException();
+        var secondary = new KeeperException.ConnectionLossException();
+        harness.AfterMulti = () => Task.FromException(primary);
+        harness.Close = () => Task.FromException(secondary);
+
+        var actual = await Assert.ThrowsAsync<AggregateException>(() => update
+            ? harness.Table.UpdateRowAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken)
+            : harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken));
+
+        Assert.Equal(new Exception[] { primary, secondary }, actual.InnerExceptions);
+        Assert.Same(actual, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
+        Assert.Equal("Multi", Assert.Single(harness.Calls));
+        Assert.Single(harness.Fake.Transactions);
+        Assert.Equal(2, harness.Fake.Nodes["/"].Version);
+        var row = harness.Fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)];
+        Assert.Equal(update ? 1 : 0, row.Version);
+        Assert.Equal(ZooKeeperBasedMembershipTable.Serialize(entry), row.Data);
+        Assert.Empty(harness.Logger.Warnings);
+        harness.AssertOneOwner(readOnly: false);
+    }
+
     [Fact]
     public async Task ReadDecorator_PreservesMutationDelegates()
     {
@@ -650,6 +749,7 @@ public sealed class ZooKeeperReadRetryTests
         internal ConcurrentQueue<string> Calls { get; } = new();
         internal List<ZooKeeperSession> Sessions { get; } = [];
         internal List<bool> ReadOnly { get; } = [];
+        internal Action<ZooKeeperSession>? OnSessionCreated { get; set; }
         internal Func<string, Task>? BeforeRequest { get; set; }
         internal Action<string>? AfterRequest { get; set; }
         internal Func<Task> Close { get; set; } = () => Task.CompletedTask;
@@ -713,6 +813,7 @@ public sealed class ZooKeeperReadRetryTests
                 return Close();
             });
             Sessions.Add(session);
+            OnSessionCreated?.Invoke(session);
             return session;
         }
 
