@@ -117,7 +117,7 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task OutboxSchedulingFailure_FencesOldActivationAndFreshSendUsesNewOwnership()
+    public async Task OutboxPreparationFailure_KeepsActivationHealthyAndRetryUsesNewOwnership()
     {
         const string jobName = "orleans.messaging.outbox-flush";
         var sender = NewGrain();
@@ -130,14 +130,15 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         Fixture.JobManagerProbe.FailAfterNext(jobName);
 
         await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message));
-        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.IsType<IOException>(await oldGrain.Faulted.Task);
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.False(oldGrain.Faulted.Task.IsCompleted);
+        Assert.False(oldContext.Deactivated.IsCompleted);
+        await sender.RetryWriteStateAsync();
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
-        var fresh = await sender.GetSnapshotAsync();
-        Assert.NotEqual(before.ActivationId, fresh.ActivationId);
-        Assert.Equal(0, fresh.OutboxCount);
-        Assert.Null(fresh.OutboxJob);
+        var healthy = await sender.GetSnapshotAsync();
+        Assert.Equal(before.ActivationId, healthy.ActivationId);
+        Assert.Same(oldManager, Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<IJournaledStateManager>());
+        Assert.Equal(0, healthy.OutboxCount);
+        Assert.Null(healthy.OutboxJob);
         var orphan = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(jobName, sender.GetGrainId()));
 
         var receiverWrite = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
@@ -192,7 +193,7 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task DeleteThenWrite_DiscardsPendingOutboxWithoutPoisoningNextWrite()
+    public async Task DeleteThenWrite_RequiresAcknowledgedOutboxBeforeClearingState()
     {
         var sender = NewGrain();
         var receiver = NewGrain();
@@ -201,10 +202,17 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
             "messages/delete-then-write",
             NewMessage(75, "delete-then-write"));
 
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sender.DeleteThenWriteStateAsync());
+        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+
+        await sender.RetryWriteStateAsync();
+        var delivered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        await Fixture.WaitForOutboxCountAsync(sender, 0);
         await sender.DeleteThenWriteStateAsync();
 
         Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
-        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+        Assert.Equal("delete-then-write", Assert.Single(delivered.Effects).Value);
     }
 
     [Fact]

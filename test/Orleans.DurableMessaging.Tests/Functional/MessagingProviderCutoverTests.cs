@@ -193,8 +193,10 @@ public sealed class MessagingProviderCutoverTests
         fixture.Jobs.FailAfterNext = true;
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousA = fixture.Jobs.Scheduled.Last();
-        if (outbox) await retried.AssertFencedAsync();
-        else Assert.Equal(0, retried.Fault.FailureCount);
+        Assert.Equal(0, retried.Fault.FailureCount);
+        Assert.False(retried.Fault.Failure.Task.IsCompleted);
+        Assert.Equal(0, retried.Count(outbox));
+        await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -215,8 +217,10 @@ public sealed class MessagingProviderCutoverTests
         fixture.Jobs.FailAfterNext = true;
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousB = fixture.Jobs.Scheduled.Last();
-        if (outbox) await retried.AssertFencedAsync();
-        else Assert.Equal(0, retried.Fault.FailureCount);
+        Assert.Equal(0, retried.Fault.FailureCount);
+        Assert.False(retried.Fault.Failure.Task.IsCompleted);
+        Assert.Equal(0, retried.Count(outbox));
+        await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -742,7 +746,8 @@ public sealed class MessagingProviderCutoverTests
         {
             if (outbox)
             {
-                Outbox.Send(envelope);
+                using var batch = await Outbox.PrepareSendAsync([envelope], Token);
+                Outbox.Send(batch);
                 await Manager.WriteStateAsync(Token);
             }
             else

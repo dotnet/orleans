@@ -29,23 +29,30 @@ for a follow-up message.
 
 Durable Messaging has the following boundaries:
 
-- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> creates a local pending
-  intent. Outbox inspection includes local intents and journaled messages once per ID.
-  An ordinary journal write prepares the required durable wake-up before capturing the
-  envelope, ownership generation, and exact returned job handle with the grain's staged
-  effects. State readiness is checked again after asynchronous preparation, so newly
-  staged intents have a viable wake-up before capture. Completion releases exactly the
-  captured messages for dispatch; intents staged during storage I/O await another write.
-- Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
-  whether the original is provisional or durable. Reusing that ID with different routing,
-  correlation, body, or request-context content throws without changing the outbox.
+- Awaiting <xref:Orleans.DurableMessaging.IDurableOutbox.PrepareSendAsync*> copies and
+  validates the envelopes, reserves their identities, and confirms a durable self-wakeup
+  before application state changes. The returned
+  <xref:Orleans.DurableMessaging.IPreparedOutboxBatch> retains those prerequisites.
+  Preparation keeps message depth and journaled state unchanged.
+- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> with that batch
+  synchronously stages its intents alongside business changes. Outbox inspection includes
+  staged intents and journaled messages once per ID. An ordinary journal write captures
+  the envelopes, ownership generation, and exact returned job handle with those effects.
+  Acknowledgement releases exactly the captured messages for dispatch; intents staged
+  during storage I/O await another write.
+- Repeatedly sending the same live batch within its valid scope is idempotent. Equivalent
+  envelopes sharing a `MessageId` coalesce while their original intent is prepared,
+  staged, or durable. Every call validates activation, scope, and lifetime first.
+  Reusing an ID with different routing, correlation, body, or request-context content
+  throws before intent admission.
 - Handlers prepare local values asynchronously and return a synchronous action.
   Expected preparation failures produce retry or dead-letter accounting. Messaging
   invokes the action once for that prepared attempt and stages outgoing intents, inbox
   completion and deduplication in the same uninterrupted activation turn.
-- Journal capture observes the combined staged effects. The manager serializes
-  prerequisite preparation, capture and storage; each state acknowledges its captured
-  changes after storage succeeds.
+- Journal capture observes the combined staged effects. The manager synchronously
+  validates every registered state's pending changes inside admitted execution, then
+  captures in the same continuation. Each state acknowledges its captured changes after
+  storage succeeds.
 - Deletion requires quiescent messaging operations. Successful deletion clears durable
   messaging state and pending intents before subsequent writes begin.
 - A receiver allocates an ownership token and places it in a scheduled inbox job
@@ -93,30 +100,54 @@ order. Selection keeps shared application state unchanged. Its context exposes e
 metadata and grain identity, and validates access to outgoing-message operations.
 
 <xref:Orleans.DurableMessaging.IInboxHandler.PrepareAsync*> performs fallible computation,
-I/O and envelope serialization using operation-local values, then returns a non-null
-synchronous action. The action applies the prepared business mutations and stages
-prepared outgoing envelopes. Messaging validates the current message and ownership
+I/O and envelope serialization using operation-local values. It awaits
+`context.Outbox.PrepareSendAsync` for outgoing envelopes, then returns a non-null
+synchronous action. The action applies the prepared business mutations and calls
+`context.Send(batch)` to stage the prepared output. Messaging validates the current message and ownership
 before invoking it, then stages inbox completion and deduplication before the activation
 turn yields. Earlier journal writes can complete while preparation awaits because the
 prepared attempt's effects are still local.
 
-The handler context admits outgoing sends only while its returned action executes.
-Both context send paths share this attempt-scoped boundary. Preparation retains
-read-only outbox inspection and envelope construction; sending during preparation or
-through a context retained from another attempt reports an explicit contract violation.
+The handler context admits batch preparation during its matching `PrepareAsync` call
+and outgoing sends while the returned action executes. Both context send paths share
+this attempt-scoped boundary. Preparation supports read-only outbox inspection and
+envelope construction. Every use validates the current attempt, phase, activation and
+batch lifetime; a contract violation retains its first cause and prevents completion.
+
+Handlers consume preparation results and handle or propagate their failures before
+returning an action. Retrieving a failed result counts as consumption when it throws.
+The runtime rejects unfinished acquisitions and completed failed or canceled results
+which remain unconsumed. It owns started acquisitions and their late results independently
+of caller consumption. Converting a returned value task with `AsTask()` transfers result
+retrieval to the task adapter; application code then awaits or handles that caller-owned
+task before returning the action.
+
+The handler facade retains prepared batches through the attempt's actual persistence
+outcome and disposes unused or late results. Ordinary application methods await every
+preparation and dispose each successful batch after their synchronous mutation/staging
+and journal-write scope. Disposing an unstaged batch releases its reservation; disposing
+a staged batch preserves its cohort's ownership through acknowledgement. An empty batch
+is a valid no-op which requires no new job.
 
 The registered inbox and outbox states own their capture, acknowledgement, replay and
-reset bookkeeping. The outbox prepares durable wake-up ownership inside the serialized
-journal operation. After every preparation await, the manager checks all states'
-readiness again. A successful readiness pass and capture execute synchronously, so a
-newly staged message is included with a prepared owner. Mutations made during the
-storage await remain pending for the next capture.
+reset bookkeeping. Feature preparation establishes durable wake-up ownership before
+staging. <xref:Orleans.Journaling.IStateMachine.ValidatePendingChanges*> checks every
+registered state synchronously before append, snapshot, committed-prefix, and zero-byte
+capture paths. The check raises the original failure and validates staged generations
+and exact physical ownership. <xref:Orleans.Journaling.IStateMachine.ValidateWrite*>
+validates request admission in the caller's logical execution context. Independent
+writes can commit earlier valid state while another operation prepares local values.
+Mutations made during storage I/O remain pending for the next capture.
 
-A terminal preparation, capture or storage failure fences the journal manager. State
+A terminal capture or storage failure fences the journal manager. State
 fault notifications stop messaging work before failed write waiters resume. Unexpected
 application or staging failures also latch the original error in the inbox state and
-drive a journal operation into this terminal path before a queued capture can persist
-partial new effects. A fresh activation creates new state objects and replays the
+drive an ordinary journal write into this terminal path, including when no earlier
+write was queued. The execution-time check fences before partial new effects can be
+captured; already-captured cohorts retain their own storage outcome and acknowledgement.
+Genuine preparation I/O failures occur before shared mutations and follow retry/dead-letter
+accounting, or a handler can catch them and prepare a safe alternative.
+A fresh activation creates new state objects and replays the
 actual durable outcome. A failed append response can follow a successful storage
 commit: replay restores that committed envelope and exact ownership handle. A failed
 ownership-clear write follows the same boundary; fresh replay determines whether the
@@ -186,10 +217,15 @@ Grains deriving from <xref:Orleans.Journaling.DurableGrain> receive the same set
 automatically. The capability enables ordinary grains to use their application's
 inheritance model with scoped inbox and outbox services.
 
-The following grain selects messaging through its application interface and stages a
-validated notification count for the inbox's completion write:
+The following grain selects messaging through its application interface, prepares an
+optional reply, and stages the reply and notification count for the inbox's completion write:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
+
+An ordinary grain method awaits preparation before changing its sent count, stages the
+prepared batch, and persists both through the application-facing state manager:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_send" language="csharp":::
 
 Orleans caches messaging selection with each concrete grain type. After construction
 and grain-instance assignment, shared activation setup validates the execution model,
@@ -216,8 +252,9 @@ journal format so opaque envelope bodies and request-context slices recover exac
 Durable Messaging grains use non-reentrant execution. Activation validates the grain's
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,
 or `StatelessWorker` declarations. Resolved grain properties govern the reentrancy checks,
-including properties supplied by custom attributes. A single non-interleaving activation owns each grain
-journal and pump. The Journaling implementation prepares registered
+including properties supplied by custom attributes. Resolved placement strategies
+identify stateless workers, including keyed placement aliases. A single non-interleaving
+activation owns each grain journal and pump. Journaling synchronously validates registered
 <xref:Orleans.Journaling.IStateMachine> instances before capture, acknowledges their
 persisted changes, and notifies them of terminal failure. State-level deletion checks
 enforce quiescence and successful reset restores local messaging bookkeeping.
@@ -230,3 +267,7 @@ window. Monitor inbox depth, outbox depth, retry failures, dead letters, and old
 pending-message age. Keep deduplication retention longer than the maximum expected
 outbox retry age. The `orleans-durable-messaging-orphaned-jobs-reclaimed` counter
 identifies terminal cleanup of schedule-before-commit crash remnants.
+Message outcome counters group by grain type and status; pending and processed
+duplicates each record one duplicate receipt. Sent-message counters and latency
+histograms group by grain type, orphan metrics retain job name, and depth gauges report
+aggregate pending work. Routing keys remain available in message diagnostics.

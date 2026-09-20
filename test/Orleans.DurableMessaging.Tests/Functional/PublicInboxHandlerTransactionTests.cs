@@ -99,7 +99,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Empty((await sink.GetSnapshotAsync()).Effects);
     }
     [Fact]
-    public async Task HandlerAndRealOutboxPreparation_SerializeCaptureAndPreserveCancelledWriteWait()
+    public async Task HandlerAndRealOutboxPreparation_AllowsIndependentWritesAndPreservesCancelledWriteWait()
     {
         var receiver = NewGrain();
         var sink = NewGrain();
@@ -121,21 +121,19 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         handler.Release();
         await scheduling.WaitUntilEnteredAsync();
         var preparing = grain.GetSnapshotForTest();
-        Assert.Single(preparing.Effects);
-        Assert.Equal(0, preparing.InboxCount);
-        Assert.Equal(1, preparing.ProcessedMessageCount);
-        Assert.Equal(1, preparing.OutboxCount);
+        Assert.Empty(preparing.Effects);
+        Assert.Equal(1, preparing.InboxCount);
+        Assert.Equal(0, preparing.ProcessedMessageCount);
+        Assert.Equal(0, preparing.OutboxCount);
         Assert.Null(preparing.OutboxJob);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(grain.Captures, snapshot => snapshot.Effects.Count > 0 || snapshot.OutboxCount > 0);
+
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         using var cancellation = new CancellationTokenSource();
-        var canceledWait = manager.WriteStateAsync(cancellation.Token).AsTask();
-        var completedWait = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-        Assert.False(canceledWait.IsCompleted);
-        Assert.False(completedWait.IsCompleted);
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        Task completedWait;
         try
         {
             scheduling.Continue();
@@ -149,7 +147,14 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
             Assert.Equal(owner.Id, captured.OutboxJob?.Id);
             Assert.Equal(owner.ShardId, captured.OutboxJob?.ShardId);
             Assert.Equal(owner.Metadata!["orleans.messaging.ownership-id"], captured.OutboxJobId);
+            var canceledWait = manager.WriteStateAsync(cancellation.Token).AsTask();
+            completedWait = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            Assert.False(canceledWait.IsCompleted);
             Assert.False(completedWait.IsCompleted);
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
+            Assert.False(completedWait.IsCompleted);
+            Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
             Assert.Empty((await sink.GetSnapshotAsync()).Effects);
         }
         finally

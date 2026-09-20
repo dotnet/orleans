@@ -68,7 +68,9 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 
     public async Task SendAsync(GrainId target, string route, DurableTestMessage message)
     {
-        _outbox.Send(new DurableEnvelopeBuilder(_sessions, this.GetGrainId()).To(target, route).WithBody(message).Build());
+        var envelope = new DurableEnvelopeBuilder(_sessions, this.GetGrainId()).To(target, route).WithBody(message).Build();
+        using var batch = await _outbox.PrepareSendAsync([envelope]);
+        _outbox.Send(batch);
         await _owner.WriteStateAsync();
     }
 
@@ -82,23 +84,26 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 
     public bool CanHandle(IInboxHandlerContext context) => true;
 
-    public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         Assert.True(context.Envelope.Data.TryGetBody<DurableTestMessage>(out var body));
         var message = Assert.IsType<DurableTestMessage>(body);
-        _effects.TryGetValue(message.LogicalId, out var prior);
-        var effect = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
-        DurableEnvelope? forwarded = message.ForwardTo is { } target
-            ? context.CreateEnvelope().To(target, "messages/forwarded").WithBody(message with { ForwardTo = null }).Build()
-            : null;
-        return new(() =>
+        IPreparedOutboxBatch? outgoing = null;
+        if (message.ForwardTo is { } target)
         {
-            _effects[message.LogicalId] = effect;
-            if (forwarded is { } envelope)
+            var envelope = context.CreateEnvelope().To(target, "messages/forwarded").WithBody(message with { ForwardTo = null }).Build();
+            outgoing = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
+        }
+
+        return () =>
+        {
+            _effects.TryGetValue(message.LogicalId, out var prior);
+            _effects[message.LogicalId] = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
+            if (outgoing is { } batch)
             {
-                context.Send(envelope);
+                context.Send(batch);
             }
-        });
+        };
     }
 
     private NamedFactoryMessagingSnapshot CreateSnapshot() =>

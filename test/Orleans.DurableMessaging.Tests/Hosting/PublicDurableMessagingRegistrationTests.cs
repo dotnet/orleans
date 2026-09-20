@@ -9,6 +9,7 @@ using Orleans.DurableMessaging.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Metadata;
+using Orleans.Placement;
 using Orleans.Runtime;
 using Xunit;
 
@@ -160,7 +161,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new ReentrantTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context, GetGrainProperties(typeof(ReentrantTestGrain))]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(ReentrantTestGrain)), new RandomPlacement()]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("non-reentrant", diagnostic.Message, StringComparison.Ordinal);
@@ -180,7 +181,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new InterleavableTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context, GetGrainProperties(typeof(InterleavableTestGrain))]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(InterleavableTestGrain)), new RandomPlacement()]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("interleavable method", diagnostic.Message, StringComparison.Ordinal);
@@ -200,7 +201,7 @@ public sealed class PublicDurableMessagingRegistrationTests
         context.GrainInstance.Returns(new StatelessWorkerTestGrain());
 
         var exception = Assert.Throws<TargetInvocationException>(
-            () => validate.Invoke(null, [context, GetGrainProperties(typeof(StatelessWorkerTestGrain))]));
+            () => validate.Invoke(null, [context, GetGrainProperties(typeof(StatelessWorkerTestGrain)), new Orleans.Concurrency.StatelessWorkerAttribute().PlacementStrategy]));
 
         var diagnostic = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("one activation", diagnostic.Message, StringComparison.Ordinal);

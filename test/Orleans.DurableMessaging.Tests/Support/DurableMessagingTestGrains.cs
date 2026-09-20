@@ -175,7 +175,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public async Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message)
     {
         var envelope = CreateEnvelope(target, route, message);
-        _outbox.Send(envelope);
+        using var batch = await _outbox.PrepareSendAsync([envelope]);
+        _outbox.Send(batch);
         await WriteStateAsync();
         return envelope.MessageId;
     }
@@ -183,8 +184,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     public async Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
     {
         var envelope = CreateEnvelope(target, route, message);
-        _outbox.Send(envelope);
-        _outbox.Send(envelope);
+        using var batch = await _outbox.PrepareSendAsync([envelope]);
+        _outbox.Send(batch);
+        _outbox.Send(batch);
         await WriteStateAsync();
         return envelope.MessageId;
     }
@@ -196,11 +198,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return messageId;
     }
 
-    public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
+    public async Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
     {
         var envelope = CreateEnvelope(target, route, message);
-        _outbox.Send(envelope);
-        return Task.FromResult(envelope.MessageId);
+        using var batch = await _outbox.PrepareSendAsync([envelope]);
+        _outbox.Send(batch);
+        return envelope.MessageId;
     }
 
     public async Task DeleteThenWriteStateAsync()
