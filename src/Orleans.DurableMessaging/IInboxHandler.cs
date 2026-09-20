@@ -103,6 +103,13 @@ public interface IInboxHandler
     /// then stage the resulting batch from the action.
     /// </para>
     /// <para>
+    /// Consume preparation completions and handle or propagate their errors before returning the action.
+    /// A caught preparation failure may select a safe alternative outcome. Task conversions such as
+    /// <c>AsTask()</c> consume the returned value task for a caller-owned task; await or handle that task
+    /// before returning. Runtime guards track value-task consumption, while application code owns the
+    /// handling of converted task outcomes.
+    /// </para>
+    /// <para>
     /// Messaging awaits preparation and invokes the returned action once for that prepared attempt.
     /// Use a synchronous lambda or method group which applies already-prepared business mutations and
     /// stages envelopes or prepared batches. An attempt with no effects returns an empty synchronous action. The runtime

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
@@ -269,6 +270,7 @@ internal sealed partial class DurableInboxExtension :
             {
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 ScheduleLocalDrain();
+                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "duplicate");
                 return DeliveryResult.Duplicate();
             }
 
@@ -935,7 +937,7 @@ internal sealed partial class DurableInboxExtension :
 
     private sealed class HandlerExecution(DurableInboxExtension owner) : IDurableOutbox
     {
-        private readonly List<Task<IPreparedOutboxBatch>> _preparations = [];
+        private readonly List<HandlerPreparation> _preparations = [];
         private readonly List<HandlerBatch> _batches = [];
 
         public DurableInboxExtension Owner { get; } = owner;
@@ -952,39 +954,56 @@ internal sealed partial class DurableInboxExtension :
         {
             ValidateScope(HandlerPhase.Preparing,
                 "Handler batches can be prepared only during that attempt's PrepareAsync call.");
-            var preparation = AcquireBatchAsync(messages, cancellationToken);
+            var preparation = new HandlerPreparation(this, messages, cancellationToken);
             _preparations.Add(preparation);
-            preparation.Ignore();
-            return new(preparation);
+            preparation.Completion.Ignore();
+            return preparation.AsValueTask();
         }
 
-        private async Task<IPreparedOutboxBatch> AcquireBatchAsync(
-            IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken)
+        private async Task AcquireBatchAsync(
+            HandlerPreparation preparation, IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken)
         {
-            var prepared = await Owner._outbox.PrepareSendAsync(messages, cancellationToken).ConfigureAwait(true);
             try
             {
-                ValidateScope(HandlerPhase.Preparing,
-                    "Handler batch preparation must complete before that attempt's PrepareAsync call returns.");
-                Owner.ValidateReady();
-                cancellationToken.ThrowIfCancellationRequested();
-                var batch = new HandlerBatch(this, prepared);
-                _batches.Add(batch);
-                return batch;
+                var prepared = await Owner._outbox.PrepareSendAsync(messages, cancellationToken).ConfigureAwait(true);
+                try
+                {
+                    ValidateScope(HandlerPhase.Preparing,
+                        "Handler batch preparation must complete before that attempt's PrepareAsync call returns.");
+                    Owner.ValidateReady();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var batch = new HandlerBatch(this, prepared);
+                    _batches.Add(batch);
+                    preparation.SetResult(batch);
+                }
+                catch
+                {
+                    prepared.Dispose();
+                    throw;
+                }
             }
-            catch
+            catch (Exception exception)
             {
-                prepared.Dispose();
+                preparation.SetException(exception);
                 throw;
             }
         }
 
         public void ValidatePreparationCompleted()
         {
-            if (_preparations.Any(static task => !task.IsCompleted))
+            foreach (var preparation in _preparations)
             {
-                RejectOperation(new InvalidOperationException(
-                    "Inbox handlers must await every batch preparation before returning their synchronous apply action."));
+                if (!preparation.IsCompleted)
+                {
+                    RejectOperation(new InvalidOperationException(
+                        "Inbox handlers must await every batch preparation before returning their synchronous apply action."));
+                }
+                if (preparation.Failure is { } failure && !preparation.IsConsumed)
+                {
+                    RejectOperation(new InvalidOperationException(
+                        "Inbox handlers must consume every failed batch preparation before returning their synchronous apply action.",
+                        failure));
+                }
             }
         }
 
@@ -1014,7 +1033,7 @@ internal sealed partial class DurableInboxExtension :
             Phase = HandlerPhase.Completed;
             foreach (var preparation in _preparations)
             {
-                await ((Task)preparation).ConfigureAwait(
+                await preparation.Completion.ConfigureAwait(
                     ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             }
 
@@ -1043,6 +1062,43 @@ internal sealed partial class DurableInboxExtension :
                 current.SendFailure ??= SendFailure;
             }
             SendFailure.Throw();
+        }
+
+        private sealed class HandlerPreparation : IValueTaskSource<IPreparedOutboxBatch>
+        {
+            private ManualResetValueTaskSourceCore<IPreparedOutboxBatch> _source = new() { RunContinuationsAsynchronously = true };
+            private int _consumed;
+
+            public HandlerPreparation(HandlerExecution execution, IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken)
+            {
+                Completion = execution.AcquireBatchAsync(this, messages, cancellationToken);
+            }
+
+            public Task Completion { get; }
+            public Exception? Failure { get; private set; }
+            public bool IsCompleted => _source.GetStatus(_source.Version) != ValueTaskSourceStatus.Pending;
+            public bool IsConsumed => Volatile.Read(ref _consumed) != 0;
+            public ValueTask<IPreparedOutboxBatch> AsValueTask() => new(this, _source.Version);
+            public void SetResult(IPreparedOutboxBatch batch) => _source.SetResult(batch);
+            public void SetException(Exception exception)
+            {
+                Failure = exception;
+                _source.SetException(exception);
+            }
+
+            public ValueTaskSourceStatus GetStatus(short token) => _source.GetStatus(token);
+            public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
+                _source.OnCompleted(continuation, state, token, flags);
+
+            public IPreparedOutboxBatch GetResult(short token)
+            {
+                // Task conversion also retrieves the result; retirement observes Completion separately.
+                if (_source.GetStatus(token) != ValueTaskSourceStatus.Pending)
+                {
+                    Volatile.Write(ref _consumed, 1);
+                }
+                return _source.GetResult(token);
+            }
         }
 
         private sealed class HandlerBatch(HandlerExecution execution, IPreparedOutboxBatch prepared) : IPreparedOutboxBatch

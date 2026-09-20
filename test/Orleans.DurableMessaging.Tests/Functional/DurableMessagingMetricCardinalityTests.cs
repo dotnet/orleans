@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
@@ -13,6 +14,47 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBehaviorTestBase
 {
+    [Fact]
+    public async Task PendingAndProcessedDuplicates_RecordOneBoundedReceiptEach()
+    {
+        var receiver = NewGrain();
+        await receiver.GetSnapshotAsync();
+        var services = Fixture.GetGrainContext(receiver).ActivationServices;
+        var jobTime = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
+        var ownershipId = $"{Guid.NewGuid():N}:1";
+        var job = await services.GetRequiredService<ILocalDurableJobManager>().ScheduleJobAsync(new ScheduleJobRequest
+        {
+            Target = receiver.GetGrainId(),
+            JobName = ReceiverTestServices.InboxJobName,
+            DueTime = jobTime.GetUtcNow().AddHours(1),
+            Metadata = new Dictionary<string, string> { ["orleans.messaging.ownership-id"] = ownershipId }
+        }, TestContext.Current.CancellationToken);
+        using var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"));
+        await receiver.SeedInboxStateAsync(envelope.Value, ownershipId, job);
+        var pending = await receiver.GetSnapshotAsync();
+        Assert.Equal(1, pending.InboxCount);
+        Assert.Equal(0, pending.ProcessedMessageCount);
+        Assert.Empty(pending.Effects);
+        Assert.Equal(job.Id, pending.InboxJob!.Id);
+        Assert.Equal(job.ShardId, pending.InboxJob.ShardId);
+        var instruments = services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableMessagingInstruments"));
+        var received = (Instrument)instruments.GetType().GetField("_inboxMessagesReceived", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(instruments)!;
+        using var probe = new MessageMetricListener(received.Meter);
+        var grainType = receiver.GetGrainId().Type.ToString();
+
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Single(probe.Read("inbox-messages-received")).AssertCounter(grainType, "duplicate");
+        var processed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(0, processed.InboxCount);
+        Assert.Equal(1, processed.ProcessedMessageCount);
+        Assert.Equal(1, Assert.Single(processed.Effects).Count);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var receipts = probe.Read("inbox-messages-received");
+        Assert.Equal(2, receipts.Length);
+        Assert.All(receipts, receipt => receipt.AssertCounter(grainType, "duplicate"));
+        Assert.Single(receipts.Select(receipt => receipt.Series).Distinct());
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(64)]
