@@ -75,13 +75,15 @@ public interface IDurableOutbox
     /// </para>
     /// <para>
     /// Once preparation is owned, cancellation ends only the caller's wait. Scheduling retains its resources
-    /// through the actual outcome, and the implementation releases any batch which the caller did not receive.
+    /// through the actual outcome. If that wait is canceled, the implementation releases its unclaimed batch
+    /// after scheduling completes. Activation retirement cleans up remaining owned preparation.
     /// </para>
     /// <para>
     /// Inbox handlers acquire batches through <see cref="IInboxHandlerContext.Outbox"/> during
-    /// <see cref="IInboxHandler.PrepareAsync"/>. The runtime tracks those batches through the attempt and
-    /// disposes them when the attempt ends, including preparation or apply failure. Retain a batch for the
-    /// returned action. Ordinary callers own disposal and keep their scope through the journal write.
+    /// <see cref="IInboxHandler.PrepareAsync"/>. The runtime tracks preparations from their start and owns
+    /// resulting batches through attempt completion, including late results after cancellation or failure.
+    /// Retain a batch for the returned action. Ordinary callers must await every preparation operation and
+    /// dispose each successfully returned batch, keeping its scope through staging and the journal write.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="messages"/> is null.</exception>

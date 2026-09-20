@@ -18,8 +18,9 @@ namespace Orleans.DurableMessaging;
 /// Repeated disposal is safe.
 /// </para>
 /// <para>
-/// The inbox runtime disposes batches acquired through the handler's outbox when that attempt ends.
-/// Ordinary callers dispose their batches after the staging and persistence scope.
+/// The inbox runtime owns preparations started through the handler's outbox and disposes their batches
+/// at attempt end, including late results. Ordinary callers await every preparation operation and dispose
+/// each successfully returned batch after the staging and persistence scope.
 /// </para>
 /// </remarks>
 public interface IPreparedOutboxBatch : IDisposable
