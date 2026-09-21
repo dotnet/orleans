@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -28,14 +30,15 @@ internal static class BootstrapOutboxServices
         services.RemoveAll<IDurableOutbox>();
         services.RemoveAllKeyed<IDurableOutbox>(KeyedService.AnyKey);
         services.RemoveAllKeyed<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output");
-        services.TryAddScoped(outboxType);
+        foreach (var descriptor in services.Where(descriptor => descriptor.IsKeyedService
+            && StateNames.Take(6).Any(name => Equals(descriptor.ServiceKey, name))).ToArray())
+        {
+            services.Remove(descriptor);
+        }
+        services.TryAddScoped(outboxType, provider => ActivatorUtilities.CreateInstance(provider, outboxType,
+            provider.GetRequiredKeyedService<IDurableValueCommandCodec<long>>("orleans-binary")));
+        services.TryAddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<Guid, int>>("orleans-binary"));
         services.AddScoped<IDurableOutbox>(provider => (IDurableOutbox)provider.GetRequiredService(outboxType));
-        AddAlias(typeof(IDurableDictionary<Guid, DurableEnvelope>), StateNames[0], "MessageState");
-        AddAlias(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), ReceiverTestServices.GetImplementationType("OutboxMessageState")), StateNames[1], "AttemptState");
-        AddAlias(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), ReceiverTestServices.GetImplementationType("OutboxDeadLetter")), StateNames[2], "DeadLetterState");
-        AddAlias(typeof(IDurableValue<string>), StateNames[3], "JobIdState");
-        AddAlias(typeof(IDurableValue<Orleans.DurableJobs.DurableJob>), StateNames[4], "JobState");
-        AddAlias(typeof(IDurableValue<string>), StateNames[5], "CompletedJobIdState");
         AddAlias(typeof(IDurableValue<long>), StateNames[6], "JobSequenceState");
 
         void AddAlias(Type serviceType, string key, string property)
@@ -49,10 +52,34 @@ internal static class BootstrapOutboxServices
 
 }
 
-public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter
+public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerProvider
 {
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(Guid MessageId, int Value)>> _outputs = new();
+
+    private readonly ConcurrentDictionary<GrainId, TaskCompletionSource> _drains = new();
+
+    public Task WaitForDrainAsync(GrainId sender) =>
+        _drains.GetOrAdd(sender, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+    public ILogger CreateLogger(string categoryName) => new CompletionLogger(this, categoryName);
+    public void Dispose() { }
+
+    private sealed class CompletionLogger(BootstrapDeliveryProbe owner, string category) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => category == "Orleans.DurableMessaging.DurableOutbox";
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (IsEnabled(logLevel) && eventId.Name == "LogDeliveryComplete"
+                && state is IEnumerable<KeyValuePair<string, object?>> fields
+                && fields.Any(field => field.Key == "RemainingCount" && field.Value is 0)
+                && ReceiverTestServices.CurrentGrainContext is { } context)
+            {
+                owner._drains.GetOrAdd(context.GrainId, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+            }
+        }
+    }
 
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
@@ -86,10 +113,11 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     private readonly BootstrapDeliveryProbe _probe;
     private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
 
-    public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox, BootstrapDeliveryProbe probe)
+    public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox, BootstrapDeliveryProbe probe,
+        IDurableDictionaryCommandCodec<Guid, int> codec)
     {
         _probe = probe;
-        _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
+        _codec = codec;
         manager.RegisterStateMachine("bootstrap-output-values", this);
         inbox.RegisterHandler("output", this);
     }

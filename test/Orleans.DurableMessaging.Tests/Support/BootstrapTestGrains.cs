@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Metadata;
@@ -69,9 +70,6 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public object? GrainAtActivation { get; private set; }
     public int ActivationValue { get; private set; }
     public int HandlerCalls { get; private set; }
-    public Exception? ApplyFailure { get; set; }
-    public TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public TaskCompletionSource<Exception> Faulted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public int Disposals { get; private set; }
     public Task<int> Read() => Task.FromResult(Observation.Value!.Value);
     public async Task Set(int value)
@@ -113,8 +111,6 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
             Observation.Value.Value = value;
             context.Send(batch);
             HandlerCalls++;
-            ApplyAttempted.TrySetResult();
-            if (ApplyFailure is { } failure) throw failure;
         };
     }
     public void Dispose() => Disposals++;
@@ -271,6 +267,7 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
         services.AddSingleton(Delivery);
+        services.AddSingleton<ILoggerProvider>(Delivery);
         services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();

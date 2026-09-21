@@ -1,121 +1,57 @@
-using System;
 using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging;
 
 internal sealed partial class DurableOutbox
 {
-    [Flags]
-    private enum StateSlot
+    // The existing sequence stream supplies the feature's capture/ACK boundary for every journal writer.
+    private sealed class SequenceState(DurableOutbox owner, IDurableValueCommandCodec<long> codec)
+        : IDurableValue<long>, IStateMachine, IDurableValueCommandHandler<long>
     {
-        Messages = 1,
-        MessageStates = 2,
-        DeadLetters = 4,
-        JobId = 8,
-        Job = 16,
-        CompletedJobId = 32,
-        JobSequence = 64,
-        All = Messages | MessageStates | DeadLetters | JobId | Job | CompletedJobId | JobSequence
-    }
+        private long _value;
+        private bool _dirty;
 
-    private interface IOutboxState : IStateMachine
-    {
-        bool HasChanges { get; }
-    }
-
-    private sealed class DictionaryState<TValue>(DurableOutbox owner, StateSlot slot)
-        : DeferredJournaledDictionary<Guid, TValue>(owner._stateManager), IOutboxState
-    {
-        public bool HasChanges => HasPendingChanges;
-        public override void ValidatePendingChanges() => owner.ValidatePendingChanges();
-        public override void ValidateWrite() => owner.ValidateWrite();
-        public override void ValidateDelete() => owner.ValidateDelete();
-        public override void OnDeleteStarted() => owner.OnDeleteStarted();
-
-        public override void WritePendingEntries(JournalStreamWriter writer)
+        public long Value
         {
-            owner.CaptureWrite(snapshot: false);
-            base.WritePendingEntries(writer);
-            owner.OnStateCaptured(slot);
+            get => _value;
+            set
+            {
+                _value = value;
+                _dirty = true;
+            }
         }
 
-        public override void WriteSnapshot(JournalStreamWriter writer)
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
+
+        public void Reset(JournalStreamWriter writer)
         {
-            owner.CaptureWrite(snapshot: true);
-            base.WriteSnapshot(writer);
-            owner.OnStateCaptured(slot);
+            _value = 0;
+            _dirty = false;
+            owner.ResetState();
         }
 
-        public override void OnWriteCompleted()
+        public void OnRecoveryCompleted() => owner.OnRecoveryCompleted();
+
+        public void WritePendingEntries(JournalStreamWriter writer)
         {
-            base.OnWriteCompleted();
-            owner.OnStateWriteCompleted(slot);
+            owner.CaptureWrite();
+            if (_dirty)
+            {
+                codec.WriteSet(_value, writer);
+                _dirty = false;
+            }
         }
 
-        public override void Reset(JournalStreamWriter writer)
+        public void WriteSnapshot(JournalStreamWriter writer)
         {
-            base.Reset(writer);
-            owner.OnStateReset(slot);
+            owner.CaptureWrite();
+            codec.WriteSet(_value, writer);
+            _dirty = false;
         }
 
-        public override void OnRecoveryCompleted()
-        {
-            base.OnRecoveryCompleted();
-            owner.OnStateRecoveryCompleted(slot);
-        }
+        public void OnWriteCompleted() => owner.CompleteCapture();
 
-        public override void OnFaulted(Exception exception)
-        {
-            owner.OnFaulted(exception);
-            base.OnFaulted(exception);
-        }
-    }
-
-    private sealed class ValueState<TValue>(DurableOutbox owner, StateSlot slot)
-        : DeferredJournaledValue<TValue>(owner._stateManager), IOutboxState
-    {
-        public bool HasChanges => HasPendingChanges;
-        public override void ValidatePendingChanges() => owner.ValidatePendingChanges();
-        public override void ValidateWrite() => owner.ValidateWrite();
-        public override void ValidateDelete() => owner.ValidateDelete();
-        public override void OnDeleteStarted() => owner.OnDeleteStarted();
-
-        public override void WritePendingEntries(JournalStreamWriter writer)
-        {
-            owner.CaptureWrite(snapshot: false);
-            base.WritePendingEntries(writer);
-            owner.OnStateCaptured(slot);
-        }
-
-        public override void WriteSnapshot(JournalStreamWriter writer)
-        {
-            owner.CaptureWrite(snapshot: true);
-            base.WriteSnapshot(writer);
-            owner.OnStateCaptured(slot);
-        }
-
-        public override void OnWriteCompleted()
-        {
-            base.OnWriteCompleted();
-            owner.OnStateWriteCompleted(slot);
-        }
-
-        public override void Reset(JournalStreamWriter writer)
-        {
-            base.Reset(writer);
-            owner.OnStateReset(slot);
-        }
-
-        public override void OnRecoveryCompleted()
-        {
-            base.OnRecoveryCompleted();
-            owner.OnStateRecoveryCompleted(slot);
-        }
-
-        public override void OnFaulted(Exception exception)
-        {
-            owner.OnFaulted(exception);
-            base.OnFaulted(exception);
-        }
+        void IDurableValueCommandHandler<long>.ApplySet(long value) => _value = value;
     }
 }
