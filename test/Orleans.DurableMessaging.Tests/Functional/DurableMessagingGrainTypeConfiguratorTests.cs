@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
@@ -111,9 +112,11 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Equal(2, Fixture.Storage.GetReadCount(journal));
 
         var delivered = Delivery.WaitForOutputAsync(grain.GetGrainId());
+        var drained = Delivery.WaitForDrainAsync(grain.GetGrainId());
         Delivery.Release();
         var receipt = await delivered;
-        await recoveredState.OutboxDrained.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        await drained;
+        Assert.Equal(42, await grain.GetValueAsync());
         Assert.Equal(output.MessageId, receipt.MessageId);
         Assert.Equal(42, receipt.Value);
         Assert.Empty(recovered.Outbox.Messages);
@@ -208,51 +211,6 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         }
         else Assert.Null(owner);
         Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RealOutbox_PartialHandlerApplyFencesUncapturedWorkAndPreservesPriorAck(bool precedingWrite)
-    {
-        var grain = CreateGrain(typeof(PlainBootstrapGrain));
-        await grain.SetValueAsync(11);
-        var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
-        var state = observation.Context.ActivationServices.GetRequiredService<BootstrapState>();
-        var journal = JournalId.FromGrainId(grain.GetGrainId());
-        using var handler = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
-        Assert.Equal(DeliveryStatus.Accepted,
-            (await grain.AsReference<IDurableInboxExtension>().DeliverAsync(CreateEnvelope(grain), Cancellation)).Status);
-        await handler.WaitUntilEnteredAsync();
-        var failure = new IOException("Real outbox handler partial apply failure.");
-        var onTurn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        observation.Context.Scheduler.QueueAction(() =>
-        {
-            state.ApplyFailure = failure;
-            if (precedingWrite) observation.Value!.Value = 20;
-            onTurn.SetResult();
-        });
-        await onTurn.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-        var storage = precedingWrite ? Fixture.Storage.BlockWrite(journal) : null;
-        var previous = precedingWrite ? observation.Manager!.WriteStateAsync(Cancellation).AsTask() : Task.CompletedTask;
-        if (storage is not null) await storage.WaitUntilEnteredAsync();
-        var queued = precedingWrite ? observation.Manager!.WriteStateAsync(Cancellation).AsTask() : null;
-        handler.Release();
-        await state.ApplyAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        Assert.Equal(precedingWrite ? 21 : 12, observation.Value!.Value);
-        Assert.Equal(1, observation.Outbox!.Count);
-        Assert.Equal(1, Fixture.JobManagerProbe.GetSuccessCount(BootstrapOutboxServices.JobName, grain.GetGrainId()));
-        storage?.Release();
-        await previous;
-        if (queued is not null) Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => queued));
-        Assert.Same(failure, await state.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
-        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => observation.Manager!.WriteStateAsync(Cancellation).AsTask());
-        Assert.Same(failure, rejected.InnerException);
-        Assert.Equal(writes + (precedingWrite ? 1 : 0), Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Empty(GetProcessed(observation.Context));
-        Assert.Equal(1, observation.Inbox!.Count);
-        storage?.Dispose();
     }
 
     [Fact]
@@ -465,18 +423,28 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     public void RepeatedRegistration_InstallsOneTypeConfigurator()
     {
         var services = new ServiceCollection();
+        var silo = Substitute.For<ISiloBuilder>();
+        silo.Services.Returns(services);
+        silo.AddJournaling();
         ReceiverTestServices.Add(services, static _ => { });
         BootstrapOutboxServices.Add(services);
         ReceiverTestServices.Add(services, static _ => { });
         BootstrapOutboxServices.Add(services);
-        var descriptor = Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IConfigureGrainTypeComponents));
+        var descriptor = Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IConfigureGrainTypeComponents)
+            && descriptor.ImplementationType == ReceiverTestServices.GetImplementationType("DurableMessagingGrainTypeConfigurator"));
         Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
         Assert.Equal(ReceiverTestServices.GetImplementationType("DurableMessagingGrainTypeConfigurator"), descriptor.ImplementationType);
         Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IDurableOutbox));
-        foreach (var stateName in BootstrapOutboxServices.StateNames)
+        foreach (var stateName in BootstrapOutboxServices.StateNames.Take(6))
         {
-            Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, stateName));
+            Assert.DoesNotContain(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, stateName));
         }
+        Assert.Single(services, descriptor => descriptor.IsKeyedService
+            && Equals(descriptor.ServiceKey, BootstrapOutboxServices.StateNames[6]));
+        Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, KeyedService.AnyKey)
+            && descriptor.ServiceType == typeof(IDurableDictionary<,>));
+        Assert.Single(services, descriptor => descriptor.IsKeyedService && Equals(descriptor.ServiceKey, KeyedService.AnyKey)
+            && descriptor.ServiceType == typeof(IDurableValue<>));
         Assert.Empty(typeof(IDurableMessagingGrain).GetInterfaces());
         Assert.Empty(typeof(IDurableMessagingGrain).GetMethods());
         Assert.False(typeof(IAddressable).IsAssignableFrom(typeof(IDurableMessagingGrain)));
