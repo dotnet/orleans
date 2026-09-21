@@ -165,16 +165,19 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         try
         {
             var collection = this._storage.GetCollection();
-            // A single RunQuery stream includes rows and version in one strongly consistent snapshot.
-            var snapshot = await FirestoreDataManager.ExecuteWithCancellation(
-                collection.GetSnapshotAsync(cancellationToken), cancellationToken);
-            var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._partitionId)
-                ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
-            var silos = snapshot.Documents
-                .Where(document => document.Id != this._partitionId)
-                .Select(document => document.ConvertTo<SiloInstanceEntity>())
-                .ToArray();
-            var data = Convert((silos, versionSnapshot.ConvertTo<ClusterVersionEntity>()));
+            var entries = await this._storage.ExecuteTransaction(async transaction =>
+            {
+                // The transaction binds every streamed document to one serializable snapshot.
+                var snapshot = await transaction.GetSnapshotAsync(collection, transaction.CancellationToken);
+                var versionSnapshot = snapshot.Documents.SingleOrDefault(document => document.Id == this._partitionId)
+                    ?? throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
+                var silos = snapshot.Documents
+                    .Where(document => document.Id != this._partitionId)
+                    .Select(document => document.ConvertTo<SiloInstanceEntity>())
+                    .ToArray();
+                return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
+            }, cancellationToken);
+            var data = Convert(entries);
             LogReadAll(data);
 
             return data;
