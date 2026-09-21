@@ -14,8 +14,7 @@ namespace Orleans.Journaling;
 /// both apply the mutation locally and emit the corresponding command to the journal).
 /// </item>
 /// <item>
-/// When the application requests a write, the journaled state manager validates the request,
-/// validates the pending changes of all states, and calls
+/// When the application requests a write, the journaled state manager calls
 /// <see cref="WritePendingEntries"/> (and occasionally <see cref="WriteSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
@@ -67,62 +66,6 @@ public interface IStateMachine
     /// This method will be called before any <see cref="WritePendingEntries"/> or <see cref="WriteSnapshot"/> calls.
     /// </remarks>
     void OnRecoveryCompleted() { }
-
-    /// <summary>
-    /// Validates this state's pending changes immediately before an admitted write captures journal entries or a snapshot.
-    /// The default implementation accepts the pending changes.
-    /// </summary>
-    /// <remarks>
-    /// Validation is pure and synchronous. All registered states pass validation before any state is captured,
-    /// including writes which only flush committed entries or produce zero bytes. Validation and capture run
-    /// in the same work-loop continuation. Throwing reports a terminal state-local failure and fences the manager.
-    /// Callers acquire asynchronous prerequisites before staging changes. Independent operation-local preparation
-    /// can proceed while previously staged valid changes are captured.
-    /// </remarks>
-    void ValidatePendingChanges() { }
-
-    /// <summary>
-    /// Validates a write request in the public caller's context before it is queued.
-    /// The default implementation accepts the request.
-    /// </summary>
-    /// <remarks>
-    /// Validation is pure and runs only at request admission. Throwing rejects this request and leaves the manager healthy.
-    /// Use <see cref="ValidatePendingChanges"/> to report a terminal state-local failure inside admitted execution.
-    /// </remarks>
-    void ValidateWrite() { }
-
-    /// <summary>
-    /// Validates deletion at public request admission and again during serialized execution.
-    /// The default implementation accepts deletion.
-    /// </summary>
-    /// <remarks>
-    /// Validation is pure. An admission failure rejects the request and leaves the manager healthy.
-    /// An execution-time failure fences the manager. All states pass execution-time validation
-    /// before the manager calls <see cref="OnDeleteStarted"/> on any state.
-    /// </remarks>
-    void ValidateDelete() { }
-
-    /// <summary>
-    /// Notifies the state that deletion is starting, after all execution-time validation succeeds
-    /// and before the storage operation begins. The default implementation performs no action.
-    /// </summary>
-    /// <remarks>
-    /// A successful storage deletion is followed by <see cref="Reset"/> before deletion waiters complete.
-    /// </remarks>
-    void OnDeleteStarted() { }
-
-    /// <summary>
-    /// Notifies the state of the manager's first terminal failure, before current and queued operation waiters fault.
-    /// The default implementation performs no action.
-    /// </summary>
-    /// <param name="exception">The original failure recorded by the manager.</param>
-    /// <remarks>
-    /// The manager is already fenced when this callback runs. Every registered state is notified even if
-    /// another notification throws; notification errors are logged and the original failure is preserved.
-    /// Owner shutdown during initial recovery and idle shutdown complete through normal shutdown.
-    /// Cancellation during admitted validation or write/delete storage work is terminal.
-    /// </remarks>
-    void OnFaulted(Exception exception) { }
 
     /// <summary>
     /// Writes pending state changes to the journal.

@@ -260,11 +260,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             case AppendJournalWorkItem:
                             case WriteSnapshotWorkItem:
                                 {
-                                    foreach (var state in _states.Values)
-                                    {
-                                        state.ValidatePendingChanges();
-                                    }
-
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
                                     var isSnapshot = workItem is WriteSnapshotWorkItem
@@ -459,16 +454,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                             case DeleteStateWorkItem:
                                 {
-                                    foreach (var state in _states.Values)
-                                    {
-                                        state.ValidateDelete();
-                                    }
-
-                                    foreach (var state in _states.Values)
-                                    {
-                                        state.OnDeleteStarted();
-                                    }
-
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -597,19 +582,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
         try
         {
-            // Fencing prevents registration, so callbacks can use the stable registry outside the lock.
-            foreach (var (name, state) in _states)
-            {
-                try
-                {
-                    state.OnFaulted(exception);
-                }
-                catch (Exception notificationException)
-                {
-                    LogErrorNotifyingFaultedState(_shared.Logger, notificationException, name);
-                }
-            }
-
             if (!_shutdownCancellation.IsCancellationRequested)
             {
                 LogErrorProcessingWorkItems(_shared.Logger, exception);
@@ -704,11 +676,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
-            foreach (var state in _states.Values)
-            {
-                state.ValidateDelete();
-            }
-
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -898,11 +865,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
-            foreach (var state in _states.Values)
-            {
-                state.ValidateWrite();
-            }
-
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -1360,11 +1322,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
-
-    [LoggerMessage(
-        Level = LogLevel.Error,
-        Message = "Error notifying journaled state \"{Name}\" of a terminal failure.")]
-    private static partial void LogErrorNotifyingFaultedState(ILogger logger, Exception exception, string name);
 
     [LoggerMessage(
         Level = LogLevel.Information,

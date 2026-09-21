@@ -62,13 +62,11 @@ Concurrent calls made while the same kind of write is queued can share that queu
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
-and proposed output in operation-local data. After establishing that an outcome is safe to commit, apply its
-mutations to durable state and initiate a write. Coordinate that transition with other interleaved operations
-which can affect the same decision. Any caller's write can include staged mutations from other calls.
-
-If an application error occurs after staging and makes those mutations unsafe to commit, end the activation's
-use of the manager and request deactivation. In-flight methods can retain local decisions and references
-across awaits; a fresh activation reconstructs both application and durable state together.
+and proposed output in operation-local data. After the final preparation await, check the relevant
+preconditions and apply the complete safe-to-commit update synchronously, then request an ordinary write.
+Orleans executes that synchronous block on a single activation thread. Another grain turn can run when
+the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
+staged mutations from other calls.
 
 ## Consistency and competing writers
 
@@ -114,32 +112,21 @@ owning manager's configured format, including before recovery of an empty journa
 codec resolution to that owner. Grain-bound managers resolve codecs from the activation's services;
 standalone owners use shared application services.
 
-<xref:Orleans.Journaling.IStateMachine.ValidateWrite*> and <xref:Orleans.Journaling.IStateMachine.ValidateDelete*>
-perform pure validation in the requesting caller's context. An admission rejection leaves the manager healthy.
-Deletion validates all states again in serialized execution, then calls
-<xref:Orleans.Journaling.IStateMachine.OnDeleteStarted*> on every state before awaiting storage deletion.
-Successful deletion resets states before completing callers.
-
-Before each append or snapshot capture, the manager calls
-<xref:Orleans.Journaling.IStateMachine.ValidatePendingChanges*> on every registered state.
-This pure synchronous check validates state-owned failure latches and pending-change invariants inside
-the admitted operation's failure boundary. Every state passes before capture begins in the same work-loop
-continuation, including writes which flush only committed entries or produce zero bytes.
-
-Features acquire asynchronous prerequisites before staging their changes, then apply prepared mutations
-synchronously and request an ordinary write. Independent operation-local preparation can continue while
-the manager captures previously staged valid changes. `ValidateWrite` remains caller-context admission
-validation; a terminal state-local error belongs in `ValidatePendingChanges` so the manager fences even
-when the reporting write is its first admitted operation. A previously captured write retains its actual
-storage outcome and acknowledgement bookkeeping.
-
+States synchronously encode their pending changes through <xref:Orleans.Journaling.IStateMachine.WritePendingEntries*>
+or their current contents through <xref:Orleans.Journaling.IStateMachine.WriteSnapshot*>.
 After storage acknowledges captured bytes, <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted*>
 performs durable-completion bookkeeping. A zero-byte write completes without this callback.
-An admitted validation, capture, or storage failure fences the manager, records the original
-exception, and calls <xref:Orleans.Journaling.IStateMachine.OnFaulted*> on every registered state before
-faulting current and queued waiters. Notification failures are logged while the original failure remains
-the operation's outcome. Owner-canceled initial recovery and idle shutdown complete through normal shutdown.
-Cancellation during admitted validation or write/delete storage work is terminal.
+
+The journal owner keeps feature operations quiescent through deletion's storage and reset outcome,
+including when a caller cancels its wait. Successful deletion calls <xref:Orleans.Journaling.IStateMachine.Reset*>
+before completing deletion waiters.
+
+The manager records the first capture or storage failure, fences further persistence, faults current
+and queued manager waiters, and requests grain deactivation. Features observe their write failures and
+complete their own operation waiters and resource cleanup through their operation and lifecycle ownership.
+Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage
+outcome and acknowledgement bookkeeping. Owner-canceled initial recovery and idle shutdown complete
+through normal shutdown; admitted write/delete storage cancellation remains terminal.
 
 ## Compaction
 
