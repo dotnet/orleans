@@ -383,7 +383,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task ManagerCommandCodec_UsesActivationScopeBeforeRecovery()
+    public async Task StateConstruction_InjectsActivationScopedCodecBeforeRecovery()
     {
         var builder = CreateNamedProviderBuilder();
         builder.AddVolatileJournalStorage();
@@ -401,20 +401,25 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             static (services, _) => new OrleansBinaryDurableValueCommandCodec<int>(
                 services.GetRequiredService<ICodecProvider>().GetCodec<int>(),
                 services.GetRequiredService<SerializerSessionPool>()));
+        builder.Services.AddStateMachine<CodecState, CodecState>(static (services, _) =>
+            new CodecState(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey)));
         await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
         await using var first = services.CreateAsyncScope();
         await using var second = services.CreateAsyncScope();
         var owner = first.ServiceProvider.GetRequiredService<IJournaledStateManager>();
         var manager = first.ServiceProvider.GetRequiredService<IDurableStateManager>();
         Assert.Same(owner, manager);
-        var codec = owner.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>();
+        var state = manager.GetOrAddState<CodecState>("value");
+        var codec = state.Codec;
         Assert.Same(first.ServiceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey), codec);
-        Assert.NotSame(codec, second.ServiceProvider.GetRequiredService<IJournaledStateManager>()
-            .GetRequiredCommandCodec<IDurableValueCommandCodec<int>>());
+        Assert.NotSame(codec, second.ServiceProvider.GetRequiredService<IDurableStateManager>()
+            .GetOrAddState<CodecState>("value").Codec);
         Assert.Throws<InvalidOperationException>(() =>
             services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(OrleansBinaryJournalFormat.JournalFormatKey));
-        var state = new DurableValue<int>("value", owner, codec);
-        Assert.Same(state, manager.GetOrAddValue<int>("value"));
+        Assert.Same(state, manager.GetOrAddState<CodecState>("value"));
+        Assert.Same(state, first.ServiceProvider.GetRequiredKeyedService<CodecState>("value"));
+        Assert.True(owner.TryGetStateMachine("value", out var registered));
+        Assert.Same(state, registered);
         var lifecycle = Assert.IsType<CompositionTestLifecycle>(first.ServiceProvider.GetRequiredService<IGrainContext>().ObservableLifecycle);
         Assert.Equal(1, lifecycle.Subscriptions);
         await lifecycle.OnStart(TestContext.Current.CancellationToken);
@@ -426,7 +431,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task ManagerCommandCodec_UsesOwningNamedFormatOnEmptyJournal()
+    public async Task StateConstruction_InjectsNamedFormatCodecOnEmptyJournal()
     {
         var builder = CreateNamedProviderBuilder();
         builder.AddVolatileJournalStorage();
@@ -435,7 +440,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             new NamedBinaryJournalFormat(services.GetRequiredService<OrleansBinaryJournalFormat>()));
         builder.Services.AddKeyedSingleton(typeof(IDurableDictionaryCommandCodec<,>), CustomFormatKey,
             typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
-        builder.Services.AddKeyedSingleton<IDurableValueCommandCodec<int>>(CustomFormatKey, static (services, _) =>
+        builder.Services.AddKeyedScoped<IDurableValueCommandCodec<int>>(CustomFormatKey, static (services, _) =>
             new OrleansBinaryDurableValueCommandCodec<int>(
                 services.GetRequiredService<ICodecProvider>().GetCodec<int>(),
                 services.GetRequiredService<SerializerSessionPool>()));
@@ -447,39 +452,54 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
                     TimeProvider.System,
                     services),
                 new TestJournalStorageProvider(customStorage)));
-        await using var services = builder.Services.BuildServiceProvider();
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var dependencies = services.CreateAsyncScope();
         var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>("custom");
         await using var defaultManager = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(new JournalId("default"));
         await using var customManager = factory.CreateStandalone(new JournalId("custom"));
-        IJournaledStateManager delegating = new DelegatingCodecManager(customManager);
-        var codec = delegating.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>();
-        Assert.Same(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey), codec);
-        Assert.Same(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey),
-            defaultManager.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>());
-        Assert.NotSame(defaultManager.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>(), codec);
-        var state = new DurableValue<int>("value", delegating, codec);
+        IJournaledStateManager delegating = new DelegatingStateManager(customManager);
+        var codec = dependencies.ServiceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey);
+        Assert.Throws<InvalidOperationException>(() =>
+            services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey));
+        var defaultCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey);
+        Assert.NotSame(defaultCodec, codec);
+        var state = new CodecState(codec);
+        Assert.Same(codec, state.Codec);
+        delegating.RegisterStateMachine("value", state);
+        var defaultState = new CodecState(defaultCodec);
+        defaultManager.RegisterStateMachine("value", defaultState);
+        await defaultManager.InitializeAsync(TestContext.Current.CancellationToken);
         await delegating.InitializeAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, state.Value);
         Assert.Empty(customStorage.Segments);
         state.Value = 42;
+        defaultState.Value = 7;
         await delegating.WriteStateAsync(TestContext.Current.CancellationToken);
+        await defaultManager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(customStorage.Segments);
         await using var recovered = factory.CreateStandalone(new JournalId("custom"));
-        var recoveredState = new DurableValue<int>("value", recovered, recovered.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>());
+        var recoveredState = new CodecState(codec);
+        recovered.RegisterStateMachine("value", recoveredState);
         await recovered.InitializeAsync(TestContext.Current.CancellationToken);
         Assert.Equal(42, recoveredState.Value);
 
-        var missing = Assert.Throws<InvalidOperationException>(() => customManager.GetRequiredCommandCodec<IDurableQueueCommandCodec<int>>());
-        Assert.Contains(CustomFormatKey, missing.Message);
-        Assert.Contains(nameof(IDurableQueueCommandCodec<int>), missing.Message);
+        await using var recoveredDefault = services.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(new JournalId("default"));
+        var recoveredDefaultState = new CodecState(defaultCodec);
+        recoveredDefault.RegisterStateMachine("value", recoveredDefaultState);
+        await recoveredDefault.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(7, recoveredDefaultState.Value);
     }
 
     [Fact]
-    public void ManagerCommandCodec_DefaultReportsUnsupportedResolution()
+    public void StateConstruction_MissingFormatCodecFails()
     {
-        IJournaledStateManager manager = new UnsupportedCodecManager();
-        var exception = Assert.Throws<NotSupportedException>(() => manager.GetRequiredCommandCodec<IDurableValueCommandCodec<int>>());
-        Assert.Contains("write command codec resolution", exception.Message);
+        var builder = CreateNamedProviderBuilder();
+        builder.AddJournaling();
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.NotNull(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey));
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new CodecState(services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(CustomFormatKey)));
+        Assert.Contains(nameof(IDurableValueCommandCodec<int>), exception.Message);
     }
 
     [Fact]
@@ -529,25 +549,26 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         public void Replay(JournalBufferReader input, JournalReplayContext context) => inner.Replay(input, context);
     }
 
-    private sealed class DelegatingCodecManager(IJournaledStateManager inner) : IJournaledStateManager
+    private sealed class CodecState(IDurableValueCommandCodec<int> codec) : IStateMachine, IDurableValueCommandHandler<int>
     {
-        public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull => inner.GetRequiredCommandCodec<TCodec>();
+        public IDurableValueCommandCodec<int> Codec { get; } = codec;
+        public int Value { get; set; }
+        public void Reset(JournalStreamWriter writer) => Value = 0;
+        public void WritePendingEntries(JournalStreamWriter writer) => Codec.WriteSet(Value, writer);
+        public void WriteSnapshot(JournalStreamWriter writer) => Codec.WriteSet(Value, writer);
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, Codec).Apply(entry.Reader, this);
+        public void ApplySet(int value) => Value = value;
+    }
+
+    private sealed class DelegatingStateManager(IJournaledStateManager inner) : IJournaledStateManager
+    {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
         public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
         public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? state)
             => inner.TryGetStateMachine(name, out state);
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
-    }
-
-    private sealed class UnsupportedCodecManager : IJournaledStateManager
-    {
-        public ValueTask InitializeAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-        public void RegisterStateMachine(string name, IStateMachine state) => throw new NotSupportedException();
-        public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? state)
-            => throw new NotSupportedException();
-        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class LifecycleJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>

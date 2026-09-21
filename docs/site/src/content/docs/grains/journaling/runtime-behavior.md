@@ -107,10 +107,12 @@ individual initialization caller's token ends only its wait; owned recovery cont
 ## Custom state lifecycle
 
 Custom <xref:Orleans.Journaling.IStateMachine> implementations share the manager's single logical execution thread.
-Resolve write codecs through <xref:Orleans.Journaling.IJournaledStateManager.GetRequiredCommandCodec*> to use the
-owning manager's configured format, including before recovery of an empty journal. Delegating managers forward
-codec resolution to that owner. Grain-bound managers resolve codecs from the activation's services;
-standalone owners use shared application services.
+Supply command codecs as constructor dependencies. The registration factory selects codecs keyed by the
+same write-format key used to configure the journal owner. Activation-owned state factories resolve those
+dependencies from the activation's services; standalone callers supply codecs with the appropriate lifetime.
+The codec is available when the state is constructed, including for an empty journal.
+During replay, <xref:Orleans.Journaling.JournalReplayContext.GetRequiredCommandCodec*> selects the codec
+for each entry's stored format.
 
 States synchronously encode their pending changes through <xref:Orleans.Journaling.IStateMachine.WritePendingEntries*>
 or their current contents through <xref:Orleans.Journaling.IStateMachine.WriteSnapshot*>.

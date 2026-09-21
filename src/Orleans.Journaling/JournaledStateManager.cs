@@ -100,9 +100,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     internal IServiceProvider ServiceProvider => _grainContext is { } context ? context.ActivationServices : _shared.ServiceProvider;
 
-    public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull
-        => JournalFormatServices.GetRequiredCommandCodec<TCodec>(ServiceProvider, _shared.JournalFormatKey);
-
     public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
