@@ -127,6 +127,161 @@ public sealed class ZooKeeperReadRetryTests
         harness.AssertOneOwner(readOnly: true);
     }
 
+    [Fact]
+    public async Task ConnectionMonitor_FailureBeforeDisconnected_WaitsForNextConnection()
+    {
+        var monitor = CreateConnectionMonitor();
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var connectedGeneration = ((IZooKeeperConnectionMonitor)monitor).CaptureAttemptGeneration();
+
+        var wait = ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(connectedGeneration, TestContext.Current.CancellationToken).AsTask();
+        Assert.False(wait.IsCompleted);
+
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        Assert.False(wait.IsCompleted);
+
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        Assert.True(await wait);
+    }
+
+    [Fact]
+    public async Task ConnectionMonitor_ReconnectBeforeWaiterRegistration_CompletesImmediately()
+    {
+        var monitor = CreateConnectionMonitor();
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var connectedGeneration = ((IZooKeeperConnectionMonitor)monitor).CaptureAttemptGeneration();
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+
+        var wait = ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(connectedGeneration, TestContext.Current.CancellationToken);
+
+        Assert.True(wait.IsCompletedSuccessfully);
+        Assert.True(await wait);
+    }
+
+    [Fact]
+    public async Task ConnectionMonitor_OneReconnectReleasesAllWaiters_AndCanceledWaiterDoesNotPoisonPeers()
+    {
+        var monitor = CreateConnectionMonitor();
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var connectedGeneration = ((IZooKeeperConnectionMonitor)monitor).CaptureAttemptGeneration();
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var canceledWaiter = ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(connectedGeneration, canceled.Token).AsTask();
+        var peers = Enumerable.Range(0, 16).Select(_ => ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(connectedGeneration, TestContext.Current.CancellationToken).AsTask()).ToArray();
+
+        canceled.Cancel();
+        var cancellation = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWaiter);
+        Assert.Equal(canceled.Token, cancellation.CancellationToken);
+        Assert.All(peers, peer => Assert.False(peer.IsCompleted));
+
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        Assert.All(peers, peer => Assert.False(peer.IsCompleted));
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+
+        Assert.All(await Task.WhenAll(peers), Assert.True);
+    }
+
+    [Fact]
+    public async Task ConnectionMonitor_TimeoutReturnsWithoutReplacingNativeFailure()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var monitor = CreateConnectionMonitor(timeProvider, TimeSpan.FromSeconds(1));
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var connectedGeneration = ((IZooKeeperConnectionMonitor)monitor).CaptureAttemptGeneration();
+        var wait = ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(connectedGeneration, TestContext.Current.CancellationToken).AsTask();
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        Assert.False(wait.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+
+        Assert.False(await wait);
+    }
+
+    [Fact]
+    public async Task ConnectionMonitor_InitialConnectionDoesNotSatisfyPostFailureReconnect()
+    {
+        var monitor = CreateConnectionMonitor();
+        var attemptGeneration = ((IZooKeeperConnectionMonitor)monitor).CaptureAttemptGeneration();
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+
+        var wait = ((IZooKeeperConnectionMonitor)monitor)
+            .WaitForConnectionAfterAsync(attemptGeneration, TestContext.Current.CancellationToken).AsTask();
+
+        Assert.False(wait.IsCompleted);
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        Assert.False(wait.IsCompleted);
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        Assert.True(await wait);
+    }
+
+    [Fact]
+    public async Task ReadRetry_ParallelRowsWaitForOneReconnectBeforeReissuing()
+    {
+        const int rowCount = 9;
+        var harness = await Harness.CreateAsync(rowCount);
+        var monitor = CreateConnectionMonitor();
+        harness.ConnectionMonitor = monitor;
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var failed = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+        harness.BeforeRequest = request =>
+        {
+            if (request.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
+                && !request.EndsWith("/IAmAlive", StringComparison.Ordinal)
+                && failed.TryAdd(request, 0))
+            {
+                throw new KeeperException.ConnectionLossException();
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var read = harness.Read(TestContext.Current.CancellationToken);
+        Assert.Equal(rowCount, harness.Logger.Warnings.Count);
+        var admittedCalls = harness.Calls.ToArray();
+        harness.Clock.Advance(TimeSpan.FromMilliseconds(250));
+        Assert.Equal(admittedCalls, harness.Calls);
+
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        Assert.Equal(admittedCalls, harness.Calls);
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+
+        harness.AssertSnapshot(await read, harness.Entries, rowCount);
+        Assert.All(harness.Entries, entry => Assert.Equal(2,
+            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress))));
+        Assert.All(harness.Entries, entry => Assert.Equal(1,
+            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress))));
+        harness.AssertOneOwner(readOnly: true);
+    }
+
+    [Fact]
+    public async Task ReadRetry_ReconnectTimeout_ReissuesAndPreservesNativeFailure()
+    {
+        var harness = await Harness.CreateAsync();
+        var monitorTime = new FakeTimeProvider();
+        var monitor = CreateConnectionMonitor(monitorTime, TimeSpan.FromSeconds(1));
+        harness.ConnectionMonitor = monitor;
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var failure = new KeeperException.ConnectionLossException();
+        harness.BeforeRequest = _ => Task.FromException(failure);
+        var read = harness.Read(TestContext.Current.CancellationToken);
+        var completion = Record.ExceptionAsync(() => read);
+
+        foreach (var delay in new[] { 250, 500, 1000, 2000 })
+        {
+            await harness.Clock.AdvanceNextAsync(TimeSpan.FromMilliseconds(delay));
+            monitorTime.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Same(failure, await completion);
+        Assert.Equal(Enumerable.Repeat("Sync /", 5), harness.Calls);
+        harness.AssertOneOwner(readOnly: true);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -656,6 +811,20 @@ public sealed class ZooKeeperReadRetryTests
 
     private static TaskCompletionSource Gate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private static ZooKeeperWatcher CreateConnectionMonitor(
+        TimeProvider? timeProvider = null,
+        TimeSpan? reconnectTimeout = null) =>
+        new(
+            NullLogger.Instance,
+            timeProvider ?? TimeProvider.System,
+            reconnectTimeout ?? TimeSpan.FromMinutes(1));
+
+    private static Task Signal(ZooKeeperWatcher watcher, Watcher.Event.KeeperState state)
+    {
+        watcher.ProcessConnectionState(state);
+        return Task.CompletedTask;
+    }
+
     [Fact]
     public async Task NativeFixture_PrimaryFailure_IsCapturedBeforeTeardownAndRethrownUnchanged()
     {
@@ -787,6 +956,7 @@ public sealed class ZooKeeperReadRetryTests
         internal List<ZooKeeperSession> Sessions { get; } = [];
         internal List<bool> ReadOnly { get; } = [];
         internal Action<ZooKeeperSession>? OnSessionCreated { get; set; }
+        internal IZooKeeperConnectionMonitor? ConnectionMonitor { get; set; }
         internal Func<string, Task>? BeforeRequest { get; set; }
         internal Action<string>? AfterRequest { get; set; }
         internal Func<Task> Close { get; set; } = () => Task.CompletedTask;
@@ -844,11 +1014,14 @@ public sealed class ZooKeeperReadRetryTests
                     await AfterMulti();
                 },
                 native.SetData);
-            var session = new ZooKeeperSession(operations, () =>
-            {
-                Interlocked.Increment(ref CloseCount);
-                return Close();
-            });
+            var session = new ZooKeeperSession(
+                operations,
+                () =>
+                {
+                    Interlocked.Increment(ref CloseCount);
+                    return Close();
+                },
+                ConnectionMonitor);
             Sessions.Add(session);
             OnSessionCreated?.Invoke(session);
             return session;

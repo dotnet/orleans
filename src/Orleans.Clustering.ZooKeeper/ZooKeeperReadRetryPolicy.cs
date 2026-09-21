@@ -33,15 +33,16 @@ internal static partial class ZooKeeperReadRetryPolicy
     internal static ZooKeeperBasedMembershipTable.NativeOperations Wrap(
         ZooKeeperBasedMembershipTable.NativeOperations native,
         ResiliencePipeline pipeline,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        IZooKeeperConnectionMonitor? connectionMonitor = null) =>
         new(
-            path => ExecuteAsync("GetData", () => native.GetData(path), pipeline, cancellationToken),
-            path => ExecuteAsync("GetChildren", () => native.GetChildren(path), pipeline, cancellationToken),
+            path => ExecuteAsync("GetData", () => native.GetData(path), pipeline, cancellationToken, connectionMonitor),
+            path => ExecuteAsync("GetChildren", () => native.GetChildren(path), pipeline, cancellationToken, connectionMonitor),
             path => ExecuteAsync("Sync", async () =>
             {
                 await native.Sync(path);
                 return true;
-            }, pipeline, cancellationToken),
+            }, pipeline, cancellationToken, connectionMonitor),
             native.Multi,
             native.SetData);
 
@@ -49,16 +50,32 @@ internal static partial class ZooKeeperReadRetryPolicy
         string operationName,
         Func<Task<T>> operation,
         ResiliencePipeline pipeline,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IZooKeeperConnectionMonitor? connectionMonitor)
     {
         var context = ResilienceContextPool.Shared.Get(operationName, cancellationToken);
+        long? reconnectAfter = null;
         try
         {
             return await pipeline.ExecuteAsync(async context =>
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
+                if (reconnectAfter is { } connectedGeneration && connectionMonitor is not null)
+                {
+                    await connectionMonitor.WaitForConnectionAfterAsync(connectedGeneration, context.CancellationToken);
+                }
+
+                var attemptGeneration = connectionMonitor?.CaptureAttemptGeneration() ?? 0;
                 // Await actual native completion: cancellation ends admission, not an in-flight request.
-                return await operation();
+                try
+                {
+                    return await operation();
+                }
+                catch (KeeperException.ConnectionLossException)
+                {
+                    reconnectAfter = attemptGeneration;
+                    throw;
+                }
             }, context);
         }
         finally

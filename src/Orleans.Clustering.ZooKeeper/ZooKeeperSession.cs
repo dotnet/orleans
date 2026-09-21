@@ -11,19 +11,31 @@ internal sealed class ZooKeeperSession
     // Bind synchronously; the owned task supplies the completion semantics.
     private readonly TaskCompletionSource<Task> _completion = new();
 
-    internal ZooKeeperSession(ZooKeeperBasedMembershipTable.NativeOperations operations, Func<Task> close)
+    internal ZooKeeperSession(
+        ZooKeeperBasedMembershipTable.NativeOperations operations,
+        Func<Task> close,
+        IZooKeeperConnectionMonitor? connectionMonitor = null)
     {
         _operations = operations;
         _close = close;
+        ConnectionMonitor = connectionMonitor;
         Completion = _completion.Task.Unwrap();
         Completion.Ignore();
     }
 
     internal Task Completion { get; }
+    internal IZooKeeperConnectionMonitor? ConnectionMonitor { get; }
+    internal ZooKeeperBasedMembershipTable.NativeOperations Operations => _operations;
 
     internal static Task<T> ExecuteAsync<T>(
         Func<ZooKeeperSession> createSession,
         Func<ZooKeeperBasedMembershipTable.NativeOperations, Task<T>> operation,
+        CancellationToken cancellationToken)
+        => ExecuteSessionAsync(createSession, session => operation(session.Operations), cancellationToken);
+
+    internal static Task<T> ExecuteSessionAsync<T>(
+        Func<ZooKeeperSession> createSession,
+        Func<ZooKeeperSession, Task<T>> operation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -33,12 +45,12 @@ internal sealed class ZooKeeperSession
         return ZooKeeperBasedMembershipTable.AwaitOperationAsync(completion, cancellationToken);
     }
 
-    private async Task<T> RunAsync<T>(Func<ZooKeeperBasedMembershipTable.NativeOperations, Task<T>> operation)
+    private async Task<T> RunAsync<T>(Func<ZooKeeperSession, Task<T>> operation)
     {
         T result;
         try
         {
-            result = await operation(_operations);
+            result = await operation(this);
         }
         catch (Exception primary)
         {
