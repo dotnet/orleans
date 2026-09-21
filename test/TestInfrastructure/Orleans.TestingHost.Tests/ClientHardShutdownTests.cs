@@ -84,17 +84,6 @@ public sealed class ClientHardShutdownTests
         Assert.NotEqual(client.StopToken, hostedService.StopToken);
         Assert.Equal(1, client.DisposeCount);
         Assert.Null(getClientHost());
-
-        var aggregateCancellation = new AggregateException(
-            new OperationCanceledException(),
-            new TaskCanceledException());
-        client = new RecordingHost(_ => Task.FromException(aggregateCancellation));
-        SetClientHost(cluster, client);
-
-        await killClientAsync();
-
-        Assert.Equal(1, client.DisposeCount);
-        Assert.Null(getClientHost());
     }
 
     private static async Task AssertShutdownFailureIsPreservedAsync(
@@ -113,13 +102,13 @@ public sealed class ClientHardShutdownTests
         Assert.Equal(1, client.DisposeCount);
         Assert.Null(getClientHost());
 
-        var mixedFailure = new AggregateException(new OperationCanceledException(), expected);
-        client = new RecordingHost(_ => Task.FromException(mixedFailure));
+        var aggregateFailure = new AggregateException(new OperationCanceledException());
+        client = new RecordingHost(_ => Task.FromException(aggregateFailure));
         SetClientHost(cluster, client);
 
         var actualAggregate = await Assert.ThrowsAsync<AggregateException>(killClientAsync);
 
-        Assert.Same(mixedFailure, actualAggregate);
+        Assert.Same(aggregateFailure, actualAggregate);
         Assert.Equal(1, client.DisposeCount);
         Assert.Null(getClientHost());
     }
