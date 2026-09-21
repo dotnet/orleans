@@ -838,16 +838,22 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(7, result.Version.Version);
         Assert.Equal(entry.SiloAddress, Assert.Single(result.Members).Item1.SiloAddress);
         Assert.Equal(Now, Assert.Single(result.Members).Item1.IAmAliveTime);
-        Assert.Equal(0, client.Transactions);
-        Assert.Empty(client.Commits);
         if (readAll)
         {
-            AssertSingleStrongQuery(client);
+            Assert.Equal(1, client.Transactions);
+            var query = Assert.Single(client.Queries);
+            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
+            Assert.False(query.Transaction.IsEmpty);
             Assert.Equal(2, client.QueryDocumentReads);
             Assert.Empty(client.Reads);
+            var commit = Assert.Single(client.Commits);
+            Assert.Equal(query.Transaction, commit.Transaction);
+            Assert.Empty(commit.Writes);
         }
         else
         {
+            Assert.Equal(0, client.Transactions);
+            Assert.Empty(client.Commits);
             var read = Assert.Single(client.Reads);
             Assert.Equal(new[] { VersionPath, RowPath(entry) }, read.Documents);
             Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.None, read.ConsistencySelectorCase);
@@ -867,8 +873,15 @@ public sealed class FirestoreMembershipHeartbeatTests
         document.UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(2));
         var rowETag = ETag(document);
         var token = ETag(client.Documents[VersionPath]);
+        var changed = false;
         client.AfterFirstReadResponse = () =>
         {
+            if (changed)
+            {
+                return;
+            }
+
+            changed = true;
             client.Change(document.Name, nameof(SiloInstanceEntity.ProxyPort), new Value { IntegerValue = 8 });
             client.Change(document.Name, nameof(SiloInstanceEntity.MembershipVersion), new Value { IntegerValue = 8 });
             client.Change(VersionPath, nameof(ClusterVersionEntity.MembershipVersion), new Value { IntegerValue = 8 });
@@ -879,15 +892,37 @@ public sealed class FirestoreMembershipHeartbeatTests
             ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
             : await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
 
-        Assert.Equal(7, result.Version.Version);
-        Assert.Equal(token, result.Version.VersionEtag);
         var row = Assert.Single(result.Members);
-        Assert.Equal(7, row.Item1.ProxyPort);
-        Assert.Equal(rowETag, row.Item2);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
-        Assert.Equal(0, client.Transactions);
-        Assert.Empty(client.Commits);
-        Assert.Equal(1, client.Reads.Count + client.Queries.Count);
+        if (readAll)
+        {
+            Assert.Equal(8, result.Version.Version);
+            Assert.Equal(ETag(client.Documents[VersionPath]), result.Version.VersionEtag);
+            Assert.Equal(8, row.Item1.ProxyPort);
+            Assert.Equal(ETag(client.Documents[document.Name]), row.Item2);
+            Assert.Equal(2, client.Transactions);
+            Assert.Equal(2, client.Queries.Count);
+            Assert.Equal(2, client.Commits.Count);
+            Assert.Empty(client.Reads);
+            Assert.All(client.Queries, query =>
+            {
+                Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
+                Assert.False(query.Transaction.IsEmpty);
+            });
+            Assert.Equal(client.Queries.Select(query => query.Transaction), client.Commits.Select(commit => commit.Transaction));
+            Assert.All(client.Commits, commit => Assert.Empty(commit.Writes));
+        }
+        else
+        {
+            Assert.Equal(7, result.Version.Version);
+            Assert.Equal(token, result.Version.VersionEtag);
+            Assert.Equal(7, row.Item1.ProxyPort);
+            Assert.Equal(rowETag, row.Item2);
+            Assert.Equal(0, client.Transactions);
+            Assert.Empty(client.Commits);
+            Assert.Single(client.Reads);
+            Assert.Empty(client.Queries);
+        }
     }
 
     [Theory]
@@ -905,9 +940,14 @@ public sealed class FirestoreMembershipHeartbeatTests
             ? table.ReadAllAsync(TestContext.Current.CancellationToken)
             : table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken));
 
-        Assert.Equal(0, client.Transactions);
         Assert.Empty(client.Commits);
         Assert.Equal(1, client.Reads.Count + client.Queries.Count);
+        Assert.Equal(readAll ? 1 : 0, client.Transactions);
+        if (readAll)
+        {
+            var query = Assert.Single(client.Queries);
+            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
+        }
     }
 
     [Fact]
@@ -943,7 +983,7 @@ public sealed class FirestoreMembershipHeartbeatTests
             : table.ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
-        Assert.Equal(0, client.Transactions);
+        Assert.Equal(readAll ? 1 : 0, client.Transactions);
         Assert.Empty(client.Commits);
         Assert.Equal(1, client.Reads.Count + client.Queries.Count);
     }
@@ -969,7 +1009,7 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Assert.Same(failure, exception.InnerException);
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(0, client.Transactions);
+        Assert.Equal(operation == "ReadAll" ? 1 : 0, client.Transactions);
         Assert.Equal(1, client.Reads.Count + client.Queries.Count + client.Commits.Count);
         Assert.Empty(client.CommittedWrites);
 
