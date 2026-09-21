@@ -897,7 +897,9 @@ public sealed class FirestoreMembershipHeartbeatTests
         if (readAll)
         {
             Assert.Equal(8, result.Version.Version);
+            Assert.Equal(ETag(client.Documents[VersionPath]), result.Version.VersionEtag);
             Assert.Equal(8, row.Item1.ProxyPort);
+            Assert.Equal(ETag(client.Documents[document.Name]), row.Item2);
             Assert.Equal(2, client.Transactions);
             Assert.Equal(2, client.Queries.Count);
             Assert.Equal(2, client.Commits.Count);
