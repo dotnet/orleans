@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Linq;
@@ -21,6 +22,7 @@ using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Versions;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
@@ -390,16 +392,27 @@ public class HostedClientDrainTests
             var referenceRuntime = Substitute.For<IGrainReferenceRuntime>();
             var referenceActivator = new GrainReferenceActivator(
                 Scopes, [new UntypedReferenceProvider(_root, referenceRuntime)]);
+            var manifestProvider = Substitute.For<IClusterManifestProvider>();
+            manifestProvider.Current.Returns(new ClusterManifest(
+                MajorMinorVersion.Zero,
+                ImmutableDictionary<SiloAddress, GrainManifest>.Empty));
+            manifestProvider.LocalGrainManifest.Returns(new GrainManifest(
+                ImmutableDictionary<GrainType, GrainProperties>.Empty,
+                ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty));
+            var interfaceTypeResolver = new GrainInterfaceTypeResolver(
+                [], _root.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>());
+            var grainTypeResolver = new GrainInterfaceTypeToGrainTypeResolver(manifestProvider);
+            var grainTypeAvailability = new GrainTypeAvailability(
+                interfaceTypeResolver,
+                grainTypeResolver,
+                new GrainVersionManifest(manifestProvider));
             var silo = Substitute.For<ILocalSiloDetails>();
             // Address data only: no socket, port allocation, DNS, or silo startup.
             silo.SiloAddress.Returns(SiloAddress.New(IPAddress.Loopback, 0, 1));
             silo.GatewayAddress.Returns((SiloAddress)null!);
             Runtime = new InsideRuntimeClient(
                 silo, Scopes, messageFactory, loggerFactory, options, trace, referenceActivator,
-                new GrainInterfaceTypeResolver(
-                    [], _root.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>()),
-                new GrainInterfaceTypeToGrainTypeResolver(Substitute.For<IClusterManifestProvider>()),
-                deepCopier, Clock, mapping, instruments);
+                interfaceTypeResolver, grainTypeResolver, grainTypeAvailability, deepCopier, Clock, mapping, instruments);
 
             // Constructor-only transport graph. GatewayAddress == null guards the throwing factory.
             // Catalog/connections/placement/locator are only reached by transport operations:
