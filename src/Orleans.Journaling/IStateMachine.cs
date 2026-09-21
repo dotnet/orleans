@@ -32,7 +32,8 @@ namespace Orleans.Journaling;
 /// <para>
 /// Application code prepares fallible work in operation-local data and stages only mutations which are
 /// safe to commit. Staged mutations are shared by all interleaved callers using the same manager.
-/// Storage acknowledgement establishes durability; recovery takes place in a fresh manager and state instances.
+/// Storage acknowledgement establishes durability. A new activation creates a fresh manager and state instances;
+/// retrying failed initialization resets and replays the existing instances.
 /// </para>
 /// </remarks>
 public interface IStateMachine
