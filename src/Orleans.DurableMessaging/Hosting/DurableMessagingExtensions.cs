@@ -90,19 +90,6 @@ public static class DurableMessagingExtensions
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
         services.TryAddSingleton<DurableMessagingInstruments>();
 
-        services.TryAddScoped(sp =>
-        {
-            var manager = sp.GetRequiredService<IJournaledStateManager>();
-            var state = new InboxJournalState(manager);
-            manager.RegisterStateMachine(DurableMessagingStateNames.Inbox, state);
-            return state;
-        });
-        services.TryAddKeyedScoped<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
-            DurableMessagingStateNames.Inbox, (sp, _) => sp.GetRequiredService<InboxJournalState>());
-        AddDeferredDictionaryState<(GrainId, Guid), DateTimeOffset>(services, DurableMessagingStateNames.InboxProcessed);
-        AddDeferredDictionaryState<(GrainId, Guid), InboxMessageState>(services, DurableMessagingStateNames.InboxMessageState);
-        AddDeferredDictionaryState<(GrainId, Guid), InboxDeadLetter>(services, DurableMessagingStateNames.InboxDeadLetters);
-
         services.TryAddScoped<DurableInboxExtension>(sp =>
         {
             var stateManager = sp.GetRequiredService<IJournaledStateManager>();
@@ -129,8 +116,7 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<DurableMessagingPumpResults>(),
                 sp.GetRequiredService<TimeProvider>(),
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
-                options,
-                sp.GetRequiredService<InboxJournalState>());
+                options);
         });
 
         services.TryAddKeyedScoped<IGrainExtension>(
@@ -153,21 +139,11 @@ public static class DurableMessagingExtensions
         });
         services.TryAddScoped<IDurableInbox>(sp => sp.GetRequiredService<DurableInbox>());
 
-        services.TryAddScoped<DurableOutbox>();
+        services.TryAddScoped(sp => ActivatorUtilities.CreateInstance<DurableOutbox>(
+            sp,
+            sp.GetRequiredKeyedService<IDurableValueCommandCodec<long>>(DurableMessagingJournalFormatKey)));
         services.TryAddKeyedScoped<IDurableOutbox>(DurableMessagingStateNames.Outbox, (sp, _) => sp.GetRequiredService<DurableOutbox>());
         services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>(DurableMessagingStateNames.Outbox));
-        services.TryAddKeyedScoped<IDurableDictionary<Guid, DurableEnvelope>>(
-            DurableMessagingStateNames.Outbox, (sp, _) => sp.GetRequiredService<DurableOutbox>().MessageState);
-        services.TryAddKeyedScoped<IDurableDictionary<Guid, OutboxMessageState>>(
-            DurableMessagingStateNames.OutboxMessageState, (sp, _) => sp.GetRequiredService<DurableOutbox>().AttemptState);
-        services.TryAddKeyedScoped<IDurableDictionary<Guid, OutboxDeadLetter>>(
-            DurableMessagingStateNames.OutboxDeadLetters, (sp, _) => sp.GetRequiredService<DurableOutbox>().DeadLetterState);
-        services.TryAddKeyedScoped<IDurableValue<string>>(
-            DurableMessagingStateNames.OutboxJobId, (sp, _) => sp.GetRequiredService<DurableOutbox>().JobIdState);
-        services.TryAddKeyedScoped<IDurableValue<DurableJob>>(
-            DurableMessagingStateNames.OutboxJobHandle, (sp, _) => sp.GetRequiredService<DurableOutbox>().JobState);
-        services.TryAddKeyedScoped<IDurableValue<string>>(
-            DurableMessagingStateNames.OutboxCompletedJobId, (sp, _) => sp.GetRequiredService<DurableOutbox>().CompletedJobIdState);
         services.TryAddKeyedScoped<IDurableValue<long>>(
             DurableMessagingStateNames.OutboxJobSequence, (sp, _) => sp.GetRequiredService<DurableOutbox>().JobSequenceState);
         services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
@@ -187,17 +163,5 @@ public static class DurableMessagingExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IConfigureGrainTypeComponents, DurableMessagingGrainTypeConfigurator>());
         return services;
-    }
-
-    private static void AddDeferredDictionaryState<TKey, TValue>(IServiceCollection services, string name)
-        where TKey : notnull
-    {
-        services.TryAddKeyedScoped<IDurableDictionary<TKey, TValue>>(name, (sp, _) =>
-        {
-            var manager = sp.GetRequiredService<IJournaledStateManager>();
-            var state = new DeferredJournaledDictionary<TKey, TValue>(manager);
-            manager.RegisterStateMachine(name, state);
-            return state;
-        });
     }
 }

@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 09/18/2026
+ms.date: 09/21/2026
 ms.topic: conceptual
 ---
 
@@ -49,12 +49,11 @@ Durable Messaging has the following boundaries:
   Expected preparation failures produce retry or dead-letter accounting. Messaging
   invokes the action once for that prepared attempt and stages outgoing intents, inbox
   completion and deduplication in the same uninterrupted activation turn.
-- Journal capture observes the combined staged effects. The manager synchronously
-  validates every registered state's pending changes inside admitted execution, then
-  captures in the same continuation. Each state acknowledges its captured changes after
-  storage succeeds.
-- Deletion requires quiescent messaging operations. Successful deletion clears durable
-  messaging state and pending intents before subsequent writes begin.
+- Journal capture observes the combined, safe-to-commit staged effects. The manager
+  persists them atomically, then acknowledges each state's captured changes.
+- The owning grain or standalone host keeps messaging operations quiescent through
+  deletion. Successful deletion resets durable messaging state and pending intents
+  before that owner is disposed or deactivated. A fresh owner handles subsequent work.
 - A receiver allocates an ownership token and places it in a scheduled inbox job
   before committing the envelope, token, and returned job handle together. It returns
   `Accepted` after that commit succeeds.
@@ -108,6 +107,11 @@ before invoking it, then stages inbox completion and deduplication before the ac
 turn yields. Earlier journal writes can complete while preparation awaits because the
 prepared attempt's effects are still local.
 
+Complete fallible application work and check preconditions during preparation. The
+returned action applies the complete set of business changes synchronously, leaving
+state ready for an atomic journal write. Orleans' single-threaded activation execution
+keeps these updates together until the action returns.
+
 The handler context admits batch preparation during its matching `PrepareAsync` call
 and outgoing sends while the returned action executes. Both context send paths share
 this attempt-scoped boundary. Preparation supports read-only outbox inspection and
@@ -129,22 +133,22 @@ and journal-write scope. Disposing an unstaged batch releases its reservation; d
 a staged batch preserves its cohort's ownership through acknowledgement. An empty batch
 is a valid no-op which requires no new job.
 
-The registered inbox and outbox states own their capture, acknowledgement, replay and
-reset bookkeeping. Feature preparation establishes durable wake-up ownership before
-staging. <xref:Orleans.Journaling.IStateMachine.ValidatePendingChanges*> checks every
-registered state synchronously before append, snapshot, committed-prefix, and zero-byte
-capture paths. The check raises the original failure and validates staged generations
-and exact physical ownership. <xref:Orleans.Journaling.IStateMachine.ValidateWrite*>
-validates request admission in the caller's logical execution context. Independent
-writes can commit earlier valid state while another operation prepares local values.
+Durable Messaging uses standard named journaled dictionaries and values. Journaling
+supplies their capture, acknowledgement, replay and reset protocol. The outbox's
+existing journaled sequence state associates captured message identities and wake-up
+ownership with the storage acknowledgement, releasing exactly that cohort for dispatch.
+Feature preparation establishes durable wake-up ownership before staging. Application and messaging code
+complete their preconditions before applying synchronous changes, so the registered
+<xref:Orleans.Journaling.IStateMachine> instances are ready for capture when the journal
+write begins. Independent writes can commit earlier valid state while another operation
+prepares local values.
 Mutations made during storage I/O remain pending for the next capture.
 
-A terminal capture or storage failure fences the journal manager. State
-fault notifications stop messaging work before failed write waiters resume. Unexpected
-application or staging failures also latch the original error in the inbox state and
-drive an ordinary journal write into this terminal path, including when no earlier
-write was queued. The execution-time check fences before partial new effects can be
-captured; already-captured cohorts retain their own storage outcome and acknowledgement.
+A failure in an admitted write or delete fences the journal manager, faults its
+operation waiters and requests grain deactivation. Messaging handles failed writes by completing
+the affected operations and releasing their owned resources. Activation shutdown drains
+messaging work; standalone owners coordinate component cleanup with manager disposal.
+Already-captured cohorts retain their actual storage outcome and acknowledgement.
 Genuine preparation I/O failures occur before shared mutations and follow retry/dead-letter
 accounting, or a handler can catch them and prepare a safe alternative.
 A fresh activation creates new state objects and replays the
@@ -153,21 +157,17 @@ commit: replay restores that committed envelope and exact ownership handle. A fa
 ownership-clear write follows the same boundary; fresh replay determines whether the
 previous owner remains responsible or cleanup was committed.
 
-If another state rejects a write request after Messaging has staged an attempt,
-Messaging retains the original failure, stops that activation's work and requests
-deactivation. The manager's request-validation boundary can reject the request while
-remaining healthy. The inbox's latched failure blocks a later admitted capture, and
-a fresh activation recovers the durable outcome.
-
 Cancellation of a caller's wait for
 <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
-queued write running through capture and acknowledgement. Feature completion tracks
-both the triggering write and its captured state acknowledgement. A delivery
+queued write running through capture and acknowledgement. The manager completes the
+write according to the captured buffer's actual storage outcome. Messaging completes
+its operations against that outcome and retains their resources through cleanup. A delivery
 caller can also cancel its wait while the owned delivery operation retains admission
 through completion. Activation shutdown drains that operation; late failures are
 observed and logged even after the caller has left. The owner keeps delivery operations,
-gates and pump leases quiescent through the full deletion task and resumes delivery
-after awaiting successful deletion. Durable attempts and timer
+gates and pump leases quiescent by stopping and draining the inbox and outbox before
+deleting the journal. It awaits the actual deletion task, then disposes or deactivates
+the owner. A fresh owner handles subsequent messages. Durable attempts and timer
 turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
 durable attempt token across timer turns.
 
@@ -238,6 +238,12 @@ registration factory. A scoped factory assigning an explicit-<xref:Orleans.Journ
 manager to a grain lifecycle performs that enrollment before returning it. Standalone
 managers retain caller-owned initialization and disposal.
 
+A standalone owner can explicitly retry failed initial recovery by calling
+<xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> again. Each attempt
+rebuilds state from the beginning of the journal. The host starts messaging after
+initialization succeeds. An admitted write or delete failure follows the terminal
+failure path and recovery uses a fresh owner.
+
 Standard activation services resolve <xref:Orleans.Journaling.IDurableStateManager>
 and <xref:Orleans.Journaling.IJournaledStateManager> to the same manager.
 Grain code uses the former for named state access and commits; integrations use the
@@ -254,13 +260,15 @@ execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInt
 or `StatelessWorker` declarations. Resolved grain properties govern the reentrancy checks,
 including properties supplied by custom attributes. Resolved placement strategies
 identify stateless workers, including keyed placement aliases. A single non-interleaving
-activation owns each grain journal and pump. Journaling synchronously validates registered
-<xref:Orleans.Journaling.IStateMachine> instances before capture, acknowledges their
-persisted changes, and notifies them of terminal failure. State-level deletion checks
-enforce quiescence and successful reset restores local messaging bookkeeping.
-Command codecs are resolved from the owning manager's configured write format. Use
-shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
-journal storage support development and tests.
+activation owns each grain journal and pump. Journaling captures and replays registered
+<xref:Orleans.Journaling.IStateMachine> instances, acknowledges persisted changes, and
+resets them after deletion. The owning grain or standalone host coordinates messaging
+quiescence and cleanup through the complete deletion operation.
+Journaling constructs the named durable collections in their owning scope using the
+configured write format. Standalone hosts bind collection factories to the actual
+advanced owner and retain their dependency scope until that owner is disposed.
+Use shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs
+and journal storage support development and tests.
 
 Capacity and retention settings bound storage growth and define the effectively-once
 window. Monitor inbox depth, outbox depth, retry failures, dead letters, and oldest

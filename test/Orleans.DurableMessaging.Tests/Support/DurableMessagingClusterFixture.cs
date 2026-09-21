@@ -66,8 +66,6 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             {
                 siloBuilder.AddDurableMessaging(ConfigureOptions);
             }
-            ReceiverTestServices.AddObservedStateProbes(siloBuilder.Services);
-
             ControlledTimerRegistry.Decorate(siloBuilder.Services, OutboxPumpTimerProbe);
             siloBuilder.ConfigureServices(services =>
                 ControlledDurableJobManager.Decorate(services, JobManagerProbe));

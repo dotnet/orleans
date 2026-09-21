@@ -125,12 +125,10 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var before = await sender.GetSnapshotAsync();
         var oldContext = Fixture.GetGrainContext(sender);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
-        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         var message = NewMessage(55, "schedule-retry");
         Fixture.JobManagerProbe.FailAfterNext(jobName);
 
         await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message));
-        Assert.False(oldGrain.Faulted.Task.IsCompleted);
         Assert.False(oldContext.Deactivated.IsCompleted);
         await sender.RetryWriteStateAsync();
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
@@ -180,7 +178,8 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var failure = await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(
             receiver.GetGrainId(), "messages/write-failure", NewMessage(53, "failed-write")));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(failure.Message, Assert.IsType<IOException>(await oldGrain.Faulted.Task).Message);
+        Assert.Equal(failure.Message, Assert.IsType<IOException>(
+            await oldGrain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)).Message);
         await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
         var recovered = await sender.GetSnapshotAsync();
 
@@ -193,26 +192,40 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task DeleteThenWrite_RequiresAcknowledgedOutboxBeforeClearingState()
+    public async Task StopDeleteAndDeactivate_DiscardsUncommittedOutboxAndFreshOwnerCanSend()
     {
         var sender = NewGrain();
         var receiver = NewGrain();
         await sender.StageWithoutCommitAsync(
             receiver.GetGrainId(),
-            "messages/delete-then-write",
-            NewMessage(75, "delete-then-write"));
+            "messages/delete-uncommitted",
+            NewMessage(75, "deleted-intent"));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => sender.DeleteThenWriteStateAsync());
-        Assert.Equal(1, (await sender.GetSnapshotAsync()).OutboxCount);
+        var before = await sender.GetSnapshotAsync();
+        var oldContext = Fixture.GetGrainContext(sender);
+        Assert.Equal(1, before.OutboxCount);
+        await sender.DeleteStateAndDeactivateAsync();
+        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var fresh = await sender.GetSnapshotAsync();
+
+        Assert.NotEqual(before.ActivationId, fresh.ActivationId);
+        Assert.Equal(0, fresh.OutboxCount);
+        Assert.Null(fresh.OutboxJobId);
+        Assert.Null(fresh.OutboxJob);
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
 
-        await sender.RetryWriteStateAsync();
+        var effect = new DurableEffect(Guid.NewGuid(), 1, 76, "fresh-owner");
+        await sender.StageEffectAsync(effect);
+        var drained = Fixture.SnapshotProbe.WaitAsync(
+            sender.GetGrainId(),
+            snapshot => snapshot.ActivationId == fresh.ActivationId
+                && snapshot.OutboxCount == 0
+                && snapshot.Effects.Contains(effect));
+        await sender.SendAsync(receiver.GetGrainId(), "messages/after-delete", NewMessage(76, "after-delete"));
         var delivered = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        await Fixture.WaitForOutboxCountAsync(sender, 0);
-        await sender.DeleteThenWriteStateAsync();
-
+        await drained;
         Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
-        Assert.Equal("delete-then-write", Assert.Single(delivered.Effects).Value);
+        Assert.Equal("after-delete", Assert.Single(delivered.Effects).Value);
     }
 
     [Fact]

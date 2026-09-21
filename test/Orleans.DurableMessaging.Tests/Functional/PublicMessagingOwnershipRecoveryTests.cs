@@ -122,7 +122,7 @@ public sealed class PublicMessagingOwnershipRecoveryTests : DurableMessagingBeha
         await sender.SendAsync(receiver.GetGrainId(), "messages/outbox-clear-retry", NewMessage(56, "outbox-clear-retry"));
         _ = await Fixture.WaitForEffectCountAsync(receiver, 1);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.IsType<IOException>(await oldGrain.Faulted.Task);
+        Assert.IsType<IOException>(await oldGrain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ObjectDisposedException>(() => oldManager.WriteStateAsync(CancellationToken.None).AsTask());
         _ = await sender.GetSnapshotAsync();
         var cleaned = await Fixture.SnapshotProbe.WaitAsync(sender.GetGrainId(),

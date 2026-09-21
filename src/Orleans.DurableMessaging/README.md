@@ -306,7 +306,7 @@ Transport is at-least-once and unordered. Retained deduplication records provide
 effectively-once handler effects. Applications which require ordering carry
 sequence numbers and converge on application-defined order. A single
 non-interleaving activation owns each grain journal and its pumps. The journaled
-state manager validates pending state before capture and fences terminal failures.
+state manager captures safe-to-commit state and fences admitted persistence failures.
 
 Use shared, production-grade Journaling and Durable Jobs storage for multi-silo
 deployments. In-memory storage supports development and tests. Inbox and outbox

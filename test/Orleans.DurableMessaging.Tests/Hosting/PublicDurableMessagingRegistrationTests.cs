@@ -26,6 +26,7 @@ public sealed class PublicDurableMessagingRegistrationTests
     public void AddDurableMessaging_RepeatedPublicRegistrationRetainsOneConfiguratorAndScopedBindings(bool useSiloBuilder)
     {
         var builder = new TestSiloBuilder();
+        builder.AddJournaling();
         var services = builder.Services;
         for (var invocation = 0; invocation < 2; invocation++)
         {
@@ -54,16 +55,24 @@ public sealed class PublicDurableMessagingRegistrationTests
         {
             "inbox", "inbox-processed", "inbox-message-state", "inbox-dead-letters",
             "outbox", "outbox-message-state", "outbox-dead-letters", "outbox-job-id",
-            "outbox-job-handle", "outbox-completed-job-id", "outbox-job-sequence"
+            "outbox-job-handle", "outbox-completed-job-id"
         })
         {
-            var state = Assert.Single(services, descriptor =>
+            Assert.DoesNotContain(services, descriptor =>
                 descriptor.IsKeyedService && Equals(descriptor.ServiceKey, $"__orleans.durable-messaging.{stateName}")
                 && descriptor.ServiceType.IsGenericType
                 && (descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IDurableDictionary<,>)
                     || descriptor.ServiceType.GetGenericTypeDefinition() == typeof(IDurableValue<>)));
-            Assert.Equal(ServiceLifetime.Scoped, state.Lifetime);
         }
+        foreach (var stateType in new[] { typeof(IDurableDictionary<,>), typeof(IDurableValue<>) })
+        {
+            Assert.Single(services, descriptor => descriptor.IsKeyedService
+                && Equals(descriptor.ServiceKey, KeyedService.AnyKey) && descriptor.ServiceType == stateType);
+        }
+        var sequence = Assert.Single(services, descriptor => descriptor.IsKeyedService
+            && Equals(descriptor.ServiceKey, "__orleans.durable-messaging.outbox-job-sequence")
+            && descriptor.ServiceType == typeof(IDurableValue<long>));
+        Assert.Equal(ServiceLifetime.Scoped, sequence.Lifetime);
         var extension = Assert.Single(services, descriptor =>
             descriptor.ServiceType == typeof(IGrainExtension) && Equals(descriptor.ServiceKey, typeof(IDurableInboxExtension)));
         Assert.Equal(ServiceLifetime.Scoped, extension.Lifetime);

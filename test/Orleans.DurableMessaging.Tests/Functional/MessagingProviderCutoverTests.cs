@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Immutable;
 using System.Net;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +25,7 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class MessagingProviderCutoverTests
 {
     private const string OwnershipKey = "orleans.messaging.ownership-id";
+    private const string JournalFormatKey = "orleans-binary";
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -44,15 +44,9 @@ public sealed class MessagingProviderCutoverTests
             });
             silo.AddVolatileJournalStorage("jobs");
             silo.UseJournaledDurableJobs(options => options.ActiveProviderName = "jobs");
+            silo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = JournalFormatKey);
             silo.AddDurableMessaging();
             silo.Services.AddSingleton(snapshots);
-            silo.Services.AddKeyedScoped<IDurableDictionary<Guid, DurableEffect>>("cutover-effects", (services, _) =>
-            {
-                var owner = services.GetRequiredService<IJournaledStateManager>();
-                var effects = new ObservedJournalDictionary<Guid, DurableEffect>(owner);
-                owner.RegisterStateMachine("cutover-effects", effects);
-                return effects;
-            });
             silo.Services.AddScoped<IJournaledStateManager>(services =>
             {
                 var context = services.GetRequiredService<IGrainContext>();
@@ -101,10 +95,10 @@ public sealed class MessagingProviderCutoverTests
         var id = new JournalId("integration/non-grain-state");
         foreach (var (provider, expected) in new[] { ("A", 11), ("B", 22) })
         {
-            var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(provider);
-            await using var manager = factory.CreateStandalone(id);
-            var value = new ObservedJournalValue<int>(manager);
-            manager.RegisterStateMachine("value", value);
+            await using var scope = fixture.CreateScope(provider, id);
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
+            Assert.False(manager is IDurableStateManager);
             await manager.InitializeAsync(Token);
             Assert.Equal(0, value.Value);
             value.Value = expected;
@@ -118,10 +112,9 @@ public sealed class MessagingProviderCutoverTests
 
         foreach (var (provider, expected) in new[] { ("A", 11), ("B", 22) })
         {
-            var factory = services.GetRequiredKeyedService<IJournaledStateManagerFactory>(provider);
-            await using var manager = factory.CreateStandalone(id);
-            var value = new ObservedJournalValue<int>(manager);
-            manager.RegisterStateMachine("value", value);
+            await using var scope = fixture.CreateScope(provider, id);
+            var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+            var value = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
             await manager.InitializeAsync(Token);
             Assert.Equal(expected, value.Value);
         }
@@ -165,10 +158,21 @@ public sealed class MessagingProviderCutoverTests
         Assert.NotNull(await fixture.A.CreateStorage(id).GetMetadataAsync(Token));
         Assert.NotNull(await fixture.B.CreateStorage(id).GetMetadataAsync(Token));
         Assert.Null(await fixture.Services.GetRequiredService<IJournalStorageProvider>().CreateStorage(id).GetMetadataAsync(Token));
-        foreach (var name in new[] { "__orleans.durable-messaging.outbox", "__orleans.durable-messaging.inbox" })
+        foreach (var (name, isOutboxState) in new[]
+        {
+            ("__orleans.durable-messaging.outbox", true),
+            ("__orleans.durable-messaging.inbox", false)
+        })
         {
             Assert.True(a.Manager.TryGetStateMachine(name, out var messagingState));
-            Assert.Equal(typeof(IDurableOutbox).Assembly, messagingState.GetType().Assembly);
+            if (isOutboxState)
+            {
+                Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(messagingState);
+            }
+            else
+            {
+                Assert.IsAssignableFrom<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(messagingState);
+            }
         }
     }
 
@@ -193,8 +197,6 @@ public sealed class MessagingProviderCutoverTests
         fixture.Jobs.FailAfterNext = true;
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousA = fixture.Jobs.Scheduled.Last();
-        Assert.Equal(0, retried.Fault.FailureCount);
-        Assert.False(retried.Fault.Failure.Task.IsCompleted);
         Assert.Equal(0, retried.Count(outbox));
         await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
@@ -217,8 +219,6 @@ public sealed class MessagingProviderCutoverTests
         fixture.Jobs.FailAfterNext = true;
         await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
         var ambiguousB = fixture.Jobs.Scheduled.Last();
-        Assert.Equal(0, retried.Fault.FailureCount);
-        Assert.False(retried.Fault.Failure.Task.IsCompleted);
         Assert.Equal(0, retried.Count(outbox));
         await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
@@ -280,10 +280,11 @@ public sealed class MessagingProviderCutoverTests
         var sink = await fixture.OpenAsync("state", new JournalId("integration/crash-sink"));
         var message = fixture.Envelope(owner, outbox, sink);
         fixture.Jobs.DuplicateNext = true;
+        IOException failure;
         if (committedBeforeFailure)
         {
             fixture.State.FailAfterWrite(id);
-            await Assert.ThrowsAsync<IOException>(() => owner.CommitAsync(message, outbox));
+            failure = await Assert.ThrowsAsync<IOException>(() => owner.CommitAsync(message, outbox));
         }
         else
         {
@@ -306,12 +307,12 @@ public sealed class MessagingProviderCutoverTests
                 write.Fail();
             }
 
-            await Assert.ThrowsAsync<IOException>(() => commit);
+            failure = await Assert.ThrowsAsync<IOException>(() => commit);
         }
         var scheduledA = fixture.Jobs.Scheduled.ToArray();
         Assert.Equal(2, scheduledA.Length);
         Assert.NotEqual(scheduledA[0].Id, scheduledA[1].Id);
-        await owner.AssertFencedAsync();
+        await owner.AssertWriteFencedAsync(failure);
         owner = await fixture.ReopenAsync(owner);
         Assert.Equal(committedBeforeFailure ? 1 : 0, owner.Count(outbox));
         if (committedBeforeFailure)
@@ -458,6 +459,7 @@ public sealed class MessagingProviderCutoverTests
             var membership = Substitute.For<IClusterMembershipService>();
             membership.CurrentSnapshot.Returns(new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, new MembershipVersion(1)));
             services.AddSingleton(membership);
+            services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = JournalFormatKey);
             builder.AddVolatileJournalStorage();
             foreach (var (name, storage) in new[] { ("A", A), ("B", B), ("state", State) })
             {
@@ -526,17 +528,25 @@ public sealed class MessagingProviderCutoverTests
             Jobs.WriteShard = Assert.Single(Jobs.Shards, shard => shard.Id == writeId);
         }
 
-        public async Task<Endpoint> OpenAsync(string provider, JournalId id)
+        public AsyncServiceScope CreateScope(string provider, JournalId id)
         {
             var scope = Services.CreateAsyncScope();
             var binding = scope.ServiceProvider.GetRequiredService<EndpointBinding>();
             binding.Provider = provider;
             binding.Id = id;
             binding.Context.GrainId.Returns(GrainId.Create("integration-endpoint", id.Value));
-            var endpoint = new Endpoint(scope, binding.Context.GrainId, provider, id);
+            return scope;
+        }
+
+        public async Task<Endpoint> OpenAsync(string provider, JournalId id)
+        {
+            var scope = CreateScope(provider, id);
+            var endpoint = new Endpoint(scope, scope.ServiceProvider.GetRequiredService<IGrainContext>().GrainId, provider, id);
             _endpoints[endpoint.GrainId] = endpoint;
             _openedEndpoints.Add(endpoint);
             await endpoint.Manager.InitializeAsync(Token);
+            await Assert.IsAssignableFrom<ILifecycleObserver>(endpoint.Outbox).OnStart(Token);
+            await Assert.IsAssignableFrom<ILifecycleObserver>(endpoint.InboxExtension).OnStart(Token);
             return endpoint;
         }
 
@@ -548,7 +558,7 @@ public sealed class MessagingProviderCutoverTests
             var outbox = previous.Outbox;
             var inboxHandle = previous.Handle(false);
             var outboxHandle = previous.Handle(true);
-            await previous.DisposeAsync();
+            await previous.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10), Token);
             var current = await OpenAsync(previous.Provider, previous.Id);
             Assert.NotSame(manager, current.Manager);
             Assert.NotSame(effects, current.Effects);
@@ -659,18 +669,18 @@ public sealed class MessagingProviderCutoverTests
         }
     }
 
-    private sealed class EndpointBinding
+    private sealed class EndpointBinding : IDurableMessagingGrain
     {
         public string Provider { get; set; } = null!;
         public JournalId Id { get; set; }
-        public IGrainContext Context { get; } = CreateContext();
+        public IGrainContext Context { get; }
 
-        private static IGrainContext CreateContext()
+        public EndpointBinding()
         {
             var context = Substitute.For<IGrainContext>();
-            context.GrainInstance.Returns(new object());
+            context.GrainInstance.Returns(this);
             context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
-            return context;
+            Context = context;
         }
     }
 
@@ -686,19 +696,17 @@ public sealed class MessagingProviderCutoverTests
             Id = id;
             var services = scope.ServiceProvider;
             Manager = services.GetRequiredService<IJournaledStateManager>();
-            Fault = new FaultTrackingEffects(Manager);
-            Manager.RegisterStateMachine("effects", Fault);
+            var effects = services.GetRequiredKeyedService<IDurableDictionary<Guid, int>>("effects");
             Inbox = services.GetRequiredService<IDurableInbox>();
             Outbox = services.GetRequiredService<IDurableOutbox>();
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
             Timers = services.GetRequiredService<ManualTimers>();
-            Effects = Fault;
+            Effects = effects;
             Inbox.RegisterHandler("record", new RecordHandler(Effects));
         }
 
         public string Provider { get; }
         public JournalId Id { get; }
-        public FaultTrackingEffects Fault { get; }
         public GrainId GrainId { get; }
         public IJournaledStateManager Manager { get; }
         public IDurableInbox Inbox { get; }
@@ -725,21 +733,10 @@ public sealed class MessagingProviderCutoverTests
             return handle;
         }
 
-        public async Task AssertFencedAsync()
+        public async Task AssertWriteFencedAsync(IOException failure)
         {
-            var failure = await Fault.Failure.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
-            Assert.IsType<IOException>(failure);
             var fenced = await Assert.ThrowsAsync<InvalidOperationException>(() => Manager.WriteStateAsync(Token).AsTask());
             Assert.Same(failure, fenced.InnerException);
-            Assert.Equal(1, Fault.FailureCount);
-            var callback = Substitute.For<IJobRunContext>();
-            callback.Job.Returns(new DurableJob { Id = "post-fault", ShardId = "post-fault", Name = JobName(true), TargetGrainId = GrainId });
-            callback.RunId.Returns("post-fault");
-            foreach (var outbox in new[] { false, true })
-            {
-                var rejected = await Assert.ThrowsAsync<IOException>(() => Handler(outbox).ExecuteJobAsync(callback, Token).AsTask());
-                Assert.Same(failure, rejected);
-            }
         }
 
         public async Task CommitAsync(DurableEnvelope envelope, bool outbox)
@@ -763,100 +760,6 @@ public sealed class MessagingProviderCutoverTests
             await Assert.IsAssignableFrom<ILifecycleObserver>(InboxExtension).OnStop(Token);
             await Assert.IsAssignableFrom<ILifecycleObserver>(Outbox).OnStop(Token);
             await _scope.DisposeAsync();
-        }
-    }
-
-    private sealed class FaultTrackingEffects : IDurableDictionary<Guid, int>, IStateMachine, IDurableDictionaryCommandHandler<Guid, int>
-    {
-        private readonly Dictionary<Guid, int> _effects = [];
-        private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
-        private bool _dirty;
-
-        public FaultTrackingEffects(IJournaledStateManager manager)
-        {
-            _codec = manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<Guid, int>>();
-        }
-
-        public TaskCompletionSource<Exception> Failure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public int FailureCount { get; private set; }
-        public int Count => _effects.Count;
-        public bool IsReadOnly => false;
-        public ICollection<Guid> Keys => _effects.Keys;
-        public ICollection<int> Values => _effects.Values;
-        public int this[Guid key]
-        {
-            get => _effects[key];
-            set
-            {
-                _effects[key] = value;
-                _dirty = true;
-            }
-        }
-
-        public void Add(Guid key, int value)
-        {
-            _effects.Add(key, value);
-            _dirty = true;
-        }
-
-        public void Add(KeyValuePair<Guid, int> item) => Add(item.Key, item.Value);
-        public void Clear()
-        {
-            _effects.Clear();
-            _dirty = true;
-        }
-
-        public bool ContainsKey(Guid key) => _effects.ContainsKey(key);
-        public bool TryGetValue(Guid key, out int value) => _effects.TryGetValue(key, out value);
-        public bool Contains(KeyValuePair<Guid, int> item) => ((ICollection<KeyValuePair<Guid, int>>)_effects).Contains(item);
-        public void CopyTo(KeyValuePair<Guid, int>[] array, int arrayIndex) => ((ICollection<KeyValuePair<Guid, int>>)_effects).CopyTo(array, arrayIndex);
-        public bool Remove(Guid key)
-        {
-            var removed = _effects.Remove(key);
-            _dirty |= removed;
-            return removed;
-        }
-
-        public bool Remove(KeyValuePair<Guid, int> item) => Contains(item) && Remove(item.Key);
-        public IEnumerator<KeyValuePair<Guid, int>> GetEnumerator() => _effects.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
-            context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
-
-        public void Reset(JournalStreamWriter writer)
-        {
-            _effects.Clear();
-            _dirty = false;
-        }
-
-        public void WritePendingEntries(JournalStreamWriter writer)
-        {
-            if (_dirty)
-            {
-                WriteSnapshot(writer);
-            }
-        }
-
-        public void WriteSnapshot(JournalStreamWriter writer)
-        {
-            _codec.WriteSnapshot(_effects, writer);
-            _dirty = false;
-        }
-
-        void IDurableDictionaryCommandHandler<Guid, int>.ApplySet(Guid key, int value) => _effects[key] = value;
-        void IDurableDictionaryCommandHandler<Guid, int>.ApplyRemove(Guid key) => _effects.Remove(key);
-        void IDurableDictionaryCommandHandler<Guid, int>.ApplyClear() => _effects.Clear();
-        void IDurableDictionaryCommandHandler<Guid, int>.Reset(int capacityHint)
-        {
-            _effects.Clear();
-            _effects.EnsureCapacity(capacityHint);
-        }
-
-        public void OnFaulted(Exception exception)
-        {
-            FailureCount++;
-            Failure.TrySetResult(exception);
         }
     }
 

@@ -235,25 +235,33 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
-            var grain = ReceiverTestServices.CurrentGrainContext?.GrainInstance as DurableMessagingTestGrain;
+            var instance = ReceiverTestServices.CurrentGrainContext?.GrainInstance;
+            var grain = instance as DurableMessagingTestGrain;
+            var named = instance as NamedFactoryMessagingGrain;
             var captured = grain?.CaptureStorageWrite();
+            var namedSnapshot = named?.CaptureStorageWrite();
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
             owner._snapshots.TryRemove(journalId, out _);
             owner.OnWriteSucceeded(journalId);
             await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             if (captured is not null) grain!.PublishStoredSnapshot(captured);
+            if (namedSnapshot is not null) named!.PublishStoredSnapshot(namedSnapshot);
         }
 
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
-            var grain = ReceiverTestServices.CurrentGrainContext?.GrainInstance as DurableMessagingTestGrain;
+            var instance = ReceiverTestServices.CurrentGrainContext?.GrainInstance;
+            var grain = instance as DurableMessagingTestGrain;
+            var named = instance as NamedFactoryMessagingGrain;
             var captured = grain?.CaptureStorageWrite();
+            var namedSnapshot = named?.CaptureStorageWrite();
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             owner.OnWriteSucceeded(journalId);
             await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             if (captured is not null) grain!.PublishStoredSnapshot(captured);
+            if (namedSnapshot is not null) named!.PublishStoredSnapshot(namedSnapshot);
         }
 
         public async ValueTask DeleteAsync(CancellationToken cancellationToken)

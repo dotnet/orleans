@@ -45,8 +45,8 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
     private readonly IDurableOutbox _outbox;
     private readonly IDurableDictionary<Guid, DurableEffect> _effects;
     private readonly SerializerSessionPool _sessions;
+    private readonly NamedFactoryMessagingProbe _probe;
     private readonly Guid _activationId = Guid.NewGuid();
-    private NamedFactoryMessagingSnapshot? _captured;
 
     public NamedFactoryMessagingGrain(
         IJournaledStateManager owner,
@@ -60,9 +60,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
         _outbox = outbox;
         _effects = effects;
         _sessions = sessions;
-        var state = (ObservedJournalDictionary<Guid, DurableEffect>)effects;
-        state.Capturing = () => _captured = CreateSnapshot();
-        state.Written = () => probe.Publish(this.GetGrainId(), Assert.IsType<NamedFactoryMessagingSnapshot>(_captured));
+        _probe = probe;
         inbox.RegisterHandler(this);
     }
 
@@ -75,6 +73,9 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
     }
 
     public Task<NamedFactoryMessagingSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
+
+    internal NamedFactoryMessagingSnapshot CaptureStorageWrite() => CreateSnapshot();
+    internal void PublishStoredSnapshot(NamedFactoryMessagingSnapshot snapshot) => _probe.Publish(this.GetGrainId(), snapshot);
 
     public Task RequestDeactivationAsync()
     {

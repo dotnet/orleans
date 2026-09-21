@@ -194,7 +194,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
             Fixture.Storage.FailWrite(journal);
         }
         handler.Release();
-        Assert.IsType<IOException>(await oldGrain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        Assert.IsType<IOException>(await oldGrain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);

@@ -432,6 +432,9 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
     public void RepeatedRegistration_InstallsOneTypeConfigurator()
     {
         var services = new ServiceCollection();
+        var silo = Substitute.For<ISiloBuilder>();
+        silo.Services.Returns(services);
+        silo.AddJournaling();
         services.AddDurableMessaging();
         services.AddDurableMessaging();
         var descriptor = Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IConfigureGrainTypeComponents)

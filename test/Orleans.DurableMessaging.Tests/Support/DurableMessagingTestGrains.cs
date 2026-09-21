@@ -17,7 +17,6 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
-    Task DeleteThenWriteStateAsync();
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
     Task StageOutputAsync(DurableEnvelope envelope);
@@ -204,12 +203,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         using var batch = await _outbox.PrepareSendAsync([envelope]);
         _outbox.Send(batch);
         return envelope.MessageId;
-    }
-
-    public async Task DeleteThenWriteStateAsync()
-    {
-        await _journalOwner.DeleteStateAsync(CancellationToken.None);
-        await WriteStateAsync();
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
