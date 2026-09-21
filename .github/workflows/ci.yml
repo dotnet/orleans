@@ -15,6 +15,7 @@ permissions:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
+  DOTNET_COVERAGE_NOLOGO: 1
   DOTNET_COVERAGE_VERSION: 18.11.2
   # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
