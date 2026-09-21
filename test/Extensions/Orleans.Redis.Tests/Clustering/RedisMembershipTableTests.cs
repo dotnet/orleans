@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using NSubstitute;
 using Orleans.Clustering.Redis;
+using Orleans.Clustering.TestKit;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Xunit;
@@ -25,6 +27,8 @@ namespace Tester.Redis.Clustering
     [TestArea("Membership")]
     public class RedisMembershipTableTests : MembershipTableTestsBase
     {
+        private readonly Dictionary<string, RedisKey> _conformanceKeys = [];
+
         public RedisMembershipTableTests(ConnectionStringFixture fixture, CommonFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
@@ -39,24 +43,45 @@ namespace Tester.Redis.Clustering
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
+            membershipTable = (RedisMembershipTable)CreateMembershipTable(logger, _clusterOptions);
+            return membershipTable;
+        }
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
             TestUtils.CheckForRedis();
 
-            membershipTable = new RedisMembershipTable(
+            return new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions()
                 {
-                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                    ConfigurationOptions = ConfigurationOptions.Parse(connectionString),
                     EntryExpiry = TimeSpan.FromHours(1)
                 }),
-                this._clusterOptions);
+                clusterOptions);
+        }
 
-            return membershipTable;
+        protected override MembershipTableTestHandle CreateConformanceHandle(ILogger logger, IOptions<ClusterOptions> clusterOptions)
+        {
+            _conformanceKeys[clusterOptions.Value.ClusterId] = RedisClusteringOptions.DefaultCreateRedisKey(clusterOptions.Value);
+            return base.CreateConformanceHandle(logger, clusterOptions);
+        }
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+            => CreateConformanceFixture(IsConformanceClusterDeletedAsync);
+
+        private async ValueTask<bool> IsConformanceClusterDeletedAsync(string clusterId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var key = _conformanceKeys[clusterId];
+            await using var client = await ConnectionMultiplexer.ConnectAsync(ConfigurationOptions.Parse(connectionString));
+            cancellationToken.ThrowIfCancellationRequested();
+            return !await client.GetDatabase().KeyExistsAsync(key, CommandFlags.DemandMaster);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             return new RedisGatewayListProvider(
-                //(RedisMembershipTable)this.membershipTable,
-                (RedisMembershipTable)CreateMembershipTable(logger),
+                membershipTable,
                 this._gatewayOptions);
         }
 
@@ -117,6 +142,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true, true)]
         public async Task UpdateIAmAlive_OneCommandPreservesOtherBytesAndExpiry(bool hasVersion, bool expires)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -185,6 +211,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true)]
         public async Task CanonicalWrite_UsesOriginalTokensAfterOwnerHeartbeat(bool insert)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -252,6 +279,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true, 10)]
         public async Task CanonicalWrite_RejectsNonSequentialVersionInOneCommand(bool insert, int proposedVersion)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),
@@ -320,6 +348,7 @@ namespace Tester.Redis.Clustering
         [InlineData(true)]
         public async Task Cleanup_OneScanAndAtomicCandidateCommands_PreserveRacingChanges(bool refreshCandidate)
         {
+            await InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
             using var connection = await ConnectionMultiplexer.ConnectAsync(await GetConnectionString());
             using var table = new RedisMembershipTable(
                 Options.Create(new RedisClusteringOptions { CreateMultiplexer = _ => Task.FromResult(((IConnectionMultiplexer)connection, true)) }),

@@ -76,6 +76,22 @@ public sealed class FaultyMembershipTableTests
     }
 
     [Fact]
+    public async Task Cleanup_IgnoredOwnerHeartbeat_FailsProtectionGuarantee()
+    {
+        var control = new MembershipFaultController(MembershipFault.IgnoreHeartbeatWrite)
+        {
+            Backend = new IdealizedMembershipBackend { SeparateHeartbeatStorage = true }
+        };
+        var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => control.Fixture().RunAsync(
+            (fixture, ct) => new MembershipTableTestRunner(fixture).CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct),
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("cleanup removed an ineligible identity", failure.Message);
+        Assert.Equal(10, control.Injected);
+        Assert.Empty(control.Backend.Partitions);
+    }
+
+    [Fact]
     public async Task Heartbeat_LiveRowBackendFailure_PropagatesUnchanged()
     {
         var control = new MembershipFaultController(MembershipFault.HeartbeatStorageFailure);

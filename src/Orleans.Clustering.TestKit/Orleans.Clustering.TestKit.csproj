@@ -22,6 +22,7 @@
     <PackageReference Include="System.Text.Json" PrivateAssets="all" />
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
     <InternalsVisibleTo Include="Orleans.Clustering.TestKit.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

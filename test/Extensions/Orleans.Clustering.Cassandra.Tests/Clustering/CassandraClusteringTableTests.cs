@@ -7,6 +7,7 @@ using Orleans.Clustering.Cassandra.Hosting;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Tester.Cassandra.Utility;
+using UnitTests.MembershipTests;
 using Xunit;
 
 namespace Tester.Cassandra.Clustering;
@@ -19,7 +20,7 @@ namespace Tester.Cassandra.Clustering;
 [TestSuite("Functional")]
 [TestProvider("Cassandra")]
 [TestArea("Membership")]
-public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
+public sealed partial class CassandraClusteringTableTests : MembershipTableFullConformanceTestsBase, IClassFixture<CassandraContainer>, IAsyncDisposable
 {
     private readonly CassandraContainer _cassandraContainer;
     private readonly ITestOutputHelper _testOutputHelper;
@@ -904,6 +905,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     {
         var services = CreateMembershipServices(serviceId, clusterId, () => CreateSession(cancellationToken), cassandraTtl);
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
+        _legacyMembershipHandles.Add((membershipTable, clusterId, services));
         await membershipTable.InitializeMembershipTableAsync(true, cancellationToken);
 
         IGatewayListProvider gatewayProvider = services.GetRequiredService<CassandraGatewayListProvider>();
@@ -1074,23 +1076,6 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             _testOutputHelper.WriteLine(queriedEntryMember.Item1.SiloAddress.ToParsableString());
         }
 
-        await membershipTable.DeleteMembershipTableEntriesAsync(clusterOptions.ClusterId, TestContext.Current.CancellationToken);
-
-        readAll = await membershipTable.ReadAllAsync(TestContext.Current.CancellationToken);
-
-        _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
-        foreach (var row in readAll.Members)
-        {
-            var entry = row.Item1;
-            _testOutputHelper.WriteLine(clusterIdentifier);
-            _testOutputHelper.WriteLine("  " + entry.HostName);
-            _testOutputHelper.WriteLine("  " + entry.SiloName);
-            _testOutputHelper.WriteLine("  " + entry.StartTime);
-            _testOutputHelper.WriteLine("  " + entry.IAmAliveTime);
-            _testOutputHelper.WriteLine("  " + entry.SiloAddress);
-            _testOutputHelper.WriteLine("  " + entry.ProxyPort);
-            _testOutputHelper.WriteLine("  " + entry.Status);
-        }
     }
 
 }

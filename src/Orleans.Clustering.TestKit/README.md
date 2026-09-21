@@ -140,8 +140,19 @@ runs the same behavioral assertions.
 The generated fact is conventionally named
 `MembershipTable_ModelBased_GeneratedConformance`; it calls
 `MembershipTableModelBasedTestRunner.RunGeneratedConformanceTests`.
+Generated cases await fixture initialization and disposal through Accordant's
+asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
+The public runner executes the complete generated suite. Repository hosted
+system-target tests distribute the same seed-17 manifest across four xUnit cases
+(240, 240, 240, and 239 histories), preserving every history and operation count.
 
 ## Comparison and protocol rules
+
+Required histories begin with normal silo registration: a new membership
+entry has an empty suspicion history. These histories establish and change
+suspicion votes through canonical updates to existing rows.
+Forward updates change status and suspicion votes while retaining the activation's
+identity, endpoint, host/silo names, start time, and deployment metadata.
 
 The immutable observation captures all public persisted entry fields, nested
 suspect identities/times, full endpoint/generation identity, row ETags, and
@@ -179,12 +190,16 @@ removed rows. Every retained canonical field remains unchanged.
 Empty cleanup preserves the canonical observation and table version/ETag.
 The cleanup scenario retains a Dead row exactly at the cutoff, repeats that
 cutoff as a no-op, then advances it by one tick and requires that row's deletion.
+Setup publishes each heartbeat through its live owner before transitioning the
+target row to Dead, supplying the same timestamp with that transition.
+Eligibility uses those controlled publications and the canonical start/vote
+timestamps, accepting lagged raw heartbeat observations.
 Restarts use a strictly newer generation at the same endpoint. The generated
 model chooses legal forward lifecycle operations.
 
 Own-cluster deletion removes that cluster's data and preserves other clusters.
 Deletion ends the stored history. G26 verifies native deletion and the other
-cluster's complete view. G27 checks unused and foreign cluster IDs, verifying
+cluster's complete view. G27 uses a populated foreign cluster, verifying
 the configured cluster's complete view throughout.
 For a foreign cluster ID, a scoped provider can leave that scope unchanged or
 reject it with `ArgumentException` naming `clusterId`. The suite verifies complete
@@ -229,8 +244,10 @@ Concurrency uses materialized ready/start/completion gates, exact winner counts,
 and immediate per-observation checks against known before/after histories.
 ReadAll and ReadRow scenarios race readers against both forward updates and
 Dead-row cleanup, including the transition from a present point row to absence.
-The cleanup scenario also races two cleaners over one eligible Dead row and
-accepts either an unchanged version or one atomic increment.
+The cleanup scenario checks idempotent cleanup through both handles and accepts
+either an unchanged version or one atomic increment. Provider-native tests cover
+overlapping cleanup attempts and their contention/error behavior; the runtime
+cleanup agent logs failures and schedules later attempts.
 `concurrencyRowCount` (default 128,
 range 3–10000) bounds the multi-row workload without changing any assertion.
 An adapter must select a safe count which crosses its backend's actual paging

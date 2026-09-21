@@ -1,9 +1,15 @@
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.DynamoDB;
+using Orleans.Clustering.TestKit;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime.MembershipService;
 using TestExtensions;
 using UnitTests;
 using UnitTests.MembershipTests;
@@ -34,19 +40,123 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
                 throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
             var options = new DynamoDBClusteringOptions();
             DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this._clusterOptions);
+            return new TestOwnedDynamoDBMembershipTable(this.loggerFactory, Options.Create(options), clusterOptions);
+        }
+
+        // Persisted fields and suspect votes exceed DynamoDB's 1 MiB query page at this count.
+        protected override int ConformanceConcurrencyRowCount => 4096;
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+        {
+            var options = new DynamoDBClusteringOptions();
+            DynamoDBMembershipHelper.ParseDataConnectionString(connectionString, options);
+            AmazonDynamoDBClient? probe = null;
+            return new MembershipTableTestFixture(
+                GetType().Name,
+                (serviceId, clusterId, cancellationToken) =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var table = CreateMembershipTable(
+                        loggerFactory.CreateLogger<DynamoDBMembershipTable>(),
+                        Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }));
+                    if (probe is null)
+                    {
+                        var ownedProbe = CreateDeletionProbeClient(options);
+                        probe = ownedProbe;
+                        return ValueTask.FromResult(new MembershipTableTestHandle(table, () =>
+                        {
+                            try { ((IDisposable)table).Dispose(); }
+                            finally { ownedProbe.Dispose(); }
+                            return ValueTask.CompletedTask;
+                        }));
+                    }
+
+                    return ValueTask.FromResult(new MembershipTableTestHandle(table, () =>
+                    {
+                        ((IDisposable)table).Dispose();
+                        return ValueTask.CompletedTask;
+                    }));
+                },
+                async (clusterId, cancellationToken) =>
+                {
+                    var request = new QueryRequest
+                    {
+                        TableName = options.TableName,
+                        ConsistentRead = true,
+                        Limit = 1,
+                        KeyConditionExpression = "#deployment = :cluster",
+                        ExpressionAttributeNames = new()
+                        {
+                            ["#deployment"] = SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME
+                        },
+                        ExpressionAttributeValues = new()
+                        {
+                            [":cluster"] = new AttributeValue(clusterId)
+                        },
+                        Select = Select.COUNT
+                    };
+                    do
+                    {
+                        // The unfiltered partition query includes VersionRow and follows every continuation key.
+                        var page = await probe!.QueryAsync(request, cancellationToken);
+                        if (page.Count > 0)
+                        {
+                            return false;
+                        }
+                        request.ExclusiveStartKey = page.LastEvaluatedKey;
+                    }
+                    while (request.ExclusiveStartKey is { Count: > 0 });
+
+                    return true;
+                });
+        }
+
+        private static AmazonDynamoDBClient CreateDeletionProbeClient(DynamoDBClusteringOptions options)
+        {
+            var isServiceUrl = Uri.TryCreate(options.Service, UriKind.Absolute, out var serviceUri)
+                && (serviceUri.Scheme == Uri.UriSchemeHttp || serviceUri.Scheme == Uri.UriSchemeHttps);
+            var config = isServiceUrl
+                ? new AmazonDynamoDBConfig { ServiceURL = options.Service }
+                : new AmazonDynamoDBConfig { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(options.Service) };
+            AWSCredentials? credentials = null;
+            if (!string.IsNullOrEmpty(options.AccessKey) && !string.IsNullOrEmpty(options.SecretKey))
+            {
+                credentials = string.IsNullOrEmpty(options.Token)
+                    ? new BasicAWSCredentials(options.AccessKey, options.SecretKey)
+                    : new SessionAWSCredentials(options.AccessKey, options.SecretKey, options.Token);
+            }
+            else if (!string.IsNullOrEmpty(options.ProfileName))
+            {
+                var chain = new CredentialProfileStoreChain();
+                if (!chain.TryGetAWSCredentials(options.ProfileName, out credentials))
+                {
+                    throw new InvalidOperationException($"AWS named profile '{options.ProfileName}' could not be retrieved.");
+                }
+            }
+
+            if (credentials is null && serviceUri?.Scheme == Uri.UriSchemeHttp)
+            {
+                credentials = new BasicAWSCredentials("dummy", "dummyKey");
+            }
+
+            return credentials is null
+                ? new AmazonDynamoDBClient(config)
+                : new AmazonDynamoDBClient(credentials, config);
         }
 
         protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
         {
             var options = new DynamoDBGatewayOptions();
             DynamoDBGatewayListProviderHelper.ParseDataConnectionString(this.connectionString, options);
-            return new DynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this._clusterOptions, this._gatewayOptions);
+            return new TestOwnedDynamoDBGatewayListProvider(this.loggerFactory.CreateLogger<DynamoDBGatewayListProvider>(), Options.Create(options), this._clusterOptions, this._gatewayOptions);
         }
 
         protected override Task<string> GetConnectionString()
