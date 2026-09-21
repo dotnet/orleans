@@ -53,11 +53,21 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 Custom pooled caches use <xref:Orleans.Providers.Streams.Common.ICacheDataAdapter.Compare*> to position cursors against cached messages. The default implementation compares `SequenceNumber` and `EventIndex`, preserving the numeric ordering used by existing providers. Override it when the authoritative provider position is encoded in <xref:Orleans.Providers.Streams.Common.CachedMessage.Segment>; return an order consistent with the token produced by <xref:Orleans.Providers.Streams.Common.ICacheDataAdapter.GetSequenceToken*> so cache bounds, block selection, and cache-miss detection use the same position contract.
 
-`AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
+Receipt-based adapters acknowledge completed messages through their receiver. Retained-log transports can use <xref:Orleans.Streams.IQueueCache.UpdateDeliveryProgress*> to receive subscription-progress snapshots. Register an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory> as a named component with `ConfigureComponent`, and load its per-partition position before reading.
 
 For a durable custom checkpoint backend, implement <xref:Orleans.Streams.IStreamCheckpointStore> and pass it to <xref:Orleans.Streams.StreamQueueCheckpointer> with <xref:Orleans.Streams.StreamQueueCheckpointerOptions>. Load the checkpointer before processing the partition. Each store update receives the expected backend version and returns the resulting <xref:Orleans.Streams.StreamCheckpointStoreState>, so a version conflict supplies the authoritative checkpoint and version for retry or reconciliation.
 
 <xref:Orleans.Streams.StreamQueueCheckpointer> limits writes to the configured persistence interval, coalesces pending updates to the latest checkpoint, and flushes the latest position on demand. Set <xref:Orleans.Streams.StreamQueueCheckpointerOptions.CheckpointComparer> when checkpoint values have an ordering contract; the checkpointer then keeps progress monotonic across local updates and concurrent store writers.
+
+## Checkpoint progress and provider compatibility
+
+The queue-cache progress callback receives the earliest processed subscription token, or `null` when there are no subscriptions. Its default implementation is a no-op. Custom implementations retain this contract, their admission behavior, and their delivery-failure policy. Interpret the snapshot using the provider's own record boundaries, retention, and recovery guarantees before persisting a checkpoint.
+
+The built-in Event Hubs transport, cache, data adapter, and chronological eviction strategy cooperate through an internal certified-progress protocol. Orleans selects this combination during initialization and keeps that choice for the provider run. Existing custom or derived implementations retain their established behavior. The [implementation guide](../implementation/streams-implementation/index.md) explains the built-in read-accounting, replay, and checkpoint guarantees.
+
+Custom eviction strategies use <xref:Orleans.Providers.Streams.Common.IPurgeObservable.TryRemoveOldestMessage*> and update removal counts and buffer-reclamation bookkeeping after it returns `true`. The default implementation calls the existing removal method and returns `true`, preserving existing purge implementations. A guarded cache returns `false` when the oldest record must remain retained.
+
+The <xref:Orleans.Streams.IQueueCacheCursor.RecordDeliveryFailure*> callback retains the provider's failure notification and skip policy. Receipt-based providers continue past an exhausted delivery after their error protocol; their failed receipts retain the provider's acknowledgement or redelivery treatment.
 
 ## Register the provider
 
