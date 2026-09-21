@@ -770,11 +770,14 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var client = ClientHost;
         if (client != null)
         {
-            var cancelled = new CancellationTokenSource();
+            using var cancelled = new CancellationTokenSource();
             cancelled.Cancel();
             try
             {
                 await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (IsCancellation(exception))
+            {
             }
             finally
             {
@@ -783,6 +786,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             }
         }
     }
+
+    private static bool IsCancellation(Exception exception) =>
+        exception is OperationCanceledException
+        || exception is AggregateException aggregate
+            && aggregate.Flatten().InnerExceptions.All(static inner => inner is OperationCanceledException);
 
     /// <summary>
     /// Do a Stop or Kill of the specified silo, followed by a restart.
