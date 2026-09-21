@@ -1,0 +1,128 @@
+name: Dissemination performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_repository:
+        description: 'Public runtime repository (owner/repository); selected code executes on this runner'
+        type: string
+        required: true
+        default: 'ReubenBond/orleans'
+      candidate_ref:
+        description: 'Runtime commit, tag or branch; resolved commit is preserved in selection.json'
+        type: string
+        required: true
+        default: '3fc0a4610cd2eb5feef27e958fcca59658aaae47'
+      sizes:
+        description: 'Distinct process counts (3..128, at most six)'
+        type: string
+        default: '4,8'
+      iterations:
+        description: 'Closed-loop rounds (3..200), or open-loop 1 Hz duration in seconds (3..30)'
+        type: number
+        default: 3
+      repetitions:
+        description: 'Paired repetitions with alternating forward/reverse order (1..5)'
+        type: number
+        default: 2
+      runtime_paths:
+        description: 'All includes the pinned original; Current compares candidate off/on'
+        type: choice
+        options: [All, Current]
+        default: All
+      scenarios:
+        description: 'Distinct comma-separated scenarios: stable,churn,partition'
+        type: string
+        default: 'stable,churn,partition'
+      workload:
+        description: 'Open-loop requires stable only and at most 32 processes'
+        type: choice
+        options: [ClosedLoop, OpenLoopSynchronized, OpenLoopStaggered]
+        default: ClosedLoop
+      silo_processor_count:
+        description: 'Logical processors per silo (0 = inherit runner, maximum 64)'
+        type: number
+        default: 0
+      gc_conserve_memory:
+        description: 'DOTNET_GCConserveMemory for every silo (0..9)'
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dissemination-performance-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  measure:
+    name: Isolated original and candidate off/on measurements
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Tooling checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Original runtime checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: dotnet/orleans
+          ref: 6739589254b746a8790cf53524e6abe372bb53d4
+          path: .dissemination-runtime-original
+          persist-credentials: false
+      - name: Selected candidate runtime checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ inputs.candidate_repository }}
+          ref: ${{ inputs.candidate_ref }}
+          path: .dissemination-runtime-candidate
+          persist-credentials: false
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Check script input and artifact boundaries
+        shell: pwsh
+        run: ./.github/scripts/test-dissemination-performance.ps1
+      - name: Build isolated binaries and measure selected workloads
+        shell: pwsh
+        env:
+          CANDIDATE_REPOSITORY: ${{ inputs.candidate_repository }}
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          PERFORMANCE_SIZES: ${{ inputs.sizes }}
+          PERFORMANCE_ITERATIONS: ${{ inputs.iterations }}
+          PERFORMANCE_REPETITIONS: ${{ inputs.repetitions }}
+          PERFORMANCE_PATHS: ${{ inputs.runtime_paths }}
+          PERFORMANCE_SCENARIOS: ${{ inputs.scenarios }}
+          PERFORMANCE_WORKLOAD: ${{ inputs.workload }}
+          PERFORMANCE_PROCESSORS: ${{ inputs.silo_processor_count }}
+          PERFORMANCE_GC: ${{ inputs.gc_conserve_memory }}
+        run: |
+          ./.github/scripts/dissemination-performance.ps1 `
+            -CandidateRepository $env:CANDIDATE_REPOSITORY -CandidateRef $env:CANDIDATE_REF `
+            -Sizes $env:PERFORMANCE_SIZES -Iterations ([int]$env:PERFORMANCE_ITERATIONS) `
+            -Repetitions ([int]$env:PERFORMANCE_REPETITIONS) -RuntimePaths $env:PERFORMANCE_PATHS `
+            -Scenarios $env:PERFORMANCE_SCENARIOS -Workload $env:PERFORMANCE_WORKLOAD `
+            -SiloProcessorCount ([int]$env:PERFORMANCE_PROCESSORS) `
+            -GCConserveMemory ([int]$env:PERFORMANCE_GC)
+      - name: Preserve raw measurements and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-performance-results
+          retention-days: 30
+          path: |
+            Artifacts/DisseminationPerformance/results
+            Artifacts/DisseminationPerformance/*.binlog
+      - name: Preserve reproducible binaries and exact revision selection
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dissemination-performance-binaries
+          retention-days: 7
+          path: Artifacts/DisseminationPerformance/bin
