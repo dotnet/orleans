@@ -770,11 +770,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var client = ClientHost;
         if (client != null)
         {
-            var cancelled = new CancellationTokenSource();
-            cancelled.Cancel();
+            var cancelled = new CancellationToken(canceled: true);
             try
             {
-                await client.StopAsync(cancelled.Token).ConfigureAwait(false);
+                await client.StopAsync(cancelled).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                if (!exception.IsCancellation())
+                {
+                    throw;
+                }
             }
             finally
             {

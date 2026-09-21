@@ -55,17 +55,16 @@ internal sealed class TestClusterHostTerminator(ILogger<TestClusterHostTerminato
             {
                 await host.StopAsync(cancellationToken);
             }
-            catch (Exception exception) when (
-                exception is OperationCanceledException
-                || exception is AggregateException aggregateException
-                && aggregateException.Flatten().InnerExceptions is { Count: > 0 } innerExceptions
-                && innerExceptions.All(static inner => inner is OperationCanceledException))
-            {
-                logger.LogDebug("Canceled graceful draining after a fatal test silo error.");
-            }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Failed to stop a test silo after a fatal error.");
+                if (exception.IsCancellation())
+                {
+                    logger.LogDebug("Canceled graceful draining after a fatal test silo error.");
+                }
+                else
+                {
+                    logger.LogError(exception, "Failed to stop a test silo after a fatal error.");
+                }
             }
         });
     }
