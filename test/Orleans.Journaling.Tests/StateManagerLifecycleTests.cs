@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -231,6 +232,87 @@ public partial class StateManagerTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(storage.Appends);
         Assert.Equal(1, state.WriteCompletedCount);
+    }
+
+    [Fact]
+    public async Task RecoveryRetries_ReuseSingleWorkLoopTask()
+    {
+        var storage = new MutableReadStorage(3, [1, 2, 3], [1, 2, 3], CreatePersistedValueBytes("value", 42));
+        await using var manager = CreateTestSystem(storage).Manager;
+        var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
+        var initial = manager.InitializeAsync(CancellationToken.None).AsTask();
+        var workLoop = GetWorkLoop();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => WaitFor(initial));
+        Assert.Equal(1, storage.ReadCount);
+
+        var retry = manager.InitializeAsync(CancellationToken.None).AsTask();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => WaitFor(retry));
+        Assert.Same(workLoop, GetWorkLoop());
+        Assert.False(workLoop.IsCompleted);
+        Assert.Equal(2, storage.ReadCount);
+
+        const int callerCount = 8;
+        var start = NewSignal();
+        var allEnqueued = NewSignal();
+        var enqueued = 0;
+        var callers = Enumerable.Range(0, callerCount).Select(_ => Task.Run(async () =>
+        {
+            await WaitFor(start.Task);
+            var initialization = manager.InitializeAsync(CancellationToken.None).AsTask();
+            if (Interlocked.Increment(ref enqueued) == callerCount) allEnqueued.SetResult();
+            await initialization;
+        }, TestContext.Current.CancellationToken)).ToArray();
+        start.SetResult();
+        await WaitFor(allEnqueued.Task);
+        await WaitFor(storage.BlockedReadStarted.Task);
+        Assert.Same(workLoop, GetWorkLoop());
+        Assert.False(workLoop.IsCompleted);
+        Assert.Equal(3, storage.ReadCount);
+        Assert.All(callers, caller => Assert.False(caller.IsCompleted));
+
+        storage.AllowBlockedRead.SetResult();
+        await WaitFor(Task.WhenAll(callers));
+        Assert.Equal(42, value.Value);
+        value.Value = 43;
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Same(workLoop, GetWorkLoop());
+        Assert.False(workLoop.IsCompleted);
+        Assert.Equal(3, storage.ReadCount);
+
+        await WaitFor(manager.DisposeAsync().AsTask());
+        Assert.Same(workLoop, GetWorkLoop());
+        Assert.True(workLoop.IsCompletedSuccessfully);
+
+        Task GetWorkLoop() => Assert.IsAssignableFrom<Task>(
+            typeof(JournaledStateManager).GetField("_workLoop", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(manager));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoveryFailure_WaitsForExplicitRetryOrShutdown(bool lifecycleStop)
+    {
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new MutableReadStorage([1, 2, 3], []);
+            var sut = CreateTestSystem(storage);
+            await using var manager = sut.Manager;
+            manager.RegisterStateMachine("state", new LifecycleState());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycleStop
+                ? sut.Lifecycle.OnStart(CancellationToken.None)
+                : manager.InitializeAsync(CancellationToken.None).AsTask());
+            await Task.Yield();
+            Assert.Equal(1, storage.ReadCount);
+            Assert.Empty(storage.OperationLog);
+            Assert.True(manager.TryGetStateMachine("state", out _));
+            Assert.Throws<InvalidOperationException>(() => manager.RegisterStateMachine("late", new LifecycleState()));
+
+            await WaitFor(lifecycleStop
+                ? sut.Lifecycle.OnStop(TestContext.Current.CancellationToken)
+                : manager.DisposeAsync().AsTask());
+            Assert.Equal(1, storage.ReadCount);
+        });
     }
 
     [Fact]

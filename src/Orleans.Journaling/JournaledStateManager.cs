@@ -156,15 +156,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
         lock (_lock)
         {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
             ThrowIfFenced();
-            if (_workLoop is null || _state is ManagerState.RecoveryFailed)
+            if (_workLoop is null)
             {
-                _state = ManagerState.Unknown;
                 _workLoop = Start();
             }
 
@@ -188,30 +187,50 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private async Task WorkLoop()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-        try
-        {
-            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-        }
-        catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
-        {
-            return;
-        }
-        catch (Exception exception)
+        while (!_shutdownCancellation.IsCancellationRequested)
         {
             try
             {
-                LogErrorProcessingWorkItems(_shared.Logger, exception);
+                await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                _workSignal.Signal();
+                break;
             }
-            finally
+            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
             {
-                lock (_lock)
+                return;
+            }
+            catch (Exception exception)
+            {
+                try
                 {
-                    _state = ManagerState.RecoveryFailed;
-                    FaultQueuedWorkItemsUnderLock(exception);
+                    LogErrorProcessingWorkItems(_shared.Logger, exception);
+                }
+                finally
+                {
+                    lock (_lock)
+                    {
+                        FaultQueuedWorkItemsUnderLock(exception);
+                    }
                 }
             }
 
-            return;
+            // Signals can remain from the failed attempt. Retry only for newly queued initialization work.
+            while (true)
+            {
+                await _workSignal.WaitAsync().ConfigureAwait(true);
+                if (_shutdownCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                lock (_lock)
+                {
+                    if (_workQueue.Count > 0)
+                    {
+                        break;
+                    }
+                }
+            }
         }
 
         while (!_shutdownCancellation.Token.IsCancellationRequested)
@@ -1199,7 +1218,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private enum ManagerState : byte
     {
         Unknown,
-        RecoveryFailed,
         Ready,
         Fenced
     }

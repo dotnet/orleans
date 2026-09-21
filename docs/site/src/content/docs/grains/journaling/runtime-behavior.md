@@ -103,6 +103,8 @@ failure or after restoring the required format, codec, or backing data. Each att
 bookkeeping and replays the journal from the beginning using the same registered state machines.
 Concurrent callers share the active attempt; writes and deletion become available after initialization
 succeeds. State registration stays closed once initialization has begun.
+One work-loop task owns recovery attempts and subsequent journal work for the manager's lifetime.
+After a failed attempt it waits for an explicit initialization request before retrying.
 
 Owner shutdown which cancels initial recovery cancels all initialization waiters and leaves the manager
 stopped. Disposal waits for the owned read to finish before releasing journal resources. Cancelling an
