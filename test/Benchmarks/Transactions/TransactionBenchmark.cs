@@ -70,6 +70,11 @@ public class TransactionBenchmark : IDisposable
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Table transaction benchmarks.");
+            }
+
             hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
             {
                 options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);

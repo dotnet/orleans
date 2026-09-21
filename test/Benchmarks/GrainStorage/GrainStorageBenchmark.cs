@@ -66,6 +66,11 @@ public class GrainStorageBenchmark : IDisposable
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Table grain storage benchmarks.");
+            }
+
             hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
             {
                 options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
@@ -77,6 +82,11 @@ public class GrainStorageBenchmark : IDisposable
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
+            if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.DataConnectionString))
+            {
+                throw new InvalidOperationException("OrleansDataConnectionString must be set for Azure Blob grain storage benchmarks.");
+            }
+
             hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
             {
                 options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
@@ -90,7 +100,7 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAdoNetGrainStorageAsDefault(options =>
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString!; // The benchmark requires the configured ADO.NET test connection.
+                options.ConnectionString = TestDefaultConfiguration.MsSqlConnectionString!;
             });
         }
     }
