@@ -1,0 +1,1606 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.DurableJobs;
+using Orleans.DurableMessaging.Configuration;
+using Orleans.Journaling;
+using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
+using Orleans.Timers;
+
+namespace Orleans.DurableMessaging;
+
+/// <summary>
+/// Prepares and stages outbound messages using owner-bound durable collections.
+/// The sequence state associates message cohorts with journal acknowledgement.
+/// </summary>
+internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver
+{
+    internal const string JobName = "orleans.messaging.outbox-flush";
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
+    private readonly IJournaledStateManager _stateManager;
+    private readonly IDurableDictionary<Guid, DurableEnvelope> _messages;
+    private readonly IGrainFactory _grainFactory;
+    private readonly IGrainContext _grainContext;
+    private readonly ITimerRegistry _timerRegistry;
+    private readonly ILogger<DurableOutbox> _logger;
+    private readonly DurableMessagingInstruments _instruments;
+    private readonly TimeSpan _backpressureRetryDelay;
+    private readonly TimeSpan _maxRetryAge;
+    private readonly int _maxDeliveryAttempts;
+    private readonly int _batchSize;
+    private readonly TimeSpan _deadLetterRetentionPeriod;
+    private readonly int _maxRetainedDeadLetters;
+    private readonly IDurableDictionary<Guid, OutboxMessageState> _messageStates;
+    private readonly IDurableDictionary<Guid, OutboxDeadLetter> _deadLetters;
+    private readonly IDurableValue<string> _jobId;
+    private readonly IDurableValue<DurableJob> _job;
+    private readonly IDurableValue<string> _completedJobId;
+    private readonly IDurableValue<long> _jobSequence;
+    private readonly ILocalDurableJobManager _jobManager;
+    private readonly TimeProvider _jobTimeProvider;
+    private readonly DurableMessagingPumpResults _pumpResults;
+    private readonly DurableMessagingPumpCoordinator _pumpCoordinator = new();
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _deliveryGate = new(1, 1);
+    private readonly CancellationTokenSource _shutdown = new();
+
+    private readonly Dictionary<Guid, PendingMessage> _pendingMessages = [];
+    private int _unacknowledgedMessageCount;
+    private PendingMessage[] _capturedMessages = [];
+    private bool _captureStarted;
+    private OwnershipProposal? _preparedOwnership;
+    private string? _preparingOwnershipId;
+    private int _activePreparations;
+    private int _liveBatches;
+    private TaskCompletionSource? _preparationsDrained;
+    private int _activeWrites;
+    private TaskCompletionSource? _writesDrained;
+    private string? _committingOwnershipId;
+    private DurableJob? _committingJob;
+    private string? _committingCompletedJobId;
+    private string? _durableOwnershipId;
+    private DurableJob? _durableJob;
+    private string? _durableCompletedJobId;
+    private PendingDeliveryBatch? _pendingDeliveryBatch;
+    private bool _recoveryCompleted;
+    private int _ensureJobScheduledQueued;
+    private int _activePumpTurns;
+    private string _ownershipEpoch = Guid.NewGuid().ToString("N");
+    private long _reservedSequence;
+    private long _stateGeneration;
+    private string? _ownershipStateError;
+    private ExceptionDispatchInfo? _failure;
+    private int _metricsActive;
+    private int _reportedDepth;
+
+    public DurableOutbox(
+        IJournaledStateManager manager,
+        IGrainFactory grainFactory,
+        IGrainContext grainContext,
+        ITimerRegistry timerRegistry,
+        ILogger<DurableOutbox> logger,
+        DurableMessagingInstruments instruments,
+        ILocalDurableJobManager jobManager,
+        IDurableJobHandlerRegistry jobHandlers,
+        DurableMessagingPumpResults pumpResults,
+        [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider jobTimeProvider,
+        IOptions<DurableInboxOptions> options,
+        [FromKeyedServices(DurableMessagingStateNames.Outbox)] IDurableDictionary<Guid, DurableEnvelope> messages,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxMessageState)] IDurableDictionary<Guid, OutboxMessageState> messageStates,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxDeadLetters)] IDurableDictionary<Guid, OutboxDeadLetter> deadLetters,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxJobId)] IDurableValue<string> jobId,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxJobHandle)] IDurableValue<DurableJob> job,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxCompletedJobId)] IDurableValue<string> completedJobId,
+        IDurableValueCommandCodec<long> jobSequenceCodec)
+    {
+        ArgumentNullException.ThrowIfNull(manager);
+        ArgumentNullException.ThrowIfNull(grainFactory);
+        ArgumentNullException.ThrowIfNull(grainContext);
+        ArgumentNullException.ThrowIfNull(timerRegistry);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(instruments);
+        ArgumentNullException.ThrowIfNull(jobManager);
+        ArgumentNullException.ThrowIfNull(jobHandlers);
+        ArgumentNullException.ThrowIfNull(pumpResults);
+        ArgumentNullException.ThrowIfNull(jobTimeProvider);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(messages);
+        ArgumentNullException.ThrowIfNull(messageStates);
+        ArgumentNullException.ThrowIfNull(deadLetters);
+        ArgumentNullException.ThrowIfNull(jobId);
+        ArgumentNullException.ThrowIfNull(job);
+        ArgumentNullException.ThrowIfNull(completedJobId);
+        ArgumentNullException.ThrowIfNull(jobSequenceCodec);
+        _stateManager = manager;
+        _grainFactory = grainFactory;
+        _grainContext = grainContext;
+        _timerRegistry = timerRegistry;
+        _logger = logger;
+        _instruments = instruments;
+        _jobManager = jobManager;
+        _pumpResults = pumpResults;
+        _jobTimeProvider = jobTimeProvider;
+        _backpressureRetryDelay = options.Value.BackpressureRetryDelay;
+        _maxRetryAge = options.Value.MaxOutboxRetryAge;
+        _maxDeliveryAttempts = options.Value.MaxDeliveryAttempts;
+        _batchSize = options.Value.OutboxBatchSize;
+        _deadLetterRetentionPeriod = options.Value.DeadLetterRetentionPeriod;
+        _maxRetainedDeadLetters = options.Value.MaxRetainedDeadLetters;
+        _messages = messages;
+        _messageStates = messageStates;
+        _deadLetters = deadLetters;
+        _jobId = jobId;
+        _job = job;
+        _completedJobId = completedJobId;
+        var sequence = new SequenceState(this, jobSequenceCodec);
+        _jobSequence = sequence;
+        manager.RegisterStateMachine(DurableMessagingStateNames.OutboxJobSequence, sequence);
+        jobHandlers.Register(this);
+
+        var lifecycle = grainContext.ObservableLifecycle;
+        lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.Activate, this);
+    }
+
+    internal IDurableDictionary<Guid, DurableEnvelope> MessageState => _messages;
+    internal IDurableDictionary<Guid, OutboxMessageState> AttemptState => _messageStates;
+    internal IDurableDictionary<Guid, OutboxDeadLetter> DeadLetterState => _deadLetters;
+    internal IDurableValue<string> JobIdState => _jobId;
+    internal IDurableValue<DurableJob> JobState => _job;
+    internal IDurableValue<string> CompletedJobIdState => _completedJobId;
+    internal IDurableValue<long> JobSequenceState => _jobSequence;
+
+    public int Count => _messages.Count;
+
+    public IEnumerable<DurableEnvelope> Messages => _messages.Values;
+
+    public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
+        _messages.TryGetValue(messageId, out envelope);
+
+    public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
+        IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateReady();
+        var unique = new Dictionary<Guid, DurableEnvelope>(messages.Count);
+        foreach (var envelope in messages)
+        {
+            if (envelope.SenderId != _grainContext.GrainId)
+            {
+                throw new InvalidOperationException(
+                    $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
+            }
+            DurableEnvelopeValidation.Validate(envelope);
+            if (envelope.ReceiverId.IsDefault)
+            {
+                throw new ArgumentException("The envelope receiver must not be the default grain ID.", nameof(messages));
+            }
+            if (unique.TryGetValue(envelope.MessageId, out var existing))
+            {
+                ValidateEquivalent(existing, envelope);
+            }
+            else
+            {
+                unique.Add(envelope.MessageId, envelope);
+            }
+        }
+        return PrepareBatchAsync(unique.Values.ToArray(), cancellationToken);
+    }
+
+    private async ValueTask<IPreparedOutboxBatch> PrepareBatchAsync(DurableEnvelope[] messages, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        StartPreparation();
+        var operation = PrepareUnderGateAsync(messages);
+        try
+        {
+            var batch = await operation.WaitAsync(cancellationToken).ConfigureAwait(true);
+            CompletePreparation();
+            return batch;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ReleaseUnclaimedAsync(operation).Ignore();
+            throw;
+        }
+        catch
+        {
+            CompletePreparation();
+            throw;
+        }
+    }
+
+    private async Task ReleaseUnclaimedAsync(Task<IPreparedOutboxBatch> operation)
+    {
+        try
+        {
+            (await operation.ConfigureAwait(true)).Dispose();
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            LogPreparationFailed(_logger, exception);
+        }
+        finally
+        {
+            CompletePreparation();
+        }
+    }
+
+    private async Task<IPreparedOutboxBatch> PrepareUnderGateAsync(DurableEnvelope[] messages)
+    {
+        PendingMessage[]? entries = null;
+        var reserved = false;
+        try
+        {
+            ValidateReady();
+            entries = new PendingMessage[messages.Length];
+            for (var i = 0; i < messages.Length; i++)
+            {
+                var envelope = messages[i];
+                if (_pendingMessages.TryGetValue(envelope.MessageId, out var pending))
+                {
+                    ValidateEquivalent(pending.Envelope, envelope);
+                }
+                else
+                {
+                    var existing = _messages.TryGetValue(envelope.MessageId, out var current);
+                    if (existing)
+                    {
+                        ValidateEquivalent(current, envelope);
+                    }
+                    pending = new(envelope) { Staged = existing, Captured = existing, Acknowledged = existing };
+                }
+                entries[i] = pending;
+            }
+            foreach (var pending in entries)
+            {
+                _pendingMessages[pending.Envelope.MessageId] = pending;
+                pending.References++;
+            }
+            reserved = true;
+            if (messages.Length > 0)
+            {
+                await PrepareOwnershipAsync(replaceExisting: false).ConfigureAwait(true);
+            }
+            ValidateReady();
+            _liveBatches++;
+            reserved = false;
+            return new PreparedBatch(this, _stateGeneration, entries);
+        }
+        finally
+        {
+            if (reserved)
+            {
+                foreach (var entry in entries!)
+                {
+                    entry.References--;
+                    ReleaseEntry(entry);
+                }
+            }
+            _gate.Release();
+            ReleaseUnusedOwnership();
+        }
+    }
+
+    private async ValueTask PrepareOwnershipAsync(bool replaceExisting)
+    {
+        if (HasPreparedOwnership() || HasCommittedOwnership() && (!replaceExisting || _liveBatches > 0))
+        {
+            return;
+        }
+        var previousOwner = CurrentOwner;
+        var sequence = checked(++_reservedSequence);
+        var id = DurableMessagingJobOwnership.CreateId(_ownershipEpoch, sequence);
+        _preparingOwnershipId = id;
+        try
+        {
+            var job = await _jobManager.ScheduleJobAsync(new ScheduleJobRequest
+            {
+                Target = _grainContext.GrainId,
+                JobName = JobName,
+                DueTime = _jobTimeProvider.GetUtcNow(),
+                Metadata = DurableMessagingJobOwnership.CreateMetadata(id)
+            }, _shutdown.Token).ConfigureAwait(true);
+            ValidateOwner(previousOwner);
+            _preparedOwnership = new(id, sequence, job, previousOwner);
+        }
+        catch
+        {
+            _failure?.Throw();
+            throw;
+        }
+        finally
+        {
+            _preparingOwnershipId = null;
+        }
+    }
+
+    public void Send(IPreparedOutboxBatch batch)
+    {
+        ArgumentNullException.ThrowIfNull(batch);
+        ValidateReady();
+        if (batch is not PreparedBatch prepared || !ReferenceEquals(prepared.Owner, this))
+        {
+            throw new InvalidOperationException("The prepared batch belongs to another outbox.");
+        }
+        ObjectDisposedException.ThrowIf(prepared.Disposed, batch);
+        ValidateGeneration(prepared.Generation);
+        if (prepared.Entries.Length > 0 && !HasCommittedOwnership() && !HasPreparedOwnership())
+        {
+            throw new InvalidOperationException("The prepared batch lost its acknowledged durable job ownership.");
+        }
+        if (prepared.Staged)
+        {
+            return;
+        }
+        try
+        {
+            if (prepared.Entries.Any(static entry => !entry.Staged) && !HasCommittedOwnership())
+            {
+                ApplyPreparedOwnership();
+            }
+            foreach (var pending in prepared.Entries)
+            {
+                if (pending.Staged)
+                {
+                    continue;
+                }
+                var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
+                _messages.Add(pending.Envelope.MessageId, pending.Envelope);
+                _messageStates.Add(pending.Envelope.MessageId, state);
+                pending.Staged = true;
+                _unacknowledgedMessageCount++;
+                EnsureMetricsActive();
+                ReconcileOutboxDepth();
+                _instruments.OnOutboxMessageSent(_grainContext.GrainId.Type.ToString());
+            }
+            prepared.Staged = true;
+        }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+    }
+
+    private static void ValidateEquivalent(DurableEnvelope existing, DurableEnvelope envelope)
+    {
+        if (!DurableEnvelopeEquivalence.AreEquivalent(existing, envelope))
+        {
+            throw new InvalidOperationException(
+                $"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
+        }
+    }
+
+    private void ReleaseBatch(PreparedBatch batch)
+    {
+        if (batch.Generation != _stateGeneration)
+        {
+            return;
+        }
+        foreach (var pending in batch.Entries)
+        {
+            pending.References--;
+            ReleaseEntry(pending);
+        }
+        _liveBatches--;
+        ReleaseUnusedOwnership();
+    }
+
+    private void ReleaseEntry(PendingMessage pending)
+    {
+        if (pending.References == 0 && (!pending.Staged || pending.Acknowledged))
+        {
+            _pendingMessages.Remove(pending.Envelope.MessageId);
+        }
+    }
+
+    private void StartPreparation()
+    {
+        if (_activePreparations++ == 0)
+        {
+            _preparationsDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+
+    private void CompletePreparation()
+    {
+        if (--_activePreparations == 0)
+        {
+            _preparationsDrained!.TrySetResult();
+        }
+        ReleaseUnusedOwnership();
+    }
+
+    private void ReleaseUnusedOwnership()
+    {
+        if (_liveBatches == 0 && _activePreparations == 0 && _unacknowledgedMessageCount == 0 && !_captureStarted && _gate.CurrentCount != 0)
+        {
+            _preparedOwnership = null;
+        }
+    }
+
+    private bool HasPreparedOwnership() => _preparedOwnership is { } proposal
+        && proposal.PreviousOwner.Generation == _stateGeneration
+        && ((string.Equals(proposal.PreviousOwner.Id, _jobId.Value, StringComparison.Ordinal)
+            && (proposal.PreviousOwner.Job is null && _job.Value is null
+                || DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.PreviousOwner.Job, _job.Value)))
+            || (string.Equals(proposal.Id, _jobId.Value, StringComparison.Ordinal)
+                && DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.Job, _job.Value)));
+
+    private void ApplyPreparedOwnership()
+    {
+        var owner = _preparedOwnership!;
+        if (string.Equals(owner.Id, _jobId.Value, StringComparison.Ordinal)
+            && DurableMessagingJobOwnership.IsSamePhysicalJob(owner.Job, _job.Value))
+        {
+            return;
+        }
+        ValidateOwner(owner.PreviousOwner);
+        _jobId.Value = owner.Id;
+        _job.Value = owner.Job;
+        _jobSequence.Value = owner.Sequence;
+    }
+
+    private void StageWrite(OutboxWrite operation)
+    {
+        ValidateGeneration(operation.Generation);
+        PreparedDelivery[] deliveries = [];
+        Dictionary<Guid, OutboxDeadLetter>? deadLetters = null;
+        switch (operation)
+        {
+            case DeliveryWrite delivery:
+                ValidateOwner(delivery.Owner);
+                foreach (var outcome in delivery.Outcomes)
+                {
+                    ValidateCandidate(outcome.Candidate);
+                }
+                deliveries = delivery.Outcomes.Select(outcome => PrepareDelivery(outcome, ref deadLetters)).ToArray();
+                delivery.Prepared = deliveries;
+                break;
+            case ClearOwnerWrite clear:
+                ValidateOwner(clear.Owner);
+                break;
+            case OwnershipWrite:
+                if (!HasPreparedOwnership())
+                {
+                    throw new InvalidOperationException("Outbox ownership must be prepared before staging.");
+                }
+                break;
+            case CompactWrite:
+                deadLetters = _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
+                DurableDeadLetterRetention.Compact(deadLetters, _jobTimeProvider.GetUtcNow(),
+                    _deadLetterRetentionPeriod, _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt);
+                break;
+        }
+        if (operation is OwnershipWrite)
+        {
+            ApplyPreparedOwnership();
+        }
+        foreach (var result in deliveries)
+        {
+            var envelope = result.Outcome.Candidate.Envelope;
+            if (result.Remove)
+            {
+                _messages.Remove(envelope.MessageId);
+                _messageStates.Remove(envelope.MessageId);
+            }
+            else
+            {
+                _messageStates[envelope.MessageId] = result.Retry!;
+            }
+            RecordDeliveryMetrics(result);
+        }
+        if (deadLetters is not null)
+        {
+            foreach (var key in _deadLetters.Keys.Where(key => !deadLetters.ContainsKey(key)).ToArray())
+            {
+                _deadLetters.Remove(key);
+            }
+            foreach (var entry in deadLetters)
+            {
+                if (!_deadLetters.TryGetValue(entry.Key, out var existing) || !ReferenceEquals(existing, entry.Value))
+                {
+                    _deadLetters[entry.Key] = entry.Value;
+                }
+            }
+        }
+        if (Count == 0 && operation is ClearOwnerWrite completed)
+        {
+            _completedJobId.Value = completed.Owner.Id;
+            _jobId.Value = null;
+            _job.Value = null;
+        }
+        ReconcileOutboxDepth();
+    }
+
+    private void CaptureWrite()
+    {
+        if (_captureStarted)
+        {
+            return;
+        }
+        var messages = _unacknowledgedMessageCount == 0 ? []
+            : _pendingMessages.Values.Where(static entry => entry.Staged && !entry.Captured).ToArray();
+        var ownerChanged = !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
+            || !(_durableJob is null && _job.Value is null || DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value))
+            || !string.Equals(_durableCompletedJobId, _completedJobId.Value, StringComparison.Ordinal);
+        if (messages.Length == 0 && !ownerChanged)
+        {
+            return;
+        }
+        _captureStarted = true;
+        _capturedMessages = messages;
+        foreach (var message in messages)
+        {
+            message.Captured = true;
+        }
+        _committingOwnershipId = _jobId.Value;
+        _committingJob = _job.Value;
+        _committingCompletedJobId = _completedJobId.Value;
+    }
+
+    private void CompleteCapture()
+    {
+        if (!_captureStarted)
+        {
+            return;
+        }
+        _durableOwnershipId = _committingOwnershipId;
+        _durableJob = _committingJob;
+        _durableCompletedJobId = _committingCompletedJobId;
+        foreach (var message in _capturedMessages)
+        {
+            message.Acknowledged = true;
+            _unacknowledgedMessageCount--;
+            ReleaseEntry(message);
+        }
+        _capturedMessages = [];
+        _captureStarted = false;
+        ReleaseUnusedOwnership();
+    }
+
+    internal void FailPersistence(Exception exception)
+    {
+        if (_failure is not null)
+        {
+            return;
+        }
+        _failure = ExceptionDispatchInfo.Capture(exception);
+        Stop();
+    }
+
+    [DoesNotReturn]
+    private void FailStaging(Exception exception)
+    {
+        FailPersistence(exception);
+        LogStagingFailed(_logger, _failure!.SourceException);
+        try
+        {
+            _grainContext.Deactivate(new DeactivationReason(
+                DeactivationReasonCode.ApplicationError, _failure.SourceException, "Durable outbox staging failed."), CancellationToken.None);
+        }
+        catch (Exception deactivationException)
+        {
+            LogDeactivationFailed(_logger, deactivationException);
+        }
+        _failure.Throw();
+    }
+
+    private void OnRecoveryCompleted()
+    {
+        _reservedSequence = _jobSequence.Value;
+        _durableOwnershipId = _jobId.Value;
+        _durableJob = _job.Value;
+        _durableCompletedJobId = _completedJobId.Value;
+        _ownershipStateError = DurableMessagingJobOwnership.GetPairError(_jobId.Value, _job.Value);
+        _recoveryCompleted = true;
+        ReconcileOutboxDepth();
+    }
+
+    private void ResetState()
+    {
+        _recoveryCompleted = false;
+        _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
+        _stateGeneration++;
+        _ownershipEpoch = Guid.NewGuid().ToString("N");
+        _reservedSequence = 0;
+        _pendingMessages.Clear();
+        _unacknowledgedMessageCount = 0;
+        _liveBatches = 0;
+        _preparedOwnership = null;
+        _capturedMessages = [];
+        _captureStarted = false;
+        _durableOwnershipId = null;
+        _durableJob = null;
+        _durableCompletedJobId = null;
+        _ownershipStateError = null;
+    }
+
+    private async ValueTask SubmitAsync(OutboxWrite operation)
+    {
+        ValidateReady();
+        try
+        {
+            StageWrite(operation);
+        }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+        if (_activeWrites++ == 0)
+        {
+            _writesDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        try
+        {
+            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            _failure?.Throw();
+            if (operation is DeliveryWrite delivery)
+            {
+                var delivered = delivery.Prepared.Count(static result => result.Outcome.Result?.Status is
+                    DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered);
+                var backpressured = delivery.Prepared.Count(static result => result.Outcome.Result?.Status == DeliveryStatus.Backpressured);
+                LogDeliveryComplete(_logger, delivered, backpressured, delivery.Prepared.Length - delivered - backpressured, Count);
+            }
+        }
+        catch (Exception exception)
+        {
+            FailPersistence(exception);
+            _failure!.Throw();
+            throw;
+        }
+        finally
+        {
+            if (--_activeWrites == 0)
+            {
+                _writesDrained!.TrySetResult();
+            }
+        }
+    }
+
+    private PumpOwner CurrentOwner => new(_jobId.Value, _job.Value, _stateGeneration);
+
+    private void ValidateReady()
+    {
+        _failure?.Throw();
+        _shutdown.Token.ThrowIfCancellationRequested();
+        ThrowIfOwnershipStateInvalid();
+        if (!_recoveryCompleted)
+        {
+            throw new InvalidOperationException("Durable outbox initialization has not completed.");
+        }
+    }
+
+    private void ValidateGeneration(long generation)
+    {
+        ValidateReady();
+        if (generation != _stateGeneration)
+        {
+            throw new InvalidOperationException("The admitted outbox operation belongs to an obsolete activation or deletion generation.");
+        }
+    }
+
+    private void ValidateOwner(PumpOwner owner)
+    {
+        ValidateGeneration(owner.Generation);
+        if (!string.Equals(owner.Id, _jobId.Value, StringComparison.Ordinal)
+            || !(owner.Job is null && _job.Value is null || DurableMessagingJobOwnership.IsSamePhysicalJob(owner.Job, _job.Value)))
+        {
+            throw new InvalidOperationException("The admitted outbox operation no longer owns the acknowledged physical job.");
+        }
+    }
+
+    private void ThrowIfOwnershipStateInvalid()
+    {
+        var error = _ownershipStateError ?? DurableMessagingJobOwnership.GetPairError(_jobId.Value, _job.Value);
+        if (error is not null)
+        {
+            throw new InvalidOperationException(error);
+        }
+    }
+
+    private bool HasCommittedOwnership() => DurableMessagingJobOwnership.HasOwner(_jobId.Value, _job.Value)
+        && string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
+        && DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value);
+
+    private bool IsCurrentPump(DurableJob job, long stateGeneration) => _failure is null && !_shutdown.IsCancellationRequested
+        && _recoveryCompleted && stateGeneration == _stateGeneration
+        && DurableMessagingJobOwnership.IsSamePhysicalJob(_job.Value, job) && HasCommittedOwnership();
+
+    private bool IsOwnershipTransitionPending(string ownershipId) =>
+        string.Equals(ownershipId, _preparingOwnershipId, StringComparison.Ordinal)
+        || (_preparedOwnership is { } proposal && string.Equals(ownershipId, proposal.Id, StringComparison.Ordinal)
+            && (!HasCommittedOwnership() || !DurableMessagingJobOwnership.IsSamePhysicalJob(proposal.Job, _job.Value)))
+        || !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
+        || (_job.Value is not null && !DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value));
+
+    private bool IsPendingAcknowledgement(Guid id) =>
+        _pendingMessages.TryGetValue(id, out var pending) && pending.Staged && !pending.Acknowledged;
+
+    private DeliveryCandidate[] SelectMessages()
+    {
+        var now = _jobTimeProvider.GetUtcNow();
+        var selected = _messages.Values.Where(envelope => !IsPendingAcknowledgement(envelope.MessageId) && IsReadyForAttempt(envelope, now))
+            .Take(_batchSize).Select(envelope => new DeliveryCandidate(envelope,
+                _messageStates.TryGetValue(envelope.MessageId, out var state) ? CopyState(state) : null)).ToArray();
+        if (selected.Length == 0)
+        {
+            LogNoDurableMessages(_logger, Count);
+        }
+        else
+        {
+            LogDeliveringMessages(_logger, selected.Length);
+        }
+        return selected;
+    }
+
+    private static OutboxMessageState CopyState(OutboxMessageState state) => new()
+    {
+        AttemptCount = state.AttemptCount,
+        LastError = state.LastError,
+        NextAttemptAt = state.NextAttemptAt,
+        EnqueuedAt = state.EnqueuedAt
+    };
+
+    private void ValidateCandidate(DeliveryCandidate candidate)
+    {
+        if (IsPendingAcknowledgement(candidate.Envelope.MessageId)
+            || !_messages.TryGetValue(candidate.Envelope.MessageId, out var current)
+            || !DurableEnvelopeEquivalence.AreEquivalent(candidate.Envelope, current))
+        {
+            throw new InvalidOperationException("The admitted outbox delivery no longer refers to a durable pending message.");
+        }
+        _messageStates.TryGetValue(current.MessageId, out var state);
+        var expected = candidate.State;
+        if (state?.AttemptCount != expected?.AttemptCount || state?.NextAttemptAt != expected?.NextAttemptAt
+            || state?.EnqueuedAt != expected?.EnqueuedAt || state?.LastError != expected?.LastError)
+        {
+            throw new InvalidOperationException("The admitted outbox delivery attempt state has changed.");
+        }
+    }
+
+    private async Task<DeliveryOutcome> DeliverAsync(DeliveryCandidate candidate, CancellationToken cancellationToken)
+    {
+        if (candidate.State?.EnqueuedAt is { } enqueuedAt
+            && DurableMessagingTime.IsExpired(_jobTimeProvider.GetUtcNow(), enqueuedAt, _maxRetryAge))
+        {
+            return new(candidate, null, $"The message exceeded the maximum retry age of {_maxRetryAge}.", TimeSpan.Zero, Expired: true);
+        }
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var envelope = candidate.Envelope;
+            var target = envelope.ReceiverId == _grainContext.GrainId
+                ? _grainContext.GetGrainExtension<IDurableInboxExtension>()
+                : _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
+            var result = await target.DeliverAsync(envelope, cancellationToken).ConfigureAwait(true);
+            return new(candidate, result, null, stopwatch.Elapsed, Expired: false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            LogDeliveryError(_logger, exception, candidate.Envelope.MessageId, candidate.Envelope.SenderId,
+                candidate.Envelope.ReceiverId, candidate.Envelope.RouteKey, candidate.Envelope.CorrelationKey?.ToString());
+            return new(candidate, null, exception.ToString(), stopwatch.Elapsed, Expired: false);
+        }
+    }
+
+    public async Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            ValidateReady();
+            var owner = CurrentOwner;
+            var outcomes = new List<DeliveryOutcome>();
+            foreach (var candidate in SelectMessages())
+            {
+                outcomes.Add(await DeliverAsync(candidate, cancellationToken).ConfigureAwait(true));
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateOwner(owner);
+            if (outcomes.Count > 0)
+            {
+                await SubmitAsync(new DeliveryWrite(owner, outcomes.ToArray())).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            _deliveryGate.Release();
+        }
+    }
+
+    private async Task AdvancePendingDeliveriesAsync(DurableJob job, long generation,
+        CancellationToken cancellationToken, CancellationToken attemptCancellationToken)
+    {
+        await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            ValidateReady();
+            if (!IsCurrentPump(job, generation))
+            {
+                return;
+            }
+            if (_pendingDeliveryBatch is { } batch)
+            {
+                if (batch.Owner.Generation != generation || !DurableMessagingJobOwnership.IsSamePhysicalJob(batch.Owner.Job, job)
+                    || batch.Cancellation.IsCancellationRequested)
+                {
+                    CancelPendingDeliveryBatchAsync().Ignore();
+                    return;
+                }
+                if (batch.Attempts.Any(static task => !task.IsCompleted))
+                {
+                    return;
+                }
+                _pendingDeliveryBatch = null;
+                using (batch)
+                {
+                    var outcomes = await Task.WhenAll(batch.Attempts).ConfigureAwait(true);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ValidateOwner(batch.Owner);
+                    await SubmitAsync(new DeliveryWrite(batch.Owner, outcomes)).ConfigureAwait(true);
+                }
+                return;
+            }
+
+            var candidates = SelectMessages();
+            if (candidates.Length == 0)
+            {
+                return;
+            }
+            var owner = new PumpOwner(_jobId.Value, job, generation);
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(attemptCancellationToken, _shutdown.Token);
+            var pending = new PendingDeliveryBatch(owner, cancellation);
+            try
+            {
+                foreach (var candidate in candidates)
+                {
+                    if (candidate.Envelope.ReceiverId == _grainContext.GrainId)
+                    {
+                        var result = await DeliverAsync(candidate, cancellationToken).ConfigureAwait(true);
+                        ValidateReady();
+                        if (!IsCurrentPump(job, generation))
+                        {
+                            await pending.CancelAsync(_logger).ConfigureAwait(true);
+                            return;
+                        }
+                        pending.Attempts.Add(Task.FromResult(result));
+                    }
+                    else
+                    {
+                        pending.Attempts.Add(DeliverAsync(candidate, cancellation.Token));
+                    }
+                }
+                if (pending.Attempts.All(static task => task.IsCompleted))
+                {
+                    using (pending)
+                    {
+                        var outcomes = await Task.WhenAll(pending.Attempts).ConfigureAwait(true);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        ValidateOwner(owner);
+                        await SubmitAsync(new DeliveryWrite(owner, outcomes)).ConfigureAwait(true);
+                    }
+                }
+                else
+                {
+                    _pendingDeliveryBatch = pending;
+                }
+            }
+            catch
+            {
+                await pending.CancelAsync(_logger).ConfigureAwait(true);
+                throw;
+            }
+        }
+        finally
+        {
+            _deliveryGate.Release();
+        }
+    }
+
+    private PreparedDelivery PrepareDelivery(DeliveryOutcome outcome, ref Dictionary<Guid, OutboxDeadLetter>? deadLetters)
+    {
+        var status = outcome.Result?.Status;
+        if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
+        {
+            return new(outcome, true, null);
+        }
+        var state = outcome.Candidate.State is { } existing ? CopyState(existing) : new OutboxMessageState();
+        var now = _jobTimeProvider.GetUtcNow();
+        if (!outcome.Expired)
+        {
+            state.AttemptCount = checked(state.AttemptCount + 1);
+        }
+        state.EnqueuedAt ??= now;
+        state.LastError = outcome.Error ?? status switch
+        {
+            DeliveryStatus.Backpressured => "The receiver is backpressured.",
+            DeliveryStatus.RouteNotFound => outcome.Result?.Message ?? "The receiver has no compatible route.",
+            _ => $"Unexpected delivery status '{status}'."
+        };
+        if (outcome.Expired || state.AttemptCount >= _maxDeliveryAttempts
+            || DurableMessagingTime.IsExpired(now, state.EnqueuedAt.Value, _maxRetryAge))
+        {
+            var letter = new OutboxDeadLetter
+            {
+                Envelope = outcome.Candidate.Envelope,
+                DeadLetteredAt = now,
+                Reason = state.LastError,
+                AttemptCount = state.AttemptCount
+            };
+            deadLetters ??= _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
+            DurableDeadLetterRetention.Compact(deadLetters, now, _deadLetterRetentionPeriod,
+                _maxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
+                reservedCapacity: deadLetters.ContainsKey(letter.Envelope.MessageId) ? 0 : 1);
+            deadLetters[letter.Envelope.MessageId] = letter;
+            return new(outcome, true, null);
+        }
+        var exponent = Math.Min(state.AttemptCount - 1, DurableInboxOptions.MaximumBackoffExponent);
+        state.NextAttemptAt = DurableMessagingTime.AddClamped(now, TimeSpan.FromTicks(_backpressureRetryDelay.Ticks * (1L << exponent)));
+        return new(outcome, false, state);
+    }
+
+    private void RecordDeliveryMetrics(PreparedDelivery delivery)
+    {
+        var outcome = delivery.Outcome;
+        var envelope = outcome.Candidate.Envelope;
+        var status = outcome.Result?.Status;
+        var metricStatus = status == DeliveryStatus.RouteNotFound ? "route_not_found" : status?.ToString().ToLowerInvariant() ?? "error";
+        _instruments.OnOutboxMessageDelivered(_grainContext.GrainId.Type.ToString(), metricStatus);
+        _instruments.OnOutboxDeliveryDuration(outcome.Duration, _grainContext.GrainId.Type.ToString());
+        switch (status)
+        {
+            case DeliveryStatus.Accepted:
+            case DeliveryStatus.Duplicate:
+            case DeliveryStatus.DeadLettered:
+                LogMessageDelivered(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey,
+                    status.Value, envelope.CorrelationKey?.ToString());
+                break;
+            case DeliveryStatus.Backpressured:
+                LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                break;
+            case DeliveryStatus.RouteNotFound:
+                LogDeliveryRouteNotFound(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId,
+                    envelope.RouteKey, envelope.CorrelationKey?.ToString(), outcome.Result?.Message);
+                break;
+            case { } unexpected:
+                LogUnexpectedDeliveryStatus(_logger, unexpected, envelope.MessageId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                break;
+        }
+    }
+
+    private bool IsReadyForAttempt(DurableEnvelope envelope, DateTimeOffset now) =>
+        !_messageStates.TryGetValue(envelope.MessageId, out var state)
+        || state.EnqueuedAt is { } enqueuedAt && DurableMessagingTime.IsExpired(now, enqueuedAt, _maxRetryAge)
+        || state.NextAttemptAt is null || state.NextAttemptAt <= now;
+
+    private DateTimeOffset? GetNextAttemptAt(DurableEnvelope envelope, DateTimeOffset now)
+    {
+        if (!_messageStates.TryGetValue(envelope.MessageId, out var state))
+        {
+            return null;
+        }
+        var retryAt = state.NextAttemptAt ?? now;
+        var expiresAt = state.EnqueuedAt is { } enqueuedAt ? DurableMessagingTime.AddClamped(enqueuedAt, _maxRetryAge) : retryAt;
+        return retryAt <= expiresAt ? retryAt : expiresAt;
+    }
+
+    private async Task CancelPendingDeliveryBatchAsync()
+    {
+        if (_pendingDeliveryBatch is { } batch)
+        {
+            try
+            {
+                await batch.CancelAsync(_logger).ConfigureAwait(true);
+            }
+            finally
+            {
+                if (ReferenceEquals(_pendingDeliveryBatch, batch))
+                {
+                    _pendingDeliveryBatch = null;
+                }
+            }
+        }
+    }
+
+    public async Task OnStart(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateReady();
+        EnsureMetricsActive();
+        if (_messages.Count > 0)
+        {
+            LogPumpStartingOnActivation(_logger, _messages.Count);
+        }
+        if (_messages.Count > 0 && !HasCommittedOwnership())
+        {
+            QueueEnsureJobScheduled();
+        }
+        if (_deadLetters.Count > _maxRetainedDeadLetters || _deadLetters.Values.Any(entry =>
+            DurableMessagingTime.IsExpired(_jobTimeProvider.GetUtcNow(), entry.DeadLetteredAt, _deadLetterRetentionPeriod)))
+        {
+            await SubmitAsync(new CompactWrite(_stateGeneration)).ConfigureAwait(true);
+        }
+    }
+
+    public async Task OnStop(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            Stop();
+        }
+        finally
+        {
+            try
+            {
+                await _deliveryGate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+                try
+                {
+                    await CancelPendingDeliveryBatchAsync().ConfigureAwait(true);
+                }
+                finally
+                {
+                    _deliveryGate.Release();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (_preparationsDrained is { } preparations)
+                    {
+                        await preparations.Task.ConfigureAwait(true);
+                    }
+                }
+                finally
+                {
+                    if (_writesDrained is { } writes)
+                    {
+                        await writes.Task.ConfigureAwait(true);
+                    }
+                }
+            }
+        }
+    }
+
+    private void Stop()
+    {
+        _stateGeneration++;
+        _liveBatches = 0;
+        _preparedOwnership = null;
+        foreach (var entry in _pendingMessages.Values.Where(static entry => !entry.Staged).ToArray())
+        {
+            _pendingMessages.Remove(entry.Envelope.MessageId);
+        }
+        _pumpCoordinator.Reset();
+        _pumpResults.Clear(JobName);
+        try
+        {
+            _shutdown.Cancel();
+        }
+        catch (AggregateException exception)
+        {
+            LogCancellationFailed(_logger, exception);
+        }
+        finally
+        {
+            CancelPendingDeliveryBatchAsync().Ignore();
+            if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
+            {
+                _instruments.OnOutboxDepthChanged(-Interlocked.Exchange(ref _reportedDepth, 0));
+            }
+        }
+    }
+
+    private void EnsureMetricsActive()
+    {
+        if (Interlocked.Exchange(ref _metricsActive, 1) == 0)
+        {
+            _reportedDepth = Count;
+            _instruments.OnOutboxDepthChanged(Count);
+        }
+    }
+
+    private void ReconcileOutboxDepth()
+    {
+        if (Volatile.Read(ref _metricsActive) != 0)
+        {
+            var count = Count;
+            _instruments.OnOutboxDepthChanged(count - Interlocked.Exchange(ref _reportedDepth, count));
+        }
+    }
+
+    private void QueueEnsureJobScheduled()
+    {
+        if (Interlocked.Exchange(ref _ensureJobScheduledQueued, 1) != 0)
+        {
+            return;
+        }
+        var state = new EnsureJobTimerState(this);
+        try
+        {
+            state.Handle.Attach(_timerRegistry.RegisterGrainTimer(_grainContext,
+                static (state, cancellationToken) => state.RunAsync(cancellationToken), state,
+                new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan) { Interleave = false, KeepAlive = true }));
+        }
+        catch
+        {
+            Volatile.Write(ref _ensureJobScheduledQueued, 0);
+            throw;
+        }
+    }
+
+    internal async Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        StartPreparation();
+        try
+        {
+            ValidateReady();
+            if (_messages.Count > 0 && ((replaceExisting && _liveBatches == 0) || !HasCommittedOwnership()))
+            {
+                await PrepareOwnershipAsync(replaceExisting).ConfigureAwait(true);
+                await SubmitAsync(new OwnershipWrite(_stateGeneration)).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+            CompletePreparation();
+        }
+    }
+
+    public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    {
+        _failure?.Throw();
+        _shutdown.Token.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
+        ThrowIfOwnershipStateInvalid();
+        if (!DurableMessagingJobOwnership.TryGetOwnershipId(context.Job, out var ownershipId))
+        {
+            return DurableJobRunResult.Completed;
+        }
+
+        if (IsOwnershipTransitionPending(ownershipId))
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
+        var key = new DurableMessagingPumpExecutionKey(
+            JobName,
+            context.Job.Id,
+            context.RunId,
+            Volatile.Read(ref _stateGeneration));
+        if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
+        {
+            var disposition = DurableMessagingJobOwnership.ResolveMismatch(
+                _recoveryCompleted,
+                HasCommittedOwnership(),
+                DurableMessagingJobOwnership.IsCompleted(_durableCompletedJobId, ownershipId),
+                Count > 0);
+            if (disposition == OwnershipMismatchDisposition.ReclaimOrphan)
+            {
+                LogOrphanedJobReclaimed(_logger, ownershipId, _grainContext.GrainId);
+                _instruments.OnOrphanedJobReclaimed(_grainContext.GrainId.Type.ToString(), JobName);
+                return CompleteObsoleteExecution(key);
+            }
+
+            if (disposition == OwnershipMismatchDisposition.CompleteStale)
+            {
+                return CompleteObsoleteExecution(key);
+            }
+
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
+        if (!_recoveryCompleted || IsOwnershipTransitionPending(ownershipId))
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
+        if (!DurableMessagingJobOwnership.IsSamePhysicalJob(_job.Value, context.Job))
+        {
+            return CompleteObsoleteExecution(key);
+        }
+
+        if (_pumpResults.TryTake(key, out var result, out var exception))
+        {
+            if (exception is not null)
+            {
+                throw exception;
+            }
+
+            return result!;
+        }
+
+        if (!_pumpCoordinator.TryAcquire(ownershipId, cancellationToken, out var lease))
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
+        if (!_pumpResults.TryStart(key, cancellationToken, out var execution))
+        {
+            _pumpCoordinator.Release(lease);
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
+        _activePumpTurns++;
+        var state = new PumpTimerState(
+            this,
+            execution,
+            lease,
+            context.Job,
+            cancellationToken);
+        try
+        {
+            state.Handle.Attach(_timerRegistry.RegisterGrainTimer(
+                _grainContext,
+                static (state, timerCancellation) => state.RunAsync(timerCancellation),
+                state,
+                new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan)
+                {
+                    Interleave = false,
+                    KeepAlive = true
+                }));
+        }
+        catch (Exception registrationException)
+        {
+            _activePumpTurns--;
+            _pumpCoordinator.Release(lease);
+            _pumpResults.Fail(execution, registrationException);
+            throw;
+        }
+
+        return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+    }
+
+    private DurableJobRunResult CompleteObsoleteExecution(DurableMessagingPumpExecutionKey key)
+    {
+        // Stable ownership retires this run; its retained result will no longer be polled.
+        _pumpResults.TryTake(key, out _, out _);
+        return DurableJobRunResult.Completed;
+    }
+
+    private async Task RunPumpTimerAsync(
+        DurableMessagingPumpExecution execution,
+        DurableMessagingPumpLease lease,
+        DurableJob job,
+        CancellationToken jobCancellation,
+        CancellationToken timerCancellation)
+    {
+        if (!_pumpCoordinator.IsCurrent(lease) || !IsCurrentPump(job, execution.Key.StateGeneration))
+        {
+            _pumpResults.Discard(execution);
+            return;
+        }
+
+        if (!_pumpResults.TryBegin(execution))
+        {
+            return;
+        }
+
+        DurableJobRunResult? result = null;
+        Exception? failure = null;
+        try
+        {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                jobCancellation,
+                timerCancellation,
+                _shutdown.Token);
+            result = await ExecuteJobCoreAsync(
+                lease.OwnershipId,
+                job,
+                execution.Key.StateGeneration,
+                linkedCancellation.Token,
+                jobCancellation);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        finally
+        {
+            if (failure is null)
+            {
+                _pumpResults.Complete(execution, result!);
+            }
+            else
+            {
+                _pumpResults.Fail(execution, failure);
+            }
+        }
+    }
+
+    internal async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(string jobId, DurableJob job, long stateGeneration,
+        CancellationToken cancellationToken, CancellationToken attemptCancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            ValidateReady();
+            if (!IsCurrentPump(job, stateGeneration) || IsOwnershipTransitionPending(jobId))
+            {
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+        await AdvancePendingDeliveriesAsync(job, stateGeneration, cancellationToken, attemptCancellationToken).ConfigureAwait(true);
+        if (_pendingDeliveryBatch is not null)
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            ValidateReady();
+            if (!IsCurrentPump(job, stateGeneration) || IsOwnershipTransitionPending(jobId))
+            {
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+            }
+            if (Count == 0 && _liveBatches == 0 && _activePreparations == 0)
+            {
+                await SubmitAsync(new ClearOwnerWrite(new(jobId, job, stateGeneration))).ConfigureAwait(true);
+                if (_jobId.Value is null)
+                {
+                    return DurableJobRunResult.Completed;
+                }
+            }
+            if (_unacknowledgedMessageCount > 0 || (Count == 0 && _liveBatches > 0))
+            {
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+            }
+            var now = _jobTimeProvider.GetUtcNow();
+            var attempts = _messages.Values.Select(envelope => GetNextAttemptAt(envelope, now)).ToArray();
+            var next = attempts.Any(value => value is null || value <= now) ? now : attempts.Min() ?? now;
+            return DurableJobRunResult.RescheduleAt(next);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Durable outbox command staging failed.")]
+    private static partial void LogStagingFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after an outbox staging failure failed.")]
+    private static partial void LogDeactivationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An unclaimed outbox preparation failed.")]
+    private static partial void LogPreparationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An outbox cancellation callback failed during cleanup.")]
+    private static partial void LogCancellationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "No durable messages to deliver (all {Count} messages are still pending)")]
+    private static partial void LogNoDurableMessages(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Delivering {Count} durable messages from outbox")]
+    private static partial void LogDeliveringMessages(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Delivered message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (Status: {Status}, CorrelationKey: {CorrelationKey})")]
+    private static partial void LogMessageDelivered(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, DeliveryStatus status, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Route not found for message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}): {Message}")]
+    private static partial void LogDeliveryRouteNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey, string? message);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Backpressured delivering message {MessageId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}), will retry later")]
+    private static partial void LogDeliveryBackpressured(ILogger logger, Guid messageId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unexpected delivery status {Status} for message {MessageId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, Guid messageId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error delivering message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
+    private static partial void LogDeliveryError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
+    private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Grain activated with {Count} pending outbox messages, starting pump")]
+    private static partial void LogPumpStartingOnActivation(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in outbox pump loop")]
+    private static partial void LogPumpLoopError(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Reclaimed orphaned outbox job ownership {OwnershipId} for grain {GrainId}")]
+    private static partial void LogOrphanedJobReclaimed(ILogger logger, string ownershipId, GrainId grainId);
+
+    private sealed class PumpTimerState(
+        DurableOutbox owner,
+        DurableMessagingPumpExecution execution,
+        DurableMessagingPumpLease lease,
+        DurableJob job,
+        CancellationToken jobCancellation)
+    {
+        public OneShotTimerHandle Handle { get; } = new();
+
+        public async Task RunAsync(CancellationToken timerCancellation)
+        {
+            try
+            {
+                await owner.RunPumpTimerAsync(
+                    execution,
+                    lease,
+                    job,
+                    jobCancellation,
+                    timerCancellation);
+            }
+            finally
+            {
+                owner._pumpCoordinator.Release(lease);
+                owner._activePumpTurns--;
+                Handle.Complete();
+            }
+        }
+    }
+
+    private readonly record struct PumpOwner(string? Id, DurableJob? Job, long Generation);
+    private sealed class PendingMessage(DurableEnvelope envelope)
+    {
+        public DurableEnvelope Envelope { get; } = envelope;
+        public int References { get; set; }
+        public bool Staged { get; set; }
+        public bool Captured { get; set; }
+        public bool Acknowledged { get; set; }
+    }
+
+    private sealed class PreparedBatch(DurableOutbox owner, long generation, PendingMessage[] entries) : IPreparedOutboxBatch
+    {
+        public DurableOutbox Owner { get; } = owner;
+        public long Generation { get; } = generation;
+        public PendingMessage[] Entries { get; } = entries;
+        public bool Staged { get; set; }
+        public bool Disposed { get; private set; }
+        public void Dispose()
+        {
+            if (!Disposed)
+            {
+                Disposed = true;
+                Owner.ReleaseBatch(this);
+            }
+        }
+    }
+    private sealed record OwnershipProposal(string Id, long Sequence, DurableJob Job, PumpOwner PreviousOwner);
+    private sealed record DeliveryCandidate(DurableEnvelope Envelope, OutboxMessageState? State);
+    private sealed record DeliveryOutcome(DeliveryCandidate Candidate, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);
+    private sealed record PreparedDelivery(DeliveryOutcome Outcome, bool Remove, OutboxMessageState? Retry);
+
+    private abstract class OutboxWrite(long generation)
+    {
+        public long Generation { get; } = generation;
+    }
+    private sealed class DeliveryWrite(PumpOwner owner, DeliveryOutcome[] outcomes) : OutboxWrite(owner.Generation)
+    {
+        public PumpOwner Owner { get; } = owner;
+        public DeliveryOutcome[] Outcomes { get; } = outcomes;
+        public PreparedDelivery[] Prepared { get; set; } = [];
+    }
+    private sealed class ClearOwnerWrite(PumpOwner owner) : OutboxWrite(owner.Generation)
+    {
+        public PumpOwner Owner { get; } = owner;
+    }
+    private sealed class OwnershipWrite(long generation) : OutboxWrite(generation);
+    private sealed class CompactWrite(long generation) : OutboxWrite(generation);
+
+    private sealed class PendingDeliveryBatch(PumpOwner owner, CancellationTokenSource cancellation) : IDisposable
+    {
+        private bool _disposed;
+        private Task? _drain;
+        public PumpOwner Owner { get; } = owner;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public List<Task<DeliveryOutcome>> Attempts { get; } = [];
+        public Task CancelAsync(ILogger<DurableOutbox> logger)
+        {
+            if (_drain is { } drain)
+            {
+                return drain;
+            }
+            if (_disposed)
+            {
+                return Task.CompletedTask;
+            }
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _drain = completion.Task;
+            try
+            {
+                Cancellation.Cancel();
+            }
+            catch (AggregateException exception)
+            {
+                LogCancellationFailed(logger, exception);
+            }
+            DrainAsync(completion).Ignore();
+            return _drain;
+        }
+
+        private async Task DrainAsync(TaskCompletionSource completion)
+        {
+            // Delivery already logs transport failures. Retirement observes every outcome before releasing the token source.
+            await ((Task)Task.WhenAll(Attempts)).ConfigureAwait(
+                ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            Dispose();
+            completion.TrySetResult();
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                Cancellation.Dispose();
+            }
+        }
+    }
+
+    private sealed class EnsureJobTimerState(DurableOutbox owner)
+    {
+        public OneShotTimerHandle Handle { get; } = new();
+        public async Task RunAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await owner.EnsureJobScheduledAsync(false, cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || owner._shutdown.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                LogPumpLoopError(owner._logger, exception);
+                if (owner._failure is null && !owner._shutdown.IsCancellationRequested)
+                {
+                    owner._grainContext.Deactivate(new DeactivationReason(
+                        DeactivationReasonCode.ApplicationError, exception, "Durable outbox ownership repair failed."), CancellationToken.None);
+                }
+            }
+            finally
+            {
+                Volatile.Write(ref owner._ensureJobScheduledQueued, 0);
+                Handle.Complete();
+            }
+        }
+    }
+}
