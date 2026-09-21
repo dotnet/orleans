@@ -60,21 +60,44 @@ internal static partial class ZooKeeperReadRetryPolicy
             return await pipeline.ExecuteAsync(async context =>
             {
                 context.CancellationToken.ThrowIfCancellationRequested();
+                IDisposable? retryAdmission = null;
                 if (reconnectAfter is { } connectedGeneration && connectionMonitor is not null)
                 {
-                    await connectionMonitor.WaitForConnectionAfterAsync(connectedGeneration, context.CancellationToken);
+                    while (await connectionMonitor.WaitForConnectionAfterAsync(
+                        connectedGeneration,
+                        context.CancellationToken))
+                    {
+                        // Preserve first-attempt fanout while draining recovery traffic one request at a time.
+                        retryAdmission = await connectionMonitor.AcquireRetryAdmissionAsync(context.CancellationToken);
+                        if (connectionMonitor.IsConnectedAfter(connectedGeneration))
+                        {
+                            break;
+                        }
+
+                        retryAdmission.Dispose();
+                        retryAdmission = null;
+                    }
                 }
 
-                var attemptGeneration = connectionMonitor?.CaptureAttemptGeneration() ?? 0;
-                // Await actual native completion: cancellation ends admission, not an in-flight request.
                 try
                 {
-                    return await operation();
+                    context.CancellationToken.ThrowIfCancellationRequested();
+                    var attemptGeneration = connectionMonitor?.CaptureAttemptGeneration() ?? 0;
+                    // Await actual native completion: cancellation ends admission, not an in-flight request.
+                    try
+                    {
+                        return await operation();
+                    }
+                    catch (KeeperException.ConnectionLossException)
+                    {
+                        connectionMonitor?.ReportConnectionLoss(attemptGeneration);
+                        reconnectAfter = attemptGeneration;
+                        throw;
+                    }
                 }
-                catch (KeeperException.ConnectionLossException)
+                finally
                 {
-                    reconnectAfter = attemptGeneration;
-                    throw;
+                    retryAdmission?.Dispose();
                 }
             }, context);
         }

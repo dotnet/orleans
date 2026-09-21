@@ -149,6 +149,7 @@ namespace Orleans.Runtime.Membership
         /// <remarks>
         /// Connection-loss failures in native reads are retried up to four times on the operation's session.
         /// Each retry waits for that session's next connected event before issuing another request.
+        /// Recovery requests use one-at-a-time admission while first-attempt reads remain concurrent.
         /// The table and child versions fence each complete snapshot pass.
         /// </remarks>
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
@@ -173,6 +174,7 @@ namespace Orleans.Runtime.Membership
         /// Table and child-version checks fence the complete snapshot.
         /// Connection-loss failures in native reads are retried up to four times on the same session.
         /// Each retry waits for that session's next connected event before issuing another request.
+        /// Recovery requests use one-at-a-time admission while first-attempt rows remain concurrent.
         /// Caller cancellation stops further requests while admitted requests and client close complete.
         /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
@@ -688,6 +690,7 @@ namespace Orleans.Runtime.Membership
         private readonly TimeProvider _timeProvider;
         private readonly TimeSpan _reconnectTimeout;
         private readonly object _connectionLock = new();
+        private readonly SemaphoreSlim _retryAdmission = new(1, 1);
         private TaskCompletionSource _connectionChanged = NewConnectionChangedSource();
         private long _connectedGeneration;
         private bool _connected;
@@ -755,6 +758,37 @@ namespace Orleans.Runtime.Membership
             }
         }
 
+        bool IZooKeeperConnectionMonitor.IsConnectedAfter(long connectedGeneration)
+        {
+            lock (_connectionLock)
+            {
+                return _connected && _connectedGeneration > connectedGeneration;
+            }
+        }
+
+        async ValueTask<IDisposable> IZooKeeperConnectionMonitor.AcquireRetryAdmissionAsync(
+            CancellationToken cancellationToken)
+        {
+            await _retryAdmission.WaitAsync(cancellationToken);
+            return new RetryAdmission(_retryAdmission);
+        }
+
+        void IZooKeeperConnectionMonitor.ReportConnectionLoss(long connectedGeneration)
+        {
+            TaskCompletionSource? changed = null;
+            lock (_connectionLock)
+            {
+                if (_connected && _connectedGeneration <= connectedGeneration)
+                {
+                    _connected = false;
+                    changed = _connectionChanged;
+                    _connectionChanged = NewConnectionChangedSource();
+                }
+            }
+
+            changed?.TrySetResult();
+        }
+
         async ValueTask<bool> IZooKeeperConnectionMonitor.WaitForConnectionAfterAsync(
             long connectedGeneration,
             CancellationToken cancellationToken)
@@ -768,7 +802,7 @@ namespace Orleans.Runtime.Membership
                     Task changed;
                     lock (_connectionLock)
                     {
-                        if (_connectedGeneration > connectedGeneration)
+                        if (_connected && _connectedGeneration > connectedGeneration)
                         {
                             return true;
                         }
@@ -799,6 +833,13 @@ namespace Orleans.Runtime.Membership
 
         private static TaskCompletionSource NewConnectionChangedSource() =>
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private sealed class RetryAdmission(SemaphoreSlim admission) : IDisposable
+        {
+            private SemaphoreSlim? _admission = admission;
+
+            public void Dispose() => Interlocked.Exchange(ref _admission, null)?.Release();
+        }
 
         [LoggerMessage(
             Level = LogLevel.Debug,

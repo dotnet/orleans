@@ -186,6 +186,24 @@ public sealed class ZooKeeperReadRetryTests
     }
 
     [Fact]
+    public async Task ConnectionMonitor_CanceledRetryAdmissionDoesNotPoisonPeers()
+    {
+        var monitor = (IZooKeeperConnectionMonitor)CreateConnectionMonitor();
+        using var owner = await monitor.AcquireRetryAdmissionAsync(TestContext.Current.CancellationToken);
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var canceledAdmission = monitor.AcquireRetryAdmissionAsync(canceled.Token).AsTask();
+        var peerAdmission = monitor.AcquireRetryAdmissionAsync(TestContext.Current.CancellationToken).AsTask();
+
+        canceled.Cancel();
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledAdmission);
+        Assert.Equal(canceled.Token, failure.CancellationToken);
+        Assert.False(peerAdmission.IsCompleted);
+
+        owner.Dispose();
+        using var peer = await peerAdmission;
+    }
+
+    [Fact]
     public async Task ConnectionMonitor_TimeoutReturnsWithoutReplacingNativeFailure()
     {
         var timeProvider = new FakeTimeProvider();
@@ -227,22 +245,63 @@ public sealed class ZooKeeperReadRetryTests
         var monitor = CreateConnectionMonitor();
         harness.ConnectionMonitor = monitor;
         await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-        var failed = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-        harness.BeforeRequest = request =>
+        var counts = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+        var releaseFirstAttempts = Gate();
+        var allFirstAttempts = Gate();
+        var allWarnings = Gate();
+        var retryEntered = Channel.CreateUnbounded<string>();
+        var releaseRetry = Channel.CreateUnbounded<bool>();
+        var firstAttempts = 0;
+        var activeFirstAttempts = 0;
+        var maxFirstAttempts = 0;
+        var activeRetryAttempts = 0;
+        var maxRetryAttempts = 0;
+        harness.Logger.WarningRecorded = count =>
+        {
+            if (count == rowCount)
+                allWarnings.TrySetResult();
+        };
+        harness.BeforeRequest = async request =>
         {
             if (request.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
-                && !request.EndsWith("/IAmAlive", StringComparison.Ordinal)
-                && failed.TryAdd(request, 0))
+                && !request.EndsWith("/IAmAlive", StringComparison.Ordinal))
             {
-                throw new KeeperException.ConnectionLossException();
-            }
+                var count = counts.AddOrUpdate(request, 1, static (_, value) => value + 1);
+                if (count == 1)
+                {
+                    var active = Interlocked.Increment(ref activeFirstAttempts);
+                    InterlockedExtensions.Max(ref maxFirstAttempts, active);
+                    if (Interlocked.Increment(ref firstAttempts) == rowCount)
+                        allFirstAttempts.TrySetResult();
+                    await releaseFirstAttempts.Task;
+                    Interlocked.Decrement(ref activeFirstAttempts);
+                    throw new KeeperException.ConnectionLossException();
+                }
 
-            return Task.CompletedTask;
+                if (count == 2)
+                {
+                    var active = Interlocked.Increment(ref activeRetryAttempts);
+                    InterlockedExtensions.Max(ref maxRetryAttempts, active);
+                    Assert.True(retryEntered.Writer.TryWrite(request));
+                    await releaseRetry.Reader.ReadAsync(TestContext.Current.CancellationToken);
+                    Interlocked.Decrement(ref activeRetryAttempts);
+                }
+            }
         };
 
         var read = harness.Read(TestContext.Current.CancellationToken);
-        Assert.Equal(rowCount, harness.Logger.Warnings.Count);
+        await allFirstAttempts.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(rowCount, activeFirstAttempts);
+        Assert.True(maxFirstAttempts > 1);
+        releaseFirstAttempts.SetResult();
+        await allWarnings.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         var admittedCalls = harness.Calls.ToArray();
+        for (var i = 0; i < rowCount; i++)
+            Assert.Equal(TimeSpan.FromMilliseconds(250), await harness.Clock.NextTimerAsync());
         harness.Clock.Advance(TimeSpan.FromMilliseconds(250));
         Assert.Equal(admittedCalls, harness.Calls);
 
@@ -250,11 +309,91 @@ public sealed class ZooKeeperReadRetryTests
         Assert.Equal(admittedCalls, harness.Calls);
         await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
 
+        for (var i = 0; i < rowCount; i++)
+        {
+            try
+            {
+                _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken);
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException(
+                    $"Retry {i + 1}/{rowCount} did not enter; calls={string.Join(", ", counts.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}={pair.Value}"))}",
+                    exception);
+            }
+            Assert.Equal(1, activeRetryAttempts);
+            Assert.Equal(1, maxRetryAttempts);
+            Assert.True(releaseRetry.Writer.TryWrite(true));
+        }
+
         harness.AssertSnapshot(await read, harness.Entries, rowCount);
         Assert.All(harness.Entries, entry => Assert.Equal(2,
             harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress))));
         Assert.All(harness.Entries, entry => Assert.Equal(1,
             harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress))));
+        harness.AssertOneOwner(readOnly: true);
+    }
+
+    [Fact]
+    public async Task ReadRetry_SerializedWaiterRevalidatesAfterEarlierRetryDisconnects()
+    {
+        const int rowCount = 2;
+        var harness = await Harness.CreateAsync(rowCount);
+        var monitor = CreateConnectionMonitor();
+        harness.ConnectionMonitor = monitor;
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        var counts = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+        var secondRetryWarning = Gate();
+        var retryEntered = Channel.CreateUnbounded<string>();
+        string? firstRetry = null;
+        harness.Logger.WarningRecorded = count =>
+        {
+            if (count == rowCount + 1)
+                secondRetryWarning.TrySetResult();
+        };
+        harness.BeforeRequest = request =>
+        {
+            if (!request.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
+                || request.EndsWith("/IAmAlive", StringComparison.Ordinal))
+                return Task.CompletedTask;
+
+            var count = counts.AddOrUpdate(request, 1, static (_, value) => value + 1);
+            if (count == 1)
+                throw new KeeperException.ConnectionLossException();
+            if (count == 2)
+            {
+                Assert.True(retryEntered.Writer.TryWrite(request));
+                if (Interlocked.CompareExchange(ref firstRetry, request, null) is null)
+                    throw new KeeperException.ConnectionLossException();
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var read = harness.Read(TestContext.Current.CancellationToken);
+        Assert.Equal(rowCount, harness.Logger.Warnings.Count);
+        for (var i = 0; i < rowCount; i++)
+            Assert.Equal(TimeSpan.FromMilliseconds(250), await harness.Clock.NextTimerAsync());
+        harness.Clock.Advance(TimeSpan.FromMilliseconds(250));
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken);
+        await secondRetryWarning.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(retryEntered.Reader.TryRead(out _));
+        Assert.Equal(rowCount + 1, harness.Calls.Count(call =>
+            call.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
+            && !call.EndsWith("/IAmAlive", StringComparison.Ordinal)));
+
+        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
+        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
+        _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken);
+        await harness.Clock.AdvanceNextAsync(TimeSpan.FromMilliseconds(500));
+
+        harness.AssertSnapshot(await read, harness.Entries, rowCount);
+        Assert.All(harness.Entries, entry => Assert.True(
+            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)) is 2 or 3));
         harness.AssertOneOwner(readOnly: true);
     }
 
@@ -1112,6 +1251,7 @@ public sealed class ZooKeeperReadRetryTests
     {
         internal sealed record Warning(Exception? Exception, IReadOnlyDictionary<string, object?> Values);
         internal ConcurrentQueue<Warning> Warnings { get; } = new();
+        internal Action<int>? WarningRecorded { get; set; }
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -1119,6 +1259,22 @@ public sealed class ZooKeeperReadRetryTests
             Assert.Equal(LogLevel.Warning, logLevel);
             var values = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(state);
             Warnings.Enqueue(new(exception, values.ToDictionary(pair => pair.Key, pair => pair.Value)));
+            WarningRecorded?.Invoke(Warnings.Count);
+        }
+    }
+
+    private static class InterlockedExtensions
+    {
+        internal static void Max(ref int location, int value)
+        {
+            var current = Volatile.Read(ref location);
+            while (current < value)
+            {
+                var observed = Interlocked.CompareExchange(ref location, value, current);
+                if (observed == current)
+                    return;
+                current = observed;
+            }
         }
     }
 }
