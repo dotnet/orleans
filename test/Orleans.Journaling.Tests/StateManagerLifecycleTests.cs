@@ -144,7 +144,11 @@ public partial class StateManagerTests
         var state = new LifecycleState { EmitEntry = false };
         manager.RegisterStateMachine("state", state);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        // Initialization records the state name even when the state emits no entries.
+        Assert.True(manager.PendingWriteByteCount > 0);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var directoryEntry = Assert.Single(ReadBinaryEntries(Assert.Single(storage.Appends)));
+        Assert.Equal(0u, directoryEntry.StreamId.Value);
         Assert.Equal(0, manager.PendingWriteByteCount);
         Assert.Equal(1, state.WriteCompletedCount);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
