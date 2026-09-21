@@ -26,7 +26,7 @@ namespace Orleans.Journaling.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestCategory("BVT")]
-public class StateManagerTests : JournalingTestBase
+public partial class StateManagerTests : JournalingTestBase
 {
     /// <summary>
     /// Tests the registration and basic operation of multiple states.
@@ -121,8 +121,8 @@ public class StateManagerTests : JournalingTestBase
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Contains("fenced", writeException.Message, StringComparison.Ordinal);
-        Assert.Contains("fenced", deleteException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -617,7 +617,7 @@ public class StateManagerTests : JournalingTestBase
     [InlineData("append")]
     [InlineData("replace")]
     [InlineData("delete")]
-    public async Task StateManager_FailureDeactivatesOwningGrain(string operation)
+    public async Task StateManager_FailureHandling_RespectsRecoveryBoundary(string operation)
     {
         var expected = new IOException("Expected journal operation failure.");
         var storage = new CapturingStorage();
@@ -635,6 +635,14 @@ public class StateManagerTests : JournalingTestBase
         if (operation == "initialize")
         {
             storage.NextReadException = expected;
+            Assert.Same(expected, await Assert.ThrowsAsync<IOException>(() =>
+                manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()));
+            context.DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            value.Value = 42;
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Single(storage.Appends);
+            return;
         }
         else
         {
@@ -648,7 +656,6 @@ public class StateManagerTests : JournalingTestBase
 
         var failedOperation = operation switch
         {
-            "initialize" => manager.InitializeAsync(TestContext.Current.CancellationToken),
             "delete" => manager.DeleteStateAsync(TestContext.Current.CancellationToken),
             _ => manager.WriteStateAsync(TestContext.Current.CancellationToken)
         };
@@ -1064,7 +1071,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_FreshRecovery_ReplaysFixedStorage()
+    public async Task StateManager_RecoveryRetry_ReplaysFixedStorage()
     {
         var validBytes = CreatePersistedValueBytes("value", 42);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3], validBytes);
@@ -1075,11 +1082,6 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
-        await sut.Manager.DisposeAsync();
-        sut = CreateTestSystem(storage: storage);
-        value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
         await sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
@@ -1090,7 +1092,37 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_FreshRecovery_PreservesUnknownStreamOnce()
+    public async Task StateManager_RecoveryRetry_ReplaysListWithoutDuplicatingEntries()
+    {
+        var seedStorage = new CapturingStorage();
+        await using (var seed = CreateTestSystem(seedStorage).Manager)
+        {
+            var source = new DurableList<int>("items", seed,
+                new OrleansBinaryDurableListCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool));
+            await seed.InitializeAsync(TestContext.Current.CancellationToken);
+            source.Add(1);
+            source.Add(2);
+            await seed.WriteStateAsync(TestContext.Current.CancellationToken);
+        }
+
+        var bytes = seedStorage.RecoverableBytes;
+        var storage = new MutableReadStorage([.. bytes, 1, 2, 3], bytes);
+        await using var manager = CreateTestSystem(storage).Manager;
+        var items = new DurableList<int>("items", manager,
+            new OrleansBinaryDurableListCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
+        Assert.Equal([1, 2], items);
+
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], items);
+        Assert.Equal(2, storage.ReadCount);
+        items.Add(3);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2, 3], items);
+    }
+
+    [Fact]
+    public async Task StateManager_RecoveryRetry_PreservesUnknownStreamOnce()
     {
         var validBytes = CreateUnknownStreamBytes(new JournalStreamId(99), [1, 2, 3]);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3], validBytes) { IsCompactionRequested = true };
@@ -1100,10 +1132,6 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
-        await sut.Manager.DisposeAsync();
-        sut = CreateTestSystem(storage: storage);
         await sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
@@ -1116,7 +1144,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_FreshRecovery_RemovesStaleRetiredPlaceholder()
+    public async Task StateManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
     {
         var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new JournalStreamId(8), [1, 2, 3]), 1, 2, 3], []);
         var sut = CreateTestSystem(storage: storage);
@@ -1125,10 +1153,6 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask());
-        await sut.Manager.DisposeAsync();
-        sut = CreateTestSystem(storage: storage);
         await sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
@@ -2276,6 +2300,8 @@ public class StateManagerTests : JournalingTestBase
         private byte[] _bytes;
         private int _readCount;
 
+        public int ReadCount => Volatile.Read(ref _readCount);
+
         public MutableReadStorage(params byte[][] readSnapshots) : this(blockedReadNumber: 0, readSnapshots)
         {
         }
@@ -2330,9 +2356,12 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public CancellationToken ReadToken { get; private set; }
+
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
+            ReadToken = cancellationToken;
             cancellationToken.ThrowIfCancellationRequested();
             if (Interlocked.Increment(ref _readCount) == _blockedReadNumber)
             {

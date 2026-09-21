@@ -183,8 +183,9 @@ provider and requested state name.
 - `OnRecoveryCompleted`: finish reconstruction before application use.
 - `OnWriteCompleted`: publish effects that depend on storage acknowledgement.
 
-The recovery model uses fresh instances and replay. `JournalReplayContext.ResolveStateMachine`
-routes entries to the state machine for their stream.
+Recovery resets state machines and replays durable entries. A failed initialization can be retried on the
+same manager and registered states. `JournalReplayContext.ResolveStateMachine` routes entries to the
+state machine for their stream.
 
 `IJournaledStateManager` is independent of the grain-facing `IDurableStateManager` and extends
 `IAsyncDisposable`. Its owner API provides `RegisterStateMachine`, `TryGetStateMachine`,
@@ -255,12 +256,17 @@ durable state and await `WriteStateAsync`. One acknowledgement covers the manage
 batch, including changes staged by interleaved callers. Applications are responsible for sequencing that transition
 with other interleaved operations and for making uncertain-outcome retries idempotent.
 
-A failed journal operation permanently fences the manager, faults queued operations, and requests
+A failed write or delete permanently fences the manager, faults queued operations, and requests
 deactivation of the associated grain. In-flight calls retain their existing in-memory state while subsequent
 state-manager operations fail explicitly. A new activation recovers the actual durable outcome.
 For a manager created through `IJournaledStateManagerFactory`, dispose the failed instance and create
 another manager for the same `JournalId`, explicitly constructing and registering fresh state components
 before initialization and retiring the old components and dependencies according to their assigned lifetimes.
+
+An initialization failure reports its error to the attempt's callers and leaves the manager uninitialized.
+Call `InitializeAsync` again to retry from the beginning using the existing reset/replay contract.
+Concurrent callers share the active attempt, and writes become available after recovery succeeds.
+State registration stays closed after initialization first begins.
 
 Cancelling a caller's wait leaves an already queued write running. Observe durability through write
 acknowledgement or a fresh activation before deciding whether to retry an application command.

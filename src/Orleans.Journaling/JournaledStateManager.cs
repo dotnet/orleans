@@ -156,11 +156,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
         lock (_lock)
         {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
             ThrowIfFenced();
             if (_workLoop is null)
             {
@@ -187,14 +187,50 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private async Task WorkLoop()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-        try
+        while (!_shutdownCancellation.IsCancellationRequested)
         {
-            await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
-        }
-        catch (Exception exception)
-        {
-            Fence(exception);
-            return;
+            try
+            {
+                await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                _workSignal.Signal();
+                break;
+            }
+            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    LogErrorProcessingWorkItems(_shared.Logger, exception);
+                }
+                finally
+                {
+                    lock (_lock)
+                    {
+                        FaultQueuedWorkItemsUnderLock(exception);
+                    }
+                }
+            }
+
+            // Signals can remain from the failed attempt. Retry only for newly queued initialization work.
+            while (true)
+            {
+                await _workSignal.WaitAsync().ConfigureAwait(true);
+                if (_shutdownCancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                lock (_lock)
+                {
+                    if (_workQueue.Count > 0)
+                    {
+                        break;
+                    }
+                }
+            }
         }
 
         while (!_shutdownCancellation.Token.IsCancellationRequested)
@@ -548,6 +584,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
                 }
             }
+            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+            {
+                return;
+            }
             catch (Exception exception)
             {
                 Fence(exception);
@@ -560,6 +600,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     {
         lock (_lock)
         {
+            if (_state is ManagerState.Fenced)
+            {
+                return;
+            }
+
             _state = ManagerState.Fenced;
             _failure = exception;
         }
