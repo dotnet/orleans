@@ -1,33 +1,32 @@
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.ExceptionServices;
 using Orleans.Journaling;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
 // Captures handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
-internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
-    : ObservedJournalDictionary<Guid, DurableEnvelope>(manager, deferred: true), IDurableOutbox
+internal sealed class JournaledTestOutbox(IDurableDictionary<Guid, DurableEnvelope> messages)
+    : IDurableOutbox, ILifecycleObserver, IEnumerable<KeyValuePair<Guid, DurableEnvelope>>
 {
     private static readonly Func<DurableEnvelope, DurableEnvelope, bool> AreEquivalent = ReceiverTestServices
         .GetImplementationType("DurableEnvelopeEquivalence")
         .GetMethod("AreEquivalent")!
         .CreateDelegate<Func<DurableEnvelope, DurableEnvelope, bool>>();
 
-    private readonly HashSet<Guid> _pending = [];
-    private Guid[] _admitted = [];
-    private ExceptionDispatchInfo? _failure;
     private PreparationBarrier? _nextPreparation;
     private readonly List<PreparationOperation> _preparations = [];
     private readonly List<BatchObservation> _batches = [];
-    public Exception? Failure => _failure?.SourceException;
+    private readonly TaskCompletionSource _stopping = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private Task? _stopTask;
+    public Task Stopping => _stopping.Task;
     public int SendCalls { get; private set; }
     public Exception? NextSendFailure { get; set; }
     public int PreparationsStarted => _preparations.Count;
     public int PreparationsCompleted { get; private set; }
     public IReadOnlyList<PreparationOperation> Preparations => _preparations;
     public IReadOnlyList<BatchObservation> PreparedBatches => _batches;
-    public IReadOnlyList<Guid> LastCapturedIds { get; private set; } = [];
-    public Action? AfterWriteCompleted { get; set; }
+    public IDurableDictionary<Guid, DurableEnvelope> StoredMessages { get; } = messages;
+    public int Count => StoredMessages.Count;
 
     // This gates explicit local acquisition only, never journal execution or capture.
     public PreparationBarrier BlockNextPreparation(bool ignoreCancellation = false)
@@ -97,17 +96,19 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
         public void Dispose() => Observation.RecordDisposal();
     }
 
-    public IEnumerable<DurableEnvelope> Messages => Values;
+    public IEnumerable<DurableEnvelope> Messages => StoredMessages.Values;
+    public IEnumerator<KeyValuePair<Guid, DurableEnvelope>> GetEnumerator() => StoredMessages.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public async ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
         IReadOnlyList<DurableEnvelope> messages,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfStopped();
         var operation = new PreparationOperation(_preparations.Count + 1);
         _preparations.Add(operation);
         try
         {
-            _failure?.Throw();
             cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(messages);
 
@@ -132,8 +133,7 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
                 }
             }
 
-            // Even if the attempt closed during the wait, publish the controlled local result.
-            // The receiver must observe/dispose it; Send still checks the owner's retained fault.
+            // Publish late local results so the receiver's retirement can observe and dispose them.
             var observation = new BatchObservation(
                 _batches.Count + 1, operation.Id, snapshot.Select(static message => message.MessageId).ToArray());
             var batch = new PreparedBatch(this, snapshot, observation);
@@ -156,7 +156,7 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     public void Send(IPreparedOutboxBatch batch)
     {
         SendCalls++;
-        _failure?.Throw();
+        ThrowIfStopped();
         ArgumentNullException.ThrowIfNull(batch);
         if (batch is not PreparedBatch prepared || !ReferenceEquals(prepared.Owner, this))
         {
@@ -181,10 +181,9 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
         ValidateMessages(prepared.Messages);
         foreach (var envelope in prepared.Messages)
         {
-            if (!ContainsKey(envelope.MessageId))
+            if (!StoredMessages.ContainsKey(envelope.MessageId))
             {
-                Add(envelope.MessageId, envelope);
-                _pending.Add(envelope.MessageId);
+                StoredMessages.Add(envelope.MessageId, envelope);
             }
         }
         prepared.Observation.IsStaged = true;
@@ -211,46 +210,29 @@ internal sealed class JournaledTestOutbox(IJournaledStateManager manager)
     }
 
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
-        TryGetValue(messageId, out envelope);
+        StoredMessages.TryGetValue(messageId, out envelope);
 
-    public override void ValidatePendingChanges() => _failure?.Throw();
+    public Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    public override void WritePendingEntries(JournalStreamWriter writer)
+    public Task OnStop(CancellationToken cancellationToken)
     {
-        base.WritePendingEntries(writer);
-        Capture();
+        _stopping.TrySetResult();
+        return _stopTask ??= DrainAsync();
+
+        async Task DrainAsync()
+        {
+            foreach (var preparation in _preparations)
+            {
+                await preparation.Completed;
+            }
+        }
     }
 
-    public override void WriteSnapshot(JournalStreamWriter writer)
+    private void ThrowIfStopped()
     {
-        base.WriteSnapshot(writer);
-        Capture();
-    }
-
-    private void Capture()
-    {
-        _admitted = _pending.ToArray();
-        _pending.Clear();
-        LastCapturedIds = _admitted;
-    }
-
-    public override void OnWriteCompleted()
-    {
-        base.OnWriteCompleted();
-        _admitted = [];
-        AfterWriteCompleted?.Invoke();
-    }
-
-    public override void OnFaulted(Exception exception)
-    {
-        _failure ??= ExceptionDispatchInfo.Capture(exception);
-        base.OnFaulted(exception);
-    }
-
-    public override void Reset(JournalStreamWriter writer)
-    {
-        base.Reset(writer);
-        _pending.Clear();
-        _admitted = [];
+        if (_stopping.Task.IsCompleted)
+        {
+            throw new InvalidOperationException("The test outbox owner is stopped.");
+        }
     }
 }

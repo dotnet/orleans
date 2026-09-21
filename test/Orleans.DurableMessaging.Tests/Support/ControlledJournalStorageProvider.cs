@@ -12,6 +12,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, WritePlan> _deletePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
+    private readonly ConcurrentDictionary<JournalId, byte> _postDeleteFailures = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
     private readonly ConcurrentDictionary<JournalId, int> _reads = new();
     private readonly ConcurrentDictionary<JournalId, int> _creations = new();
@@ -95,6 +96,24 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         }
     }
 
+    public WriteBarrier BlockAcknowledgement(JournalId journalId)
+    {
+        var plan = new WritePlan(1, fail: false);
+        if (!_postWritePlans.TryAdd(journalId, plan))
+        {
+            throw new InvalidOperationException($"A post-write plan is already armed for journal '{journalId}'.");
+        }
+        return new WriteBarrier(plan);
+    }
+
+    public void FailAfterDelete(JournalId journalId)
+    {
+        if (!_postDeleteFailures.TryAdd(journalId, 0))
+        {
+            throw new InvalidOperationException($"A post-delete failure is already armed for journal '{journalId}'.");
+        }
+    }
+
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
 
@@ -138,7 +157,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private void OnWriteSucceeded(JournalId journalId) =>
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
 
-    private void AfterWrite(JournalId journalId)
+    private async ValueTask AfterWriteAsync(JournalId journalId, CancellationToken cancellationToken)
     {
         if (!_postWritePlans.TryGetValue(journalId, out var plan)
             || Interlocked.Increment(ref plan.Seen) != plan.Target)
@@ -147,7 +166,12 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         }
 
         _postWritePlans.TryRemove(new KeyValuePair<JournalId, WritePlan>(journalId, plan));
-        throw new IOException($"Injected post-commit journal response failure for '{journalId}'.");
+        if (plan.Fail)
+        {
+            throw new IOException($"Injected post-commit journal response failure for '{journalId}'.");
+        }
+        plan.Entered.TrySetResult();
+        await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal sealed class WritePlan(int target, bool fail)
@@ -184,9 +208,11 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
+            var grain = ReceiverTestServices.CurrentGrainContext?.GrainInstance as DurableMessagingTestGrain;
             owner._reads.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
             await owner.BeforeReadAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReadAsync(consumer, cancellationToken).ConfigureAwait(false);
+            grain?.CaptureStorageRead();
         }
 
         public ValueTask<bool> CreateIfNotExistsAsync(
@@ -209,19 +235,25 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
+            var grain = ReceiverTestServices.CurrentGrainContext?.GrainInstance as DurableMessagingTestGrain;
+            var captured = grain?.CaptureStorageWrite();
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
             owner._snapshots.TryRemove(journalId, out _);
             owner.OnWriteSucceeded(journalId);
-            owner.AfterWrite(journalId);
+            await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
+            if (captured is not null) grain!.PublishStoredSnapshot(captured);
         }
 
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
+            var grain = ReceiverTestServices.CurrentGrainContext?.GrainInstance as DurableMessagingTestGrain;
+            var captured = grain?.CaptureStorageWrite();
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             owner.OnWriteSucceeded(journalId);
-            owner.AfterWrite(journalId);
+            await owner.AfterWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
+            if (captured is not null) grain!.PublishStoredSnapshot(captured);
         }
 
         public async ValueTask DeleteAsync(CancellationToken cancellationToken)
@@ -232,6 +264,10 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
                 await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
             await inner.DeleteAsync(cancellationToken).ConfigureAwait(false);
+            if (owner._postDeleteFailures.TryRemove(journalId, out _))
+            {
+                throw new IOException($"Injected post-delete journal response failure for '{journalId}'.");
+            }
         }
     }
 }

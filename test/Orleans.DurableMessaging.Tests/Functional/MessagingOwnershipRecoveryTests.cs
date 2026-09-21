@@ -15,7 +15,7 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTestBase
 {
     [Fact]
-    public async Task JournalFailureDuringLocalScheduling_PreventsOldContextApply()
+    public async Task JournalFailureDuringLocalScheduling_RejectsLaterWriteAndFreshOwnerReplaysAcknowledgedState()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -29,13 +29,15 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         await schedule.WaitUntilEnteredAsync();
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var failure = await Assert.ThrowsAsync<IOException>(() => oldManager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.Same(failure, await oldGrain.Faulted.Task);
+        Assert.Same(failure, await oldGrain.DeactivationFailure.Task);
         schedule.Continue();
-        await Assert.ThrowsAsync<IOException>(() => delivery);
+        var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => delivery);
+        Assert.Contains("fenced", rejected.Message, StringComparison.Ordinal);
+        Assert.Equal(failure.Message, Assert.IsType<IOException>(rejected.InnerException).Message);
         var oldState = oldGrain.GetSnapshotForTest();
-        Assert.Equal(0, oldState.InboxCount);
-        Assert.Null(oldState.InboxJobId);
-        Assert.Null(oldState.InboxJob);
+        Assert.Equal(1, oldState.InboxCount);
+        Assert.NotNull(oldState.InboxJobId);
+        Assert.NotNull(oldState.InboxJob);
         Assert.Single(oldState.Effects);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var recovered = await receiver.GetSnapshotAsync();
@@ -182,6 +184,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
                     ["orleans.messaging.ownership-id"] = staleJobId
                 }
             });
+        await RefreshSeededOwnerAsync(receiver);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/stale-owner");
         using var envelope = CreateEnvelope(receiver, NewMessage(58, "stale-owner"), "messages/stale-owner");
 

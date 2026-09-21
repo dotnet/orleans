@@ -17,8 +17,8 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
     [Theory]
     [InlineData(false, "schedule")]
     [InlineData(true, "schedule")]
-    [InlineData(false, "admission")]
-    [InlineData(true, "admission")]
+    [InlineData(false, "acknowledgement")]
+    [InlineData(true, "acknowledgement")]
     [InlineData(false, "storage")]
     [InlineData(true, "storage")]
     public async Task CallerCancellation_RetainsOwnedDeliveryUntilCommit(bool proxy, string phase)
@@ -27,7 +27,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var extension = GetExtension(context);
-        using var blocked = await BlockAsync(receiver, phase);
+        using var blocked = Block(receiver, phase);
         using var envelope = CreateEnvelope(receiver, NewMessage(150, phase));
         using var cancellation = new CancellationTokenSource();
         var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
@@ -43,7 +43,6 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         Assert.False(duplicate.IsCompleted);
         Assert.Equal(1, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
         blocked.Release();
-        await blocked.Preceding;
         Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(), static snapshot => snapshot.InboxJobId is null);
@@ -51,15 +50,15 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(1, completed.ProcessedMessageCount);
         Assert.Equal(0, completed.InboxCount);
-        Assert.Equal(3 + blocked.PrecedingWrites, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
+        Assert.Equal(3, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         Assert.Equal(1, GetGate(extension).CurrentCount);
         Assert.Empty(GetPendingOwners(extension));
-        Assert.False(((DurableMessagingTestGrain)context.GrainInstance!).Faulted.Task.IsCompleted);
+        Assert.False(((DurableMessagingTestGrain)context.GrainInstance!).DeactivationFailure.Task.IsCompleted);
     }
 
     [Theory]
-    [InlineData(false, "admission")]
-    [InlineData(true, "admission")]
+    [InlineData(false, "acknowledgement")]
+    [InlineData(true, "acknowledgement")]
     [InlineData(false, "storage")]
     [InlineData(true, "storage")]
     public async Task CanceledCaller_LateFailureIsLoggedAndReleasesOwnership(bool proxy, string phase)
@@ -72,7 +71,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         using var envelope = CreateEnvelope(receiver, NewMessage(151, phase));
         using var logs = new DeliveryLogProbe(envelope.Value.MessageId);
         Fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILoggerFactory>().AddProvider(logs);
-        using var blocked = await BlockAsync(receiver, phase);
+        using var blocked = Block(receiver, phase);
         using var cancellation = new CancellationTokenSource();
         var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
         await blocked.Entered();
@@ -82,8 +81,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         Assert.Single(GetPendingOwners(extension));
 
         Assert.IsType<Action>(blocked.Fail)();
-        await blocked.Preceding;
-        var failure = await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var failure = await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var logged = await logs.Failure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.IsType<IOException>(failure);
@@ -94,9 +92,20 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
-        Assert.Equal(0, recovered.InboxCount);
-        Assert.Null(recovered.InboxJobId);
-        Assert.Empty(recovered.Effects);
+        if (phase == "acknowledgement")
+        {
+            var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+            Assert.Equal(1, Assert.Single(completed.Effects).Count);
+            Assert.Equal(1, completed.ProcessedMessageCount);
+            Assert.Equal(0, completed.InboxCount);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        }
+        else
+        {
+            Assert.Equal(0, recovered.InboxCount);
+            Assert.Null(recovered.InboxJobId);
+            Assert.Empty(recovered.Effects);
+        }
     }
 
     [Theory]
@@ -112,7 +121,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         var shutdown = (CancellationTokenSource)extension.GetType().GetField("_shutdownCts", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
         var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = shutdown.Token.Register(() => stopping.TrySetResult());
-        using var blocked = await BlockAsync(receiver, "storage");
+        using var blocked = Block(receiver, "storage");
         using var envelope = CreateEnvelope(receiver, NewMessage(152, "deactivation"));
         using var cancellation = new CancellationTokenSource();
         var delivery = StartDelivery(proxy, receiver, context, extension, envelope.Value, cancellation.Token);
@@ -139,48 +148,16 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         Assert.Equal(1, recovered.ProcessedMessageCount);
     }
 
-    private async Task<BlockedPhase> BlockAsync(IDurableMessagingTestGrain receiver, string phase)
+    private BlockedPhase Block(IDurableMessagingTestGrain receiver, string phase)
     {
         switch (phase)
         {
             case "schedule":
                 var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
                 return new(schedule.WaitUntilEnteredAsync, schedule.Continue, null);
-            case "admission":
-                var context = Fixture.GetGrainContext(receiver);
-                var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
-                var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
-                var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-                await OnTurnAsync(context, () =>
-                    context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-admission-cohort");
-                var precedingStorage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
-                var preceding = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
-                await precedingStorage.WaitUntilEnteredAsync();
-                var captures = grain.Captures.Count;
-                var admitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                outbox.ValidateWriting = () =>
-                {
-                    outbox.ValidateWriting = null;
-                    admitted.TrySetResult();
-                };
-                return new(
-                    async () =>
-                    {
-                        await admitted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-                        await OnTurnAsync(context, () =>
-                        {
-                            Assert.Equal(captures, grain.Captures.Count);
-                            Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
-                        });
-                    },
-                    precedingStorage.Release,
-                    () => context.Scheduler.QueueAction(() =>
-                    {
-                        outbox.OnFaulted(new IOException("Injected late admitted-state validation failure."));
-                        precedingStorage.Release();
-                    }),
-                    PrecedingWrites: 1,
-                    PriorWrite: preceding);
+            case "acknowledgement":
+                var acknowledgement = Fixture.Storage.BlockAcknowledgement(JournalId.FromGrainId(receiver.GetGrainId()));
+                return new(acknowledgement.WaitUntilEnteredAsync, acknowledgement.Release, acknowledgement.Fail);
             case "storage":
                 var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
                 return new(storage.WaitUntilEnteredAsync, storage.Release, storage.Fail);
@@ -223,10 +200,8 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         return completed.Task;
     }
 
-    private sealed record BlockedPhase(Func<Task> Entered, Action Release, Action? Fail,
-        int PrecedingWrites = 0, Task? PriorWrite = null) : IDisposable
+    private sealed record BlockedPhase(Func<Task> Entered, Action Release, Action? Fail) : IDisposable
     {
-        public Task Preceding => PriorWrite ?? Task.CompletedTask;
         public void Dispose() => Release();
     }
 

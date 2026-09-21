@@ -46,8 +46,6 @@ public sealed class EarlyActivationValidationTests : DurableMessagingBehaviorTes
         Assert.Contains(grainType.Name, failure.ToString(), StringComparison.Ordinal);
         var observation = Assert.Single(Fixture.ActivationProbe.Get(grain.GetGrainId()));
         Assert.False(observation.InstanceAvailableDuringConstruction);
-        Assert.Equal(0, observation.ReplayStarted);
-        Assert.Equal(0, observation.ReplayCompleted);
         Assert.Equal(0, observation.Activated);
         Assert.Equal(0, observation.Calls);
         var journal = JournalId.FromGrainId(grain.GetGrainId());
@@ -77,8 +75,6 @@ public sealed class EarlyActivationValidationTests : DurableMessagingBehaviorTes
         var first = Assert.Single(Fixture.ActivationProbe.Get(grain.GetGrainId()));
         Assert.False(first.InstanceAvailableDuringConstruction);
         Assert.NotNull(first.Context.GrainInstance);
-        Assert.Equal(1, first.ReplayStarted);
-        Assert.Equal(1, first.ReplayCompleted);
         Assert.Equal(1, first.Activated);
         Assert.Equal(1, first.Calls);
         Assert.Equal(1, Fixture.Storage.GetReadCount(JournalId.FromGrainId(grain.GetGrainId())));
@@ -88,8 +84,6 @@ public sealed class EarlyActivationValidationTests : DurableMessagingBehaviorTes
         var observations = Fixture.ActivationProbe.Get(grain.GetGrainId());
         Assert.Equal(2, observations.Length);
         Assert.NotSame(first.Context, observations[1].Context);
-        Assert.Equal(1, observations[1].ReplayStarted);
-        Assert.Equal(1, observations[1].ReplayCompleted);
         Assert.Equal(1, observations[1].Activated);
         Assert.Equal(1, observations[1].Calls);
         Assert.Equal(2, Fixture.Storage.GetReadCount(JournalId.FromGrainId(grain.GetGrainId())));

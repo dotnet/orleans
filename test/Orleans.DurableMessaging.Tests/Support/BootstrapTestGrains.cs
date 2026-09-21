@@ -60,22 +60,15 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         observation.Value = value;
         observation.Inbox = inbox;
         observation.Outbox = outbox;
-        var journal = (ObservedJournalValue<int>)value;
-        journal.Initializing = OnRecoveryStarted;
-        journal.Recovered = OnRecoveryCompleted;
-        journal.Written = OnWriteCompleted;
         inbox.RegisterHandler(Route, this);
     }
 
     public BootstrapObservation Observation { get; }
-    public int RecoveryStarts { get; private set; }
-    public int RecoveryCompletions { get; private set; }
-    public int PrimaryStateCountAtRecovery { get; private set; }
-    public object? GrainAtRecovery { get; private set; }
+    public int MessagingStateCountAtActivation { get; private set; }
+    public object? GrainAtActivation { get; private set; }
     public int ActivationValue { get; private set; }
     public int HandlerCalls { get; private set; }
     public int Disposals { get; private set; }
-    public TaskCompletionSource Handled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task<int> Read() => Task.FromResult(Observation.Value!.Value);
     public async Task Set(int value)
     {
@@ -85,21 +78,10 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public Task Activate()
     {
         Observation.Activations++;
+        GrainAtActivation = Observation.Context.GrainInstance;
+        MessagingStateCountAtActivation = ReadMessagingStates(Observation.Manager!).Count();
         ActivationValue = Observation.Value!.Value;
         return Task.CompletedTask;
-    }
-    public void OnRecoveryStarted()
-    {
-        RecoveryStarts++;
-        GrainAtRecovery = Observation.Context.GrainInstance;
-        PrimaryStateCountAtRecovery = ReadMessagingStates(Observation.Manager!).Count(static observer =>
-            observer.GetType().Name == "InboxJournalState");
-    }
-    public void OnRecoveryCompleted() => RecoveryCompletions++;
-    public void OnWriteStarted() { }
-    public void OnWriteCompleted()
-    {
-        if (HandlerCalls > 0) Handled.TrySetResult();
     }
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == Route;
     public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
@@ -122,8 +104,11 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public void Dispose() => Disposals++;
     public static IEnumerable<IStateMachine> ReadMessagingStates(IJournaledStateManager manager)
     {
-        if (manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox)) yield return inbox;
-        if (manager.TryGetStateMachine("test-handler-output", out var outbox)) yield return outbox;
+        foreach (var name in new[] { "inbox", "inbox-processed", "inbox-message-state", "inbox-dead-letters",
+            "inbox-job-id", "inbox-job-handle", "inbox-completed-job-id", "inbox-job-sequence" })
+        {
+            if (manager.TryGetStateMachine("__orleans.durable-messaging." + name, out var state)) yield return state;
+        }
     }
 
 }

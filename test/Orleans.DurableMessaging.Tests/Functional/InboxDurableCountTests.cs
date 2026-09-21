@@ -82,19 +82,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                 Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery(context, probe.Extension, queued.Value, Cancellation)).Status);
             }
             var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
-            var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
             var journal = JournalId.FromGrainId(receiver.GetGrainId());
-            await OnTurnAsync(context, () =>
-                context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "preceding-count-cohort");
-            var precedingStorage = Fixture.Storage.BlockWrite(journal);
-            var preceding = manager.WriteStateAsync(Cancellation).AsTask();
-            await precedingStorage.WaitUntilEnteredAsync();
-            var admitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            outbox.ValidateWriting = () =>
-            {
-                outbox.ValidateWriting = null;
-                admitted.TrySetResult();
-            };
             var storage = Fixture.Storage.BlockWrite(journal);
             try
             {
@@ -108,40 +96,22 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                     await AssertCountsAsync(context, probe, new(0, 0, 0));
                     scheduling.Continue();
                 }
-                await admitted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+                await storage.WaitUntilEnteredAsync();
                 await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 var duplicate = StartDelivery(context, probe.Extension, envelope.Value, Cancellation);
                 Assert.False(delivery.IsCompleted);
-                precedingStorage.Release();
-                await preceding;
-                await storage.WaitUntilEnteredAsync();
-                await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 cancellation.Cancel();
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => delivery);
                 await AssertCountsAsync(context, probe, new(existing + 1, 1, existing));
                 Assert.False(duplicate.IsCompleted);
-                await OnTurnAsync(context, () =>
-                {
-                    var error = Assert.Throws<InvalidOperationException>(() => manager.DeleteStateAsync(Cancellation).GetAwaiter().GetResult());
-                    Assert.Contains("quiescent", error.Message, StringComparison.Ordinal);
-                });
-                var acknowledged = new TaskCompletionSource<Counts>(TaskCreationOptions.RunContinuationsAsynchronously);
-                outbox.AfterWriteCompleted = () =>
-                {
-                    outbox.AfterWriteCompleted = null;
-                    context.Scheduler.QueueAction(() => acknowledged.TrySetResult(probe.Read()));
-                };
                 storage.Release();
-                Assert.Equal(new Counts(existing + 1, 0, existing + 1), await acknowledged.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
                 Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
                 await AssertCountsAsync(context, probe, new(existing + 1, 0, existing + 1));
                 Assert.Equal(1, ScheduleCount(receiver));
             }
             finally
             {
-                precedingStorage.Release();
                 storage.Release();
-                outbox.ValidateWriting = null;
             }
         }
         finally
@@ -190,7 +160,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
                 if (committed) storage.Release();
                 else storage.Fail();
                 var failure = await Assert.ThrowsAsync<IOException>(() => delivery);
-                Assert.Same(failure, await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
+                Assert.Same(failure, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation));
                 await AssertCountsAsync(context, probe, new(2, 1, 1));
             }
             finally
@@ -222,14 +192,14 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task RejectedAcceptanceCount_DistinguishesSchedulingFailureFromStagedRequestFailure(bool scheduling)
+    public async Task FailedAcceptanceCount_DistinguishesSchedulingFailureFromStagedWriteFailure(bool scheduling)
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         if (scheduling) Fixture.JobManagerProbe.FailNext(ReceiverTestServices.InboxJobName);
-        else Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).NextWriteRejection = new InvalidOperationException("Expected count request veto.");
+        else Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var envelope = CreateEnvelope(receiver, NewMessage(152, "rejected"));
         if (scheduling)
         {
@@ -238,8 +208,8 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         }
         else
         {
-            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(receiver, envelope.Value));
-            Assert.Equal("Expected count request veto.", failure.Message);
+            var failure = await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
+            Assert.Contains("Injected journal write failure", failure.Message, StringComparison.Ordinal);
         }
         Assert.Equal(new Counts(scheduling ? 0 : 1, scheduling ? 0 : 1, 0), probe.Read());
         Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
@@ -256,7 +226,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
     }
 
     [Fact]
-    public async Task QuiescentDeletionCount_ResetsBeforeLaterAcceptanceAndRecovery()
+    public async Task StoppedOwnerDeletionCount_ResetsAndLaterAcceptanceUsesFreshGeneration()
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(153, "delete-pending"));
@@ -273,20 +243,23 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         await AssertCountsAsync(context, probe, new(1, 0, 1));
-        var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
-        Task deletion = null!;
-        await OnTurnAsync(context, () => deletion = manager.DeleteStateAsync(Cancellation).AsTask());
-        await deletion;
-        await AssertCountsAsync(context, probe, new(0, 0, 0));
+        await receiver.DeleteStateAndDeactivateAsync();
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        Assert.Equal(new Counts(0, 0, 0), probe.Read());
+        _ = await receiver.GetSnapshotAsync();
+        var replacement = Fixture.GetGrainContext(receiver);
+        Assert.NotSame(context, replacement);
+        var replacementProbe = new CountProbe(replacement);
+        await AssertCountsAsync(replacement, replacementProbe, new(0, 0, 0));
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await Fixture.WaitForEffectCountAsync(receiver, 1);
         _ = await receiver.GetSnapshotAsync();
-        await AssertCountsAsync(context, probe, new(0, 0, 0));
+        await AssertCountsAsync(replacement, replacementProbe, new(0, 0, 0));
         await receiver.RequestDeactivationAsync();
-        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        await replacement.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         _ = await receiver.GetSnapshotAsync();
         var freshContext = Fixture.GetGrainContext(receiver);
-        Assert.NotSame(context, freshContext);
+        Assert.NotSame(replacement, freshContext);
         await AssertCountsAsync(freshContext, new CountProbe(freshContext), new(0, 0, 0));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
     }

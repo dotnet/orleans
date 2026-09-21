@@ -4,6 +4,7 @@ using Orleans.DurableMessaging;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Serialization;
 
 namespace Orleans.DurableMessaging.Tests.Support;
@@ -22,7 +23,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync(DurableEnvelope envelope);
-    Task<DeliveryResult> DeleteJournalThenDeliverAsync(DurableEnvelope envelope);
+    Task DeleteStateAndDeactivateAsync();
     Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate);
 }
 
@@ -84,8 +85,11 @@ public sealed record DurableDeadLetterSnapshot(
     [property: Id(4)] DateTimeOffset DeadLetteredAt);
 
 [GrainType("durable-messaging-inbox-test")]
-public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IDurableJobHandler
+public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingTestGrain, IDurableJobHandler,
+    IObserver<GrainLifecycleEvents.LifecycleEvent>, IDisposable
 {
+    private readonly IGrainContext _grainContext;
+    private readonly IDisposable _lifecycleSubscription;
     private readonly IJournaledStateManager _journalOwner;
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
@@ -112,6 +116,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly HashSet<Guid> _failedOnce = [];
 
     public DurableMessagingTestGrain(
+        IGrainContext grainContext,
         IJournaledStateManager journalOwner,
         IDurableInbox inbox,
         IDurableOutbox outbox,
@@ -127,6 +132,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         HandlerProbe handlerProbe,
         SnapshotProbe snapshotProbe)
     {
+        _grainContext = grainContext;
         _journalOwner = journalOwner;
         _inbox = inbox;
         _outbox = outbox;
@@ -141,23 +147,18 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _siloDetails = siloDetails;
         _handlerProbe = handlerProbe;
         _snapshotProbe = snapshotProbe;
-        var journal = (ObservedJournalDictionary<Guid, DurableEffect>)effects;
-        journal.ValidateWriting = OnWriteRequested;
-        journal.ValidateDeleting = OnDeleteRequested;
-        journal.Capturing = OnWriteStarted;
-        journal.Written = OnWriteCompleted;
-        journal.Recovered = OnRecoveryCompleted;
-        journal.Faulted = OnFaulted;
+        _lifecycleSubscription = GrainLifecycleEvents.AllEvents.Subscribe(this);
     }
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         _inbox.RegisterHandler(new ThrowingSelectionHandler(this));
         _inbox.RegisterHandler(new MutatingSelectionHandler(this));
         _inbox.RegisterHandler("nullable/reference", new NullReferenceMessageHandler(this));
         _inbox.RegisterHandler("nullable/value", new NullNullableValueMessageHandler(this));
         _inbox.RegisterHandler(new TypedMessageHandler(this));
-        return base.OnActivateAsync(cancellationToken);
+        await base.OnActivateAsync(cancellationToken);
+        _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
     }
 
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
@@ -241,11 +242,19 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
-    public async Task<DeliveryResult> DeleteJournalThenDeliverAsync(DurableEnvelope envelope)
+    public async Task DeleteStateAndDeactivateAsync()
     {
-        await _journalOwner.DeleteStateAsync(CancellationToken.None);
-        var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
-        return await extension.DeliverAsync(envelope);
+        try
+        {
+            var inbox = (ILifecycleObserver)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
+            var outbox = (ILifecycleObserver)_outbox;
+            await Task.WhenAll(inbox.OnStop(CancellationToken.None), outbox.OnStop(CancellationToken.None));
+            await _journalOwner.DeleteStateAsync(CancellationToken.None);
+        }
+        finally
+        {
+            DeactivateOnIdle();
+        }
     }
 
     private DurableEnvelope? _controlEnvelope;
@@ -274,9 +283,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             case "test/write-journal":
                 await StateManager.WriteStateAsync(attemptCancellationToken);
                 break;
-            case "test/delete-journal":
-                await _journalOwner.DeleteStateAsync(attemptCancellationToken);
-                break;
             case "test/probe-scheduler":
                 break;
             default:
@@ -303,53 +309,37 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
     }
 
-    internal Exception? NextWriteRejection { get; set; }
-    internal Exception? NextDeleteRejection { get; set; }
+    internal TaskCompletionSource<Exception> DeactivationFailure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public void OnDeleteRequested()
+    void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnNext(GrainLifecycleEvents.LifecycleEvent value)
     {
-        if (NextDeleteRejection is { } exception)
+        if (value is GrainLifecycleEvents.Deactivating { Reason.Exception: { } exception } deactivating
+            && ReferenceEquals(deactivating.GrainContext, _grainContext))
         {
-            NextDeleteRejection = null;
-            throw exception;
-        }
-    }
-    public void OnWriteRequested()
-    {
-        if (NextWriteRejection is { } exception)
-        {
-            NextWriteRejection = null;
-            throw exception;
+            DeactivationFailure.TrySetResult(exception);
         }
     }
 
-    internal TaskCompletionSource<Exception> Faulted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    public void OnFaulted(Exception exception) => Faulted.TrySetResult(exception);
+    void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnError(Exception error) => DeactivationFailure.TrySetException(error);
+    void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnCompleted() { }
+    public void Dispose() => _lifecycleSubscription.Dispose();
 
     internal List<DurableEndpointSnapshot> Captures { get; } = [];
-    private DurableEndpointSnapshot? _capturedSnapshot;
+    internal List<Guid[]> OutputCaptures { get; } = [];
     internal Exception? NextApplyFailure { get; set; }
-    internal Action? AfterApply { get; set; }
     internal TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public void OnWriteStarted() => Captures.Add(_capturedSnapshot = CreateSnapshot());
-
-    public void OnWriteCompleted()
+    internal DurableEndpointSnapshot CaptureStorageWrite()
     {
-        if (_capturedSnapshot is { } snapshot)
-        {
-            _snapshotProbe.Publish(this.GetGrainId(), snapshot);
-            _capturedSnapshot = null;
-        }
+        var snapshot = CreateSnapshot();
+        Captures.Add(snapshot);
+        OutputCaptures.Add(_outbox.Messages.Select(static envelope => envelope.MessageId).ToArray());
+        return snapshot;
     }
+
+    internal void PublishStoredSnapshot(DurableEndpointSnapshot snapshot) => _snapshotProbe.Publish(this.GetGrainId(), snapshot);
+    internal void CaptureStorageRead() => ReplayedSnapshot = CreateSnapshot();
     internal DurableEndpointSnapshot? ReplayedSnapshot { get; private set; }
-
-    public void OnRecoveryCompleted()
-    {
-        ReplayedSnapshot = CreateSnapshot();
-        _snapshotProbe.Publish(this.GetGrainId(), ReplayedSnapshot);
-    }
 
     private async ValueTask<Action> PrepareAsync(
         DurableTestMessage message,
@@ -370,10 +360,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             if (message.CommitDuringHandling)
             {
                 await WriteStateAsync(cancellationToken);
-            }
-            if (message.DeleteDuringHandling)
-            {
-                await _journalOwner.DeleteStateAsync(cancellationToken);
             }
             if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && _failedOnce.Add(message.LogicalId)))
             {
@@ -405,7 +391,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                         context.Send(output);
                     }
                 }
-                AfterApply?.Invoke();
             };
         }
         finally
@@ -415,19 +400,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     private void PublishSnapshot() => _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
-
-    private bool AttemptWriteDuringHandlerSelection()
-    {
-        try
-        {
-            WriteStateAsync().GetAwaiter().GetResult();
-        }
-        catch (InvalidOperationException)
-        {
-        }
-
-        return false;
-    }
 
     private DurableEndpointSnapshot CreateSnapshot() =>
         new(
@@ -462,11 +434,6 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     {
         bool IInboxHandler.CanHandle(IInboxHandlerContext context)
         {
-            if (context.Envelope.RouteKey == "messages/can-handle-write")
-            {
-                return owner.AttemptWriteDuringHandlerSelection();
-            }
-
             return context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
                 || context.Envelope.RouteKey == "typed";
         }

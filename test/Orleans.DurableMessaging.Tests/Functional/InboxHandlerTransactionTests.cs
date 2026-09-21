@@ -144,27 +144,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
-    public async Task HandlerSelectionWriteAttemptRejectsBeforeStaging()
-    {
-        var receiver = NewGrain();
-        using var envelope = CreateEnvelope(
-            receiver,
-            NewMessage(12, "can-handle-write"),
-            "messages/can-handle-write");
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => DeliverAsync(receiver, envelope.Value));
-        await receiver.RequestDeactivationAsync();
-        var snapshot = await receiver.GetSnapshotAsync();
-
-        Assert.Contains("cannot be committed or deleted", exception.Message, StringComparison.Ordinal);
-        Assert.Null(snapshot.InboxJobId);
-        Assert.Equal(0, snapshot.InboxCount);
-        Assert.Empty(snapshot.Effects);
-    }
-
-    [Fact]
-    public async Task HandlerCannotCommitBeforeInboxCompletion()
+    public async Task HandlerPreparation_OrdinaryWriteLeavesEffectsLocalUntilApplyAndCompletion()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -172,33 +152,14 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         using var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-commit") with { CommitDuringHandling = true });
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var exception = await oldGrain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Contains("cannot be committed or deleted", Assert.IsType<InvalidOperationException>(exception).Message, StringComparison.Ordinal);
-        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        var failed = oldGrain.GetSnapshotForTest();
-        Assert.Empty(failed.Effects);
-        Assert.Empty(failed.InboxDeadLetters);
-        Assert.Equal(1, failed.InboxCount);
-        Assert.Equal(0, failed.ProcessedMessageCount);
-    }
-
-    [Fact]
-    public async Task HandlerCannotDeleteStateBeforeInboxCompletion()
-    {
-        var receiver = NewGrain();
-        _ = await receiver.GetSnapshotAsync();
-        var oldContext = Fixture.GetGrainContext(receiver);
-        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
-        using var envelope = CreateEnvelope(receiver, NewMessage(10, "premature-delete") with { DeleteDuringHandling = true });
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var exception = await oldGrain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Contains("cannot be committed or deleted", Assert.IsType<InvalidOperationException>(exception).Message, StringComparison.Ordinal);
-        await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        var failed = oldGrain.GetSnapshotForTest();
-        Assert.Empty(failed.Effects);
-        Assert.Empty(failed.InboxDeadLetters);
-        Assert.Equal(1, failed.InboxCount);
-        Assert.Equal(0, failed.ProcessedMessageCount);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal("premature-commit", Assert.Single(completed.Effects).Value);
+        Assert.Empty(completed.InboxDeadLetters);
+        Assert.Equal(0, completed.InboxCount);
+        Assert.Equal(1, completed.ProcessedMessageCount);
+        Assert.False(oldGrain.DeactivationFailure.Task.IsCompleted);
+        Assert.Same(oldContext, Fixture.GetGrainContext(receiver));
     }
 
     [Fact]

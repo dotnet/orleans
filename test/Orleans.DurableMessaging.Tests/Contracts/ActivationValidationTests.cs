@@ -1,7 +1,10 @@
 using System.Collections.Immutable;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.DurableMessaging.Tests.Support;
+using Orleans.DurableMessaging.Tests.Functional;
 using Orleans.Journaling;
 using Orleans.Metadata;
 using Orleans.Placement;
@@ -80,29 +83,42 @@ public sealed class ActivationValidationTests
     }
 
     [Fact]
-    public void MissingCodecCapability_PreservesRequiredContractFailure()
+    public async Task StandardStateConstruction_MissingSelectedCodecFailsBeforeEnrollment()
     {
-        var manager = Substitute.For<IJournaledStateManager>();
-        var cause = new NotSupportedException("manager-bound codec capability");
-        manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>().Returns(_ => throw cause);
-
-        var exception = Assert.Throws<NotSupportedException>(() =>
-            ReceiverTestServices.CreateDeferredDictionary<string, int>(manager));
-
-        Assert.Same(cause, exception);
+        const string selectedFormat = "orleans-binary";
+        var builder = InboxStateManagerBoundaryTests.CreateBuilder(selectedFormat);
+        builder.Services.RemoveAllKeyed(typeof(IDurableValueCommandCodec<>), selectedFormat);
+        var id = new JournalId("missing-codec/" + Guid.NewGuid().ToString("N"));
+        builder.Services.AddScoped<IJournaledStateManager>(sp =>
+            sp.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(id));
+        await using var provider = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = provider.CreateAsyncScope();
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("state"));
+        Assert.Contains(selectedFormat, exception.Message, StringComparison.Ordinal);
+        Assert.False(owner.TryGetStateMachine("state", out _));
     }
 
     [Fact]
-    public void CodecResolution_PreservesUnrelatedFailure()
+    public async Task CodecResolution_PreservesUnrelatedFailure()
     {
-        var manager = Substitute.For<IJournaledStateManager>();
         var cause = new InvalidOperationException("codec resolution failure");
-        manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>().Returns(_ => throw cause);
+        const string selectedFormat = "orleans-binary";
+        var builder = InboxStateManagerBoundaryTests.CreateBuilder(selectedFormat);
+        builder.Services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, int>>(selectedFormat, (_, _) => throw cause);
+        var id = new JournalId("codec-resolution/" + Guid.NewGuid().ToString("N"));
+        builder.Services.AddScoped<IJournaledStateManager>(sp =>
+            sp.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(id));
+        await using var provider = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = provider.CreateAsyncScope();
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReceiverTestServices.CreateDeferredDictionary<string, int>(manager));
+            scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, int>>("state"));
 
         Assert.Same(cause, exception);
+        Assert.False(owner.TryGetStateMachine("state", out _));
     }
 
     [Reentrant]

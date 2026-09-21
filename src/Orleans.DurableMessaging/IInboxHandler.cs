@@ -61,8 +61,8 @@ public interface IInboxHandler
     /// The selection context exposes envelope metadata and grain identity. Its
     /// <see cref="IInboxHandlerContext.CreateEnvelope"/>, <see cref="IInboxHandlerContext.Send"/>,
     /// and <see cref="IInboxHandlerContext.Outbox"/> members throw during selection.
-    /// The runtime also rejects explicit journal write and delete requests during selection
-    /// and handling, preserving the completion commit after the prepared action completes.
+    /// Complete fallible checks before the returned action. The action stages safe-to-commit
+    /// changes synchronously, and inbox processing persists those changes together with completion.
     /// </para>
     /// <para>
     /// <b>Handler Precedence:</b> When multiple handlers return <c>true</c>, the first registered

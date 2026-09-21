@@ -136,6 +136,7 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         _ = await owner.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(owner);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var journal = JournalId.FromGrainId(owner.GetGrainId());
         var first = CreateOutput(owner);
         var second = CreateOutput(owner);
@@ -152,8 +153,8 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
             context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-only");
         await Fixture.WriteStateAsync(owner);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-        Assert.Empty(outbox.LastCapturedIds);
-        Assert.Equal(0, ((DurableMessagingTestGrain)context.GrainInstance!).Captures[^1].OutboxCount);
+        Assert.Empty(grain.OutputCaptures[^1]);
+        Assert.Equal(0, grain.Captures[^1].OutboxCount);
 
         preparation.Release();
         using (var batch = await acquisition)
@@ -162,7 +163,7 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
             Assert.Equal(0, ((IDurableOutbox)outbox).Count);
             Assert.Equal(new[] { first.MessageId, second.MessageId }, Assert.Single(outbox.PreparedBatches).MessageIds);
             await Fixture.WriteStateAsync(owner);
-            Assert.Empty(outbox.LastCapturedIds);
+            Assert.Empty(grain.OutputCaptures[^1]);
             Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
             await OnTurnAsync(context, () =>
             {
@@ -178,7 +179,7 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
         await owner.RetryWriteStateAsync();
         Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), outbox.LastCapturedIds.Order());
+        Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), grain.OutputCaptures[^1].Order());
         await owner.RequestDeactivationAsync();
         Assert.Equal(2, (await owner.GetSnapshotAsync()).OutboxCount);
         Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), Fixture.GetStagedOutput(owner).Select(static item => item.MessageId).Order());
@@ -211,15 +212,14 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.False(grain.Faulted.Task.IsCompleted);
-        Assert.Null(outbox.Failure);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
         Assert.All(outbox.PreparedBatches, static batch => Assert.Equal(1, batch.DisposeCalls));
 
         await OnTurnAsync(context, () =>
             context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy-after-preparation-failure");
         await Fixture.WriteStateAsync(owner);
         Assert.Same(context, Fixture.GetGrainContext(owner));
-        Assert.False(grain.Faulted.Task.IsCompleted);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
         await owner.StageOutputAsync(output);
         await owner.RetryWriteStateAsync();
         Assert.Equal(output.MessageId, Assert.Single(outbox.Messages).MessageId);
@@ -280,7 +280,6 @@ public sealed class JournaledTestOutboxBehaviorTests : DurableMessagingBehaviorT
         Assert.Same(retained.Data, Assert.Single(outbox.Messages).Data);
         Assert.False(outbox.TryGetMessage(first.MessageId, out _));
         Assert.False(outbox.PreparedBatches[0].IsStaged);
-        Assert.Null(outbox.Failure);
         await owner.RetryWriteStateAsync();
         await owner.RequestDeactivationAsync();
         Assert.Equal(1, (await owner.GetSnapshotAsync()).OutboxCount);

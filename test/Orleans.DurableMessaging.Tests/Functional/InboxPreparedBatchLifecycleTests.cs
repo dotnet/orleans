@@ -4,6 +4,8 @@ using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Functional;
@@ -40,7 +42,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var input = await DeliverToHandlerAsync(rig);
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
-        var failure = await WaitAsync(rig.Grain.Faulted.Task);
+        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
         Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
         Assert.NotSame(replacement, failure);
         Assert.Equal(1, handler.Applied);
@@ -56,7 +58,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var input = await DeliverToHandlerAsync(rig);
-        var ack = ObserveNextAck(rig);
+        var ack = AwaitHandlerCompletionAsync(rig);
         handler.Continue.TrySetResult();
         var acknowledged = await WaitAsync(ack);
         AssertAcknowledgedIds(acknowledged, input.Value);
@@ -102,7 +104,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var first = rig.Handler;
         first.Remainder = (_, _) => ValueTask.FromResult<Action>(() => { });
         using var one = await DeliverToHandlerAsync(rig);
-        var ack = ObserveNextAck(rig);
+        var ack = AwaitHandlerCompletionAsync(rig);
         first.Continue.TrySetResult();
         AssertAcknowledgedIds(await WaitAsync(ack), one.Value);
         using var second = new LifecycleHandler(rig.Effects);
@@ -124,7 +126,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(1, rig.Outbox.PreparedBatches[0].DisposeCalls);
         var writes = WriteCount(rig);
         second.Continue.TrySetResult();
-        var failure = await WaitAsync(rig.Grain.Faulted.Task);
+        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
         Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
         Assert.Equal(0, second.Applied);
         Assert.Equal(2, rig.Outbox.PreparationsStarted);
@@ -171,8 +173,8 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         };
         using var input = await DeliverToHandlerAsync(rig);
         using var preparation = providerFailure ? rig.Outbox.BlockNextPreparation() : null;
-        var storage = Fixture.Storage.BlockWrite(rig.JournalId);
-        var ack = ObserveNextAck(rig);
+        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
+        var ack = AwaitHandlerCompletionAsync(rig);
         try
         {
             handler.Continue.TrySetResult();
@@ -192,7 +194,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         finally { storage.Release(); }
         var acknowledged = await WaitAsync(ack);
         AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(new[] { 0 }, acknowledged.DisposeCalls);
+        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
         AssertDeadLetter(acknowledged.Snapshot, input.Value, failure.Message, attempts: 1);
         Assert.Equal(providerFailure ? 2 : 1, rig.Outbox.PreparationsStarted);
         Assert.Equal(rig.Outbox.PreparationsStarted, rig.Outbox.PreparationsCompleted);
@@ -220,8 +222,8 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         };
         using var input = await DeliverToHandlerAsync(rig);
         using var preparation = rig.Outbox.BlockNextPreparation();
-        var storage = Fixture.Storage.BlockWrite(rig.JournalId);
-        var ack = ObserveNextAck(rig);
+        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
+        var ack = AwaitHandlerCompletionAsync(rig);
         try
         {
             handler.Continue.TrySetResult();
@@ -238,7 +240,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         finally { storage.Release(); }
         var acknowledged = await WaitAsync(ack);
         AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(acquireFirst ? new[] { 0 } : Array.Empty<int>(), acknowledged.DisposeCalls);
+        Assert.Equal(acquireFirst ? new[] { 1 } : Array.Empty<int>(), acknowledged.DisposeCalls);
         AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
         Assert.Same(failure, preparation.Operation!.Failure);
         Assert.Equal(acquireFirst ? 2 : 1, rig.Outbox.PreparationsStarted);
@@ -267,8 +269,8 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             };
         };
         using var input = await DeliverToHandlerAsync(rig);
-        var storage = Fixture.Storage.BlockWrite(rig.JournalId);
-        var ack = ObserveNextAck(rig);
+        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
+        var ack = AwaitHandlerCompletionAsync(rig);
         try
         {
             handler.Continue.TrySetResult();
@@ -276,7 +278,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             Assert.Equal(1, handler.Applied);
             Assert.Equal(2, rig.Outbox.SendCalls);
             Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Outbox).Key);
-            Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Outbox.LastCapturedIds));
+            Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Grain.OutputCaptures[^1]));
             Assert.Equal(2, rig.Outbox.PreparedBatches.Count);
             Assert.True(rig.Outbox.PreparedBatches[0].IsStaged);
             Assert.False(rig.Outbox.PreparedBatches[1].IsStaged);
@@ -286,7 +288,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         finally { storage.Release(); }
         var acknowledged = await WaitAsync(ack);
         AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(new[] { 0, 0 }, acknowledged.DisposeCalls);
+        Assert.Equal(new[] { 1, 1 }, acknowledged.DisposeCalls);
         AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 1);
         Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Outbox.PreparedBatches[0].MessageIds));
         Assert.Equal(handler.UnusedOutput.MessageId, Assert.Single(rig.Outbox.PreparedBatches[1].MessageIds));
@@ -309,7 +311,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var input = await DeliverToHandlerAsync(rig);
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
-        Assert.Same(failure, await WaitAsync(rig.Grain.Faulted.Task));
+        Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
         Assert.Equal(1, handler.Applied);
         Assert.Empty(rig.Effects);
         await AssertFaultReplayAsync(rig, input.Value, failure, writes);
@@ -338,7 +340,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         await OnTurnAsync(rig.Context, () => rig.Outbox.NextSendFailure = failure);
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
-        Assert.Same(failure, await WaitAsync(rig.Grain.Faulted.Task));
+        Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
         Assert.Same(failure, caught);
         Assert.Equal(1, handler.Applied);
         Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
@@ -380,21 +382,20 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var acquisition = rig.Outbox.BlockNextPreparation();
         if (synchronous) acquisition.Fail(providerFailure);
         var writes = WriteCount(rig);
-        var ack = ObserveNextAck(rig);
+        var completion = GetHandlerCompletion(rig);
         handler.Continue.TrySetResult();
         await acquisition.WaitAsync();
         if (!synchronous) acquisition.Fail(providerFailure);
-        var outcome = await WaitAsync(Task.WhenAny(rig.Grain.Faulted.Task, ack));
+        await WaitAsync(completion);
         Assert.Equal(0, handler.Applied);
-        Assert.Same(rig.Grain.Faulted.Task, outcome);
-        var failure = Assert.IsType<InvalidOperationException>(await rig.Grain.Faulted.Task);
+        Assert.True(rig.Grain.DeactivationFailure.Task.IsCompletedSuccessfully);
+        var failure = Assert.IsType<InvalidOperationException>(await rig.Grain.DeactivationFailure.Task);
         Assert.Contains("consume", failure.Message, StringComparison.Ordinal);
         if (canceled)
             Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
                 Assert.IsAssignableFrom<OperationCanceledException>(failure.InnerException).CancellationToken);
         else
             Assert.Same(providerFailure, failure.InnerException);
-        Assert.False(ack.IsCompleted);
         Assert.Empty(rig.Effects);
         Assert.Equal(1, rig.Outbox.PreparationsStarted);
         Assert.Equal(1, rig.Outbox.PreparationsCompleted);
@@ -444,10 +445,15 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var input = await DeliverToHandlerAsync(rig);
         using var acquisition = rig.Outbox.BlockNextPreparation();
         if (synchronous) acquisition.Fail(providerFailure);
-        var ack = ObserveNextAck(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
+        var ack = AwaitHandlerCompletionAsync(rig);
         handler.Continue.TrySetResult();
         await acquisition.WaitAsync();
         if (!synchronous) acquisition.Fail(providerFailure);
+        await storage.WaitUntilEnteredAsync();
+        Assert.All(rig.Outbox.PreparedBatches, batch => Assert.Equal(0, batch.DisposeCalls));
+        Assert.False(ack.IsCompleted);
+        storage.Release();
         var acknowledged = await WaitAsync(ack);
         if (canceled && asTask)
             Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
@@ -461,7 +467,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(1, rig.Outbox.SendCalls);
         Assert.Equal(2, rig.Outbox.PreparationsStarted);
         Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        Assert.Equal(new[] { 0 }, acknowledged.DisposeCalls);
+        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
         await AssertHealthyWriteAsync(rig);
         await DeactivateAsync(rig);
         AssertDisposed(rig.Outbox, 1);
@@ -490,7 +496,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var input = await DeliverToHandlerAsync(rig);
         using var acquisition = rig.Outbox.BlockNextPreparation();
         acquisition.Fail(providerFailure);
-        var ack = ObserveNextAck(rig);
+        var ack = AwaitHandlerCompletionAsync(rig);
         handler.Continue.TrySetResult();
         var acknowledged = await WaitAsync(ack);
         AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
@@ -524,11 +530,16 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             return ValueTask.FromResult<Action>(self.ApplyEffect);
         };
         using var input = await DeliverToHandlerAsync(rig);
-        var ack = ObserveNextAck(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
+        var ack = AwaitHandlerCompletionAsync(rig);
         handler.Continue.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
+        Assert.False(ack.IsCompleted);
+        storage.Release();
         var acknowledged = await WaitAsync(ack);
         AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
-        Assert.Equal(new[] { 0 }, acknowledged.DisposeCalls);
+        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
         Assert.Equal(1, handler.Applied);
         Assert.Equal(0, rig.Outbox.SendCalls);
         Assert.False(Assert.Single(rig.Outbox.PreparedBatches).IsStaged);
@@ -543,26 +554,19 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     {
         var rig = await CreateAsync(acquireFirst: false);
         using var handler = rig.Handler;
-        using var input = CreateEnvelope(rig.Receiver, NewMessage(452, "canceled-before-prepare"), "prepared/lifecycle");
-        const string ownershipId = "canceled-before-prepare:1";
-        var job = new DurableJob
-        {
-            Id = "canceled-before-prepare-physical",
-            ShardId = "canceled-before-prepare-shard",
-            Name = ReceiverTestServices.InboxJobName,
-            TargetGrainId = rig.Receiver.GetGrainId(),
-            DueTime = Fixture.Clock.GetUtcNow(),
-            Metadata = new Dictionary<string, string> { ["orleans.messaging.ownership-id"] = ownershipId }
-        };
-        await rig.Receiver.SeedInboxStateAsync(input.Value, ownershipId, job);
+        using var input = await DeliverToHandlerAsync(rig);
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var ownershipId = job.Metadata!["orleans.messaging.ownership-id"];
         var writes = WriteCount(rig);
-        var ack = ObserveNextAck(rig);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await OnTurnAsync(rig.Context, async () =>
         {
             var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
             var extension = rig.Context.ActivationServices.GetRequiredService(type);
+            var operations = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
+            var existing = operations.Cast<object>().ToArray();
+            Assert.Single(existing);
             var generation = type.GetField("_stateGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
             var owner = Activator.CreateInstance(type.GetNestedType("PumpOwner", BindingFlags.NonPublic)!,
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null,
@@ -577,23 +581,22 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             Assert.True(submission.IsCompletedSuccessfully);
             await submission;
             Assert.True((bool)handlerWrite.GetProperty("Skipped")!.GetValue(operation)!);
-            foreach (var name in new[] { "_pendingWrites", "_stagedWrites", "_admittedWrites" })
-            {
-                var operations = (System.Collections.IEnumerable)type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .GetValue(extension)!;
-                Assert.Empty(operations.Cast<object>());
-            }
+            Assert.Equal(existing, operations.Cast<object>());
+            var finished = (TaskCompletionSource)handlerWrite.GetProperty("Finished")!.GetValue(operation)!;
+            Assert.True(finished.Task.IsCompletedSuccessfully);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
                 await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(new JobContext(job), cancellation.Token));
         });
-        Assert.False(handler.Ready.Task.IsCompleted);
+        Assert.Equal(1, handler.PreparationCalls);
         Assert.Equal(0, handler.Applied);
         Assert.Equal(0, rig.Outbox.PreparationsStarted);
         Assert.Equal(writes, WriteCount(rig));
-        Assert.False(ack.IsCompleted);
         Assert.Empty(rig.Effects);
         Assert.Single(rig.InboxState);
         Assert.Empty(rig.ProcessedState);
+        var completion = AwaitHandlerCompletionAsync(rig);
+        handler.Continue.TrySetResult();
+        await WaitAsync(completion);
         await AssertHealthyWriteAsync(rig);
     }
 
@@ -617,9 +620,8 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
         await preparation.WaitAsync();
-        var failure = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.Faulted.Task));
+        var failure = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
         Assert.Equal("Inbox handlers must await every batch preparation before returning their synchronous apply action.", failure.Message);
-        Assert.Same(failure, rig.Outbox.Failure);
         Assert.Equal(0, handler.Applied);
         Assert.False(preparation.Operation!.Completed.IsCompleted);
         Assert.False(rig.Context.Deactivated.IsCompleted);
@@ -640,7 +642,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(acquireFirst ? 2 : 1, rig.Outbox.PreparationsCompleted);
         Assert.Equal((acquireFirst ? 1 : 0) + (providerFails ? 0 : 1), rig.Outbox.PreparedBatches.Count);
         Assert.All(rig.Outbox.PreparedBatches, batch => Assert.False(batch.IsStaged));
-        Assert.Same(failure, rig.Outbox.Failure);
     }
 
     [Theory]
@@ -665,7 +666,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
         await preparation.WaitAsync();
-        var failure = await WaitAsync(rig.Grain.Faulted.Task);
+        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
         Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
         Assert.Contains("synchronous apply action", failure.Message, StringComparison.Ordinal);
         Assert.NotSame(replacement, failure);
@@ -682,7 +683,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(2, rig.Outbox.PreparationsStarted);
         Assert.Equal(2, rig.Outbox.PreparationsCompleted);
         Assert.Equal(providerFails ? 1 : 2, rig.Outbox.PreparedBatches.Count);
-        Assert.Same(failure, rig.Outbox.Failure);
     }
 
     [Theory]
@@ -713,7 +713,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         {
             first.Remainder = (_, _) => ValueTask.FromResult<Action>(() => { });
             using var one = await DeliverToHandlerAsync(rig);
-            var ack = ObserveNextAck(rig);
+            var ack = AwaitHandlerCompletionAsync(rig);
             first.Continue.TrySetResult();
             AssertAcknowledgedIds(await WaitAsync(ack), one.Value);
             invalid = first.Batch;
@@ -743,11 +743,10 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             if (kind == "wrong-attempt") Assert.Equal(1, rig.Outbox.PreparedBatches[0].DisposeCalls);
             var writes = WriteCount(rig);
             current.Continue.TrySetResult();
-            var failure = await WaitAsync(rig.Grain.Faulted.Task);
+            var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
             if (kind == "disposed") Assert.IsType<ObjectDisposedException>(rejection);
             else Assert.IsType<InvalidOperationException>(rejection);
             Assert.Same(rejection, failure);
-            Assert.Same(failure, rig.Outbox.Failure);
             Assert.Equal(1, current.Applied);
             Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
             Assert.Equal(0, rig.Outbox.SendCalls);
@@ -786,17 +785,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var input = CreateEnvelope(rig.Receiver, NewMessage(407, "owned-cancellation"), "prepared/lifecycle");
-        var job = new DurableJob
-        {
-            Id = "prepared-cancel-physical",
-            ShardId = "prepared-cancel-shard",
-            Name = ReceiverTestServices.InboxJobName,
-            TargetGrainId = rig.Receiver.GetGrainId(),
-            DueTime = Fixture.Clock.GetUtcNow(),
-            Metadata = new Dictionary<string, string> { ["orleans.messaging.ownership-id"] = "prepared-cancel:1" }
-        };
-        await rig.Receiver.SeedInboxStateAsync(input.Value, "prepared-cancel:1", job);
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         handler.Remainder = async (self, token) =>
         {
@@ -806,21 +795,18 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             token.ThrowIfCancellationRequested();
             return self.ApplyEffect;
         };
-        var extension = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(
-            ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        using var cancellation = new CancellationTokenSource();
-        DurableJobRunResult result = null!;
-        await OnTurnAsync(rig.Context, async () =>
-            result = await extension.ExecuteJobAsync(new JobContext(job), cancellation.Token));
-        Assert.Equal(DurableJobRunStatus.InProgress, result.Status);
-        await WaitAsync(handler.Ready.Task);
+        using var input = await DeliverToHandlerAsync(rig);
+        var timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context)
+                && item.Timer.GetType().GenericTypeArguments is [var state]
+                && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension")).Timer;
         using var preparation = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
         var writes = WriteCount(rig);
         handler.Continue.TrySetResult();
         await preparation.WaitAsync();
-        cancellation.Cancel();
+        await OnTurnAsync(rig.Context, timer.Dispose);
         await WaitAsync(cancellationObserved.Task);
-        var failure = await WaitAsync(rig.Grain.Faulted.Task);
+        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
         Assert.IsAssignableFrom<OperationCanceledException>(failure);
         Assert.False(preparation.Operation!.Completed.IsCompleted);
         Assert.False(rig.Context.Deactivated.IsCompleted);
@@ -881,13 +867,23 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         return input;
     }
 
-    private static Task<Acknowledgement> ObserveNextAck(Harness rig)
+    private static async Task<Acknowledgement> AwaitHandlerCompletionAsync(Harness rig)
     {
-        var completion = new TaskCompletionSource<Acknowledgement>(TaskCreationOptions.RunContinuationsAsynchronously);
-        rig.Outbox.AfterWriteCompleted = () => completion.TrySetResult(new(
+        await GetHandlerCompletion(rig);
+        Acknowledgement completion = null!;
+        await OnTurnAsync(rig.Context, () => completion = new(
             rig.Grain.GetSnapshotForTest(), rig.Outbox.PreparedBatches.Select(batch => batch.DisposeCalls).ToArray(),
             rig.ProcessedState.Select(entry => entry.Key).ToArray(), rig.InboxState.Select(entry => entry.Key).ToArray()));
-        return completion.Task;
+        return completion;
+    }
+
+    private static Task GetHandlerCompletion(Harness rig)
+    {
+        var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+        var pending = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
+        var operation = Assert.Single(pending.Cast<object>(), item => item.GetType().Name == "HandlerWrite");
+        var finished = (TaskCompletionSource)operation.GetType().GetProperty("Finished")!.GetValue(operation)!;
+        return finished.Task;
     }
 
     private int WriteCount(Harness rig) => Fixture.Storage.GetSuccessfulWriteCount(rig.JournalId);
@@ -899,8 +895,7 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy-after-preparation";
             await rig.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         });
-        Assert.False(rig.Grain.Faulted.Task.IsCompleted);
-        Assert.Null(rig.Outbox.Failure);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
     }
 
     private static async Task DeactivateAsync(Harness rig)
@@ -912,7 +907,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     private async Task AssertFaultReplayAsync(Harness rig, DurableEnvelope input, Exception failure, int writes,
         int processedBefore = 0, int expectedSendCalls = 0, int expectedBatchCount = 1)
     {
-        Assert.Same(failure, rig.Outbox.Failure);
         Assert.Equal(writes, WriteCount(rig));
         Assert.Equal(expectedSendCalls, rig.Outbox.SendCalls);
         Assert.Empty(rig.Outbox);
@@ -929,7 +923,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         AssertDeadLetter(recovered, input, processedBefore: processedBefore);
         Assert.True(Processed(Fixture.GetGrainContext(rig.Receiver)).ContainsKey((input.SenderId, input.MessageId)));
         Assert.Empty(Fixture.GetStagedOutput(rig.Receiver));
-        Assert.Same(failure, rig.Outbox.Failure);
     }
 
     private static void AssertDisposed(JournaledTestOutbox outbox, int expected)
@@ -1033,12 +1026,14 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         public IPreparedOutboxBatch? Batch { get; private set; }
         public IPreparedOutboxBatch? UnusedBatch { get; set; }
         public int Applied { get; private set; }
+        public int PreparationCalls { get; private set; }
         public Func<LifecycleHandler, CancellationToken, ValueTask<Action>> Remainder { get; set; } =
             static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
 
         public bool CanHandle(IInboxHandlerContext context) => false; // Registered by exact route.
         public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
+            PreparationCalls++;
             Context = context;
             Output = context.CreateEnvelope().To(context.GrainId, "output").WithBody(41).Build();
             UnusedOutput = context.CreateEnvelope().To(context.GrainId, "unused-output").WithBody(42).Build();

@@ -82,28 +82,27 @@ code uses the typed named-state API and ordinary writes; messaging uses the jour
 owner for state-machine registration and persistence. Shared setup resolves the
 complete messaging graph before recovery closes registration.
 
-The persisted inbox facets implement `IStateMachine`. Their `WritePendingEntries`
-and `WriteSnapshot` callbacks retain the existing stream names, command codecs,
-and capture/acknowledgement boundaries. Custom `AddStateMachine` factories construct
-components and the manager registers their canonical named instances. Deferred
-helpers resolve command codecs through their owning manager, using activation
-services for grain-bound owners and shared services for standalone owners.
+The inbox uses eight canonical standard `IDurableDictionary` and `IDurableValue`
+states under the existing stream names. Keyed Journaling registrations bind them
+to the actual advanced owner, selected write format and activation or explicit
+standalone dependency scope before initialization. Standard dictionaries encode
+commands as they change; standard values encode dirty values at capture. The
+journal manager owns atomic persistence and the captured buffer's lifetime.
 
-The primary inbox state forwards `ValidatePendingChanges` to its runtime owner.
-This pure synchronous check raises the original failure and validates staged
-generations and physical ownership inside admitted journal execution, before
-append, snapshot, committed-prefix, or zero-byte capture. `ValidateWrite` guards
-request admission in the handler's logical execution context. Independent writes
-remain valid while another operation prepares local values. A partial-apply failure
-reaches the journal's terminal failure boundary through an ordinary write, including
-when no earlier write was queued; an already captured cohort retains its own ACK.
+The inbox completes asynchronous preparation and feature preconditions before
+synchronous safe-to-commit updates. Independent writes can persist previously staged
+valid state while another operation prepares local values. Each captured cohort
+retains its own acknowledgement. Capture, replay, reset and acknowledgement remain
+the journal state protocol.
 
 `IJournaledStateManagerFactory.CreateStandalone` creates an owner for an explicit
 `JournalId`. Its caller constructs and registers the state machines before
 initialization and owns their dependency lifetimes. Initialization and disposal
 remain caller-owned; a grain factory deliberately enrolls such an owner in the
 lifecycle when integrating it with activation startup. Full journal deletion uses
-the advanced owner and the existing quiescence boundary.
+the advanced owner and the existing quiescence boundary. A manually composed owner
+initializes the manager before starting the inbox and outbox lifecycle. Inbox
+startup then initializes its recovered ownership and retention caches.
 
 The inbox accepts a message after DurableJobs confirms scheduling and the journal
 commits the envelope together with its ownership generation and exact returned job
@@ -120,7 +119,7 @@ The handler context's outbox permits preparation during that attempt's `PrepareA
 call and sending its own batches during the returned action. Every call checks the
 current attempt and phase before applying repeated-send semantics. A caught or replaced
 scope violation retains its original cause and prevents a successful completion commit.
-An action-time failure stops capture and recovers through a fresh activation.
+An action-time failure ends the inbox operation and requests a fresh activation.
 
 Preparation keeps business state, outgoing intents, and inbox completion unchanged.
 Independent journal writes can persist previously staged changes while preparation
@@ -137,16 +136,19 @@ into dead-letter storage. Its processed marker suppresses duplicates through the
 configured deduplication window.
 
 Acceptance and ownership repair retain local proposals until scheduling is acknowledged
-before synchronously staging the complete envelope and ownership pair. Journaled
-state callbacks encode the staged changes and acknowledge only the captured cohort.
-An unexpected apply failure is latched before yielding; synchronous journal validation
-raises the original failure before capture. A journal failure permanently fences the activation,
-signals pending
-preparations and callbacks, and faults its waiters. A fresh activation replays the actual
-durable outcome, including commits whose acknowledgement failed. A persistence-request
-rejection after staging stops inbox admission and requests a fresh activation. The
-manager can remain healthy after rejecting a request; a later admitted write observes
-the inbox's latched failure before capture.
+before synchronously staging the complete envelope and ownership pair. The inbox
+awaits the ordinary write which follows that synchronous staging, then acknowledges
+only the immutable acceptance or ownership facts of that operation. Ownership-changing
+operations retain the inbox gate through this acknowledgement.
+Application code completes fallible checks before applying shared changes, so every
+staged mutation is safe to commit. Inbox processing requests persistence after
+successful staging. A failed preparation or apply operation surfaces directly and
+releases owned preparation resources. Genuine journal failures
+remain subject to the manager's internal failure fence and waiter completion; the
+inbox catches its failed write and stops local processing with the original observed
+cause. Operation lifetime tracking keeps shutdown waiting for actual writes and
+preparation retirement. A fresh activation replays
+the actual durable outcome, including commits whose acknowledgement failed.
 A delivery caller can cancel its wait while the owned operation retains admission
 through completion. Activation shutdown drains that operation, and delivery failures
 are logged and observed even after the caller has left.
@@ -159,15 +161,18 @@ acceptance again. Capacity limits return `Backpressured` before persistence.
 `CanHandle` implementations are pure metadata predicates: the handler keeps grain
 state and injected durable state unchanged until the action returned by `PrepareAsync`
 runs. The selection context enforces access to metadata and grain identity; its outbound-message APIs
-throw during selection. The inbox state rejects explicit write/delete requests
-inside selection, preparation and apply, preserving the runtime's completion commit.
+throw during selection. The returned synchronous action stages prepared business
+changes and outgoing messages, and the inbox adds completion before its ordinary write.
 A route miss preserves the grain's staged state for its next journal write.
-The grain owner quiesces delivery and pumping for the full journal deletion operation,
-and resumes delivery after awaiting successful deletion. Journal deletion validates
-completed delivery operations, released inbox gates, and idle pump leases. Once deletion starts, admission stays closed until the persisted
-states reset. Recovery and deletion bookkeeping use the existing state streams.
+For full journal deletion, the owner stops and drains its inbox and outbox through
+their existing lifecycle, awaits the advanced owner's actual `DeleteStateAsync`
+operation, then disposes or deactivates that owner. Caller wait cancellation leaves
+this owned workflow running. Stopped admission remains closed through reset and
+deletion; subsequent work uses a fresh owner. Reset removes committed and staged
+state using the existing streams. Stop clears pump/results and metrics; the fresh
+owner initializes new local ownership and acknowledgement state.
 Interleaved control calls observe that quiescence boundary; the
-active handler retains its own logical persistence-request guard.
+active handler retains its own attempt-scoped messaging guards.
 Superseded queued pump executions release their retained result and cancellation
 registration. Inbox shutdown, terminal failure, and quiescent deletion clear only
 inbox execution entries; subsequent work recovers through the durable wakeup path.

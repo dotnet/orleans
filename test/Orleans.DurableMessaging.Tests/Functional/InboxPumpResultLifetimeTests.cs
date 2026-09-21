@@ -23,6 +23,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var oldJob = CreateJob(receiver, "replaced:1");
         await receiver.SetInboxOwnershipAsync("replaced:1", oldJob);
+        await RefreshSeededOwnerAsync(receiver);
         var context = Fixture.GetGrainContext(receiver);
         var results = GetEntries(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-replacement");
@@ -48,7 +49,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         Assert.DoesNotContain(results.Keys.Cast<object>(), key => GetJobId(key) == oldJob.Id);
         Assert.Equal(default, GetRegistration(entry));
         Assert.Equal(DurableJobRunStatus.Completed, (await InvokeAsync(receiver, CreateRun(oldJob, 2))).Status);
-        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).Faulted.Task.IsCompleted);
+        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).DeactivationFailure.Task.IsCompleted);
         handler.Release();
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
@@ -60,6 +61,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var job = CreateJob(receiver, "clear:1");
         await receiver.SetInboxOwnershipAsync("clear:1", job);
+        await RefreshSeededOwnerAsync(receiver);
         var context = Fixture.GetGrainContext(receiver);
         var entries = GetEntries(context);
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
@@ -83,8 +85,9 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         var job = CreateJob(receiver, "shutdown:1");
+        await receiver.SetInboxOwnershipAsync("shutdown:1", job);
+        await RefreshSeededOwnerAsync(receiver);
         using var envelope = CreateEnvelope(receiver, NewMessage(171, "fresh-after-stop"));
-        await receiver.SeedInboxStateAsync(envelope.Value, "shutdown:1", job);
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var entries = GetEntries(context);
@@ -96,6 +99,16 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeAsync(receiver, run)).Status);
         var entry = Assert.Single(entries.Values.Cast<object>());
         Assert.NotEqual(default, GetRegistration(entry));
+        var messages = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
+            "__orleans.durable-messaging.inbox");
+        var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        Task persisted = null!;
+        await OnTurnAsync(context, () =>
+        {
+            messages.Add((envelope.Value.SenderId, envelope.Value.MessageId), envelope.Value);
+            persisted = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        });
+        await persisted;
         hold.Release();
         await turn;
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -115,6 +128,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var job = CreateJob(receiver, "fault:1");
         await receiver.SetInboxOwnershipAsync("fault:1", job);
+        await RefreshSeededOwnerAsync(receiver);
         await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 172, "uncommitted"));
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
@@ -138,19 +152,13 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var result = await InvokeAsync(receiver, CreateRun(failedWrite));
 
         Assert.Equal(DurableJobRunStatus.Failed, result.Status);
-        Assert.IsType<IOException>(await grain.Faulted.Task);
-        Assert.Empty(entries);
-        Assert.Equal(default, GetRegistration(entry));
-        var feature = (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        await OnTurnAsync(context, () =>
-        {
-            var failedPump = feature.ExecuteJobAsync(CreateRun(job, 2), TestContext.Current.CancellationToken);
-            Assert.True(failedPump.IsCompleted);
-            Assert.Throws<IOException>(() => failedPump.GetAwaiter().GetResult());
-        });
+        Assert.IsType<IOException>(await grain.DeactivationFailure.Task);
         hold.Release();
         await turn;
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Empty(entries);
+        Assert.Equal(default, GetRegistration(entry));
+        Assert.Equal(job.Id, grain.GetSnapshotForTest().InboxJob!.Id);
         Assert.Single(grain.GetSnapshotForTest().Effects);
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
     }
@@ -161,6 +169,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var receiver = NewGrain();
         var job = CreateJob(receiver, "attempt:1");
         await receiver.SetInboxOwnershipAsync("attempt:1", job);
+        await RefreshSeededOwnerAsync(receiver);
         var context = Fixture.GetGrainContext(receiver);
         var entries = GetEntries(context);
         var feature = (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
