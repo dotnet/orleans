@@ -35,15 +35,18 @@ namespace Orleans.DurableMessaging;
 ///         DurableEnvelope? confirmation = null;
 ///         if (context.Envelope.ReplyTo is { } replyTo)
 ///         {
-///             confirmation = context.CreateEnvelope()
+///             var confirmationBuilder = context.CreateEnvelope()
 ///                 .To(replyTo, "order/confirmation")
 ///                 .WithBody(new OrderConfirmation
 ///                 {
 ///                     OrderId = message.OrderId,
 ///                     Status = result.Status
-///                 })
-///                 .WithCorrelationKey(context.Envelope.CorrelationKey)
-///                 .Build();
+///                 });
+///             if (context.Envelope.CorrelationKey is { } correlationKey)
+///             {
+///                 confirmationBuilder.WithCorrelationKey(correlationKey);
+///             }
+///             confirmation = confirmationBuilder.Build();
 ///         }
 ///
 ///         var fulfillmentMessage = context.CreateEnvelope()

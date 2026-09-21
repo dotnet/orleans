@@ -188,11 +188,14 @@ public readonly struct DurableEnvelope
     ///
     ///     if (context.Envelope.ReplyTo is { } replyTo)
     ///     {
-    ///         var response = context.CreateEnvelope()
+    ///         var responseBuilder = context.CreateEnvelope()
     ///             .To(replyTo, "payment/response")
-    ///             .WithBody(result)
-    ///             .WithCorrelationKey(context.Envelope.CorrelationKey)  // Preserve correlation
-    ///             .Build();
+    ///             .WithBody(result);
+    ///         if (context.Envelope.CorrelationKey is { } correlationKey)
+    ///         {
+    ///             responseBuilder.WithCorrelationKey(correlationKey);
+    ///         }
+    ///         var response = responseBuilder.Build();
     ///
     ///         var batch = await context.Outbox.PrepareSendAsync([response], ct);
     ///         return () => context.Send(batch);

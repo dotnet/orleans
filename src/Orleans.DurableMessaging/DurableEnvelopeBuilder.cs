@@ -201,11 +201,14 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// // Reply in handler
     /// if (context.Envelope.ReplyTo is { } replyTo)
     /// {
-    ///     var reply = context.CreateEnvelope()
+    ///     var replyBuilder = context.CreateEnvelope()
     ///         .To(replyTo, "process.reply")
-    ///         .WithCorrelationKey(context.Envelope.CorrelationKey)
-    ///         .WithBody(response)
-    ///         .Build();
+    ///         .WithBody(response);
+    ///     if (context.Envelope.CorrelationKey is { } correlationKey)
+    ///     {
+    ///         replyBuilder.WithCorrelationKey(correlationKey);
+    ///     }
+    ///     var reply = replyBuilder.Build();
     ///     var batch = await context.Outbox.PrepareSendAsync([reply], ct);
     ///     return () => context.Send(batch);
     /// }
