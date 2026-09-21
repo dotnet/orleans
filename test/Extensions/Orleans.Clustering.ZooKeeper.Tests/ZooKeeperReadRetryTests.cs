@@ -186,24 +186,6 @@ public sealed class ZooKeeperReadRetryTests
     }
 
     [Fact]
-    public async Task ConnectionMonitor_CanceledRetryAdmissionDoesNotPoisonPeers()
-    {
-        var monitor = (IZooKeeperConnectionMonitor)CreateConnectionMonitor();
-        using var owner = await monitor.AcquireRetryAdmissionAsync(TestContext.Current.CancellationToken);
-        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var canceledAdmission = monitor.AcquireRetryAdmissionAsync(canceled.Token).AsTask();
-        var peerAdmission = monitor.AcquireRetryAdmissionAsync(TestContext.Current.CancellationToken).AsTask();
-
-        canceled.Cancel();
-        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledAdmission);
-        Assert.Equal(canceled.Token, failure.CancellationToken);
-        Assert.False(peerAdmission.IsCompleted);
-
-        owner.Dispose();
-        using var peer = await peerAdmission;
-    }
-
-    [Fact]
     public async Task ConnectionMonitor_TimeoutReturnsWithoutReplacingNativeFailure()
     {
         var timeProvider = new FakeTimeProvider();
@@ -235,166 +217,6 @@ public sealed class ZooKeeperReadRetryTests
         Assert.False(wait.IsCompleted);
         await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
         Assert.True(await wait);
-    }
-
-    [Fact]
-    public async Task ReadRetry_ParallelRowsWaitForOneReconnectBeforeReissuing()
-    {
-        const int rowCount = 9;
-        var harness = await Harness.CreateAsync(rowCount);
-        var monitor = CreateConnectionMonitor();
-        harness.ConnectionMonitor = monitor;
-        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-        var counts = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
-        var releaseFirstAttempts = Gate();
-        var allFirstAttempts = Gate();
-        var allWarnings = Gate();
-        var retryEntered = Channel.CreateUnbounded<string>();
-        var releaseRetry = Channel.CreateUnbounded<bool>();
-        var firstAttempts = 0;
-        var activeFirstAttempts = 0;
-        var maxFirstAttempts = 0;
-        var activeRetryAttempts = 0;
-        var maxRetryAttempts = 0;
-        harness.Logger.WarningRecorded = count =>
-        {
-            if (count == rowCount)
-                allWarnings.TrySetResult();
-        };
-        harness.BeforeRequest = async request =>
-        {
-            if (request.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
-                && !request.EndsWith("/IAmAlive", StringComparison.Ordinal))
-            {
-                var count = counts.AddOrUpdate(request, 1, static (_, value) => value + 1);
-                if (count == 1)
-                {
-                    var active = Interlocked.Increment(ref activeFirstAttempts);
-                    InterlockedExtensions.Max(ref maxFirstAttempts, active);
-                    if (Interlocked.Increment(ref firstAttempts) == rowCount)
-                        allFirstAttempts.TrySetResult();
-                    await releaseFirstAttempts.Task;
-                    Interlocked.Decrement(ref activeFirstAttempts);
-                    throw new KeeperException.ConnectionLossException();
-                }
-
-                if (count == 2)
-                {
-                    var active = Interlocked.Increment(ref activeRetryAttempts);
-                    InterlockedExtensions.Max(ref maxRetryAttempts, active);
-                    Assert.True(retryEntered.Writer.TryWrite(request));
-                    await releaseRetry.Reader.ReadAsync(TestContext.Current.CancellationToken);
-                    Interlocked.Decrement(ref activeRetryAttempts);
-                }
-            }
-        };
-
-        var read = harness.Read(TestContext.Current.CancellationToken);
-        await allFirstAttempts.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken);
-        Assert.Equal(rowCount, activeFirstAttempts);
-        Assert.True(maxFirstAttempts > 1);
-        releaseFirstAttempts.SetResult();
-        await allWarnings.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken);
-        var admittedCalls = harness.Calls.ToArray();
-        for (var i = 0; i < rowCount; i++)
-            Assert.Equal(TimeSpan.FromMilliseconds(250), await harness.Clock.NextTimerAsync());
-        harness.Clock.Advance(TimeSpan.FromMilliseconds(250));
-        Assert.Equal(admittedCalls, harness.Calls);
-
-        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
-        Assert.Equal(admittedCalls, harness.Calls);
-        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-
-        for (var i = 0; i < rowCount; i++)
-        {
-            try
-            {
-                _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(
-                    TimeSpan.FromSeconds(10),
-                    TestContext.Current.CancellationToken);
-            }
-            catch (TimeoutException exception)
-            {
-                throw new TimeoutException(
-                    $"Retry {i + 1}/{rowCount} did not enter; calls={string.Join(", ", counts.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}={pair.Value}"))}",
-                    exception);
-            }
-            Assert.Equal(1, activeRetryAttempts);
-            Assert.Equal(1, maxRetryAttempts);
-            Assert.True(releaseRetry.Writer.TryWrite(true));
-        }
-
-        harness.AssertSnapshot(await read, harness.Entries, rowCount);
-        Assert.All(harness.Entries, entry => Assert.Equal(2,
-            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress))));
-        Assert.All(harness.Entries, entry => Assert.Equal(1,
-            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress))));
-        harness.AssertOneOwner(readOnly: true);
-    }
-
-    [Fact]
-    public async Task ReadRetry_SerializedWaiterRevalidatesAfterEarlierRetryDisconnects()
-    {
-        const int rowCount = 2;
-        var harness = await Harness.CreateAsync(rowCount);
-        var monitor = CreateConnectionMonitor();
-        harness.ConnectionMonitor = monitor;
-        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-        var counts = new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
-        var secondRetryWarning = Gate();
-        var retryEntered = Channel.CreateUnbounded<string>();
-        string? firstRetry = null;
-        harness.Logger.WarningRecorded = count =>
-        {
-            if (count == rowCount + 1)
-                secondRetryWarning.TrySetResult();
-        };
-        harness.BeforeRequest = request =>
-        {
-            if (!request.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
-                || request.EndsWith("/IAmAlive", StringComparison.Ordinal))
-                return Task.CompletedTask;
-
-            var count = counts.AddOrUpdate(request, 1, static (_, value) => value + 1);
-            if (count == 1)
-                throw new KeeperException.ConnectionLossException();
-            if (count == 2)
-            {
-                Assert.True(retryEntered.Writer.TryWrite(request));
-                if (Interlocked.CompareExchange(ref firstRetry, request, null) is null)
-                    throw new KeeperException.ConnectionLossException();
-            }
-
-            return Task.CompletedTask;
-        };
-
-        var read = harness.Read(TestContext.Current.CancellationToken);
-        Assert.Equal(rowCount, harness.Logger.Warnings.Count);
-        for (var i = 0; i < rowCount; i++)
-            Assert.Equal(TimeSpan.FromMilliseconds(250), await harness.Clock.NextTimerAsync());
-        harness.Clock.Advance(TimeSpan.FromMilliseconds(250));
-        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-        _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken);
-        await secondRetryWarning.Task.WaitAsync(TestContext.Current.CancellationToken);
-
-        Assert.False(retryEntered.Reader.TryRead(out _));
-        Assert.Equal(rowCount + 1, harness.Calls.Count(call =>
-            call.StartsWith("GetData /127.0.0.1", StringComparison.Ordinal)
-            && !call.EndsWith("/IAmAlive", StringComparison.Ordinal)));
-
-        await Signal(monitor, Watcher.Event.KeeperState.Disconnected);
-        await Signal(monitor, Watcher.Event.KeeperState.SyncConnected);
-        _ = await retryEntered.Reader.ReadAsync(TestContext.Current.CancellationToken);
-        await harness.Clock.AdvanceNextAsync(TimeSpan.FromMilliseconds(500));
-
-        harness.AssertSnapshot(await read, harness.Entries, rowCount);
-        Assert.All(harness.Entries, entry => Assert.True(
-            harness.Calls.Count(call => call == "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)) is 2 or 3));
-        harness.AssertOneOwner(readOnly: true);
     }
 
     [Fact]
@@ -464,13 +286,12 @@ public sealed class ZooKeeperReadRetryTests
         var harness = await Harness.CreateAsync();
         using var cancellation = new CancellationTokenSource();
         var first = Gate();
-        var second = Gate();
         var firstCompleted = Gate();
         var closeStarted = Gate();
         var releaseClose = Gate();
         var firstKey = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress);
         var secondKey = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[1].SiloAddress);
-        harness.BeforeRequest = request => request == firstKey ? first.Task : request == secondKey ? second.Task : Task.CompletedTask;
+        harness.BeforeRequest = request => request == firstKey ? first.Task : Task.CompletedTask;
         harness.AfterRequest = request =>
         {
             if (request == firstKey)
@@ -486,7 +307,7 @@ public sealed class ZooKeeperReadRetryTests
         var owner = Assert.Single(harness.Sessions);
         try
         {
-            Assert.Equal(new[] { "Sync /", "GetChildren /", firstKey, secondKey }, harness.Calls);
+            Assert.Equal(new[] { "Sync /", "GetChildren /", firstKey }, harness.Calls);
             cancellation.Cancel();
             var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => read);
             Assert.Equal(cancellation.Token, failure.CancellationToken);
@@ -496,21 +317,20 @@ public sealed class ZooKeeperReadRetryTests
             await firstCompleted.Task.WaitAsync(TestContext.Current.CancellationToken);
             Assert.False(owner.Completion.IsCompleted);
             Assert.False(closeStarted.Task.IsCompleted);
-            second.SetResult();
             await closeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
             Assert.False(owner.Completion.IsCompleted);
+            Assert.DoesNotContain(secondKey, harness.Calls);
         }
         finally
         {
             first.TrySetResult();
-            second.TrySetResult();
             releaseClose.TrySetResult();
             await Record.ExceptionAsync(() => owner.Completion);
         }
 
         var ownedFailure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.Completion);
         Assert.Equal(cancellation.Token, ownedFailure.CancellationToken);
-        Assert.Equal(new[] { "Sync /", "GetChildren /", firstKey, secondKey }, harness.Calls);
+        Assert.Equal(new[] { "Sync /", "GetChildren /", firstKey }, harness.Calls);
         harness.AssertOneOwner(readOnly: true);
     }
 
@@ -671,7 +491,7 @@ public sealed class ZooKeeperReadRetryTests
     [Theory]
     [InlineData(9)]
     [InlineData(128)]
-    public async Task Read_RetryingOneRow_PreservesSuccessfulSiblings(int rowCount)
+    public async Task Read_RetryingRow_ContinuesSequentialSnapshotAfterRecovery(int rowCount)
     {
         var harness = await Harness.CreateAsync(rowCount);
         var key = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress);
@@ -688,7 +508,7 @@ public sealed class ZooKeeperReadRetryTests
         var read = harness.Read(TestContext.Current.CancellationToken);
         Assert.False(read.IsCompleted);
         Assert.All(harness.Entries.Skip(1), entry =>
-            Assert.Contains("GetData " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress), harness.Calls));
+            Assert.DoesNotContain("GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress), harness.Calls));
         await harness.Clock.AdvanceNextAsync(TimeSpan.FromMilliseconds(250));
 
         harness.AssertSnapshot(await read, harness.Entries, rowCount);
@@ -703,7 +523,7 @@ public sealed class ZooKeeperReadRetryTests
     [InlineData(9, true)]
     [InlineData(128, false)]
     [InlineData(128, true)]
-    public async Task ReadOwner_StartsEveryRowBeforeAwaitingNativeCompletion(int rowCount, bool cancel)
+    public async Task ReadOwner_ReadsOneRowAtATimeAndOwnsAdmittedRequest(int rowCount, bool cancel)
     {
         var harness = await Harness.CreateAsync(rowCount);
         using var cancellation = new CancellationTokenSource();
@@ -714,8 +534,9 @@ public sealed class ZooKeeperReadRetryTests
         var owner = Assert.Single(harness.Sessions);
         try
         {
-            Assert.Equal(new[] { "Sync /", "GetChildren /" }.Concat(
-                harness.Entries.Select(entry => "GetData " + ZooKeeperNativeFake.RowPath(entry.SiloAddress))), harness.Calls);
+            Assert.Equal(
+                new[] { "Sync /", "GetChildren /", "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress) },
+                harness.Calls);
             if (cancel)
             {
                 cancellation.Cancel();
@@ -733,7 +554,7 @@ public sealed class ZooKeeperReadRetryTests
         {
             var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => owner.Completion);
             Assert.Equal(cancellation.Token, failure.CancellationToken);
-            Assert.Equal(2 + rowCount, harness.Calls.Count);
+            Assert.Equal(3, harness.Calls.Count);
         }
         else
         {
@@ -743,45 +564,26 @@ public sealed class ZooKeeperReadRetryTests
         harness.AssertOneOwner(readOnly: true);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Read_MissingRow_PreservesOtherNativeFailureAfterJoining(bool connectionLoss)
+    [Fact]
+    public async Task Read_MissingRow_StopsBeforeLaterNativeFailure()
     {
         var harness = await Harness.CreateAsync();
-        var release = Gate();
-        Exception failure = connectionLoss ? new KeeperException.ConnectionLossException() : new KeeperException.NoAuthException();
+        var missing = new KeeperException.NoNodeException(ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress));
+        var laterFailure = new KeeperException.NoAuthException();
         var first = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress);
         var second = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[1].SiloAddress);
-        harness.BeforeRequest = async request =>
+        harness.BeforeRequest = request =>
         {
             if (request == first)
-                throw new KeeperException.NoNodeException(ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress));
+                throw missing;
             if (request == second)
-            {
-                await release.Task;
-                throw failure;
-            }
+                throw laterFailure;
+            return Task.CompletedTask;
         };
-        var read = harness.Read(TestContext.Current.CancellationToken);
-        var completion = Record.ExceptionAsync(() => read);
-        try
-        {
-            Assert.Contains(second, harness.Calls);
-            Assert.False(read.IsCompleted);
-            Assert.Equal(0, harness.CloseCount);
-        }
-        finally
-        {
-            release.TrySetResult();
-        }
-        if (connectionLoss)
-        {
-            foreach (var delay in new[] { 250, 500, 1000, 2000 })
-                await harness.Clock.AdvanceNextAsync(TimeSpan.FromMilliseconds(delay));
-        }
-        Assert.Same(failure, await completion);
-        Assert.DoesNotContain("GetData /", harness.Calls);
+
+        Assert.Same(missing, await Record.ExceptionAsync(() => harness.Read(TestContext.Current.CancellationToken)));
+        Assert.DoesNotContain(second, harness.Calls);
+        Assert.Contains("GetData /", harness.Calls);
         harness.AssertOneOwner(readOnly: true);
     }
 
@@ -1014,8 +816,7 @@ public sealed class ZooKeeperReadRetryTests
             harness.Fake.Nodes[path] = harness.Fake.Nodes[path] with { Data = ZooKeeperBasedMembershipTable.Serialize(entry) };
         }
         var first = Gate();
-        var second = Gate();
-        var firstCompleted = Gate();
+        var firstSettled = Gate();
         var closeStarted = Gate();
         var releaseClose = Gate();
         var failure = new KeeperException.NoAuthException();
@@ -1024,19 +825,18 @@ public sealed class ZooKeeperReadRetryTests
         harness.Fake.BeforeRead = async path =>
         {
             if (path == firstPath)
-                await first.Task;
-            if (path == secondPath)
             {
-                await second.Task;
-                if (fail)
-                    throw failure;
+                try
+                {
+                    await first.Task;
+                    if (fail)
+                        throw failure;
+                }
+                finally
+                {
+                    firstSettled.TrySetResult();
+                }
             }
-        };
-        harness.Fake.AfterRead = path =>
-        {
-            if (path == firstPath)
-                firstCompleted.SetResult();
-            return Task.CompletedTask;
         };
         using var cancellation = new CancellationTokenSource();
         async Task<bool> NativeOperation()
@@ -1058,22 +858,20 @@ public sealed class ZooKeeperReadRetryTests
         try
         {
             Assert.Same(native, observed);
-            Assert.Equal(new[] { "children /", "read " + firstPath, "read " + secondPath }, harness.Fake.Calls);
+            Assert.Equal(new[] { "children /", "read " + firstPath }, harness.Fake.Calls);
             cancellation.Cancel();
             var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => caller);
             Assert.Equal(cancellation.Token, canceled.CancellationToken);
             Assert.False(observed!.IsCompleted);
             first.SetResult();
-            await firstCompleted.Task.WaitAsync(TestContext.Current.CancellationToken);
-            Assert.False(closeStarted.Task.IsCompleted);
-            second.SetResult();
+            await firstSettled.Task.WaitAsync(TestContext.Current.CancellationToken);
             await closeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
             Assert.False(observed.IsCompleted);
+            Assert.DoesNotContain("read " + secondPath, harness.Fake.Calls);
         }
         finally
         {
             first.TrySetResult();
-            second.TrySetResult();
             releaseClose.TrySetResult();
             await Record.ExceptionAsync(() => native);
         }
@@ -1083,7 +881,7 @@ public sealed class ZooKeeperReadRetryTests
         else
             Assert.Equal(cancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(actual).CancellationToken);
         Assert.Empty(harness.Fake.Transactions);
-        Assert.Equal(new[] { "children /", "read " + firstPath, "read " + secondPath }, harness.Fake.Calls);
+        Assert.Equal(new[] { "children /", "read " + firstPath }, harness.Fake.Calls);
     }
 
     private sealed class Harness
@@ -1251,7 +1049,6 @@ public sealed class ZooKeeperReadRetryTests
     {
         internal sealed record Warning(Exception? Exception, IReadOnlyDictionary<string, object?> Values);
         internal ConcurrentQueue<Warning> Warnings { get; } = new();
-        internal Action<int>? WarningRecorded { get; set; }
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -1259,22 +1056,6 @@ public sealed class ZooKeeperReadRetryTests
             Assert.Equal(LogLevel.Warning, logLevel);
             var values = Assert.IsAssignableFrom<IEnumerable<KeyValuePair<string, object?>>>(state);
             Warnings.Enqueue(new(exception, values.ToDictionary(pair => pair.Key, pair => pair.Value)));
-            WarningRecorded?.Invoke(Warnings.Count);
-        }
-    }
-
-    private static class InterlockedExtensions
-    {
-        internal static void Max(ref int location, int value)
-        {
-            var current = Volatile.Read(ref location);
-            while (current < value)
-            {
-                var observed = Interlocked.CompareExchange(ref location, value, current);
-                if (observed == current)
-                    return;
-                current = observed;
-            }
         }
     }
 }

@@ -8,11 +8,7 @@ internal interface IZooKeeperConnectionMonitor
 {
     long CaptureAttemptGeneration();
 
-    bool IsConnectedAfter(long connectedGeneration);
-
     ValueTask<bool> WaitForConnectionAfterAsync(long connectedGeneration, CancellationToken cancellationToken);
-
-    ValueTask<IDisposable> AcquireRetryAdmissionAsync(CancellationToken cancellationToken);
 
     void ReportConnectionLoss(long connectedGeneration);
 }

@@ -42,6 +42,8 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger logger;
 
         internal const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
+        internal const int MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS = 5;
+        internal const int MAX_CLEANUP_ROW_ATTEMPTS = 5;
 
         private readonly ZooKeeperWatcher watcher;
         private readonly Func<bool, ZooKeeperSession> _createSession;
@@ -149,8 +151,8 @@ namespace Orleans.Runtime.Membership
         /// <remarks>
         /// Connection-loss failures in native reads are retried up to four times on the operation's session.
         /// Each retry waits for that session's next connected event before issuing another request.
-        /// Recovery requests use one-at-a-time admission while first-attempt reads remain concurrent.
-        /// The table and child versions fence each complete snapshot pass.
+        /// The table and child versions fence each complete snapshot pass. Concurrent canonical
+        /// modifications restart the pass up to five total attempts.
         /// </remarks>
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
@@ -169,12 +171,12 @@ namespace Orleans.Runtime.Membership
 
         /// <inheritdoc />
         /// <remarks>
-        /// Rows are read concurrently on an operation-owned connection,
-        /// with each membership record read before its heartbeat.
-        /// Table and child-version checks fence the complete snapshot.
+        /// Rows are read sequentially on an operation-owned connection.
+        /// Each membership record is read before its heartbeat.
+        /// Table and child-version checks fence the complete snapshot. Concurrent canonical
+        /// modifications restart the complete sequential pass up to five total attempts.
         /// Connection-loss failures in native reads are retried up to four times on the same session.
         /// Each retry waits for that session's next connected event before issuing another request.
-        /// Recovery requests use one-at-a-time admission while first-attempt rows remain concurrent.
         /// Caller cancellation stops further requests while admitted requests and client close complete.
         /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
@@ -217,7 +219,7 @@ namespace Orleans.Runtime.Membership
             cancellationToken.ThrowIfCancellationRequested();
             await zk.Sync("/");
             // Retries retain this session's ordered view.
-            while (true)
+            for (var attempt = 0; attempt < MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Stat before;
@@ -236,22 +238,21 @@ namespace Orleans.Runtime.Membership
 
                 var rows = new List<Tuple<MembershipEntry, string>>();
                 KeeperException.NoNodeException? missingRow = null;
-                cancellationToken.ThrowIfCancellationRequested();
-                var pendingRows = Task.WhenAll(addresses.Select(address => GetRow(zk, address, siloAddress is not null, cancellationToken)));
-                try
+                foreach (var address in addresses)
                 {
-                    rows.AddRange((await pendingRows).OfType<Tuple<MembershipEntry, string>>());
-                }
-                catch (KeeperException.NoNodeException exception)
-                {
-                    // Join every admitted read so a missing row cannot hide another native failure.
-                    var failure = pendingRows.Exception!.InnerExceptions.FirstOrDefault(error => error is not KeeperException.NoNodeException);
-                    if (failure is not null)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
                     {
-                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+                        if (await GetRow(zk, address, siloAddress is not null, cancellationToken) is { } row)
+                        {
+                            rows.Add(row);
+                        }
                     }
-
-                    missingRow = exception;
+                    catch (KeeperException.NoNodeException exception)
+                    {
+                        missingRow = exception;
+                        break;
+                    }
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -266,6 +267,9 @@ namespace Orleans.Runtime.Membership
                     return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
                 }
             }
+
+            throw new OrleansException(
+                $"Unable to read a consistent ZooKeeper membership snapshot after {MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS} attempts.");
         }
 
         private static bool SameVersion(Stat before, Stat after) =>
@@ -586,6 +590,11 @@ namespace Orleans.Runtime.Membership
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate, CancellationToken.None);
 
         /// <inheritdoc />
+        /// <remarks>
+        /// Rows are evaluated sequentially in the order returned by ZooKeeper. A row whose
+        /// conditional delete conflicts is re-evaluated up to five total attempts before
+        /// the operation reports contention.
+        /// </remarks>
         public Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
         {
             return UsingZookeeper(zk => CleanupCoreAsync(zk, beforeDate, cancellationToken),
@@ -597,14 +606,19 @@ namespace Orleans.Runtime.Membership
             cancellationToken.ThrowIfCancellationRequested();
             var children = await zk.GetChildren("/");
             var cutoff = beforeDate.UtcDateTime;
-            await Task.WhenAll(children.Children.Select(child => CleanupRowAsync(zk, "/" + child, cutoff, cancellationToken)));
+            foreach (var child in children.Children)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await CleanupRowAsync(zk, "/" + child, cutoff, cancellationToken);
+            }
+
             return true;
         }
 
         private static async Task CleanupRowAsync(NativeOperations zk, string rowPath, DateTime cutoff, CancellationToken cancellationToken)
         {
             var heartbeatPath = rowPath + "/IAmAlive";
-            while (true)
+            for (var attempt = 0; attempt < MAX_CLEANUP_ROW_ATTEMPTS; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 DataResult row;
@@ -665,6 +679,9 @@ namespace Orleans.Runtime.Membership
                     throw;
                 }
             }
+
+            throw new OrleansException(
+                $"Unable to clean ZooKeeper membership row '{rowPath}' after {MAX_CLEANUP_ROW_ATTEMPTS} concurrent modifications.");
         }
 
         [LoggerMessage(
@@ -690,7 +707,6 @@ namespace Orleans.Runtime.Membership
         private readonly TimeProvider _timeProvider;
         private readonly TimeSpan _reconnectTimeout;
         private readonly object _connectionLock = new();
-        private readonly SemaphoreSlim _retryAdmission = new(1, 1);
         private TaskCompletionSource _connectionChanged = NewConnectionChangedSource();
         private long _connectedGeneration;
         private bool _connected;
@@ -758,21 +774,6 @@ namespace Orleans.Runtime.Membership
             }
         }
 
-        bool IZooKeeperConnectionMonitor.IsConnectedAfter(long connectedGeneration)
-        {
-            lock (_connectionLock)
-            {
-                return _connected && _connectedGeneration > connectedGeneration;
-            }
-        }
-
-        async ValueTask<IDisposable> IZooKeeperConnectionMonitor.AcquireRetryAdmissionAsync(
-            CancellationToken cancellationToken)
-        {
-            await _retryAdmission.WaitAsync(cancellationToken);
-            return new RetryAdmission(_retryAdmission);
-        }
-
         void IZooKeeperConnectionMonitor.ReportConnectionLoss(long connectedGeneration)
         {
             TaskCompletionSource? changed = null;
@@ -833,13 +834,6 @@ namespace Orleans.Runtime.Membership
 
         private static TaskCompletionSource NewConnectionChangedSource() =>
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        private sealed class RetryAdmission(SemaphoreSlim admission) : IDisposable
-        {
-            private SemaphoreSlim? _admission = admission;
-
-            public void Dispose() => Interlocked.Exchange(ref _admission, null)?.Release();
-        }
 
         [LoggerMessage(
             Level = LogLevel.Debug,

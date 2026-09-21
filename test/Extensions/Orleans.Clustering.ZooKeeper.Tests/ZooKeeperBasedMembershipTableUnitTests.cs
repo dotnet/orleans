@@ -407,7 +407,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task ReadAll_PipelinesRowsWithSequentialMemberAndHeartbeatReads()
+        public async Task ReadAll_ReadsRowsSequentially_WithMemberBeforeHeartbeat()
         {
             var (fake, first) = await CreateNativeTable();
             var second = CreateTimedEntry(12346);
@@ -415,12 +415,22 @@ namespace UnitTests.MembershipTests
             fake.Calls.Clear();
             var rowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var releaseRow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var activeReads = 0;
             fake.BeforeRead = async path =>
             {
-                if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
+                var active = Interlocked.Increment(ref activeReads);
+                Assert.Equal(1, active);
+                try
                 {
-                    rowStarted.TrySetResult();
-                    await releaseRow.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
+                    {
+                        rowStarted.TrySetResult();
+                        await releaseRow.Task.WaitAsync(TestContext.Current.CancellationToken);
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref activeReads);
                 }
             };
 
@@ -429,9 +439,7 @@ namespace UnitTests.MembershipTests
             {
                 await rowStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(
-                    new[] { "sync /", "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress),
-                        "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress),
-                        "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress) },
+                    new[] { "sync /", "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress) },
                     fake.Calls);
                 Assert.False(read.IsCompleted);
             }
@@ -453,9 +461,9 @@ namespace UnitTests.MembershipTests
             }
             Assert.Equal(
                 new[] { "sync /", "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress),
+                    "read " + ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress),
                     "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress),
-                    "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress),
-                    "read " + ZooKeeperNativeFake.HeartbeatPath(first.SiloAddress), "read /" },
+                    "read " + ZooKeeperNativeFake.HeartbeatPath(second.SiloAddress), "read /" },
                 fake.Calls);
         }
 
@@ -464,7 +472,7 @@ namespace UnitTests.MembershipTests
         [InlineData(9, true)]
         [InlineData(128, false)]
         [InlineData(128, true)]
-        public async Task ReadAll_StartsEveryRowBeforeAwaitingNativeCompletion(int rowCount, bool cancel)
+        public async Task ReadAll_ReadsOneRowAtATime(int rowCount, bool cancel)
         {
             var fake = new ZooKeeperNativeFake();
             var entries = Enumerable.Range(0, rowCount).Select(index => CreateTimedEntry(12345 + index)).ToArray();
@@ -476,32 +484,21 @@ namespace UnitTests.MembershipTests
             fake.Calls.Clear();
             var releaseMembers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             using var cancellation = new CancellationTokenSource();
+            var firstPath = ZooKeeperNativeFake.RowPath(entries[0].SiloAddress);
             fake.BeforeRead = async path =>
             {
-                if (path != "/" && !path.EndsWith("/IAmAlive", StringComparison.Ordinal))
+                if (path == firstPath)
                 {
                     await releaseMembers.Task.WaitAsync(TestContext.Current.CancellationToken);
                 }
             };
 
-            var native = fake.Operations;
-            Task<DataResult> ReadData(string path)
-            {
-                // Protect the fake's synchronous call log while native completions remain independently gated.
-                lock (fake.Calls)
-                {
-                    return native.GetData(path);
-                }
-            }
-            var operations = new ZooKeeperBasedMembershipTable.NativeOperations(
-                ReadData, native.GetChildren, native.Sync, native.Multi, native.SetData);
-            var read = ZooKeeperBasedMembershipTable.ReadCoreAsync(operations, null, cancellation.Token);
+            var read = ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, null, cancellation.Token);
             var completion = Record.ExceptionAsync(() => read);
             try
             {
                 Assert.Equal(
-                    new[] { "sync /", "children /" }.Concat(
-                        entries.Select(entry => "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress))),
+                    new[] { "sync /", "children /", "read " + firstPath },
                     fake.Calls);
                 if (cancel)
                 {
@@ -520,7 +517,7 @@ namespace UnitTests.MembershipTests
             {
                 Assert.Equal(cancellation.Token,
                     Assert.IsAssignableFrom<OperationCanceledException>(await completion).CancellationToken);
-                Assert.Equal(2 + rowCount, fake.Calls.Count);
+                Assert.Equal(3, fake.Calls.Count);
             }
             else
             {
@@ -539,71 +536,29 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        [Theory]
-        [InlineData("missing")]
-        [InlineData("authorization")]
-        [InlineData("cancellation")]
-        public async Task Read_MissingRow_AwaitsOtherAdmittedRowsAndPreservesFailures(string otherOutcome)
+        [Fact]
+        public async Task Read_MissingRow_StopsBeforeLaterRowsAndPreservesFailure()
         {
             var (fake, first) = await CreateNativeTable();
             var second = CreateTimedEntry(12346);
             Assert.True(await Insert(fake, second, 1));
             fake.Calls.Clear();
             var missingRow = new KeeperException.NoNodeException(ZooKeeperNativeFake.RowPath(first.SiloAddress));
-            var releaseOther = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var authorizationFailure = new KeeperException.NoAuthException();
-            using var cancellation = new CancellationTokenSource();
-            fake.BeforeRead = async path =>
+            fake.BeforeRead = path =>
             {
                 if (path == ZooKeeperNativeFake.RowPath(first.SiloAddress))
                 {
                     throw missingRow;
                 }
 
-                if (path == ZooKeeperNativeFake.RowPath(second.SiloAddress))
-                {
-                    await releaseOther.Task.WaitAsync(TestContext.Current.CancellationToken);
-                    if (otherOutcome == "authorization")
-                    {
-                        throw authorizationFailure;
-                    }
-
-                    if (otherOutcome == "cancellation")
-                    {
-                        cancellation.Cancel();
-                        cancellation.Token.ThrowIfCancellationRequested();
-                    }
-
-                    throw new KeeperException.NoNodeException(path);
-                }
+                return Task.CompletedTask;
             };
 
-            var read = ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, null, cancellation.Token);
-            var completion = Record.ExceptionAsync(() => read);
-            try
-            {
-                Assert.Contains("read " + ZooKeeperNativeFake.RowPath(second.SiloAddress), fake.Calls);
-                Assert.False(read.IsCompleted);
-            }
-            finally
-            {
-                releaseOther.TrySetResult();
-                await completion;
-            }
-
-            var failure = await completion;
-            if (otherOutcome == "authorization")
-            {
-                Assert.Same(authorizationFailure, failure);
-            }
-            else if (otherOutcome == "cancellation")
-            {
-                Assert.Equal(cancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(failure).CancellationToken);
-            }
-            else
-            {
-                Assert.Same(missingRow, failure);
-            }
+            Assert.Same(missingRow, await Record.ExceptionAsync(() => Read(fake)));
+            Assert.Equal(
+                new[] { "sync /", "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress), "read /" },
+                fake.Calls);
+            Assert.DoesNotContain("read " + ZooKeeperNativeFake.RowPath(second.SiloAddress), fake.Calls);
         }
 
         [Fact]
@@ -702,6 +657,62 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
+        public async Task ReadAll_PerpetualCanonicalChurn_StopsAfterMaximumAttempts()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            fake.BeforeRead = path =>
+            {
+                if (path == "/")
+                {
+                    var root = fake.Nodes["/"];
+                    fake.Nodes["/"] = root with { Version = root.Version + 1 };
+                }
+
+                return Task.CompletedTask;
+            };
+
+            var failure = await Assert.ThrowsAsync<OrleansException>(() => Read(fake));
+
+            Assert.Equal(
+                $"Unable to read a consistent ZooKeeper membership snapshot after {ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS} attempts.",
+                failure.Message);
+            Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+                fake.Calls.Count(call => call == "children /"));
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+                fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+                fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+                fake.Calls.Count(call => call == "read /"));
+        }
+
+        [Fact]
+        public async Task ReadAll_StabilizesOnFinalAllowedAttempt()
+        {
+            var (fake, entry) = await CreateNativeTable();
+            var closingReads = 0;
+            fake.BeforeRead = path =>
+            {
+                if (path == "/" && ++closingReads < ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS)
+                {
+                    var root = fake.Nodes["/"];
+                    fake.Nodes["/"] = root with { Version = root.Version + 1 };
+                }
+
+                return Task.CompletedTask;
+            };
+
+            var result = await Read(fake);
+
+            Assert.Single(result.Members);
+            Assert.Equal(entry.SiloAddress, result.Members[0].Item1.SiloAddress);
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS, closingReads);
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS,
+                fake.Calls.Count(call => call == "children /"));
+        }
+
+        [Fact]
         public async Task ReadAll_CancellationStopsBeforeRequestingTheNextRow()
         {
             var (fake, first) = await CreateNativeTable();
@@ -730,20 +741,22 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task Read_MissingRowAndAuthorizationFailure_PropagatesAuthorizationFailure()
+        public async Task Read_MissingRow_DoesNotObserveLaterAuthorizationFailure()
         {
             var (fake, entry) = await CreateNativeTable();
             var second = CreateTimedEntry(12346);
             Assert.True(await Insert(fake, second, 1));
-            var failure = new KeeperException.NoAuthException();
+            var missing = new KeeperException.NoNodeException(ZooKeeperNativeFake.RowPath(entry.SiloAddress));
+            var authorization = new KeeperException.NoAuthException();
             fake.BeforeRead = path => path == ZooKeeperNativeFake.RowPath(entry.SiloAddress)
-                ? Task.FromException(new KeeperException.NoNodeException(path))
+                ? Task.FromException(missing)
                 : path == ZooKeeperNativeFake.RowPath(second.SiloAddress)
-                    ? Task.FromException(failure) : Task.CompletedTask;
+                    ? Task.FromException(authorization) : Task.CompletedTask;
 
             var actual = await Record.ExceptionAsync(() => Read(fake));
 
-            Assert.Same(failure, actual);
+            Assert.Same(missing, actual);
+            Assert.DoesNotContain("read " + ZooKeeperNativeFake.RowPath(second.SiloAddress), fake.Calls);
             Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
         }
 
@@ -1364,13 +1377,13 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
-        public async Task Cleanup_ParallelFailure_WaitsForOutstandingRequests()
+        public async Task Cleanup_ReadsRowsSequentiallyAndStopsOnFailure()
         {
             var (fake, first) = await CreateNativeTable();
             var second = CreateTimedEntry(12346);
             Assert.True(await Insert(fake, second, 1));
+            fake.Calls.Clear();
             var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var completeFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var failure = new KeeperException.NoAuthException();
             fake.BeforeRead = path =>
@@ -1383,7 +1396,6 @@ namespace UnitTests.MembershipTests
 
                 if (path == ZooKeeperNativeFake.RowPath(second.SiloAddress))
                 {
-                    failed.SetResult();
                     return Task.FromException(failure);
                 }
 
@@ -1394,8 +1406,9 @@ namespace UnitTests.MembershipTests
                 fake.Operations, DateTime.UnixEpoch.AddDays(2), TestContext.Current.CancellationToken);
             try
             {
-                await Task.WhenAll(firstStarted.Task, failed.Task).WaitAsync(TestContext.Current.CancellationToken);
+                await firstStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
                 Assert.False(operation.IsCompleted);
+                Assert.DoesNotContain("read " + ZooKeeperNativeFake.RowPath(second.SiloAddress), fake.Calls);
             }
             finally
             {
@@ -1403,6 +1416,10 @@ namespace UnitTests.MembershipTests
             }
 
             Assert.Same(failure, await Record.ExceptionAsync(() => operation));
+            Assert.Equal(
+                new[] { "children /", "read " + ZooKeeperNativeFake.RowPath(first.SiloAddress),
+                    "read " + ZooKeeperNativeFake.RowPath(second.SiloAddress) },
+                fake.Calls);
             Assert.Equal(5, fake.Nodes.Count);
         }
 
@@ -1493,6 +1510,61 @@ namespace UnitTests.MembershipTests
             Assert.Same(failure, actual);
             Assert.Equal(3, fake.Nodes.Count);
             Assert.Equal(1, fake.Nodes["/"].Version);
+        }
+
+        [Fact]
+        public async Task Cleanup_PerpetualConflict_StopsAfterMaximumAttempts()
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            var later = CreateTimedEntry(12346);
+            Assert.True(await Insert(fake, later, 1));
+            fake.Calls.Clear();
+            fake.Transactions.Clear();
+            fake.BeforeMulti = _ => Task.FromException(
+                new KeeperException.BadVersionException(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+
+            var failure = await Assert.ThrowsAsync<OrleansException>(() =>
+                ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                    fake.Operations,
+                    DateTime.UnixEpoch.AddDays(2),
+                    TestContext.Current.CancellationToken));
+
+            Assert.Equal(
+                $"Unable to clean ZooKeeper membership row '{ZooKeeperNativeFake.RowPath(entry.SiloAddress)}' after {ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS} concurrent modifications.",
+                failure.Message);
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS, fake.Transactions.Count);
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS,
+                fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS,
+                fake.Calls.Count(call => call == "read " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            Assert.True(fake.Nodes.ContainsKey(ZooKeeperNativeFake.RowPath(entry.SiloAddress)));
+            Assert.True(fake.Nodes.ContainsKey(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress)));
+            Assert.DoesNotContain("read " + ZooKeeperNativeFake.RowPath(later.SiloAddress), fake.Calls);
+        }
+
+        [Fact]
+        public async Task Cleanup_ConflictOnFinalAllowedAttempt_ThenSucceeds()
+        {
+            var (fake, entry) = await CreateNativeTable(SiloStatus.Dead);
+            var attempts = 0;
+            fake.BeforeMulti = _ =>
+            {
+                if (++attempts < ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS)
+                {
+                    throw new KeeperException.BadVersionException(ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress));
+                }
+
+                return Task.CompletedTask;
+            };
+
+            await ZooKeeperBasedMembershipTable.CleanupCoreAsync(
+                fake.Operations,
+                DateTime.UnixEpoch.AddDays(2),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(ZooKeeperBasedMembershipTable.MAX_CLEANUP_ROW_ATTEMPTS, attempts);
+            Assert.Single(fake.Nodes);
+            Assert.Equal("/", Assert.Single(fake.Nodes).Key);
         }
 
         [Theory]
