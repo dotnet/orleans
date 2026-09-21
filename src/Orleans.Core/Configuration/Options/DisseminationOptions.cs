@@ -1,0 +1,199 @@
+using System;
+
+namespace Orleans.Configuration;
+
+/// <summary>
+/// Options for configuring internal silo-to-silo dissemination.
+/// </summary>
+public sealed class DisseminationOptions
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether the dissemination subsystem is enabled.
+    /// </summary>
+    /// <value><see langword="false"/>. Enable dissemination explicitly after configuring the participating namespaces.</value>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum number of concurrent local dissemination broadcast attempts.
+    /// </summary>
+    /// <remarks>
+    /// Each attempt releases capacity when its local wait completes, including timeout or cancellation.
+    /// </remarks>
+    public int MaxConcurrentSends { get; set; } = 32;
+
+    /// <summary>
+    /// Gets or sets the maximum total payload bytes in one dissemination batch.
+    /// </summary>
+    /// <remarks>
+    /// Bounds outgoing batches and the values admitted from each incoming broadcast or repair response.
+    /// </remarks>
+    public int MaxBatchBytes { get; set; } = 1024 * 1024;
+
+    /// <summary>
+    /// Gets or sets the maximum number of items in one dissemination batch.
+    /// </summary>
+    /// <remarks>
+    /// Bounds outgoing batches and the values examined in each incoming broadcast or repair response.
+    /// </remarks>
+    public int MaxBatchItems { get; set; } = 8 * 1024;
+
+    /// <summary>
+    /// Gets or sets overlay-specific dissemination options.
+    /// </summary>
+    public DisseminationOverlayOptions Overlay { get; set; } = new();
+}
+
+/// <summary>
+/// Options for the dissemination overlay.
+/// </summary>
+public sealed class DisseminationOverlayOptions
+{
+    /// <summary>
+    /// Gets or sets the code-configured fanout selector for the membership broadcast forest.
+    /// </summary>
+    /// <remarks>
+    /// The argument is the current member count for the membership broadcast forest.
+    /// The selector must return the same fanout on every silo for a given member count so that forwarding
+    /// routes agree across the cluster.
+    /// When this value is <see langword="null"/>, <see cref="TargetHopCount"/>, <see cref="MinFanOutFactor"/>,
+    /// and <see cref="MaxFanOutFactor"/> are used to derive a fanout factor.
+    /// Aggregation trees use <see cref="AggregationFanOutFactor"/> instead.
+    /// </remarks>
+    public Func<int, int>? FanOutFactor { get; set; }
+
+    /// <summary>
+    /// Gets or sets the target number of tree hops used by the bindable fanout selector.
+    /// </summary>
+    public int TargetHopCount { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the minimum fanout factor used by the bindable fanout selector.
+    /// </summary>
+    public int MinFanOutFactor { get; set; } = 4;
+
+    /// <summary>
+    /// Gets or sets the maximum fanout factor used by the bindable fanout selector.
+    /// </summary>
+    public int MaxFanOutFactor { get; set; } = 32;
+
+    /// <summary>
+    /// Gets or sets the maximum number of children per node in the aggregation distribution tree.
+    /// </summary>
+    /// <remarks>
+    /// This value is independent of the membership broadcast forest's <see cref="FanOutFactor"/> selector
+    /// and is clamped to the member count. Configure the same value on every silo so that distribution
+    /// routes agree across the cluster. Producers continue to send updates directly to the aggregation root.
+    /// </remarks>
+    /// <value>The default is 8 and the value must be greater than zero.</value>
+    public int AggregationFanOutFactor { get; set; } = 8;
+
+    /// <summary>
+    /// Gets or sets the interval between anti-entropy repair rounds.
+    /// </summary>
+    /// <value>The interval is 5 seconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
+    public TimeSpan AntiEntropyInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets or sets the number of peers contacted during each anti-entropy repair round.
+    /// </summary>
+    /// <remarks>
+    /// This also bounds concurrent local repair attempts across overlapping rounds. Each attempt releases
+    /// capacity when its local wait completes, including timeout or cancellation.
+    /// </remarks>
+    public int AntiEntropyPeerCount { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the maximum number of items in one anti-entropy repair batch.
+    /// </summary>
+    /// <remarks>
+    /// The effective limit is the minimum of this value, <see cref="DisseminationOptions.MaxBatchItems"/>,
+    /// and the peer's advertised receive budget. This allows repair batches to be tuned independently
+    /// of broadcast batches.
+    /// </remarks>
+    /// <value>The default is 8192 and the value must be greater than zero.</value>
+    public int MaxAntiEntropyBatchItems { get; set; } = 8 * 1024;
+
+    /// <summary>
+    /// Gets or sets the maximum total payload bytes in one anti-entropy repair batch.
+    /// </summary>
+    /// <remarks>
+    /// The effective limit is the minimum of this value, <see cref="DisseminationOptions.MaxBatchBytes"/>,
+    /// and the peer's advertised receive budget. This allows repair batches to be tuned independently
+    /// of broadcast batches.
+    /// </remarks>
+    /// <value>The default is 1048576 and the value must be greater than zero.</value>
+    public int MaxAntiEntropyBatchBytes { get; set; } = 1024 * 1024;
+
+    internal int GetFanOutFactor(int memberCount)
+    {
+        var count = Math.Max(1, memberCount);
+        var selectedFanOut = FanOutFactor?.Invoke(count) ?? GetConfiguredFanOutFactor(count);
+        return Math.Clamp(selectedFanOut, 1, count);
+    }
+
+    internal int GetConfiguredFanOutFactor(int memberCount)
+    {
+        var count = Math.Max(1, memberCount);
+        var targetHopCount = Math.Max(1, TargetHopCount);
+        var scaled = targetHopCount switch
+        {
+            1 => count,
+            2 => Math.Sqrt(count),
+            3 => Math.Cbrt(count),
+            _ => Math.Pow(count, 1d / targetHopCount),
+        };
+        var min = Math.Max(1, MinFanOutFactor);
+        var max = Math.Max(min, MaxFanOutFactor);
+        return (int)Math.Ceiling(Math.Max(min, Math.Min(scaled, max)));
+    }
+}
+
+/// <summary>
+/// Options for a dissemination namespace.
+/// </summary>
+public sealed class DisseminationNamespaceOptions
+{
+    /// <summary>
+    /// Gets or sets a value indicating whether this namespace is enabled.
+    /// </summary>
+    /// <value><see langword="false"/>. Enable each participating namespace explicitly.</value>
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the hard maximum number of distinct pending keys retained for this namespace by each peer.
+    /// </summary>
+    /// <remarks>
+    /// The bound applies independently to each namespace in each peer pump. A notification for a key which is
+    /// already retained updates that key at the limit, while a new distinct key is rejected with diagnostics until
+    /// acknowledged delivery or membership pruning releases capacity. Values are materialized from namespace state
+    /// only when they are sent, so this bounds retained identities rather than serialized batch bytes.
+    /// </remarks>
+    public int MaxPendingItemCount { get; set; } = 1024;
+
+    /// <summary>
+    /// Gets or sets the local transport and application budgets for a namespace value.
+    /// </summary>
+    /// <remarks>
+    /// Each hop has independent local transport and application windows. Broadcast application ages from
+    /// the start of receiver processing, including earlier items in the batch. Anti-entropy application
+    /// starts a new window after exchanges finish. Received lifetimes are capped by the local namespace
+    /// setting, and owners observe cancellation before applying queued state. Forwarding re-materializes
+    /// the current value with a new hop lifetime. These local windows use each silo's own clock.
+    /// </remarks>
+    /// <value>The lifetime is 30 seconds by default and must be greater than zero.</value>
+    public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the expected cadence for updates in this namespace.
+    /// </summary>
+    /// <remarks>
+    /// Anti-entropy requests omit keys whose version advanced within this interval. Duplicate values do not
+    /// postpone repair probes.
+    /// </remarks>
+    public TimeSpan ExpectedUpdateCadence { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Gets or sets the maximum serialized payload size for this namespace.
+    /// </summary>
+    public int MaxPayloadBytes { get; set; } = 1024 * 1024;
+}

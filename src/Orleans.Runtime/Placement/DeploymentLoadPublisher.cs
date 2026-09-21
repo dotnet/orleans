@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Dissemination;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -26,6 +28,7 @@ namespace Orleans.Runtime
         private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
@@ -33,6 +36,7 @@ namespace Orleans.Runtime
 
         private long _lastUpdateDateTimeTicks;
         private IGrainTimer? _publishTimer;
+        private Task<StatisticsPublication>? _publicationTask;
 
         public ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> PeriodicStatistics => _periodicStats;
 
@@ -48,6 +52,7 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            IServiceProvider serviceProvider,
             SystemTargetShared shared)
             : base(Constants.DeploymentLoadPublisherSystemTargetType, shared)
         {
@@ -59,6 +64,7 @@ namespace Orleans.Runtime
             _activationWorkingSet = activationWorkingSet;
             _environmentStatisticsProvider = environmentStatisticsProvider;
             _loadSheddingOptions = loadSheddingOptions;
+            _serviceProvider = serviceProvider;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
@@ -79,19 +85,58 @@ namespace Orleans.Runtime
                 await this.RunOrQueueTask(() =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    _publishTimer = RegisterGrainTimer(PublishStatistics, randomTimerOffset, _statisticsRefreshTime);
+                    _publishTimer = RegisterGrainTimer(PublishStatisticsOnTimer, randomTimerOffset, _statisticsRefreshTime);
                     return Task.CompletedTask;
                 });
             }
 
             await RefreshClusterStatistics(cancellationToken);
-            await PublishStatistics(cancellationToken);
+            await this.RunOrQueueTask(async token =>
+            {
+                await PublishStatistics(token);
+                return true;
+            }, cancellationToken);
             LogDebugStartedDeploymentLoadPublisher(_logger);
         }
 
-        internal async Task PublishStatistics(CancellationToken cancellationToken)
+        internal Task PublishStatistics(CancellationToken cancellationToken) =>
+            PublishStatisticsAndGetReceipt(cancellationToken);
+
+        private async Task PublishStatisticsOnTimer(CancellationToken cancellationToken)
+        {
+            var publication = await PublishStatisticsAndGetReceipt(cancellationToken);
+            if (publication.Receipt.Accepted && !cancellationToken.IsCancellationRequested)
+            {
+                // Change during a grain timer callback applies its due time after the callback
+                // completes. Account for direct delivery and notifications since receipt arrival,
+                // rather than adding another full period after the root's cohort wait.
+                // Startup and explicit publications must not change a paused/disposed timer.
+                var remaining = publication.Receipt.NextPublicationDelay
+                    - publication.TimeProvider!.GetElapsedTime(publication.ReceiptTimestamp);
+                _publishTimer?.Change(
+                    remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero,
+                    _statisticsRefreshTime);
+            }
+        }
+
+        private async Task<StatisticsPublication> PublishStatisticsAndGetReceipt(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // Startup and the interleaving timer can overlap. Join the pending sample instead of
+            // submitting another source publication while its cohort is still open.
+            if (_publicationTask is { IsCompleted: false } pending)
+            {
+                return await pending.WaitAsync(cancellationToken);
+            }
+
+            // Native operations own this caller's cancellation and may complete successfully
+            // after observing it. Only joining callers need an independently cancellable wait.
+            return await (_publicationTask = PublishStatisticsCore(cancellationToken));
+        }
+
+        private async Task<StatisticsPublication> PublishStatisticsCore(CancellationToken cancellationToken)
+        {
+            StatisticsPublication publication = default;
             try
             {
                 LogTracePublishStatistics(_logger);
@@ -112,24 +157,30 @@ namespace Orleans.Runtime
                 DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
-                var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
-                var tasks = new List<Task>(members.Count);
-                foreach (var siloAddress in members)
+                var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
+                IReadOnlyCollection<SiloAddress> directRecipients = members;
+                publication = await PublishStatisticsViaDissemination(myStats, cancellationToken);
+                if (publication.Receipt.Accepted)
                 {
-                    // No need to make a grain call to ourselves.
-                    if (siloAddress.Equals(_siloDetails.SiloAddress))
-                    {
-                        continue;
-                    }
-
                     try
                     {
-                        var deploymentLoadPublisher = _grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(Constants.DeploymentLoadPublisherSystemTargetType, siloAddress);
-                        tasks.Add(deploymentLoadPublisher.UpdateRuntimeStatistics(_siloDetails.SiloAddress, myStats, cancellationToken));
+                        var dissemination = _serviceProvider.GetRequiredService<IDisseminationService>();
+                        var disseminationNamespace = _serviceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+                        var unconfirmedPeers = dissemination.GetUnconfirmedPeers(disseminationNamespace);
+                        if (unconfirmedPeers.Count == 0)
+                        {
+                            directRecipients = [];
+                        }
+                        else
+                        {
+                            // An unsupported intermediate node can separate otherwise capable tree participants.
+                            var unconfirmed = unconfirmedPeers.ToHashSet();
+                            directRecipients = members.Any(unconfirmed.Contains) ? members : [];
+                        }
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
-                        tasks.Add(Task.FromCanceled(cancellationToken));
+                        throw;
                     }
                     catch (Exception exception)
                     {
@@ -137,17 +188,20 @@ namespace Orleans.Runtime
                     }
                 }
 
-                await Task.WhenAll(tasks);
+                await PublishStatisticsDirectly(myStats, directRecipients, cancellationToken);
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 throw;
             }
             catch (Exception exc)
             {
                 LogWarningRuntimeStatisticsUpdateFailure2(_logger, exc);
             }
+
+            return publication;
         }
 
         public Task UpdateRuntimeStatistics(
@@ -160,23 +214,144 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private void UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
+        internal Task<DisseminationApplyResult> ApplyDisseminatedRuntimeStatisticsAsync(
+            SiloAddress siloAddress,
+            SiloRuntimeStatistics siloStats,
+            CancellationToken cancellationToken) =>
+            this.RunOrQueueTask(
+                token =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    return Task.FromResult(UpdateRuntimeStatisticsInternal(siloAddress, siloStats, isDisseminated: true));
+                },
+                cancellationToken);
+
+        internal bool IsRuntimeStatisticsObsolete(SiloAddress siloAddress, long timestampTicks) =>
+            _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active
+            || (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime.Ticks > timestampTicks);
+
+        internal Dictionary<SiloAddress, SiloStatus> GetActiveSiloStatusesForStatisticsDigest() =>
+            _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true);
+
+        private async Task<StatisticsPublication> PublishStatisticsViaDissemination(
+            SiloRuntimeStatistics myStats,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_statisticsRefreshTime <= TimeSpan.Zero)
+            {
+                return default;
+            }
+
+            var disseminationNamespace = _serviceProvider.GetRequiredService<DeploymentLoadStatisticsDisseminationNamespace>();
+            if (!disseminationNamespace.Options.Enabled)
+            {
+                return default;
+            }
+
+            var timeProvider = _serviceProvider.GetRequiredService<TimeProvider>();
+            // A cohort may intentionally stay open for P. Allow another P for transport and
+            // distribution admission; the receipt's delay, not this budget, controls sampling.
+            // For long periods, the ordinary RPC timeout may expire first and take the same
+            // logged direct-publication fallback without changing cluster-wide RPC settings.
+            var receiptTimeout = TimeSpan.FromMilliseconds(Math.Min(disseminationNamespace.AggregationPeriod.TotalMilliseconds * 2, uint.MaxValue - 1));
+            using var timeoutCancellation = new CancellationTokenSource(receiptTimeout, timeProvider);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCancellation.Token);
+            try
+            {
+                var dissemination = _serviceProvider.GetRequiredService<IDisseminationService>();
+                var receipt = await dissemination.PublishAggregated(
+                    disseminationNamespace,
+                    _siloDetails.SiloAddress,
+                    myStats.DateTime.Ticks,
+                    cancellation.Token);
+                var receiptTimestamp = timeProvider.GetTimestamp();
+                return new(receipt, timeProvider, receiptTimestamp);
+            }
+            catch (OperationCanceledException) when (
+                timeoutCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            {
+                LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, receiptTimeout);
+                return default;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                return default;
+            }
+        }
+
+        private readonly record struct StatisticsPublication(
+            DisseminationPublicationReceipt Receipt,
+            TimeProvider? TimeProvider,
+            long ReceiptTimestamp);
+
+        private async Task PublishStatisticsDirectly(
+            SiloRuntimeStatistics myStats,
+            IReadOnlyCollection<SiloAddress> members,
+            CancellationToken cancellationToken)
+        {
+            var tasks = new List<Task>(members.Count);
+            foreach (var siloAddress in members)
+            {
+                if (siloAddress.Equals(_siloDetails.SiloAddress))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var deploymentLoadPublisher = _grainFactory.GetSystemTarget<IDeploymentLoadPublisher>(
+                        Constants.DeploymentLoadPublisherSystemTargetType, siloAddress);
+                    tasks.Add(deploymentLoadPublisher.UpdateRuntimeStatistics(_siloDetails.SiloAddress, myStats, cancellationToken));
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    tasks.Add(Task.FromCanceled(cancellationToken));
+                }
+                catch (Exception exception)
+                {
+                    LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                }
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private DisseminationApplyResult UpdateRuntimeStatisticsInternal(
+            SiloAddress siloAddress,
+            SiloRuntimeStatistics siloStats,
+            bool isDisseminated = false)
         {
             LogTraceUpdateRuntimeStatistics(_logger, siloAddress);
             if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
             {
-                return;
+                return DisseminationApplyResult.Rejected;
             }
 
             // Take only if newer.
-            if (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime > siloStats.DateTime)
+            if (_periodicStats.TryGetValue(siloAddress, out var old))
             {
-                return;
+                if (old.DateTime > siloStats.DateTime)
+                {
+                    return DisseminationApplyResult.Obsolete;
+                }
+
+                if (isDisseminated && old.DateTime == siloStats.DateTime)
+                {
+                    return DisseminationApplyResult.Duplicate;
+                }
             }
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
             DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
+            return DisseminationApplyResult.Applied;
         }
 
         internal async Task RefreshClusterStatistics(CancellationToken cancellationToken)
@@ -308,6 +483,11 @@ namespace Orleans.Runtime
             Message = "Started DeploymentLoadPublisher"
         )]
         private static partial void LogDebugStartedDeploymentLoadPublisher(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Deployment load dissemination did not accept the update within {Timeout}. Publishing directly.")]
+        private static partial void LogDebugRuntimeStatisticsDisseminationTimedOut(ILogger logger, TimeSpan timeout);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
