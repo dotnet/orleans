@@ -19,7 +19,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Initializes the state manager by replaying its journal.
     /// </summary>
     /// <remarks>
-    /// A recovery failure permanently fences this instance. Recover by creating a new manager and new state instances.
+    /// A recovery failure fails the current initialization attempt and leaves this instance uninitialized.
+    /// A subsequent call retries recovery from the beginning, resetting and replaying the registered state machines.
+    /// Writes become available after initialization succeeds. A manager fenced by a persistence failure requires a new instance.
     /// Owner shutdown which cancels recovery cancels initialization and leaves this instance stopped.
     /// Cancelling the caller's token ends only that caller's wait while owned recovery continues.
     /// </remarks>

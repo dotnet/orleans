@@ -25,8 +25,8 @@ namespace Orleans.Journaling;
 /// rather than treating in-memory mutations as durable.
 /// </item>
 /// <item>
-/// A failed journal operation permanently fences the manager and requests grain deactivation.
-/// A new manager initializes new state instances by calling <see cref="Reset"/> and replaying durable entries.
+/// A failed write or delete permanently fences the manager and requests grain deactivation.
+/// Recovery calls <see cref="Reset"/> before replaying durable entries, including when initialization is retried.
 /// </item>
 /// </list>
 /// <para>

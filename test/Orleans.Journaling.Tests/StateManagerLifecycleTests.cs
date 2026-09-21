@@ -208,7 +208,7 @@ public partial class StateManagerTests
     }
 
     [Fact]
-    public async Task InitializationFailure_PreservesOriginalCause()
+    public async Task InitializationFailure_ReportsOriginalCauseAndAllowsRetry()
     {
         var expected = new IOException("Recovery failed.");
         var storage = new CapturingStorage { NextReadException = expected };
@@ -216,9 +216,76 @@ public partial class StateManagerTests
         var state = new LifecycleState();
         manager.RegisterStateMachine("state", state);
         Assert.Same(expected, await Record.ExceptionAsync(() => manager.InitializeAsync(CancellationToken.None).AsTask()));
-        var retry = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
-        Assert.Same(expected, retry.InnerException);
         Assert.Equal(0, state.RecoveryCompletedCount);
+        Assert.True(manager.TryGetStateMachine("state", out var registered));
+        Assert.Same(state, registered);
+        var write = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var delete = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("not been initialized", write.Message);
+        Assert.Contains("not been initialized", delete.Message);
+        var lateRegistration = Assert.Throws<InvalidOperationException>(() => manager.RegisterStateMachine("late", new LifecycleState()));
+        Assert.Contains("initialization has begun", lateRegistration.Message);
+
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, state.RecoveryCompletedCount);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(storage.Appends);
+        Assert.Equal(1, state.WriteCompletedCount);
+    }
+
+    [Fact]
+    public async Task RecoveryRetry_CoalescesCallersAndOwnsRead()
+    {
+        var storage = new MutableReadStorage(2, [1, 2, 3], CreatePersistedValueBytes("value", 42));
+        await using var manager = CreateTestSystem(storage).Manager;
+        var value = new DurableValue<int>("value", manager, CreateValueCodec<int>());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
+        Assert.Equal(1, storage.ReadCount);
+
+        using var caller = new CancellationTokenSource();
+        var canceledWaiter = manager.InitializeAsync(caller.Token).AsTask();
+        await WaitFor(storage.BlockedReadStarted.Task);
+        var remainingWaiter = manager.InitializeAsync(CancellationToken.None).AsTask();
+        Assert.Equal(2, storage.ReadCount);
+        var write = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("not been initialized", write.Message);
+        var registration = Assert.Throws<InvalidOperationException>(() => manager.RegisterStateMachine("late", new LifecycleState()));
+        Assert.Contains("initialization has begun", registration.Message);
+        caller.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(canceledWaiter));
+        Assert.False(storage.ReadToken.IsCancellationRequested);
+        Assert.False(remainingWaiter.IsCompleted);
+
+        storage.AllowBlockedRead.SetResult();
+        await WaitFor(remainingWaiter);
+        Assert.Equal(42, value.Value);
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, storage.ReadCount);
+        value.Value = 43;
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(["append"], storage.OperationLog);
+    }
+
+    [Fact]
+    public async Task RecoveryCompletionFailure_RetryResetsRegisteredState()
+    {
+        var storage = new CapturingStorage();
+        await using var manager = CreateTestSystem(storage).Manager;
+        var state = new LifecycleState();
+        manager.RegisterStateMachine("state", state);
+        var expected = new InvalidOperationException("Recovery completion failed.");
+        state.RecoveryCompletedAction = () => throw expected;
+        Assert.Same(expected, await Record.ExceptionAsync(() => manager.InitializeAsync(CancellationToken.None).AsTask()));
+        Assert.Equal(1, state.ResetCount);
+        Assert.Equal(1, state.RecoveryCompletedCount);
+        Assert.Empty(storage.Appends);
+
+        state.RecoveryCompletedAction = null;
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, state.ResetCount);
+        Assert.Equal(2, state.RecoveryCompletedCount);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(storage.Appends);
     }
 
     [Fact]
@@ -299,7 +366,7 @@ public partial class StateManagerTests
     [InlineData("provider-cancellation")]
     [InlineData("provider-io")]
     [InlineData("replay")]
-    public async Task RecoveryFailure_FencesAndFaultsInitializationWaiters(string failure)
+    public async Task RecoveryFailure_FaultsAttemptWaitersAndAllowsRetry(string failure)
     {
         var context = new QueuedSynchronizationContext();
         await context.Run(async () =>
@@ -308,7 +375,7 @@ public partial class StateManagerTests
                 ? new OperationCanceledException("Provider read cancellation.", new CancellationToken(canceled: true))
                 : new IOException("Provider read failure.");
             IJournalStorage storage = failure == "replay"
-                ? new RawReadStorage([1, 2, 3])
+                ? new MutableReadStorage([1, 2, 3], [])
                 : new CapturingStorage { NextReadException = expected };
             await using var manager = CreateTestSystem(storage).Manager;
             var states = new[] { new LifecycleState(), new LifecycleState() };
@@ -333,9 +400,48 @@ public partial class StateManagerTests
 
             Assert.Same(observed, await Record.ExceptionAsync(() => WaitFor(waiters[1])));
             Assert.All(states, state => Assert.Equal(0, state.RecoveryCompletedCount));
-            var rejected = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
-            Assert.Same(observed, rejected.InnerException);
+            var retry = manager.InitializeAsync(CancellationToken.None).AsTask();
+            var concurrent = manager.InitializeAsync(CancellationToken.None).AsTask();
+            await WaitFor(Task.WhenAll(retry, concurrent));
+            Assert.All(states, state => Assert.Equal(1, state.RecoveryCompletedCount));
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.All(states, state => Assert.Equal(1, state.WriteCompletedCount));
         });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoveryRetry_ShutdownCancelsAllWaitingCallers(bool lifecycleStop)
+    {
+        var storage = new MutableReadStorage(2, [1, 2, 3], []);
+        var sut = CreateTestSystem(storage);
+        await using var manager = sut.Manager;
+        var state = new LifecycleState();
+        manager.RegisterStateMachine("state", state);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => lifecycleStop
+            ? sut.Lifecycle.OnStart(CancellationToken.None)
+            : manager.InitializeAsync(CancellationToken.None).AsTask());
+        var first = manager.InitializeAsync(CancellationToken.None).AsTask();
+        await WaitFor(storage.BlockedReadStarted.Task);
+        var second = manager.InitializeAsync(CancellationToken.None).AsTask();
+        await WaitFor(lifecycleStop
+            ? sut.Lifecycle.OnStop(TestContext.Current.CancellationToken)
+            : manager.DisposeAsync().AsTask());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(first));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(second));
+        Assert.True(storage.ReadToken.IsCancellationRequested);
+        Assert.Equal(2, storage.ReadCount);
+        Assert.Equal(0, state.RecoveryCompletedCount);
+        Assert.Empty(storage.OperationLog);
+        if (lifecycleStop)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
+        }
+
+        await manager.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => manager.InitializeAsync(CancellationToken.None).AsTask());
     }
 
     [Fact]
@@ -538,12 +644,17 @@ public partial class StateManagerTests
         public bool EmitEntry { get; set; } = true;
         public Action? ResetAction { get; set; }
         public Action? WriteCompletedAction { get; set; }
+        public Action? RecoveryCompletedAction { get; set; }
         public int ResetCount { get; private set; }
         public int CaptureCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
         public int RecoveryCompletedCount { get; private set; }
 
-        public void OnRecoveryCompleted() => RecoveryCompletedCount++;
+        public void OnRecoveryCompleted()
+        {
+            RecoveryCompletedCount++;
+            RecoveryCompletedAction?.Invoke();
+        }
 
         public void Reset(JournalStreamWriter writer)
         {

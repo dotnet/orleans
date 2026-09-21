@@ -78,7 +78,7 @@ Design commands to tolerate retries at the application boundary. Use operation i
 
 ## Storage failures
 
-A failed append, snapshot replacement, delete, or initialization permanently fences that manager instance.
+A failed append, snapshot replacement, or delete permanently fences that manager instance.
 Queued operations fault, and later write, delete, registration, and initialization requests fail explicitly.
 Existing in-memory state remains available to in-flight calls until deactivation completes. The grain runtime
 starts deactivation as part of handling the failure.
@@ -97,8 +97,12 @@ assigned lifetimes.
 Cancelling a write's cancellation token stops the caller's wait. An already queued write continues to its
 storage outcome, so the caller reconciles that outcome before retrying the command.
 
-An initialization failure preserves stored data for diagnosis. Restore the required format/codec registration
-or repair the backing data before creating a fresh manager or retrying activation.
+An initialization failure reports its error to that attempt's callers and leaves the manager uninitialized.
+The caller can retry <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> after a transient
+failure or after restoring the required format, codec, or backing data. Each attempt resets recovery
+bookkeeping and replays the journal from the beginning using the same registered state machines.
+Concurrent callers share the active attempt; writes and deletion become available after initialization
+succeeds. State registration stays closed once initialization has begun.
 
 Owner shutdown which cancels initial recovery cancels all initialization waiters and leaves the manager
 stopped. Disposal waits for the owned read to finish before releasing journal resources. Cancelling an
@@ -123,7 +127,7 @@ The journal owner keeps feature operations quiescent through deletion's storage 
 including when a caller cancels its wait. Successful deletion calls <xref:Orleans.Journaling.IStateMachine.Reset*>
 before completing deletion waiters.
 
-The manager records the first capture or storage failure, fences further persistence, faults current
+The manager records the first write or delete failure, fences further persistence, faults current
 and queued manager waiters, and requests grain deactivation. Features observe their write failures and
 complete their own operation waiters and resource cleanup through their operation and lifecycle ownership.
 Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage

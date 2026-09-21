@@ -162,8 +162,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfFenced();
-            if (_workLoop is null)
+            if (_workLoop is null || _state is ManagerState.RecoveryFailed)
             {
+                _state = ManagerState.Unknown;
                 _workLoop = Start();
             }
 
@@ -197,7 +198,19 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
         catch (Exception exception)
         {
-            Fence(exception);
+            try
+            {
+                LogErrorProcessingWorkItems(_shared.Logger, exception);
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    _state = ManagerState.RecoveryFailed;
+                    FaultQueuedWorkItemsUnderLock(exception);
+                }
+            }
+
             return;
         }
 
@@ -1186,6 +1199,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private enum ManagerState : byte
     {
         Unknown,
+        RecoveryFailed,
         Ready,
         Fenced
     }
