@@ -27,7 +27,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var orphan = CreateJob(receiver, "orphan", "old-shard", "old:1");
         using var schedule = Fixture.JobManagerProbe.BlockNext(ReceiverTestServices.InboxJobName);
-        var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        using var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
 
         var activation = receiver.GetSnapshotAsync();
@@ -87,8 +87,9 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var lifecycle = await Assert.ThrowsAnyAsync<Exception>(() => activation);
         await current.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await ExecuteAsync(extension, handle));
-        var delivery = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await ((IDurableInboxExtension)extension).DeliverAsync(envelope.Value, TestContext.Current.CancellationToken));
+        var delivery = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            OnTurnAsync(extension.Context, () =>
+                ((IDurableInboxExtension)extension.Handler).DeliverAsync(envelope.Value, TestContext.Current.CancellationToken)));
         Assert.Contains(delivery.Message, lifecycle.ToString(), StringComparison.Ordinal);
         Assert.Contains(fault == "mismatched-metadata" ? "metadata does not match" : "both be present or both be absent", delivery.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
@@ -141,7 +142,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         var oldContext = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        var read = Fixture.Storage.BlockRead(JournalId.FromGrainId(receiver.GetGrainId()));
+        using var read = Fixture.Storage.BlockRead(JournalId.FromGrainId(receiver.GetGrainId()));
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         var activation = receiver.GetSnapshotAsync();
         await read.WaitUntilEnteredAsync();
@@ -171,7 +172,7 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         using var envelope = CreateEnvelope(receiver, NewMessage(94, "duplicate-jobs"), route);
         Fixture.JobManagerProbe.DuplicateNext(ReceiverTestServices.InboxJobName);
-        var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        using var write = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var delivery = DeliverAsync(receiver, envelope.Value);
         await write.WaitUntilEnteredAsync();
         var jobs = Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId());
@@ -243,12 +244,33 @@ public sealed class InboxCallbackOwnershipTests : DurableMessagingBehaviorTestBa
             .Invoke(reference, [run, TestContext.Current.CancellationToken])!;
     }
 
-    private IDurableJobFeatureHandler GetExtension(IDurableMessagingTestGrain receiver) =>
-        (IDurableJobFeatureHandler)Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredService(
-            ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+    private (IGrainContext Context, IDurableJobFeatureHandler Handler) GetExtension(IDurableMessagingTestGrain receiver)
+    {
+        var context = Fixture.GetGrainContext(receiver);
+        return (context, (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(
+            ReceiverTestServices.GetImplementationType("DurableInboxExtension")));
+    }
 
-    private static ValueTask<DurableJobRunResult> ExecuteAsync(IDurableJobFeatureHandler extension, DurableJob job) =>
-        extension.ExecuteJobAsync(new CallbackContext(job), TestContext.Current.CancellationToken);
+    private static Task<DurableJobRunResult> ExecuteAsync(
+        (IGrainContext Context, IDurableJobFeatureHandler Handler) extension, DurableJob job)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        return OnTurnAsync(extension.Context, () =>
+            extension.Handler.ExecuteJobAsync(new CallbackContext(job), cancellationToken));
+    }
+
+    private static Task<TResult> OnTurnAsync<TResult>(IGrainContext context, Func<ValueTask<TResult>> action)
+    {
+        var task = new Task<Task<TResult>>(async () =>
+        {
+            Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+            var result = await action();
+            Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+            return result;
+        });
+        context.Scheduler.QueueTask(task);
+        return task.Unwrap();
+    }
 
     private static DurableJob CreateJob(IDurableMessagingTestGrain receiver, string id, string shardId, string? ownershipId) =>
         new()
