@@ -7,6 +7,8 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public sealed class FaultingInboxCodecFixture : DurableMessagingClusterFixture
 {
     public Exception? NextFailure { get; set; }
+    public bool FailOnSnapshot { get; set; }
+    public bool? FailedSnapshot { get; private set; }
     protected override void ConfigureServices(IServiceCollection services)
     {
         var descriptor = services.Last(entry => entry.ServiceType == typeof(IDurableDictionaryCommandCodec<,>)
@@ -20,11 +22,12 @@ public sealed class FaultingInboxCodecFixture : DurableMessagingClusterFixture
         IDurableDictionaryCommandCodec<(GrainId, Guid), DurableEnvelope> inner)
         : IDurableDictionaryCommandCodec<(GrainId, Guid), DurableEnvelope>
     {
-        private void Check()
+        private void Check(bool snapshot = false)
         {
-            if (owner.NextFailure is { } failure)
+            if (snapshot == owner.FailOnSnapshot && owner.NextFailure is { } failure)
             {
                 owner.NextFailure = null;
+                owner.FailedSnapshot = snapshot;
                 throw failure;
             }
         }
@@ -37,7 +40,7 @@ public sealed class FaultingInboxCodecFixture : DurableMessagingClusterFixture
         public void WriteClear(JournalStreamWriter writer) { Check(); inner.WriteClear(writer); }
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<(GrainId, Guid), DurableEnvelope>> items, JournalStreamWriter writer)
         {
-            Check();
+            Check(snapshot: true);
             inner.WriteSnapshot(items, writer);
         }
         public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<(GrainId, Guid), DurableEnvelope> consumer) => inner.Apply(input, consumer);

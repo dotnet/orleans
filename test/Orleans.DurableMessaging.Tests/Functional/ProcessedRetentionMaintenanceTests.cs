@@ -166,7 +166,7 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
 
         var failure = await Assert.ThrowsAsync<IOException>(() => RunPumpAsync(receiver));
 
-        Assert.Same(failure, await oldGrain.Faulted.Task);
+        Assert.Same(failure, await oldGrain.DeactivationFailure.Task);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         Assert.Equal(0, oldGrain.GetSnapshotForTest().ProcessedMessageCount);
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);

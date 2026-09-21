@@ -40,14 +40,22 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
-        var firstFailure = new IOException("Original terminal journal failure.");
+        IOException? firstFailure = null;
         using var seeded = await OnTurnAsync(context, () => CancellationCleanupProbe.SeedResults(extension));
+        if (terminalFailure)
+        {
+            Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+            using var failingInput = CreateEnvelope(receiver, NewMessage(311, "capture-failure"));
+            var delivery = await OnTurnAsync(context, () =>
+                ((IDurableInboxExtension)extension).DeliverAsync(failingInput.Value, TestContext.Current.CancellationToken).AsTask());
+            firstFailure = await Assert.ThrowsAsync<IOException>(() => delivery);
+        }
+        Task stopping = null!;
         await OnTurnAsync(context, () =>
         {
-            Assert.True(CancellationCleanupProbe.CoordinatorIsActive(extension));
-            if (terminalFailure) CancellationCleanupProbe.ExtensionType.GetMethod("OnFaulted")!.Invoke(extension, [firstFailure]);
-            var stop = ((ILifecycleObserver)extension).OnStop(CancellationToken.None);
-            Assert.True(stop.IsCompletedSuccessfully);
+            if (!terminalFailure) Assert.True(CancellationCleanupProbe.CoordinatorIsActive(extension));
+            stopping = ((ILifecycleObserver)extension).OnStop(CancellationToken.None);
+            Assert.False(stopping.IsCompleted);
             CancellationCleanupProbe.AssertClean(extension, seeded);
             Assert.True(shutdown.Token.IsCancellationRequested);
             Assert.Equal(1, handler.CallbackCalls);
@@ -58,9 +66,20 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         Assert.True(token.IsCancellationRequested);
         Assert.False(handler.Finished);
         handler.Release.TrySetResult();
-        var failure = await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        if (terminalFailure) Assert.Same(firstFailure, failure);
-        else Assert.IsAssignableFrom<OperationCanceledException>(failure);
+        await stopping.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Exception failure;
+        if (terminalFailure)
+        {
+            failure = await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            Assert.Same(firstFailure, failure);
+        }
+        else
+        {
+            failure = Assert.IsType<OperationCanceledException>(handler.Cancellation);
+            Assert.Null(CancellationCleanupProbe.Field<ExceptionDispatchInfo?>(extension, "_failure"));
+            Assert.False(grain.DeactivationFailure.Task.IsCompleted);
+            await receiver.RequestDeactivationAsync();
+        }
         Assert.DoesNotContain(handler.CallbackFailure, failure is AggregateException aggregate ? aggregate.Flatten().InnerExceptions : [failure]);
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.True(handler.Finished);
@@ -86,6 +105,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         public Exception CallbackFailure { get; } = new InvalidOperationException("Application cancellation callback failed.");
         public int CallbackCalls { get; private set; }
         public bool Finished { get; private set; }
+        public OperationCanceledException? Cancellation { get; private set; }
         public bool CanHandle(IInboxHandlerContext context) => true;
         public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
@@ -100,6 +120,11 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
                 await Release.Task;
                 cancellationToken.ThrowIfCancellationRequested();
                 return () => throw new InvalidOperationException("A canceled handler must never apply.");
+            }
+            catch (OperationCanceledException exception)
+            {
+                Cancellation = exception;
+                throw;
             }
             finally { Finished = true; }
         }
@@ -186,6 +211,8 @@ internal sealed class CancellationCleanupProbe : IDisposable
         SetField(Extension, "_metricsActive", 1);
         SetField(Extension, "_reportedDepth", 1);
         SetField(Extension, "_activeDelivery", Task.CompletedTask);
+        SetField(Extension, "_pendingWrites", Activator.CreateInstance(
+            ExtensionType.GetField("_pendingWrites", BindingFlags.NonPublic | BindingFlags.Instance)!.FieldType)!);
         var coordinator = Field<object>(Extension, "_pumpCoordinator");
         object?[] arguments = ["owner", Shutdown.Token, null];
         Assert.True((bool)coordinator.GetType().GetMethod("TryAcquire")!.Invoke(coordinator, arguments)!);

@@ -1,8 +1,14 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
+using Orleans.DurableMessaging.Tests.Functional;
+using Orleans.DurableMessaging.Tests.Support;
+using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Timers;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -233,24 +239,54 @@ public sealed class DeliveryAndOptionsContractTests
     [Fact]
     public async Task InboxLifecycleStart_CancellationInterruptsBlockedResume()
     {
-        var extensionType = typeof(IDurableInbox).Assembly.GetType(
-            "Orleans.DurableMessaging.DurableInboxExtension",
-            throwOnError: true)!;
-        var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
-        var grainContext = Substitute.For<IGrainContext>();
-        grainContext.GrainInstance.Returns(Substitute.For<IDurableMessagingGrain>());
-        extensionType.GetField("_grainContext", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(extension, grainContext);
-        extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(extension, new SemaphoreSlim(0, 1));
-        extensionType.GetField("_metricsActive", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(extension, 1);
-        using var cancellation = new CancellationTokenSource();
+        var builder = InboxStateManagerBoundaryTests.CreateBuilder("orleans-binary");
+        var id = new JournalId("lifecycle-start/" + Guid.NewGuid().ToString("N"));
+        builder.Services.AddScoped<IJournaledStateManager>(sp =>
+            sp.GetRequiredService<IJournaledStateManagerFactory>().CreateStandalone(id));
+        builder.Services.AddScoped<IGrainContext>(sp =>
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(GrainId.Create("lifecycle-start", "blocked"));
+            context.GrainInstance.Returns(Substitute.For<IDurableMessagingGrain>());
+            context.ActivationServices.Returns(sp);
+            context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
+            return context;
+        });
+        var jobs = Substitute.For<ILocalDurableJobManager>();
+        var timers = Substitute.For<ITimerRegistry>();
+        builder.Services.AddSingleton(jobs);
+        builder.Services.AddSingleton(timers);
+        builder.Services.AddSingleton(Substitute.For<IDurableJobHandlerRegistry>());
+        var instrumentsType = ReceiverTestServices.GetImplementationType("DurableMessagingInstruments");
+        builder.Services.AddSingleton(instrumentsType,
+            instrumentsType.GetMethod("CreateForDirectConstruction", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!);
+        ReceiverTestServices.Add(builder.Services, static _ => { });
+        await using var provider = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = provider.CreateAsyncScope();
+        var extensionType = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+        var extension = (ILifecycleObserver)scope.ServiceProvider.GetRequiredService(extensionType);
+        var owner = scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        await owner.InitializeAsync(TestContext.Current.CancellationToken);
+        var gate = (SemaphoreSlim)extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
+        await gate.WaitAsync(TestContext.Current.CancellationToken);
+        try
+        {
+            using var cancellation = new CancellationTokenSource();
+            var start = extension.OnStart(cancellation.Token);
+            Assert.False(start.IsCompleted);
+            cancellation.Cancel();
 
-        var start = extension.OnStart(cancellation.Token);
-        Assert.False(start.IsCompleted);
-        cancellation.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+            Assert.Equal(0, gate.CurrentCount);
+            Assert.Empty(jobs.ReceivedCalls());
+            Assert.Empty(timers.ReceivedCalls());
+            Assert.Empty(scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
+                "__orleans.durable-messaging.inbox"));
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 }

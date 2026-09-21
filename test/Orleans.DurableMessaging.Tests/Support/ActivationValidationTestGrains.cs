@@ -23,8 +23,6 @@ public sealed class ActivationValidationProbe
     {
         public IGrainContext Context { get; } = context;
         public bool InstanceAvailableDuringConstruction { get; } = context.GrainInstance is not null;
-        public int ReplayStarted;
-        public int ReplayCompleted;
         public int Activated;
         public int Calls;
     }
@@ -52,9 +50,6 @@ public abstract class ActivationValidationTestGrain : DurableGrain, IActivationV
     {
         _value = value;
         _observation = probe.Track(context);
-        var journal = (ObservedJournalValue<int>)value;
-        journal.Initializing = OnRecoveryStarted;
-        journal.Recovered = OnRecoveryCompleted;
     }
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -77,10 +72,6 @@ public abstract class ActivationValidationTestGrain : DurableGrain, IActivationV
         return Task.CompletedTask;
     }
 
-    public void OnRecoveryStarted() => Interlocked.Increment(ref _observation.ReplayStarted);
-    public void OnRecoveryCompleted() => Interlocked.Increment(ref _observation.ReplayCompleted);
-    public void OnWriteStarted() { }
-    public void OnWriteCompleted() { }
 }
 
 public sealed class SupportedActivationValidationTestGrain(

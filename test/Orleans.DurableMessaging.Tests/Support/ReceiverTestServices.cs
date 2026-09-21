@@ -36,23 +36,6 @@ internal static class ReceiverTestServices
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
         services.AddOptions<DurableInboxOptions>().Configure(configure);
         services.TryAddSingleton(instrumentsType);
-        services.AddScoped(GetImplementationType("InboxJournalState"), sp =>
-        {
-            var manager = sp.GetRequiredService<IJournaledStateManager>();
-            var state = (IStateMachine)CreateInstance(GetImplementationType("InboxJournalState"), manager);
-            manager.RegisterStateMachine("__orleans.durable-messaging.inbox", state);
-            return state;
-        });
-        services.AddKeyedScoped<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox",
-            (sp, _) => (IDurableDictionary<(GrainId, Guid), DurableEnvelope>)sp.GetRequiredService(GetImplementationType("InboxJournalState")));
-        RegisterDictionary<(GrainId, Guid), DateTimeOffset>(services, "inbox-processed");
-        RegisterInternalDictionary<(GrainId, Guid)>(services, "InboxMessageState", "inbox-message-state");
-        RegisterInternalDictionary<(GrainId, Guid)>(services, "InboxDeadLetter", "inbox-dead-letters");
-        services.AddStateMachine<IDurableDictionary<Guid, DurableEffect>, ObservedJournalDictionary<Guid, DurableEffect>>(
-            static (sp, _) => new(sp.GetRequiredService<IJournaledStateManager>()));
-        services.AddStateMachine<IDurableValue<int>, ObservedJournalValue<int>>(
-            static (sp, _) => new(sp.GetRequiredService<IJournaledStateManager>()));
-
         services.TryAddScoped(extensionType, sp => CreateInstance(
             extensionType,
             sp.GetRequiredService<IGrainContext>(),
@@ -76,8 +59,7 @@ internal static class ReceiverTestServices
             sp.GetRequiredService(pumpResultsType),
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
-            sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value,
-            sp.GetRequiredService(GetImplementationType("InboxJournalState"))));
+            sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value));
 
         services.TryAddKeyedScoped<IGrainExtension>(
             typeof(IDurableInboxExtension),
@@ -85,6 +67,7 @@ internal static class ReceiverTestServices
         services.TryAddScoped(inboxType, sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
+            _ = GetDictionary<(GrainId, Guid), DateTimeOffset>(sp, "inbox-processed");
             _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxMessageState", "inbox-message-state");
             _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxDeadLetter", "inbox-dead-letters");
             _ = GetValue<string>(sp, "inbox-job-id");
@@ -100,11 +83,8 @@ internal static class ReceiverTestServices
         });
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
-        services.AddStateMachine<IDurableOutbox, JournaledTestOutbox>();
         services.AddScoped<IDurableOutbox>(static sp =>
-            sp.GetRequiredKeyedService<IDurableOutbox>("test-handler-output"));
-        services.AddKeyedScoped<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output", (sp, _) =>
-            (JournaledTestOutbox)sp.GetRequiredService<IDurableOutbox>());
+            new JournaledTestOutbox(sp.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output")));
         services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
         services.TryAddScoped(pumpResultsType, sp =>
         {
@@ -121,42 +101,6 @@ internal static class ReceiverTestServices
                 65_536);
         });
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IConfigureGrainTypeComponents), configuratorType));
-    }
-
-    public static IStateMachine CreateStandardDictionary<TKey, TValue>(IJournaledStateManager manager) where TKey : notnull
-    {
-        var type = typeof(IStateMachine).Assembly.GetType("Orleans.Journaling.DurableDictionary`2", throwOnError: true)!
-            .MakeGenericType(typeof(TKey), typeof(TValue));
-        return (IStateMachine)Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
-            binder: null, args: [manager.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>()], culture: null)!;
-    }
-
-    public static IStateMachine CreateDeferredDictionary<TKey, TValue>(IJournaledStateManager manager) where TKey : notnull =>
-        (IStateMachine)CreateInstance(GetImplementationType("DeferredJournaledDictionary`2").MakeGenericType(typeof(TKey), typeof(TValue)), manager);
-
-    public static IStateMachine CreateDeferredValue<T>(IJournaledStateManager manager) =>
-        (IStateMachine)CreateInstance(GetImplementationType("DeferredJournaledValue`1").MakeGenericType(typeof(T)), manager);
-
-    private static void RegisterDictionary<TKey, TValue>(IServiceCollection services, string name) where TKey : notnull =>
-        services.AddKeyedScoped<IDurableDictionary<TKey, TValue>>("__orleans.durable-messaging." + name, (sp, key) =>
-        {
-            var manager = sp.GetRequiredService<IJournaledStateManager>();
-            var state = CreateDeferredDictionary<TKey, TValue>(manager);
-            manager.RegisterStateMachine((string)key!, state);
-            return (IDurableDictionary<TKey, TValue>)state;
-        });
-
-    private static void RegisterInternalDictionary<TKey>(IServiceCollection services, string type, string name) where TKey : notnull
-    {
-        var valueType = GetImplementationType(type);
-        services.AddKeyedScoped(typeof(IDurableDictionary<,>).MakeGenericType(typeof(TKey), valueType),
-            "__orleans.durable-messaging." + name, (sp, key) =>
-            {
-                var manager = sp.GetRequiredService<IJournaledStateManager>();
-                var state = (IStateMachine)CreateInstance(GetImplementationType("DeferredJournaledDictionary`2").MakeGenericType(typeof(TKey), valueType), manager);
-                manager.RegisterStateMachine((string)key!, state);
-                return state;
-            });
     }
 
     private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName)

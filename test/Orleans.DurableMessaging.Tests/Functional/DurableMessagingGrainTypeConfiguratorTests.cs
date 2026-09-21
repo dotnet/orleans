@@ -61,7 +61,6 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         Assert.Single(GetProcessed(first.Context));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
         storage.Release();
-        await state.Handled.Task.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(42, await grain.GetValueAsync());
         Assert.Equal(0, first.Inbox.Count);
         Assert.Single(GetProcessed(first.Context));
@@ -118,7 +117,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
             Assert.Same(observation.ConstructedGrain, observation.Context.GrainInstance);
             var manager = observation.Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
-            Assert.Single(BootstrapState.ReadMessagingStates(manager), static observer => observer.GetType().Name == "InboxJournalState");
+            Assert.Equal(8, BootstrapState.ReadMessagingStates(manager).Count());
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out _));
             Assert.True(manager.TryGetStateMachine("test-handler-output", out _));
             Assert.Equal(0, observation.Activations);
@@ -254,10 +253,10 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             Assert.Equal(0, observation.Activations);
             var manager = observation.Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
-            Assert.Same(observation.Context.ActivationServices.GetRequiredService(
-                ReceiverTestServices.GetImplementationType("InboxJournalState")), inbox);
+            Assert.Same(observation.Context.ActivationServices.GetRequiredKeyedService<
+                IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
             Assert.True(manager.TryGetStateMachine("test-handler-output", out var outbox));
-            Assert.Same(observation.Context.ActivationServices.GetRequiredService<IDurableOutbox>(), outbox);
+            Assert.Same(((JournaledTestOutbox)observation.Context.ActivationServices.GetRequiredService<IDurableOutbox>()).StoredMessages, outbox);
             Assert.Single(GetSetup(observation.Context).GetInvocationList());
         }
         finally
@@ -328,10 +327,8 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     {
         Assert.Equal(grainClass, observation.ConstructedGrain!.GetType());
         Assert.False(observation.InstanceAvailableInConstructor);
-        Assert.Same(observation.ConstructedGrain, state.GrainAtRecovery);
-        Assert.Equal(1, state.RecoveryStarts);
-        Assert.Equal(1, state.RecoveryCompletions);
-        Assert.Equal(1, state.PrimaryStateCountAtRecovery);
+        Assert.Same(observation.ConstructedGrain, state.GrainAtActivation);
+        Assert.Equal(8, state.MessagingStateCountAtActivation);
         Assert.Equal(1, observation.Activations);
         Assert.Equal(expectedActivationValue, state.ActivationValue);
         var services = observation.Context.ActivationServices;
@@ -339,19 +336,19 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var applicationManager = services.GetRequiredService<IDurableStateManager>();
         Assert.Same(observation.Manager, applicationManager);
         Assert.Same(observation.Value, applicationManager.GetOrAddState<IDurableValue<int>>("bootstrap-value"));
-        Assert.True(applicationManager.TryGetState<IDurableOutbox>("test-handler-output", out var applicationOutbox));
-        Assert.Same(observation.Outbox, applicationOutbox);
-        Assert.Same(observation.Outbox, applicationManager.GetOrAddState<IDurableOutbox>("test-handler-output"));
+        Assert.True(applicationManager.TryGetState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output", out var applicationOutbox));
+        Assert.Same(((JournaledTestOutbox)observation.Outbox!).StoredMessages, applicationOutbox);
+        Assert.Same(applicationOutbox, applicationManager.GetOrAddState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"));
         Assert.Same(observation.Value, services.GetRequiredKeyedService<IDurableValue<int>>("bootstrap-value"));
         Assert.Same(observation.Inbox, services.GetRequiredService<IDurableInbox>());
         Assert.Same(observation.Outbox, services.GetRequiredService<IDurableOutbox>());
         Assert.True(observation.Inbox!.TryGetHandler(BootstrapState.Route, out var handler));
         Assert.Same(state, handler);
-        var primary = Assert.Single(BootstrapState.ReadMessagingStates(observation.Manager!), static state => state.GetType().Name == "InboxJournalState");
-        Assert.Same(services.GetRequiredService(ReceiverTestServices.GetImplementationType("InboxJournalState")), primary);
+        Assert.Equal(8, BootstrapState.ReadMessagingStates(observation.Manager!).Count());
+        var primary = services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox");
         Assert.Same(primary, applicationManager.GetOrAddState<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"));
         Assert.True(observation.Manager!.TryGetStateMachine("test-handler-output", out var output));
-        Assert.Same(observation.Outbox, output);
+        Assert.Same(applicationOutbox, output);
     }
     private IBootstrapTestGrain CreateGrain(Type grainClass) => grainClass == typeof(GenericBootstrapGrain<int>)
         ? Fixture.Client.GetGrain<IGenericBootstrapTestGrain<int>>(Guid.NewGuid())

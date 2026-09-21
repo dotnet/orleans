@@ -22,6 +22,15 @@ public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
     protected static DurableTestMessage NewMessage(int sequence, string value) =>
         new(Guid.NewGuid(), sequence, value);
 
+    protected async Task RefreshSeededOwnerAsync(IDurableMessagingTestGrain receiver)
+    {
+        var previous = Fixture.GetGrainContext(receiver);
+        await receiver.RequestDeactivationAsync();
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        _ = await receiver.GetSnapshotAsync();
+        Assert.NotSame(previous, Fixture.GetGrainContext(receiver));
+    }
+
     protected static Task<DeliveryResult> DeliverAsync(
         IDurableMessagingTestGrain receiver,
         DurableEnvelope envelope) =>

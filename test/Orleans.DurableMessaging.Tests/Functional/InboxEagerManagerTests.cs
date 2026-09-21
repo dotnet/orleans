@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
@@ -24,30 +25,37 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public async Task SynchronousManager_StagesBeforeWriteAndPreservesRequestOutcome(bool reverseStateOrder, bool rejectWrite)
+    public async Task SynchronousManager_StagesBeforeWriteAndCompletesWithoutStateFaultNotifications(bool reverseStateOrder, bool failWrite)
     {
         var source = NewGrain();
         _ = await source.GetSnapshotAsync();
         var services = Fixture.GetGrainContext(source).ActivationServices;
-        await using var manager = new EagerManager(services.GetRequiredService<IJournaledStateManager>(),
-            services.GetRequiredKeyedService<IJournalFormat>("orleans-binary"), reverseStateOrder);
-        var primary = (IStateMachine)Create("InboxJournalState", manager);
-        manager.RegisterStateMachine("__orleans.durable-messaging.inbox", primary);
-        var messages = (IDurableDictionary<(GrainId, Guid), DurableEnvelope>)primary;
-        var processed = Dictionary<DateTimeOffset>(manager, "inbox-processed");
-        var attempts = InternalDictionary(manager, "InboxMessageState", "inbox-message-state");
-        var deadLetters = InternalDictionary(manager, "InboxDeadLetter", "inbox-dead-letters");
-        var ownerId = new ObservedJournalValue<string>(manager);
-        manager.RegisterStateMachine("__orleans.durable-messaging.inbox-job-id", ownerId);
-        var ownerJob = Value<DurableJob>(manager, "inbox-job-handle");
-        var completed = Value<string>(manager, "inbox-completed-job-id");
-        var sequence = Value<long>(manager, "inbox-job-sequence");
+        var format = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey;
+        var builder = InboxStateManagerBoundaryTests.CreateBuilder(format);
+        builder.Services.AddScoped<IJournaledStateManager>(sp =>
+            new EagerManager(sp.GetRequiredKeyedService<IJournalFormat>(format), reverseStateOrder));
+        await using var provider = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = provider.CreateAsyncScope();
+        var stateServices = scope.ServiceProvider;
+        var manager = Assert.IsType<EagerManager>(stateServices.GetRequiredService<IJournaledStateManager>());
+        var messages = stateServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox");
+        var processed = stateServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
+        var attempts = stateServices.GetRequiredKeyedService(typeof(IDurableDictionary<,>)
+            .MakeGenericType(typeof((GrainId, Guid)), ReceiverTestServices.GetImplementationType("InboxMessageState")), "__orleans.durable-messaging.inbox-message-state");
+        var deadLetters = stateServices.GetRequiredKeyedService(typeof(IDurableDictionary<,>)
+            .MakeGenericType(typeof((GrainId, Guid)), ReceiverTestServices.GetImplementationType("InboxDeadLetter")), "__orleans.durable-messaging.inbox-dead-letters");
+        var ownerId = stateServices.GetRequiredKeyedService<IDurableValue<string>>("__orleans.durable-messaging.inbox-job-id");
+        var ownerJob = stateServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.inbox-job-handle");
+        var completed = stateServices.GetRequiredKeyedService<IDurableValue<string>>("__orleans.durable-messaging.inbox-completed-job-id");
+        var sequence = stateServices.GetRequiredKeyedService<IDurableValue<long>>("__orleans.durable-messaging.inbox-job-sequence");
         var handler = Substitute.For<IInboxHandler>();
         handler.CanHandle(Arg.Any<IInboxHandlerContext>()).Returns(true);
         var inbox = Create("DurableInbox", messages, new[] { handler }, 10);
         var context = Substitute.For<IGrainContext>();
         var grainId = GrainId.Create("eager-inbox", "standalone");
         context.GrainId.Returns(grainId);
+        context.ActivationServices.Returns(stateServices);
+        context.GrainInstance.Returns(Substitute.For<IDurableMessagingGrain>());
         context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
         var jobs = Substitute.For<ILocalDurableJobManager>();
         DurableJob scheduled = null!;
@@ -65,26 +73,26 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             };
             return Task.FromResult(scheduled);
         });
-        var rejection = new InvalidOperationException("Foreign state rejected this write request.");
-        if (rejectWrite)
+        var failure = new IOException("Owner failed while capturing the staged write.");
+        if (failWrite)
         {
-            ownerId.ValidateWriting = () => throw rejection;
             context.When(value => value.Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>()))
                 .Do(_ => throw new IOException("Secondary deactivation failure."));
         }
         var timers = Substitute.For<ITimerRegistry>();
         var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
         var extension = (IDurableInboxExtension)Create("DurableInboxExtension", context,
-            timers, manager, services.GetRequiredService<SerializerSessionPool>(),
+            timers, manager, stateServices.GetRequiredService<SerializerSessionPool>(),
             services.GetRequiredService(typeof(ILogger<>).MakeGenericType(type)),
             services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableMessagingInstruments")),
             inbox, messages, processed, attempts, deadLetters, ownerId, ownerJob, completed, sequence,
             Substitute.For<IDurableOutbox>(), jobs, Substitute.For<IDurableJobHandlerRegistry>(),
             Create("DurableMessagingPumpResults"), TimeProvider.System, TimeProvider.System,
-            new DurableInboxOptions { MaxCapacity = 10 }, primary);
+            new DurableInboxOptions { MaxCapacity = 10 });
         using var lifetime = (IDisposable)extension;
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        var envelope = new DurableEnvelopeBuilder(services.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"))
+        await ((ILifecycleObserver)extension).OnStart(TestContext.Current.CancellationToken);
+        var envelope = new DurableEnvelopeBuilder(stateServices.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"))
             .To(grainId, "route").WithBody(42).Build();
         manager.BeforeCapture = () =>
         {
@@ -92,15 +100,19 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             Assert.Same(scheduled, ownerJob.Value);
             Assert.Equal(scheduled.Metadata!["orleans.messaging.ownership-id"], ownerId.Value);
             Assert.Equal(1, sequence.Value);
+            if (failWrite) throw failure;
         };
         var delivery = extension.DeliverAsync(envelope, TestContext.Current.CancellationToken);
-        if (rejectWrite)
+        if (failWrite)
         {
-            Assert.Same(rejection, await Assert.ThrowsAsync<InvalidOperationException>(() => delivery.AsTask()));
-            Assert.Same(rejection, Assert.Throws<InvalidOperationException>(primary.ValidatePendingChanges));
+            Assert.True(delivery.IsCompleted);
+            Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => delivery.AsTask()));
+            var captured = (System.Runtime.ExceptionServices.ExceptionDispatchInfo)type
+                .GetField("_failure", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
+            Assert.Same(failure, captured.SourceException);
             Assert.Equal(1, manager.Requests);
             Assert.Equal(0, manager.Writes);
-            Assert.False(manager.IsFenced);
+            Assert.True(manager.IsFenced);
             Assert.Empty(manager.Batches);
             Assert.Single(messages);
             Assert.Empty(timers.ReceivedCalls());
@@ -120,30 +132,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         ReceiverTestServices.GetImplementationType(name), BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DoNotWrapExceptions,
         binder: null, args, culture: null)!;
 
-    private static IDurableDictionary<(GrainId, Guid), T> Dictionary<T>(EagerManager manager, string name)
-    {
-        var state = ReceiverTestServices.CreateDeferredDictionary<(GrainId, Guid), T>(manager);
-        manager.RegisterStateMachine("__orleans.durable-messaging." + name, state);
-        return (IDurableDictionary<(GrainId, Guid), T>)state;
-    }
-
-    private static object InternalDictionary(EagerManager manager, string type, string name)
-    {
-        var stateType = ReceiverTestServices.GetImplementationType("DeferredJournaledDictionary`2")
-            .MakeGenericType(typeof((GrainId, Guid)), ReceiverTestServices.GetImplementationType(type));
-        var state = (IStateMachine)Activator.CreateInstance(stateType, manager)!;
-        manager.RegisterStateMachine("__orleans.durable-messaging." + name, state);
-        return state;
-    }
-
-    private static IDurableValue<T> Value<T>(EagerManager manager, string name)
-    {
-        var state = ReceiverTestServices.CreateDeferredValue<T>(manager);
-        manager.RegisterStateMachine("__orleans.durable-messaging." + name, state);
-        return (IDurableValue<T>)state;
-    }
-
-    private sealed class EagerManager(IJournaledStateManager codecs, IJournalFormat format, bool reverseStateOrder) : IJournaledStateManager
+    private sealed class EagerManager(IJournalFormat format, bool reverseStateOrder) : IJournaledStateManager
     {
         private readonly Dictionary<string, IStateMachine> _states = [];
         private readonly JournalBufferWriter _writer = format.CreateWriter();
@@ -155,7 +144,6 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         public int Requests { get; private set; }
         public bool IsFenced => _failure is not null;
         public List<byte[]> Batches { get; } = [];
-        public TCodec GetRequiredCommandCodec<TCodec>() where TCodec : notnull => codecs.GetRequiredCommandCodec<TCodec>();
         public void RegisterStateMachine(string name, IStateMachine state)
         {
             _states.Add(name, state);
@@ -175,10 +163,8 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             Requests++;
             _failure?.Throw();
             token.ThrowIfCancellationRequested();
-            foreach (var state in States) state.ValidateWrite();
             try
             {
-                foreach (var state in States) state.ValidatePendingChanges();
                 BeforeCapture?.Invoke();
                 foreach (var state in States) state.WritePendingEntries(_writer.CreateJournalStreamWriter(new(_ids[state])));
                 using var buffer = _writer.GetBuffer();
@@ -194,7 +180,6 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             catch (Exception exception)
             {
                 _failure ??= System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception);
-                foreach (var state in States) state.OnFaulted(exception);
                 throw;
             }
         }
@@ -202,8 +187,6 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         {
             _failure?.Throw();
             token.ThrowIfCancellationRequested();
-            foreach (var state in States) state.ValidateDelete();
-            foreach (var state in States) state.OnDeleteStarted();
             _writer.Reset();
             foreach (var state in States) state.Reset(_writer.CreateJournalStreamWriter(new(_ids[state])));
             Batches.Clear();

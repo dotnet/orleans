@@ -73,23 +73,17 @@ internal sealed partial class DurableInboxExtension :
     private int _disposed;
     private int _metricsActive;
     private int _reportedDepth;
-    private string? _committingOwnershipId;
-    private DurableJob? _committingJob;
     private string? _durableOwnershipId;
     private DurableJob? _durableJob;
     private string _ownershipEpoch = Guid.NewGuid().ToString("N");
     private long _stateGeneration;
     private bool _recoveryCompleted;
-    private bool _deleting;
     private string? _ownershipStateError;
     private long _reservedSequence;
     private ExceptionDispatchInfo? _failure;
     private readonly HashSet<string> _pendingOwnershipIds = new(StringComparer.Ordinal);
     private readonly List<InboxWrite> _pendingWrites = [];
-    private InboxWrite[] _admittedWrites = [];
-    private readonly List<InboxWrite> _stagedWrites = [];
     private string? _durableCompletedJobId;
-    private string? _committingCompletedJobId;
     private DateTimeOffset? _nextProcessedExpiry;
     private DateTimeOffset? _lastProcessedCompaction;
 
@@ -106,7 +100,6 @@ internal sealed partial class DurableInboxExtension :
     /// <param name="processed">Durable dictionary for processed message tracking.</param>
     /// <param name="outbox">Durable outbox for sending response messages.</param>
     /// <param name="options">Durable messaging options.</param>
-    /// <param name="journalState">The registered persisted inbox state.</param>
     public DurableInboxExtension(
         IGrainContext grainContext,
         ITimerRegistry timerRegistry,
@@ -129,8 +122,7 @@ internal sealed partial class DurableInboxExtension :
         DurableMessagingPumpResults pumpResults,
         TimeProvider timeProvider,
         TimeProvider jobTimeProvider,
-        DurableInboxOptions options,
-        InboxJournalState journalState)
+        DurableInboxOptions options)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(timerRegistry);
@@ -183,7 +175,6 @@ internal sealed partial class DurableInboxExtension :
         _retryDelay = options.BackpressureRetryDelay;
         _deadLetterRetentionPeriod = options.DeadLetterRetentionPeriod;
         _maxRetainedDeadLetters = options.MaxRetainedDeadLetters;
-        journalState.Attach(this);
         jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
@@ -208,18 +199,7 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private static void ThrowIfHandlerOperationRejected(HandlerExecution execution)
-    {
-        execution.SendFailure?.Throw();
-        if (execution.WriteRejected)
-        {
-            throw CreateHandlerWriteException();
-        }
-    }
-
-    private static InvalidOperationException CreateHandlerWriteException() => new(
-        "Journaled state cannot be committed or deleted from inside a durable inbox handler. "
-        + "Handler effects, outgoing messages, and inbox completion are staged by the prepared action and captured together.");
+    private static void ThrowIfHandlerOperationRejected(HandlerExecution execution) => execution.SendFailure?.Throw();
 
     public int Count => _inboxDict.Count;
     public int Capacity => _maxCapacity;
@@ -380,37 +360,42 @@ internal sealed partial class DurableInboxExtension :
         {
             if (operation is HandlerWrite handler)
             {
-                try
+                await PrepareHandlerAsync(handler, _shutdownToken).ConfigureAwait(true);
+                if (handler.Skipped)
                 {
-                    await PrepareHandlerAsync(handler, _shutdownToken).ConfigureAwait(true);
-                    if (handler.Skipped)
-                    {
-                        return;
-                    }
-                }
-                catch (Exception exception)
-                {
-                    LatchFailure(exception);
+                    return;
                 }
             }
 
-            if (_failure is null)
+            if (!StageWrite(operation))
             {
-                try
-                {
-                    if (!StageWrite(operation))
-                    {
-                        return;
-                    }
-                    _stagedWrites.Add(operation);
-                }
-                catch (Exception exception)
-                {
-                    LatchFailure(exception);
-                }
+                return;
             }
-
-            await Task.WhenAll(WriteAsync(), operation.Completed.Task).ConfigureAwait(true);
+            try
+            {
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            }
+            catch (Exception exception)
+            {
+                LatchFailure(exception);
+                throw;
+            }
+            AcknowledgeWrite(operation);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException
+            || _failure is not null || !_shutdownToken.IsCancellationRequested)
+        {
+            LatchFailure(exception);
+            try
+            {
+                _grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, _failure!.SourceException, "Durable inbox operation failed."));
+            }
+            catch (Exception deactivationException)
+            {
+                LogDeactivationRequestFailure(_logger, deactivationException);
+            }
+            _failure!.Throw();
+            throw;
         }
         finally
         {
@@ -424,29 +409,7 @@ internal sealed partial class DurableInboxExtension :
             finally
             {
                 _pendingWrites.Remove(operation);
-            }
-        }
-
-        async Task WriteAsync()
-        {
-            try
-            {
-                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
-            }
-            catch (Exception exception)
-            {
-                LatchFailure(exception);
-                try
-                {
-                    _grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, _failure!.SourceException, "Durable inbox persistence failed."));
-                }
-                catch (Exception deactivationException)
-                {
-                    LogDeactivationRequestFailure(_logger, deactivationException);
-                }
-                operation.Completed.TrySetException(_failure!.SourceException);
-                _failure.Throw();
-                throw;
+                operation.Finished.TrySetResult();
             }
         }
     }
@@ -455,10 +418,10 @@ internal sealed partial class DurableInboxExtension :
     {
         _failure?.Throw();
         ThrowIfOwnershipStateInvalid();
-        _shutdownCts.Token.ThrowIfCancellationRequested();
-        if (!_recoveryCompleted || _deleting)
+        _shutdownToken.ThrowIfCancellationRequested();
+        if (!_recoveryCompleted)
         {
-            throw new InvalidOperationException("Durable inbox initialization must complete and journal deletion must be idle.");
+            throw new InvalidOperationException("Durable inbox initialization must complete before processing.");
         }
     }
 
@@ -502,41 +465,6 @@ internal sealed partial class DurableInboxExtension :
     // Every provisional key is an inbox key; acknowledgement removes only its provisional marker.
     private int GetDurableInboxCount() => _inboxDict.Count - _provisionalAcceptances.Count;
 
-    public void ValidateWrite()
-    {
-        if (_handlerExecution.Value is { } execution && ReferenceEquals(execution.Owner, this))
-        {
-            execution.WriteRejected = true;
-            throw CreateHandlerWriteException();
-        }
-    }
-
-    public void ValidateDelete()
-    {
-        _failure?.Throw();
-        ValidateWrite();
-        if (!_activeDelivery.IsCompleted || _gate.CurrentCount == 0 || _pumpCoordinator.IsActive
-            || _pendingOwnershipIds.Count != 0 || _pendingWrites.Count != 0 || _admittedWrites.Length != 0)
-        {
-            throw new InvalidOperationException("Durable inbox operations must be quiescent before deleting journaled state.");
-        }
-    }
-
-    public void OnDeleteStarted() => _deleting = true;
-
-    public void ValidatePendingChanges()
-    {
-        _failure?.Throw();
-        foreach (var operation in _stagedWrites)
-        {
-            ValidateGeneration(operation.Generation);
-            if (operation is HandlerWrite handler)
-            {
-                ValidateOwner(handler.Owner);
-            }
-        }
-    }
-
     private async ValueTask PrepareHandlerAsync(HandlerWrite operation, CancellationToken cancellationToken)
     {
         ValidateOwner(operation.Owner);
@@ -578,7 +506,7 @@ internal sealed partial class DurableInboxExtension :
             execution.SendFailure.Throw();
             throw;
         }
-        catch (Exception exception) when (!cancellation.IsCancellationRequested && !execution.WriteRejected && _failure is null)
+        catch (Exception exception) when (!cancellation.IsCancellationRequested && _failure is null)
         {
             // Conforming handlers report business failures before staging application effects.
             operation.Error = exception;
@@ -754,32 +682,29 @@ internal sealed partial class DurableInboxExtension :
         _jobSequence.Value = proposal.Sequence;
     }
 
-    public void CaptureWrites()
+    private void AcknowledgeWrite(InboxWrite operation)
     {
-        _admittedWrites = _stagedWrites.ToArray();
-        _stagedWrites.Clear();
-        _committingOwnershipId = _jobId.Value;
-        _committingJob = _job.Value;
-        _committingCompletedJobId = _completedJobId.Value;
-    }
-
-    public void OnWriteCompleted()
-    {
-        _durableOwnershipId = _committingOwnershipId;
-        _durableJob = _committingJob;
-        _durableCompletedJobId = _committingCompletedJobId;
-        _committingOwnershipId = null;
-        _committingJob = null;
-        _committingCompletedJobId = null;
-        foreach (var operation in _admittedWrites)
+        // Ownership-changing operations retain the inbox gate through their own write acknowledgement.
+        switch (operation)
         {
-            if (operation is AcceptanceWrite acceptance)
-            {
+            case AcceptanceWrite acceptance:
+                if (acceptance.Owner is { } owner)
+                {
+                    _durableOwnershipId = owner.Id;
+                    _durableJob = owner.Job;
+                }
                 _provisionalAcceptances.Remove(acceptance.Key);
-            }
-            operation.Completed.TrySetResult();
+                break;
+            case OwnershipWrite ownership:
+                _durableOwnershipId = ownership.Owner.Id;
+                _durableJob = ownership.Owner.Job;
+                break;
+            case ClearOwnerWrite clear:
+                _durableCompletedJobId = clear.Owner.Id;
+                _durableOwnershipId = null;
+                _durableJob = null;
+                break;
         }
-        _admittedWrites = [];
     }
 
     private void LatchFailure(Exception exception)
@@ -802,22 +727,13 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    public void OnFaulted(Exception exception)
-    {
-        LatchFailure(exception);
-        foreach (var operation in _pendingWrites)
-        {
-            operation.Completed.TrySetException(_failure!.SourceException);
-        }
-    }
-
     [LoggerMessage(Level = LogLevel.Error, Message = "An inbox cancellation callback failed while stopping processing.")]
     private static partial void LogCancellationCallbackFailure(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after an inbox persistence failure failed.")]
     private static partial void LogDeactivationRequestFailure(ILogger logger, Exception exception);
 
-    public void OnRecoveryCompleted()
+    private void InitializeRecoveredState()
     {
         _stateGeneration++;
         _reservedSequence = _jobSequence.Value;
@@ -828,38 +744,6 @@ internal sealed partial class DurableInboxExtension :
         _lastProcessedCompaction = null;
         RebuildProcessedExpiry();
         _recoveryCompleted = true;
-        ReconcileInboxDepth();
-    }
-
-    public void ResetState()
-    {
-        if (_pendingWrites.Count != 0)
-        {
-            throw new InvalidOperationException("Journal deletion reset an active inbox operation.");
-        }
-
-        _deleting = false;
-        _provisionalAcceptances.Clear();
-        _stagedWrites.Clear();
-        _admittedWrites = [];
-        _pendingOwnershipIds.Clear();
-        _committingOwnershipId = null;
-        _committingJob = null;
-        _committingCompletedJobId = null;
-        _pumpCoordinator.Reset();
-        _pumpResults.Clear(JobName);
-        if (_recoveryCompleted)
-        {
-            _stateGeneration++;
-        }
-        _ownershipEpoch = Guid.NewGuid().ToString("N");
-        _reservedSequence = 0;
-        _durableOwnershipId = null;
-        _durableJob = null;
-        _durableCompletedJobId = null;
-        _ownershipStateError = null;
-        _nextProcessedExpiry = null;
-        _lastProcessedCompaction = null;
         ReconcileInboxDepth();
     }
 
@@ -887,6 +771,7 @@ internal sealed partial class DurableInboxExtension :
         {
             throw new InvalidOperationException("Durable inbox activation requires IDurableMessagingGrain or DurableGrain.");
         }
+        InitializeRecoveredState();
         await ResumeProcessingAsync(cancellationToken).ConfigureAwait(true);
         if (_deadLetters.Values.Any(entry => DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), entry.DeadLetteredAt, _deadLetterRetentionPeriod))
             || _deadLetters.Count > _maxRetainedDeadLetters
@@ -898,9 +783,11 @@ internal sealed partial class DurableInboxExtension :
 
     public async Task OnStop(CancellationToken cancellationToken)
     {
+        var operations = _pendingWrites.Select(static operation => operation.Finished.Task).Append(_activeDelivery).ToArray();
         StopProcessing();
-        // The operation retains admission after its caller leaves; its failure is logged and observed independently.
-        await _activeDelivery.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        // Owned work outlives caller cancellation and drains through actual persistence and batch retirement.
+        await Task.WhenAll(operations).ConfigureAwait(
+            ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
     }
 
     internal void StopProcessing()
@@ -941,7 +828,6 @@ internal sealed partial class DurableInboxExtension :
         private readonly List<HandlerBatch> _batches = [];
 
         public DurableInboxExtension Owner { get; } = owner;
-        public bool WriteRejected { get; set; }
         public HandlerPhase Phase { get; set; }
         public ExceptionDispatchInfo? SendFailure { get; private set; }
         public int Count => Owner._outbox.Count;
@@ -1120,7 +1006,7 @@ internal sealed partial class DurableInboxExtension :
     private abstract class InboxWrite(long generation)
     {
         public long Generation { get; } = generation;
-        public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed class AcceptanceWrite(long generation, DurableEnvelope envelope, OwnershipProposal? owner) : InboxWrite(generation)
@@ -1162,7 +1048,7 @@ internal sealed partial class DurableInboxExtension :
         _failure?.Throw();
         _shutdownToken.ThrowIfCancellationRequested();
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_recoveryCompleted || _deleting)
+        if (!_recoveryCompleted)
         {
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }
@@ -1172,7 +1058,7 @@ internal sealed partial class DurableInboxExtension :
             return DurableJobRunResult.Completed;
         }
 
-        if (_pendingOwnershipIds.Count != 0 || _stagedWrites.Concat(_admittedWrites).Any(static operation => operation is ClearOwnerWrite))
+        if (_pendingOwnershipIds.Count != 0 || _pendingWrites.Any(static operation => operation is ClearOwnerWrite))
         {
             return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
         }

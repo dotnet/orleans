@@ -48,13 +48,12 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
             context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "interleaved-safe-write";
         });
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Empty(outbox.LastCapturedIds);
+        Assert.Empty(grain.OutputCaptures[^1]);
         Assert.Equal(0, handler.Applied);
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.FinishPreparation.TrySetResult();
-        Assert.Same(rejection, await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
-        Assert.Same(rejection, outbox.Failure);
+        Assert.Same(rejection, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         Assert.Empty(outbox);
         Assert.Equal(0, outbox.SendCalls);
@@ -110,7 +109,7 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
             Assert.Single(outbox);
         });
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.False(grain.Faulted.Task.IsCompleted);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
         await receiver.RequestDeactivationAsync();
         var replayed = await receiver.GetSnapshotAsync();
         Assert.Equal(1, replayed.OutboxCount);
@@ -176,13 +175,12 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.BeginSend.TrySetResult();
         handler.FinishPreparation.TrySetResult();
-        Assert.Same(failure, await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        Assert.Same(failure, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         Assert.Equal(1, handler.Applied);
         Assert.Equal(1, outbox.SendCalls);
         Assert.Single(outbox);
         Assert.Throws<InvalidOperationException>(() => handler.Send(handler.Batch));
         Assert.Equal(1, outbox.SendCalls);
-        Assert.Same(failure, outbox.Failure);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
@@ -239,7 +237,7 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         second.BeginSend.TrySetResult();
         second.FinishPreparation.TrySetResult();
-        var failure = await grain.Faulted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var failure = await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
         Assert.Equal(1, first.Applied);
         Assert.Equal(1, second.Applied);

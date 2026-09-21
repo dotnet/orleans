@@ -67,7 +67,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(job.ShardId, completed.InboxJob.ShardId);
         Assert.Equal(accepted.InboxJobId, completed.InboxJobId);
         Assert.Equal(1, ScheduleCount(receiver));
-        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).Faulted.Task.IsCompleted);
+        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).DeactivationFailure.Task.IsCompleted);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
 
         Assert.Equal(DurableJobRunStatus.Completed, (await RunPumpAsync(receiver, job)).Status);
@@ -163,7 +163,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Null(completed.InboxJobId);
         Assert.Equal(1, ScheduleCount(receiver));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
-        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).Faulted.Task.IsCompleted);
+        Assert.False(Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance).DeactivationFailure.Task.IsCompleted);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), expectedAttempts: 2, now + TimeSpan.FromMinutes(3));
         Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         Assert.Equal(1, ScheduleCount(receiver));
-        Assert.False(grain.Faulted.Task.IsCompleted);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
     }
 
     private HandlerProbe.Barrier ArmHandlerBeforeAdvance(GrainId grainId, string route, TimeSpan advance)

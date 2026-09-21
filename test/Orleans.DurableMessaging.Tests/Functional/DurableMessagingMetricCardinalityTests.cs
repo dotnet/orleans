@@ -19,19 +19,16 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
     {
         var receiver = NewGrain();
         await receiver.GetSnapshotAsync();
-        var services = Fixture.GetGrainContext(receiver).ActivationServices;
-        var jobTime = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
-        var ownershipId = $"{Guid.NewGuid():N}:1";
-        var job = await services.GetRequiredService<ILocalDurableJobManager>().ScheduleJobAsync(new ScheduleJobRequest
-        {
-            Target = receiver.GetGrainId(),
-            JobName = ReceiverTestServices.InboxJobName,
-            DueTime = jobTime.GetUtcNow().AddHours(1),
-            Metadata = new Dictionary<string, string> { ["orleans.messaging.ownership-id"] = ownershipId }
-        }, TestContext.Current.CancellationToken);
+        var context = Fixture.GetGrainContext(receiver);
+        var services = context.ActivationServices;
+        var extension = (IDurableInboxExtension)services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+        using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-metric-pending");
+        var turn = receiver.HoldPumpTurnAsync("hold-metric-pending", replacement: null, deactivate: false);
+        await hold.WaitUntilEnteredAsync();
         using var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"));
-        await receiver.SeedInboxStateAsync(envelope.Value, ownershipId, job);
-        var pending = await receiver.GetSnapshotAsync();
+        Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery()).Status);
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));
+        var pending = Fixture.GetSnapshot(receiver);
         Assert.Equal(1, pending.InboxCount);
         Assert.Equal(0, pending.ProcessedMessageCount);
         Assert.Empty(pending.Effects);
@@ -42,8 +39,10 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         using var probe = new MessageMetricListener(received.Meter);
         var grainType = receiver.GetGrainId().Type.ToString();
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await StartDelivery()).Status);
         Assert.Single(probe.Read("inbox-messages-received")).AssertCounter(grainType, "duplicate");
+        hold.Release();
+        await turn;
         var processed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(0, processed.InboxCount);
         Assert.Equal(1, processed.ProcessedMessageCount);
@@ -53,6 +52,17 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         Assert.Equal(2, receipts.Length);
         Assert.All(receipts, receipt => receipt.AssertCounter(grainType, "duplicate"));
         Assert.Single(receipts.Select(receipt => receipt.Series).Distinct());
+
+        Task<DeliveryResult> StartDelivery()
+        {
+            var started = new TaskCompletionSource<Task<DeliveryResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            context.Scheduler.QueueAction(() =>
+            {
+                try { started.SetResult(extension.DeliverAsync(envelope.Value, TestContext.Current.CancellationToken).AsTask()); }
+                catch (Exception exception) { started.SetException(exception); }
+            });
+            return started.Task.Unwrap();
+        }
     }
 
     [Theory]
