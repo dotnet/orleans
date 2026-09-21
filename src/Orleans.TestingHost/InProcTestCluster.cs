@@ -775,8 +775,12 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             {
                 await client.StopAsync(cancelled).ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (Exception exception)
             {
+                if (!exception.IsCancellation())
+                {
+                    throw;
+                }
             }
             finally
             {

@@ -821,8 +821,12 @@ namespace Orleans.TestingHost
                 {
                     await client.StopAsync(cancelled).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (Exception exception)
                 {
+                    if (!exception.IsCancellation())
+                    {
+                        throw;
+                    }
                 }
                 finally
                 {
