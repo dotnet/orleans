@@ -19,7 +19,11 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Initializes the state manager by replaying its journal.
     /// </summary>
     /// <remarks>
-    /// A failed initialization permanently fences this instance. Recover by creating a new manager and new state instances.
+    /// A recovery failure fails the current initialization attempt and leaves this instance uninitialized.
+    /// A subsequent call retries recovery from the beginning, resetting and replaying the registered state machines.
+    /// Writes become available after initialization succeeds. A manager fenced by a persistence failure requires a new instance.
+    /// Owner shutdown which cancels recovery cancels initialization and leaves this instance stopped.
+    /// Cancelling the caller's token ends only that caller's wait while owned recovery continues.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
@@ -58,7 +62,8 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Resets this instance, removing any persistent state.
     /// </summary>
     /// <remarks>
-    /// Quiesce other operations before deleting state: deletion resets every registered state machine.
+    /// The caller keeps other operations quiescent through completion: deletion resets every registered state machine.
+    /// Cancellation ends the caller's wait; an already queued deletion continues to its storage and reset outcome.
     /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>

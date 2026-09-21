@@ -62,13 +62,11 @@ Concurrent calls made while the same kind of write is queued can share that queu
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
-and proposed output in operation-local data. After establishing that an outcome is safe to commit, apply its
-mutations to durable state and initiate a write. Coordinate that transition with other interleaved operations
-which can affect the same decision. Any caller's write can include staged mutations from other calls.
-
-If an application error occurs after staging and makes those mutations unsafe to commit, end the activation's
-use of the manager and request deactivation. In-flight methods can retain local decisions and references
-across awaits; a fresh activation reconstructs both application and durable state together.
+and proposed output in operation-local data. After the final preparation await, check the relevant
+preconditions and apply the complete safe-to-commit update synchronously, then request an ordinary write.
+Orleans executes that synchronous block on a single activation thread. Another grain turn can run when
+the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
+staged mutations from other calls.
 
 ## Consistency and competing writers
 
@@ -80,7 +78,7 @@ Design commands to tolerate retries at the application boundary. Use operation i
 
 ## Storage failures
 
-A failed append, snapshot replacement, delete, or initialization permanently fences that manager instance.
+A failed append, snapshot replacement, or delete permanently fences that manager instance.
 Queued operations fault, and later write, delete, registration, and initialization requests fail explicitly.
 Existing in-memory state remains available to in-flight calls until deactivation completes. The grain runtime
 starts deactivation as part of handling the failure.
@@ -99,8 +97,44 @@ assigned lifetimes.
 Cancelling a write's cancellation token stops the caller's wait. An already queued write continues to its
 storage outcome, so the caller reconciles that outcome before retrying the command.
 
-An initialization failure preserves stored data for diagnosis. Restore the required format/codec registration
-or repair the backing data before creating a fresh manager or retrying activation.
+An initialization failure reports its error to that attempt's callers and leaves the manager uninitialized.
+The caller can retry <xref:Orleans.Journaling.IJournaledStateManager.InitializeAsync*> after a transient
+failure or after restoring the required format, codec, or backing data. Each attempt resets recovery
+bookkeeping and replays the journal from the beginning using the same registered state machines.
+Concurrent callers share the active attempt; writes and deletion become available after initialization
+succeeds. State registration stays closed once initialization has begun.
+One work-loop task owns recovery attempts and subsequent journal work for the manager's lifetime.
+After a failed attempt it waits for an explicit initialization request before retrying.
+
+Owner shutdown which cancels initial recovery cancels all initialization waiters and leaves the manager
+stopped. Disposal waits for the owned read to finish before releasing journal resources. Cancelling an
+individual initialization caller's token ends only its wait; owned recovery continues for other callers.
+
+## Custom state lifecycle
+
+Custom <xref:Orleans.Journaling.IStateMachine> implementations share the manager's single logical execution thread.
+Supply command codecs as constructor dependencies. The registration factory selects codecs keyed by the
+same write-format key used to configure the journal owner. Activation-owned state factories resolve those
+dependencies from the activation's services; standalone callers supply codecs with the appropriate lifetime.
+The codec is available when the state is constructed, including for an empty journal.
+During replay, <xref:Orleans.Journaling.JournalReplayContext.GetRequiredCommandCodec*> selects the codec
+for each entry's stored format.
+
+States synchronously encode their pending changes through <xref:Orleans.Journaling.IStateMachine.WritePendingEntries*>
+or their current contents through <xref:Orleans.Journaling.IStateMachine.WriteSnapshot*>.
+After storage acknowledges captured bytes, <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted*>
+performs durable-completion bookkeeping. A zero-byte write completes without this callback.
+
+The journal owner keeps feature operations quiescent through deletion's storage and reset outcome,
+including when a caller cancels its wait. Successful deletion calls <xref:Orleans.Journaling.IStateMachine.Reset*>
+before completing deletion waiters.
+
+The manager records the first write or delete failure, fences further persistence, faults current
+and queued manager waiters, and requests grain deactivation. Features observe their write failures and
+complete their own operation waiters and resource cleanup through their operation and lifecycle ownership.
+Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage
+outcome and acknowledgement bookkeeping. Owner-canceled initial recovery and idle shutdown complete
+through normal shutdown; admitted write/delete storage cancellation remains terminal.
 
 ## Compaction
 
