@@ -150,7 +150,8 @@ namespace Orleans.Runtime.Membership
         /// <inheritdoc />
         /// <remarks>
         /// Connection-loss failures in native reads are retried up to four times on the operation's session.
-        /// Each retry waits for that session's next connected event before issuing another request.
+        /// Before each retry, the operation waits up to the session timeout for that session's next connected event.
+        /// When the wait expires or the session becomes terminal, the retry proceeds and preserves the native outcome.
         /// The table and child versions fence each complete snapshot pass. Concurrent canonical
         /// modifications restart the pass up to five total attempts.
         /// </remarks>
@@ -176,7 +177,8 @@ namespace Orleans.Runtime.Membership
         /// Table and child-version checks fence the complete snapshot. Concurrent canonical
         /// modifications restart the complete sequential pass up to five total attempts.
         /// Connection-loss failures in native reads are retried up to four times on the same session.
-        /// Each retry waits for that session's next connected event before issuing another request.
+        /// Before each retry, the operation waits up to the session timeout for that session's next connected event.
+        /// When the wait expires or the session becomes terminal, the retry proceeds and preserves the native outcome.
         /// Caller cancellation stops further requests while admitted requests and client close complete.
         /// </remarks>
         public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
