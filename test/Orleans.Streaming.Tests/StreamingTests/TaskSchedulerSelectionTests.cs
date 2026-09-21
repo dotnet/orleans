@@ -126,7 +126,7 @@ public class TaskSchedulerSelectionTests
     public async Task StreamSubscriptionManager_QueryProjectionUsesCallingScheduler()
     {
         var scheduler = new ManualTaskScheduler();
-        var pubSub = Substitute.For<IStreamPubSub>();
+        var pubSub = Substitute.For<IStreamPubSubRuntime>();
         var subscriptions = new List<StreamSubscription>();
         var query = new TaskCompletionSource<List<StreamSubscription>>(TaskCreationOptions.RunContinuationsAsynchronously);
         Func<QualifiedStreamId, GrainId, Task<List<StreamSubscription>>> getAllSubscriptions = pubSub.GetAllSubscriptions;

@@ -24,6 +24,9 @@ namespace Orleans.Streams
         [Alias("974334B6")]
         Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 
+        [Alias("UnregisterConsumerFromProducer")]
+        Task UnregisterConsumerFromProducer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId producer, CancellationToken cancellationToken = default);
+
         [Alias("29B61035")]
         Task<int> ProducerCount(QualifiedStreamId streamId, CancellationToken cancellationToken = default);
 

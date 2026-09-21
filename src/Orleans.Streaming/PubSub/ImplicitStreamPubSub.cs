@@ -8,7 +8,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class ImplicitStreamPubSub : IStreamPubSub
+    internal class ImplicitStreamPubSub : IStreamPubSubRuntime
     {
         private readonly ImplicitStreamSubscriberTable implicitTable;
 
@@ -75,6 +75,13 @@ namespace Orleans.Streams
             }
             return Task.CompletedTask;
         }
+
+        public Task UnregisterConsumerFromProducer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId producer,
+            CancellationToken cancellationToken)
+            => UnregisterConsumer(subscriptionId, streamId, cancellationToken);
 
         public Task<int> ProducerCount(QualifiedStreamId streamId)
             => ProducerCount(streamId, CancellationToken.None);

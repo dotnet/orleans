@@ -33,16 +33,17 @@ public readonly struct StreamCheckpointStoreState : IEquatable<StreamCheckpointS
     /// <inheritdoc />
     public bool Equals(StreamCheckpointStoreState other)
         => string.Equals(Checkpoint, other.Checkpoint, StringComparison.Ordinal)
-        && string.Equals(Version, other.Version, StringComparison.Ordinal);
+            && string.Equals(Version, other.Version, StringComparison.Ordinal);
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-        => obj is StreamCheckpointStoreState other && Equals(other);
+    public override bool Equals(object? obj) => obj is StreamCheckpointStoreState other && Equals(other);
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Checkpoint, Version);
 
+    /// <summary>Determines whether two persisted checkpoint states are equal.</summary>
     public static bool operator ==(StreamCheckpointStoreState left, StreamCheckpointStoreState right) => left.Equals(right);
 
+    /// <summary>Determines whether two persisted checkpoint states differ.</summary>
     public static bool operator !=(StreamCheckpointStoreState left, StreamCheckpointStoreState right) => !left.Equals(right);
 }
