@@ -19,6 +19,16 @@ namespace Orleans.Runtime.Messaging
 
         internal int Count => _requests?.Count ?? 0;
 
+        internal static void MarkResponseForUntrackedDelivery(Message response)
+        {
+            // Preserve the attempt identity while allowing delivery through a replacement gateway.
+            // A live retry has a positive attempt and will continue to reject this response as superseded.
+            if (response.GatewayRequestAttempt > 0)
+            {
+                response.GatewayRequestAttempt = -response.GatewayRequestAttempt;
+            }
+        }
+
         internal bool Track(Message request)
         {
             if (request.Direction != Message.Directions.Request
@@ -78,7 +88,7 @@ namespace Orleans.Runtime.Messaging
 
             if (_requests is not { } requests || !requests.TryGetValue(response.Id, out var trackedRequest))
             {
-                return response.GatewayRequestAttempt == 0
+                return response.GatewayRequestAttempt <= 0
                     ? CompletionResult.NotTracked
                     : CompletionResult.Superseded;
             }
@@ -107,6 +117,13 @@ namespace Orleans.Runtime.Messaging
 
             if (!responseSilo.Equals(trackedRequest.TargetSilo))
             {
+                if (response.GatewayRequestAttempt != 0)
+                {
+                    requests.Remove(response.Id);
+                    ClearAuxiliaryState(response.Id);
+                    return CompletionResult.Completed;
+                }
+
                 _deferredResponses ??= [];
                 if (!_deferredResponses.TryGetValue(response.Id, out var responses))
                 {
