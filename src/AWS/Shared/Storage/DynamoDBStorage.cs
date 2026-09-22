@@ -663,7 +663,12 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="conditionValues">Optional field/attribute values used in the conditional expression</param>
         /// <returns></returns>
         public Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
+            => DeleteEntryAsync(tableName, keys, CancellationToken.None, conditionExpression, conditionValues);
+
+        internal Task DeleteEntryAsync(string tableName, Dictionary<string, AttributeValue> keys, CancellationToken cancellationToken,
+            string conditionExpression = "", Dictionary<string, AttributeValue>? conditionValues = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntry(_logger, tableName, new(keys));
 
             try
@@ -680,7 +685,7 @@ namespace Orleans.Transactions.DynamoDB
                 if (conditionValues != null && conditionValues.Keys.Count > 0)
                     request.ExpressionAttributeValues = conditionValues;
 
-                return _ddbClient.DeleteItemAsync(request);
+                return _ddbClient.DeleteItemAsync(request, cancellationToken);
             }
             catch (Exception exc)
             {
@@ -702,7 +707,7 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="tableName">The table name.</param>
         /// <param name="toDelete">The keys of the entries to delete.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
+        public async Task DeleteEntriesAsync(string tableName, IReadOnlyCollection<Dictionary<string, AttributeValue>> toDelete, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogTraceDeletingTableEntries(_logger, tableName);
@@ -710,7 +715,7 @@ namespace Orleans.Transactions.DynamoDB
             if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
 
             if (toDelete.Count == 0)
-                return Task.CompletedTask;
+                return;
 
             try
             {
@@ -726,7 +731,12 @@ namespace Orleans.Transactions.DynamoDB
                     batch.Add(writeRequest);
                 }
                 request.RequestItems.Add(tableName, batch);
-                return _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var response = await _ddbClient.BatchWriteItemAsync(request, cancellationToken);
+                var unprocessedCount = response.UnprocessedItems?.Values.Sum(items => items.Count) ?? 0;
+                if (unprocessedCount > 0)
+                {
+                    throw new InvalidOperationException($"Amazon DynamoDB failed to delete {unprocessedCount} item(s) from table {tableName}.");
+                }
             }
             catch (Exception exc)
             {

@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Redis journal storage
 
-Orleans Journaling persists durable state changes as ordered journal data which is replayed to recover in-memory durable values and collections in <xref:Orleans.Journaling.DurableGrain> grains. See the [Journaling overview](index.md) for its programming model and the [Event Sourcing comparison](../event-sourcing/index.md#event-sourcing-and-experimental-journaling) for the boundary between the two features.
+Orleans Journaling persists durable state changes as ordered journal data which is replayed to recover in-memory durable values and collections managed by <xref:Orleans.Journaling.IDurableStateManager>. Ordinary grains can inject the manager, and <xref:Orleans.Journaling.DurableGrain> provides a convenience base class. See the [Journaling overview](index.md) for its programming model and the [Event Sourcing comparison](../event-sourcing/index.md#event-sourcing-and-experimental-journaling) for the boundary between the two features.
 
 The pre-release [`Microsoft.Orleans.Journaling.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Journaling.Redis) package stores journal data in [Redis](https://redis.io/docs/latest/develop/data-types/). Its APIs carry diagnostic `ORLEANSEXP005`.
 

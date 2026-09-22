@@ -78,7 +78,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
-        ListOptions? options = null,
+        JournalCatalogListOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -138,7 +138,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     }
 
     private string GetJournalFormatKey()
-        => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
+        => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonLinesJournalFormat.JournalFormatKey);
 }
 
 /// <summary>

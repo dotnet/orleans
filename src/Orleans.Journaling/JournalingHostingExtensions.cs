@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -10,15 +11,21 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Provides extensions for configuring journaling services.
 /// </summary>
-public static class HostingExtensions
+public static class JournalingHostingExtensions
 {
     /// <summary>
     /// Adds the services, durable state types, and journal formats required for journaling.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder.</returns>
-    public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
+    /// <remarks>
+    /// Resolving the standard grain-scoped <see cref="IDurableStateManager"/> enrolls it in the grain lifecycle.
+    /// Its registered durable states recover during <see cref="GrainLifecycleStage.SetupState"/>, before grain activation.
+    /// Managers created through <see cref="IJournaledStateManagerFactory"/> have caller-owned initialization and disposal.
+    /// </remarks>
+    public static ISiloBuilder AddJournaling(this ISiloBuilder builder)
     {
+        ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddOptions<JournaledStateManagerOptions>();
         builder.Services.TryAddSingleton(static serviceProvider =>
             serviceProvider.GetService<OrleansInstruments>() is { } instruments
@@ -26,10 +33,11 @@ public static class HostingExtensions
                 : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager>(static services =>
-            new JournaledStateManager(
+            new DurableStateManager(
                 services.GetRequiredService<JournaledStateManagerShared>(),
                 services.GetRequiredService<IJournalStorageProvider>(),
                 services.GetRequiredService<IGrainContext>()));
+        builder.Services.TryAddScoped<IDurableStateManager>(static services => (IDurableStateManager)services.GetRequiredService<IJournaledStateManager>());
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
                 ?? ActivatorUtilities.CreateInstance<JournaledStateManagerFactory>(services));
@@ -43,10 +51,70 @@ public static class HostingExtensions
         builder.Services.TryAddKeyedScoped(typeof(IDurableQueue<>), KeyedService.AnyKey, typeof(DurableQueue<>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableSet<>), KeyedService.AnyKey, typeof(DurableSet<>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
-        builder.Services.TryAddKeyedScoped(typeof(IPersistentState<>), KeyedService.AnyKey, typeof(DurableState<>));
+        builder.Services.TryAddKeyedScoped(typeof(IPersistentState<>), KeyedService.AnyKey, typeof(JournaledPersistentState<>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableTaskCompletionSource<>), KeyedService.AnyKey, typeof(DurableTaskCompletionSource<>));
-        builder.Services.TryAddKeyedScoped(typeof(IDurableNothing), KeyedService.AnyKey, typeof(DurableNothing));
         return builder;
+    }
+
+    /// <summary>
+    /// Registers a custom durable state contract and its state machine implementation.
+    /// </summary>
+    /// <typeparam name="TState">The application state contract.</typeparam>
+    /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection.</returns>
+    /// <remarks>
+    /// Requires journaling services registered by <see cref="AddJournaling"/>.
+    /// Constructor dependencies are resolved from the grain activation's service scope.
+    /// Use the factory overload when construction needs the state name.
+    /// The manager registers the instance; its constructor need not register itself.
+    /// </remarks>
+    public static IServiceCollection AddStateMachine<TState, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TImplementation>(
+        this IServiceCollection services)
+        where TState : class
+        where TImplementation : class, TState, IStateMachine
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        var factory = ActivatorUtilities.CreateFactory<TImplementation>([]);
+        return services.AddStateMachine<TState, TImplementation>((serviceProvider, _) => factory(serviceProvider, null));
+    }
+
+    /// <summary>
+    /// Registers a factory for a custom durable state contract.
+    /// </summary>
+    /// <typeparam name="TState">The application state contract.</typeparam>
+    /// <typeparam name="TImplementation">The state machine implementation.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="factory">Creates a state component using its activation's service scope and stable state name.</param>
+    /// <returns>The service collection.</returns>
+    /// <remarks>
+    /// Requires journaling services registered by <see cref="AddJournaling"/>.
+    /// Keyed injection and the manager return the same named instance. The manager registers the state,
+    /// and the activation scope disposes it. The factory is not invoked for an existing compatible state.
+    /// </remarks>
+    public static IServiceCollection AddStateMachine<TState, TImplementation>(
+        this IServiceCollection services,
+        Func<IServiceProvider, string, TImplementation> factory)
+        where TState : class
+        where TImplementation : class, TState, IStateMachine
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(factory);
+        services.AddKeyedScoped<TState>(KeyedService.AnyKey, (serviceProvider, key) =>
+        {
+            if (key is not string name || string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentException("A durable state service key must be a non-empty string.", nameof(key));
+            }
+
+            if (serviceProvider.GetRequiredService<IDurableStateManager>() is not DurableStateManager manager)
+            {
+                throw new InvalidOperationException("Custom state machine factories require the grain's durable state manager registered by AddJournaling.");
+            }
+
+            return manager.GetOrAddState<TState, TImplementation>(name, factory);
+        });
+        return services;
     }
 
     /// <summary>
@@ -106,7 +174,7 @@ public static class HostingExtensions
             throw new InvalidOperationException($"Journal storage provider '{name}' already has keyed services registered.");
         }
 
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         services.AddSingleton(new JournalStorageRegistration(name, typeof(TProvider)));
         var isDefault = string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal);
         if (isDefault)

@@ -71,10 +71,10 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             ((IDisposable)manager).Dispose();
         }
 
-        await using var jsonProvider = await CreateAzureProviderAsync(JsonJournalExtensions.JournalFormatKey, blobName, cts.Token);
+        await using var jsonProvider = await CreateAzureProviderAsync(JsonLinesJournalFormat.JournalFormatKey, blobName, cts.Token);
         var migratedStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-        var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonJournalExtensions.JournalFormatKey);
-        var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonJournalExtensions.JournalFormatKey);
+        var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonLinesJournalFormat.JournalFormatKey);
+        var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonLinesJournalFormat.JournalFormatKey);
         await migratedManager.InitializeAsync(cts.Token);
 
         Assert.Equal(1, migratedDict["alpha"]);
@@ -84,8 +84,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         ((IDisposable)migratedManager).Dispose();
 
         var recoveredStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-        var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonJournalExtensions.JournalFormatKey);
-        var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonJournalExtensions.JournalFormatKey);
+        var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonLinesJournalFormat.JournalFormatKey);
+        var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonLinesJournalFormat.JournalFormatKey);
         await recoveredManager.InitializeAsync(cts.Token);
 
         Assert.Equal(1, recoveredDict["alpha"]);
@@ -185,7 +185,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             new DurableQueue<string>("queue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableSet<string>("set", manager, new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableValue<int>("value", manager, new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
-            new DurableState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new JournaledPersistentState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
@@ -221,10 +221,10 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
         services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
-        services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
+        services.AddKeyedSingleton<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
-            JsonJournalExtensions.JournalFormatKey,
+            JsonLinesJournalFormat.JournalFormatKey,
             typeof(JsonDurableDictionaryCommandCodecService<,>));
     }
 
@@ -305,7 +305,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             {
                 Bytes.AddRange(buffer.ToArray());
                 buffer.Skip(buffer.Length);
-                Formats.Add(metadata?.Format);
+                Formats.Add(metadata?.FormatKey);
             }
 
             IsCompleted |= buffer.IsCompleted;
@@ -319,6 +319,6 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         DurableQueue<string> Queue,
         DurableSet<string> Set,
         DurableValue<int> Value,
-        DurableState<string> State,
+        JournaledPersistentState<string> State,
         DurableTaskCompletionSource<int> Tcs);
 }

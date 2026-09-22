@@ -210,7 +210,7 @@ The check interval accepts durations from 1 to 4294967294 milliseconds.
 Shard journals use names such as
 `jobs/shards/20260909T1200000000000Z-<unique-id>`. The fixed-width UTC start time
 precedes the unique suffix, so ordinal name order is shard-start-time order. Each sweep
-lists the raw `jobs/shards/` prefix with an inclusive `ListOptions.MaxId` bound covering the lookahead
+lists the raw `jobs/shards/` prefix with an inclusive `JournalCatalogListOptions.MaxId` bound covering the lookahead
 horizon. The range includes every earlier start time, including jobs overdue after a long
 outage. Future shard identities are filtered by the catalog before candidate metadata reads.
 

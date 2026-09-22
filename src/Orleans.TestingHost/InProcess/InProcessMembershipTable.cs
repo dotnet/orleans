@@ -12,10 +12,22 @@ namespace Orleans.TestingHost.InProcess;
 /// <summary>
 /// An in-memory implementation of <see cref="IMembershipTable"/> for testing purposes.
 /// </summary>
-internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTable, IGatewayListProvider
+internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListProvider
 {
-    private readonly Table _table = new();
-    private readonly string _clusterId = clusterId;
+    private readonly Table _table;
+    private readonly string _clusterId;
+
+    public InProcessMembershipTable(string clusterId) : this(clusterId, new Table())
+    {
+    }
+
+    private InProcessMembershipTable(string clusterId, Table table)
+    {
+        _clusterId = clusterId;
+        _table = table;
+    }
+
+    internal InProcessMembershipTable CreateClient() => new(_clusterId, _table);
 
     public TimeSpan MaxStaleness => TimeSpan.Zero;
     public bool IsUpdatable => true;
@@ -209,7 +221,6 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 }
 
                 data.Entry.IAmAliveTime = entry.IAmAliveTime;
-                _table[entry.SiloAddress] = (data.Entry, NewETag());
             }
         }
 
@@ -220,8 +231,8 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 var entries = _table.Values.ToList();
                 foreach (var (entry, _) in entries)
                 {
-                    if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                    if (entry.Status == SiloStatus.Dead
+                        && entry.EffectiveUpdateTime < beforeDate)
                     {
                         _table.Remove(entry.SiloAddress, out _);
                     }

@@ -84,8 +84,8 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Gets the current completed tick count.</summary>
     int GetTickCount(GrainId grainId, string reminderName);
 
-    /// <summary>Starts one silo and waits for its reminder service to become ready.</summary>
-    Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken);
+    /// <summary>Starts one silo which owns <paramref name="grainId"/> and waits for its reminder service to become ready.</summary>
+    Task<SiloAddress> JoinOneSiloAsync(GrainId grainId, CancellationToken cancellationToken);
 
     /// <summary>Stops the specified silo.</summary>
     Task LeaveSiloAsync(SiloAddress siloAddress, CancellationToken cancellationToken);
@@ -411,8 +411,8 @@ public abstract class ReminderServiceLifecycleTestRunner
             {
                 try
                 {
-                    joined = await _harness.JoinOneSiloAsync(cancellationToken);
-                    var grain = CreateGrainOwnedBy(joined, Guarantee);
+                    var grain = CreateGrain(Guarantee);
+                    joined = await _harness.JoinOneSiloAsync(grain.GetGrainId(), cancellationToken);
                     const string Name = "stale-owner-registration";
                     reminders.Add((grain, Name));
                     staleOwner = _harness.ActiveSilos
@@ -588,9 +588,9 @@ public abstract class ReminderServiceLifecycleTestRunner
             cancellationToken,
             async () =>
             {
-                joined = await _harness.JoinOneSiloAsync(cancellationToken);
+                var grain = CreateGrain(Guarantee);
+                joined = await _harness.JoinOneSiloAsync(grain.GetGrainId(), cancellationToken);
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                var grain = CreateGrainOwnedBy(joined, Guarantee);
                 const string Name = "join-leave-owner";
                 reminders.Add((grain, Name));
                 var due = TimeSpan.FromSeconds(3);
@@ -692,28 +692,6 @@ public abstract class ReminderServiceLifecycleTestRunner
         var ordinal = Interlocked.Increment(ref _grainCounter);
         var key = ReminderTestData.CreateGuid(_seed, $"{ProviderName}/{label}/{ordinal}");
         return _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
-    }
-
-    private IReminderServiceTestGrain CreateGrainOwnedBy(SiloAddress owner, string label)
-    {
-        var ordinal = Interlocked.Increment(ref _grainCounter);
-        for (var candidate = 0; candidate < ushort.MaxValue; candidate++)
-        {
-            var key = ReminderTestData.CreateGuid(
-                _seed,
-                $"{ProviderName}/{label}/{ordinal}/{candidate.ToString(CultureInfo.InvariantCulture)}");
-            var grain = _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
-            if (_harness.IsOwner(owner, grain.GetGrainId()))
-            {
-                return grain;
-            }
-        }
-
-        Fail(label, "identity selection")
-            .WithExpected($"a deterministic grain identity owned by {owner}")
-            .WithObserved("no owned identity in 65,535 deterministic candidates")
-            .Throw();
-        return null!;
     }
 
     private async Task ExecuteWithCleanupAsync(

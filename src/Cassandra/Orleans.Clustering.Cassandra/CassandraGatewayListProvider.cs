@@ -18,7 +18,6 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
     private readonly string _identifier;
     private readonly CassandraClusteringOptions _options;
     private readonly IServiceProvider _serviceProvider;
-    private readonly int? _ttlSeconds;
     private ISession? _session;
     private OrleansQueries? _queries;
     private DateTime _cacheUntil;
@@ -40,7 +39,6 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
         _serviceProvider = serviceProvider;
 
         _maxStaleness = gatewayOptions.Value.GatewayListRefreshPeriod;
-        _ttlSeconds = _options.GetCassandraTtlSeconds(clusterMembershipOptions.Value);
     }
 
     private ISession Session => _session ?? throw new InvalidOperationException(NotInitializedMessage);
@@ -57,7 +55,7 @@ internal sealed class CassandraGatewayListProvider : IGatewayListProvider
 
         _queries = await OrleansQueries.CreateInstance(_session);
 
-        await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay, _ttlSeconds);
+        await _queries.EnsureTableExistsAsync(_options.InitializeRetryMaxDelay);
     }
 
     async Task<IList<Uri>> IGatewayListProvider.GetGateways()

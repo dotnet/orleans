@@ -139,6 +139,7 @@ Orleans source-generates serializers for annotated application types. Add an int
 | Package | Purpose |
 | --- | --- |
 | [Microsoft.Orleans.TestingHost](https://www.nuget.org/packages/Microsoft.Orleans.TestingHost) | Host configurable in-process test clusters. |
+| [Microsoft.Orleans.Clustering.TestKit](https://www.nuget.org/packages/Microsoft.Orleans.Clustering.TestKit) | [Membership provider conformance tests](../implementation/provider-authoring.md#membership-provider-conformance), including Accordant-generated behavioral histories. |
 | [Microsoft.Orleans.Serialization.TestKit](https://www.nuget.org/packages/Microsoft.Orleans.Serialization.TestKit) | Verify custom serializer behavior. |
 | [Microsoft.Orleans.Transactions.TestKit.Base](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.Base) | Shared transaction test kit. |
 | [Microsoft.Orleans.Transactions.TestKit.xUnit](https://www.nuget.org/packages/Microsoft.Orleans.Transactions.TestKit.xUnit) | xUnit integration for the transaction test kit. |

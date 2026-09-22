@@ -195,11 +195,11 @@ public sealed class DurableCollectionDirectWriteTests
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterState(string name, IJournaledState state) => state.Reset(writer.CreateWriter());
+        public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(writer.CreateWriter());
 
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
         {
-            state = null;
+            stateMachine = null;
             return false;
         }
 
@@ -207,6 +207,8 @@ public sealed class DurableCollectionDirectWriteTests
 
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask DisposeAsync() => default;
     }
 
     private sealed class TestJournalStreamWriter : IDisposable

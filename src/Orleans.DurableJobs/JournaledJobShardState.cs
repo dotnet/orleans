@@ -4,7 +4,7 @@ using Orleans.Journaling;
 
 namespace Orleans.DurableJobs;
 
-internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCommandHandler<DurableJobShardJournalRecord>
+internal sealed class JournaledJobShardState : IStateMachine, IDurableValueCommandHandler<DurableJobShardJournalRecord>
 {
     public const string StateName = "jobs";
 
@@ -179,28 +179,27 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
         }
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, GetCodec()).Apply(entry.Reader, this);
 
     void IDurableValueCommandHandler<DurableJobShardJournalRecord>.ApplySet(DurableJobShardJournalRecord value) => Apply(value);
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _jobQueue = new(_timeProvider);
         IsAddingCompleted = false;
         _writer = writer;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter writer)
+    void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
     {
         GetCodec().WriteSet(DurableJobShardJournalRecord.ForSnapshot(CaptureSnapshot()), writer);
     }
 
-    IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
     private void Write(DurableJobShardJournalRecord record) => GetCodec().WriteSet(record, _writer);
 

@@ -42,10 +42,10 @@ BEGIN
     SET
         IAmAliveTime = i_am_alive_time
     WHERE
-        d.DeploymentId = deployment_id AND deployment_id IS NOT NULL
-        AND d.Address = address_arg AND address_arg IS NOT NULL
-        AND d.Port = port_arg AND port_arg IS NOT NULL
-        AND d.Generation = generation_arg AND generation_arg IS NOT NULL;
+        d.DeploymentId = deployment_id
+        AND d.Address = address_arg
+        AND d.Port = port_arg
+        AND d.Generation = generation_arg;
 END
 $func$ LANGUAGE plpgsql;
 
@@ -123,6 +123,16 @@ DECLARE
 BEGIN
 
     BEGIN
+        UPDATE OrleansMembershipVersionTable
+        SET
+            Timestamp = now(),
+            Version = Version + 1
+        WHERE
+            DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
+            AND Version = VersionArg AND VersionArg IS NOT NULL;
+
+        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
+
         INSERT INTO OrleansMembershipTable
         (
             DeploymentId,
@@ -147,24 +157,16 @@ BEGIN
             ProxyPortArg,
             StartTimeArg,
             IAmAliveTimeArg
+        WHERE RowCountVar > 0
         ON CONFLICT (DeploymentId, Address, Port, Generation) DO
             NOTHING;
 
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        UPDATE OrleansMembershipVersionTable
-        SET
-            Timestamp = now(),
-            Version = Version + 1
-        WHERE
-            DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
-            AND Version = VersionArg AND VersionArg IS NOT NULL
-            AND RowCountVar > 0;
-
-        GET DIAGNOSTICS RowCountVar = ROW_COUNT;
-
-        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
 
 
         RETURN QUERY SELECT RowCountVar;
@@ -228,7 +230,7 @@ BEGIN
     SET
         Status = StatusArg,
         SuspectTimes = SuspectTimesArg,
-        IAmAliveTime = IAmAliveTimeArg
+        IAmAliveTime = GREATEST(IAmAliveTime, IAmAliveTimeArg)
     WHERE
         DeploymentId = DeploymentIdArg AND DeploymentIdArg IS NOT NULL
         AND Address = AddressArg AND AddressArg IS NOT NULL
@@ -239,7 +241,9 @@ BEGIN
 
         GET DIAGNOSTICS RowCountVar = ROW_COUNT;
 
-        ASSERT RowCountVar <> 0, 'no rows affected, rollback';
+        IF RowCountVar = 0 THEN
+            RAISE EXCEPTION 'no rows affected, rollback' USING ERRCODE = 'assert_failure';
+        END IF;
 
 
         RETURN QUERY SELECT RowCountVar;
@@ -353,5 +357,18 @@ VALUES
     WHERE DeploymentId = @DeploymentId
         AND @DeploymentId IS NOT NULL
         AND IAmAliveTime < @IAmAliveTime
-        AND Status != 3;
+        AND StartTime < @IAmAliveTime
+        AND COALESCE(SuspectTimes, '''') = ''''
+        AND Status = 6;
+');
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'CleanupDefunctSiloEntryKey',
+    'DELETE FROM OrleansMembershipTable
+    WHERE DeploymentId = @DeploymentId AND Status = 6
+        AND Address = @Address AND Port = @Port AND Generation = @Generation
+        AND IAmAliveTime = @IAmAliveTime AND StartTime = @StartTime
+        AND COALESCE(SuspectTimes, '''') = COALESCE(@SuspectTimes, '''');
 ');

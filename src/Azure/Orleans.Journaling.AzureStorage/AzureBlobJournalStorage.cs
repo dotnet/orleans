@@ -410,7 +410,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             SetWal(walDetails.ETag, CreateWalProviderState(manifest, walDetails.ContentLength, walDetails.BlobCommittedBlockCount));
 
             await using var walStream = walResult.Value.Content;
-            var expectedFormat = manifest.Metadata.Format;
+            var expectedFormat = manifest.Metadata.FormatKey;
             if (manifest.Checkpoint is { } checkpoint)
             {
                 var checkpointClient = GetCheckpointClient(checkpoint.Name);
@@ -426,7 +426,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     cancellationToken).ConfigureAwait(false);
                 LogRead(_shared.Logger, totalCheckpointBytes, checkpointClient.BlobContainerName, checkpointClient.Name);
                 bytes += totalCheckpointBytes;
-                expectedFormat = checkpointMetadata.Format;
+                expectedFormat = checkpointMetadata.FormatKey;
             }
 
             if (manifest.Checkpoint is { WalOffset: > 0 } checkpointOffset)
@@ -442,7 +442,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
 
             // Prefer WAL format metadata, falling back to the checkpoint when compaction recreated an empty WAL.
-            var walMetadata = manifest.Metadata.Format is { Length: > 0 }
+            var walMetadata = manifest.Metadata.FormatKey is { Length: > 0 }
                 ? manifest.Metadata
                 : expectedFormat is { Length: > 0 }
                     ? new JournalMetadata(expectedFormat)
@@ -877,7 +877,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private static WalProviderState CreateWalProviderState(WalManifest manifest, long contentLength, int committedBlockCount)
         => new(
-            manifest.Metadata.Format,
+            manifest.Metadata.FormatKey,
             manifest.Checkpoint?.Name,
             manifest.Checkpoint?.WalOffset ?? 0,
             manifest.Generation,

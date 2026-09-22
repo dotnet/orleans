@@ -1,7 +1,10 @@
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
+using Orleans.Clustering.TestKit;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
@@ -50,11 +53,50 @@ namespace Tester.AzureUtils
         /// and table names suitable for unit testing.
         /// </summary>
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
+            => CreateMembershipTable(logger, _clusterOptions);
+
+        protected override IMembershipTable CreateMembershipTable(ILogger logger, IOptions<ClusterOptions> clusterOptions)
         {
             TestUtils.CheckForAzureStorage();
             var options = new AzureStorageClusteringOptions();
             options.ConfigureTestDefaults();
-            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), this._clusterOptions);
+            return new AzureBasedMembershipTable(loggerFactory, Options.Create(options), clusterOptions);
+        }
+
+        // Azure Table Storage returns at most 1,000 entities per response page.
+        protected override int ConformanceConcurrencyRowCount => 1001;
+
+        protected override MembershipTableTestFixture CreateConformanceFixture()
+        {
+            TestUtils.CheckForAzureStorage();
+            var options = new AzureStorageClusteringOptions();
+            var probe = AzureStorageOperationOptionsExtensions.GetTableServiceClient().GetTableClient(options.TableName);
+            return new MembershipTableTestFixture(
+                GetType().Name,
+                (serviceId, clusterId, cancellationToken) =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return ValueTask.FromResult(new MembershipTableTestHandle(CreateMembershipTable(
+                        loggerFactory.CreateLogger<AzureBasedMembershipTable>(),
+                        Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId }))));
+                },
+                async (clusterId, cancellationToken) =>
+                {
+                    // The partition contains both silo entities and the membership version row.
+                    await foreach (var page in probe.QueryAsync<TableEntity>(
+                        TableClient.CreateQueryFilter($"PartitionKey eq {clusterId}"),
+                        maxPerPage: 1,
+                        select: [nameof(TableEntity.PartitionKey), nameof(TableEntity.RowKey)],
+                        cancellationToken: cancellationToken).AsPages())
+                    {
+                        if (page.Values.Count > 0)
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
         }
 
         /// <summary>
@@ -76,9 +118,8 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
-        public void MembershipTable_Azure_Init()
-        {
-        }
+        public Task MembershipTable_Azure_Init()
+            => InitializeLegacyMembershipTableAsync(TestContext.Current.CancellationToken);
 
         [Fact, TestCategory("Functional")]
         public async Task MembershipTable_Azure_GetGateways()

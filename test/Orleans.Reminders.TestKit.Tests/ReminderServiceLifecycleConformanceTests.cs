@@ -20,6 +20,7 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
     private InProcessTestCluster? _cluster;
     private ReminderTestClock? _clock;
     private readonly short _initialSilos = 1;
+    private readonly bool _useVirtualBuckets;
 
     public ReminderServiceLifecycleFixture()
     {
@@ -35,6 +36,11 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
         _initialSilos = initialSilos;
     }
 
+    internal ReminderServiceLifecycleFixture(bool useVirtualBuckets)
+    {
+        _useVirtualBuckets = useVirtualBuckets;
+    }
+
     public ReminderServiceLifecycleHarness Harness { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -42,8 +48,12 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
         try
         {
             var builder = new InProcessTestClusterBuilder(_initialSilos);
-            builder.ConfigureSilo((_, siloBuilder) =>
-                siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+            if (!_useVirtualBuckets)
+            {
+                builder.ConfigureSilo((_, siloBuilder) =>
+                    siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+            }
+
             builder.UseIdealizedReminderTable(
                 configureReminderOptions: options => options.ReminderLoadingWindow = LoadingWindow);
             _clock = ReminderTestClock.Attach(
@@ -310,6 +320,29 @@ public sealed class FaultyReminderServiceLifecycleTests
             });
     }
 
+    [Fact]
+    public async Task JoinedSiloOwnsRequestedIdentityWithVirtualBuckets()
+    {
+        var fixture = new ReminderServiceLifecycleFixture(useVirtualBuckets: true);
+        await fixture.InitializeAsync();
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMinutes(2));
+            await fixture.Harness.WaitForStartupReadinessAsync(cancellation.Token);
+            var grain = fixture.Harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(Guid.Empty);
+
+            var joined = await fixture.Harness.JoinOneSiloAsync(grain.GetGrainId(), cancellation.Token);
+
+            Assert.True(fixture.Harness.IsOwner(joined, grain.GetGrainId()));
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+    }
+
     private static async Task RunFaultAsync(
         Func<IReminderServiceLifecycleHarness, LifecycleRunner> createRunner,
         Func<LifecycleRunner, CancellationToken, Task> scenario,
@@ -365,7 +398,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public virtual Task WaitForScheduleChangeCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForScheduleChangeCountAsync(grainId, reminderName, count, cancellationToken);
         public Task WaitForTickCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForTickCountAsync(grainId, reminderName, count, cancellationToken);
         public int GetTickCount(GrainId grainId, string reminderName) => Inner.GetTickCount(grainId, reminderName);
-        public Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken) => Inner.JoinOneSiloAsync(cancellationToken);
+        public Task<SiloAddress> JoinOneSiloAsync(GrainId grainId, CancellationToken cancellationToken) => Inner.JoinOneSiloAsync(grainId, cancellationToken);
         public Task LeaveSiloAsync(SiloAddress siloAddress, CancellationToken cancellationToken) => Inner.LeaveSiloAsync(siloAddress, cancellationToken);
         public Task WaitForTopologyReconciliationAsync(CancellationToken cancellationToken) => Inner.WaitForTopologyReconciliationAsync(cancellationToken);
     }

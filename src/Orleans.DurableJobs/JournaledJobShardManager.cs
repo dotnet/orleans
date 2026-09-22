@@ -123,7 +123,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         cancellationToken.ThrowIfCancellationRequested();
         var storageEntries = new SortedDictionary<JournalId, (DurableJobsJournalProvider Provider, JournalCatalogEntry Entry)>(Comparer<JournalId>.Create(
             static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value)));
-        var options = new ListOptions
+        var options = new JournalCatalogListOptions
         {
             Prefix = new JournalId(JobShardId.StoragePrefix.Value + "/"),
             MaxId = JobShardId.GetMaxJournalId(maxDueTime),
@@ -519,10 +519,10 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
-        var manager = descriptor.Provider.Factory.Create(descriptor.StorageId);
+        var manager = descriptor.Provider.Factory.CreateStandalone(descriptor.StorageId);
         try
         {
-            manager.RegisterState(JournaledJobShardState.StateName, state);
+            manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
             await manager.InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         catch

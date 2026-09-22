@@ -245,7 +245,7 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
     internal static JournalId CatalogId(int index, bool future) => new($"catalog/{(future ? "21000101" : "20000101")}/{index:D8}");
     private static JournalId WorkId(int index) => new($"work/{index:D8}");
 
-    internal ListOptions CatalogOptions() => new()
+    internal JournalCatalogListOptions CatalogOptions() => new()
     {
         Prefix = new JournalId("catalog/"),
         MinId = CatalogId(0, future: false),
@@ -285,7 +285,7 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
 
     internal static void ValidateMetadata(IJournalMetadata? metadata, bool includeMetadata)
     {
-        if (metadata?.Format != FormatKey || string.IsNullOrEmpty(metadata.ETag))
+        if (metadata?.FormatKey != FormatKey || string.IsNullOrEmpty(metadata.ETag))
         {
             throw new BenchmarkValidationException(BenchmarkValidationError.JournalFormatOrETag);
         }
@@ -438,7 +438,7 @@ internal sealed class AzureJournalScenario(AzureJournalOptions options, AzureJou
                 throw new BenchmarkValidationException(BenchmarkValidationError.RecoveryAfterCompletion);
             }
 
-            if (metadata?.Format != FormatKey)
+            if (metadata?.FormatKey != FormatKey)
             {
                 throw new BenchmarkValidationException(BenchmarkValidationError.RecoveryFormat);
             }

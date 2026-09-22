@@ -1,7 +1,7 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Interface for a state which can be persisted to durable storage.
+/// Defines the replay, snapshot, and acknowledgement protocol for a journal-backed state machine.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,7 +15,7 @@ namespace Orleans.Journaling;
 /// </item>
 /// <item>
 /// When the application requests a write, the journaled state manager calls
-/// <see cref="AppendEntries"/> (and occasionally <see cref="AppendSnapshot"/>) to materialize
+/// <see cref="WritePendingEntries"/> (and occasionally <see cref="WriteSnapshot"/>) to materialize
 /// the pending changes, then flushes the journal to durable storage.
 /// </item>
 /// <item>
@@ -25,17 +25,18 @@ namespace Orleans.Journaling;
 /// rather than treating in-memory mutations as durable.
 /// </item>
 /// <item>
-/// A failed journal operation permanently fences the manager and requests grain deactivation.
-/// A new manager initializes new state instances by calling <see cref="Reset"/> and replaying durable entries.
+/// A failed write or delete permanently fences the manager and requests grain deactivation.
+/// Recovery calls <see cref="Reset"/> before replaying durable entries, including when initialization is retried.
 /// </item>
 /// </list>
 /// <para>
 /// Application code prepares fallible work in operation-local data and stages only mutations which are
 /// safe to commit. Staged mutations are shared by all interleaved callers using the same manager.
-/// Storage acknowledgement establishes durability; recovery takes place in a fresh manager and state instances.
+/// Storage acknowledgement establishes durability. A new activation creates a fresh manager and state instances;
+/// retrying failed initialization resets and replays the existing instances.
 /// </para>
 /// </remarks>
-public interface IJournaledState
+public interface IStateMachine
 {
     /// <summary>
     /// Replays one entry during journal recovery.
@@ -63,7 +64,7 @@ public interface IJournaledState
     /// <remarks>
     /// The state should not expect any additional recovery entries after this method is called,
     /// unless <see cref="Reset"/> is called to reset the state to its initial state.
-    /// This method will be called before any <see cref="AppendEntries"/> or <see cref="AppendSnapshot"/> calls.
+    /// This method will be called before any <see cref="WritePendingEntries"/> or <see cref="WriteSnapshot"/> calls.
     /// </remarks>
     void OnRecoveryCompleted() { }
 
@@ -71,22 +72,16 @@ public interface IJournaledState
     /// Writes pending state changes to the journal.
     /// </summary>
     /// <param name="writer">The journal stream writer.</param>
-    void AppendEntries(JournalStreamWriter writer);
+    void WritePendingEntries(JournalStreamWriter writer);
 
     /// <summary>
     /// Writes a snapshot of the state to the provided writer.
     /// </summary>
     /// <param name="writer">The journal stream writer.</param>
-    void AppendSnapshot(JournalStreamWriter writer);
+    void WriteSnapshot(JournalStreamWriter writer);
 
     /// <summary>
     /// Notifies the state that all prior journal entries and snapshots which it has written have been written to stable storage.
     /// </summary>
     void OnWriteCompleted() { }
-
-    /// <summary>
-    /// Creates and returns a deep copy of this instance. All replicas must be independent such that changes to one do not affect any other.
-    /// </summary>
-    /// <returns>A replica of this instance.</returns>
-    IJournaledState DeepCopy();
 }

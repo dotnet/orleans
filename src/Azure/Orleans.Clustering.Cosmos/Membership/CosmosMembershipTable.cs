@@ -8,16 +8,16 @@ internal partial class CosmosMembershipTable : IMembershipTable
 {
     private const string PARTITION_KEY = "/ClusterId";
     private const string CLUSTER_VERSION_ID = "ClusterVersion";
+    private const int MaxMembershipSnapshotAttempts = 5;
+    private const int MaxBatchSize = 100;
     private readonly ILogger _logger;
     private readonly CosmosClusteringOptions _options;
     private readonly IServiceProvider _serviceProvider;
     private readonly string _clusterId;
     private readonly PartitionKey _partitionKey;
-    private readonly QueryRequestOptions _queryRequestOptions;
     private Task<CosmosClient>? _clientTask;
     private CosmosClient _client = default!;
     private Container _container = default!;
-    private SiloEntity? _self = null;
 
     public CosmosMembershipTable(
         ILoggerFactory loggerFactory,
@@ -30,8 +30,6 @@ internal partial class CosmosMembershipTable : IMembershipTable
         _options = options.Value;
         _clusterId = clusterOptions.Value.ClusterId;
         _partitionKey = new(_clusterId);
-
-        _queryRequestOptions = new() { PartitionKey = _partitionKey };
     }
 
     [Obsolete("Use InitializeMembershipTableAsync instead.")]
@@ -58,9 +56,11 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         try
         {
-            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(CLUSTER_VERSION_ID, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false)).Resource;
+            versionEntity = (await _container.ReadItemAsync<ClusterVersionEntity>(
+                CLUSTER_VERSION_ID, _partitionKey,
+                cancellationToken: cancellationToken).ConfigureAwait(false)).Resource;
         }
-        catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
+        catch (CosmosException ce) when (IsMissingItem(ce))
         {
             if (versionEntity is null)
             {
@@ -71,11 +71,17 @@ internal partial class CosmosMembershipTable : IMembershipTable
                     Id = CLUSTER_VERSION_ID
                 };
 
-                var response = await _container.CreateItemAsync(versionEntity, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false);
-
-                if (response.StatusCode == HttpStatusCode.Created)
+                try
                 {
-                    LogDebugCreatedNewClusterVersionEntity();
+                    var response = await _container.CreateItemAsync(versionEntity, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    if (response.StatusCode == HttpStatusCode.Created)
+                    {
+                        LogDebugCreatedNewClusterVersionEntity();
+                    }
+                }
+                catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
+                {
+                    // Another initializer created the version row.
                 }
             }
         }
@@ -87,20 +93,38 @@ internal partial class CosmosMembershipTable : IMembershipTable
     public async Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!string.Equals(clusterId, _clusterId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"The cluster ID must match this membership table's configured cluster ID '{_clusterId}'.",
+                nameof(clusterId));
+        }
+
         try
         {
-            var silos = await ReadSilos(cancellationToken).ConfigureAwait(false);
+            var snapshot = await ReadMembershipSnapshot(siloId: null, cancellationToken).ConfigureAwait(false);
 
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
-
-            foreach (var silo in silos)
+            foreach (var chunk in snapshot.Silos.Chunk(MaxBatchSize))
             {
-                batch = batch.DeleteItem(silo.Id);
+                var batch = _container.CreateTransactionalBatch(_partitionKey);
+                foreach (var silo in chunk)
+                {
+                    batch.DeleteItem(
+                        silo.Id,
+                        new TransactionalBatchItemRequestOptions { IfMatchEtag = silo.ETag });
+                }
+
+                using var response = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw CreateBatchException(response);
+                }
             }
 
-            batch = batch.DeleteItem(CLUSTER_VERSION_ID);
-
-            using var response = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
+            await _container.DeleteItemAsync<ClusterVersionEntity>(
+                CLUSTER_VERSION_ID, _partitionKey,
+                new ItemRequestOptions { IfMatchEtag = snapshot.Version.VersionEtag },
+                cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -117,39 +141,31 @@ internal partial class CosmosMembershipTable : IMembershipTable
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            // Filter by status server-side (Status is indexed); apply the date check in C#
-            // so that the Math.Max(IAmAliveTime, StartTime) semantics are preserved correctly.
-            var activeStatus = (int)SiloStatus.Active;
-            var query = _container
-                .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
-                .Where(g => g.EntityType == nameof(SiloEntity) && g.Status != activeStatus);
-
-            using var iterator = query.ToFeedIterator();
-            var nonActiveSilos = new List<SiloEntity>();
-            do
+            var deadSilos = await ReadSilos(cancellationToken, SiloStatus.Dead).ConfigureAwait(false);
+            foreach (var silo in deadSilos)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var items = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
-                nonActiveSilos.AddRange(items);
-            } while (iterator.HasMoreResults);
+                if (GetEffectiveUpdateTime(silo) >= beforeDate.UtcDateTime)
+                {
+                    continue;
+                }
 
-            var silos = nonActiveSilos
-                .Where(s => Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks) < beforeDate.Ticks)
-                .ToList();
-
-            if (silos.Count == 0)
-            {
-                return;
+                try
+                {
+                    await _container.DeleteItemAsync<SiloEntity>(
+                        silo.Id, _partitionKey,
+                        new ItemRequestOptions { IfMatchEtag = silo.ETag },
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
+                {
+                    // A concurrent update retains the row for a later cleanup pass.
+                }
+                catch (CosmosException exception) when (IsMissingItem(exception))
+                {
+                    await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
+                }
             }
-
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
-
-            foreach (var silo in silos)
-            {
-                batch = batch.DeleteItem(silo.Id);
-            }
-
-            using var response = await batch.ExecuteAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -168,33 +184,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         try
         {
-            var readClusterVersionTask = ReadClusterVersion(cancellationToken);
-            var readSiloTask = _container.ReadItemAsync<SiloEntity>(id, _partitionKey, cancellationToken: cancellationToken);
-
-            await Task.WhenAll(readClusterVersionTask, readSiloTask).ConfigureAwait(false);
-
-            var clusterVersion = await readClusterVersionTask;
-            var silo = await readSiloTask;
-
-            TableVersion? version = null;
-            if (clusterVersion is not null)
-            {
-                // Cosmos populates ETag on resources returned from reads.
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
-            }
-            else
-            {
-                LogErrorClusterVersionEntityDoesNotExist();
-            }
-
-            var memEntries = new List<Tuple<MembershipEntry, string>>
-            {
-                // Cosmos populates ETag on resources returned from reads.
-                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag!)
-            };
-
-            // A cluster version record is created during provider initialization.
-            return new MembershipTableData(memEntries, version!);
+            var snapshot = await ReadMembershipSnapshot(id, cancellationToken).ConfigureAwait(false);
+            return ConvertToTableData(snapshot.Silos, snapshot.Version);
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -212,44 +203,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            var readClusterVersionTask = ReadClusterVersion(cancellationToken);
-            var readSilosTask = ReadSilos(cancellationToken);
-
-            await Task.WhenAll(readClusterVersionTask, readSilosTask).ConfigureAwait(false);
-
-            var clusterVersion = await readClusterVersionTask;
-            var silos = await readSilosTask;
-
-            TableVersion? version = null;
-            if (clusterVersion is not null)
-            {
-                // Cosmos populates ETag on resources returned from reads.
-                version = new TableVersion(clusterVersion.ClusterVersion, clusterVersion.ETag!);
-            }
-            else
-            {
-                LogErrorClusterVersionEntityDoesNotExist();
-            }
-
-            var memEntries = new List<Tuple<MembershipEntry, string>>();
-            foreach (var entity in silos)
-            {
-                try
-                {
-                    var membershipEntry = ParseEntity(entity);
-                    // Cosmos populates ETag on resources returned from reads.
-                    memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag!));
-                }
-                catch (Exception exc) when (exc is not OperationCanceledException)
-                {
-                    LogErrorReadingAllMembershipRecords(exc);
-                    WrappedException.CreateAndRethrow(exc);
-                    throw;
-                }
-            }
-
-            // A cluster version record is created during provider initialization.
-            return new MembershipTableData(memEntries, version!);
+            var snapshot = await ReadMembershipSnapshot(siloId: null, cancellationToken).ConfigureAwait(false);
+            return ConvertToTableData(snapshot.Silos, snapshot.Version);
         }
         catch (Exception exc) when (exc is not OperationCanceledException)
         {
@@ -271,15 +226,19 @@ internal partial class CosmosMembershipTable : IMembershipTable
             var versionEntity = BuildVersionEntity(tableVersion);
 
             using var response = await _container.CreateTransactionalBatch(_partitionKey)
-                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
-                .CreateItem(siloEntity)
+                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions
+                {
+                    IfMatchEtag = tableVersion.VersionEtag,
+                    EnableContentResponseOnWrite = false
+                })
+                .CreateItem(siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
-            return response.IsSuccessStatusCode;
+            return IsSuccessfulMembershipBatch(response, allowMissingRow: false);
         }
         catch (CosmosException exc)
         {
-            if (exc.StatusCode == HttpStatusCode.PreconditionFailed) return false;
+            if (exc.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed) return false;
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -291,19 +250,26 @@ internal partial class CosmosMembershipTable : IMembershipTable
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         try
         {
             var siloEntity = ConvertToEntity(entry, _clusterId);
-            siloEntity.ETag = etag;
-
             var versionEntity = BuildVersionEntity(tableVersion);
 
             using var response = await _container.CreateTransactionalBatch(_partitionKey)
-                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = tableVersion.VersionEtag })
-                .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { IfMatchEtag = siloEntity.ETag })
+                .ReplaceItem(versionEntity.Id, versionEntity, new TransactionalBatchItemRequestOptions
+                {
+                    IfMatchEtag = tableVersion.VersionEtag,
+                    EnableContentResponseOnWrite = false
+                })
+                .ReplaceItem(siloEntity.Id, siloEntity, new TransactionalBatchItemRequestOptions { EnableContentResponseOnWrite = false })
                 .ExecuteAsync(cancellationToken).ConfigureAwait(false);
 
-            return response.IsSuccessStatusCode;
+            return IsSuccessfulMembershipBatch(response, allowMissingRow: true);
         }
         catch (CosmosException exc)
         {
@@ -321,43 +287,108 @@ internal partial class CosmosMembershipTable : IMembershipTable
         cancellationToken.ThrowIfCancellationRequested();
         var siloEntityId = ConstructSiloEntityId(entry.SiloAddress);
 
-        if (_self is not { } selfRow)
-        {
-            var response = await _container.ReadItemAsync<SiloEntity>(siloEntityId, _partitionKey, cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            if (response.StatusCode != HttpStatusCode.OK)
-            {
-                LogWarningUnableToQueryEntry(new(entry));
-                throw new OrleansException($"Unable to query for SiloEntity {entry.ToFullString()}");
-            }
-
-            _self = selfRow = response.Resource;
-        }
-
-        selfRow.IAmAliveTime = entry.IAmAliveTime;
-
         try
         {
-            var replaceResponse = await _container.ReplaceItemAsync(
-                selfRow,
+            using var response = await _container.PatchItemStreamAsync(
                 siloEntityId,
                 _partitionKey,
-                new ItemRequestOptions { IfMatchEtag = selfRow.ETag },
+                [PatchOperation.Set("/IAmAliveTime", new DateTimeOffset(entry.IAmAliveTime))],
+                new PatchItemRequestOptions { EnableContentResponseOnWrite = false },
                 cancellationToken).ConfigureAwait(false);
-            _self = replaceResponse.Resource;
+            response.EnsureSuccessStatusCode();
         }
-        catch (OperationCanceledException)
+        catch (Exception exc) when (exc is not OperationCanceledException)
         {
-            _self = null;
-            throw;
-        }
-        catch (Exception exc)
-        {
-            _self = null;
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
+
+    private async Task<(List<SiloEntity> Silos, TableVersion Version)> ReadMembershipSnapshot(string? siloId, CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaxMembershipSnapshotAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var before = await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
+            var silos = new List<SiloEntity>();
+            if (siloId is not null)
+            {
+                try
+                {
+                    var response = await _container.ReadItemAsync<SiloEntity>(
+                        siloId, _partitionKey,
+                        cancellationToken: cancellationToken).ConfigureAwait(false);
+                    silos.Add(response.Resource);
+                }
+                catch (CosmosException exception) when (IsMissingItem(exception))
+                {
+                    // The closing version read verifies the membership view containing this absence.
+                }
+            }
+            else
+            {
+                var queryOptions = new QueryRequestOptions
+                {
+                    PartitionKey = _partitionKey
+                };
+                // Heartbeats patch documents without changing the version fence; immutable
+                // ordering keeps those updates from moving rows across continuation pages.
+                using var iterator = _container.GetItemQueryIterator<SiloEntity>(
+                    CreateSiloQuery(), requestOptions: queryOptions);
+                do
+                {
+                    var page = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
+                    silos.AddRange(page);
+                } while (iterator.HasMoreResults);
+            }
+
+            // Separate reads can straddle a membership update; matching version etags fence the view.
+            var after = await ReadClusterVersion(cancellationToken).ConfigureAwait(false);
+            if (string.Equals(before.ETag, after.ETag, StringComparison.Ordinal))
+            {
+                return (silos, new TableVersion(after.Resource.ClusterVersion, after.ETag));
+            }
+        }
+
+        throw new OrleansException(
+            $"Unable to read a consistent membership snapshot for cluster '{_clusterId}' after {MaxMembershipSnapshotAttempts} attempts.");
+    }
+
+    private static MembershipTableData ConvertToTableData(List<SiloEntity> silos, TableVersion version)
+    {
+        // The table-version etag tracks canonical membership changes while heartbeats patch silo documents.
+        return new MembershipTableData(
+            silos.Select(entity => Tuple.Create(ParseEntity(entity), version.VersionEtag)).ToList(),
+            version);
+    }
+
+    private static bool IsSuccessfulMembershipBatch(TransactionalBatchResponse response, bool allowMissingRow)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return true;
+        }
+
+        if (response.Any(result => result.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed))
+        {
+            return false;
+        }
+
+        if (allowMissingRow && response.Count == 2
+            && response[0].StatusCode == HttpStatusCode.FailedDependency
+            && response[1].StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        throw CreateBatchException(response);
+    }
+
+    private static CosmosException CreateBatchException(TransactionalBatchResponse response)
+        => new(response.ErrorMessage, response.StatusCode, 0, response.ActivityId, response.RequestCharge);
+
+    private static bool IsMissingItem(CosmosException exception)
+        => exception.StatusCode == HttpStatusCode.NotFound && exception.SubStatusCode == 0;
 
     private async Task InitializeCosmosClient(CancellationToken cancellationToken)
     {
@@ -418,37 +449,21 @@ internal partial class CosmosMembershipTable : IMembershipTable
         containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartTime/?" });
         containerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/IAmAliveTime/?" });
 
-        const int maxRetries = 3;
-        for (var retry = 0; retry <= maxRetries; ++retry)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var containerResponse = await db.CreateContainerIfNotExistsAsync(
-                containerProperties,
-                _options.ContainerThroughputProperties,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
-            {
-                break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
-            }
-            await Task.Delay(1000, cancellationToken);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        await db.CreateContainerIfNotExistsAsync(
+            containerProperties,
+            _options.ContainerThroughputProperties,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<ClusterVersionEntity?> ReadClusterVersion(CancellationToken cancellationToken)
+    private async Task<ItemResponse<ClusterVersionEntity>> ReadClusterVersion(CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _container.ReadItemAsync<ClusterVersionEntity>(
+            return await _container.ReadItemAsync<ClusterVersionEntity>(
                 CLUSTER_VERSION_ID,
                 _partitionKey,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            return response.StatusCode == HttpStatusCode.OK
-                ? response.Resource
-                : response.StatusCode == HttpStatusCode.NotFound
-                    ? null
-                    : throw new Exception($"Error reading Cluster Version entity. Status code: {response.StatusCode}");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -462,16 +477,9 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
-            var query = _container
-                .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
-                .Where(g => g.EntityType == nameof(SiloEntity));
-
-            if (status is not null)
-            {
-                query = query.Where(g => (SiloStatus)g.Status == status);
-            }
-
-            using var iterator = query.ToFeedIterator();
+            using var iterator = _container.GetItemQueryIterator<SiloEntity>(
+                CreateSiloQuery(status),
+                requestOptions: new QueryRequestOptions { PartitionKey = _partitionKey });
 
             var silos = new List<SiloEntity>();
             do
@@ -492,6 +500,33 @@ internal partial class CosmosMembershipTable : IMembershipTable
     }
 
     private static string ConstructSiloEntityId(SiloAddress silo) => $"{silo.Endpoint.Address}-{silo.Endpoint.Port}-{silo.Generation}";
+
+    private static QueryDefinition CreateSiloQuery(SiloStatus? status = null)
+    {
+        var query = new QueryDefinition(
+            "SELECT * FROM c WHERE c.EntityType = @entityType"
+            + (status.HasValue ? " AND c.Status = @status" : "")
+            + " ORDER BY c.id")
+            .WithParameter("@entityType", nameof(SiloEntity));
+        if (status.HasValue)
+        {
+            query.WithParameter("@status", (int)status.Value);
+        }
+
+        return query;
+    }
+
+    private static DateTime GetEffectiveUpdateTime(SiloEntity entity)
+    {
+        var result = entity.StartTime > entity.IAmAliveTime ? entity.StartTime.UtcDateTime : entity.IAmAliveTime.UtcDateTime;
+        foreach (var value in entity.SuspectingTimes)
+        {
+            var suspectTime = LogFormatter.ParseDate(value);
+            result = suspectTime > result ? suspectTime : result;
+        }
+
+        return result;
+    }
 
     private static MembershipEntry ParseEntity(SiloEntity entity)
     {

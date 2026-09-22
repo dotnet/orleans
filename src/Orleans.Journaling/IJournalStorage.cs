@@ -15,7 +15,7 @@ public interface IJournalStorage
     /// <see cref="JournalBufferReader"/> with <see cref="JournalBufferReader.IsCompleted"/> set to <see langword="true"/>.
     /// Each call must pass metadata describing the journal file being read. If storage has no metadata,
     /// pass <see langword="null"/> or <see cref="JournalMetadata.Empty"/>. Metadata passed during one read must have the same
-    /// <see cref="IJournalMetadata.Format"/> value for every call.
+    /// <see cref="IJournalMetadata.FormatKey"/> value for every call.
     /// </remarks>
     /// <param name="consumer">The consumer of ordered raw journal data. Chunk boundaries are not journal-entry boundaries.</param>
     /// <param name="cancellationToken">The cancellation token.</param>

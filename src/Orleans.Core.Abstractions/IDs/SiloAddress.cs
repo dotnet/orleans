@@ -453,6 +453,11 @@ namespace Orleans.Runtime
             this.hashCodeSet = true;
         }
 
+        internal void InternalSetUniformHashCodes(uint[] hashCodes)
+        {
+            uniformHashCache = hashCodes;
+        }
+
         /// <summary>
         /// Returns a collection of uniform hash codes variants for this instance.
         /// </summary>

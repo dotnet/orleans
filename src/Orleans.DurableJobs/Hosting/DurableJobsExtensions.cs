@@ -112,7 +112,7 @@ public static class DurableJobsExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.AddDurableJobs();
-        builder.AddJournalStorage();
+        builder.AddJournaling();
         builder.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
         if (configure is not null)
         {

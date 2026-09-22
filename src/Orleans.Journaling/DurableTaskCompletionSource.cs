@@ -42,7 +42,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IDurableTaskCompletionSourceCommandHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IStateMachine, IDurableTaskCompletionSourceCommandHandler<T>
 {
     private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -65,7 +65,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableTaskCompletionSourceCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     internal DurableTaskCompletionSource(
@@ -79,7 +79,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
     public bool TrySetResult(T value)
@@ -128,7 +128,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     private void OnValuePersisted()
@@ -149,10 +149,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
-    void IJournaledState.OnWriteCompleted() => OnValuePersisted();
+    void IStateMachine.OnRecoveryCompleted() => OnValuePersisted();
+    void IStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
@@ -165,7 +165,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -173,7 +173,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
     private void WriteState(JournalStreamWriter writer)
     {
@@ -209,7 +209,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
 
 /// <summary>

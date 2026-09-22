@@ -44,7 +44,13 @@ Under the cluster prefix, the provider maintains:
 | `<silo-address>` | The silo registration, including its host name, gateway port, start time, status, silo name, and failure-detector votes. |
 | `<silo-address>/iamalive` | The silo's periodic `IAmAlive` timestamp. |
 
-Membership-row changes and the corresponding version change use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) with compare-and-set operations. An `IAmAlive` update writes only its separate timestamp key and doesn't advance the table version. This value supports diagnostics and startup recovery; it isn't the direct heartbeat used to detect a failed silo. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
+Membership reads use Consul's consistent mode to return coherent snapshots of registrations and the table version. Single-silo reads query the silo's registration and timestamp prefix and validate that the table version's ETag remains unchanged across the read. Retried reads wait 100 ms after a version change and honor cancellation. Insertions and status updates use a [Consul transaction](https://developer.hashicorp.com/consul/api-docs/txn) to atomically compare-and-set the registration and table version. A conflicting row or table ETag returns a failed update so the caller can refresh its membership view. Other transaction failures surface as exceptions containing Consul's operation error details.
+
+Each silo owns its periodic `IAmAlive` updates throughout its registered lifetime. Each update performs one native write to that silo's `iamalive` key, retaining the registration fields, row ETag, and table version. The write honors cancellation and propagates storage failures. Membership reads include the separately published timestamp for liveness diagnostics; row and table concurrency checks use only canonical membership tokens.
+
+Cleanup removes Dead registrations whose start time, `IAmAlive` timestamp, and failure-detector votes all precede the cutoff. It compares the registration and timestamp keys atomically and retains the table version, preserving entries changed by concurrent writers.
+
+The `IAmAlive` timestamp supports diagnostics and startup recovery. Silos probe one another for failure detection, as described in [Cluster membership](../../../implementation/cluster-management.md).
 
 Orleans clients list the cluster prefix and select active registrations with a nonzero gateway port. If a client discovers no gateways, inspect the exact prefix used by the client and silos, then compare registration status, gateway ports, and advertised-address reachability.
 

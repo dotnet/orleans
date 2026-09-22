@@ -81,10 +81,10 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
             ((IDisposable)manager).Dispose();
         }
 
-        await using var jsonProvider = await CreateAzureProviderAsync(JsonJournalExtensions.JournalFormatKey, cts.Token);
+        await using var jsonProvider = await CreateAzureProviderAsync(JsonLinesJournalFormat.JournalFormatKey, cts.Token);
         var migratedStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-        var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonJournalExtensions.JournalFormatKey);
-        var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonJournalExtensions.JournalFormatKey);
+        var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonLinesJournalFormat.JournalFormatKey);
+        var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonLinesJournalFormat.JournalFormatKey);
         await migratedManager.InitializeAsync(cts.Token);
 
         Assert.Equal(1, migratedDict["alpha"]);
@@ -94,8 +94,8 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         ((IDisposable)migratedManager).Dispose();
 
         var recoveredStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
-        var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonJournalExtensions.JournalFormatKey);
-        var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonJournalExtensions.JournalFormatKey);
+        var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonLinesJournalFormat.JournalFormatKey);
+        var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonLinesJournalFormat.JournalFormatKey);
         await recoveredManager.InitializeAsync(cts.Token);
 
         Assert.Equal(1, recoveredDict["alpha"]);
@@ -197,7 +197,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         Assert.All(recovered.Formats, format => Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, format));
         Assert.Equal(payload, recovered.Bytes.ToArray());
         var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await recoveredStorage.GetMetadataAsync(cts.Token));
-        Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, metadata.Format);
+        Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, metadata.FormatKey);
         Assert.NotNull(metadata.ETag);
 
         await recoveredStorage.DeleteAsync(cts.Token);
@@ -213,7 +213,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
             new DurableQueue<string>("queue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableSet<string>("set", manager, new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableValue<int>("value", manager, new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
-            new DurableState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new JournaledPersistentState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
@@ -249,10 +249,10 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
         services.Configure<JsonJournalOptions>(options => options.SerializerOptions = jsonOptions);
-        services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
+        services.AddKeyedSingleton<IJournalFormat>(JsonLinesJournalFormat.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
             typeof(IDurableDictionaryCommandCodec<,>),
-            JsonJournalExtensions.JournalFormatKey,
+            JsonLinesJournalFormat.JournalFormatKey,
             typeof(JsonDurableDictionaryCommandCodecService<,>));
     }
 
@@ -328,7 +328,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
             {
                 Bytes.AddRange(buffer.ToArray());
                 buffer.Skip(buffer.Length);
-                Formats.Add(metadata?.Format);
+                Formats.Add(metadata?.FormatKey);
             }
 
             IsCompleted |= buffer.IsCompleted;
@@ -342,12 +342,12 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         DurableQueue<string> Queue,
         DurableSet<string> Set,
         DurableValue<int> Value,
-        DurableState<string> State,
+        JournaledPersistentState<string> State,
         DurableTaskCompletionSource<int> Tcs);
 
     [Theory]
     [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
-    [InlineData(JsonJournalExtensions.JournalFormatKey)]
+    [InlineData(JsonLinesJournalFormat.JournalFormatKey)]
     public async Task AzureTableStorage_JournalCodec_RecoversAcrossFreshProviderInstances(string journalFormatKey)
     {
         var grainId = GrainId.Create("journaling-table-fresh-provider", Guid.NewGuid().ToString("N"));
@@ -366,7 +366,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
             await manager.WriteStateAsync(cts.Token);
 
             var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync(cts.Token));
-            Assert.Equal(journalFormatKey, metadata.Format);
+            Assert.Equal(journalFormatKey, metadata.FormatKey);
             Assert.NotNull(metadata.ETag);
             ((IDisposable)manager).Dispose();
         }
@@ -380,7 +380,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         Assert.Equal(2, recoveredDictionary.Count);
         Assert.Equal(1, recoveredDictionary["alpha"]);
         Assert.Equal(42, recoveredDictionary["quoted-\"β\""]);
-        Assert.Equal(journalFormatKey, (await recoveredStorage.GetMetadataAsync(cts.Token))?.Format);
+        Assert.Equal(journalFormatKey, (await recoveredStorage.GetMetadataAsync(cts.Token))?.FormatKey);
 
         await recoveredStorage.DeleteAsync(cts.Token);
         ((IDisposable)recoveredManager).Dispose();
@@ -393,11 +393,11 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         var journalId = JournalId.FromGrainId(grainId);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
-        await using (var jsonProvider = await CreateAzureProviderAsync(JsonJournalExtensions.JournalFormatKey, cts.Token))
+        await using (var jsonProvider = await CreateAzureProviderAsync(JsonLinesJournalFormat.JournalFormatKey, cts.Token))
         {
             var storage = jsonProvider.StorageProvider.CreateStorage(journalId);
-            var manager = CreateFormatAwareManager(jsonProvider.ServiceProvider, storage, JsonJournalExtensions.JournalFormatKey);
-            var dictionary = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, manager, JsonJournalExtensions.JournalFormatKey);
+            var manager = CreateFormatAwareManager(jsonProvider.ServiceProvider, storage, JsonLinesJournalFormat.JournalFormatKey);
+            var dictionary = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, manager, JsonLinesJournalFormat.JournalFormatKey);
             await manager.InitializeAsync(cts.Token);
             dictionary.Add("alpha", 1);
             await manager.WriteStateAsync(cts.Token);
@@ -414,14 +414,14 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
 
             Assert.Equal(1, dictionary["alpha"]);
             var afterRecovery = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync(cts.Token));
-            Assert.Equal(JsonJournalExtensions.JournalFormatKey, afterRecovery.Format);
+            Assert.Equal(JsonLinesJournalFormat.JournalFormatKey, afterRecovery.FormatKey);
             Assert.Equal(beforeRecovery.ETag, afterRecovery.ETag);
 
             dictionary.Add("beta", 2);
             await manager.WriteStateAsync(cts.Token);
 
             var afterMigration = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync(cts.Token));
-            Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, afterMigration.Format);
+            Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, afterMigration.FormatKey);
             Assert.NotEqual(afterRecovery.ETag, afterMigration.ETag);
             ((IDisposable)manager).Dispose();
         }
@@ -476,7 +476,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         await WriteDictionaryJournalAsync(journalId, OrleansBinaryJournalFormat.JournalFormatKey, cts.Token);
-        await SetStoredFormatAsync(journalId, JsonJournalExtensions.JournalFormatKey, cts.Token);
+        await SetStoredFormatAsync(journalId, JsonLinesJournalFormat.JournalFormatKey, cts.Token);
 
         await using var readerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, cts.Token);
         var storage = readerProvider.StorageProvider.CreateStorage(journalId);
@@ -487,7 +487,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => manager.InitializeAsync(cts.Token).AsTask());
 
-        Assert.Contains($"journal format key '{JsonJournalExtensions.JournalFormatKey}'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"journal format key '{JsonLinesJournalFormat.JournalFormatKey}'", exception.Message, StringComparison.Ordinal);
         Assert.Contains($"configured write journal format key is '{OrleansBinaryJournalFormat.JournalFormatKey}'", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(exception.InnerException);
         ((IDisposable)manager).Dispose();
@@ -499,7 +499,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
 
     [Theory]
     [InlineData(OrleansBinaryJournalFormat.JournalFormatKey)]
-    [InlineData(JsonJournalExtensions.JournalFormatKey)]
+    [InlineData(JsonLinesJournalFormat.JournalFormatKey)]
     public async Task AzureTableStorage_TruncatedCodecPayload_PropagatesRecoveryFailureWithoutMutation(string journalFormatKey)
     {
         var grainId = GrainId.Create("journaling-table-truncated-payload", Guid.NewGuid().ToString("N"));
@@ -518,7 +518,7 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
             ((IDisposable)manager).Dispose();
 
             var valid = await CaptureStoredJournalAsync(storage, cts.Token);
-            var bytesToRemove = string.Equals(journalFormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal) ? 2 : 1;
+            var bytesToRemove = string.Equals(journalFormatKey, JsonLinesJournalFormat.JournalFormatKey, StringComparison.Ordinal) ? 2 : 1;
             await storage.ReplaceAsync(
                 new ReadOnlySequence<byte>(valid.Bytes.AsMemory(0, valid.Bytes.Length - bytesToRemove)),
                 cts.Token);
@@ -583,8 +583,8 @@ public sealed class AzureTableCodecRecoveryTests : JournalingTestBase, IAsyncLif
         await storage.ReadAsync(consumer, cancellationToken);
         Assert.True(consumer.IsCompleted);
         Assert.NotEmpty(consumer.Formats);
-        Assert.All(consumer.Formats, format => Assert.Equal(metadata.Format, format));
-        return new(metadata.Format, metadata.ETag, consumer.Bytes.ToArray());
+        Assert.All(consumer.Formats, format => Assert.Equal(metadata.FormatKey, format));
+        return new(metadata.FormatKey, metadata.ETag, consumer.Bytes.ToArray());
     }
 
     private static void AssertStoredJournalUnchanged(StoredJournalSnapshot before, StoredJournalSnapshot after)

@@ -8,21 +8,21 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Represents a dictionary whose mutations are recorded in a journal.
 /// </summary>
-/// <typeparam name="K">The type of keys in the dictionary.</typeparam>
-/// <typeparam name="V">The type of values in the dictionary.</typeparam>
-public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
+/// <typeparam name="TKey">The type of keys in the dictionary.</typeparam>
+/// <typeparam name="TValue">The type of values in the dictionary.</typeparam>
+public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue> where TKey : notnull
 {
 }
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryCommandHandler<K, V> where K : notnull
+internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue>, IStateMachine, IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
 {
-    private readonly IDurableDictionaryCommandCodec<K, V> _codec;
-    private readonly Dictionary<K, V> _items = [];
+    private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
+    private readonly Dictionary<TKey, TValue> _items = [];
     private JournalStreamWriter _writer;
 
-    protected DurableDictionary(IDurableDictionaryCommandCodec<K, V> codec)
+    protected DurableDictionary(IDurableDictionaryCommandCodec<TKey, TValue> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
@@ -33,19 +33,19 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
+        : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<TKey, TValue>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<TKey, TValue> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        manager.RegisterState(key, this);
+        manager.RegisterStateMachine(key, this);
     }
 
-    public V this[K key]
+    public TValue this[TKey key]
     {
         get => _items[key];
 
@@ -58,27 +58,27 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public int Count => _items.Count;
 
-    public ICollection<K> Keys => _items.Keys;
+    public ICollection<TKey> Keys => _items.Keys;
 
-    public ICollection<V> Values => _items.Values;
+    public ICollection<TValue> Values => _items.Values;
 
-    public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
+    public bool IsReadOnly => ((ICollection<KeyValuePair<TKey, TValue>>)_items).IsReadOnly;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _writer = writer;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -89,9 +89,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         ApplyClear();
     }
 
-    public bool Contains(K key) => _items.ContainsKey(key);
+    public bool Contains(TKey key) => _items.ContainsKey(key);
 
-    public bool Remove(K key)
+    public bool Remove(TKey key)
     {
         if (!_items.ContainsKey(key))
         {
@@ -103,32 +103,32 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         return true;
     }
 
-    private void WriteRemove(K key)
+    private void WriteRemove(TKey key)
     {
         _codec.WriteRemove(key, GetWriter());
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    private void WriteSet(K key, V value)
+    private void WriteSet(TKey key, TValue value)
     {
         _codec.WriteSet(key, value, GetWriter());
     }
 
-    protected virtual void OnSet(K key, V value) { }
+    protected virtual void OnSet(TKey key, TValue value) { }
 
-    private void ApplySet(K key, V value)
+    private void ApplySet(TKey key, TValue value)
     {
         _items[key] = value;
         OnSet(key, value);
     }
 
-    internal bool ApplyRemove(K key) => _items.Remove(key);
+    internal bool ApplyRemove(TKey key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
-    void IDurableDictionaryCommandHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
-    void IDurableDictionaryCommandHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
-    void IDurableDictionaryCommandHandler<K, V>.ApplyClear() => ApplyClear();
-    void IDurableDictionaryCommandHandler<K, V>.Reset(int capacityHint)
+    void IDurableDictionaryCommandHandler<TKey, TValue>.ApplySet(TKey key, TValue value) => ApplySet(key, value);
+    void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyRemove(TKey key) => ApplyRemove(key);
+    void IDurableDictionaryCommandHandler<TKey, TValue>.ApplyClear() => ApplyClear();
+    void IDurableDictionaryCommandHandler<TKey, TValue>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);
@@ -140,8 +140,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         return _writer;
     }
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
-    public void Add(K key, V value)
+    public void Add(TKey key, TValue value)
     {
         if (_items.ContainsKey(key))
         {
@@ -153,27 +152,27 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         OnSet(key, value);
     }
 
-    public bool ContainsKey(K key) => _items.ContainsKey(key);
-    public bool TryGetValue(K key, [MaybeNullWhen(false)] out V value) => _items.TryGetValue(key, out value);
-    public void Add(KeyValuePair<K, V> item) => Add(item.Key, item.Value);
-    public bool Contains(KeyValuePair<K, V> item) => _items.Contains(item);
-    public void CopyTo(KeyValuePair<K, V>[] array, int arrayIndex) => ((ICollection<KeyValuePair<K, V>>)_items).CopyTo(array, arrayIndex);
-    public bool Remove(KeyValuePair<K, V> item)
+    public bool ContainsKey(TKey key) => _items.ContainsKey(key);
+    public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value) => _items.TryGetValue(key, out value);
+    public void Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
+    public bool Contains(KeyValuePair<TKey, TValue> item) => _items.Contains(item);
+    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((ICollection<KeyValuePair<TKey, TValue>>)_items).CopyTo(array, arrayIndex);
+    public bool Remove(KeyValuePair<TKey, TValue> item)
     {
-        if (!((ICollection<KeyValuePair<K, V>>)_items).Contains(item))
+        if (!((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item))
         {
             return false;
         }
 
         WriteRemove(item.Key);
-        _ = ((ICollection<KeyValuePair<K, V>>)_items).Remove(item);
+        _ = ((ICollection<KeyValuePair<TKey, TValue>>)_items).Remove(item);
         return true;
     }
 
-    public IEnumerator<KeyValuePair<K, V>> GetEnumerator() => ((IEnumerable<KeyValuePair<K, V>>)_items).GetEnumerator();
+    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
 
     [DoesNotReturn]
-    private static void ThrowDuplicateKey(K key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));
+    private static void ThrowDuplicateKey(TKey key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));
 }
 
 [DebuggerDisplay("{Value}", Name = "[{Key}]")]

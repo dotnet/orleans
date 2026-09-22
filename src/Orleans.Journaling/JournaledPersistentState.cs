@@ -5,7 +5,7 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IPersistentStateCommandHandler<T>
+internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateMachine, IPersistentStateCommandHandler<T>
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
     private readonly IJournaledStateManager _manager;
@@ -16,7 +16,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     private bool _hasState;
     private bool _clearRequested;
 
-    public DurableState(
+    public JournaledPersistentState(
         [ServiceKey] string key,
         IJournaledStateManager manager,
         JournaledStateManagerShared shared,
@@ -24,16 +24,16 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IPersistentStateCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
-        manager.RegisterState(key, this);
         _manager = manager;
+        manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec)
+    internal JournaledPersistentState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        manager.RegisterState(key, this);
         _manager = manager;
+        manager.RegisterStateMachine(key, this);
     }
 
     public Action? OnPersisted { get; set; }
@@ -55,10 +55,10 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
+    void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    void IJournaledState.OnWriteCompleted()
+    void IStateMachine.OnWriteCompleted()
     {
         switch (_pendingWrite)
         {
@@ -79,7 +79,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         OnPersisted?.Invoke();
     }
 
-    void IJournaledState.Reset(JournalStreamWriter writer)
+    void IStateMachine.Reset(JournalStreamWriter writer)
     {
         _value = default;
         _version = 0;
@@ -89,7 +89,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _clearRequested = false;
     }
 
-    void IJournaledState.AppendEntries(JournalStreamWriter writer)
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         if (_clearRequested)
         {
@@ -101,7 +101,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         }
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         if (_clearRequested)
         {
@@ -114,7 +114,6 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         }
     }
 
-    public IJournaledState DeepCopy() => throw new NotImplementedException();
 
     private void WriteState(JournalStreamWriter writer)
     {

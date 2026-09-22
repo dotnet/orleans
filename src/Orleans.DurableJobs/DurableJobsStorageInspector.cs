@@ -15,7 +15,7 @@ internal sealed partial class DurableJobsStorageInspector(
             long count = 0, owned = 0, poisoned = 0, unrecognized = 0;
             DateTimeOffset? oldest = null, newest = null;
             var seen = new HashSet<JournalId>();
-            var options = new ListOptions
+            var options = new JournalCatalogListOptions
             {
                 Prefix = new JournalId(JobShardId.StoragePrefix.Value + "/"),
                 IncludeMetadata = true

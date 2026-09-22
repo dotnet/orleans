@@ -1008,7 +1008,7 @@ internal sealed class RedisJournalStorage : IJournalStorage
         string eTag,
         IReadOnlyDictionary<string, string> properties) : IJournalMetadata
     {
-        public string Format { get; } = format;
+        public string FormatKey { get; } = format;
 
         public string ETag { get; } = eTag;
 
