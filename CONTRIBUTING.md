@@ -46,7 +46,7 @@ When a binary breaking change is intentional:
 1. Review the generated `CompatibilitySuppressions.xml` beside the project and retain only entries for the approved break. Commit that file with the implementation and explain the compatibility impact in the pull request.
 1. After a release containing the break becomes the repository baseline, remove suppressions which that baseline makes obsolete.
 
-Use `PackageValidationBaselineFrameworkToIgnore` in the package project for an intentional target-framework removal. A package awaiting its first release can set `EnablePackageValidation` to `false` with a comment explaining that it has no released baseline; enable validation after its first release. Keep exceptions package-specific instead of adding compatibility diagnostics to a shared `NoWarn`.
+Use `PackageValidationBaselineFrameworkToIgnore` in the package project for an intentional target-framework removal. A package awaiting its first release can clear `OrleansPackageValidationBaselineVersion` and set `EnablePackageValidation` to `true`. This validates the package's framework assets while the first release establishes its baseline. Adopt the shared baseline once it includes the package. Keep exceptions package-specific instead of adding compatibility diagnostics to a shared `NoWarn`.
 
 ### Run tests
 
