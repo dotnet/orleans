@@ -215,6 +215,54 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void ReaddressedResponseWithoutTrackedAttemptCanBeDelivered()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        tracker.Clear();
+
+        GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(response);
+
+        Assert.True(response.GatewayRequestAttempt < 0);
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
+    }
+
+    [Fact]
+    public void ReaddressedResponseDoesNotCompleteLiveRetry()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(original));
+        var response = CreateResponse(original, Message.ResponseTypes.Success);
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(retry));
+
+        GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(response);
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
+        Assert.Equal(1, tracker.Count);
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void TokenizedResponseFromUnannouncedForwardingDestinationCompletes()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        response.SendingSilo = Silo2;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ForwardedResponseBeforeUpdateCompletesImmediately()
     {
         var tracker = CreateTracker();
@@ -582,10 +630,13 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(tracker.Track(request));
         var response2 = CreateResponse(request, Message.ResponseTypes.Success);
         response2.SendingSilo = Silo2;
+        response2.GatewayRequestAttempt = 0;
         var response3 = CreateResponse(request, Message.ResponseTypes.Success);
         response3.SendingSilo = silo3;
+        response3.GatewayRequestAttempt = 0;
         var response4 = CreateResponse(request, Message.ResponseTypes.Success);
         response4.SendingSilo = silo4;
+        response4.GatewayRequestAttempt = 0;
 
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response2));
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Deferred, tracker.TryComplete(response3));

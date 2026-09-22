@@ -201,7 +201,7 @@ namespace Orleans.Runtime.Messaging
                 // If that gateway is dead, another gateway connected to the client can deliver the response locally.
                 var routeViaTargetSilo = ShouldRouteResponseViaTargetSilo(msg, _siloAddress);
                 var targetSiloIsDead = routeViaTargetSilo && siloStatusOracle.IsDeadSilo(msg.TargetSilo!);
-                if (CanDeliverToProxyLocally(msg, _siloAddress, targetSiloIsDead) && TryDeliverToProxy(msg))
+                if (TryDeliverToProxyLocally(msg, targetSiloIsDead))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -286,13 +286,14 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg, sendMessage);
+                            _ = SendAsync(this, connectionTask, msg, sendMessage, allowResponseReaddress);
 
                             static async Task SendAsync(
                                 MessageCenter messageCenter,
                                 ValueTask<Connection> connectionTask,
                                 Message msg,
-                                Action<Message, Connection?, Exception?>? sendMessage)
+                                Action<Message, Connection?, Exception?>? sendMessage,
+                                bool allowResponseReaddress)
                             {
                                 try
                                 {
@@ -309,16 +310,24 @@ namespace Orleans.Runtime.Messaging
                                 catch (Exception exception)
                                 {
                                     if (msg.Direction == Message.Directions.Response
-                                        && msg.TargetSilo is { } targetSilo
-                                        && CanDeliverToProxyLocally(
-                                            msg,
-                                            messageCenter._siloAddress,
-                                            messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
-                                        && messageCenter.TryDeliverToProxy(msg))
+                                        && msg.TargetSilo is { } targetSilo)
                                     {
-                                        return;
+                                        var targetSiloIsDead = messageCenter.siloStatusOracle.IsDeadSilo(targetSilo);
+                                        if (messageCenter.TryDeliverToProxyLocally(msg, targetSiloIsDead))
+                                        {
+                                            return;
+                                        }
+
+                                        if (allowResponseReaddress
+                                            && ShouldReaddressResponse(msg, targetSiloIsDead))
+                                        {
+                                            msg.TargetSilo = null;
+                                            await ReaddressResponseAsync(messageCenter, msg, targetSilo);
+                                            return;
+                                        }
                                     }
-                                    else if (sendMessage is null)
+
+                                    if (sendMessage is null)
                                     {
                                         RejectMessage();
                                     }
@@ -379,6 +388,21 @@ namespace Orleans.Runtime.Messaging
             SiloAddress localSilo,
             bool targetSiloIsDead) =>
             !ShouldRouteResponseViaTargetSilo(message, localSilo) || targetSiloIsDead;
+
+        private bool TryDeliverToProxyLocally(Message message, bool targetSiloIsDead)
+        {
+            if (!CanDeliverToProxyLocally(message, _siloAddress, targetSiloIsDead))
+            {
+                return false;
+            }
+
+            if (targetSiloIsDead)
+            {
+                GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(message);
+            }
+
+            return TryDeliverToProxy(message);
+        }
 
         internal static bool ShouldReaddressResponse(Message message, bool targetSiloIsDead) =>
             message.Direction == Message.Directions.Response
