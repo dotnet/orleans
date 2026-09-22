@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace Orleans.TestingHost;
@@ -79,11 +81,20 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         Dispose(false);
     }
 
-    private int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
+    internal int GetAvailableConsecutiveServerPorts(IPEndPoint[] tcpConnInfoArray, int portStartRange, int portEndRange, int consecutivePortsToCheck)
     {
         const int MaxAttempts = 100;
 
+        var stopwatch = Stopwatch.StartNew();
         var allocations = new List<(int Port, string Mutex)>();
+        var listenerRejections = 0;
+        var socketRejections = 0;
+        var localReservationRejections = 0;
+        var externalReservationRejections = 0;
+        int? lastListenerPort = null;
+        (int Port, SocketError SocketError, int NativeErrorCode)? lastSocketFailure = null;
+        int? lastLocallyReservedPort = null;
+        int? lastExternallyReservedPort = null;
 
         for (var attempts = 0; attempts < MaxAttempts; attempts++)
         {
@@ -94,68 +105,117 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             var endPort = basePort + consecutivePortsToCheck;
 
             // make sure none of the ports in the sub range are in use
-            if (tcpConnInfoArray.All(endpoint => endpoint.Port < basePort || endpoint.Port >= endPort))
+            var activeListener = tcpConnInfoArray.FirstOrDefault(endpoint => endpoint.Port >= basePort && endpoint.Port < endPort);
+            if (activeListener is not null)
             {
-                var portsAvailable = true;
-                for (var i = 0; i < consecutivePortsToCheck; i++)
+                listenerRejections++;
+                lastListenerPort = activeListener.Port;
+                continue;
+            }
+
+            var portsAvailable = true;
+            for (var i = 0; i < consecutivePortsToCheck; i++)
+            {
+                var port = basePort + i;
+                try
                 {
-                    var port = basePort + i;
-                    try
-                    {
-                        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                        socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
-                    }
-                    catch (SocketException)
-                    {
-                        portsAvailable = false;
-                        break;
-                    }
+                    using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                    socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
+                }
+                catch (SocketException exception)
+                {
+                    socketRejections++;
+                    lastSocketFailure = (port, exception.SocketErrorCode, exception.NativeErrorCode);
+                    portsAvailable = false;
+                    break;
+                }
+            }
+
+            if (!portsAvailable)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < consecutivePortsToCheck; i++)
+            {
+                var port = basePort + i;
+                var name = $"Global.TestCluster.{port.ToString(CultureInfo.InvariantCulture)}";
+                MutexAcquisitionResult acquisitionResult;
+                try
+                {
+                    acquisitionResult = MutexManager.Instance.Acquire(name);
+                }
+                catch
+                {
+                    ReleaseAllocations(allocations);
+                    throw;
                 }
 
-                if (!portsAvailable)
+                if (acquisitionResult == MutexAcquisitionResult.Acquired)
                 {
-                    continue;
+                    allocations.Add((port, name));
                 }
-
-                for (var i = 0; i < consecutivePortsToCheck; i++)
+                else
                 {
-                    var port = basePort + i;
-                    var name = $"Global.TestCluster.{port.ToString(CultureInfo.InvariantCulture)}";
-                    if (MutexManager.Instance.Acquire(name))
+                    if (acquisitionResult == MutexAcquisitionResult.HeldByCurrentProcess)
                     {
-                        allocations.Add((port, name));
+                        localReservationRejections++;
+                        lastLocallyReservedPort = port;
                     }
                     else
                     {
-                        foreach (var allocation in allocations)
-                        {
-                            MutexManager.Instance.SignalRelease(allocation.Mutex);
-                        }
-
-                        allocations.Clear();
-                        break;
+                        externalReservationRejections++;
+                        lastExternallyReservedPort = port;
                     }
-                }
 
-                if (allocations.Count == 0)
-                {
-                    // Try a different range.
-                    continue;
+                    ReleaseAllocations(allocations);
+                    break;
                 }
-
-                lock (_lockObj)
-                {
-                    foreach (var allocation in allocations)
-                    {
-                        _allocatedPorts[allocation.Port] = allocation.Mutex;
-                    }
-                }
-
-                return basePort;
             }
+
+            if (allocations.Count == 0)
+            {
+                // Try a different range.
+                continue;
+            }
+
+            lock (_lockObj)
+            {
+                foreach (var allocation in allocations)
+                {
+                    _allocatedPorts[allocation.Port] = allocation.Mutex;
+                }
+            }
+
+            return basePort;
         }
 
-        throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
+        var lastSocketFailureDescription = lastSocketFailure is { } socketFailure
+            ? $"{socketFailure.Port} ({socketFailure.SocketError}, native error {socketFailure.NativeErrorCode})"
+            : "none";
+        throw new InvalidOperationException(
+            $"Cannot find {consecutivePortsToCheck} consecutive free ports in range [{portStartRange}, {portEndRange}) after {MaxAttempts} attempts in {stopwatch.ElapsedMilliseconds} ms. "
+            + $"Rejected candidate ranges: active TCP listener={listenerRejections} (last port: {lastListenerPort?.ToString(CultureInfo.InvariantCulture) ?? "none"}), "
+            + $"socket bind failure={socketRejections} (last failure: {lastSocketFailureDescription}), "
+            + $"reservation held by this process={localReservationRejections} (last port: {lastLocallyReservedPort?.ToString(CultureInfo.InvariantCulture) ?? "none"}), "
+            + $"reservation held by another process={externalReservationRejections} (last port: {lastExternallyReservedPort?.ToString(CultureInfo.InvariantCulture) ?? "none"}).");
+
+        static void ReleaseAllocations(List<(int Port, string Mutex)> allocations)
+        {
+            foreach (var allocation in allocations)
+            {
+                MutexManager.Instance.SignalRelease(allocation.Mutex);
+            }
+
+            allocations.Clear();
+        }
+    }
+
+    internal enum MutexAcquisitionResult
+    {
+        Acquired,
+        HeldByCurrentProcess,
+        HeldByAnotherProcess,
     }
 
     private class MutexManager
@@ -185,37 +245,64 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             _thread.Join();
         }
 
-        public bool Acquire(string name)
+        public MutexAcquisitionResult Acquire(string name)
         {
-            var result = new[] { 0 };
+            var result = new[] { MutexAcquisitionResult.HeldByCurrentProcess };
             var signal = new ManualResetEventSlim(initialState: false);
+            ExceptionDispatchInfo? error = null;
             _workItems.Add(() =>
             {
                 try
                 {
-                    if (!_mutexes.TryGetValue(name, out var mutex))
+                    if (!_mutexes.ContainsKey(name))
                     {
-                        mutex = new Mutex(false, name);
-                        if (mutex.WaitOne(500))
-                        {
-                            // Acquired
-                            _mutexes[name] = mutex;
-                            Interlocked.Increment(ref result[0]);
-                            return;
-                        }
-
-                        // Failed to acquire: the mutex is already held by another process.
+                        Mutex? mutex = new(false, name);
+                        var acquired = false;
                         try
                         {
-                            mutex.ReleaseMutex();
+                            try
+                            {
+                                acquired = mutex.WaitOne(500);
+                            }
+                            catch (AbandonedMutexException)
+                            {
+                                acquired = true;
+                            }
+
+                            if (acquired)
+                            {
+                                // Acquired
+                                _mutexes[name] = mutex;
+                                mutex = null;
+                                result[0] = MutexAcquisitionResult.Acquired;
+                            }
+                            else
+                            {
+                                result[0] = MutexAcquisitionResult.HeldByAnotherProcess;
+                            }
                         }
                         finally
                         {
-                            mutex.Close();
+                            if (mutex is not null)
+                            {
+                                try
+                                {
+                                    if (acquired)
+                                    {
+                                        mutex.ReleaseMutex();
+                                    }
+                                }
+                                finally
+                                {
+                                    mutex.Close();
+                                }
+                            }
                         }
                     }
-
-                    // Failed to acquire: the mutex is already held by this process.
+                }
+                catch (Exception exception)
+                {
+                    error = ExceptionDispatchInfo.Capture(exception);
                 }
                 finally
                 {
@@ -228,7 +315,8 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
                 throw new TimeoutException("Timed out while waiting for MutexManager to acquire mutex.");
             }
 
-            return result[0] == 1;
+            error?.Throw();
+            return result[0];
         }
 
         public void SignalRelease(string name)
