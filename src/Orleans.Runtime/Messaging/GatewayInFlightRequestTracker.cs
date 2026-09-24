@@ -19,14 +19,39 @@ namespace Orleans.Runtime.Messaging
 
         internal int Count => _requests?.Count ?? 0;
 
-        internal static void MarkResponseForUntrackedDelivery(Message response)
+        internal static void MarkForUntrackedDelivery(Message message)
         {
             // Preserve the attempt identity while allowing delivery through a replacement gateway.
             // A live retry has a positive attempt and will continue to reject this response as superseded.
-            if (response.GatewayRequestAttempt > 0)
+            if (message.GatewayRequestAttempt > 0)
             {
-                response.GatewayRequestAttempt = -response.GatewayRequestAttempt;
+                message.GatewayRequestAttempt = -message.GatewayRequestAttempt;
             }
+        }
+
+        internal bool TryPrepareForUntrackedDelivery(Message request, bool releaseTrackedRequest)
+        {
+            if (request.GatewayRequestAttempt == 0)
+            {
+                return true;
+            }
+
+            var attempt = request.GatewayRequestAttempt > 0
+                ? request.GatewayRequestAttempt
+                : -request.GatewayRequestAttempt;
+            if (_requests?.TryGetValue(request.Id, out var trackedRequest) is true)
+            {
+                if (!releaseTrackedRequest || attempt != trackedRequest.Attempt)
+                {
+                    return false;
+                }
+
+                _requests.Remove(request.Id);
+                ClearAuxiliaryState(request.Id);
+            }
+
+            MarkForUntrackedDelivery(request);
+            return true;
         }
 
         internal bool Track(Message request)
@@ -57,6 +82,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
+            var cacheInvalidationHeader = CopyCacheInvalidationHeader(request);
             var trackedRequest = new TrackedRequest(
                 request.Id,
                 request.GatewayRequestAttempt,
@@ -68,7 +94,7 @@ namespace Orleans.Runtime.Messaging
                 targetSilo,
                 request.TargetGrain,
                 request.ForwardCount,
-                request.CacheInvalidationHeader is { } cacheInvalidationHeader ? new(cacheInvalidationHeader) : null,
+                cacheInvalidationHeader,
                 timeProvider.GetTimestamp(),
                 explicitTimeToLive.HasValue,
                 retentionPeriod);
@@ -77,6 +103,34 @@ namespace Orleans.Runtime.Messaging
             _forwardingUpdates?.Remove(request.Id);
             _deferredResponses?.Remove(request.Id);
             return true;
+        }
+
+        internal bool TryRemoveExpiredAttempt(Message request)
+        {
+            if (request.GatewayRequestAttempt <= 0
+                || _requests?.TryGetValue(request.Id, out var trackedRequest) is not true
+                || request.GatewayRequestAttempt != trackedRequest.Attempt
+                || timeProvider.GetElapsedTime(trackedRequest.StartTimestamp) < trackedRequest.RetentionPeriod)
+            {
+                return false;
+            }
+
+            _requests.Remove(request.Id);
+            ClearAuxiliaryState(request.Id);
+            return true;
+        }
+
+        private static List<GrainAddressCacheUpdate>? CopyCacheInvalidationHeader(Message request)
+        {
+            if (request.CacheInvalidationHeader is not { } cacheInvalidationHeader)
+            {
+                return null;
+            }
+
+            lock (cacheInvalidationHeader)
+            {
+                return new(cacheInvalidationHeader);
+            }
         }
 
         internal CompletionResult TryComplete(Message response)
@@ -98,7 +152,11 @@ namespace Orleans.Runtime.Messaging
                 return CompletionResult.Superseded;
             }
 
-            if (response.GatewayRequestAttempt != 0 && response.ForwardCount < trackedRequest.ForwardCount)
+            if (response.GatewayRequestAttempt != 0
+                && response.ForwardCount < trackedRequest.ForwardCount
+                && (response.ForwardCount != 0
+                    || response.SendingSilo?.Equals(trackedRequest.TargetSilo) is not true
+                    || trackedRequest.PreviousTargetSilos?.Contains(trackedRequest.TargetSilo) is true))
             {
                 return CompletionResult.Superseded;
             }
@@ -189,10 +247,13 @@ namespace Orleans.Runtime.Messaging
             {
                 var update = updates[index];
                 updates.RemoveAt(index);
+                var previousTargetSilos = trackedRequest.PreviousTargetSilos ?? [];
+                previousTargetSilos.Add(trackedRequest.TargetSilo);
                 trackedRequest = trackedRequest with
                 {
                     TargetSilo = update.TargetSilo,
                     ForwardCount = update.ForwardCount,
+                    PreviousTargetSilos = previousTargetSilos,
                 };
                 requests[requestId] = trackedRequest;
                 updated = true;
@@ -393,7 +454,8 @@ namespace Orleans.Runtime.Messaging
             List<GrainAddressCacheUpdate>? CacheInvalidationHeader,
             long StartTimestamp,
             bool HasTimeToLive,
-            TimeSpan RetentionPeriod);
+            TimeSpan RetentionPeriod,
+            List<SiloAddress>? PreviousTargetSilos = null);
 
         private readonly record struct ForwardingUpdate(
             SiloAddress SourceSilo,

@@ -209,9 +209,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (allowResponseReaddress && ShouldReaddressResponse(msg, targetSiloIsDead))
                 {
-                    var deadTargetSilo = msg.TargetSilo!;
-                    msg.TargetSilo = null;
-                    _ = ReaddressResponseAsync(this, msg, deadTargetSilo);
+                    ReaddressResponse(msg, msg.TargetSilo!);
                     return;
                 }
 
@@ -321,8 +319,7 @@ namespace Orleans.Runtime.Messaging
                                         if (allowResponseReaddress
                                             && ShouldReaddressResponse(msg, targetSiloIsDead))
                                         {
-                                            msg.TargetSilo = null;
-                                            await ReaddressResponseAsync(messageCenter, msg, targetSilo);
+                                            messageCenter.ReaddressResponse(msg, targetSilo);
                                             return;
                                         }
                                     }
@@ -348,10 +345,17 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        internal void ReaddressResponse(Message message, SiloAddress unavailableTargetSilo)
+        {
+            GatewayInFlightRequestTracker.MarkForUntrackedDelivery(message);
+            message.TargetSilo = null;
+            _ = ReaddressResponseAsync(this, message, unavailableTargetSilo);
+        }
+
         private static async Task ReaddressResponseAsync(
             MessageCenter messageCenter,
             Message message,
-            SiloAddress deadTargetSilo)
+            SiloAddress unavailableTargetSilo)
         {
             try
             {
@@ -364,8 +368,16 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+            if (message.TargetSilo is { } currentTargetSilo
+                && currentTargetSilo.Equals(unavailableTargetSilo)
+                && messageCenter.Gateway?.IsClientConnected(message.TargetGrain) is true
+                && messageCenter.TryDeliverToProxy(message))
+            {
+                return;
+            }
+
             if (message.TargetSilo is not { } targetSilo
-                || targetSilo.Equals(deadTargetSilo)
+                || targetSilo.Equals(unavailableTargetSilo)
                 || messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
             {
                 messageCenter.RejectMessage(
@@ -398,7 +410,7 @@ namespace Orleans.Runtime.Messaging
 
             if (targetSiloIsDead)
             {
-                GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(message);
+                GatewayInFlightRequestTracker.MarkForUntrackedDelivery(message);
             }
 
             return TryDeliverToProxy(message);

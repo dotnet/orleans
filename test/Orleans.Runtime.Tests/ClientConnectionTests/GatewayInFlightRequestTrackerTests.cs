@@ -223,7 +223,7 @@ public class GatewayInFlightRequestTrackerTests
         var response = CreateResponse(request, Message.ResponseTypes.Success);
         tracker.Clear();
 
-        GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(response);
+        GatewayInFlightRequestTracker.MarkForUntrackedDelivery(response);
 
         Assert.True(response.GatewayRequestAttempt < 0);
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
@@ -239,7 +239,7 @@ public class GatewayInFlightRequestTrackerTests
         var retry = CreateMessage(1, Message.Directions.Request, Silo2);
         Assert.True(tracker.Track(retry));
 
-        GatewayInFlightRequestTracker.MarkResponseForUntrackedDelivery(response);
+        GatewayInFlightRequestTracker.MarkForUntrackedDelivery(response);
 
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
         Assert.Equal(1, tracker.Count);
@@ -260,6 +260,74 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
         Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void MissingOwnerCanSendRequestWithUntrackedDelivery()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        request.GatewayRequestAttempt = 42;
+
+        Assert.True(tracker.TryPrepareForUntrackedDelivery(request, releaseTrackedRequest: false));
+        Assert.Equal(-42, request.GatewayRequestAttempt);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void DisconnectReleasesMatchingOwnerForUntrackedDelivery()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var attempt = request.GatewayRequestAttempt;
+
+        Assert.True(tracker.TryPrepareForUntrackedDelivery(request, releaseTrackedRequest: true));
+        Assert.Equal(-attempt, request.GatewayRequestAttempt);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void UntrackedDeliveryDoesNotReleaseNewerOwner()
+    {
+        var tracker = CreateTracker();
+        var staleRequest = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(staleRequest));
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryPrepareForUntrackedDelivery(staleRequest, releaseTrackedRequest: true));
+        Assert.True(staleRequest.GatewayRequestAttempt > 0);
+        Assert.Equal(1, tracker.Count);
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
+    }
+
+    [Fact]
+    public void PreviouslyUntrackedRequestDoesNotBypassNewerOwner()
+    {
+        var tracker = CreateTracker();
+        var staleRequest = CreateMessage(1, Message.Directions.Request, Silo1);
+        staleRequest.GatewayRequestAttempt = -42;
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryPrepareForUntrackedDelivery(staleRequest, releaseTrackedRequest: true));
+        Assert.Equal(-42, staleRequest.GatewayRequestAttempt);
+        Assert.Equal(1, tracker.Count);
+    }
+
+    [Fact]
+    public void FailedTrackingDoesNotReleaseCurrentOwner()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+
+        Assert.False(tracker.TryPrepareForUntrackedDelivery(request, releaseTrackedRequest: false));
+        Assert.True(request.GatewayRequestAttempt > 0);
+        Assert.Equal(1, tracker.Count);
     }
 
     [Fact]
@@ -526,6 +594,30 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void TokenizedResponseWithoutForwardCountCompletesAtTrackedDestination()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id,
+                Silo1,
+                Silo2,
+                forwardCount: 1,
+                request.GatewayRequestAttempt,
+                out _,
+                out _));
+        var response = CreateResponse(request, Message.ResponseTypes.Success);
+        response.SendingSilo = Silo2;
+        response.ForwardCount = 0;
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Completed, tracker.TryComplete(response));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void OldGenerationResponseIsSupersededAfterReturningToSameSilo()
     {
         var tracker = CreateTracker();
@@ -787,6 +879,21 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void ExpiredAttemptIsRemovedWhenItCannotBeRetracked()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider);
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        request.TimeToLive = TimeSpan.FromSeconds(1);
+        Assert.True(tracker.Track(request));
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.False(tracker.Track(request));
+        Assert.True(tracker.TryRemoveExpiredAttempt(request));
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ExplicitTimeToLiveControlsExpiry()
     {
         var timeProvider = new FakeTimeProvider();
@@ -954,6 +1061,18 @@ public class GatewayInFlightRequestTrackerTests
         Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: true));
         Assert.True(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: true));
         Assert.False(MessageCenter.ShouldReaddressResponse(response, targetSiloIsDead: false));
+    }
+
+    [Fact]
+    public void ResponseForDisconnectedOriginGatewayIsReaddressed()
+    {
+        var response = CreateMessage(1, Message.Directions.Response, Silo1);
+        response.Result = Message.ResponseTypes.Success;
+
+        Assert.True(Gateway.ShouldReaddressDisconnectedClientResponse(response, clientIsConnected: false));
+        Assert.False(Gateway.ShouldReaddressDisconnectedClientResponse(response, clientIsConnected: true));
+        response.Result = Message.ResponseTypes.Status;
+        Assert.False(Gateway.ShouldReaddressDisconnectedClientResponse(response, clientIsConnected: false));
     }
 
     [Fact]
