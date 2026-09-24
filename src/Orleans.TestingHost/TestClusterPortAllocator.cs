@@ -282,6 +282,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         public MutexAcquisition Acquire(string name)
         {
             var result = new[] { MutexAcquisitionResult.HeldByCurrentProcess };
+            var acquiredByRequest = new[] { false };
             var signal = new ManualResetEventSlim(initialState: false);
             ExceptionDispatchInfo? error = null;
             _workItems.Add(() =>
@@ -309,6 +310,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
                                 _mutexes[name] = mutex;
                                 mutex = null;
                                 result[0] = MutexAcquisitionResult.Acquired;
+                                acquiredByRequest[0] = true;
                             }
                             else
                             {
@@ -351,6 +353,9 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
             if (!signal.Wait(TimeSpan.FromSeconds(10)))
             {
+                // The acquisition remains queued and can complete after this caller gives up.
+                // Queue conditional cleanup behind it so only a mutex acquired by this request is released.
+                SignalRelease(name, acquiredByRequest);
                 throw new TimeoutException("Timed out while waiting for MutexManager to acquire mutex.");
             }
 
@@ -362,7 +367,9 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             return new MutexAcquisition(result[0], error?.SourceException);
         }
 
-        public void SignalRelease(string name)
+        public void SignalRelease(string name) => SignalRelease(name, acquiredByRequest: null);
+
+        private void SignalRelease(string name, bool[]? acquiredByRequest)
         {
             if (_workItems.IsAddingCompleted) return;
 
@@ -370,7 +377,7 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             {
                 _workItems.Add(() =>
                 {
-                    if (_mutexes.Remove(name, out var value))
+                    if ((acquiredByRequest is null || acquiredByRequest[0]) && _mutexes.Remove(name, out var value))
                     {
                         value.ReleaseMutex();
                         value.Close();

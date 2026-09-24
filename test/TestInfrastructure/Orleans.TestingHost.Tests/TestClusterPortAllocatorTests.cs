@@ -60,14 +60,11 @@ public class TestClusterPortAllocatorTests
     [Fact]
     public void GetAvailableConsecutiveServerPorts_WhenReservedByCurrentProcess_ReportsAndReleasesReservation()
     {
+        const int port = 31_000;
         using var firstAllocator = new TestClusterPortAllocator();
         using var secondAllocator = new TestClusterPortAllocator();
         using var thirdAllocator = new TestClusterPortAllocator();
-        var port = firstAllocator.GetAvailableConsecutiveServerPorts(
-            [],
-            TestClusterPortAllocator.GatewayPortRangeStart,
-            TestClusterPortAllocator.GatewayPortRangeEnd,
-            consecutivePortsToCheck: 1);
+        Assert.Equal(port, firstAllocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => secondAllocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
