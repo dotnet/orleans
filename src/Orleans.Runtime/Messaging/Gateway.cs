@@ -412,6 +412,19 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
+            if (ShouldReaddressDisconnectedClientResponse(msg, client.IsConnected))
+            {
+                messageCenter.ReaddressResponse(msg, siloAddress);
+                return true;
+            }
+
+            if (msg.Direction == Message.Directions.Response
+                && msg.Result == Message.ResponseTypes.Status
+                && !client.IsConnected)
+            {
+                return true;
+            }
+
             // when this Gateway receives a message from client X to client addressable object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
             // it will use this Gateway to re-route the REPLY from Y back to X.
@@ -433,6 +446,16 @@ namespace Orleans.Runtime.Messaging
 
             return true;
         }
+
+        internal static bool ShouldReaddressDisconnectedClientResponse(Message message, bool clientIsConnected) =>
+            !clientIsConnected
+            && message.Direction == Message.Directions.Response
+            && message.Result != Message.ResponseTypes.Status;
+
+        internal bool IsClientConnected(GrainId clientGrainId) =>
+            ClientGrainId.TryParse(clientGrainId, out var clientId)
+            && clients.TryGetValue(clientId, out var client)
+            && client.IsConnected;
 
         internal sealed class ClientState
         {
@@ -620,39 +643,53 @@ namespace Orleans.Runtime.Messaging
             {
                 Message? requestToReject = null;
                 var requestTrackingStopped = false;
+                var sendUntracked = false;
                 lock (_requestLock)
                 {
                     if (_gateway.IsStopping || Connection is null)
                     {
-                        destination.Send(message);
-                        return;
+                        sendUntracked = _pendingRequests.TryPrepareForUntrackedDelivery(
+                            message,
+                            releaseTrackedRequest: true);
+                        requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                     }
-
-                    if (!_pendingRequests.Track(message))
+                    else if (!_pendingRequests.Track(message))
                     {
-                        destination.Send(message);
-                        return;
+                        sendUntracked = _pendingRequests.TryPrepareForUntrackedDelivery(
+                            message,
+                            releaseTrackedRequest: false);
+                        if (!sendUntracked && _pendingRequests.TryRemoveExpiredAttempt(message))
+                        {
+                            requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                        }
                     }
-
-                    if (!_isRequestTrackingRegistered)
+                    else
                     {
-                        _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
-                        _isRequestTrackingRegistered = true;
-                    }
+                        if (!_isRequestTrackingRegistered)
+                        {
+                            _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
+                            _isRequestTrackingRegistered = true;
+                        }
 
-                    // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
-                    // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
-                    if (!_gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!))
-                    {
-                        destination.Send(message);
-                        return;
-                    }
+                        // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
+                        // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
+                        if (!_gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!))
+                        {
+                            destination.Send(message);
+                            return;
+                        }
 
-                    _pendingRequests.TryRemove(message.Id, out requestToReject);
-                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                        _pendingRequests.TryRemove(message.Id, out requestToReject);
+                        requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                    }
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
+                if (sendUntracked)
+                {
+                    destination.Send(message);
+                }
+
                 if (requestToReject is not null)
                 {
                     RejectClaimedRequest(requestToReject, message.TargetSilo!);
