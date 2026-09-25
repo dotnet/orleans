@@ -38,11 +38,36 @@ public class TestClusterPortAllocatorTests
     }
 
     [Fact]
+    public void AllocateConsecutivePortPairs_WhenGatewayAllocationFails_ReleasesSiloPorts()
+    {
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        var gatewayPort = Assert.IsType<IPEndPoint>(listener.LocalEndPoint).Port;
+        var siloPort = GetAvailablePort(30_001, 32_768, gatewayPort);
+        using var allocator = new TestClusterPortAllocator();
+        using var verifier = new TestClusterPortAllocator();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => allocator.AllocateConsecutivePortPairs(
+            [],
+            numPorts: 1,
+            siloPort,
+            siloPort + 1,
+            gatewayPort,
+            gatewayPort + 1));
+        Assert.Contains($"range [{gatewayPort}, {gatewayPort + 1})", exception.Message);
+
+        Assert.Equal(
+            siloPort,
+            verifier.GetAvailableConsecutiveServerPorts([], siloPort, siloPort + 1, consecutivePortsToCheck: 1));
+    }
+
+    [Fact]
     public void GetAvailableConsecutiveServerPorts_WhenSocketBindFails_ReportsRejectionDiagnostics()
     {
         using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        listener.Listen();
+        listener.Listen(1);
         var port = Assert.IsType<IPEndPoint>(listener.LocalEndPoint).Port;
         using var allocator = new TestClusterPortAllocator();
 
@@ -60,7 +85,7 @@ public class TestClusterPortAllocatorTests
     [Fact]
     public void GetAvailableConsecutiveServerPorts_WhenReservedByCurrentProcess_ReportsAndReleasesReservation()
     {
-        const int port = 31_000;
+        var port = GetAvailablePort(30_001, 32_768);
         using var firstAllocator = new TestClusterPortAllocator();
         using var secondAllocator = new TestClusterPortAllocator();
         using var thirdAllocator = new TestClusterPortAllocator();
@@ -76,5 +101,28 @@ public class TestClusterPortAllocatorTests
 
         firstAllocator.Dispose();
         Assert.Equal(port, thirdAllocator.GetAvailableConsecutiveServerPorts([], port, port + 1, consecutivePortsToCheck: 1));
+    }
+
+    private static int GetAvailablePort(int rangeStart, int rangeEnd, int excludedPort = -1)
+    {
+        for (var port = rangeStart; port < rangeEnd; port++)
+        {
+            if (port == excludedPort)
+            {
+                continue;
+            }
+
+            try
+            {
+                using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                socket.Bind(new IPEndPoint(IPAddress.Loopback, port));
+                return port;
+            }
+            catch (SocketException)
+            {
+            }
+        }
+
+        throw new InvalidOperationException($"No available port was found in range [{rangeStart}, {rangeEnd}).");
     }
 }

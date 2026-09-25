@@ -38,11 +38,35 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
         var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
         var tcpConnInfoArray = ipGlobalProperties.GetActiveTcpListeners();
 
-        // each returned port in the pair will have to have at least this amount of available ports following it
+        return AllocateConsecutivePortPairs(
+            tcpConnInfoArray,
+            numPorts,
+            SiloPortRangeStart,
+            SiloPortRangeEnd,
+            GatewayPortRangeStart,
+            GatewayPortRangeEnd);
+    }
 
+    internal (int, int) AllocateConsecutivePortPairs(
+        IPEndPoint[] tcpConnInfoArray,
+        int numPorts,
+        int siloPortRangeStart,
+        int siloPortRangeEnd,
+        int gatewayPortRangeStart,
+        int gatewayPortRangeEnd)
+    {
         // These server-port ranges sit below the default dynamic client-port ranges on supported operating systems.
-        return (GetAvailableConsecutiveServerPorts(tcpConnInfoArray, SiloPortRangeStart, SiloPortRangeEnd, numPorts),
-            GetAvailableConsecutiveServerPorts(tcpConnInfoArray, GatewayPortRangeStart, GatewayPortRangeEnd, numPorts));
+        var siloPort = GetAvailableConsecutiveServerPorts(tcpConnInfoArray, siloPortRangeStart, siloPortRangeEnd, numPorts);
+        try
+        {
+            var gatewayPort = GetAvailableConsecutiveServerPorts(tcpConnInfoArray, gatewayPortRangeStart, gatewayPortRangeEnd, numPorts);
+            return (siloPort, gatewayPort);
+        }
+        catch
+        {
+            ReleaseAllocatedPorts(siloPort, numPorts);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -207,6 +231,12 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
 
             lock (_lockObj)
             {
+                if (_disposed)
+                {
+                    ReleaseAllocations(allocations);
+                    throw new ObjectDisposedException(nameof(TestClusterPortAllocator));
+                }
+
                 foreach (var allocation in allocations)
                 {
                     _allocatedPorts[allocation.Port] = allocation.Mutex;
@@ -239,6 +269,20 @@ public class TestClusterPortAllocator : ITestClusterPortAllocator
             }
 
             allocations.Clear();
+        }
+    }
+
+    private void ReleaseAllocatedPorts(int basePort, int portCount)
+    {
+        lock (_lockObj)
+        {
+            for (var port = basePort; port < basePort + portCount; port++)
+            {
+                if (_allocatedPorts.Remove(port, out var mutex))
+                {
+                    MutexManager.Instance.SignalRelease(mutex);
+                }
+            }
         }
     }
 
