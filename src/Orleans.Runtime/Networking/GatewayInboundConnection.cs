@@ -64,6 +64,7 @@ namespace Orleans.Runtime.Messaging
         {
             msg.GatewayRequestAttempt = 0;
             msg.GatewayForwardingSource = null;
+            msg.GatewayResponseRoutingHistory = null;
 
             // Don't process messages that have already timed out
             if (msg.IsExpired)
