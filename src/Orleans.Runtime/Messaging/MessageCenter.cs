@@ -348,9 +348,54 @@ namespace Orleans.Runtime.Messaging
         internal void ReaddressResponse(Message message, SiloAddress unavailableTargetSilo)
         {
             GatewayInFlightRequestTracker.MarkForUntrackedDelivery(message);
+            RecordUnavailableGateway(message, unavailableTargetSilo);
+            if (!CanReaddressResponse(message, messagingOptions.MaxForwardCount))
+            {
+                if (Gateway?.TryQueueResponseToKnownClient(message) is not true)
+                {
+                    RejectMessage(
+                        message,
+                        Message.RejectionTypes.Transient,
+                        new SiloUnavailableException($"No live gateway is available for client {message.TargetGrain}."));
+                }
+
+                return;
+            }
+
             message.TargetSilo = null;
             _ = ReaddressResponseAsync(this, message, unavailableTargetSilo);
         }
+
+        internal static void RecordUnavailableGateway(Message message, SiloAddress unavailableGateway)
+        {
+            var history = message.GatewayResponseRoutingHistory;
+            var updated = new SiloAddress[(history?.Length ?? 0) + 1];
+            history?.CopyTo(updated, 0);
+            updated[^1] = unavailableGateway;
+            message.GatewayResponseRoutingHistory = updated;
+        }
+
+        internal static bool HasVisitedGateway(Message message, SiloAddress gateway)
+        {
+            if (message.GatewayResponseRoutingHistory is not { } history)
+            {
+                return false;
+            }
+
+            foreach (var visited in history)
+            {
+                if (visited.Equals(gateway))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool CanReaddressResponse(Message message, int maxForwardCount) =>
+            message.GatewayResponseRoutingHistory is not { } history
+            || history.Length <= maxForwardCount;
 
         private static async Task ReaddressResponseAsync(
             MessageCenter messageCenter,
@@ -370,14 +415,12 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetSilo is { } currentTargetSilo
                 && currentTargetSilo.Equals(unavailableTargetSilo)
-                && messageCenter.Gateway?.IsClientConnected(message.TargetGrain) is true
-                && messageCenter.TryDeliverToProxy(message))
+                && messageCenter.Gateway?.TryQueueResponseToKnownClient(message) is true)
             {
                 return;
             }
 
             if (message.TargetSilo is not { } targetSilo
-                || targetSilo.Equals(unavailableTargetSilo)
                 || messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
             {
                 messageCenter.RejectMessage(
@@ -387,7 +430,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            messageCenter.SendMessage(message, sendMessage: null, allowResponseReaddress: false);
+            messageCenter.SendMessage(message, sendMessage: null, allowResponseReaddress: true);
         }
 
         internal static bool ShouldRouteResponseViaTargetSilo(Message message, SiloAddress localSilo) =>

@@ -14,6 +14,7 @@ namespace Orleans.Runtime
         internal const int MaxCacheInvalidationHeaderEntries = 16;
         internal const string GatewayRequestAttemptKey = "#GatewayRequestAttempt";
         internal const string GatewayForwardingSourceKey = "#GatewayForwardingSource";
+        internal const string GatewayResponseRoutingHistoryKey = "#GatewayResponseRoutingHistory";
 
         [NonSerialized]
         private short _retryCount;
@@ -21,6 +22,8 @@ namespace Orleans.Runtime
         private long _gatewayRequestAttempt;
         [NonSerialized]
         private SiloAddress? _gatewayForwardingSource;
+        [NonSerialized]
+        private SiloAddress[]? _gatewayResponseRoutingHistory;
 
         public CoarseStopwatch _timeToExpiry;
 
@@ -109,6 +112,16 @@ namespace Orleans.Runtime
             set
             {
                 _gatewayForwardingSource = value;
+                UpdateRequestContextFlag();
+            }
+        }
+
+        internal SiloAddress[]? GatewayResponseRoutingHistory
+        {
+            get => _gatewayResponseRoutingHistory;
+            set
+            {
+                _gatewayResponseRoutingHistory = value;
                 UpdateRequestContextFlag();
             }
         }
@@ -286,7 +299,10 @@ namespace Orleans.Runtime
         private void UpdateRequestContextFlag() =>
             _headers.SetFlag(
                 MessageFlags.HasRequestContextData,
-                _requestContextData is not null || _gatewayRequestAttempt != 0 || _gatewayForwardingSource is not null);
+                _requestContextData is not null
+                    || _gatewayRequestAttempt != 0
+                    || _gatewayForwardingSource is not null
+                    || _gatewayResponseRoutingHistory is not null);
 
         public GrainInterfaceType InterfaceType
         {

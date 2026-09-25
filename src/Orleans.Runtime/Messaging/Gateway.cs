@@ -452,10 +452,17 @@ namespace Orleans.Runtime.Messaging
             && message.Direction == Message.Directions.Response
             && message.Result != Message.ResponseTypes.Status;
 
-        internal bool IsClientConnected(GrainId clientGrainId) =>
-            ClientGrainId.TryParse(clientGrainId, out var clientId)
-            && clients.TryGetValue(clientId, out var client)
-            && client.IsConnected;
+        internal bool TryQueueResponseToKnownClient(Message message)
+        {
+            if (!ClientGrainId.TryParse(message.TargetGrain, out var clientId)
+                || !clients.TryGetValue(clientId, out var client))
+            {
+                return false;
+            }
+
+            client.SendResponse(message);
+            return true;
+        }
 
         internal sealed class ClientState
         {
@@ -558,6 +565,7 @@ namespace Orleans.Runtime.Messaging
             {
                 msg.GatewayRequestAttempt = 0;
                 msg.GatewayForwardingSource = null;
+                msg.GatewayResponseRoutingHistory = null;
                 _pendingToSend.Enqueue(msg);
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
