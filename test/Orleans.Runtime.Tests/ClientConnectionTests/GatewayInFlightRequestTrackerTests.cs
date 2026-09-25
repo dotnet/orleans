@@ -1076,6 +1076,23 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void ResponseReaddressHistoryPreventsGatewayCycles()
+    {
+        var response = CreateMessage(1, Message.Directions.Response, Silo1);
+        var silo3 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 33333), 3);
+
+        MessageCenter.RecordUnavailableGateway(response, Silo1);
+        MessageCenter.RecordUnavailableGateway(response, Silo2);
+        MessageCenter.RecordUnavailableGateway(response, Silo1);
+
+        Assert.True(MessageCenter.HasVisitedGateway(response, Silo1));
+        Assert.True(MessageCenter.HasVisitedGateway(response, Silo2));
+        Assert.False(MessageCenter.HasVisitedGateway(response, silo3));
+        Assert.Equal(3, response.GatewayResponseRoutingHistory!.Length);
+        Assert.False(MessageCenter.CanReaddressResponse(response, maxForwardCount: 2));
+    }
+
+    [Fact]
     public void GrainResponseIsNotReaddressedWhenTargetSiloIsDead()
     {
         var response = CreateMessage(1, Message.Directions.Response, Silo1);
