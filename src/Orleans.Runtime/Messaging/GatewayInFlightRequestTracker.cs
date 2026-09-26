@@ -13,11 +13,13 @@ namespace Orleans.Runtime.Messaging
         private static long _nextAttempt;
         private readonly int _maxDeferredResponses = Math.Max(1, maxForwardCount + 1);
         private Dictionary<CorrelationId, TrackedRequest>? _requests;
+        private Dictionary<CorrelationId, ReleasedAttempt>? _releasedAttempts;
         // Updates can cross different silo connections, so later forwarding hops can arrive before earlier ones.
         private Dictionary<CorrelationId, List<ForwardingUpdate>>? _forwardingUpdates;
         private Dictionary<CorrelationId, List<Message>>? _deferredResponses;
 
         internal int Count => _requests?.Count ?? 0;
+        internal bool HasEntries => Count > 0 || _releasedAttempts is { Count: > 0 };
 
         internal static void MarkForUntrackedDelivery(Message message)
         {
@@ -48,6 +50,11 @@ namespace Orleans.Runtime.Messaging
 
                 _requests.Remove(request.Id);
                 ClearAuxiliaryState(request.Id);
+            }
+            else if (!TryConsumeReleasedAttempt(request.Id, attempt)
+                && request.GatewayRequestAttempt > 0)
+            {
+                return false;
             }
 
             MarkForUntrackedDelivery(request);
@@ -100,6 +107,7 @@ namespace Orleans.Runtime.Messaging
                 retentionPeriod);
 
             _requests[request.Id] = trackedRequest;
+            _releasedAttempts?.Remove(request.Id);
             _forwardingUpdates?.Remove(request.Id);
             _deferredResponses?.Remove(request.Id);
             return true;
@@ -142,6 +150,14 @@ namespace Orleans.Runtime.Messaging
 
             if (_requests is not { } requests || !requests.TryGetValue(response.Id, out var trackedRequest))
             {
+                var attempt = response.GatewayRequestAttempt < 0
+                    ? -response.GatewayRequestAttempt
+                    : response.GatewayRequestAttempt;
+                if (attempt != 0 && TryConsumeReleasedAttempt(response.Id, attempt))
+                {
+                    return CompletionResult.NotTracked;
+                }
+
                 return response.GatewayRequestAttempt <= 0
                     ? CompletionResult.NotTracked
                     : CompletionResult.Superseded;
@@ -155,8 +171,8 @@ namespace Orleans.Runtime.Messaging
             if (response.GatewayRequestAttempt != 0
                 && response.ForwardCount < trackedRequest.ForwardCount
                 && (response.ForwardCount != 0
-                    || response.SendingSilo?.Equals(trackedRequest.TargetSilo) is not true
-                    || trackedRequest.PreviousTargetSilos?.Contains(trackedRequest.TargetSilo) is true))
+                    || response.SendingSilo is { } sendingSilo
+                        && trackedRequest.PreviousTargetSilos?.Contains(sendingSilo) is true))
             {
                 return CompletionResult.Superseded;
             }
@@ -175,7 +191,9 @@ namespace Orleans.Runtime.Messaging
 
             if (!responseSilo.Equals(trackedRequest.TargetSilo))
             {
-                if (response.GatewayRequestAttempt != 0)
+                if (response.GatewayRequestAttempt != 0
+                    && response.ForwardCount == 0
+                    && trackedRequest.PreviousTargetSilos?.Contains(responseSilo) is not true)
                 {
                     requests.Remove(response.Id);
                     ClearAuxiliaryState(response.Id);
@@ -299,6 +317,15 @@ namespace Orleans.Runtime.Messaging
         {
             if (_requests is not { } requests || !requests.TryGetValue(request.Id, out var trackedRequest))
             {
+                var attempt = request.GatewayRequestAttempt < 0
+                    ? -request.GatewayRequestAttempt
+                    : request.GatewayRequestAttempt;
+                if (attempt != 0 && TryConsumeReleasedAttempt(request.Id, attempt))
+                {
+                    requestToReject = request;
+                    return true;
+                }
+
                 if (request.GatewayRequestAttempt != 0)
                 {
                     requestToReject = null!;
@@ -315,7 +342,8 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (targetSilo.Equals(trackedRequest.TargetSilo))
+            if (targetSilo.Equals(trackedRequest.TargetSilo)
+                && request.ForwardCount >= trackedRequest.ForwardCount)
             {
                 requests.Remove(request.Id);
                 ClearAuxiliaryState(request.Id);
@@ -337,6 +365,24 @@ namespace Orleans.Runtime.Messaging
         }
 
         internal bool Contains(CorrelationId requestId) => _requests?.ContainsKey(requestId) is true;
+
+        internal void Release()
+        {
+            if (_requests is not { Count: > 0 } requests)
+            {
+                return;
+            }
+
+            _releasedAttempts ??= [];
+            foreach (var (id, request) in requests)
+            {
+                _releasedAttempts[id] = new(request.Attempt, request.StartTimestamp, request.RetentionPeriod);
+            }
+
+            requests.Clear();
+            _forwardingUpdates?.Clear();
+            _deferredResponses?.Clear();
+        }
 
         internal List<Message>? RemoveForSilo(SiloAddress silo)
         {
@@ -372,27 +418,46 @@ namespace Orleans.Runtime.Messaging
 
         internal void RemoveExpired()
         {
-            if (_requests is not { Count: > 0 } requests)
+            if (_requests is { Count: > 0 } requests)
             {
-                return;
-            }
-
-            List<CorrelationId>? expired = null;
-            foreach (var (id, request) in requests)
-            {
-                if (timeProvider.GetElapsedTime(request.StartTimestamp) >= request.RetentionPeriod)
+                List<CorrelationId>? expired = null;
+                foreach (var (id, request) in requests)
                 {
-                    expired ??= [];
-                    expired.Add(id);
+                    if (timeProvider.GetElapsedTime(request.StartTimestamp) >= request.RetentionPeriod)
+                    {
+                        expired ??= [];
+                        expired.Add(id);
+                    }
+                }
+
+                if (expired is not null)
+                {
+                    foreach (var id in expired)
+                    {
+                        requests.Remove(id);
+                        ClearAuxiliaryState(id);
+                    }
                 }
             }
 
-            if (expired is not null)
+            if (_releasedAttempts is { Count: > 0 } releasedAttempts)
             {
-                foreach (var id in expired)
+                List<CorrelationId>? expired = null;
+                foreach (var (id, attempt) in releasedAttempts)
                 {
-                    requests.Remove(id);
-                    ClearAuxiliaryState(id);
+                    if (timeProvider.GetElapsedTime(attempt.StartTimestamp) >= attempt.RetentionPeriod)
+                    {
+                        expired ??= [];
+                        expired.Add(id);
+                    }
+                }
+
+                if (expired is not null)
+                {
+                    foreach (var id in expired)
+                    {
+                        releasedAttempts.Remove(id);
+                    }
                 }
             }
         }
@@ -400,6 +465,7 @@ namespace Orleans.Runtime.Messaging
         internal void Clear()
         {
             _requests?.Clear();
+            _releasedAttempts?.Clear();
             _forwardingUpdates?.Clear();
             _deferredResponses?.Clear();
         }
@@ -408,6 +474,18 @@ namespace Orleans.Runtime.Messaging
         {
             _forwardingUpdates?.Remove(requestId);
             _deferredResponses?.Remove(requestId);
+        }
+
+        private bool TryConsumeReleasedAttempt(CorrelationId requestId, long attempt)
+        {
+            if (_releasedAttempts?.TryGetValue(requestId, out var released) is true
+                && released.Attempt == attempt)
+            {
+                _releasedAttempts.Remove(requestId);
+                return true;
+            }
+
+            return false;
         }
 
         private Message CreateRequest(TrackedRequest request)
@@ -461,6 +539,11 @@ namespace Orleans.Runtime.Messaging
             SiloAddress SourceSilo,
             SiloAddress TargetSilo,
             int ForwardCount);
+
+        private readonly record struct ReleasedAttempt(
+            long Attempt,
+            long StartTimestamp,
+            TimeSpan RetentionPeriod);
 
         internal enum CompletionResult
         {
