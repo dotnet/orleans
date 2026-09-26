@@ -186,6 +186,10 @@ namespace Orleans.Storage
                 {
                     await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: false);
                 }
+                else if (_migrateLegacyKeys && !string.IsNullOrWhiteSpace(grainState.ETag))
+                {
+                    await WriteAndRetireLegacyAsync(grainState, record, GetLegacyKeyString(grainId), clear: false);
+                }
                 else
                 {
                     await WriteStateInternal(grainState, record);
@@ -368,7 +372,15 @@ namespace Orleans.Storage
                 }
                 else
                 {
-                    await WriteStateInternal(grainState, record, true);
+                    if (_migrateLegacyKeys && !string.IsNullOrWhiteSpace(grainState.ETag))
+                    {
+                        await WriteAndRetireLegacyAsync(grainState, record, GetLegacyKeyString(grainId), clear: true);
+                    }
+                    else
+                    {
+                        await WriteStateInternal(grainState, record, true);
+                    }
+
                     grainState.State = CreateInstance<T>();
                     grainState.RecordExists = false;
                 }
@@ -543,6 +555,55 @@ namespace Orleans.Storage
                     ConditionExpression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})",
                 }],
                 deletes: [LegacyDelete(legacyPartitionKey, record.GrainType, legacyETag)]);
+
+            grainState.ETag = newETag.ToString(CultureInfo.InvariantCulture);
+            grainState.RecordExists = !clear;
+        }
+
+        /// <summary>
+        /// Writes or clears a state read from the current key, and deletes the grain's legacy item in the same transaction.
+        /// An item written while the migration was off leaves its legacy item behind, which the read fallback would bring
+        /// back once the current item is gone, through <see cref="DynamoDBStorageOptions.TimeToLive"/> or a delete.
+        /// </summary>
+        private async Task WriteAndRetireLegacyAsync<T>(IGrainState<T> grainState, GrainStateRecord record, string legacyPartitionKey, bool clear)
+        {
+            var currentETag = int.Parse(grainState.ETag!, NumberStyles.Integer, CultureInfo.InvariantCulture);
+            var newETag = currentETag + 1;
+            var values = new Dictionary<string, AttributeValue>
+            {
+                { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentETag.ToString(CultureInfo.InvariantCulture) } },
+                { ":newETag", new AttributeValue { N = newETag.ToString(CultureInfo.InvariantCulture) } },
+                { ":state", record.State is { Length: > 0 } ? new AttributeValue { B = new MemoryStream(record.State) } : new AttributeValue { NULL = true } },
+            };
+            var update = $"SET {ETAG_PROPERTY_NAME} = :newETag, {BINARY_STATE_PROPERTY_NAME} = :state";
+            if (this.options.TimeToLive.HasValue)
+            {
+                values.Add(":ttl", new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) });
+                update += $", {GRAIN_TTL_PROPERTY_NAME} = :ttl";
+            }
+
+            await this.storage.WriteTxAsync(
+                updates: [new Update
+                {
+                    TableName = this.options.TableName,
+                    Key = new Dictionary<string, AttributeValue>
+                    {
+                        { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                        { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                    },
+                    UpdateExpression = update,
+                    ConditionExpression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
+                    ExpressionAttributeValues = values,
+                }],
+                deletes: [new Delete
+                {
+                    TableName = this.options.TableName,
+                    Key = new Dictionary<string, AttributeValue>
+                    {
+                        { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(legacyPartitionKey) },
+                        { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                    },
+                }]);
 
             grainState.ETag = newETag.ToString(CultureInfo.InvariantCulture);
             grainState.RecordExists = !clear;
