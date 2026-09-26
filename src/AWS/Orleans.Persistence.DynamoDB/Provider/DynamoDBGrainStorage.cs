@@ -340,10 +340,11 @@ namespace Orleans.Storage
                         expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     }
 
-                    if (_migrateLegacyKeys)
+                    if (_migrateLegacyKeys && !string.IsNullOrWhiteSpace(grainState.ETag))
                     {
                         // a legacy item left beside the current one, by a write made before the migration was enabled,
-                        // would come back through the read fallback once the current item is gone: it goes with it
+                        // would come back through the read fallback once the current item is gone: it goes with it.
+                        // A state never read has no ETag, and its clear leaves whatever is there, as before.
                         await this.storage.WriteTxAsync(deletes:
                         [
                             new Delete { TableName = this.options.TableName, Key = keys, ConditionExpression = expression, ExpressionAttributeValues = conditionalValues },
@@ -439,6 +440,14 @@ namespace Orleans.Storage
             while (true)
             {
                 var recordedFormat = await ReadKeyFormatAsync(ct);
+                if (recordedFormat is not (null or LEGACY_KEY_FORMAT or CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT))
+                {
+                    // a format this version does not know, from a newer one: following it wrongly would split the state
+                    throw new OrleansConfigurationException(
+                        $"DynamoDB Grain Storage {this.name} cannot start: table {this.options.TableName} records the key format "
+                        + $"'{recordedFormat}', which this version does not know. Run a version that supports it.");
+                }
+
                 var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
 
                 _keyServiceId = useClusterServiceId ? this.options.ClusterServiceId : string.Empty;

@@ -278,6 +278,42 @@ public class DynamoDBGrainStorageKeyFormatTests
         Assert.Equal("MigratingToClusterServiceId", (await ReadRow("__OrleansKeyFormat", "__OrleansKeyFormat"))!["KeyFormat"].S);
     }
 
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithDeleteStateOnClear_ClearingUnreadStateLeavesTheLegacyItem()
+    {
+        // a clear of a state that was never read has no ETag, and leaves whatever is there, as before
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; o.DeleteStateOnClear = true; });
+        await storage.ClearStateAsync(GrainType, grainId, new GrainState<TestStoreGrainState>(new TestStoreGrainState()));
+
+        Assert.True(await RowExists($"_{grainId}"));
+        Assert.Equal("legacy", (await ReadAsync(storage, grainId)).State!.A);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_UnknownKeyFormatRecord_FailsToStart()
+    {
+        await CreateStorage();
+        await WriteKeyFormatRecord("SomethingNewer");
+
+        var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(() => CreateStorage());
+
+        Assert.Contains("SomethingNewer", exception.Message);
+    }
+
+    private async Task WriteKeyFormatRecord(string format)
+    {
+        var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
+        await storage.PutEntryAsync(_tableName, new Dictionary<string, AttributeValue>
+        {
+            { "GrainReference", new AttributeValue("__OrleansKeyFormat") },
+            { "GrainType", new AttributeValue("__OrleansKeyFormat") },
+            { "KeyFormat", new AttributeValue(format) }
+        });
+    }
+
     private static GrainId NewGrainId() => GrainId.Create("keyformat", Guid.NewGuid().ToString("N"));
 
     private async Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null)
