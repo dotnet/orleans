@@ -241,9 +241,31 @@ public class DynamoDBGrainStorageKeyFormatTests
         Assert.Equal("a", (await ReadAsync(await CreateStorage(), grainId)).State!.A);
     }
 
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_KeyFormatRecordedByAnotherSiloMeanwhile_IsFollowed()
+    {
+        // this silo reads no record and would keep the empty ServiceId, but another one records a migration first
+        var interleaved = false;
+        var storage = await CreateStorage(beforeInit: s => s.BeforeKeyFormatWriteForTesting = async () =>
+        {
+            if (!interleaved)
+            {
+                interleaved = true;
+                await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+            }
+        });
+
+        var grainId = NewGrainId();
+        await WriteAsync(storage, grainId, "a");
+
+        Assert.True(interleaved);
+        Assert.True(await RowExists($"{ClusterServiceId}_{grainId}"));
+        Assert.Equal("MigratingToClusterServiceId", (await ReadRow("__OrleansKeyFormat", "__OrleansKeyFormat"))!["KeyFormat"].S);
+    }
+
     private static GrainId NewGrainId() => GrainId.Create("keyformat", Guid.NewGuid().ToString("N"));
 
-    private async Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null)
+    private async Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null)
     {
         if (!AWSTestConstants.IsDynamoDbAvailable)
         {
@@ -260,6 +282,7 @@ public class DynamoDBGrainStorageKeyFormatTests
         configure?.Invoke(options);
 
         var storage = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(_fixture.Services, "KeyFormatTests", options, NullLogger<DynamoDBGrainStorage>.Instance);
+        beforeInit?.Invoke(storage);
         await storage.Init(CancellationToken.None);
         return storage;
     }
@@ -280,14 +303,14 @@ public class DynamoDBGrainStorageKeyFormatTests
 
     private async Task<bool> RowExists(string partitionKey) => await ReadRow(partitionKey) is not null;
 
-    private async Task<Dictionary<string, AttributeValue>?> ReadRow(string partitionKey)
+    private async Task<Dictionary<string, AttributeValue>?> ReadRow(string partitionKey, string rowKey = GrainType)
     {
         var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
         var row = await storage.ReadSingleEntryAsync(_tableName,
             new Dictionary<string, AttributeValue>
             {
                 { "GrainReference", new AttributeValue(partitionKey) },
-                { "GrainType", new AttributeValue(GrainType) }
+                { "GrainType", new AttributeValue(rowKey) }
             },
             fields => fields);
         return row;

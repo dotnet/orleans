@@ -50,6 +50,9 @@ namespace Orleans.Storage
         private string _keyServiceId = string.Empty;
         private bool _migrateLegacyKeys;
 
+        /// <summary>Runs between reading and writing the key format record, so that tests can interleave another silo.</summary>
+        internal Func<Task>? BeforeKeyFormatWriteForTesting { get; set; }
+
         /// <summary>
         /// Default Constructor
         /// </summary>
@@ -409,28 +412,54 @@ namespace Orleans.Storage
                 return;
             }
 
-            var recordedFormat = await ReadKeyFormatAsync(ct);
-            var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
+            // Silos starting together may choose differently: the record is written only if it still holds what was read,
+            // and a silo that loses decides again from what the other one wrote.
+            while (true)
+            {
+                var recordedFormat = await ReadKeyFormatAsync(ct);
+                var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
 
-            _keyServiceId = useClusterServiceId ? this.options.ClusterServiceId : string.Empty;
-            _migrateLegacyKeys = useClusterServiceId && (this.options.MigrateLegacyKeys ?? recordedFormat == MIGRATING_KEY_FORMAT);
+                _keyServiceId = useClusterServiceId ? this.options.ClusterServiceId : string.Empty;
+                _migrateLegacyKeys = useClusterServiceId && (this.options.MigrateLegacyKeys ?? recordedFormat == MIGRATING_KEY_FORMAT);
 
-            if (!useClusterServiceId)
+                var format = !useClusterServiceId ? LEGACY_KEY_FORMAT
+                    : _migrateLegacyKeys ? MIGRATING_KEY_FORMAT
+                    : CLUSTER_KEY_FORMAT;
+                if (recordedFormat == format || await TryWriteKeyFormatAsync(recordedFormat, format, ct))
+                {
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(_keyServiceId))
             {
                 LogWarningEmptyServiceId(logger, this.name, this.options.TableName);
             }
+        }
 
-            var format = !useClusterServiceId ? LEGACY_KEY_FORMAT
-                : _migrateLegacyKeys ? MIGRATING_KEY_FORMAT
-                : CLUSTER_KEY_FORMAT;
-            if (recordedFormat != format)
+        private async Task<bool> TryWriteKeyFormatAsync(string? recordedFormat, string format, CancellationToken ct)
+        {
+            if (BeforeKeyFormatWriteForTesting is { } beforeWrite)
+            {
+                await beforeWrite();
+            }
+
+            try
             {
                 await this.storage.PutEntryAsync(this.options.TableName, new Dictionary<string, AttributeValue>
                 {
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
                     { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
                     { KEY_FORMAT_PROPERTY_NAME, new AttributeValue(format) },
-                }, ct);
+                },
+                ct,
+                recordedFormat is null ? $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME})" : $"{KEY_FORMAT_PROPERTY_NAME} = :recordedFormat",
+                recordedFormat is null ? null : new Dictionary<string, AttributeValue> { { ":recordedFormat", new AttributeValue(recordedFormat) } });
+                return true;
+            }
+            catch (ConditionalCheckFailedException)
+            {
+                return false;
             }
         }
 
