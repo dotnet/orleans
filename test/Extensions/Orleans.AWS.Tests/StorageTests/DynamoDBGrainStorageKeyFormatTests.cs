@@ -124,6 +124,70 @@ public class DynamoDBGrainStorageKeyFormatTests
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithoutTimeToLive_KeepsTheLegacyExpiry()
+    {
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(o => o.TimeToLive = TimeSpan.FromDays(3)), grainId, "legacy");
+        var legacyTtl = (await ReadRow($"_{grainId}"))!["GrainTtl"].N;
+
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; }), grainId, "migrated");
+
+        Assert.Equal(legacyTtl, (await ReadRow($"{ClusterServiceId}_{grainId}"))!["GrainTtl"].N);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithDeleteStateOnClear_CurrentStateWrittenMeanwhileIsInconsistent()
+    {
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; o.DeleteStateOnClear = true; });
+        var state = await ReadAsync(storage, grainId);
+
+        // another silo migrates the grain and writes it before this clear
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; }), grainId, "current");
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.ClearStateAsync(GrainType, grainId, state));
+        Assert.Equal("current", (await ReadAsync(storage, grainId)).State!.A);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithDeleteStateOnClear_CurrentStateBesideLegacyStateIsInconsistent()
+    {
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; o.DeleteStateOnClear = true; });
+        var state = await ReadAsync(storage, grainId);
+
+        // another silo writes the current key without migrating, which leaves the legacy item in place
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; }), grainId, "current");
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.ClearStateAsync(GrainType, grainId, state));
+        Assert.True(await RowExists($"_{grainId}"));
+        Assert.True(await RowExists($"{ClusterServiceId}_{grainId}"));
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeys_StateReadFromTheCurrentKeyIsNotMigrated()
+    {
+        // an orphaned legacy item with the same ETag must not stand in for a current item deleted meanwhile
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "orphan");
+        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        var state = await ReadAsync(storage, grainId);
+        Assert.Equal("current", state.State!.A);
+        var other = await CreateStorage(o => { o.UseClusterServiceId = true; o.DeleteStateOnClear = true; });
+        await other.ClearStateAsync(GrainType, grainId, await ReadAsync(other, grainId));
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(GrainType, grainId, state));
+        Assert.True(await RowExists($"_{grainId}"));
+        Assert.False(await RowExists($"{ClusterServiceId}_{grainId}"));
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task DynamoDBGrainStorage_MigrateLegacyKeys_ClearMovesClearedState()
     {
         var grainId = NewGrainId();
@@ -214,7 +278,9 @@ public class DynamoDBGrainStorageKeyFormatTests
         return state;
     }
 
-    private async Task<bool> RowExists(string partitionKey)
+    private async Task<bool> RowExists(string partitionKey) => await ReadRow(partitionKey) is not null;
+
+    private async Task<Dictionary<string, AttributeValue>?> ReadRow(string partitionKey)
     {
         var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
         var row = await storage.ReadSingleEntryAsync(_tableName,
@@ -224,6 +290,6 @@ public class DynamoDBGrainStorageKeyFormatTests
                 { "GrainType", new AttributeValue(GrainType) }
             },
             fields => fields);
-        return row is not null;
+        return row;
     }
 }
