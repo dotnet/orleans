@@ -444,8 +444,9 @@ namespace Orleans.Storage
                 {
                     // a format this version does not know, from a newer one: following it wrongly would split the state
                     throw new OrleansConfigurationException(
-                        $"DynamoDB Grain Storage {this.name} cannot start: table {this.options.TableName} records the key format "
-                        + $"'{recordedFormat}', which this version does not know. Run a version that supports it.");
+                        $"DynamoDB Grain Storage {this.name} cannot start: table {this.options.TableName} records "
+                        + (recordedFormat.Length == 0 ? "an empty key format" : $"the key format '{recordedFormat}'")
+                        + ", which this version does not know. Run a version that supports it.");
                 }
 
                 var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
@@ -502,10 +503,11 @@ namespace Orleans.Storage
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
                     { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) }
                 },
-                fields => fields.TryGetValue(KEY_FORMAT_PROPERTY_NAME, out var value) ? value.S : string.Empty,
+                fields => fields.TryGetValue(KEY_FORMAT_PROPERTY_NAME, out var value) ? value.S ?? string.Empty : string.Empty,
                 ct);
 
-            return string.IsNullOrEmpty(marker) ? null : marker;
+            // null is no record; a record without a value is one this version cannot follow, and is refused as an unknown one
+            return marker;
         }
 
         /// <summary>

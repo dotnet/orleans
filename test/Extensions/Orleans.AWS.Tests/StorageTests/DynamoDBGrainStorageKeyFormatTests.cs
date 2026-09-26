@@ -303,20 +303,38 @@ public class DynamoDBGrainStorageKeyFormatTests
         Assert.Contains("SomethingNewer", exception.Message);
     }
 
-    private async Task WriteKeyFormatRecord(string format)
+    [Fact(Timeout = 15_000), TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_KeyFormatRecordWithoutValue_FailsToStart()
+    {
+        await CreateStorage();
+        await WriteKeyFormatRecord(null);
+
+        // a record that is there but says nothing must not be taken for a missing one, whose write would then be retried for ever
+        await Assert.ThrowsAsync<OrleansConfigurationException>(() => CreateStorageUntil(TestContext.Current.CancellationToken));
+    }
+
+    private async Task WriteKeyFormatRecord(string? format)
     {
         var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
-        await storage.PutEntryAsync(_tableName, new Dictionary<string, AttributeValue>
+        var fields = new Dictionary<string, AttributeValue>
         {
             { "GrainReference", new AttributeValue("__OrleansKeyFormat") },
-            { "GrainType", new AttributeValue("__OrleansKeyFormat") },
-            { "KeyFormat", new AttributeValue(format) }
-        });
+            { "GrainType", new AttributeValue("__OrleansKeyFormat") }
+        };
+        if (format is not null)
+        {
+            fields.Add("KeyFormat", new AttributeValue(format));
+        }
+
+        await storage.PutEntryAsync(_tableName, fields);
     }
 
     private static GrainId NewGrainId() => GrainId.Create("keyformat", Guid.NewGuid().ToString("N"));
 
-    private async Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null)
+    private Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null) =>
+        CreateStorageUntil(CancellationToken.None, configure, beforeInit);
+
+    private async Task<DynamoDBGrainStorage> CreateStorageUntil(CancellationToken cancellationToken, Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null)
     {
         if (!AWSTestConstants.IsDynamoDbAvailable)
         {
@@ -334,7 +352,7 @@ public class DynamoDBGrainStorageKeyFormatTests
 
         var storage = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(_fixture.Services, "KeyFormatTests", options, NullLogger<DynamoDBGrainStorage>.Instance);
         beforeInit?.Invoke(storage);
-        await storage.Init(CancellationToken.None);
+        await storage.Init(cancellationToken);
         return storage;
     }
 
