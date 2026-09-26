@@ -1,4 +1,6 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -12,8 +14,33 @@ namespace Orleans.Configuration
     {
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
+        /// When left empty, see <see cref="UseClusterServiceId"/>.
         /// </summary>
         public string ServiceId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets whether an empty <see cref="ServiceId"/> falls back to <see cref="ClusterOptions.ServiceId"/>,
+        /// as the other grain storage providers do. When <see langword="false"/>, an empty <see cref="ServiceId"/> is used
+        /// as it is, and every key starts with an underscore. When not set, <see cref="ClusterOptions.ServiceId"/> is used,
+        /// and initialization fails if the table holds state written with an empty <see cref="ServiceId"/>: set this to
+        /// <see langword="false"/> to keep that state where it is, or to <see langword="true"/> with
+        /// <see cref="MigrateLegacyKeys"/> to move it. Has no effect when <see cref="ServiceId"/> is set.
+        /// </summary>
+        public bool? UseClusterServiceId { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether state written with an empty <see cref="ServiceId"/> is read when a grain has no state under
+        /// <see cref="ClusterOptions.ServiceId"/>, and moved there on the grain's next write. When not set, a migration
+        /// recorded in the table goes on. Has an effect only when <see cref="ClusterOptions.ServiceId"/> is used for an
+        /// empty <see cref="ServiceId"/>. Every silo must run with the same options while it is set: a silo still writing
+        /// the keys with an empty <see cref="ServiceId"/> is not protected from a migrating one.
+        /// </summary>
+        public bool? MigrateLegacyKeys { get; set; }
+
+        /// <summary>
+        /// The <see cref="ClusterOptions.ServiceId"/> of the silo, used when <see cref="UseClusterServiceId"/> applies.
+        /// </summary>
+        internal string ClusterServiceId { get; set; } = ClusterOptions.DefaultServiceId;
 
         /// <summary>
         /// Use Provisioned Throughput for tables
@@ -69,6 +96,24 @@ namespace Orleans.Configuration
 
         /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Supplies <see cref="DynamoDBStorageOptions"/> with the <see cref="ClusterOptions.ServiceId"/> of the silo.
+    /// </summary>
+    internal sealed class DynamoDBStorageClusterServiceIdConfigurator(IServiceProvider serviceProvider) : IPostConfigureOptions<DynamoDBStorageOptions>
+    {
+        public void PostConfigure(string? name, DynamoDBStorageOptions options)
+        {
+            // a provider-specific override first, as GetProviderClusterOptions does, without requiring ClusterOptions
+            var clusterOptions = (name is null ? null : serviceProvider.GetKeyedService<ClusterOptions>(name))
+                ?? serviceProvider.GetService<IOptions<ClusterOptions>>()?.Value;
+
+            if (clusterOptions?.ServiceId is { Length: > 0 } serviceId)
+            {
+                options.ClusterServiceId = serviceId;
+            }
+        }
     }
 
     /// <summary>

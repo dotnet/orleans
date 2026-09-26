@@ -981,6 +981,29 @@ namespace Orleans.Transactions.DynamoDB
         }
 
         /// <summary>
+        /// Reads a single page of at most <paramref name="limit"/> entries of a table, in no particular order.
+        /// </summary>
+        /// <typeparam name="TResult">The result type</typeparam>
+        /// <param name="tableName">The name of the table to read</param>
+        /// <param name="limit">The largest number of entries to read</param>
+        /// <param name="resolver">Function that translates the returned fields into a concrete type</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The entries read, translated by the resolver function</returns>
+        internal async Task<List<TResult>> ScanPageAsync<TResult>(string tableName, int limit, Func<Dictionary<string, AttributeValue>, TResult> resolver, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var response = await _ddbClient.ScanAsync(new ScanRequest { TableName = tableName, Limit = limit, ConsistentRead = true }, cancellationToken);
+                return response.Items is { } items ? items.ConvertAll(item => resolver(item)) : [];
+            }
+            catch (Exception exc) when (exc is not OperationCanceledException)
+            {
+                LogWarningFailedToReadTable(_logger, exc, tableName);
+                throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
+            }
+        }
+
+        /// <summary>
         /// Crete or replace multiple entries in a DynamoDB table (Batch put)
         /// </summary>
         /// <param name="tableName">The name of the table to search for the entry</param>
