@@ -82,7 +82,22 @@ namespace Orleans.Runtime.Messaging
 
         internal GatewayInstruments GatewayInstruments { get; }
 
-        internal int TrackedRequestClientCount => clientsWithTrackedRequests.Count;
+        internal int TrackedRequestClientCount
+        {
+            get
+            {
+                var result = 0;
+                foreach (var client in clientsWithTrackedRequests.Keys)
+                {
+                    if (client.HasActiveRequestTracking)
+                    {
+                        result++;
+                    }
+                }
+
+                return result;
+            }
+        }
 
         private bool IsStopping => Volatile.Read(ref isStopping) != 0;
 
@@ -479,6 +494,7 @@ namespace Orleans.Runtime.Messaging
             private GatewayInboundConnection? _connection;
             private int _dropped;
             private bool _isRequestTrackingRegistered;
+            private bool _hasActiveRequestTracking;
             private CoarseStopwatch _disconnectedSince;
 
             internal ClientState(Gateway gateway, ClientGrainId id)
@@ -497,6 +513,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             public bool IsConnected => Connection != null;
+            internal bool HasActiveRequestTracking => Volatile.Read(ref _hasActiveRequestTracking);
 
             private bool IsDropped => Volatile.Read(ref _dropped) == 1;
 
@@ -518,7 +535,8 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     _disconnectedSince.Restart();
-                    requestTrackingStopped = ClearPendingRequestsCore();
+                    _pendingRequests.Release();
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
@@ -666,10 +684,12 @@ namespace Orleans.Runtime.Messaging
                         sendUntracked = _pendingRequests.TryPrepareForUntrackedDelivery(
                             message,
                             releaseTrackedRequest: false);
-                        if (!sendUntracked && _pendingRequests.TryRemoveExpiredAttempt(message))
+                        if (!sendUntracked)
                         {
-                            requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                            _pendingRequests.TryRemoveExpiredAttempt(message);
                         }
+
+                        requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                     }
                     else
                     {
@@ -678,6 +698,8 @@ namespace Orleans.Runtime.Messaging
                             _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
                             _isRequestTrackingRegistered = true;
                         }
+
+                        Volatile.Write(ref _hasActiveRequestTracking, true);
 
                         // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
                         // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
@@ -726,14 +748,16 @@ namespace Orleans.Runtime.Messaging
 
             private bool UnregisterRequestTrackingIfEmptyCore()
             {
-                if (_isRequestTrackingRegistered && _pendingRequests.Count == 0)
+                var requestTrackingStopped = _hasActiveRequestTracking && _pendingRequests.Count == 0;
+                Volatile.Write(ref _hasActiveRequestTracking, _pendingRequests.Count > 0);
+
+                if (_isRequestTrackingRegistered && !_pendingRequests.HasEntries)
                 {
                     _gateway.clientsWithTrackedRequests.TryRemove(this, out _);
                     _isRequestTrackingRegistered = false;
-                    return true;
                 }
 
-                return false;
+                return requestTrackingStopped;
             }
 
             public void DropExpiredRequests()

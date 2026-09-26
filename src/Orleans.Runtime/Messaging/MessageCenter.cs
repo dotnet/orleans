@@ -381,24 +381,6 @@ namespace Orleans.Runtime.Messaging
             message.GatewayResponseRoutingHistory = updated;
         }
 
-        internal static bool HasVisitedGateway(Message message, SiloAddress gateway)
-        {
-            if (message.GatewayResponseRoutingHistory is not { } history)
-            {
-                return false;
-            }
-
-            foreach (var visited in history)
-            {
-                if (visited.Equals(gateway))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         internal static bool CanReaddressResponse(Message message, int maxForwardCount) =>
             message.GatewayResponseRoutingHistory is not { } history
             || history.Length <= maxForwardCount;
@@ -739,6 +721,7 @@ namespace Orleans.Runtime.Messaging
 
             static async Task SendForwardingUpdateAsync(MessageCenter messageCenter, Message update)
             {
+                var failureLogged = false;
                 while (!update.IsExpired
                     && !messageCenter.stopped
                     && update.TargetSilo is { } targetSilo
@@ -752,7 +735,12 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception)
                     {
-                        LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                        if (!failureLogged)
+                        {
+                            LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                            failureLogged = true;
+                        }
+
                         await Task.Delay(TimeSpan.FromMilliseconds(100));
                     }
                 }
