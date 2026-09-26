@@ -169,6 +169,21 @@ public class DynamoDBGrainStorageKeyFormatTests
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithDeleteStateOnClear_ClearingCurrentStateRetiresTheLegacyItem()
+    {
+        // written on the current key before the migration was enabled, so the legacy item is still there
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; o.DeleteStateOnClear = true; });
+        await storage.ClearStateAsync(GrainType, grainId, await ReadAsync(storage, grainId));
+
+        Assert.False((await ReadAsync(storage, grainId)).RecordExists);
+        Assert.False(await RowExists($"_{grainId}"));
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task DynamoDBGrainStorage_MigrateLegacyKeys_StateReadFromTheCurrentKeyIsNotMigrated()
     {
         // an orphaned legacy item with the same ETag must not stand in for a current item deleted meanwhile
@@ -179,7 +194,7 @@ public class DynamoDBGrainStorageKeyFormatTests
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
         var state = await ReadAsync(storage, grainId);
         Assert.Equal("current", state.State!.A);
-        var other = await CreateStorage(o => { o.UseClusterServiceId = true; o.DeleteStateOnClear = true; });
+        var other = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; o.DeleteStateOnClear = true; });
         await other.ClearStateAsync(GrainType, grainId, await ReadAsync(other, grainId));
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(GrainType, grainId, state));

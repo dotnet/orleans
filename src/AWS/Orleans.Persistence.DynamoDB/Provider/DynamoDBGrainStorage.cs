@@ -340,7 +340,29 @@ namespace Orleans.Storage
                         expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     }
 
-                    await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                    if (_migrateLegacyKeys)
+                    {
+                        // a legacy item left beside the current one, by a write made before the migration was enabled,
+                        // would come back through the read fallback once the current item is gone: it goes with it
+                        await this.storage.WriteTxAsync(deletes:
+                        [
+                            new Delete { TableName = this.options.TableName, Key = keys, ConditionExpression = expression, ExpressionAttributeValues = conditionalValues },
+                            new Delete
+                            {
+                                TableName = this.options.TableName,
+                                Key = new Dictionary<string, AttributeValue>
+                                {
+                                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(GetLegacyKeyString(grainId)) },
+                                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) }
+                                },
+                            },
+                        ]);
+                    }
+                    else
+                    {
+                        await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                    }
+
                     ResetGrainState(grainState);
                 }
                 else
