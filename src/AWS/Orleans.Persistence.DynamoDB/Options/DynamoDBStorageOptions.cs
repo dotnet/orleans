@@ -23,9 +23,11 @@ namespace Orleans.Configuration
         /// Gets or sets whether an empty <see cref="ServiceId"/> falls back to <see cref="ClusterOptions.ServiceId"/>,
         /// as the other grain storage providers do. When <see langword="false"/>, an empty <see cref="ServiceId"/> is used
         /// as it is, and every key starts with an underscore; initialization fails if the table already records
-        /// <see cref="ClusterOptions.ServiceId"/>. When not set, the key format already recorded in the table is kept, and a
-        /// new table uses the empty <see cref="ServiceId"/>; this default changes in a future major version. The key format
-        /// is recorded once for the whole table. Has no effect when <see cref="ServiceId"/> is set.
+        /// <see cref="ClusterOptions.ServiceId"/>. When not set, <see cref="ClusterOptions.ServiceId"/> is used, and
+        /// initialization fails if the table records an empty <see cref="ServiceId"/> or holds state written with one:
+        /// set this to <see langword="false"/> to keep that state where it is, or to <see langword="true"/> with
+        /// <see cref="MigrateLegacyKeys"/> to move it. The key format is recorded once for the whole table. Has no effect
+        /// when <see cref="ServiceId"/> is set.
         /// </summary>
         public bool? UseClusterServiceId { get; set; }
 

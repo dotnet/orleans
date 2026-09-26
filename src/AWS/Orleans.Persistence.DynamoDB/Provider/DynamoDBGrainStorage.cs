@@ -418,8 +418,9 @@ namespace Orleans.Storage
 
         /// <summary>
         /// Decides the <see cref="DynamoDBStorageOptions.ServiceId"/> the keys are built from. An explicit one is used as
-        /// it is. An empty one is kept for compatibility, with a warning, unless the options or the key format recorded in
-        /// the table ask for <see cref="ClusterOptions.ServiceId"/>; the choice is recorded in the table.
+        /// it is. An empty one means <see cref="ClusterOptions.ServiceId"/>, unless the options keep the empty one; state
+        /// written with the empty one, recorded in the table or found in it, stops initialization until the options say
+        /// whether to keep or migrate it. The choice is recorded in the table.
         /// </summary>
         private async Task<string> ResolveKeyFormatAsync(CancellationToken ct)
         {
@@ -472,7 +473,32 @@ namespace Orleans.Storage
                         + $"To migrate anyway, when no such state has been deleted or has expired, delete the {KEY_FORMAT_MARKER} item first.");
                 }
 
-                var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
+                // Silos that chose the empty ServiceId may still be writing its keys, so a table that records it does not
+                // switch by itself, whether or not a scan would find their state yet.
+                if (this.options.UseClusterServiceId is null && recordedFormat == LEGACY_KEY_FORMAT)
+                {
+                    throw new OrleansConfigurationException(
+                        $"DynamoDB Grain Storage {this.name} has no ServiceId, and table {this.options.TableName} records that its keys "
+                        + "are built with an empty ServiceId, which silos running an earlier version may still be writing. "
+                        + $"{nameof(DynamoDBStorageOptions.ServiceId)} now defaults to ClusterOptions.ServiceId. Set "
+                        + $"{nameof(DynamoDBStorageOptions.UseClusterServiceId)} to false to keep the empty ServiceId, or to true, once "
+                        + $"every silo runs this version, with {nameof(DynamoDBStorageOptions.MigrateLegacyKeys)} to move the state to "
+                        + "ClusterOptions.ServiceId.");
+                }
+
+                if (this.options.UseClusterServiceId is null
+                    && recordedFormat is null
+                    && await HasLegacyStateAsync(ct))
+                {
+                    throw new OrleansConfigurationException(
+                        $"DynamoDB Grain Storage {this.name} has no ServiceId, and table {this.options.TableName} holds state written "
+                        + $"with an empty ServiceId, whose keys start with an underscore. {nameof(DynamoDBStorageOptions.ServiceId)} now "
+                        + $"defaults to ClusterOptions.ServiceId. Set {nameof(DynamoDBStorageOptions.UseClusterServiceId)} to false to keep "
+                        + $"using that state as it is, or to true with {nameof(DynamoDBStorageOptions.MigrateLegacyKeys)} to move it to "
+                        + "ClusterOptions.ServiceId.");
+                }
+
+                var useClusterServiceId = this.options.UseClusterServiceId ?? true;
 
                 _keyServiceId = useClusterServiceId ? this.options.ClusterServiceId : string.Empty;
                 _migrateLegacyKeys = useClusterServiceId && (this.options.MigrateLegacyKeys ?? recordedFormat == MIGRATING_KEY_FORMAT);
@@ -519,6 +545,22 @@ namespace Orleans.Storage
                 return false;
             }
         }
+
+        /// <summary>
+        /// Whether the table holds state written with an empty <see cref="DynamoDBStorageOptions.ServiceId"/>, whose keys
+        /// start with an underscore, as the key format record does. State written with any other ServiceId is not it, but
+        /// one starting with an underscore cannot be told apart, and the docs say to set
+        /// <see cref="DynamoDBStorageOptions.UseClusterServiceId"/> explicitly then.
+        /// </summary>
+        private Task<bool> HasLegacyStateAsync(CancellationToken ct) =>
+            this.storage.AnyAsync(this.options.TableName,
+                $"begins_with({GRAIN_REFERENCE_PROPERTY_NAME}, :legacyPrefix) AND {GRAIN_REFERENCE_PROPERTY_NAME} <> :keyFormatMarker",
+                new Dictionary<string, AttributeValue>
+                {
+                    { ":legacyPrefix", new AttributeValue("_") },
+                    { ":keyFormatMarker", new AttributeValue(KEY_FORMAT_MARKER) }
+                },
+                ct);
 
         private async Task<string?> ReadKeyFormatAsync(CancellationToken ct)
         {
@@ -770,7 +812,7 @@ namespace Orleans.Storage
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            Message = "DynamoDB Grain Storage {Name} has no ServiceId, so the keys in {TableName} start with an underscore rather than ClusterOptions.ServiceId as in the other providers. Set ServiceId, or set UseClusterServiceId to use ClusterOptions.ServiceId, with MigrateLegacyKeys to move the existing state. A future major version uses ClusterOptions.ServiceId by default."
+            Message = "DynamoDB Grain Storage {Name} keeps an empty ServiceId, as UseClusterServiceId is false, so the keys in {TableName} start with an underscore rather than ClusterOptions.ServiceId as in the other providers. Set UseClusterServiceId to true, with MigrateLegacyKeys to move the existing state."
         )]
         private static partial void LogWarningEmptyServiceId(ILogger logger, string name, string tableName);
 
