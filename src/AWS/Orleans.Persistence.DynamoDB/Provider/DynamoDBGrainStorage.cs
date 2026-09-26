@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -31,6 +32,11 @@ namespace Orleans.Storage
         private const string ETAG_PROPERTY_NAME = "ETag";
         private const string GRAIN_TTL_PROPERTY_NAME = "GrainTtl";
         private const string CURRENT_ETAG_ALIAS = ":currentETag";
+        private const string KEY_FORMAT_MARKER = "__OrleansKeyFormat";
+        private const string KEY_FORMAT_PROPERTY_NAME = "KeyFormat";
+        private const string LEGACY_KEY_FORMAT = "EmptyServiceId";
+        private const string CLUSTER_KEY_FORMAT = "ClusterServiceId";
+        private const string MIGRATING_KEY_FORMAT = "MigratingToClusterServiceId";
 
         private readonly DynamoDBStorageOptions options;
         private readonly IActivatorProvider _activatorProvider;
@@ -38,6 +44,11 @@ namespace Orleans.Storage
         private readonly string name;
 
         private DynamoDBStorage storage = null!;
+        private string _keyServiceId = string.Empty;
+        private bool _migrateLegacyKeys;
+
+        // grains whose state was read from its legacy key and is moved on their next write
+        private readonly ConcurrentDictionary<(string PartitionKey, string RowKey), int> _pendingMigrations = new();
 
         /// <summary>
         /// Default Constructor
@@ -99,6 +110,7 @@ namespace Orleans.Storage
                     secondaryIndexes: null,
                     ttlAttributeName: this.options.TimeToLive.HasValue ? GRAIN_TTL_PROPERTY_NAME : null,
                     cancellationToken: ct);
+                await ResolveKeyFormatAsync(ct);
                 stopWatch.Stop();
                 LogInformationProviderInitialized(logger, this.name, this.GetType().Name, this.options.InitStage, stopWatch.ElapsedMilliseconds);
             }
@@ -127,23 +139,17 @@ namespace Orleans.Storage
             LogTraceReadingGrainState(logger, grainType, partitionKey, grainId, this.options.TableName);
 
             string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            var record = await ReadRecordAsync(partitionKey, rowKey);
 
-            var record = await this.storage.ReadSingleEntryAsync(this.options.TableName,
-                new Dictionary<string, AttributeValue>
+            if (record == null && _migrateLegacyKeys)
+            {
+                record = await ReadRecordAsync(GetLegacyKeyString(grainId), rowKey);
+                if (record != null)
                 {
-                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(partitionKey) },
-                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(rowKey) }
-                },
-                (fields) =>
-                {
-                    return new GrainStateRecord
-                    {
-                        GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
-                        GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
-                        ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
-                        State = fields.TryGetValue(BINARY_STATE_PROPERTY_NAME, out var propertyName) ? propertyName.B?.ToArray() : null,
-                    };
-                }).ConfigureAwait(false);
+                    _pendingMigrations[(partitionKey, rowKey)] = record.ETag;
+                    LogWarningReadingLegacyKey(logger, grainType, grainId, this.options.TableName);
+                }
+            }
 
             if (record != null)
             {
@@ -172,7 +178,14 @@ namespace Orleans.Storage
             try
             {
                 ConvertToStorageFormat(grainState.State, record);
-                await WriteStateInternal(grainState, record);
+                if (_pendingMigrations.TryRemove((partitionKey, rowKey), out var legacyETag))
+                {
+                    await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: false);
+                }
+                else
+                {
+                    await WriteStateInternal(grainState, record);
+                }
             }
             catch (ConditionalCheckFailedException exc)
             {
@@ -287,7 +300,22 @@ namespace Orleans.Storage
             var operation = "Clearing";
             try
             {
-                if (this.options.DeleteStateOnClear)
+                if (_pendingMigrations.TryRemove((partitionKey, rowKey), out var legacyETag))
+                {
+                    operation = "Migrating";
+                    if (this.options.DeleteStateOnClear)
+                    {
+                        await DeleteLegacyRecordAsync(GetLegacyKeyString(grainId), rowKey, legacyETag);
+                        ResetGrainState(grainState);
+                    }
+                    else
+                    {
+                        await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: true);
+                        grainState.State = CreateInstance<T>();
+                        grainState.RecordExists = false;
+                    }
+                }
+                else if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
                     var keys = new Dictionary<string, AttributeValue>
@@ -334,9 +362,128 @@ namespace Orleans.Storage
 
         private string GetKeyString(GrainId grainId)
         {
-            var key = $"{options.ServiceId}_{grainId}";
+            var key = $"{_keyServiceId}_{grainId}";
             return AWSUtils.ValidateDynamoDBPartitionKey(key);
         }
+
+        private static string GetLegacyKeyString(GrainId grainId) => AWSUtils.ValidateDynamoDBPartitionKey($"_{grainId}");
+
+        private Task<GrainStateRecord?> ReadRecordAsync(string partitionKey, string rowKey) =>
+            this.storage.ReadSingleEntryAsync(this.options.TableName,
+                new Dictionary<string, AttributeValue>
+                {
+                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(partitionKey) },
+                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(rowKey) }
+                },
+                (fields) =>
+                {
+                    return new GrainStateRecord
+                    {
+                        GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
+                        GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
+                        ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
+                        State = fields.TryGetValue(BINARY_STATE_PROPERTY_NAME, out var propertyName) ? propertyName.B?.ToArray() : null,
+                    };
+                });
+
+        /// <summary>
+        /// Decides the <see cref="DynamoDBStorageOptions.ServiceId"/> the keys are built from. An explicit one is used as
+        /// it is. An empty one is kept for compatibility, with a warning, unless the options or the key format recorded in
+        /// the table ask for <see cref="ClusterOptions.ServiceId"/>; the choice is recorded in the table.
+        /// </summary>
+        private async Task ResolveKeyFormatAsync(CancellationToken ct)
+        {
+            if (!string.IsNullOrEmpty(this.options.ServiceId))
+            {
+                _keyServiceId = this.options.ServiceId;
+                return;
+            }
+
+            var recordedFormat = await ReadKeyFormatAsync(ct);
+            var useClusterServiceId = this.options.UseClusterServiceId ?? recordedFormat is CLUSTER_KEY_FORMAT or MIGRATING_KEY_FORMAT;
+
+            _keyServiceId = useClusterServiceId ? this.options.ClusterServiceId : string.Empty;
+            _migrateLegacyKeys = useClusterServiceId && (this.options.MigrateLegacyKeys ?? recordedFormat == MIGRATING_KEY_FORMAT);
+
+            if (!useClusterServiceId)
+            {
+                LogWarningEmptyServiceId(logger, this.name, this.options.TableName);
+            }
+
+            var format = !useClusterServiceId ? LEGACY_KEY_FORMAT
+                : _migrateLegacyKeys ? MIGRATING_KEY_FORMAT
+                : CLUSTER_KEY_FORMAT;
+            if (recordedFormat != format)
+            {
+                await this.storage.PutEntryAsync(this.options.TableName, new Dictionary<string, AttributeValue>
+                {
+                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
+                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
+                    { KEY_FORMAT_PROPERTY_NAME, new AttributeValue(format) },
+                }, ct);
+            }
+        }
+
+        private async Task<string?> ReadKeyFormatAsync(CancellationToken ct)
+        {
+            var marker = await this.storage.ReadSingleEntryAsync(this.options.TableName,
+                new Dictionary<string, AttributeValue>
+                {
+                    { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) },
+                    { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(KEY_FORMAT_MARKER) }
+                },
+                fields => fields.TryGetValue(KEY_FORMAT_PROPERTY_NAME, out var value) ? value.S : string.Empty,
+                ct);
+
+            return string.IsNullOrEmpty(marker) ? null : marker;
+        }
+
+        /// <summary>
+        /// Writes the state of a grain read from its legacy key under its current key, and deletes the legacy record in the
+        /// same transaction, so that the grain never has both or neither.
+        /// </summary>
+        private async Task MigrateStateAsync<T>(IGrainState<T> grainState, GrainStateRecord record, string legacyPartitionKey, int legacyETag, bool clear)
+        {
+            var newETag = legacyETag + 1;
+            var fields = new Dictionary<string, AttributeValue>
+            {
+                { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference) },
+                { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType) },
+                { ETAG_PROPERTY_NAME, new AttributeValue { N = newETag.ToString(CultureInfo.InvariantCulture) } },
+                { BINARY_STATE_PROPERTY_NAME, record.State is { Length: > 0 } ? new AttributeValue { B = new MemoryStream(record.State) } : new AttributeValue { NULL = true } },
+            };
+            if (this.options.TimeToLive.HasValue)
+            {
+                fields.Add(GRAIN_TTL_PROPERTY_NAME, new AttributeValue { N = ((DateTimeOffset)DateTime.UtcNow.Add(this.options.TimeToLive.Value)).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) });
+            }
+
+            await this.storage.WriteTxAsync(
+                puts: [new Put
+                {
+                    TableName = this.options.TableName,
+                    Item = fields,
+                    ConditionExpression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})",
+                }],
+                deletes: [LegacyDelete(legacyPartitionKey, record.GrainType, legacyETag)]);
+
+            grainState.ETag = newETag.ToString(CultureInfo.InvariantCulture);
+            grainState.RecordExists = !clear;
+        }
+
+        private Task DeleteLegacyRecordAsync(string legacyPartitionKey, string rowKey, int legacyETag) =>
+            this.storage.WriteTxAsync(deletes: [LegacyDelete(legacyPartitionKey, rowKey, legacyETag)]);
+
+        private Delete LegacyDelete(string legacyPartitionKey, string rowKey, int legacyETag) => new()
+        {
+            TableName = this.options.TableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(legacyPartitionKey) },
+                { GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(rowKey) }
+            },
+            ConditionExpression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}",
+            ExpressionAttributeValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = legacyETag.ToString(CultureInfo.InvariantCulture) } } },
+        };
 
         internal T? ConvertFromStorageFormat<T>(GrainStateRecord entity)
         {
@@ -447,6 +594,18 @@ namespace Orleans.Storage
             Message = "Writing binary data size = {DataSize} for grain id = Partition={Partition} / Row={Row}"
         )]
         private static partial void LogTraceWritingBinaryData(ILogger logger, int dataSize, string partition, string row);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "DynamoDB Grain Storage {Name} has no ServiceId, so the keys in {TableName} start with an underscore rather than ClusterOptions.ServiceId as in the other providers. Set ServiceId, or set UseClusterServiceId to use ClusterOptions.ServiceId, with MigrateLegacyKeys to move the existing state. A future major version uses ClusterOptions.ServiceId by default."
+        )]
+        private static partial void LogWarningEmptyServiceId(ILogger logger, string name, string tableName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Read the state of GrainType={GrainType} GrainId={GrainId} from its key without ServiceId in {TableName}; it is moved on the next write."
+        )]
+        private static partial void LogWarningReadingLegacyKey(ILogger logger, string grainType, GrainId grainId, string tableName);
     }
 
     /// <summary>

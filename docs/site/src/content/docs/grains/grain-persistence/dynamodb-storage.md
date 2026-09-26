@@ -20,6 +20,8 @@ The [AWS SDK for .NET credential and profile resolution chain](https://docs.aws.
 
 <xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> must remain stable across deployments that share the same logical application state. The provider uses optimistic concurrency and rejects stale writes.
 
+When <xref:Orleans.Configuration.DynamoDBStorageOptions.ServiceId> is empty, the keys start with an underscore instead of <xref:Orleans.Configuration.ClusterOptions.ServiceId>, unlike the other grain storage providers, and the provider logs a warning. Set <xref:Orleans.Configuration.DynamoDBStorageOptions.UseClusterServiceId> to use <xref:Orleans.Configuration.ClusterOptions.ServiceId> instead. State written before then stays under its old key unless <xref:Orleans.Configuration.DynamoDBStorageOptions.MigrateLegacyKeys> is also set: a grain with no state under the new key then reads it from the old one, and its next write moves it, in one transaction. Enable the migration once every silo runs a version that supports it, since an older silo keeps writing the old keys, and set <xref:Orleans.Configuration.DynamoDBStorageOptions.MigrateLegacyKeys> to `false` when every grain has been written, to spare the second read for grains that have no state. The provider records its choice in the table and keeps it while these options are left unset.
+
 ## Serialization
 
 Set <xref:Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer> to customize the stored representation. Changing serializers doesn't rewrite existing items, so the replacement must read the previous representation or be accompanied by a migration.
