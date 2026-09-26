@@ -31,7 +31,8 @@ namespace Orleans.Configuration
         /// Gets or sets whether state written with an empty <see cref="ServiceId"/> is read when a grain has no state under
         /// <see cref="ClusterOptions.ServiceId"/>, and moved there on the grain's next write. When not set, a migration
         /// recorded in the table goes on. Has an effect only when <see cref="ClusterOptions.ServiceId"/> is used for an
-        /// empty <see cref="ServiceId"/>.
+        /// empty <see cref="ServiceId"/>. Every silo must run with the same options while it is set: a silo still writing
+        /// the keys with an empty <see cref="ServiceId"/> is not protected from a migrating one.
         /// </summary>
         public bool? MigrateLegacyKeys { get; set; }
 
