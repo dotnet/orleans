@@ -174,7 +174,7 @@ public class CallbackDataTests
 
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         ApplicationRequestInstruments instruments,
         TimeProvider? timeProvider = null,
         TimeSpan? responseTimeout = null)
@@ -187,7 +187,7 @@ public class CallbackDataTests
     }
 
     private static SharedCallbackData CreateSharedCallbackData(
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         TimeProvider timeProvider,
         TimeSpan responseTimeout)
         => new(
