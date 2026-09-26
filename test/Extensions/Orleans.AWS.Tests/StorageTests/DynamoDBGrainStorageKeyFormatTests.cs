@@ -93,6 +93,37 @@ public class DynamoDBGrainStorageKeyFormatTests
     }
 
     [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeys_MovesStateReadByAnotherInstance()
+    {
+        // nothing is remembered between the read and the write, so a retry or another silo moves the state as well
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+
+        var state = await ReadAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; }), grainId);
+        state.State!.A = "migrated";
+        await (await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; })).WriteStateAsync(GrainType, grainId, state);
+
+        Assert.False(await RowExists($"_{grainId}"));
+        Assert.True(await RowExists($"{ClusterServiceId}_{grainId}"));
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeys_StaleLegacyStateIsInconsistent()
+    {
+        var grainId = NewGrainId();
+        var legacy = await CreateStorage();
+        await WriteAsync(legacy, grainId, "legacy");
+
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        var state = await ReadAsync(storage, grainId);
+        await WriteAsync(legacy, grainId, "changed meanwhile");
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(GrainType, grainId, state));
+        Assert.True(await RowExists($"_{grainId}"));
+        Assert.False(await RowExists($"{ClusterServiceId}_{grainId}"));
+    }
+
+    [Fact, TestCategory("Functional")]
     public async Task DynamoDBGrainStorage_MigrateLegacyKeys_ClearMovesClearedState()
     {
         var grainId = NewGrainId();

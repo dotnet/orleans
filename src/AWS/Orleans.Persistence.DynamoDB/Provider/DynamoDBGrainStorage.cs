@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,9 +46,6 @@ namespace Orleans.Storage
         private DynamoDBStorage storage = null!;
         private string _keyServiceId = string.Empty;
         private bool _migrateLegacyKeys;
-
-        // grains whose state was read from its legacy key and is moved on their next write
-        private readonly ConcurrentDictionary<(string PartitionKey, string RowKey), int> _pendingMigrations = new();
 
         /// <summary>
         /// Default Constructor
@@ -146,7 +143,6 @@ namespace Orleans.Storage
                 record = await ReadRecordAsync(GetLegacyKeyString(grainId), rowKey);
                 if (record != null)
                 {
-                    _pendingMigrations[(partitionKey, rowKey)] = record.ETag;
                     LogWarningReadingLegacyKey(logger, grainType, grainId, this.options.TableName);
                 }
             }
@@ -178,16 +174,21 @@ namespace Orleans.Storage
             try
             {
                 ConvertToStorageFormat(grainState.State, record);
-                if (_pendingMigrations.TryRemove((partitionKey, rowKey), out var legacyETag))
-                {
-                    await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: false);
-                }
-                else
+                try
                 {
                     await WriteStateInternal(grainState, record);
                 }
+                catch (ConditionalCheckFailedException) when (TryGetLegacyETag(grainState, out var legacyETag))
+                {
+                    // the current key has no item with this ETag: the state may have been read from the legacy key
+                    await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: false);
+                }
             }
             catch (ConditionalCheckFailedException exc)
+            {
+                throw new InconsistentStateException($"Inconsistent grain state: {exc}");
+            }
+            catch (TransactionCanceledException exc) when (IsConditionalCheckFailure(exc))
             {
                 throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
@@ -300,22 +301,7 @@ namespace Orleans.Storage
             var operation = "Clearing";
             try
             {
-                if (_pendingMigrations.TryRemove((partitionKey, rowKey), out var legacyETag))
-                {
-                    operation = "Migrating";
-                    if (this.options.DeleteStateOnClear)
-                    {
-                        await DeleteLegacyRecordAsync(GetLegacyKeyString(grainId), rowKey, legacyETag);
-                        ResetGrainState(grainState);
-                    }
-                    else
-                    {
-                        await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: true);
-                        grainState.State = CreateInstance<T>();
-                        grainState.RecordExists = false;
-                    }
-                }
-                else if (this.options.DeleteStateOnClear)
+                if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
                     var keys = new Dictionary<string, AttributeValue>
@@ -331,15 +317,37 @@ namespace Orleans.Storage
                         expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     }
 
-                    await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                    try
+                    {
+                        await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                    }
+                    catch (ConditionalCheckFailedException) when (TryGetLegacyETag(grainState, out var legacyETag))
+                    {
+                        operation = "Migrating";
+                        await DeleteLegacyRecordAsync(GetLegacyKeyString(grainId), rowKey, legacyETag);
+                    }
+
                     ResetGrainState(grainState);
                 }
                 else
                 {
-                    await WriteStateInternal(grainState, record, true);
+                    try
+                    {
+                        await WriteStateInternal(grainState, record, true);
+                    }
+                    catch (ConditionalCheckFailedException) when (TryGetLegacyETag(grainState, out var legacyETag))
+                    {
+                        operation = "Migrating";
+                        await MigrateStateAsync(grainState, record, GetLegacyKeyString(grainId), legacyETag, clear: true);
+                    }
+
                     grainState.State = CreateInstance<T>();
                     grainState.RecordExists = false;
                 }
+            }
+            catch (TransactionCanceledException exc) when (IsConditionalCheckFailure(exc))
+            {
+                throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
             catch (ConditionalCheckFailedException exc)
             {
@@ -469,6 +477,20 @@ namespace Orleans.Storage
             grainState.ETag = newETag.ToString(CultureInfo.InvariantCulture);
             grainState.RecordExists = !clear;
         }
+
+        /// <summary>
+        /// The ETag a write expected, when the migration applies: the state then came from the legacy key if it came from
+        /// anywhere, and the transaction checks that the legacy item still has that ETag.
+        /// </summary>
+        private bool TryGetLegacyETag<T>(IGrainState<T> grainState, out int legacyETag)
+        {
+            legacyETag = 0;
+            return _migrateLegacyKeys
+                && int.TryParse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture, out legacyETag);
+        }
+
+        private static bool IsConditionalCheckFailure(TransactionCanceledException exception) =>
+            exception.CancellationReasons?.Any(reason => string.Equals(reason.Code, "ConditionalCheckFailed", StringComparison.Ordinal)) is true;
 
         private Task DeleteLegacyRecordAsync(string legacyPartitionKey, string rowKey, int legacyETag) =>
             this.storage.WriteTxAsync(deletes: [LegacyDelete(legacyPartitionKey, rowKey, legacyETag)]);

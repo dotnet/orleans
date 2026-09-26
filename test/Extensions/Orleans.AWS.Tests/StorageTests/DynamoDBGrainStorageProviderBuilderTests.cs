@@ -42,6 +42,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.True(options.UpdateIfExists);
         Assert.False(options.DeleteStateOnClear);
         Assert.Null(options.TimeToLive);
+        Assert.Null(options.UseClusterServiceId);
+        Assert.Null(options.MigrateLegacyKeys);
         Assert.Same(defaultSerializer, options.GrainStorageSerializer);
     }
 
@@ -66,6 +68,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
             (nameof(DynamoDBStorageOptions.UpdateIfExists), "false"),
             (nameof(DynamoDBStorageOptions.DeleteStateOnClear), "true"),
             (nameof(DynamoDBStorageOptions.TimeToLive), "01:02:03"),
+            (nameof(DynamoDBStorageOptions.UseClusterServiceId), "true"),
+            (nameof(DynamoDBStorageOptions.MigrateLegacyKeys), "false"),
             ("SerializerKey", serializerKey));
         builder.Services.AddKeyedSingleton<IGrainStorageSerializer>(serializerKey, keyedSerializer);
 
@@ -87,8 +91,35 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.False(options.UpdateIfExists);
         Assert.True(options.DeleteStateOnClear);
         Assert.Equal(TimeSpan.FromHours(1) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3), options.TimeToLive);
+        Assert.True(options.UseClusterServiceId);
+        Assert.False(options.MigrateLegacyKeys);
         Assert.Same(keyedSerializer, options.GrainStorageSerializer);
         Assert.NotSame(defaultSerializer, options.GrainStorageSerializer);
+    }
+
+    [Fact]
+    public void Configure_ClusterServiceId_ComesFromClusterOptionsAndItsProviderOverride()
+    {
+        var (withoutClusterOptions, _) = ConfigureBuilder();
+        using (var services = withoutClusterOptions.Services.BuildServiceProvider())
+        {
+            Assert.Equal(ClusterOptions.DefaultServiceId, GetOptions(services).ClusterServiceId);
+        }
+
+        var (withClusterOptions, _) = ConfigureBuilder();
+        withClusterOptions.Services.Configure<ClusterOptions>(o => o.ServiceId = "cluster-service");
+        using (var services = withClusterOptions.Services.BuildServiceProvider())
+        {
+            Assert.Equal("cluster-service", GetOptions(services).ClusterServiceId);
+        }
+
+        var (withOverride, _) = ConfigureBuilder();
+        withOverride.Services.Configure<ClusterOptions>(o => o.ServiceId = "cluster-service");
+        withOverride.Services.AddKeyedSingleton(ProviderName, new ClusterOptions { ServiceId = "provider-service" });
+        using (var services = withOverride.Services.BuildServiceProvider())
+        {
+            Assert.Equal("provider-service", GetOptions(services).ClusterServiceId);
+        }
     }
 
     [Fact]
@@ -111,6 +142,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
     [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean")]
     [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean")]
     [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan")]
+    [InlineData(nameof(DynamoDBStorageOptions.UseClusterServiceId), "not-a-boolean")]
+    [InlineData(nameof(DynamoDBStorageOptions.MigrateLegacyKeys), "not-a-boolean")]
     public void Configure_InvalidTypedValue_PreservesDefault(string key, string invalidValue)
     {
         var (builder, _) = ConfigureBuilder((key, invalidValue));
@@ -128,6 +161,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         Assert.True(options.UpdateIfExists);
         Assert.False(options.DeleteStateOnClear);
         Assert.Null(options.TimeToLive);
+        Assert.Null(options.UseClusterServiceId);
+        Assert.Null(options.MigrateLegacyKeys);
     }
 
     [Fact]

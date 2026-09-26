@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration.Overrides;
 using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
@@ -104,11 +103,11 @@ namespace Orleans.Configuration
     {
         public void PostConfigure(string? name, DynamoDBStorageOptions options)
         {
-            var clusterOptions = name is null
-                ? serviceProvider.GetService<IOptions<ClusterOptions>>()
-                : serviceProvider.GetProviderClusterOptions(name);
+            // a provider-specific override first, as GetProviderClusterOptions does, without requiring ClusterOptions
+            var clusterOptions = (name is null ? null : serviceProvider.GetKeyedService<ClusterOptions>(name))
+                ?? serviceProvider.GetService<IOptions<ClusterOptions>>()?.Value;
 
-            if (clusterOptions?.Value.ServiceId is { Length: > 0 } serviceId)
+            if (clusterOptions?.ServiceId is { Length: > 0 } serviceId)
             {
                 options.ClusterServiceId = serviceId;
             }
