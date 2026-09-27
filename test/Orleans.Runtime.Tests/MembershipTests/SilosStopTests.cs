@@ -121,30 +121,24 @@ namespace UnitTests.MembershipTests
         public async Task CompletedGatewayForwardedRequestStopsTrackingClient()
         {
             var gateway = GetGateway();
-            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            var targetSilo = HostedCluster.SecondarySilos[0];
+            var target = await GetGrainOnTargetSilo(targetSilo);
             Assert.NotNull(target);
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var trackingStoppedTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.RequestTrackingStopped),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.RequestTrackingStopped stopped
+                    && stopped.SiloAddress.Equals(HostedCluster.Primary!.SiloAddress)
+                    && stopped.ClientId.Equals(clientId),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
 
-            var observer = new LongRunningTaskObserver();
-            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
-            try
-            {
-                var callId = Guid.NewGuid();
-                var promise = target.LongWaitWithStartNotification(
-                    TimeSpan.FromSeconds(5),
-                    callId,
-                    observerReference,
-                    CancellationToken.None);
+            var instanceId = await target.GetRuntimeInstanceId();
 
-                await observer.WaitForCallToStart(callId);
-                Assert.Equal(1, gateway.TrackedRequestClientCount);
-
-                await promise;
-                Assert.Equal(0, gateway.TrackedRequestClientCount);
-            }
-            finally
-            {
-                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
-            }
+            Assert.Contains(targetSilo.SiloAddress.Endpoint.ToString(), instanceId);
+            await trackingStoppedTask;
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
         }
 
         [Fact, TestCategory("Liveness")]
