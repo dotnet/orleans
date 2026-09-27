@@ -153,14 +153,13 @@ namespace Orleans.Runtime.Messaging
                 var attempt = response.GatewayRequestAttempt < 0
                     ? -response.GatewayRequestAttempt
                     : response.GatewayRequestAttempt;
-                if (attempt != 0 && TryConsumeReleasedAttempt(response.Id, attempt))
+                if (attempt != 0)
                 {
-                    return CompletionResult.NotTracked;
+                    TryConsumeReleasedAttempt(response.Id, attempt);
                 }
 
-                return response.GatewayRequestAttempt <= 0
-                    ? CompletionResult.NotTracked
-                    : CompletionResult.Superseded;
+                // Retention bounds gateway state; the client callback owns the response deadline.
+                return CompletionResult.NotTracked;
             }
 
             if (response.GatewayRequestAttempt != 0 && response.GatewayRequestAttempt != trackedRequest.Attempt)

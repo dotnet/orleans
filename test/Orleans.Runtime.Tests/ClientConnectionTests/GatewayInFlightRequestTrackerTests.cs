@@ -203,7 +203,7 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
-    public void TokenizedResponseWithoutTrackedAttemptIsSuperseded()
+    public void TokenizedResponseWithoutTrackedAttemptCanBeDelivered()
     {
         var tracker = CreateTracker();
         var request = CreateMessage(1, Message.Directions.Request, Silo1);
@@ -211,7 +211,8 @@ public class GatewayInFlightRequestTrackerTests
         var response = CreateResponse(request, Message.ResponseTypes.Success);
         tracker.Clear();
 
-        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
+        Assert.False(tracker.HasEntries);
     }
 
     [Fact]
@@ -878,10 +879,10 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.Equal(0, tracker.Count);
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
             tracker.TryComplete(CreateResponse(request1, Message.ResponseTypes.Success)));
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
             tracker.TryComplete(CreateResponse(request2, Message.ResponseTypes.Error)));
     }
 
@@ -929,8 +930,69 @@ public class GatewayInFlightRequestTrackerTests
 
         Assert.False(tracker.HasEntries);
         Assert.Equal(
-            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            GatewayInFlightRequestTracker.CompletionResult.NotTracked,
             tracker.TryComplete(CreateResponse(request, Message.ResponseTypes.Success)));
+    }
+
+    [Theory]
+    [InlineData((int)Message.ResponseTypes.Success, false)]
+    [InlineData((int)Message.ResponseTypes.Error, false)]
+    [InlineData((int)Message.ResponseTypes.Rejection, false)]
+    [InlineData((int)Message.ResponseTypes.Success, true)]
+    [InlineData((int)Message.ResponseTypes.Error, true)]
+    [InlineData((int)Message.ResponseTypes.Rejection, true)]
+    public void TtlLessResponseAfterTrackerExpiryCanBeDelivered(int responseType, bool expireOnSend)
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(30));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.Null(request.TimeToLive);
+        Assert.True(tracker.Track(request));
+        var response = CreateResponse(request, (Message.ResponseTypes)responseType);
+        Assert.True(response.GatewayRequestAttempt > 0);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(30));
+        if (expireOnSend)
+        {
+            Assert.True(tracker.TryRemoveExpiredAttempt(request));
+        }
+        else
+        {
+            tracker.RemoveExpired();
+        }
+
+        Assert.False(tracker.HasEntries);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        timeProvider.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
+        Assert.False(tracker.HasEntries);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExpiredAttemptResponseDoesNotCompleteActiveRetry(bool sameDestination)
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(30));
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(original));
+        var response = CreateResponse(original, Message.ResponseTypes.Success);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(30));
+        tracker.RemoveExpired();
+        Assert.False(tracker.HasEntries);
+        var retry = CreateMessage(1, Message.Directions.Request, sameDestination ? Silo1 : Silo2);
+        Assert.True(tracker.Track(retry));
+        Assert.NotEqual(original.GatewayRequestAttempt, retry.GatewayRequestAttempt);
+
+        Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
+        Assert.Equal(1, tracker.Count);
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Completed,
+            tracker.TryComplete(CreateResponse(retry, Message.ResponseTypes.Success)));
+        Assert.False(tracker.HasEntries);
     }
 
     [Fact]
@@ -1075,7 +1137,7 @@ public class GatewayInFlightRequestTrackerTests
         if (clearFirst)
         {
             tracker.Clear();
-            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.Superseded, tracker.TryComplete(response));
+            Assert.Equal(GatewayInFlightRequestTracker.CompletionResult.NotTracked, tracker.TryComplete(response));
         }
         else
         {
