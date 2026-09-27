@@ -92,7 +92,7 @@ For external client requests sent to a remote silo, the ingress gateway tracks t
 
 Forwarding updates advance destination ownership as the request moves between silos. Responses pass through the live ingress gateway to complete tracking. If that gateway becomes unavailable to the client, response routing selects a current gateway and bounds routing repair by the configured forwarding limit.
 
-Terminal responses and rejections remove tracked requests. Expiration bounds retained state using the message TTL, or the silo response timeout when the message has no TTL. Disconnect releases destination ownership while retaining a bounded attempt marker for response delivery after reconnect; client drop and gateway shutdown clear the remaining state.
+Terminal responses and rejections remove tracked requests. Expiration bounds retained state using the message TTL, or the silo response timeout when the message has no TTL. After tracking expires, responses remain eligible for delivery to the client, whose callback owns the call deadline. An active retry with the same correlation ID retains its attempt guard against older responses. Disconnect releases destination ownership while retaining a bounded attempt marker for delayed sends after reconnect; client drop and gateway shutdown clear the remaining state.
 
 A destination can forward a request and fail before the gateway observes the ownership update. A resulting availability rejection therefore leaves the execution outcome uncertain. Applications use idempotent operations or durable operation identifiers when retrying.
 
