@@ -86,6 +86,16 @@ Messages have expiration metadata derived from the response timeout. With <xref:
 
 Rejections carry more information than a timeout because the runtime has made an explicit decision for the current processing attempt. Earlier forwarded or transported attempts remain outcome-uncertain. Treat the rejection type as a routing or availability signal.
 
+### Gateway-forwarded requests and silo failure
+
+For external client requests sent to a remote silo, the ingress gateway tracks the destination and request attempt in its per-client state. Registration and the transport enqueue are serialized with membership-driven removal. When membership declares the tracked destination dead, the gateway removes the request and returns a transient rejection backed by <xref:Orleans.Runtime.SiloUnavailableException>, completing the client call promptly.
+
+Forwarding updates advance destination ownership as the request moves between silos. Responses pass through the live ingress gateway to complete tracking. If that gateway becomes unavailable to the client, response routing selects a current gateway and bounds routing repair by the configured forwarding limit.
+
+Terminal responses and rejections remove tracked requests. Expiration bounds retained state using the message TTL, or the silo response timeout when the message has no TTL. Disconnect releases destination ownership while retaining a bounded attempt marker for response delivery after reconnect; client drop and gateway shutdown clear the remaining state.
+
+A destination can forward a request and fail before the gateway observes the ownership update. A resulting availability rejection therefore leaves the execution outcome uncertain. Applications use idempotent operations or durable operation identifiers when retrying.
+
 ## Designing callers
 
 Choose semantics at the application boundary:
