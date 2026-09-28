@@ -289,6 +289,7 @@ public sealed class ZooKeeperReadRetryTests
         var firstCompleted = Gate();
         var closeStarted = Gate();
         var releaseClose = Gate();
+        var firstCompletedBeforeClose = false;
         var firstKey = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[0].SiloAddress);
         var secondKey = "GetData " + ZooKeeperNativeFake.RowPath(harness.Entries[1].SiloAddress);
         harness.BeforeRequest = request => request == firstKey ? first.Task : Task.CompletedTask;
@@ -299,6 +300,7 @@ public sealed class ZooKeeperReadRetryTests
         };
         harness.Close = () =>
         {
+            firstCompletedBeforeClose = firstCompleted.Task.IsCompleted;
             closeStarted.SetResult();
             return releaseClose.Task;
         };
@@ -316,8 +318,8 @@ public sealed class ZooKeeperReadRetryTests
             first.SetResult();
             await firstCompleted.Task.WaitAsync(TestContext.Current.CancellationToken);
             Assert.False(owner.Completion.IsCompleted);
-            Assert.False(closeStarted.Task.IsCompleted);
             await closeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            Assert.True(firstCompletedBeforeClose);
             Assert.False(owner.Completion.IsCompleted);
             Assert.DoesNotContain(secondKey, harness.Calls);
         }
