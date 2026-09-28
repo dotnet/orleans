@@ -18,7 +18,7 @@ internal static class MetadataSourceOutputGenerator
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
             var metadataGenerator = new MetadataGenerator(metadataModel, metadataModel.AssemblyName, supportsModuleInitializers);
             var metadataClass = metadataGenerator.GenerateMetadata();
-            var metadataNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly")}";
+            var metadataNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly").EscapeIdentifier()}";
             var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
             GeneratedSourceOutput.AddMember(namespacedMembers, metadataNamespace, metadataClass);
             var assemblyAttributes = CreateAssemblyAttributes(
