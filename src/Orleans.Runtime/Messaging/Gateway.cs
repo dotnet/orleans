@@ -429,7 +429,7 @@ namespace Orleans.Runtime.Messaging
 
             if (ShouldReaddressDisconnectedClientResponse(msg, client.IsConnected))
             {
-                messageCenter.ReaddressResponse(msg, siloAddress);
+                _ = messageCenter.ReaddressResponse(msg, siloAddress);
                 return true;
             }
 

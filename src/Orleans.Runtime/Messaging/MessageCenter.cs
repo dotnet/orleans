@@ -211,7 +211,7 @@ namespace Orleans.Runtime.Messaging
 
                 if (allowResponseReaddress && ShouldReaddressResponse(msg, targetSiloIsDead))
                 {
-                    ReaddressResponse(msg, msg.TargetSilo!);
+                    _ = ReaddressResponse(msg, msg.TargetSilo!);
                     return;
                 }
 
@@ -325,7 +325,7 @@ namespace Orleans.Runtime.Messaging
                                         if (allowResponseReaddress
                                             && ShouldReaddressResponse(msg, targetSiloIsDead))
                                         {
-                                            messageCenter.ReaddressResponse(msg, targetSilo);
+                                            _ = messageCenter.ReaddressResponse(msg, targetSilo);
                                             return;
                                         }
                                     }
@@ -351,7 +351,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void ReaddressResponse(Message message, SiloAddress unavailableTargetSilo)
+        internal Task ReaddressResponse(Message message, SiloAddress unavailableTargetSilo)
         {
             GatewayInFlightRequestTracker.MarkForUntrackedDelivery(message);
             RecordUnavailableGateway(message, unavailableTargetSilo);
@@ -365,11 +365,11 @@ namespace Orleans.Runtime.Messaging
                         new SiloUnavailableException($"No live gateway is available for client {message.TargetGrain}."));
                 }
 
-                return;
+                return Task.CompletedTask;
             }
 
             message.TargetSilo = null;
-            _ = ReaddressResponseAsync(this, message, unavailableTargetSilo);
+            return ReaddressResponseAsync(this, message, unavailableTargetSilo);
         }
 
         internal static void RecordUnavailableGateway(Message message, SiloAddress unavailableGateway)
@@ -397,7 +397,11 @@ namespace Orleans.Runtime.Messaging
             catch (Exception exception)
             {
                 messageCenter.messagingTrace.OnDispatcherSelectTargetFailed(message, exception);
-                messageCenter.RejectMessage(message, Message.RejectionTypes.Unrecoverable, exception);
+                if (messageCenter.Gateway?.TryQueueResponseToKnownClient(message) is not true)
+                {
+                    messageCenter.RejectMessage(message, Message.RejectionTypes.Unrecoverable, exception);
+                }
+
                 return;
             }
 
@@ -411,10 +415,14 @@ namespace Orleans.Runtime.Messaging
             if (message.TargetSilo is not { } targetSilo
                 || messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
             {
-                messageCenter.RejectMessage(
-                    message,
-                    Message.RejectionTypes.Transient,
-                    new SiloUnavailableException($"No live gateway is available for client {message.TargetGrain}."));
+                if (messageCenter.Gateway?.TryQueueResponseToKnownClient(message) is not true)
+                {
+                    messageCenter.RejectMessage(
+                        message,
+                        Message.RejectionTypes.Transient,
+                        new SiloUnavailableException($"No live gateway is available for client {message.TargetGrain}."));
+                }
+
                 return;
             }
 

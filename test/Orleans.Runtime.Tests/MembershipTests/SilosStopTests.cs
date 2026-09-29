@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
@@ -6,8 +7,10 @@ using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
+using Orleans.Serialization.Invocation;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
@@ -35,7 +38,12 @@ namespace UnitTests.MembershipTests
                         options.NumVotesForDeathDeclaration = 1;
                         options.TableRefreshTimeout = TimeSpan.FromSeconds(2);
                     })
-                    .Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
+                    .Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true)
+                    .ConfigureServices(services =>
+                    {
+                        services.AddSingleton<FaultingClientDirectory>();
+                        services.AddSingleton<ILocalClientDirectory>(services => services.GetRequiredService<FaultingClientDirectory>());
+                    });
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -139,6 +147,52 @@ namespace UnitTests.MembershipTests
             Assert.Contains(targetSilo.SiloAddress.Endpoint.ToString(), instanceId);
             await trackingStoppedTask;
             Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task ResponseAddressingFailureQueuesForDisconnectedClient()
+        {
+            var services = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var messageCenter = services.GetRequiredService<MessageCenter>();
+            var gateway = messageCenter.Gateway!;
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var request = new Message
+            {
+                Id = new CorrelationId(-1),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = HostedCluster.SecondarySilos[0].SiloAddress,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+            var connection = Assert.IsType<GatewayInboundConnection>(client.Connection);
+            var response = services.GetRequiredService<MessageFactory>().CreateResponseMessage(request);
+            response.GatewayRequestAttempt = 42;
+            response.Result = Message.ResponseTypes.Success;
+            var body = response.BodyObject = Response.Completed;
+            var directory = services.GetRequiredService<FaultingClientDirectory>();
+            directory.UnavailableClient = clientId;
+            client.RecordDisconnection();
+            try
+            {
+                await messageCenter.ReaddressResponse(response, HostedCluster.Primary.SiloAddress);
+
+                Assert.Equal(1, directory.Failures);
+                Assert.Null(client.Connection);
+                Assert.Equal(Message.ResponseTypes.Success, response.Result);
+                Assert.Same(body, response.BodyObject);
+                Assert.Equal(clientId, response.TargetGrain);
+                Assert.Null(response.TargetSilo);
+                Assert.Equal(0, response.GatewayRequestAttempt);
+                Assert.Null(response.GatewayResponseRoutingHistory);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                directory.UnavailableClient = default;
+                client.RecordConnection(connection);
+            }
         }
 
         [Fact, TestCategory("Liveness")]
@@ -549,6 +603,25 @@ namespace UnitTests.MembershipTests
 
         private Gateway GetGateway() =>
             ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider.GetRequiredService<MessageCenter>().Gateway!;
+
+        private sealed class FaultingClientDirectory(ClientDirectory inner) : ILocalClientDirectory
+        {
+            public GrainId UnavailableClient { get; set; }
+            public int Failures { get; private set; }
+
+            public bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out List<GrainAddress>? addresses)
+            {
+                if (grainId == UnavailableClient)
+                {
+                    Failures++;
+                    throw new ClientNotAvailableException(grainId);
+                }
+
+                return inner.TryLocalLookup(grainId, out addresses);
+            }
+
+            public ValueTask<List<GrainAddress>> Lookup(GrainId grainId) => inner.Lookup(grainId);
+        }
 
         private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
         {
