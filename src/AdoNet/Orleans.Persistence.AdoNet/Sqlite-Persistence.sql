@@ -79,49 +79,66 @@ CREATE INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
 -- Updates an existing grain state with optimistic concurrency control or inserts it if it does not exist.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
 ('WriteToStorageKey', '
-    BEGIN TRANSACTION;
-
-    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteState
+    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest
     (
-        TotalChangesBefore INT NOT NULL
+        GrainIdHash INT NOT NULL,
+        GrainIdN0 BIGINT NOT NULL,
+        GrainIdN1 BIGINT NOT NULL,
+        GrainTypeHash INT NOT NULL,
+        GrainTypeString NVARCHAR(512) NOT NULL,
+        GrainIdExtensionString NVARCHAR(512) NULL,
+        ServiceId NVARCHAR(150) NOT NULL,
+        PayloadBinary BLOB NULL,
+        GrainStateVersion INT NULL,
+        Applied INT NOT NULL DEFAULT 0
     );
-    DELETE FROM OrleansStorageWriteState;
-    INSERT INTO OrleansStorageWriteState (TotalChangesBefore) VALUES (total_changes() + 1);
 
-    UPDATE OrleansStorage
-    SET
-        PayloadBinary = @PayloadBinary,
-        ModifiedOn = datetime(''now''),
-        Version = Version + 1
-    WHERE
-        GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
-        AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
-        AND GrainTypeString = @GrainTypeString
-        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
-        AND ServiceId = @ServiceId
-        AND Version = @GrainStateVersion;
+    CREATE TEMP TRIGGER IF NOT EXISTS OrleansStorageWriteApply
+    AFTER INSERT ON OrleansStorageWriteRequest
+    BEGIN
+        UPDATE OrleansStorage
+        SET
+            PayloadBinary = NEW.PayloadBinary,
+            ModifiedOn = datetime(''now''),
+            Version = Version + 1
+        WHERE
+            GrainIdHash = NEW.GrainIdHash AND GrainTypeHash = NEW.GrainTypeHash
+            AND GrainIdN0 = NEW.GrainIdN0 AND GrainIdN1 = NEW.GrainIdN1
+            AND GrainTypeString = NEW.GrainTypeString
+            AND (GrainIdExtensionString = NEW.GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND NEW.GrainIdExtensionString IS NULL))
+            AND ServiceId = NEW.ServiceId
+            AND Version = NEW.GrainStateVersion;
 
-    INSERT INTO OrleansStorage (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, ModifiedOn, Version)
-    SELECT @GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @PayloadBinary, datetime(''now''), 1
-    WHERE changes() = 0
-      AND @GrainStateVersion IS NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM OrleansStorage
-        WHERE GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
-        AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
-        AND GrainTypeString = @GrainTypeString
-        AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
-        AND ServiceId = @ServiceId
-    );
+        UPDATE OrleansStorageWriteRequest SET Applied = changes() WHERE rowid = NEW.rowid;
+
+        INSERT INTO OrleansStorage (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, ModifiedOn, Version)
+        SELECT NEW.GrainIdHash, NEW.GrainIdN0, NEW.GrainIdN1, NEW.GrainTypeHash, NEW.GrainTypeString, NEW.GrainIdExtensionString, NEW.ServiceId, NEW.PayloadBinary, datetime(''now''), 1
+        WHERE NEW.GrainStateVersion IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM OrleansStorage
+            WHERE GrainIdHash = NEW.GrainIdHash AND GrainTypeHash = NEW.GrainTypeHash
+            AND GrainIdN0 = NEW.GrainIdN0 AND GrainIdN1 = NEW.GrainIdN1
+            AND GrainTypeString = NEW.GrainTypeString
+            AND (GrainIdExtensionString = NEW.GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND NEW.GrainIdExtensionString IS NULL))
+            AND ServiceId = NEW.ServiceId
+        );
+
+        UPDATE OrleansStorageWriteRequest SET Applied = Applied + changes(), PayloadBinary = NULL WHERE rowid = NEW.rowid;
+    END;
+
+    DELETE FROM OrleansStorageWriteRequest;
+
+    INSERT INTO OrleansStorageWriteRequest (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, GrainStateVersion)
+    VALUES (@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @PayloadBinary, @GrainStateVersion);
 
     SELECT CASE WHEN @GrainStateVersion IS NULL THEN 1 ELSE @GrainStateVersion + 1 END AS NewGrainStateVersion
-    WHERE total_changes() > (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1);
+    FROM OrleansStorageWriteRequest
+    WHERE Applied > 0;
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
-    WHERE total_changes() = (SELECT TotalChangesBefore FROM OrleansStorageWriteState LIMIT 1)
+    FROM OrleansStorageWriteRequest
+    WHERE Applied = 0
         AND @GrainStateVersion IS NOT NULL;
-
-    COMMIT;
 ');
 
 -- Retrieves the binary payload and the current version of a specific grain state.
