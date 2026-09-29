@@ -172,8 +172,8 @@ namespace UnitTests.MembershipTests
             response.Result = Message.ResponseTypes.Success;
             var body = response.BodyObject = Response.Completed;
             var directory = services.GetRequiredService<FaultingClientDirectory>();
-            directory.UnavailableClient = clientId;
             client.RecordDisconnection();
+            directory.UnavailableClient = clientId;
             try
             {
                 await messageCenter.ReaddressResponse(response, HostedCluster.Primary.SiloAddress);
@@ -606,14 +606,22 @@ namespace UnitTests.MembershipTests
 
         private sealed class FaultingClientDirectory(ClientDirectory inner) : ILocalClientDirectory
         {
-            public GrainId UnavailableClient { get; set; }
-            public int Failures { get; private set; }
+            private readonly AsyncLocal<GrainId> _unavailableClient = new();
+            private int _failures;
+
+            public GrainId UnavailableClient
+            {
+                get => _unavailableClient.Value;
+                set => _unavailableClient.Value = value;
+            }
+
+            public int Failures => Volatile.Read(ref _failures);
 
             public bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out List<GrainAddress>? addresses)
             {
                 if (grainId == UnavailableClient)
                 {
-                    Failures++;
+                    Interlocked.Increment(ref _failures);
                     throw new ClientNotAvailableException(grainId);
                 }
 
