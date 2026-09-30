@@ -17,25 +17,15 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_COVERAGE_NOLOGO: 1
   DOTNET_COVERAGE_VERSION: 18.11.2
-  # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
-  AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+  # Proprietary emulators stay on their official registries; redistributable images are pinned in ci-images.json.
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
   COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260907@sha256:2db1f9e74c506bcf6fc347aa937aea1c00fa756061296a5a9efba530ce86ec02
   CONSUL_IMAGE: mirror.gcr.io/hashicorp/consul:1.19@sha256:e244c64df77ab3586f177f1692e98575086eb40343dc82a6320f5e79543490eb
   CONSUL_FALLBACK_IMAGE: docker.io/hashicorp/consul:1.19@sha256:e244c64df77ab3586f177f1692e98575086eb40343dc82a6320f5e79543490eb
-  DYNAMODB_IMAGE: amazon/dynamodb-local:latest
-  ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
-  # Keep in sync with SeaweedFSTestContainer
-  # so the fixtures use the pre-pulled image.
-  SEAWEEDFS_IMAGE: ghcr.io/chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
-  MINISTACK_IMAGE: ministackorg/ministack:1.4.11@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1
+  DYNAMODB_IMAGE: docker.io/amazon/dynamodb-local:latest@sha256:ff89bd48ff32cd8d9be5fee8873b65b8854dc408f1afe881be6eb00247bc0dab
   MSSQL_IMAGE: mcr.microsoft.com/mssql/server:2022-CU26-ubuntu-22.04@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
-  NATS_IMAGE: nats:latest
-  POSTGRES_IMAGE: postgres
-  REDIS_IMAGE: redis
-  TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
-  TESTCONTAINERS_RYUK_MIRROR_IMAGE: ghcr.io/dotnet/orleans-ci-test-images:ryuk-0.14.0-amd64@sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981
-  ZOOKEEPER_IMAGE: zookeeper:3.9
+  # Redis 8 requires a source-redistribution compliance decision before publishing a public mirror.
+  REDIS_IMAGE: docker.io/library/redis:latest@sha256:6f81e8915c60b065a524e6967e0ad1c639ba6efa84d669f823683ea04d9150ee
 jobs:
   whitespace:
     name: Whitespace formatting
@@ -126,8 +116,6 @@ jobs:
   test-cassandra:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
-    env:
-      CASSANDRA_IMAGE: cassandra:${{ matrix.dbversion }}
     strategy:
       fail-fast: false
       matrix:
@@ -140,8 +128,8 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
-        bash .github/scripts/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
+        bash .github/scripts/docker-pull-ci-image.sh ryuk TESTCONTAINERS_RYUK_CONTAINER_IMAGE
+        bash .github/scripts/docker-pull-ci-image.sh "cassandra-${{ matrix.dbversion }}" ORLEANS_CASSANDRA_TEST_IMAGE
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -167,7 +155,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$POSTGRES_IMAGE"
+        postgres_image="$(bash .github/scripts/docker-pull-ci-image.sh postgres)"
 
         docker run -d --pull=never --name postgres \
           -p 5432:5432 \
@@ -176,7 +164,7 @@ jobs:
           --health-interval 10s \
           --health-timeout 5s \
           --health-retries 5 \
-          "$POSTGRES_IMAGE" \
+          "$postgres_image" \
           -c max_connections=200
 
         bash .github/scripts/docker-wait-for-health.sh postgres
@@ -196,8 +184,7 @@ jobs:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
     env:
-      # The official MariaDB 10.6 image is not published to GHCR. Prefer Google's Docker Hub
-      # mirror, with Docker Hub as a fallback, and pin both references to the same digest.
+      # Prefer Google's pinned Docker Hub mirror, with Docker Hub as a fallback.
       MARIADB_IMAGE: mirror.gcr.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
       MARIADB_FALLBACK_IMAGE: docker.io/library/mariadb:10.6@sha256:daacc2f260f8ec999daa5e03a017a23a7e6fa3fb982aaf26e8b72f24daf03bc9
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -336,13 +323,13 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+        azurite_image="$(bash .github/scripts/docker-pull-ci-image.sh azurite)"
 
         docker run -d --pull=never --name azurite \
           -p 10000:10000 \
           -p 10001:10001 \
           -p 10002:10002 \
-          "$AZURITE_IMAGE" \
+          "$azurite_image" \
           azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
     - name: Wait for Azurite
       run: |
@@ -376,13 +363,13 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+        azurite_image="$(bash .github/scripts/docker-pull-ci-image.sh azurite)"
 
         docker run -d --pull=never --name azurite \
           -p 10000:10000 \
           -p 10001:10001 \
           -p 10002:10002 \
-          "$AZURITE_IMAGE" \
+          "$azurite_image" \
           azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
     - name: Wait for Azurite
       run: |
@@ -497,7 +484,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
+        bash .github/scripts/docker-pull-ci-image.sh ryuk TESTCONTAINERS_RYUK_CONTAINER_IMAGE
         consul_image="$CONSUL_IMAGE"
         if ! bash .github/scripts/docker-pull-with-retry.sh "$consul_image"; then
           echo "Pulling Consul from Docker Hub after the mirror failed."
@@ -526,11 +513,11 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$ZOOKEEPER_IMAGE"
+        zookeeper_image="$(bash .github/scripts/docker-pull-ci-image.sh zookeeper)"
 
         docker run -d --pull=never --name zookeeper \
           -p 2181:2181 \
-          "$ZOOKEEPER_IMAGE"
+          "$zookeeper_image"
 
         echo "Waiting for ZooKeeper to accept TCP connections..."
         timeout 60 bash -c 'until nc -z localhost 2181; do sleep 1; done'
@@ -607,8 +594,8 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
-        bash .github/scripts/docker-pull-with-retry.sh "$SEAWEEDFS_IMAGE"
+        bash .github/scripts/docker-pull-ci-image.sh ryuk TESTCONTAINERS_RYUK_CONTAINER_IMAGE
+        bash .github/scripts/docker-pull-ci-image.sh seaweedfs ORLEANS_SEAWEEDFS_TEST_IMAGE
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -648,11 +635,11 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$ELASTICMQ_IMAGE"
+        elasticmq_image="$(bash .github/scripts/docker-pull-ci-image.sh elasticmq)"
 
         docker run -d --pull=never --name elasticmq \
           -p 9324:9324 \
-          "$ELASTICMQ_IMAGE"
+          "$elasticmq_image"
     - name: Wait for ElasticMQ and DynamoDB
       run: |
         echo "Waiting for ElasticMQ and DynamoDB Local to be ready..."
@@ -699,12 +686,12 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$NATS_IMAGE"
+        nats_image="$(bash .github/scripts/docker-pull-ci-image.sh nats)"
 
         docker run -d --pull=never --name nats \
           -p 4222:4222 \
           -p 8222:8222 \
-          "$NATS_IMAGE" \
+          "$nats_image" \
           --js --http_port=8222
     - name: Wait for NATS
       run: |
@@ -743,12 +730,12 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$MINISTACK_IMAGE"
+        ministack_image="$(bash .github/scripts/docker-pull-ci-image.sh ministack)"
 
         docker run -d --pull=never --name ministack \
           -p 4566:4566 \
           -e MINISTACK_REGION="$AWS_REGION" \
-          "$MINISTACK_IMAGE"
+          "$ministack_image"
     - name: Start DynamoDB Local
       shell: bash
       run: |
