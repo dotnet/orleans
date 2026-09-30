@@ -5,13 +5,14 @@ import remarkDirective from 'remark-directive';
 import starlightDotMd from 'starlight-dot-md';
 import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsTxt from 'starlight-llms-txt';
+import { getBuildConcurrency } from './scripts/lib/build-settings.mjs';
 import { createSidebar } from './scripts/lib/docfx.mjs';
 import { cleanMarkdownOutput } from './src/plugins/clean-markdown-output.mjs';
 import { remarkMermaid } from './src/plugins/remark-mermaid.mjs';
 import { remarkVersionZones } from './src/plugins/remark-version-zones.mjs';
 
 const sidebar = await createSidebar(new URL('./src/content/docs/toc.yml', import.meta.url));
-const buildConcurrency = Number(process.env.ORLEANS_DOCS_BUILD_CONCURRENCY) || 4;
+const buildConcurrency = getBuildConcurrency();
 const markdownPageExample =
   'https://dotnet.github.io/orleans/docs/implementation/streams-implementation.md';
 sidebar.unshift({ label: 'Documentation', link: '/docs/' });
