@@ -33,7 +33,8 @@ env:
   NATS_IMAGE: nats:latest
   POSTGRES_IMAGE: postgres
   REDIS_IMAGE: redis
-  TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0
+  TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+  TESTCONTAINERS_RYUK_MIRROR_IMAGE: ghcr.io/dotnet/orleans-ci-test-images:ryuk-0.14.0-amd64@sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981
   ZOOKEEPER_IMAGE: zookeeper:3.9
 jobs:
   whitespace:
@@ -43,6 +44,8 @@ jobs:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       with:
         fetch-depth: 0
+    - name: Check CI image selection
+      run: bash .github/scripts/test-docker-pull-ci-image.sh
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
@@ -137,7 +140,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
         bash .github/scripts/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
     - name: Test
       uses: ./.github/actions/run-tests
@@ -494,7 +497,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
         consul_image="$CONSUL_IMAGE"
         if ! bash .github/scripts/docker-pull-with-retry.sh "$consul_image"; then
           echo "Pulling Consul from Docker Hub after the mirror failed."
@@ -604,7 +607,7 @@ jobs:
       run: |
         set -euo pipefail
 
-        bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
+        bash .github/scripts/docker-pull-ci-image.sh "$TESTCONTAINERS_RYUK_MIRROR_IMAGE" "$TESTCONTAINERS_RYUK_IMAGE" TESTCONTAINERS_RYUK_CONTAINER_IMAGE
         bash .github/scripts/docker-pull-with-retry.sh "$SEAWEEDFS_IMAGE"
     - name: Test
       uses: ./.github/actions/run-tests

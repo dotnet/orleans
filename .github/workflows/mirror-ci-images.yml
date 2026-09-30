@@ -1,0 +1,56 @@
+name: Mirror CI test images
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/mirror-ci-images.yml
+    - .github/workflows/ci.yml
+    - .github/scripts/docker-pull-ci-image.sh
+permissions:
+  contents: read
+  packages: write
+jobs:
+  mirror:
+    name: Mirror pinned Linux test images
+    if: github.repository == 'dotnet/orleans' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+        # Keep the pinned sources and destinations in sync with ci.yml.
+        - name: consul
+          source: docker.io/hashicorp/consul@sha256:1863b76110b65b9b40c355a3082db89fba499a454c931c3365ad12aa54b9d2ef
+          destination: ghcr.io/dotnet/orleans-ci-test-images:consul-1.19-amd64
+          digest: sha256:1863b76110b65b9b40c355a3082db89fba499a454c931c3365ad12aa54b9d2ef
+        - name: ryuk
+          source: docker.io/testcontainers/ryuk@sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981
+          destination: ghcr.io/dotnet/orleans-ci-test-images:ryuk-0.14.0-amd64
+          digest: sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981
+    steps:
+    - name: Install pinned registry copier
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl --fail --location --silent --show-error \
+          https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz \
+          --output crane.tar.gz
+        echo "0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0  crane.tar.gz" | sha256sum --check
+        tar -xzf crane.tar.gz crane
+    - name: Copy and verify ${{ matrix.name }}
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SOURCE_IMAGE: ${{ matrix.source }}
+        DESTINATION_IMAGE: ${{ matrix.destination }}
+        EXPECTED_DIGEST: ${{ matrix.digest }}
+      run: |
+        set -euo pipefail
+        echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        test "$(./crane digest "$SOURCE_IMAGE")" = "$EXPECTED_DIGEST"
+        ./crane copy "$SOURCE_IMAGE" "$DESTINATION_IMAGE"
+        test "$(./crane digest "$DESTINATION_IMAGE")" = "$EXPECTED_DIGEST"
+        echo "GHCR creates packages private by default. Set ghcr.io/dotnet/orleans-ci-test-images to public after its first publication so PR jobs can pull it without credentials." >> "$GITHUB_STEP_SUMMARY"
