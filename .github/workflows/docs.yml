@@ -31,7 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      ORLEANS_DOCS_BUILD_CONCURRENCY: 4
       ORLEANS_DOCS_SOURCE_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout

@@ -41,6 +41,14 @@ Pagefind indexing, and production build with:
 npm run validate
 ```
 
+Astro generates one route at a time by default on Windows to avoid the
+concurrent prerender output race tracked in
+[#10672](https://github.com/dotnet/orleans/issues/10672). Other platforms
+generate four routes concurrently. Set `ORLEANS_DOCS_BUILD_CONCURRENCY` to a
+positive integer to select a different worker count. Windows users who enable
+concurrent generation should use Node.js 24.20 or later, which includes the
+upstream fix for the secondary libuv shutdown assertion.
+
 The source audit reports a rule ID, file, line, and remediation. It enforces:
 
 - Orleans 10 guidance outside migration pages and explicitly versioned compatibility zones.
