@@ -22,7 +22,9 @@ namespace Consul.Tests
             () => EnsureConsulAndGetSkipReasonAsync().GetAwaiter().GetResult(),
             LazyThreadSafetyMode.PublicationOnly);
 
-        private static readonly ConsulContainer _container = new ConsulBuilder("public.ecr.aws/hashicorp/consul:1.19")
+        private static readonly ConsulContainer _container = new ConsulBuilder(
+            Environment.GetEnvironmentVariable("CONSUL_IMAGE")
+            ?? "mirror.gcr.io/hashicorp/consul:1.19@sha256:e244c64df77ab3586f177f1692e98575086eb40343dc82a6320f5e79543490eb")
             .WithCreateParameterModifier(parameters =>
             {
                 if (parameters.HostConfig is not null && !IsWindowsDockerDaemon())
