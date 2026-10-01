@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
@@ -57,6 +60,52 @@ public class DefaultGrainActivatorTests
         Assert.NotSame(first, second);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void ManualRegistrationCreatesGrainThroughSiloManifest()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var options = new GrainTypeOptions();
+        options.AddClass(typeof(ParameterlessGrain));
+        var converter = new TypeConverter([], [], [], Options.Create(new TypeManifestOptions()), new CachedTypeResolver());
+        var resolver = new GrainTypeResolver([], converter);
+        var manifest = new SiloManifestProvider(
+            [], [], Options.Create(options), resolver, new GrainInterfaceTypeResolver([], converter), converter);
+
+        Assert.True(manifest.GrainTypeMap.TryGetGrainClass(resolver.GetGrainType(typeof(ParameterlessGrain)), out var grainClass));
+        var activator = new DefaultGrainActivator(services, grainClass);
+        var grain = Assert.IsType<ParameterlessGrain>(activator.CreateInstance(CreateContext(services)));
+
+        Assert.Equal(42, grain.Add(17, 25));
+        Assert.Single(manifest.SiloManifest.Grains);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ManualRegistrationExposesConstructorPreservationContract()
+    {
+        var registration = typeof(GrainTypeOptions).GetMethod(nameof(GrainTypeOptions.AddClass))!;
+        var preservation = registration.GetParameters()[0].GetCustomAttribute<DynamicallyAccessedMembersAttribute>();
+        Assert.Equal(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces, preservation?.MemberTypes);
+        var collectionWarning = typeof(GrainTypeOptions).GetProperty(nameof(GrainTypeOptions.Classes))!
+            .GetMethod!.GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        Assert.NotNull(collectionWarning);
+        Assert.Contains(nameof(GrainTypeOptions.AddClass), collectionWarning.Message);
+        var dictionaryWarning = typeof(GrainClassMap).GetConstructors().Single()
+            .GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
+        Assert.NotNull(dictionaryWarning);
+        Assert.Contains(nameof(GrainTypeOptions.AddClass), dictionaryWarning.Message);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ManualRegistrationRejectsNullClass()
+    {
+        var options = new GrainTypeOptions();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => options.AddClass(null!));
+
+        Assert.Equal("grainClass", exception.ParamName);
+        Assert.Empty(options.GrainClasses);
+    }
+
     private static IGrainContext CreateContext(IServiceProvider services)
     {
         var context = Substitute.For<IGrainContext>();
@@ -70,7 +119,7 @@ public class DefaultGrainActivatorTests
         manifest.AddInterfaceImplementation(typeof(TGrain));
         var grainType = GrainType.Create(typeof(TGrain).Name);
         var converter = new TypeConverter([], [], [], Options.Create(manifest), new CachedTypeResolver());
-        var map = new GrainClassMap(converter, ImmutableDictionary<GrainType, Type>.Empty.Add(grainType, typeof(TGrain)));
+        var map = GrainClassMap.CreateRegistered(converter, ImmutableDictionary<GrainType, Type>.Empty.Add(grainType, typeof(TGrain)));
         Assert.True(map.TryGetGrainClass(grainType, out var grainClass));
         Assert.Equal(typeof(TGrain), grainClass);
         return new DefaultGrainActivator(services, grainClass);

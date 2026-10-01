@@ -4,9 +4,11 @@
   "rejectDiagnostics": [
     "\\bIL\\d+: (?:Orleans\\.NativeAotSmoke\\.|OrleansCodeGen\\.OrleansNativeAotSmoke\\.|Orleans\\.Runtime\\.DefaultGrainActivator\\.)",
     "\\bIL\\d+: [^\\r\\n]*'Orleans\\.Serialization\\.Configuration\\.TypeManifestOptions\\.AddInterfaceImplementation",
+    "\\bIL\\d+: Orleans\\.Configuration\\.GrainTypeOptions\\.",
+    "\\bIL\\d+: [^\\r\\n]*'Orleans\\.Configuration\\.GrainTypeOptions\\.AddClass",
     "\\bIL(?!(?:2060|3050)\\b)\\d+: Orleans\\.Runtime\\.GrainConstructorArgumentFactory\\.",
     "\\bIL\\d+: Orleans\\.Metadata\\.GrainClassMap\\.(?!MakeGenericGrainClass\\b)",
-    "(?:DefaultGrainActivator|GrainActivation[^\\\\/]*|TypeManifestOptions)\\.cs\\([^)]*\\): (?:warning|error) IL\\d+",
+    "(?:DefaultGrainActivator|GrainActivation[^\\\\/]*|TypeManifestOptions|GrainTypeOptions)\\.cs\\([^)]*\\): (?:warning|error) IL\\d+",
     "GrainConstructorArgumentFactory\\.cs\\([^)]*\\): (?:warning|error) IL(?!(?:2060|3050)\\b)\\d+",
     "GrainClassMap\\.cs\\([^)]*\\): (?:warning|error) IL(?!(?:2055|3050)\\b)\\d+"
   ]

@@ -20,13 +20,22 @@ namespace Orleans.Metadata
         /// <param name="typeConverter">The type converter.</param>
         /// <param name="classes">
         /// The grain classes with public constructors preserved, as registered by
+        /// <see cref="Configuration.GrainTypeOptions.AddClass(Type)"/> or
         /// <see cref="Serialization.Configuration.TypeManifestOptions.AddInterfaceImplementation(Type)"/>.
         /// </param>
+        [RequiresUnreferencedCode("The dictionary's grain types must have public constructors preserved separately, for example by GrainTypeOptions.AddClass or TypeManifestOptions.AddInterfaceImplementation.")]
         public GrainClassMap(TypeConverter typeConverter, ImmutableDictionary<GrainType, Type> classes)
         {
             _typeConverter = typeConverter;
             _types = classes;
         }
+
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2026",
+            Justification = "SiloManifestProvider builds this dictionary from GrainTypeOptions registrations. Generated manifests preserve constructors through AddInterfaceImplementation and manual registrations through AddClass. Direct Classes access warns callers to preserve constructors separately.")]
+        internal static GrainClassMap CreateRegistered(TypeConverter typeConverter, ImmutableDictionary<GrainType, Type> classes)
+            => new(typeConverter, classes);
 
         /// <summary>
         /// Returns the grain class type corresponding to the provided grain type.
@@ -65,7 +74,7 @@ namespace Orleans.Metadata
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2067",
-            Justification = "Generated grain classes and trim-safe manual registrations use TypeManifestOptions.AddInterfaceImplementation, which preserves public constructors. GrainTypeOptions.Classes and the immutable dictionary retain those types but cannot carry their annotations.")]
+            Justification = "Generated and manual registrations preserve public constructors through TypeManifestOptions.AddInterfaceImplementation or GrainTypeOptions.AddClass. Direct Classes access and the public dictionary constructor require callers to preserve constructors separately and warn when trimming. The collections retain those types but cannot carry their annotations.")]
         private bool TryGetRegisteredGrainClass(
             GrainType grainType,
             [NotNullWhen(true), DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] out Type? grainClass)

@@ -545,6 +545,8 @@ namespace Orleans.Configuration
         public System.Collections.Generic.HashSet<System.Type> Classes { get { throw null; } }
 
         public System.Collections.Generic.HashSet<System.Type> Interfaces { get { throw null; } }
+
+        public void AddClass(System.Type grainClass) { }
     }
 
     public sealed partial class GrainTypeOptionsValidator : IConfigurationValidator

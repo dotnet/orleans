@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
@@ -17,7 +18,9 @@ internal static class GrainActivation
         ITypeManifestProvider generated = new OrleansCodeGen.OrleansNativeAotSmoke.Metadata_OrleansNativeAotSmoke();
         generated.Configure(manifest);
         var converter = new TypeConverter([], [], [], Options.Create(manifest), new CachedTypeResolver());
-        var map = new GrainClassMap(converter, GetRegisteredGrainClasses(manifest));
+        var manual = new GrainTypeOptions();
+        manual.AddClass(typeof(ManualGrain));
+        var map = CreateRegisteredGrainMap(converter, manifest, manual);
 
         using var services = new ServiceCollection()
             .AddScoped<GrainActivationDependency>(_ => new GrainActivationDependency())
@@ -30,6 +33,10 @@ internal static class GrainActivation
         var parameterless = GetActivator(nameof(GrainActivationParameterlessGrain), services, map);
         var addition = (GrainActivationParameterlessGrain)parameterless.CreateInstance(firstContext);
         Require(await addition.Add(17, 25) == 42, "The implicit public parameterless constructor activates a working grain.");
+
+        var manualActivator = GetActivator(nameof(ManualGrain), services, map);
+        var manualGrain = (ManualGrain)manualActivator.CreateInstance(firstContext);
+        Require(manualGrain.Add(17, 25) == 42, "Manual registration preserves the public grain constructor.");
 
         var preferred = GetActivator(nameof(GrainActivationPreferredGrain), services, map);
         var preferredGrain = (GrainActivationPreferredGrain)preferred.CreateInstance(firstContext);
@@ -47,10 +54,11 @@ internal static class GrainActivation
         Require(!ReferenceEquals(first.Dependency, second.Dependency), "Activation scopes have distinct dependencies.");
 
         await parameterless.DisposeInstance(firstContext, addition);
+        await manualActivator.DisposeInstance(firstContext, manualGrain);
         await preferred.DisposeInstance(firstContext, preferredGrain);
         await injected.DisposeInstance(firstContext, first);
         await injected.DisposeInstance(secondContext, second);
-        Console.WriteLine("NativeAOT grain activation passed: implicit constructor, preferred constructor, and scoped dependency identity.");
+        Console.WriteLine("NativeAOT grain activation passed: generated and manual registration, implicit constructor, preferred constructor, and scoped dependency identity.");
     }
 
     private static DefaultGrainActivator GetActivator(string name, IServiceProvider services, GrainClassMap map)
@@ -66,9 +74,22 @@ internal static class GrainActivation
     [UnconditionalSuppressMessage(
         "Trimming",
         "IL2026",
-        Justification = "This read-only collection access consumes the generated manifest, whose AddInterfaceImplementation calls preserve the public constructors used by the production grain activator.")]
-    private static ImmutableDictionary<GrainType, Type> GetRegisteredGrainClasses(TypeManifestOptions manifest)
-        => manifest.InterfaceImplementations.ToImmutableDictionary(type => GrainType.Create(type.Name));
+        Justification = "The dictionary contains generated registrations from AddInterfaceImplementation and the manual grain registered through AddClass. Both registration boundaries preserve public constructors before this collection access and map construction.")]
+    private static GrainClassMap CreateRegisteredGrainMap(TypeConverter converter, TypeManifestOptions manifest, GrainTypeOptions manual)
+    {
+        Require(!manifest.InterfaceImplementations.Contains(typeof(ManualGrain)), "The manual grain is registered exclusively through AddClass.");
+        var classes = manifest.InterfaceImplementations.Concat(manual.Classes).ToImmutableDictionary(type => GrainType.Create(type.Name));
+        return new GrainClassMap(converter, classes);
+    }
+
+    private sealed class ManualGrain : Grain
+    {
+        public ManualGrain()
+        {
+        }
+
+        public int Add(int left, int right) => left + right;
+    }
 
     private static void Require(bool condition, string message)
     {
