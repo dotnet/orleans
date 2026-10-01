@@ -155,6 +155,9 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
+        internal static IReadOnlyList<ServiceDescriptor> GetServiceDescriptors(IServiceProvider services)
+            => services.GetService<ConfigurationContext>()?.Builder.Services.ToArray() ?? Array.Empty<ServiceDescriptor>();
+
         private class SerializerBuilder : ISerializerBuilder
         {
             public SerializerBuilder(IServiceCollection services) => Services = services;
@@ -172,7 +175,7 @@ namespace Orleans.Serialization
                 _activatorProvider = codecProvider;
             }
 
-            public IActivator<T> Value => _activator ??= _activatorProvider.GetActivator<T>();
+            public IActivator<T> Value => _activator ?? CacheCompleted(_activatorProvider, _activatorProvider.GetActivator<T>(), ref _activator);
 
             public T Create() => Value.Create();
         }
@@ -192,7 +195,7 @@ namespace Orleans.Serialization
             [return: System.Diagnostics.CodeAnalysis.MaybeNull]
             public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => Value.ReadValue(ref reader, field);
 
-            public IFieldCodec<TField> Value => _codec ??= _codecProvider.GetCodec<TField>();
+            public IFieldCodec<TField> Value => _codec ?? CacheCompleted(_codecProvider, _codecProvider.GetCodec<TField>(), ref _codec);
         }
 
         private sealed class BaseCodecHolder<TField> : IBaseCodec<TField>, IServiceHolder<IBaseCodec<TField>> where TField : class
@@ -209,7 +212,7 @@ namespace Orleans.Serialization
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, TField value) => Value.Deserialize(ref reader, value);
 
-            public IBaseCodec<TField> Value => _baseCodec ??= _provider.GetBaseCodec<TField>();
+            public IBaseCodec<TField> Value => _baseCodec ?? CacheCompleted(_provider, _provider.GetBaseCodec<TField>(), ref _baseCodec);
         }
 
         private sealed class ValueSerializerHolder<TField> : IValueSerializer<TField>, IServiceHolder<IValueSerializer<TField>> where TField : struct
@@ -226,7 +229,7 @@ namespace Orleans.Serialization
 
             public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref TField value) => Value.Deserialize(ref reader, ref value);
 
-            public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
+            public IValueSerializer<TField> Value => _serializer ?? CacheCompleted(_provider, _provider.GetValueSerializer<TField>(), ref _serializer);
         }
 
         internal sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
@@ -247,7 +250,7 @@ namespace Orleans.Serialization
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
-            public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
+            public IDeepCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetDeepCopier<T>(), ref _copier);
         }
 
         private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
@@ -262,7 +265,13 @@ namespace Orleans.Serialization
 
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
-            public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
+            public IBaseCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetBaseCopier<T>(), ref _copier);
+        }
+
+        private static TService CacheCompleted<TService>(object provider, TService value, ref TService? slot) where TService : class
+        {
+            if (provider is not CodecProvider codecs || !codecs.IsConstructionPending) slot = value;
+            return value;
         }
     }
 

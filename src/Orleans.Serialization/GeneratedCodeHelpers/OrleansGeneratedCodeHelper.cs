@@ -118,6 +118,11 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 if (val is { } resolved) state.ValidateCycle(resolved, codecProvider);
                 return val;
             }
+            catch (Exception exception)
+            {
+                if (codecProvider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
+            }
             finally
             {
                 state.Exit();
@@ -151,6 +156,11 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 var result = Unwrap(service);
                 if (result is { } resolved) state.ValidateCycle(resolved);
                 return result;
+            }
+            catch (Exception exception)
+            {
+                if (state.Provider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
             }
             finally
             {
