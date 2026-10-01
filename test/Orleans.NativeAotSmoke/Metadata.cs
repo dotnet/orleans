@@ -9,17 +9,9 @@ namespace Orleans.NativeAotSmoke;
 
 internal static class Metadata
 {
-    private static void Main(string[] args)
+    private static void Main()
     {
         var registrations = new ServiceCollection().AddSerializer();
-        if (args.Length == 1 && args[0] == "--runtime-selection")
-        {
-            registrations.AddSingleton<Serializer<int>>(services => new(services.GetRequiredService<SerializerSessionPool>()));
-            using var runtimeServices = registrations.BuildServiceProvider();
-            RoundTrip(runtimeServices, 42, nameof(PrimitiveRoundTrip));
-            return;
-        }
-
         var integerCodec = new Int32Codec();
         var stringCodec = new StringCodec();
         AddClosedSerializer(registrations, integerCodec);
