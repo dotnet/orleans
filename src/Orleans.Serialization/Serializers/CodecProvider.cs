@@ -219,6 +219,14 @@ namespace Orleans.Serialization.Serializers
         private IFieldCodec? TryCreateCodec(Type fieldType)
         {
             if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.RequireExplicitTypeRegistration && fieldType == typeof(Invocation.ExceptionResponse))
+            {
+                throw new NotSupportedException(
+                    "Exception response transport requires an explicitly registered ExceptionResponse codec "
+                    + "and a closed codec graph for the declared exception and Data value types. "
+                    + "Register those dependencies in a serializer context.");
+            }
+
             ThrowIfUnregisteredNativeResponse(fieldType);
             if (_manifest.RequireExplicitTypeRegistration) return null;
 #if NET7_0_OR_GREATER
