@@ -2241,6 +2241,120 @@ public class DemoClass
         Assert.Equal(1, CountOccurrences(serializerText, "if (id == 2U)"));
     }
 
+    [Fact]
+    public async Task RpcResponseFactoriesGenerateConcreteClosedGraph()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<bool> Boolean();
+                ValueTask<int> Integer();
+                Task<Payload> Reference();
+                Task<int> Repeated();
+            }
+            [GenerateSerializer, Alias("rpc.payload")]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; set; }
+                [Id(1)] public Payload Next { get; set; }
+                [Id(2)] public Orleans.Serialization.Invocation.Response<Payload> Envelope { get; set; }
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCodec<bool, global::Orleans.Serialization.Codecs.BoolCodec>", source);
+        Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCopier<int, global::Orleans.Serialization.Cloning.ShallowCopier<int>>", source);
+        Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(provider)", source);
+        Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_Payload>(caller, provider)", source);
+        Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_Payload>(caller, provider)", source);
+        Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>>"));
+        Assert.Contains("RuntimeFeature.IsDynamicCodeSupported", source);
+        Assert.DoesNotContain("GetService<global::Orleans.Serialization.Codecs.IFieldCodec<", source);
+        Assert.DoesNotContain("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<", source);
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+        Assert.DoesNotContain("MakeGenericType", source);
+        Assert.DoesNotContain("WellKnownTypeAliases", source);
+        Assert.Contains("WellKnownTypeAliases.Add(\"rpc.payload\"", ConcatenateGeneratedSources(result));
+        var outputCompilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: source.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData("Task<T> Get<T>();")]
+    [InlineData("Task<System.Collections.Generic.List<T>> Get<T>();")]
+    [InlineData("Task<object> Get();")]
+    public async Task RpcResponseFactoriesDiagnoseUnresolvedNativeResults(string method)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { {{method}} }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("serializer context", diagnostic.GetMessage());
+        Assert.NotEqual(Location.None, diagnostic.Location);
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses<T> : IGrainWithIntegerKey
+            {
+                Task<T> Generic();
+                Task<int> Concrete();
+            }
+            """);
+        var jit = RunSourceGenerator(compilation);
+        var overridden = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.publishaot"] = "true",
+            ["build_property.orleansvalidaterpcresponsefactories"] = "false",
+        });
+        Assert.Empty(jit.Diagnostics);
+        Assert.Empty(overridden.Diagnostics);
+        Assert.Contains("Response<int>", ConcatenateGeneratedSources(jit));
+        Assert.DoesNotContain("Response<T>", ConcatenateGeneratedSources(jit));
+        Assert.Equal(ConcatenateGeneratedSources(jit), ConcatenateGeneratedSources(overridden));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesResolveInheritedClosedGenericResultsAndCompletionMethods()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IParent<T> : IGrainWithIntegerKey { Task<T> Get(); }
+            public interface IChild : IParent<int>
+            {
+                Task Done();
+                ValueTask DoneValueTask();
+                void OneWay();
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("Response<int>", source);
+        Assert.DoesNotContain("Response<global::System.Threading.Tasks.Task", source);
+        Assert.DoesNotContain("Response<void>", source);
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
