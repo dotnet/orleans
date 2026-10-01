@@ -9,7 +9,8 @@ namespace Orleans.Serialization;
 /// Provides compile-time registrations for a closed graph of serializable types.
 /// </summary>
 /// <remarks>
-/// Derive a partial class from this type and apply <see cref="GenerateSerializerContextAttribute"/>.
+/// Derive a class from this type and override <c>ConfigureInner</c> to register closed codec, copier,
+/// and service factories.
 /// Register its instance using <see cref="SerializerBuilderExtensions.AddSerializerContext"/>.
 /// Multiple contexts contribute to the same serializer configuration.
 /// </remarks>

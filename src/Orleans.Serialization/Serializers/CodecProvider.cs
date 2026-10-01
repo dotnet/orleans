@@ -616,7 +616,7 @@ namespace Orleans.Serialization.Serializers
             => throw CreateContextServiceNotFound(type);
 
         private static CodecNotFoundException CreateContextServiceNotFound(Type type)
-            => new($"Serialization service {type} is missing from the registered serializer contexts. Declare its closed serialized type using GenerateSerializerContextAttribute.");
+            => new($"Serialization service {type} is missing from the registered serializer contexts. Register its closed codec/copier graph and required services in a serializer context.");
 
         private IFieldCodec? CreateCodecInstance(Type fieldType, Type searchType)
         {
