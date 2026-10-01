@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -8,11 +9,14 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class LibraryTypes
 {
+    private static readonly ConditionalWeakTable<Compilation, LibraryTypes> Cache = new();
+
     private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
 
-    public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options) => new LibraryTypes(compilation, options);
+    public static LibraryTypes FromCompilation(Compilation compilation, CodeGeneratorOptions options)
+        => Cache.GetValue(compilation, static compilation => new LibraryTypes(compilation));
 
-    private LibraryTypes(Compilation compilation, CodeGeneratorOptions options)
+    private LibraryTypes(Compilation compilation)
     {
         Compilation = compilation;
         ApplicationPartAttribute = Type("Orleans.ApplicationPartAttribute");
