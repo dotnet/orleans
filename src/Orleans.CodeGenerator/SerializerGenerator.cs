@@ -1419,8 +1419,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         private bool UseUnsafeFieldAccessor => Field is not null
             && !_generatorServices.Options.HotReloadSafe
-            && LibraryTypes.SupportsUnsafeAccessors
-            && (!ContainingType.IsGenericType || LibraryTypes.SupportsGenericUnsafeAccessors);
+            && _generatorServices.Options.SupportsUnsafeAccessors
+            && LibraryTypes.HasUnsafeAccessorAttribute
+            && (!ContainingType.IsGenericType || _generatorServices.Options.SupportsGenericUnsafeAccessors);
 
         public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false, bool lazyInitialization = false, bool useUnsafeFieldAccessor = false)
         {

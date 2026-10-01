@@ -55,6 +55,10 @@ passed by reference. This allows NativeAOT-compiled generated code for C#
 payloads to restore get-only and init-only properties and to deep-copy values
 stored in readonly fields.
 
+The generator selects these capabilities from the SDK's target-framework
+identifier and version and verifies that `UnsafeAccessorAttribute` is available
+in the compilation references.
+
 For C# payloads, legacy targets and .NET 8 generic payloads use generated
 field-access delegates. Setting `OrleansHotReload=true` retains lazily
 initialized delegates for fields, so existing serializer and copier instances

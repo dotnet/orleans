@@ -15,6 +15,8 @@ internal static class SourceGeneratorOptionsParser
             GenerateFieldIds = options.GenerateFieldIds,
             GenerateCompatibilityInvokers = options.GenerateCompatibilityInvokers,
             HotReloadSafe = options.HotReload ?? false,
+            SupportsUnsafeAccessors = options.SupportsUnsafeAccessors,
+            SupportsGenericUnsafeAccessors = options.SupportsGenericUnsafeAccessors,
         };
     }
 
@@ -59,6 +61,20 @@ internal static class SourceGeneratorOptionsParser
             result.HotReload = hotReload;
         }
 
+        if (globalOptions.TryGetValue("build_property.TargetFrameworkIdentifier", out var frameworkIdentifier)
+            && string.Equals(frameworkIdentifier, ".NETCoreApp", StringComparison.OrdinalIgnoreCase)
+            && globalOptions.TryGetValue("build_property.TargetFrameworkVersion", out var frameworkVersion))
+        {
+            var versionText = frameworkVersion.StartsWith("v", StringComparison.OrdinalIgnoreCase)
+                ? frameworkVersion.Substring(1)
+                : frameworkVersion;
+            if (Version.TryParse(versionText, out var version))
+            {
+                result.SupportsUnsafeAccessors = version.Major >= 8;
+                result.SupportsGenericUnsafeAccessors = version.Major >= 9;
+            }
+        }
+
         return result;
     }
 
@@ -74,12 +90,16 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
     /// Enables hot-reload-safe code generation.
     /// </summary>
     public bool? HotReload { get; set; }
+    public bool SupportsUnsafeAccessors { get; set; }
+    public bool SupportsGenericUnsafeAccessors { get; set; }
 
     public readonly bool Equals(SourceGeneratorOptions other)
         => GenerateFieldIds == other.GenerateFieldIds
             && GenerateCompatibilityInvokers == other.GenerateCompatibilityInvokers
             && AttachDebugger == other.AttachDebugger
-            && HotReload == other.HotReload;
+            && HotReload == other.HotReload
+            && SupportsUnsafeAccessors == other.SupportsUnsafeAccessors
+            && SupportsGenericUnsafeAccessors == other.SupportsGenericUnsafeAccessors;
 
     public override readonly bool Equals(object obj) => obj is SourceGeneratorOptions other && Equals(other);
 
@@ -91,6 +111,8 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
             hash = hash * 31 + (GenerateCompatibilityInvokers ? 1 : 0);
             hash = hash * 31 + (AttachDebugger ? 1 : 0);
             hash = hash * 31 + (HotReload switch { true => 1, false => 2, null => 0 });
+            hash = hash * 31 + (SupportsUnsafeAccessors ? 1 : 0);
+            hash = hash * 31 + (SupportsGenericUnsafeAccessors ? 1 : 0);
             return hash;
         }
     }

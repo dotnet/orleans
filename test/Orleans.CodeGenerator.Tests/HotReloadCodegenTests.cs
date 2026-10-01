@@ -5,7 +5,6 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -399,7 +398,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: globalOptions is null ? null : new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics, TestContext.Current.CancellationToken);
         Assert.Empty(diagnostics);
@@ -421,7 +420,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver.RunGeneratorsAndUpdateCompilation(
             compilation,
@@ -504,20 +503,5 @@ public class HotReloadCodegenTests
                 process.Kill(entireProcessTree: true);
             }
         }
-    }
-
-    private sealed class TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-
-        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
-    }
-
-    private sealed class TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value) => options.TryGetValue(key, out value!);
     }
 }
