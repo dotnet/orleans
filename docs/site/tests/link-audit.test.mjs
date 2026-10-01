@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -12,6 +12,7 @@ import {
   isPublicInternetAddress,
   probeExternalTargets,
 } from '../scripts/lib/link-audit.mjs';
+import externalLinkAllowlist from '../src/data/external-link-allowlist.json' with { type: 'json' };
 
 const temporaryDirectories = [];
 
@@ -1068,5 +1069,94 @@ describe('external link audit', () => {
         expect.stringContaining("non-public address '127.0.0.1'"),
       ]),
     );
+  });
+
+  describe('Orleans Twitter follow link', () => {
+    const followUrl = 'https://twitter.com/intent/follow?screen_name=msftorleans';
+    const allowlist = {
+      urls: { [followUrl]: externalLinkAllowlist.urls[followUrl] },
+    };
+
+    test('accepts the configured follow URL after HEAD and GET return 403', async () => {
+      const sourceRoot = path.resolve('src/content/docs');
+      const file = path.join(sourceRoot, 'index.yml');
+      const references = collectYamlLinkReferences({
+        source: await readFile(file, 'utf8'),
+        file,
+        sourceRoot,
+      }).filter((reference) => reference.url === followUrl);
+      const requests = [];
+
+      expect(references).toHaveLength(1);
+      const result = await probeExternalTargets({
+        externalTargets: new Map([[followUrl, references]]),
+        allowlist,
+        lookupImpl: publicLookup,
+        requestImpl: async (url, options) => {
+          requests.push(`${options.method} ${url.href}`);
+          return response(403);
+        },
+      });
+
+      expect(result.failures).toEqual([]);
+      expect(result.warnings).toEqual([
+        `Allowlisted '${followUrl}' returned 403: ${allowlist.urls[followUrl]}`,
+      ]);
+      expect(result.probed).toBe(1);
+      expect(requests).toEqual([`HEAD ${followUrl}`, `GET ${followUrl}`]);
+    });
+
+    test('reports 403 failures for other Twitter paths and query strings', async () => {
+      const otherUrls = [
+        'https://twitter.com/msftorleans',
+        'https://twitter.com/intent/follow?screen_name=dotnet',
+        `${followUrl}&lang=en`,
+      ];
+      const result = await probeExternalTargets({
+        externalTargets: new Map(
+          [followUrl, ...otherUrls].map((url) => [
+            url,
+            [{ relativeFile: 'index.yml', line: 224 }],
+          ]),
+        ),
+        allowlist,
+        lookupImpl: publicLookup,
+        requestImpl: async () => response(403),
+        concurrency: 1,
+      });
+
+      expect(result.probed).toBe(4);
+      expect(result.failures).toEqual(
+        otherUrls.map(
+          (url) =>
+            `${url} (index.yml:224): returned 403; add a reasoned exact-URL allowlist entry only if the target cannot be probed reliably.`,
+        ),
+      );
+      expect(result.warnings).toEqual([
+        `Allowlisted '${followUrl}' returned 403: ${allowlist.urls[followUrl]}`,
+      ]);
+    });
+
+    test('flags the configured exception for removal when GET succeeds', async () => {
+      const requests = [];
+      const result = await probeExternalTargets({
+        externalTargets: new Map([
+          [followUrl, [{ relativeFile: 'index.yml', line: 224 }]],
+        ]),
+        allowlist,
+        lookupImpl: publicLookup,
+        requestImpl: async (url, options) => {
+          requests.push(`${options.method} ${url.href}`);
+          return response(options.method === 'HEAD' ? 403 : 200);
+        },
+      });
+
+      expect(result.failures).toEqual([
+        `External link allowlist entry '${followUrl}' is stale because the target now returns 200; remove the entry.`,
+      ]);
+      expect(result.warnings).toEqual([]);
+      expect(result.probed).toBe(1);
+      expect(requests).toEqual([`HEAD ${followUrl}`, `GET ${followUrl}`]);
+    });
   });
 });
