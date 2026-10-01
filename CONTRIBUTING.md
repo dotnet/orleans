@@ -63,6 +63,19 @@ dotnet test --solution Orleans.slnx --framework net10.0 --filter-trait "Category
 dotnet test --project test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framework net10.0 --filter-class "*MyTestClass*" --filter-method "*MyTestMethod*" --minimum-expected-tests 1
 ```
 
+### NativeAOT smoke tests
+
+The dependency-injection smoke exercises placement strategy and director registration, keyed service resolution, constructor dependency identity, and lifecycle-driven startup task activation. The static analysis workflow publishes and executes these flows with both trimming and NativeAOT.
+
+To execute the native smoke on Windows, install the [NativeAOT C++ toolchain prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/), then run:
+
+```console
+dotnet publish test\Orleans.DependencyInjection.TrimmedSmoke\Orleans.DependencyInjection.TrimmedSmoke.csproj --framework net10.0 --configuration Release --runtime win-x64 --self-contained true -p:NativeAotSmoke=true --output Artifacts\DependencyInjectionNativeAotSmoke
+Artifacts\DependencyInjectionNativeAotSmoke\Orleans.DependencyInjection.TrimmedSmoke.exe
+```
+
+`NativeAotSmoke=true` enables `PublishAot` within the smoke project, keeping build-time analyzers and source generators on their managed target frameworks. The executable verifies that runtime code generation is disabled before exercising the selected DI flows. Use `NativeAotSmoke=false` to execute the same flows in a self-contained trimmed application.
+
 ### Work on an application with local source
 
 For an application which needs to exercise an unreleased change, reference the relevant project under `src` instead of the published NuGet package. For example, reference `src/Orleans.Core/Orleans.Core.csproj` from the application project and build the application together with the Orleans solution. This lets the debugger step into the local Orleans source.
