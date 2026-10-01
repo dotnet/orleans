@@ -18,9 +18,7 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _type_IMyInterface_B86E71B69F6C2271 = typeof(global::TestProject.IMyInterface);
         private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.IMyInterface> _codec_IMyInterface_B86E71B69F6C2271;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
-        private extern static ref global::TestProject.IMyInterface getField_0(global::TestProject.InterfaceCtorParam instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
-        private extern static ref global::TestProject.IMyInterface setField_0(global::TestProject.InterfaceCtorParam instance);
+        private extern static ref global::TestProject.IMyInterface accessField_0(global::TestProject.InterfaceCtorParam instance);
         public Codec_InterfaceCtorParam(global::Orleans.Serialization.Activators.IActivator<global::TestProject.InterfaceCtorParam> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -31,7 +29,7 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.InterfaceCtorParam instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            _codec_IMyInterface_B86E71B69F6C2271.WriteField(ref writer, 0U, _type_IMyInterface_B86E71B69F6C2271, getField_0(instance));
+            _codec_IMyInterface_B86E71B69F6C2271.WriteField(ref writer, 0U, _type_IMyInterface_B86E71B69F6C2271, accessField_0(instance));
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -47,7 +45,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    setField_0(instance) = _codec_IMyInterface_B86E71B69F6C2271.ReadValue(ref reader, header);
+                    accessField_0(instance) = _codec_IMyInterface_B86E71B69F6C2271.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -97,9 +95,7 @@ namespace OrleansCodeGen.TestProject
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.InterfaceCtorParam> _activator;
         private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.IMyInterface> _copier_IMyInterface_B86E71B69F6C2271;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
-        private extern static ref global::TestProject.IMyInterface getField_0(global::TestProject.InterfaceCtorParam instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
-        private extern static ref global::TestProject.IMyInterface setField_0(global::TestProject.InterfaceCtorParam instance);
+        private extern static ref global::TestProject.IMyInterface accessField_0(global::TestProject.InterfaceCtorParam instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.InterfaceCtorParam DeepCopy(global::TestProject.InterfaceCtorParam original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -122,7 +118,7 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.InterfaceCtorParam input, global::TestProject.InterfaceCtorParam output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output) = _copier_IMyInterface_B86E71B69F6C2271.DeepCopy(getField_0(input), context);
+            accessField_0(output) = _copier_IMyInterface_B86E71B69F6C2271.DeepCopy(accessField_0(input), context);
         }
     }
 

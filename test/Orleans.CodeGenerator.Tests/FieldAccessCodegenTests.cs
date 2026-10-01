@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Xunit;
 
@@ -46,11 +47,10 @@ public class FieldAccessCodegenTests
         Assert.Contains("UnsafeAccessorKind.Field, Name = \"<ReadOnly>k__BackingField\"", generated);
         Assert.Contains("UnsafeAccessorKind.Field, Name = \"<InitOnly>k__BackingField\"", generated);
         Assert.Contains("UnsafeAccessorKind.Field, Name = \"<Private>k__BackingField\"", generated);
-        Assert.Contains("private extern static ref int getField_0(global::TestProject.Fields instance);", generated);
-        Assert.Contains("private extern static ref int setField_0(global::TestProject.Fields instance);", generated);
-        Assert.Contains("setField_0(result) =", generated);
-        Assert.Contains("setField_0(instance) =", generated);
-        Assert.Contains("private extern static ref int setField_0(ref global::TestProject.StructFields instance);", generated);
+        Assert.Contains("private extern static ref int accessField_0(global::TestProject.Fields instance);", generated);
+        Assert.Contains("accessField_0(result) =", generated);
+        Assert.Contains("accessField_0(instance) =", generated);
+        Assert.Contains("private extern static ref int accessField_0(ref global::TestProject.StructFields instance);", generated);
     }
 
     [Theory]
@@ -69,12 +69,12 @@ public class FieldAccessCodegenTests
         var generated = await Generate(hotReload: false, frameworkIdentifier, frameworkVersion);
         Assert.Contains("where T : class, global::System.IEquatable<T>, new()", generated);
         Assert.Equal(expectFieldAccessors, generated.Contains(
-            "private extern static ref int setField_0(global::TestProject.Fields instance);", StringComparison.Ordinal));
+            "private extern static ref int accessField_0(global::TestProject.Fields instance);", StringComparison.Ordinal));
         Assert.Equal(expectFieldAccessors, generated.Contains(
-            "private extern static ref int setField_0(ref global::TestProject.StructFields instance);", StringComparison.Ordinal));
+            "private extern static ref int accessField_0(ref global::TestProject.StructFields instance);", StringComparison.Ordinal));
         if (expectGenericAccessors)
         {
-            Assert.Contains("private extern static ref T setField_0(global::TestProject.GenericFields<T> instance);", generated);
+            Assert.Contains("private extern static ref T accessField_0(global::TestProject.GenericFields<T> instance);", generated);
             Assert.DoesNotContain("Utilities.FieldAccessor", generated);
         }
         else
@@ -82,6 +82,41 @@ public class FieldAccessCodegenTests
             Assert.Contains("Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.GenericFields<T>)", generated);
             Assert.DoesNotContain("extern static ref T", generated);
         }
+    }
+
+    [Theory]
+    [InlineData("Codec_Fields", 4)]
+    [InlineData("Copier_Fields", 4)]
+    [InlineData("Codec_StructFields", 2)]
+    [InlineData("Copier_StructFields", 1)]
+    [InlineData("Codec_GenericFields", 2)]
+    [InlineData("Copier_GenericFields", 2)]
+    public async Task SingleUnsafeAccessorServesFieldReadsAndWrites(string className, int expectedAccessors)
+    {
+        var generated = await Generate(hotReload: false);
+        var root = CSharpSyntaxTree.ParseText(generated, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
+        var type = Assert.Single(root.DescendantNodes().OfType<ClassDeclarationSyntax>(), c => c.Identifier.ValueText == className);
+        var accessors = type.Members.OfType<MethodDeclarationSyntax>()
+            .Where(m => m.Modifiers.Any(SyntaxKind.ExternKeyword)).ToList();
+
+        Assert.Equal(expectedAccessors, accessors.Count);
+        Assert.Equal(expectedAccessors, accessors.Select(m => m.Identifier.ValueText).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(accessors, accessor =>
+        {
+            Assert.StartsWith("accessField_", accessor.Identifier.ValueText, StringComparison.Ordinal);
+            Assert.IsType<RefTypeSyntax>(accessor.ReturnType);
+            var attribute = Assert.Single(accessor.AttributeLists.SelectMany(a => a.Attributes));
+            Assert.Contains("UnsafeAccessorKind.Field", attribute.ToString(), StringComparison.Ordinal);
+        });
+
+        var target = className.Contains("StructFields", StringComparison.Ordinal) ? "accessField_1" : "accessField_0";
+        var calls = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(i => i.Expression.ToString() == target).ToList();
+        Assert.Contains(calls, call => call.Parent is AssignmentExpressionSyntax assignment && assignment.Left == call);
+        Assert.Contains(calls, call => call.Parent is not AssignmentExpressionSyntax assignment || assignment.Right == call);
+        Assert.DoesNotContain("getField_", type.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("setField_", type.ToString(), StringComparison.Ordinal);
     }
 
     [Theory]

@@ -16,9 +16,9 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.SimpleRecord);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.SimpleRecord> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Name>k__BackingField")]
-        private extern static ref string setField_20_ctor(global::TestProject.SimpleRecord instance);
+        private extern static ref string accessField_20_ctor(global::TestProject.SimpleRecord instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref int setField_10_ctor(global::TestProject.SimpleRecord instance);
+        private extern static ref int accessField_10_ctor(global::TestProject.SimpleRecord instance);
         public Codec_SimpleRecord(global::Orleans.Serialization.Activators.IActivator<global::TestProject.SimpleRecord> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -46,7 +46,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 10U)
                 {
-                    setField_10_ctor(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
+                    accessField_10_ctor(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -55,7 +55,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 20U)
                 {
-                    setField_20_ctor(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                    accessField_20_ctor(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -113,9 +113,9 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.SimpleRecord> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Name>k__BackingField")]
-        private extern static ref string setField_20_ctor(global::TestProject.SimpleRecord instance);
+        private extern static ref string accessField_20_ctor(global::TestProject.SimpleRecord instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref int setField_10_ctor(global::TestProject.SimpleRecord instance);
+        private extern static ref int accessField_10_ctor(global::TestProject.SimpleRecord instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.SimpleRecord DeepCopy(global::TestProject.SimpleRecord original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -137,8 +137,8 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.SimpleRecord input, global::TestProject.SimpleRecord output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_10_ctor(output) = input.Value;
-            setField_20_ctor(output) = input.Name;
+            accessField_10_ctor(output) = input.Value;
+            accessField_20_ctor(output) = input.Name;
         }
     }
 
@@ -148,11 +148,11 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.RecordWithExtraProperty);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.RecordWithExtraProperty> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Description>k__BackingField")]
-        private extern static ref string setField_50(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref string accessField_50(global::TestProject.RecordWithExtraProperty instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Id>k__BackingField")]
-        private extern static ref int setField_30_ctor(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref int accessField_30_ctor(global::TestProject.RecordWithExtraProperty instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Name>k__BackingField")]
-        private extern static ref string setField_40_ctor(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref string accessField_40_ctor(global::TestProject.RecordWithExtraProperty instance);
         public Codec_RecordWithExtraProperty(global::Orleans.Serialization.Activators.IActivator<global::TestProject.RecordWithExtraProperty> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -181,7 +181,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 30U)
                 {
-                    setField_30_ctor(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
+                    accessField_30_ctor(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -190,7 +190,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 40U)
                 {
-                    setField_40_ctor(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                    accessField_40_ctor(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -210,7 +210,7 @@ namespace OrleansCodeGen.TestProject
                     id += header.FieldIdDelta;
                     if (id == 50U)
                     {
-                        setField_50(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                        accessField_50(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                         reader.ReadFieldHeader(ref header);
                         if (header.IsEndBaseOrEndObject)
                             break;
@@ -261,11 +261,11 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.RecordWithExtraProperty> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Description>k__BackingField")]
-        private extern static ref string setField_50(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref string accessField_50(global::TestProject.RecordWithExtraProperty instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Id>k__BackingField")]
-        private extern static ref int setField_30_ctor(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref int accessField_30_ctor(global::TestProject.RecordWithExtraProperty instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Name>k__BackingField")]
-        private extern static ref string setField_40_ctor(global::TestProject.RecordWithExtraProperty instance);
+        private extern static ref string accessField_40_ctor(global::TestProject.RecordWithExtraProperty instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.RecordWithExtraProperty DeepCopy(global::TestProject.RecordWithExtraProperty original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -287,9 +287,9 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.RecordWithExtraProperty input, global::TestProject.RecordWithExtraProperty output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_30_ctor(output) = input.Id;
-            setField_40_ctor(output) = input.Name;
-            setField_50(output) = input.Description;
+            accessField_30_ctor(output) = input.Id;
+            accessField_40_ctor(output) = input.Name;
+            accessField_50(output) = input.Description;
         }
     }
 

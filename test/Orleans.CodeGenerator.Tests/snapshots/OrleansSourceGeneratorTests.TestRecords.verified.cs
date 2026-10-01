@@ -78,7 +78,7 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoDataRecordClass);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecordClass> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref string setField_0(global::TestProject.DemoDataRecordClass instance);
+        private extern static ref string accessField_0(global::TestProject.DemoDataRecordClass instance);
         public Codec_DemoDataRecordClass(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecordClass> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -112,7 +112,7 @@ namespace OrleansCodeGen.TestProject
                     id += header.FieldIdDelta;
                     if (id == 0U)
                     {
-                        setField_0(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                        accessField_0(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                         reader.ReadFieldHeader(ref header);
                     }
 
@@ -161,7 +161,7 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecordClass> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref string setField_0(global::TestProject.DemoDataRecordClass instance);
+        private extern static ref string accessField_0(global::TestProject.DemoDataRecordClass instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoDataRecordClass DeepCopy(global::TestProject.DemoDataRecordClass original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -183,7 +183,7 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.DemoDataRecordClass input, global::TestProject.DemoDataRecordClass output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output) = input.Value;
+            accessField_0(output) = input.Value;
         }
     }
 
@@ -193,7 +193,7 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoDataRecord);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecord> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref string setField_0(global::TestProject.DemoDataRecord instance);
+        private extern static ref string accessField_0(global::TestProject.DemoDataRecord instance);
         public Codec_DemoDataRecord(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecord> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -227,7 +227,7 @@ namespace OrleansCodeGen.TestProject
                     id += header.FieldIdDelta;
                     if (id == 0U)
                     {
-                        setField_0(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                        accessField_0(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                         reader.ReadFieldHeader(ref header);
                     }
 
@@ -276,7 +276,7 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataRecord> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<Value>k__BackingField")]
-        private extern static ref string setField_0(global::TestProject.DemoDataRecord instance);
+        private extern static ref string accessField_0(global::TestProject.DemoDataRecord instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoDataRecord DeepCopy(global::TestProject.DemoDataRecord original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -298,7 +298,7 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.DemoDataRecord input, global::TestProject.DemoDataRecord output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output) = input.Value;
+            accessField_0(output) = input.Value;
         }
     }
 

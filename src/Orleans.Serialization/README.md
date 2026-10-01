@@ -55,6 +55,9 @@ passed by reference. This allows NativeAOT-compiled generated code for C#
 payloads to restore get-only and init-only properties and to deep-copy values
 stored in readonly fields.
 
+Generated C# codecs and copiers emit one ref-returning accessor per field for
+both reading and writing on supported targets.
+
 The generator selects these capabilities from the SDK's target-framework
 identifier and version and verifies that `UnsafeAccessorAttribute` is available
 in the compilation references.

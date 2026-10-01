@@ -106,7 +106,7 @@ public class HotReloadCodegenTests
         var generated = await Generate(GreetingV2, OptimizationLevel.Release);
         var codec = GetClass(generated, "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("private extern static ref string setField_0(global::TestProject.Greeting instance);", codec);
+        Assert.Contains("private extern static ref string accessField_0(global::TestProject.Greeting instance);", codec);
         Assert.DoesNotContain("Utilities.FieldAccessor", codec);
         Assert.Contains("private readonly global::Orleans.Serialization.Codecs.ListCodec<int> _codec_List_Int32_", codec);
         Assert.Contains("private readonly global::System.Type _type_List_Int32_", codec);
@@ -189,9 +189,9 @@ public class HotReloadCodegenTests
     {
         var codec = GetClass(await Generate(GreetingV2, OptimizationLevel.Release), "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("setField_0(global::TestProject.Greeting instance)", codec);
-        Assert.Contains("setField_3(global::TestProject.Greeting instance)", codec);
-        Assert.Contains("setField_4(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_0(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_3(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_4(global::TestProject.Greeting instance)", codec);
         Assert.DoesNotContain("setField0", codec);
         Assert.DoesNotContain("setField1", codec);
     }

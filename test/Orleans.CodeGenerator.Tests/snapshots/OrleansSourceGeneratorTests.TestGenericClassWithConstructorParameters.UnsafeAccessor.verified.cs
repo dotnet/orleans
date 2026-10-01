@@ -18,13 +18,9 @@ namespace OrleansCodeGen.TestProject
         private readonly global::System.Type _type_T_0CA466BDFA032082 = typeof(T);
         private readonly global::Orleans.Serialization.Codecs.IFieldCodec<T> _codec_T_0CA466BDFA032082;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_id")]
-        private extern static ref int getField_1(global::TestProject.GenericWithCtor<T> instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_id")]
-        private extern static ref int setField_1(global::TestProject.GenericWithCtor<T> instance);
+        private extern static ref int accessField_1(global::TestProject.GenericWithCtor<T> instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_value")]
-        private extern static ref T getField_0(global::TestProject.GenericWithCtor<T> instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_value")]
-        private extern static ref T setField_0(global::TestProject.GenericWithCtor<T> instance);
+        private extern static ref T accessField_0(global::TestProject.GenericWithCtor<T> instance);
         public Codec_GenericWithCtor(global::Orleans.Serialization.Activators.IActivator<global::TestProject.GenericWithCtor<T>> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -35,8 +31,8 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.GenericWithCtor<T> instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            _codec_T_0CA466BDFA032082.WriteField(ref writer, 0U, _type_T_0CA466BDFA032082, getField_0(instance));
-            global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 1U, getField_1(instance));
+            _codec_T_0CA466BDFA032082.WriteField(ref writer, 0U, _type_T_0CA466BDFA032082, accessField_0(instance));
+            global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 1U, accessField_1(instance));
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -52,7 +48,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    setField_0(instance) = _codec_T_0CA466BDFA032082.ReadValue(ref reader, header);
+                    accessField_0(instance) = _codec_T_0CA466BDFA032082.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -61,7 +57,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1U)
                 {
-                    setField_1(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
+                    accessField_1(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -111,13 +107,9 @@ namespace OrleansCodeGen.TestProject
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.GenericWithCtor<T>> _activator;
         private readonly global::Orleans.Serialization.Cloning.IDeepCopier<T> _copier_T_0CA466BDFA032082;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_id")]
-        private extern static ref int getField_1(global::TestProject.GenericWithCtor<T> instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_id")]
-        private extern static ref int setField_1(global::TestProject.GenericWithCtor<T> instance);
+        private extern static ref int accessField_1(global::TestProject.GenericWithCtor<T> instance);
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_value")]
-        private extern static ref T getField_0(global::TestProject.GenericWithCtor<T> instance);
-        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_value")]
-        private extern static ref T setField_0(global::TestProject.GenericWithCtor<T> instance);
+        private extern static ref T accessField_0(global::TestProject.GenericWithCtor<T> instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.GenericWithCtor<T> DeepCopy(global::TestProject.GenericWithCtor<T> original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -140,8 +132,8 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.GenericWithCtor<T> input, global::TestProject.GenericWithCtor<T> output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output) = _copier_T_0CA466BDFA032082.DeepCopy(getField_0(input), context);
-            setField_1(output) = getField_1(input);
+            accessField_0(output) = _copier_T_0CA466BDFA032082.DeepCopy(accessField_0(input), context);
+            accessField_1(output) = accessField_1(input);
         }
     }
 

@@ -238,15 +238,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             if (onlyDeepFields && member.IsShallowCopyable) continue;
 
-            if (member.GetGetterFieldDescription() is { } getterFieldDescription)
-            {
-                fields.Add(getterFieldDescription);
-            }
-
-            if (member.GetSetterFieldDescription() is { } setterFieldDescription)
-            {
-                fields.Add(setterFieldDescription);
-            }
+            AddFieldAccessorDescriptions(fields, member);
         }
 
         for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)
