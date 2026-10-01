@@ -32,6 +32,65 @@ internal static class SerializerFactoryGenerator
 
     internal sealed record Failure(ITypeSymbol Type, string Reason);
 
+    internal static Graph? CreateRpcModelRoot(
+        IGeneratorServices services,
+        INamedTypeSymbol type,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (type.IsGenericType || type.IsAbstract || type.TypeKind == TypeKind.Interface
+            || !type.HasAttribute(services.LibraryTypes.GenerateSerializerAttribute))
+        {
+            return null;
+        }
+
+        var registration = new Registration(type);
+        if (SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
+        {
+            var model = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type);
+            if (model is null) return null;
+            DescribeGeneratedModel(registration, type, model);
+            ConstructGeneratedModel(registration, services);
+        }
+        else
+        {
+            var generatedNamespace = SerializerGenerator.GetGeneratedNamespaceName(type);
+            var codecType = services.Compilation.GetTypeByMetadataName($"{generatedNamespace}.{SerializerGenerator.GetSimpleClassName(type.Name)}");
+            if (codecType is null) return null;
+            registration.Codec = Name(codecType);
+            registration.CodecConstruction = ConstructReferenced(registration.Codec, codecType);
+            if (services.LibraryTypes.IsShallowCopyable(type))
+            {
+                registration.Copier = $"global::Orleans.Serialization.Cloning.ShallowCopier<{Name(type)}>";
+                registration.CopierConstruction = $"new {registration.Copier}()";
+            }
+            else
+            {
+                var copierType = services.Compilation.GetTypeByMetadataName($"{generatedNamespace}.{CopierGenerator.GetSimpleClassName(type.Name)}");
+                if (copierType is null) return null;
+                registration.Copier = Name(copierType);
+                registration.CopierConstruction = ConstructReferenced(registration.Copier, copierType);
+            }
+        }
+
+        var responseType = services.Compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!.Construct(type);
+        var codec = $"global::Orleans.Serialization.Invocation.PooledResponseCodec<{Name(type)}, {registration.Codec}>";
+        var copier = $"global::Orleans.Serialization.Invocation.PooledResponseCopier<{Name(type)}, {registration.Copier}>";
+        var result = new StringBuilder();
+        result.Append("options.AddDefaultSerializerService<").Append(registration.Codec).Append(">(static provider => ")
+            .Append(registration.CodecConstruction).AppendLine(");");
+        result.Append("options.AddDefaultSerializerService<").Append(registration.Copier).Append(">(static provider => ")
+            .Append(registration.CopierConstruction).AppendLine(");");
+        result.Append("options.AddDefaultSerializerService<").Append(codec).Append(">(static provider => new ")
+            .Append(codec).Append("(caller => ").Append(Resolve(registration.Codec, "caller")).AppendLine("));");
+        result.Append("options.AddDefaultSerializerService<").Append(copier).Append(">(static provider => new ")
+            .Append(copier).Append("(caller => ").Append(Resolve(registration.Copier, "caller")).AppendLine("));");
+        result.Append("options.AddDefaultSerializer<").Append(Name(responseType)).Append(">(static provider => ")
+            .Append(Resolve(codec)).Append(", static provider => ").Append(Resolve(copier)).AppendLine(");");
+        result.Append("options.AddAllowedType(typeof(").Append(Name(responseType)).AppendLine("));");
+        return new Graph(new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default) { [type] = registration }, result.ToString());
+    }
+
     internal static bool TryCreate(
         IGeneratorServices services,
         IEnumerable<ITypeSymbol> roots,
@@ -420,6 +479,27 @@ internal static class SerializerFactoryGenerator
             var implementation = implementationCompilation.GetTypeByMetadataName(metadataName);
             return implementation is { IsGenericType: true } ? implementation.Construct([.. implementationType.TypeArguments]) : implementation;
         }
+    }
+
+    private static void DescribeGeneratedModel(Registration registration, INamedTypeSymbol named, ISerializableTypeDescription model)
+    {
+        var argumentsSuffix = named.IsGenericType ? $"<{string.Join(", ", named.TypeArguments.Select(Name))}>" : "";
+        var generatedNamespace = SerializerGenerator.GetGeneratedNamespaceName(named);
+        registration.Codec = $"global::{generatedNamespace}.{SerializerGenerator.GetSimpleClassName(named.Name)}{argumentsSuffix}";
+        registration.Copier = model.IsShallowCopyable
+            ? $"global::Orleans.Serialization.Cloning.ShallowCopier<{Name(named)}>"
+            : $"global::{generatedNamespace}.{CopierGenerator.GetSimpleClassName(named.Name)}{argumentsSuffix}";
+        registration.Model = model;
+    }
+
+    private static void ConstructGeneratedModel(Registration registration, IGeneratorServices services)
+    {
+        var codecDeclaration = new SerializerGenerator(services).Generate(registration.Model!);
+        var copierDeclaration = new CopierGenerator(services).GenerateCopier(registration.Model!, new());
+        registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
+        registration.CopierConstruction = copierDeclaration is null
+            ? $"new {registration.Copier}()"
+            : ConstructGenerated(registration.Copier, copierDeclaration);
     }
 
     private static string ConstructReferenced(string name, INamedTypeSymbol implementation)
