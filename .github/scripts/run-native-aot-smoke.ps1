@@ -14,12 +14,20 @@ param(
     [string] $ResultsDirectory,
 
     [Parameter(ParameterSetName = 'Run')]
-    [switch] $UseEnvironmentalTools
+    [switch] $UseEnvironmentalTools,
+
+    [Parameter()]
+    [string] $RepositoryRoot
 )
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
-$repositoryRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot))
+{
+    $RepositoryRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+}
+
+$RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 $projectDirectory = Join-Path (Join-Path $repositoryRoot 'test') 'Orleans.NativeAotSmoke'
 $manifests = @(Get-ChildItem -LiteralPath $projectDirectory -Filter '*.smoke.json' -File | Sort-Object Name)
 if ($manifests.Count -eq 0)

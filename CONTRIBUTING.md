@@ -76,6 +76,15 @@ Artifacts\NativeAotSmoke\Orleans.NativeAotSmoke.exe
 
 `PublishAot` is enabled within the native smoke project, keeping build-time analyzers and source generators on their managed target frameworks. The executable verifies that runtime code generation is disabled before exercising the selected flows. Additional scenarios use `-p:NativeAotSmokeScenario=<name>` and share the same project; each build compiles that scenario's `<name>*.cs` files. The existing `Orleans.DependencyInjection.TrimmedSmoke` project exercises the same DI flows in a self-contained trimmed application.
 
+Register each native scenario with a `<name>.smoke.json` manifest beside its source. The existing static analysis workflow discovers these manifests and runs one centralized matrix on Windows and Linux. The shared runner publishes the scenario, checks linker/AOT diagnostics, executes the native binary, and retains diagnostic logs and a binlog:
+
+```powershell
+.\.github\scripts\run-native-aot-smoke.ps1 -List
+.\.github\scripts\run-native-aot-smoke.ps1 -Scenario DependencyInjection -RuntimeIdentifier win-x64
+```
+
+Each manifest declares `scenario`, `diagnostics`, and `rejectDiagnostics`. Use `strict` for warning-free native paths. A bounded compatibility rollout can use `legacy-visible` with nonempty diagnostic rejection patterns for the supported path; the runner retains the existing backlog visibly and rejects matching new-path warnings and errors. Feature PRs add scenario sources and manifests to this shared harness.
+
 ### Work on an application with local source
 
 For an application which needs to exercise an unreleased change, reference the relevant project under `src` instead of the published NuGet package. For example, reference `src/Orleans.Core/Orleans.Core.csproj` from the application project and build the application together with the Orleans solution. This lets the debugger step into the local Orleans source.
