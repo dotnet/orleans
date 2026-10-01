@@ -2332,6 +2332,38 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task RpcResponseFactoriesRootCanonicalModelsInMetadataMode()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<Payload> Get(); }
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public IReadOnlyList<System.Tuple<int, string>> Members { get; private set; }
+                public Payload(IReadOnlyList<System.Tuple<int, string>> members) => Members = members;
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("if (!options.RequireExplicitTypeRegistration)", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Copier_Payload(", source);
+        Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.DoesNotContain("MakeGenericType", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var strict = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+    }
+
+    [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
         var compilation = await CreateCompilation("""
