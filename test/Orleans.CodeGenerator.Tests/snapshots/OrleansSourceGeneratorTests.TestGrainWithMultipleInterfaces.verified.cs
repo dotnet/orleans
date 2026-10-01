@@ -308,6 +308,12 @@ namespace OrleansCodeGen.TestProject
             n3.Add("11405B98", typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98));
             var n5 = n2.Add(typeof(global::TestProject.IGrainB));
             n5.Add("6B5D7809", typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809));
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98, TestProject");
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

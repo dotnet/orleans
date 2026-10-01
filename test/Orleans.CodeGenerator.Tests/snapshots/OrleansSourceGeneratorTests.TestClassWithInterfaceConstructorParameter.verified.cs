@@ -129,6 +129,11 @@ namespace OrleansCodeGen.TestProject
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
+            PreserveTypeMetadata("TestProject.InterfaceCtorParam, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

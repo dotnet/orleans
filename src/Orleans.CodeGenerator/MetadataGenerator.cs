@@ -8,7 +8,11 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
 
-internal class MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName, bool supportsModuleInitializers)
+internal class MetadataGenerator(
+    MetadataAggregateModel metadataModel,
+    string assemblyName,
+    bool supportsModuleInitializers,
+    bool supportsMetadataDependencies = false)
 {
     private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
     private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
@@ -19,6 +23,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
     private readonly MetadataAggregateModel _metadataModel = metadataModel;
     private readonly string _assemblyName = assemblyName ?? "Assembly";
     private readonly bool _supportsModuleInitializers = supportsModuleInitializers;
+    private readonly bool _supportsMetadataDependencies = supportsMetadataDependencies;
 
     public ClassDeclarationSyntax GenerateMetadata()
         => GenerateIncrementalMetadata();
@@ -143,25 +148,61 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         }
 
         AddCompoundTypeAliases(configParam, body, generatedInvokables);
-        return CreateMetadataClass(body, providerBody, configParam);
+        return CreateMetadataClass(body, providerBody, configParam, generatedInvokables);
     }
 
     private ClassDeclarationSyntax CreateMetadataClass(
         List<StatementSyntax> body,
         List<StatementSyntax> providerBody,
-        IdentifierNameSyntax configParam)
+        IdentifierNameSyntax configParam,
+        ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
     {
+        var metadataTypes = _metadataModel.RegisteredCodecs.SelectMany(static codec => codec.MetadataTypes)
+            .Concat(_metadataModel.SerializableTypes.SelectMany(static type => type.MetadataTypes))
+            .Concat(generatedInvokables.Select(type => new TypeMetadataIdentity(type.MetadataName, _assemblyName, string.Empty)))
+            .Where(static type => !type.IsEmpty)
+            .GroupBy(static type => (type.AssemblyName, type.MetadataName))
+            .Select(static group => group.First())
+            .OrderBy(static type => type.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(static type => type.MetadataName, StringComparer.Ordinal)
+            .ToArray();
+
         var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureInner")
             .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword))
             .AddParameterListParameters(
                 Parameter(configParam.Identifier).WithType(TypeManifestOptionsType))
             .AddBodyStatements([.. body]);
 
+        if (_supportsMetadataDependencies && metadataTypes.Length > 0)
+        {
+            foreach (var type in metadataTypes)
+            {
+                configureMethod = configureMethod.AddBodyStatements(ExpressionStatement(
+                    InvocationExpression(IdentifierName("PreserveTypeMetadata"), ArgumentList(SingletonSeparatedList(
+                        Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal($"{type.MetadataName}, {type.AssemblyName}"))))))));
+            }
+        }
+
         var result = ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName))
             .AddBaseListTypes(SimpleBaseType(TypeManifestProviderBaseType))
             .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(configureMethod);
+
+        if (_supportsMetadataDependencies && metadataTypes.Length > 0)
+        {
+            // Annotated type-name constants preserve definitions and interfaces, including inaccessible nested types.
+            var metadataAttribute = Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute"))
+                .AddArgumentListArguments(AttributeArgument(
+                    ParseExpression("global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces")));
+            var metadataParameter = Parameter(Identifier("typeName"))
+                .WithType(PredefinedType(Token(SyntaxKind.StringKeyword)))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(metadataAttribute)));
+            result = result.AddMembers(MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "PreserveTypeMetadata")
+                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddParameterListParameters(metadataParameter)
+                .WithBody(Block()));
+        }
 
         if (providerBody.Count > 0)
         {

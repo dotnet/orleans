@@ -121,6 +121,11 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.Codec_DemoData));
             config.AddCopier(typeof(OrleansCodeGen.Copier_DemoData));
             config.AddActivator(typeof(OrleansCodeGen.Activator_DemoData));
+            PreserveTypeMetadata("DemoData, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

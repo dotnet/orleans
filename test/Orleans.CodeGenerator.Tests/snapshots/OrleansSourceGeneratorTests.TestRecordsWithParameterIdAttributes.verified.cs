@@ -368,6 +368,13 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_SimpleRecord));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RecordWithExtraProperty));
             config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.RecordStructWithParameterId>));
+            PreserveTypeMetadata("TestProject.RecordStructWithParameterId, TestProject");
+            PreserveTypeMetadata("TestProject.RecordWithExtraProperty, TestProject");
+            PreserveTypeMetadata("TestProject.SimpleRecord, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

@@ -809,6 +809,18 @@ namespace OrleansCodeGen.TestProject
             n7.Add("A9FEF7AF", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
             var n9 = n2.Add(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
             n9.Add("9814021A", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF, TestProject");
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E, TestProject");
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A, TestProject");
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316, TestProject");
+            PreserveTypeMetadata("TestProject.GrainWithGuidCompoundKey, TestProject");
+            PreserveTypeMetadata("TestProject.GrainWithGuidKey, TestProject");
+            PreserveTypeMetadata("TestProject.GrainWithIntegerCompoundKey, TestProject");
+            PreserveTypeMetadata("TestProject.GrainWithStringKey, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

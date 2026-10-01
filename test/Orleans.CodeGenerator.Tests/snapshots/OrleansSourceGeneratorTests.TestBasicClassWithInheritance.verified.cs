@@ -180,6 +180,12 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BaseData));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
+            PreserveTypeMetadata("TestProject.BaseData, TestProject");
+            PreserveTypeMetadata("TestProject.DerivedData, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }
