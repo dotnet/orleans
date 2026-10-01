@@ -34,6 +34,7 @@ internal static class RpcResponseGenerator
         var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var resolver = new TypeSymbolResolver(compilation);
         var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
+        var hasCompletionMethods = false;
         var output = ImmutableArray.CreateBuilder<SourceOutputResult>();
         foreach (var proxy in proxies)
         {
@@ -48,10 +49,15 @@ internal static class RpcResponseGenerator
                 .Where(static method => method.MethodKind == MethodKind.Ordinary))
             {
                 var returnType = method.ReturnType;
-                if (returnType.SpecialType == SpecialType.System_Void
-                    || SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.Task)
+                if (returnType.SpecialType == SpecialType.System_Void)
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.Task)
                     || SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.ValueTask))
                 {
+                    hasCompletionMethods = true;
                     continue;
                 }
 
@@ -109,7 +115,7 @@ internal static class RpcResponseGenerator
             }
         }
 
-        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0)
+        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0 && !hasCompletionMethods)
         {
             return output.ToImmutable();
         }
