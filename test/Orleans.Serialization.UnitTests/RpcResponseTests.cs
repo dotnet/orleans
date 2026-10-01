@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -133,6 +134,23 @@ public sealed class RpcResponseTests : IDisposable
         Assert.Same(payload, copy.GetResult<NativeAotSmoke.RpcResponsePayload>());
         Assert.IsType<PooledResponseCopier<NativeAotSmoke.RpcResponsePayload>>(
             services.GetRequiredService<CodecProvider>().GetDeepCopier(response.GetType()));
+    }
+
+    [Fact]
+    public void LegacyJitDictionaryResponsesPreserveCustomComparers()
+    {
+        var dictionary = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["entry"] = 42 };
+        using var response = (Response<Dictionary<string, int>>)Response.FromResult(dictionary);
+        using var copy = _services.GetRequiredService<DeepCopier>().Copy(response);
+        Assert.NotSame(dictionary, copy.TypedResult);
+        Assert.Same(StringComparer.OrdinalIgnoreCase, copy.TypedResult!.Comparer);
+        Assert.Equal(42, copy.TypedResult["ENTRY"]);
+        var serializer = _services.GetRequiredService<Serializer>();
+        using var result = serializer.Deserialize<Response<Dictionary<string, int>>>(serializer.SerializeToArray(response));
+        Assert.NotNull(result);
+        Assert.NotSame(dictionary, result.TypedResult);
+        Assert.Same(StringComparer.OrdinalIgnoreCase, result.TypedResult!.Comparer);
+        Assert.Equal(42, result.TypedResult["ENTRY"]);
     }
 
     [Theory]

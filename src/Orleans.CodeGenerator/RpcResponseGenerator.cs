@@ -78,12 +78,21 @@ internal static class RpcResponseGenerator
         }
 
         var supportedResults = new List<ITypeSymbol>();
+        var dictionaryDefinition = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2");
         foreach (var entry in results.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
         {
             var resultType = entry.Key;
             var method = entry.Value;
-            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out _, out var failure))
+            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out var candidate, out var failure))
             {
+                var dictionary = candidate.Registrations.Keys.OfType<INamedTypeSymbol>()
+                    .FirstOrDefault(type => SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, dictionaryDefinition));
+                if (dictionary is not null)
+                {
+                    Report(method, dictionary, "dictionary comparers are selected per value and require an explicit closed registration preserving the comparer contract");
+                    continue;
+                }
+
                 supportedResults.Add(resultType);
             }
             else

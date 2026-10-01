@@ -2309,6 +2309,28 @@ public class DemoClass
         Assert.NotEqual(Location.None, diagnostic.Location);
     }
 
+    [Theory]
+    [InlineData("System.Collections.Generic.Dictionary<string, int>")]
+    [InlineData("System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>")]
+    public async Task RpcResponseFactoriesRequireExplicitDictionaryComparerContract(string resultType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<{{resultType}}> Get(); }
+            """);
+        var native = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(native.Diagnostics);
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Contains("comparer contract", diagnostic.GetMessage());
+        Assert.Contains("Dictionary", diagnostic.GetMessage());
+        Assert.DoesNotContain(native.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+        var jit = RunSourceGenerator(compilation);
+        Assert.Empty(jit.Diagnostics);
+        Assert.Contains(jit.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
