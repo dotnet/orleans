@@ -37,6 +37,7 @@ jobs:
             retention: 1
           - scenario: second attempt succeeds
             retry: 'true'
+            max-parallel-test-modules: '2'
             failure-mode: first
             outcome: success
             attempts: 2
@@ -44,6 +45,7 @@ jobs:
             retention: 1
           - scenario: both attempts fail
             retry: 'true'
+            max-parallel-test-modules: '2'
             failure-mode: always
             outcome: failure
             attempts: 2
@@ -78,6 +80,7 @@ jobs:
         with:
           artifact-name: retry-contract
           framework: net10.0
+          max-parallel-test-modules: ${{ matrix.max-parallel-test-modules || '1' }}
           provider: Cosmos
           retry: ${{ matrix.retry }}
         env:
@@ -91,12 +94,14 @@ jobs:
             Attempts = '${{ matrix.attempts }}'
             ResultIds = '${{ matrix.result-ids }}'
             Retention = '${{ matrix.retention }}'
+            ParallelModules = (@('${{ matrix.max-parallel-test-modules || '1' }}') * [int]'${{ matrix.attempts }}') -join ','
           }
           $actual = @{
             Outcome = '${{ steps.partition.outcome }}'
             Attempts = $env:TEST_RETRY_ATTEMPTS
             ResultIds = $env:TEST_RETRY_RESULT_IDS
             Retention = $env:TEST_RETRY_RETENTION
+            ParallelModules = $env:TEST_RETRY_MAX_PARALLEL_TEST_MODULES
           }
           foreach ($key in $expected.Keys) {
             if ($actual[$key] -cne $expected[$key]) {

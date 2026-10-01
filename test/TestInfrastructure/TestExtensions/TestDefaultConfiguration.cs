@@ -37,10 +37,15 @@ namespace TestExtensions
 
         public static string? CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
         public static string? CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
-        public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]!);
-        public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]!);
-        public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]!);
+        public static bool UseAzurite => !UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString);
+        public static Uri TableEndpoint => new(defaultConfiguration[nameof(TableEndpoint)]!);
+        public static Uri DataBlobUri => new(defaultConfiguration[nameof(DataBlobUri)]!);
+        public static Uri DataQueueUri => new(defaultConfiguration[nameof(DataQueueUri)]!);
         public static string? DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static string AzureStorageConnectionString => GetAzureStorageConnectionString(
+            UseAadAuthentication,
+            DataConnectionString,
+            static () => AzuriteContainerManager.ConnectionString);
         public static string? EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string? EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string? ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
@@ -61,12 +66,12 @@ namespace TestExtensions
                 var systemAccessToken = Environment.GetEnvironmentVariable("SYSTEM_ACCESSTOKEN");
                 if (!string.IsNullOrEmpty(systemAccessToken))
                 {
-                    // If running in an AzDo pipeline with a SYSTEM_ACCESSTOKEN available, let's try to use AzurePipelinesCredential
                     var tenantId = Environment.GetEnvironmentVariable("AZURE_TENANT_ID");
                     var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
                     var serviceConnectionId = Environment.GetEnvironmentVariable("SERVICE_CONNECTION_ID");
                     return new AzurePipelinesCredential(tenantId, clientId, serviceConnectionId, systemAccessToken);
                 }
+
                 return new DefaultAzureCredential();
             }
         }
@@ -76,6 +81,22 @@ namespace TestExtensions
             value = defaultConfiguration.GetValue(key, default(string));
 
             return value != null;
+        }
+
+        internal static string GetAzureStorageConnectionString(
+            bool useAadAuthentication,
+            string? dataConnectionString,
+            Func<string> azuriteConnectionStringFactory)
+        {
+            if (useAadAuthentication)
+            {
+                throw new InvalidOperationException(
+                    "AzureStorageConnectionString is unavailable when AAD authentication is enabled. Configure clients with the Azure Storage service endpoints and TokenCredential.");
+            }
+
+            return string.IsNullOrWhiteSpace(dataConnectionString)
+                ? azuriteConnectionStringFactory()
+                : dataConnectionString;
         }
 
         private static IConfiguration BuildDefaultConfiguration()

@@ -10,6 +10,10 @@ inputs:
     description: Test filter forwarded by run-tests.
   framework:
     description: Target framework forwarded by run-tests.
+  max-parallel-test-modules:
+    description: Maximum concurrent test modules forwarded by run-tests.
+    required: false
+    default: '1'
   result-id:
     description: Test result identifier for this attempt.
   name:
@@ -27,6 +31,7 @@ runs:
         'setup-test-environment' {
           'TEST_RETRY_ATTEMPTS=0' >> $env:GITHUB_ENV
           'TEST_RETRY_RESULT_IDS=' >> $env:GITHUB_ENV
+          'TEST_RETRY_MAX_PARALLEL_TEST_MODULES=' >> $env:GITHUB_ENV
         }
         'dotnet-test' {
           $attempt = [int] $env:TEST_RETRY_ATTEMPTS + 1
@@ -34,6 +39,9 @@ runs:
           $resultIds = @($env:TEST_RETRY_RESULT_IDS, '${{ inputs.result-id }}') |
             Where-Object { $_ }
           "TEST_RETRY_RESULT_IDS=$($resultIds -join ',')" >> $env:GITHUB_ENV
+          $parallelModules = @($env:TEST_RETRY_MAX_PARALLEL_TEST_MODULES, '${{ inputs.max-parallel-test-modules }}') |
+            Where-Object { $_ }
+          "TEST_RETRY_MAX_PARALLEL_TEST_MODULES=$($parallelModules -join ',')" >> $env:GITHUB_ENV
           Write-Output "Test attempt $attempt (${{ inputs.result-id }})"
           if ($env:TEST_RETRY_FAILURE_MODE -eq 'always' -or
               ($env:TEST_RETRY_FAILURE_MODE -eq 'first' -and $attempt -eq 1)) {
