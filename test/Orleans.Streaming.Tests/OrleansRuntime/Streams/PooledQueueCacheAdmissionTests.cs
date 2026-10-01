@@ -38,14 +38,16 @@ public class PooledQueueCacheAdmissionTests
         monitor.Received(count).TrackMemoryAllocated(16);
     }
 
-    [Fact]
-    public void NativeBufferMembershipTracksPartialPurgeAndPoolReuse()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeBufferMembershipTracksPartialPurgeAndPoolReuse(bool mutableHash)
     {
         var allocations = 0;
         var pool = new ObjectPool<FixedSizeBuffer>(() =>
         {
             allocations++;
-            return new FixedSizeBuffer(16);
+            return mutableHash ? new MutableHashBuffer() : new FixedSizeBuffer(16);
         });
         var first = pool.Allocate();
         var second = pool.Allocate();
@@ -126,6 +128,11 @@ public class PooledQueueCacheAdmissionTests
             Comparisons++;
             return ReferenceEquals(this, obj);
         }
+    }
+
+    private sealed class MutableHashBuffer() : FixedSizeBuffer(16)
+    {
+        public override int GetHashCode() => Position;
     }
 
     private sealed class AlwaysPurgePredicate() : TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero)
