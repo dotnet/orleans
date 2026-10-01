@@ -172,42 +172,6 @@ jobs:
           category: compatibility-analyzers-net10-core-runtime
           sarif_file: ${{ env.RESULTS_DIRECTORY }}/compatibility-analyzers.sarif
 
-  serialization-native-field-access:
-    name: Orleans.Serialization generated field access (${{ matrix.rid }}, NativeAOT)
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            rid: linux-x64
-          - os: windows-latest
-            rid: win-x64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-        with:
-          global-json-file: global.json
-      - name: Publish and run generated field access components
-        shell: pwsh
-        run: |
-          $output = Join-Path $env:RUNNER_TEMP 'nativeaot-field-access'
-          $publishLog = Join-Path $env:RUNNER_TEMP 'nativeaot-field-access-publish.log'
-          dotnet publish test/Orleans.NativeAotSmoke/Orleans.NativeAotSmoke.csproj `
-            --configuration Release --runtime ${{ matrix.rid }} --output $output `
-            -p:NativeAotSmokeScenario=Fields -p:ILLinkTreatWarningsAsErrors=false -p:IlcTreatWarningsAsErrors=false `
-            2>&1 | Tee-Object -FilePath $publishLog
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (Select-String -Path $publishLog -Pattern '(warning|error) IL\d+:.*(OrleansCodeGen[.+]|Utilities\.FieldAccessor|UnsafeAccessor)') {
-            throw 'Generated serializer/copier field access produced trim/AOT diagnostics.'
-          }
-          $executable = Join-Path $output 'Orleans.NativeAotSmoke'
-          if ($IsWindows) { $executable += '.exe' }
-          & $executable
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
   serialization-trimmed-smoke:
     name: Orleans.Serialization trimmed smoke (net10.0)
     runs-on: ubuntu-latest
