@@ -115,7 +115,7 @@ Event Hubs stages fetched records through packing and notification handoff. Its 
 
 Certified Event Hubs admission reserves one possible new raw-data buffer per requested record against the cache's `defaultMaxAddCount` buffer budget. Admission accounts for owned buffers and staged allocation notifications, so a pinned subscription pauses new reception even when average delivery pressure remains low. Packing failures release staged buffers, and purge cleanup returns completed buffers even when an observer throws. The receiver finishes already-staged read handoffs independently of new-read capacity. The [operations guide](../../streaming/streaming-operations.md) describes the native budget and deployment sizing.
 
-Native chronological eviction indexes owned buffers for amortized constant-time allocation-notification checks. Duplicate notifications preserve a single ownership entry, and reclamation removes that entry before pool reuse. Derived eviction strategies retain their protected-queue extension behavior.
+Native chronological eviction indexes owned buffers by resource identity for amortized constant-time allocation-notification checks. Duplicate notifications preserve a single ownership entry, and reclamation removes that entry before pool reuse. Derived eviction strategies retain their protected-queue extension behavior.
 
 ```mermaid
 flowchart TB

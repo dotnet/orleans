@@ -40,7 +40,7 @@ namespace Orleans.Providers.Streams.Common
             // Derived strategies can mutate the protected queue directly.
             if (GetType() == typeof(ChronologicalEvictionStrategy))
             {
-                this.inUseBufferSet = [];
+                this.inUseBufferSet = new(ReferenceEqualityComparer.Instance);
             }
 
             // monitoring
