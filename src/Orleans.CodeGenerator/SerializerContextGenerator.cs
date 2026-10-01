@@ -25,7 +25,7 @@ internal static class SerializerContextGenerator
     {
         var symbol = (INamedTypeSymbol)context.TargetSymbol;
         var location = symbol.Locations.FirstOrDefault();
-        if (symbol.IsGenericType || symbol.ContainingType is not null
+        if (symbol.IsFileLocal || symbol.IsGenericType || symbol.ContainingType is not null
             || symbol.BaseType?.ToDisplayString() != "Orleans.Serialization.SerializerContext"
             || symbol.IsAbstract || symbol.IsStatic
             || symbol.DeclaringSyntaxReferences.Any(reference =>

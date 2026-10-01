@@ -2,6 +2,7 @@
   <PropertyGroup>
     <SourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\..\'))</SourceRoot>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OrleansHotReload>true</OrleansHotReload>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <IsAotCompatible>true</IsAotCompatible>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>

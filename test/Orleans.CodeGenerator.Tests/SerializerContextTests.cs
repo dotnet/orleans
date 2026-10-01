@@ -45,6 +45,7 @@ public sealed class SerializerContextTests
     [InlineData("public class DemoContext : Orleans.Serialization.SerializerContext { }")]
     [InlineData("public partial class DemoContext<T> : Orleans.Serialization.SerializerContext { }")]
     [InlineData("public partial class DemoContext { }")]
+    [InlineData("file partial class DemoContext : Orleans.Serialization.SerializerContext { }")]
     public void InvalidContextsProduceGeneratorErrors(string declaration)
     {
         var (_, result) = Generate($"[Orleans.GenerateSerializerContext(typeof(int))] {declaration}");
