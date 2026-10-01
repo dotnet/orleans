@@ -64,6 +64,8 @@ Reference tracking is scoped to a writer/reader session and preserves repeated r
 
 ## RPC generation
 
+Grain-reference construction resolves the generated proxy from the registered type manifest and invokes its `(GrainReferenceShared, IdSpan)` constructor. The activator caches the constructor delegate and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. JIT runtimes use an emitted constructor delegate; NativeAOT uses a cached reflection constructor invoker. Generated `AddInterfaceProxy` registrations preserve the public proxy constructor during trimming.
+
 For each grain interface method, generated code captures arguments in an invokable object. The generated proxy submits that object through its proxy base. On the target, generated dispatch metadata invokes the concrete implementation and encodes the response.
 
 The request object is serializable like any other Orleans value. Stable method and interface metadata allow caller and target assemblies to evolve independently within the supported versioning rules. Outgoing and incoming call filters wrap the generated invocation; they do not replace serialization or dispatch.

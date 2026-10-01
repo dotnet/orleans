@@ -194,6 +194,50 @@ jobs:
             --output $output
           & (Join-Path $output 'Orleans.Serialization.TrimmedSmoke')
 
+  grain-references-nativeaot-smoke:
+    name: Production grain-reference provider (${{ matrix.runtime }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            runtime: win-x64
+            extension: .exe
+          - os: ubuntu-latest
+            runtime: linux-x64
+            extension: ""
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Publish and run production grain-reference NativeAOT smoke
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-grain-references-nativeaot-smoke'
+          $project = Join-Path 'test' 'Orleans.GrainReferences.NativeAotSmoke' 'Orleans.GrainReferences.NativeAotSmoke.csproj'
+          dotnet publish $project `
+            --configuration Release `
+            --runtime ${{ matrix.runtime }} `
+            --output $output `
+            -bl:grain-references-nativeaot-smoke.binlog 2>&1 |
+            Tee-Object -FilePath grain-references-nativeaot-smoke.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $constructorWarnings = Select-String -Path grain-references-nativeaot-smoke.log `
+            -Pattern 'warning IL[0-9]+: Orleans\.GrainReferences\.(GrainReferenceActivatorProvider|RpcProvider\.<\.ctor>)'
+          if ($constructorWarnings) { throw "Production proxy construction diagnostics: $constructorWarnings" }
+          & (Join-Path $output 'Orleans.GrainReferences.NativeAotSmoke${{ matrix.extension }}')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: grain-references-nativeaot-smoke-${{ matrix.runtime }}
+          retention-days: 1
+          path: |
+            grain-references-nativeaot-smoke.binlog
+            grain-references-nativeaot-smoke.log
+
   dependency-injection-trimmed-smoke:
     name: Orleans.DependencyInjection trimmed smoke for selected generic DI constructor flows (net10.0)
     runs-on: ubuntu-latest

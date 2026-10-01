@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Content Include="*.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\Orleans.GrainReferences.NativeAotSmoke\ReferenceConstructionFixture.cs" Link="GrainReferences\ReferenceConstructionFixture.cs" />
     <Compile Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\MembershipTests\MembershipTableConformanceTestsBase.cs" Link="Membership\MembershipTableConformanceTestsBase.cs" />
   </ItemGroup>
 
