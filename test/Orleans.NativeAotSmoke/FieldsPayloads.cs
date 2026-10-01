@@ -90,3 +90,59 @@ internal static class Outer<T> where T : class
         public U Number => _number;
     }
 }
+
+[GenerateSerializer]
+internal sealed class VolatileFields
+{
+    [Id(0)] private volatile int _number;
+    [Id(1)] private volatile string _text = "";
+    [Id(2)] private volatile byte[] _bytes = [];
+    [Id(3)] private int _ordinary;
+
+    public VolatileFields()
+    {
+    }
+
+    public VolatileFields(int number, string text, byte[] bytes, int ordinary)
+    {
+        _number = number;
+        _text = text;
+        _bytes = bytes;
+        _ordinary = ordinary;
+    }
+
+    public int Number => _number;
+    public string Text => _text;
+    public byte[] Bytes => _bytes;
+    public int Ordinary => _ordinary;
+}
+
+[GenerateSerializer]
+internal struct VolatileValueFields
+{
+    [Id(0)] private volatile int _number;
+    [Id(1)] private volatile byte[] _bytes;
+
+    public VolatileValueFields(int number, byte[] bytes)
+    {
+        _number = number;
+        _bytes = bytes;
+    }
+
+    public int Number => _number;
+    public byte[] Bytes => _bytes;
+}
+
+[GenerateSerializer]
+internal sealed class GenericVolatileFields<T> where T : class
+{
+    [Id(0)] private volatile T _value = default!;
+
+    public GenericVolatileFields()
+    {
+    }
+
+    public GenericVolatileFields(T value) => _value = value;
+
+    public T Value => _value;
+}

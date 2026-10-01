@@ -6,38 +6,40 @@ namespace Orleans.CodeGenerator.Tests;
 public class SourceGeneratorOptionsParserTests
 {
     [Theory]
-    [InlineData(".NETCoreApp", "v8.0", true, false)]
-    [InlineData(".NETCoreApp", "v9.0", true, true)]
-    [InlineData(".NETCoreApp", "v10.0", true, true)]
-    [InlineData(".NETCoreApp", "v11.0", true, true)]
-    [InlineData(".netcoreapp", "V10.0", true, true)]
-    [InlineData(".NETCoreApp", "10.0", true, true)]
-    [InlineData(".NETCoreApp", "v7.0", false, false)]
-    [InlineData(".NETStandard", "v2.1", false, false)]
-    [InlineData(".NETStandard", "v10.0", false, false)]
-    [InlineData(".NETFramework", "v4.8", false, false)]
-    [InlineData(null, "v10.0", false, false)]
-    [InlineData(".NETCoreApp", null, false, false)]
-    [InlineData(null, null, false, false)]
-    [InlineData(".NETCoreApp", "", false, false)]
-    [InlineData(".NETCoreApp", "invalid", false, false)]
-    [InlineData(".NETCoreApp", "net10.0-windows", false, false)]
+    [InlineData(".NETCoreApp", "v8.0", true, false, false)]
+    [InlineData(".NETCoreApp", "v9.0", true, true, false)]
+    [InlineData(".NETCoreApp", "v10.0", true, true, true)]
+    [InlineData(".NETCoreApp", "v11.0", true, true, true)]
+    [InlineData(".netcoreapp", "V10.0", true, true, true)]
+    [InlineData(".NETCoreApp", "10.0", true, true, true)]
+    [InlineData(".NETCoreApp", "v7.0", false, false, false)]
+    [InlineData(".NETStandard", "v2.1", false, false, false)]
+    [InlineData(".NETStandard", "v10.0", false, false, false)]
+    [InlineData(".NETFramework", "v4.8", false, false, false)]
+    [InlineData(null, "v10.0", false, false, false)]
+    [InlineData(".NETCoreApp", null, false, false, false)]
+    [InlineData(null, null, false, false, false)]
+    [InlineData(".NETCoreApp", "", false, false, false)]
+    [InlineData(".NETCoreApp", "invalid", false, false, false)]
+    [InlineData(".NETCoreApp", "net10.0-windows", false, false, false)]
     public void TargetFrameworkMetadataControlsAccessorCapabilities(
-        string? identifier, string? version, bool expectFieldAccessors, bool expectGenericAccessors)
+        string? identifier, string? version, bool expectFieldAccessors, bool expectGenericAccessors, bool expectVolatileAccessors)
     {
         var options = Parse(identifier, version);
         Assert.Equal(expectFieldAccessors, options.SupportsUnsafeAccessors);
         Assert.Equal(expectGenericAccessors, options.SupportsGenericUnsafeAccessors);
+        Assert.Equal(expectVolatileAccessors, options.SupportsVolatileUnsafeAccessors);
 
         var generatorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
         Assert.Equal(expectFieldAccessors, generatorOptions.SupportsUnsafeAccessors);
         Assert.Equal(expectGenericAccessors, generatorOptions.SupportsGenericUnsafeAccessors);
+        Assert.Equal(expectVolatileAccessors, generatorOptions.SupportsVolatileUnsafeAccessors);
     }
 
     [Theory]
     [InlineData("v7.0", "v8.0", false)]
     [InlineData("v8.0", "v9.0", false)]
-    [InlineData("v9.0", "v10.0", true)]
+    [InlineData("v9.0", "v10.0", false)]
     [InlineData("v10.0", "v11.0", true)]
     public void TargetFrameworkCapabilitiesParticipateInOptionsEquality(string beforeVersion, string afterVersion, bool expectEqual)
     {
@@ -67,6 +69,7 @@ public class SourceGeneratorOptionsParserTests
         var options = SourceGeneratorOptionsParser.ParseOptions(provider.GlobalOptions);
         Assert.True(options.SupportsUnsafeAccessors);
         Assert.True(options.SupportsGenericUnsafeAccessors);
+        Assert.True(options.SupportsVolatileUnsafeAccessors);
     }
 
     private static SourceGeneratorOptions Parse(string? identifier, string? version)

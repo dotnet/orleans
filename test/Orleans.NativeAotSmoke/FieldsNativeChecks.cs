@@ -52,6 +52,22 @@ internal static class NativeFieldAccessChecks
         FieldAccessChecks.ValidateNestedFields(
             nested, nestedResult,
             new OrleansCodeGen.Orleans.Serialization.NativeAotFieldAccessSmoke.Outer.Copier_Nested<string, int>(provider).DeepCopy(nested, context));
+        context.Reset();
+
+        var volatileFields = new VolatileFields(419, "volatile", [5, 10, 15], 23);
+        var volatileResult = RoundTrip(new Codec_VolatileFields(), volatileFields, provider, typeCodec, wellKnownTypes);
+        FieldAccessChecks.ValidateVolatileFields(volatileFields, volatileResult, new Copier_VolatileFields().DeepCopy(volatileFields, context));
+        context.Reset();
+
+        var volatileValue = new VolatileValueFields(421, [6, 12, 18]);
+        var volatileValueResult = RoundTrip(new Codec_VolatileValueFields(), volatileValue, provider, typeCodec, wellKnownTypes);
+        FieldAccessChecks.ValidateVolatileValueFields(volatileValue, volatileValueResult, new Copier_VolatileValueFields().DeepCopy(volatileValue, context));
+        context.Reset();
+
+        var genericVolatile = new GenericVolatileFields<string>("generic volatile");
+        var genericVolatileResult = RoundTrip(new Codec_GenericVolatileFields<string>(provider), genericVolatile, provider, typeCodec, wellKnownTypes);
+        FieldAccessChecks.ValidateGenericVolatileFields(
+            genericVolatile, genericVolatileResult, new Copier_GenericVolatileFields<string>(provider).DeepCopy(genericVolatile, context));
     }
 
     private static T RoundTrip<T>(IFieldCodec<T> codec, T input, CodecProvider provider, TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes)

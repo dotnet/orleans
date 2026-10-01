@@ -11,6 +11,9 @@ else if (args is ["--full-pipeline"])
     FieldAccessChecks.ConstrainedGenericFieldsRoundTripAndCopy();
     FieldAccessChecks.GenericStructFieldsRoundTripAndCopy();
     FieldAccessChecks.NestedGenericFieldsRoundTripAndCopy();
+    FieldAccessChecks.VolatileFieldsRoundTripAndCopy();
+    FieldAccessChecks.VolatileValueFieldsRoundTripAndCopy();
+    FieldAccessChecks.GenericVolatileFieldsRoundTripAndCopy();
     Console.WriteLine("NativeAOT AddSerializer private and backing field serialization and copying passed.");
 }
 else

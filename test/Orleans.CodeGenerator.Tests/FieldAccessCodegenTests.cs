@@ -39,6 +39,38 @@ public class FieldAccessCodegenTests
         }
         """;
 
+    private const string VolatileSource = """
+        [GenerateSerializer]
+        public sealed class VolatileFields
+        {
+            [Id(0)] private volatile int _number;
+            [Id(1)] private volatile string _text;
+            [Id(2)] private volatile byte[] _bytes;
+            [Id(3)] private int _ordinary;
+            [Id(4)] public volatile int Direct;
+            public int Number => _number;
+            public string Text => _text;
+            public byte[] Bytes => _bytes;
+            public int Ordinary => _ordinary;
+        }
+
+        [GenerateSerializer]
+        public struct VolatileStructFields
+        {
+            [Id(0)] private volatile int _number;
+            [Id(1)] private volatile byte[] _bytes;
+            public int Number => _number;
+            public byte[] Bytes => _bytes;
+        }
+
+        [GenerateSerializer]
+        public sealed class GenericVolatileFields<T> where T : class
+        {
+            [Id(0)] private volatile T _value;
+            public T Value => _value;
+        }
+        """;
+
     [Fact]
     public async Task PrivateAndBackingFieldsUseRefReturningUnsafeAccessors()
     {
@@ -135,13 +167,53 @@ public class FieldAccessCodegenTests
     }
 
     [Theory]
+    [InlineData("v8.0", false, false)]
+    [InlineData("v9.0", false, false)]
+    [InlineData("v10.0", false, true)]
+    [InlineData("v11.0", false, true)]
+    [InlineData("v10.0", true, false)]
+    public async Task VolatileFieldsFollowTargetRuntimeCapability(string frameworkVersion, bool hotReload, bool expectUnsafeAccessors)
+    {
+        var generated = await Generate(hotReload, frameworkVersion: frameworkVersion, source: Source + VolatileSource);
+        var root = CSharpSyntaxTree.ParseText(generated, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
+        foreach (var className in new[] { "Codec_VolatileFields", "Copier_VolatileFields", "Codec_VolatileStructFields", "Copier_VolatileStructFields", "Codec_GenericVolatileFields", "Copier_GenericVolatileFields" })
+        {
+            var type = Assert.Single(root.DescendantNodes().OfType<ClassDeclarationSyntax>(), c => c.Identifier.ValueText == className);
+            var source = type.ToString();
+            if (expectUnsafeAccessors)
+            {
+                Assert.Contains("accessField_", source, StringComparison.Ordinal);
+                Assert.DoesNotContain("Utilities.FieldAccessor", source, StringComparison.Ordinal);
+                var accessors = type.Members.OfType<MethodDeclarationSyntax>().Where(m => m.Modifiers.Any(SyntaxKind.ExternKeyword)).ToList();
+                Assert.Equal(accessors.Count, accessors.Select(m => m.Identifier.ValueText).Distinct(StringComparer.Ordinal).Count());
+            }
+            else
+            {
+                Assert.Contains("Utilities.FieldAccessor", source, StringComparison.Ordinal);
+                Assert.Contains("getField_", source, StringComparison.Ordinal);
+                Assert.Contains("setField_", source, StringComparison.Ordinal);
+                Assert.DoesNotContain("UnsafeAccessorKind.Field, Name = \"_number\"", source, StringComparison.Ordinal);
+                Assert.DoesNotContain("UnsafeAccessorKind.Field, Name = \"_bytes\"", source, StringComparison.Ordinal);
+                Assert.DoesNotContain("UnsafeAccessorKind.Field, Name = \"_value\"", source, StringComparison.Ordinal);
+            }
+        }
+
+        var codec = Assert.Single(root.DescendantNodes().OfType<ClassDeclarationSyntax>(), c => c.Identifier.ValueText == "Codec_VolatileFields").ToString();
+        Assert.Equal(!hotReload, codec.Contains("accessField_3", StringComparison.Ordinal));
+        Assert.Contains("instance.Direct", codec, StringComparison.Ordinal);
+        Assert.Contains("instance.Direct =", codec, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("v7.0", "v8.0", true)]
     [InlineData("v8.0", "v9.0", true)]
-    [InlineData("v9.0", "v10.0", false)]
+    [InlineData("v9.0", "v10.0", true)]
+    [InlineData("v10.0", "v11.0", false)]
     public async Task TargetFrameworkChangesInvalidateOnlyChangedAccessorCapabilities(
         string beforeVersion, string afterVersion, bool expectChanges)
     {
-        var compilation = await TestCompilationHelper.CreateCompilation(Source);
+        var compilation = await TestCompilationHelper.CreateCompilation(Source + VolatileSource);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
             optionsProvider: CreateOptions(hotReload: false, ".NETCoreApp", beforeVersion),
@@ -166,9 +238,9 @@ public class FieldAccessCodegenTests
         }
     }
 
-    private static async Task<string> Generate(bool hotReload, string frameworkIdentifier = ".NETCoreApp", string frameworkVersion = "v10.0")
+    private static async Task<string> Generate(bool hotReload, string frameworkIdentifier = ".NETCoreApp", string frameworkVersion = "v10.0", string source = Source)
     {
-        var compilation = await TestCompilationHelper.CreateCompilation(Source);
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [new OrleansSerializationSourceGenerator().AsSourceGenerator()],
             optionsProvider: CreateOptions(hotReload, frameworkIdentifier, frameworkVersion));

@@ -19,6 +19,12 @@ internal static class FieldAccessChecks
         services.AddSingleton<IDeepCopier<ValueFields<int>>, Copier_ValueFields<int>>();
         services.AddSingleton<IFieldCodec<Outer<string>.Nested<int>>, OrleansCodeGen.Orleans.Serialization.NativeAotFieldAccessSmoke.Outer.Codec_Nested<string, int>>();
         services.AddSingleton<IDeepCopier<Outer<string>.Nested<int>>, OrleansCodeGen.Orleans.Serialization.NativeAotFieldAccessSmoke.Outer.Copier_Nested<string, int>>();
+        services.AddSingleton<IFieldCodec<VolatileFields>, Codec_VolatileFields>();
+        services.AddSingleton<IDeepCopier<VolatileFields>, Copier_VolatileFields>();
+        services.AddSingleton<IFieldCodec<VolatileValueFields>, Codec_VolatileValueFields>();
+        services.AddSingleton<IDeepCopier<VolatileValueFields>, Copier_VolatileValueFields>();
+        services.AddSingleton<IFieldCodec<GenericVolatileFields<string>>, Codec_GenericVolatileFields<string>>();
+        services.AddSingleton<IDeepCopier<GenericVolatileFields<string>>, Copier_GenericVolatileFields<string>>();
         return services.BuildServiceProvider();
     }
 
@@ -110,6 +116,66 @@ internal static class FieldAccessChecks
         Ensure(copy.Value == input.Value && copy.Number == input.Number,
             "The nested generic copier must preserve both declaring-type parameters.");
         Ensure(!ReferenceEquals(input, copy), "The nested generic copier must create a new instance.");
+    }
+
+    public static void VolatileFieldsRoundTripAndCopy()
+    {
+        using var services = CreateServices();
+        var input = new VolatileFields(419, "volatile", [5, 10, 15], 23);
+        var serializer = services.GetRequiredService<Serializer<VolatileFields>>();
+        var result = serializer.Deserialize(serializer.SerializeToArray(input))
+            ?? throw new InvalidOperationException("Deserialization must return the volatile-field payload.");
+        var copy = services.GetRequiredService<DeepCopier>().Copy(input);
+        ValidateVolatileFields(input, result, copy);
+    }
+
+    public static void ValidateVolatileFields(VolatileFields input, VolatileFields result, VolatileFields copy)
+    {
+        Ensure(result.Number == input.Number && result.Text == input.Text && result.Ordinary == input.Ordinary
+            && result.Bytes.AsSpan().SequenceEqual(input.Bytes), "The serializer must restore volatile and ordinary fields.");
+        Ensure(copy.Number == input.Number && copy.Text == input.Text && copy.Ordinary == input.Ordinary
+            && copy.Bytes.AsSpan().SequenceEqual(input.Bytes), "The copier must restore volatile and ordinary fields.");
+        Ensure(!ReferenceEquals(input, copy), "The volatile-field copier must create a new instance.");
+        Ensure(!ReferenceEquals(input.Bytes, copy.Bytes), "The volatile array field must be deeply copied.");
+        copy.Bytes[0] = 99;
+        Ensure(input.Bytes[0] == 5, "Mutating the copied volatile array must preserve the original.");
+    }
+
+    public static void VolatileValueFieldsRoundTripAndCopy()
+    {
+        using var services = CreateServices();
+        var input = new VolatileValueFields(421, [6, 12, 18]);
+        var serializer = services.GetRequiredService<Serializer<VolatileValueFields>>();
+        var result = serializer.Deserialize(serializer.SerializeToArray(input));
+        var copy = services.GetRequiredService<DeepCopier>().Copy(input);
+        ValidateVolatileValueFields(input, result, copy);
+    }
+
+    public static void ValidateVolatileValueFields(VolatileValueFields input, VolatileValueFields result, VolatileValueFields copy)
+    {
+        Ensure(result.Number == input.Number && result.Bytes.AsSpan().SequenceEqual(input.Bytes),
+            "The struct serializer must restore volatile fields through a ref receiver.");
+        Ensure(copy.Number == input.Number && copy.Bytes.AsSpan().SequenceEqual(input.Bytes),
+            "The struct copier must restore volatile fields through a ref receiver.");
+        Ensure(!ReferenceEquals(input.Bytes, copy.Bytes), "The volatile struct array field must be deeply copied.");
+    }
+
+    public static void GenericVolatileFieldsRoundTripAndCopy()
+    {
+        using var services = CreateServices();
+        var input = new GenericVolatileFields<string>("generic volatile");
+        var serializer = services.GetRequiredService<Serializer<GenericVolatileFields<string>>>();
+        var result = serializer.Deserialize(serializer.SerializeToArray(input))
+            ?? throw new InvalidOperationException("Deserialization must return the generic volatile payload.");
+        var copy = services.GetRequiredService<DeepCopier>().Copy(input);
+        ValidateGenericVolatileFields(input, result, copy);
+    }
+
+    public static void ValidateGenericVolatileFields(GenericVolatileFields<string> input, GenericVolatileFields<string> result, GenericVolatileFields<string> copy)
+    {
+        Ensure(result.Value == input.Value, "The generic serializer must restore the volatile field.");
+        Ensure(copy.Value == input.Value, "The generic copier must restore the volatile field.");
+        Ensure(!ReferenceEquals(input, copy), "The generic volatile copier must create a new instance.");
     }
 
     private static void Ensure(bool condition, string message)

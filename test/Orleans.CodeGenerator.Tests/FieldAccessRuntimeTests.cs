@@ -50,6 +50,23 @@ public class FieldAccessRuntimeTests
     }
 
     [Fact]
+    public void GeneratedVolatileAccessorShapeMatchesTargetFramework()
+    {
+        var codecType = typeof(OrleansCodeGen.Orleans.Serialization.NativeAotFieldAccessSmoke.Codec_VolatileFields);
+        const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+#if NET8_0
+        Assert.Equal(typeof(Func<VolatileFields, int>), codecType.GetField("getField_0", flags)!.FieldType);
+        Assert.Equal(typeof(Action<VolatileFields, int>), codecType.GetField("setField_0", flags)!.FieldType);
+        Assert.Null(codecType.GetMethod("accessField_0", flags));
+#else
+        Assert.Null(codecType.GetField("getField_0", flags));
+        Assert.Null(codecType.GetField("setField_0", flags));
+        Assert.Equal(typeof(int).MakeByRefType(), codecType.GetMethod("accessField_0", flags)!.ReturnType);
+#endif
+        Assert.Equal(typeof(int).MakeByRefType(), codecType.GetMethod("accessField_3", flags)!.ReturnType);
+    }
+
+    [Fact]
     public void PrivateAndBackingFieldsRoundTripAndCopy() => FieldAccessChecks.PrivateAndBackingFieldsRoundTripAndCopy();
 
     [Fact]
@@ -60,4 +77,13 @@ public class FieldAccessRuntimeTests
 
     [Fact]
     public void NestedGenericFieldsRoundTripAndCopy() => FieldAccessChecks.NestedGenericFieldsRoundTripAndCopy();
+
+    [Fact]
+    public void VolatileFieldsRoundTripAndCopy() => FieldAccessChecks.VolatileFieldsRoundTripAndCopy();
+
+    [Fact]
+    public void VolatileValueFieldsRoundTripAndCopy() => FieldAccessChecks.VolatileValueFieldsRoundTripAndCopy();
+
+    [Fact]
+    public void GenericVolatileFieldsRoundTripAndCopy() => FieldAccessChecks.GenericVolatileFieldsRoundTripAndCopy();
 }

@@ -67,6 +67,10 @@ field-access delegates. Setting `OrleansHotReload=true` retains lazily
 initialized delegates for fields, so existing serializer and copier instances
 can access members added by hot reload.
 
+Volatile fields use ref-returning accessors on .NET 10 and later. Earlier
+targets restore private volatile fields through generated delegates, preserving
+compatibility with runtimes affected by volatile-field signature matching.
+
 F# record and union field restoration uses the existing generated-delegate
 strategy on JIT-enabled runtimes.
 

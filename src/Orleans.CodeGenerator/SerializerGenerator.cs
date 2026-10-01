@@ -1428,6 +1428,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             && !_generatorServices.Options.HotReloadSafe
             && _generatorServices.Options.SupportsUnsafeAccessors
             && LibraryTypes.HasUnsafeAccessorAttribute
+            && (!Field.IsVolatile || _generatorServices.Options.SupportsVolatileUnsafeAccessors)
             && (!ContainingType.IsGenericType || _generatorServices.Options.SupportsGenericUnsafeAccessors);
 
         public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false, bool lazyInitialization = false, bool useUnsafeFieldAccessor = false)

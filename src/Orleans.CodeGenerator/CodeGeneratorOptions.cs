@@ -44,4 +44,5 @@ public class CodeGeneratorOptions
 
     internal bool SupportsUnsafeAccessors { get; set; }
     internal bool SupportsGenericUnsafeAccessors { get; set; }
+    internal bool SupportsVolatileUnsafeAccessors { get; set; }
 }
