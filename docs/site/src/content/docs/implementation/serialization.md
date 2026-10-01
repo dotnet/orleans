@@ -158,6 +158,12 @@ The manifest records:
 
 API: <xref:Orleans.Serialization.Configuration.TypeManifestOptions>, <xref:Orleans.Serialization.ISerializerBuilder>, and <xref:Orleans.Serialization.SerializerBuilderExtensions.AddAssembly*?displayProperty=nameWithType>. Implementation: [manifest options](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Configuration/TypeManifestOptions.cs), [serializer builder extensions](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/SerializerBuilderExtensions.cs), and [serializer service registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Serialization/Hosting/ServiceCollectionExtensions.cs).
 
+### Default object activation
+
+The default serializer activator invokes a public parameterless constructor, including an explicit parameterless value-type constructor, for each new instance. For types with no public parameterless constructor, it allocates an uninitialized instance with zero-initialized fields. A registered custom activator controls construction for its target type.
+
+On runtimes which support dynamic code, the default activator caches an emitted constructor delegate. On NativeAOT, it invokes the preserved constructor through reflection and propagates the original constructor exception. Closed default activator types carry the constructor-preservation annotations required by constructor lookup and uninitialized allocation.
+
 ## Extension points
 
 Use the registration APIs exposed by <xref:Orleans.Serialization.ISerializerBuilder> for:
