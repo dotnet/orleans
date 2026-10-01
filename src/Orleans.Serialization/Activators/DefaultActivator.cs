@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 
 namespace Orleans.Serialization.Activators
 {
@@ -28,7 +29,7 @@ namespace Orleans.Serialization.Activators
 
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {
-                return () => (T)ctor.Invoke(BindingFlags.DoNotWrapExceptions, binder: null, parameters: null, culture: null);
+                return CreateInstance;
             }
 
             var method = new DynamicMethod(nameof(DefaultActivator<T>), typeof(T), new[] { typeof(object) });
@@ -36,6 +37,20 @@ namespace Orleans.Serialization.Activators
             il.Emit(OpCodes.Newobj, ctor);
             il.Emit(OpCodes.Ret);
             return (Func<T>)method.CreateDelegate(typeof(Func<T>));
+        }
+
+        private static T CreateInstance()
+        {
+            try
+            {
+                return System.Activator.CreateInstance<T>();
+            }
+            catch (TargetInvocationException exception) when (exception.InnerException is { } inner)
+            {
+                // NativeAOT generic construction wraps constructor exceptions.
+                ExceptionDispatchInfo.Capture(inner).Throw();
+                throw;
+            }
         }
 
         public abstract T Create();

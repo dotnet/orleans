@@ -1,4 +1,6 @@
 using System;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Serializers;
@@ -80,6 +82,7 @@ public sealed class DefaultActivatorTests
         var exception = Assert.Throws<InvalidOperationException>(() => activator.Create());
 
         Assert.Same(ThrowingReferenceConstructor.Error, exception);
+        Assert.Contains(nameof(ThrowingReferenceConstructor), exception.StackTrace);
     }
 
     [Fact]
@@ -90,6 +93,31 @@ public sealed class DefaultActivatorTests
         var exception = Assert.Throws<InvalidOperationException>(() => activator.Create());
 
         Assert.Same(ThrowingValueConstructor.Error, exception);
+        Assert.Contains(nameof(ThrowingValueConstructor), exception.StackTrace);
+    }
+
+    [Fact]
+    public void ReferenceType_ConstructorThrowsTargetInvocationException_PropagatesConstructorException()
+    {
+        var activator = new DefaultReferenceTypeActivator<ThrowingInvocationReferenceConstructor>();
+
+        var exception = Assert.Throws<TargetInvocationException>(() => activator.Create());
+
+        Assert.Same(ThrowingInvocationReferenceConstructor.Error, exception);
+        Assert.Same(ThrowingInvocationReferenceConstructor.Error.InnerException, exception.InnerException);
+        Assert.Contains(nameof(ThrowingInvocationReferenceConstructor), exception.StackTrace);
+    }
+
+    [Fact]
+    public void ValueType_ConstructorThrowsTargetInvocationException_PropagatesConstructorException()
+    {
+        var activator = new DefaultValueTypeActivator<ThrowingInvocationValueConstructor>();
+
+        var exception = Assert.Throws<TargetInvocationException>(() => activator.Create());
+
+        Assert.Same(ThrowingInvocationValueConstructor.Error, exception);
+        Assert.Null(exception.InnerException);
+        Assert.Contains(nameof(ThrowingInvocationValueConstructor), exception.StackTrace);
     }
 
     [Fact]
@@ -152,6 +180,7 @@ public sealed class DefaultActivatorTests
     {
         public static readonly InvalidOperationException Error = new("Reference constructor failed.");
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingReferenceConstructor() => throw Error;
     }
 
@@ -159,6 +188,23 @@ public sealed class DefaultActivatorTests
     {
         public static readonly InvalidOperationException Error = new("Value constructor failed.");
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingValueConstructor() => throw Error;
+    }
+
+    private sealed class ThrowingInvocationReferenceConstructor
+    {
+        public static readonly TargetInvocationException Error = new(new InvalidOperationException("Reference constructor failed."));
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationReferenceConstructor() => throw Error;
+    }
+
+    private struct ThrowingInvocationValueConstructor
+    {
+        public static readonly TargetInvocationException Error = new(null);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationValueConstructor() => throw Error;
     }
 }

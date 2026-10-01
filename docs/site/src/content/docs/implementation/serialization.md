@@ -162,7 +162,7 @@ API: <xref:Orleans.Serialization.Configuration.TypeManifestOptions>, <xref:Orlea
 
 The default serializer activator invokes a public parameterless constructor, including an explicit parameterless value-type constructor, for each new instance. For types with no public parameterless constructor, it allocates an uninitialized instance with zero-initialized fields. A registered custom activator controls construction for its target type.
 
-On runtimes which support dynamic code, the default activator caches an emitted constructor delegate. On NativeAOT, it invokes the preserved constructor through reflection and propagates the original constructor exception. Closed default activator types carry the constructor-preservation annotations required by constructor lookup and uninitialized allocation.
+On runtimes which support dynamic code, the default activator caches an emitted constructor delegate. On NativeAOT, it uses generic construction through <xref:System.Activator.CreateInstance*>. The NativeAOT compiler implements this operation using constructor and allocator intrinsics. The activator propagates the original constructor exception, preserving its identity and stack trace. Closed default activator types carry the constructor-preservation annotations required by constructor lookup and uninitialized allocation.
 
 ## Extension points
 

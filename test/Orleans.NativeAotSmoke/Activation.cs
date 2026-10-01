@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Activators;
 
@@ -59,16 +60,23 @@ internal static class Activation
 
         var valueActivator = new DefaultValueTypeActivator<ThrowingValueConstructor>();
         EnsureOriginalException(() => valueActivator.Create(), ThrowingValueConstructor.Error);
+
+        var invocationReferenceActivator = new DefaultReferenceTypeActivator<ThrowingInvocationReferenceConstructor>();
+        EnsureOriginalException(() => invocationReferenceActivator.Create(), ThrowingInvocationReferenceConstructor.Error);
+
+        var invocationValueActivator = new DefaultValueTypeActivator<ThrowingInvocationValueConstructor>();
+        EnsureOriginalException(() => invocationValueActivator.Create(), ThrowingInvocationValueConstructor.Error);
     }
 
-    private static void EnsureOriginalException(Action create, InvalidOperationException expected)
+    private static void EnsureOriginalException(Action create, Exception expected)
     {
         try
         {
             create();
         }
-        catch (InvalidOperationException exception) when (ReferenceEquals(exception, expected))
+        catch (Exception exception) when (ReferenceEquals(exception, expected))
         {
+            Ensure(exception.StackTrace?.Contains(".ctor", StringComparison.Ordinal) == true, "Activation lost the constructor exception's stack trace.");
             return;
         }
 
@@ -130,6 +138,7 @@ internal static class Activation
     {
         public static readonly InvalidOperationException Error = new("Reference constructor failed.");
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingReferenceConstructor() => throw Error;
     }
 
@@ -137,6 +146,23 @@ internal static class Activation
     {
         public static readonly InvalidOperationException Error = new("Value constructor failed.");
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingValueConstructor() => throw Error;
+    }
+
+    private sealed class ThrowingInvocationReferenceConstructor
+    {
+        public static readonly TargetInvocationException Error = new(new InvalidOperationException("Reference constructor failed."));
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationReferenceConstructor() => throw Error;
+    }
+
+    private struct ThrowingInvocationValueConstructor
+    {
+        public static readonly TargetInvocationException Error = new(null);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationValueConstructor() => throw Error;
     }
 }
