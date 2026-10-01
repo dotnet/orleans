@@ -313,6 +313,13 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoDataRecordStruct>));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord));
+            PreserveTypeMetadata("TestProject.DemoDataRecord, TestProject");
+            PreserveTypeMetadata("TestProject.DemoDataRecordClass, TestProject");
+            PreserveTypeMetadata("TestProject.DemoDataRecordStruct, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

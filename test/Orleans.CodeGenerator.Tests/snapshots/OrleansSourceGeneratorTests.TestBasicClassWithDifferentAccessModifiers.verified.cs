@@ -215,6 +215,12 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_PublicDemoData));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_InternalDemoData));
+            PreserveTypeMetadata("TestProject.InternalDemoData, TestProject");
+            PreserveTypeMetadata("TestProject.PublicDemoData, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

@@ -147,6 +147,12 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
+            PreserveTypeMetadata("TestProject.ClassWithImplicitFieldIds, TestProject");
+            PreserveTypeMetadata("TestProject.MyCustomEnum, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

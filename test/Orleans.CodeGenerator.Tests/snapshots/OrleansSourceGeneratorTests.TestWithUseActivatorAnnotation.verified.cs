@@ -16,6 +16,11 @@ namespace OrleansCodeGen.TestProject
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
             config.AddActivator(typeof(global::TestProject.DemoClassActivator));
+            PreserveTypeMetadata("TestProject.DemoClass, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

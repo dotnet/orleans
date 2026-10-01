@@ -233,6 +233,12 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyServiceConsumer));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_RootType));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_RootType));
+            PreserveTypeMetadata("TestProject.MyServiceConsumer, TestProject");
+            PreserveTypeMetadata("TestProject.RootType, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

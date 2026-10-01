@@ -120,6 +120,11 @@ namespace OrleansCodeGen.TestProject
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_NoPublicCtor));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_NoPublicCtor));
+            PreserveTypeMetadata("TestProject.NoPublicCtor, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

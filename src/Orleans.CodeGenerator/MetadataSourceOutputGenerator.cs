@@ -11,12 +11,13 @@ internal static class MetadataSourceOutputGenerator
     internal static SourceOutputResult CreateMetadataSourceOutput(
         MetadataAggregateModel metadataModel,
         SourceGeneratorOptions options,
-        bool supportsModuleInitializers)
+        bool supportsModuleInitializers,
+        bool supportsMetadataDependencies = false)
     {
         try
         {
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-            var metadataGenerator = new MetadataGenerator(metadataModel, metadataModel.AssemblyName, supportsModuleInitializers);
+            var metadataGenerator = new MetadataGenerator(metadataModel, metadataModel.AssemblyName, supportsModuleInitializers, supportsMetadataDependencies);
             var metadataClass = metadataGenerator.GenerateMetadata();
             var metadataNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly").EscapeIdentifier()}";
             var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);

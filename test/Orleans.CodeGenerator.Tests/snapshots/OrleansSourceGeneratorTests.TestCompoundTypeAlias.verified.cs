@@ -247,6 +247,12 @@ namespace OrleansCodeGen.TestProject
             var n2 = n1.Add(typeof(global::TestProject.MyTypeAliasClass));
             var n3 = n2.Add(typeof( int ));
             n3.Add("1", typeof(global::TestProject.MyCompoundTypeAliasClass));
+            PreserveTypeMetadata("TestProject.MyCompoundTypeAliasBaseClass, TestProject");
+            PreserveTypeMetadata("TestProject.MyCompoundTypeAliasClass, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

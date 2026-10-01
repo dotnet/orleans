@@ -139,6 +139,11 @@ namespace OrleansCodeGen.TestProject
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithFields));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithFields));
+            PreserveTypeMetadata("TestProject.DemoDataWithFields, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

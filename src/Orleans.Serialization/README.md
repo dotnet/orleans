@@ -77,6 +77,24 @@ strategy on JIT-enabled runtimes.
 NativeAOT applications also need statically available codecs, copiers, and
 activators for their closed payload types.
 
+## Generated manifest metadata
+
+The source generator preserves the type definitions and interface metadata used by the
+serializer manifest. This includes the target types of generated serializers and of
+implementations marked with `[RegisterSerializer]`, `[RegisterCopier]`,
+`[RegisterActivator]`, or `[RegisterConverter]`, together with their declaring types,
+generic arguments, and interface argument types. `TypeConverter` and `CodecProvider`
+use that metadata to discover serialization contracts during `AddSerializer` service
+initialization.
+
+NativeAOT applications also provide statically compiled closed codec and serializer
+instances for the generic combinations they use. The `Metadata` scenario in
+`test/Orleans.NativeAotSmoke` exercises the default manifest and primitive, reference
+tuple, and value tuple serialization with closed built-in codec instances.
+Its `--runtime-selection` diagnostic mode exercises runtime codec selection and
+currently exposes the exception-constructor dependency tracked in
+[dotnet/orleans#11370](https://github.com/dotnet/orleans/issues/11370).
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

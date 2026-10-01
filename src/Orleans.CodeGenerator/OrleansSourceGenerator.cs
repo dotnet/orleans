@@ -213,10 +213,16 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
                 compilation is CSharpCompilation { LanguageVersion: >= LanguageVersion.CSharp9 }
                 && compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ModuleInitializerAttribute") is not null);
 
+        var supportsMetadataDependencies = compilationProvider
+            .Select(static (compilation, _) =>
+                compilation.GetTypeByMetadataName("System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute") is not null);
+
         var metadataOutputs = metadataAggregate
             .Combine(supportsModuleInitializers)
+            .Combine(supportsMetadataDependencies)
             .Combine(generatorOptions)
-            .Select(static (input, _) => MetadataSourceOutputGenerator.CreateMetadataSourceOutput(input.Left.Left, input.Right, input.Left.Right))
+            .Select(static (input, _) => MetadataSourceOutputGenerator.CreateMetadataSourceOutput(
+                input.Left.Left.Left, input.Right, input.Left.Left.Right, input.Left.Right))
             .WithTrackingName(MetadataOutputsTrackingName);
 
         context.RegisterSourceOutput(metadataOutputs, static (productionContext, input) =>

@@ -71,6 +71,11 @@ namespace OrleansCodeGen.TestProject
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData));
             config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoData>));
+            PreserveTypeMetadata("TestProject.DemoData, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }

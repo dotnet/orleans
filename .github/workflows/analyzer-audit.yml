@@ -172,6 +172,31 @@ jobs:
           category: compatibility-analyzers-net10-core-runtime
           sarif_file: ${{ env.RESULTS_DIRECTORY }}/compatibility-analyzers.sarif
 
+  serialization-native-manifest-smoke:
+    name: Serializer manifest metadata NativeAOT smoke (net10.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Publish and run native serializer manifest smoke
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-native-manifest-smoke'
+          dotnet publish test/Orleans.NativeAotSmoke/Orleans.NativeAotSmoke.csproj `
+            --configuration Release `
+            --runtime linux-x64 `
+            --output $output `
+            -p:NativeAotSmokeScenario=Metadata `
+            -p:ILLinkTreatWarningsAsErrors=false `
+            -p:WarningsNotAsErrors=IL2026%3BIL2055%3BIL2057%3BIL2060%3BIL2067%3BIL2070%3BIL2071%3BIL2077%3BIL2090%3BIL2096%3BIL3050%3BIL4000
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $output 'Orleans.NativeAotSmoke')
+          exit $LASTEXITCODE
+
   serialization-trimmed-smoke:
     name: Orleans.Serialization trimmed smoke (net10.0)
     runs-on: ubuntu-latest

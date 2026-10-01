@@ -112,22 +112,22 @@ internal static class ReferenceAssemblyModelExtractor
                 {
                     if (symbol.HasAttribute(libraryTypes.RegisterSerializerAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Serializer));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterCopierAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Copier));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Copier));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterActivatorAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Activator));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Activator));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterConverterAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Converter));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Converter));
                     }
 
                     foreach (var iface in symbol.AllInterfaces)
@@ -399,6 +399,7 @@ internal static class ReferenceAssemblyModelExtractor
     {
         return new RegisteredCodecModel(
             new TypeRef(symbol.ToOpenTypeSyntax().ToString()),
-            kind);
+            kind,
+            TypeMetadataDependencyCollector.Collect(symbol));
     }
 }

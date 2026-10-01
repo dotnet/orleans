@@ -266,6 +266,12 @@ namespace OrleansCodeGen.TestProject
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IHelloGrain));
             n3.Add("5336307F", typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
+            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F, TestProject");
+            PreserveTypeMetadata("TestProject.HelloGrain, TestProject");
+        }
+
+        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
+        {
         }
     }
 }
