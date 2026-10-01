@@ -9,8 +9,9 @@ namespace Orleans.Serialization.Activators
     internal abstract class DefaultActivator<
 #if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+
 #endif
-        T> : IActivator<T>
+    T> : IActivator<T>
     {
         private static readonly Func<T>? DefaultConstructorFunction = Init();
         protected readonly Func<T>? Constructor = DefaultConstructorFunction;
@@ -43,8 +44,9 @@ namespace Orleans.Serialization.Activators
     internal sealed class DefaultReferenceTypeActivator<
 #if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+
 #endif
-        T> : DefaultActivator<T> where T : class
+    T> : DefaultActivator<T> where T : class
     {
         public override T Create()
             => Constructor is { } ctor
@@ -55,8 +57,9 @@ namespace Orleans.Serialization.Activators
     internal sealed class DefaultValueTypeActivator<
 #if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+
 #endif
-        T> : DefaultActivator<T> where T : struct
+    T> : DefaultActivator<T> where T : struct
     {
         public override T Create()
             => Constructor is { } ctor
