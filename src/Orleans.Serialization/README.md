@@ -91,9 +91,6 @@ NativeAOT applications also provide statically compiled closed codec and seriali
 instances for the generic combinations they use. The `Metadata` scenario in
 `test/Orleans.NativeAotSmoke` exercises the default manifest and primitive, reference
 tuple, and value tuple serialization with closed built-in codec instances.
-Its `--runtime-selection` diagnostic mode exercises runtime codec selection and
-currently exposes the exception-constructor dependency tracked in
-[dotnet/orleans#11370](https://github.com/dotnet/orleans/issues/11370).
 
 ## Documentation
 For more comprehensive documentation, please refer to:
