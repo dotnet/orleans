@@ -2403,6 +2403,46 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task RpcResponseFactoriesUseReferencedHotReloadConstructorContracts()
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            namespace ReferencedResults;
+            [GenerateSerializer]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            """, "ReferencedResults");
+        var generated = RunSourceGenerator(library, new Dictionary<string, string> { ["build_property.orleanshotreload"] = "true" });
+        Assert.Empty(generated.Diagnostics);
+        library = library.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emit = library.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+
+        var consumer = (await CreateCompilation("namespace Consumer { }", "Consumer"))
+            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()))
+            .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location));
+        var payload = consumer.GetTypeByMetadataName("ReferencedResults.Payload");
+        Assert.NotNull(payload);
+        var services = new GeneratorServices(consumer, new CodeGeneratorOptions { HotReloadSafe = false });
+        Assert.True(SerializerFactoryGenerator.TryCreate(services, [payload], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Contains("new global::OrleansCodeGen.ReferencedResults.Codec_Payload(provider)", graph.ConfigurationStatements);
+
+        var contextSource = $$"""
+            public sealed class ConsumerContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        var output = consumer.AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
         var compilation = await CreateCompilation("""
