@@ -513,6 +513,62 @@ public class ActivationDataMigrationTestsRuntimeMetrics
         AssertDeactivationMetrics(destinationMetrics, destination.Shared, "deactivateOnIdle");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Runtime_CollectsIdleActivationWithoutRequests(bool migrate)
+    {
+        await using var fixture = new MetricsFixture(siloCount: migrate ? (short)2 : (short)1);
+        await fixture.InitializeAsync();
+        using var events = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
+        var call = GetCall(fixture.GrainFactory, "ordinary", 503);
+        var ready = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Activated),
+            e => e.Payload is GrainLifecycleEvents.Activated a && a.GrainContext.GrainId == call.Reference.GrainId, Timeout, TestCancellation);
+        var activation = Assert.IsType<ActivationData>(
+            fixture.PrimaryServices.GetRequiredService<Catalog>().GetOrCreateActivation(call.Reference.GrainId, null, null));
+        await ready;
+        var services = fixture.PrimaryServices;
+
+        if (migrate)
+        {
+            await call.Invoke().WaitAsync(Timeout, TestCancellation);
+            var source = activation;
+            var destination = fixture.HostedCluster.Silos.Cast<InProcessSiloHandle>()
+                .Single(silo => silo.SiloAddress != source.Address.SiloAddress);
+            ready = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Activated),
+                e => e.Payload is GrainLifecycleEvents.Activated a && a.GrainContext.GrainId == source.GrainId
+                    && a.GrainContext.Address.SiloAddress == destination.SiloAddress, Timeout, TestCancellation);
+            source.ForwardingAddress = destination.SiloAddress;
+            Assert.True(source.TryStartMigration(null, TestCancellation));
+            await source.Deactivated.WaitAsync(Timeout, TestCancellation);
+            activation = Assert.IsType<ActivationData>(
+                Assert.IsType<GrainLifecycleEvents.Activated>((await ready).Payload).GrainContext);
+            services = destination.SiloHost.Services;
+            Assert.Equal(source.Address, activation.PreviousRegistration);
+            Assert.NotEqual(source.ActivationId, activation.ActivationId);
+        }
+
+        Assert.Equal(ActivationState.Valid, activation.State);
+        Assert.True(activation.IsInactive);
+        var collector = services.GetRequiredService<ActivationCollector>();
+        await collector.CollectActivations(TimeSpan.MaxValue, TestCancellation).WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(ActivationState.Valid, activation.State);
+
+        // Idle duration uses Environment.TickCount64, so cross a clock tick before collecting.
+        var timestamp = CoarseStopwatch.GetTimestamp();
+        Assert.True(SpinWait.SpinUntil(() => CoarseStopwatch.GetTimestamp() > timestamp, Timeout),
+            "The coarse clock did not advance before idle collection.");
+        var collected = events.WaitForEventAsync(nameof(GrainLifecycleEvents.Deactivated),
+            e => e.Payload is GrainLifecycleEvents.Deactivated d && ReferenceEquals(d.GrainContext, activation), Timeout, TestCancellation);
+        await collector.CollectActivations(TimeSpan.FromMilliseconds(1), TestCancellation).WaitAsync(Timeout, TestCancellation);
+
+        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Equal(DeactivationReasonCode.ActivationIdle,
+            Assert.IsType<GrainLifecycleEvents.Deactivated>((await collected).Payload).Reason.ReasonCode);
+        Assert.True(activation.Deactivated.IsCompletedSuccessfully);
+        Assert.Null(services.GetRequiredService<ActivationDirectory>().FindTarget(activation.GrainId));
+    }
+
     [Fact]
     public async Task Runtime_SelfPlacementDoesNotRecordSuccessfulMigration()
     {
