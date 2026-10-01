@@ -2442,6 +2442,49 @@ public class DemoClass
         Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesIgnoreStaticInterfaceHelpers(bool hasInstanceMethod)
+    {
+        var instanceMethod = hasInstanceMethod ? "Task<int> Invoke();" : "";
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IHelpers : IGrainWithIntegerKey
+            {
+                static Task<string> SupportedHelper() => Task.FromResult("local");
+                static Task<object> UnsupportedHelper() => Task.FromResult(new object());
+                static Task<T> GenericHelper<T>(T value) => Task.FromResult(value);
+                static Task CompletionHelper() => Task.CompletedTask;
+            }
+            public interface IContract : IHelpers
+            {
+                static ValueTask<bool> LocalHelper() => ValueTask.FromResult(true);
+                {{instanceMethod}}
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var factories = result.GeneratedSources.Where(static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).ToArray();
+        if (!hasInstanceMethod)
+        {
+            Assert.Empty(factories);
+            return;
+        }
+
+        var source = Assert.Single(factories).SourceText.ToString();
+        Assert.Contains("Response<int>", source);
+        Assert.DoesNotContain("Response<string>", source);
+        Assert.DoesNotContain("Response<bool>", source);
+        Assert.DoesNotContain("Response<object>", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
