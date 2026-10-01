@@ -141,6 +141,17 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Fact]
+    public void CompoundAliasPrefixSurvivesChildRegistration()
+    {
+        var tree = Orleans.Serialization.TypeSystem.CompoundTypeAliasTree.Create();
+        var prefix = tree.Add("rpc.prefix", typeof(int));
+        var child = tree.Add("rpc.prefix").Add("child", typeof(string));
+        Assert.Same(prefix, tree.Add("rpc.prefix"));
+        Assert.Equal(typeof(int), prefix.Value);
+        Assert.Equal(typeof(string), child.Value);
+    }
+
+    [Fact]
     public void AutomaticResponseFactoriesPreserveCustomJitPayloadCopier()
     {
         using var services = new ServiceCollection()
