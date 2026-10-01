@@ -137,7 +137,7 @@ For concrete `Task<TResult>` and `ValueTask<TResult>` method results, generated 
 
 The graph also registers polymorphic codec and copier dispatch for the non-generic <xref:Orleans.Serialization.Invocation.Response> boundary used by the runtime client. That dispatch selects the closed implementation for the actual response type and preserves the identity of immutable completed and exception responses. The native smoke uses <xref:Orleans.Serialization.DeepCopier`1> with `Response`, matching the runtime's response-copy boundary.
 
-Completed response transport uses the existing generated codec and its canonical singleton activator, restoring <xref:Orleans.Serialization.Invocation.CompletedResponse.Instance> after a round-trip.
+Completed response transport uses the existing generated codec and its canonical singleton activator, restoring <xref:Orleans.Serialization.Invocation.CompletedResponse.Instance> after a round-trip. Interfaces containing only non-generic `Task` or `ValueTask` methods also generate this shared response/completion graph.
 
 The finite strict response graph supplies successful typed results and completed-response transport, plus immutable exception-envelope copying. Exception transport in an explicit context requires an <xref:Orleans.Serialization.Invocation.ExceptionResponse> codec and the declared exception and `Data` value type graph. Lookup reports that registration contract when it is missing. Ordinary metadata mode retains the existing exception codecs and their serialization-constructor support.
 

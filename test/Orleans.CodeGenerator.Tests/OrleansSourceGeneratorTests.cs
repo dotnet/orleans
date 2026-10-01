@@ -2365,6 +2365,43 @@ public class DemoClass
         Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
     }
 
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public async Task RpcResponseFactoriesGenerateCompletionOnlyContracts(string returnType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface ICompletion : IGrainWithIntegerKey { {{returnType}} Done(); }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>", source);
+        Assert.Contains("Codec_CompletedResponse", source);
+        Assert.DoesNotContain("PooledResponseCodec<", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesLeaveOneWayContractsWithoutResponses()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            public interface IOneWay : IGrainWithIntegerKey { void Send(); }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        Assert.DoesNotContain(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
