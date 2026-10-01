@@ -14,7 +14,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <RuntimeHostConfigurationOption Include="Orleans.Serialization.UseGeneratedSerializerContexts" Value="true" Trim="true"
-                                    Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Factories'" />
+                                    Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'Factories' or '$(NativeAotSmokeScenario)' == 'RpcResponses'" />
   </ItemGroup>
 
   <ItemGroup>

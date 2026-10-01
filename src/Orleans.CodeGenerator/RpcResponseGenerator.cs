@@ -78,6 +78,7 @@ internal static class RpcResponseGenerator
         }
 
         var supportedResults = new List<ITypeSymbol>();
+        var metadataModelRoots = new List<SerializerFactoryGenerator.Graph>();
         var dictionaryDefinition = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2");
         foreach (var entry in results.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
         {
@@ -97,16 +98,24 @@ internal static class RpcResponseGenerator
             }
             else
             {
+                if (!options.ValidateRpcResponseFactories && resultType is INamedTypeSymbol named
+                    && SerializerFactoryGenerator.CreateRpcModelRoot(services, named, cancellationToken) is { } metadataRoot)
+                {
+                    metadataModelRoots.Add(metadataRoot);
+                    continue;
+                }
+
                 Report(method, failure.Type, failure.Reason);
             }
         }
 
-        if (supportedResults.Count == 0)
+        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0)
         {
             return output.ToImmutable();
         }
 
-        if (!SerializerFactoryGenerator.TryCreate(services, supportedResults.Select(type => responseDefinition.Construct(type)), cancellationToken, out var graph, out var graphFailure, useDefaultFactories: true))
+        SerializerFactoryGenerator.Graph? graph = null;
+        if (supportedResults.Count > 0 && !SerializerFactoryGenerator.TryCreate(services, supportedResults.Select(type => responseDefinition.Construct(type)), cancellationToken, out graph, out var graphFailure, useDefaultFactories: true))
         {
             if (options.ValidateRpcResponseFactories)
             {
@@ -130,7 +139,22 @@ internal static class RpcResponseGenerator
         source.AppendLine("{");
         source.AppendLine("#if NET5_0_OR_GREATER");
         source.AppendLine("if (global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported) return;");
-        source.AppendLine(graph.ConfigurationStatements);
+        if (graph is not null)
+        {
+            source.AppendLine(graph.ConfigurationStatements);
+        }
+
+        if (metadataModelRoots.Count > 0)
+        {
+            source.AppendLine("if (!options.RequireExplicitTypeRegistration)");
+            source.AppendLine("{");
+            foreach (var metadataRoot in metadataModelRoots)
+            {
+                source.AppendLine(metadataRoot.ConfigurationStatements);
+            }
+
+            source.AppendLine("}");
+        }
         source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
         source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
         source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));");
