@@ -44,8 +44,8 @@ internal static class RpcResponseGenerator
                 continue;
             }
 
-            foreach (var method in interfaceType.GetMembers().OfType<IMethodSymbol>()
-                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetMembers().OfType<IMethodSymbol>()))
+            foreach (var method in interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
+                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>()))
                 .Where(static method => method.MethodKind == MethodKind.Ordinary))
             {
                 var returnType = method.ReturnType;
