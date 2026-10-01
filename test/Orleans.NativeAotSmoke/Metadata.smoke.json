@@ -1,0 +1,8 @@
+{
+  "scenario": "Metadata",
+  "diagnostics": "legacy-visible",
+  "rejectDiagnostics": [
+    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bPreserveTypeMetadata\\b",
+    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bMetadata_\\w+\\.ConfigureInner\\b"
+  ]
+}
