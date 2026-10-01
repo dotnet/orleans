@@ -69,6 +69,20 @@ public static class RpcResponseContracts
             "Empty reference response payloads retain null.");
     }
 
+    public static void CompletedAndExceptionResponses()
+    {
+        using var services = CreateServices();
+        var cause = new InvalidOperationException("response failure");
+        var mutableData = new RpcResponsePayload { Value = 17 };
+        cause.Data["payload"] = mutableData;
+        using var exception = Response.FromException(cause);
+        using var copied = Copy(services, exception);
+        Ensure(ReferenceEquals(exception, copied), "Immutable exception responses retain their identity.");
+        Ensure(copied.Exception is { } copiedCause && ReferenceEquals(cause, copiedCause) && ReferenceEquals(mutableData, copiedCause.Data["payload"]),
+            "Immutable exception envelope copying retains the existing exception and Data references.");
+        Ensure(ReferenceEquals(Response.Completed, Copy(services, Response.Completed)), "Completed responses retain their singleton identity.");
+    }
+
     public static void RawResponses()
     {
         using var services = CreateServices();
@@ -138,23 +152,18 @@ public static class RpcResponseContracts
     {
         var provider = services.GetRequiredService<CodecProvider>();
         var pool = services.GetRequiredService<CopyContextPool>();
-#if NATIVE_AOT_SMOKE
-        using var context = pool.GetContext();
-        return (Response)provider.GetDeepCopier(response.GetType()).DeepCopy(response, context)!;
-#else
         return new DeepCopier<Response>(provider.GetDeepCopier<Response>(), pool).Copy(response);
-#endif
     }
 
     private static Response RoundTrip(ServiceProvider services, Response response)
     {
-        var codec = services.GetRequiredService<CodecProvider>().GetCodec(response.GetType());
+        var codec = services.GetRequiredService<CodecProvider>().GetCodec<Response>();
         var sessions = services.GetRequiredService<SerializerSessionPool>();
         var buffer = new ArrayBufferWriter<byte>();
         using (var session = sessions.GetSession())
         {
             var writer = Writer.Create(buffer, session);
-            codec.WriteField(ref writer, 0, response.GetType(), response);
+            codec.WriteField(ref writer, 0, typeof(Response), response);
             writer.Commit();
         }
 

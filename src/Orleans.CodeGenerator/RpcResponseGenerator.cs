@@ -122,15 +122,34 @@ internal static class RpcResponseGenerator
         source.AppendLine("#if NET5_0_OR_GREATER");
         source.AppendLine("if (global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported) return;");
         source.AppendLine(graph.ConfigurationStatements);
+        source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
+        source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
+        source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));");
 
         source.AppendLine("#endif");
+        source.AppendLine("}");
+        source.AppendLine("private sealed class ResponseFieldCodec : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>");
+        source.AppendLine("{");
+        source.AppendLine("public ResponseFieldCodec() { }");
+        source.AppendLine("}");
+        source.AppendLine("private sealed class ResponseFieldCopier : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Invocation.Response>");
+        source.AppendLine("{");
+        source.AppendLine("public ResponseFieldCopier() { }");
+        source.AppendLine("[return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull(\"input\")]");
+        source.AppendLine("public global::Orleans.Serialization.Invocation.Response DeepCopy(global::Orleans.Serialization.Invocation.Response input, global::Orleans.Serialization.Cloning.CopyContext context)");
+        source.AppendLine("{");
+        source.AppendLine("if (context is null) throw new global::System.ArgumentNullException(nameof(context));");
+        source.AppendLine("if (input is global::Orleans.Serialization.Invocation.CompletedResponse or global::Orleans.Serialization.Invocation.ExceptionResponse) return input;");
+        source.AppendLine("return (global::Orleans.Serialization.Invocation.Response)global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context);");
+        source.AppendLine("}");
         source.AppendLine("}");
         source.AppendLine("}");
         source.AppendLine("}");
         var unit = CSharpSyntaxTree.ParseText(source.ToString(),
             options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]),
             cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
-        var provider = unit.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        var provider = unit.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(static declaration => declaration.Identifier.ValueText == "RpcResponseFactories");
         unit = unit.ReplaceNode(provider, provider.AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes()));
         output.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(
             $"{compilation.AssemblyName}.orleans.rpcresponses.g.cs", unit.NormalizeWhitespace().ToFullString())));

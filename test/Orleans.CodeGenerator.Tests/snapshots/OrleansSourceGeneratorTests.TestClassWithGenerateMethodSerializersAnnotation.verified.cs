@@ -171,7 +171,34 @@ namespace OrleansCodeGen.TestProject
             options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<string>());
             options.AddDefaultSerializer<string>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider));
             options.AddAllowedType(typeof(string));
+            options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());
+            options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null !, provider));
 #endif
+        }
+
+        private sealed class ResponseFieldCodec : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCodec()
+            {
+            }
+        }
+
+        private sealed class ResponseFieldCopier : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCopier()
+            {
+            }
+
+            [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+            public global::Orleans.Serialization.Invocation.Response DeepCopy(global::Orleans.Serialization.Invocation.Response input, global::Orleans.Serialization.Cloning.CopyContext context)
+            {
+                if (context is null)
+                    throw new global::System.ArgumentNullException(nameof(context));
+                if (input is global::Orleans.Serialization.Invocation.CompletedResponse or global::Orleans.Serialization.Invocation.ExceptionResponse)
+                    return input;
+                return (global::Orleans.Serialization.Invocation.Response)global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context);
+            }
         }
     }
 

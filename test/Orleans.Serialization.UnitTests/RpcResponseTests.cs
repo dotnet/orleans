@@ -112,6 +112,15 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.RawResponses();
 
     [Fact]
+    public void GeneratedResponseFactoriesPreserveCompletionAndExceptionIdentity()
+    {
+        var provider = _services.GetRequiredService<CodecProvider>();
+        Assert.IsType<ShallowCopier<CompletedResponse>>(provider.GetDeepCopier<CompletedResponse>());
+        Assert.IsType<ShallowCopier<ExceptionResponse>>(provider.GetDeepCopier<ExceptionResponse>());
+        NativeAotSmoke.RpcResponseContracts.CompletedAndExceptionResponses();
+    }
+
+    [Fact]
     public void AutomaticResponseFactoriesPreserveCustomJitPayloadCopier()
     {
         using var services = new ServiceCollection()

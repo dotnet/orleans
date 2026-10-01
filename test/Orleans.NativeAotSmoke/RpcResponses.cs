@@ -4,6 +4,7 @@ using Orleans.NativeAotSmoke;
 RpcResponseContracts.PrimitiveResponses();
 RpcResponseContracts.ReferenceResponsePreservesCycles();
 RpcResponseContracts.NullResponsePayload();
+RpcResponseContracts.CompletedAndExceptionResponses();
 RpcResponseContracts.RawResponses();
 RpcResponseContracts.MissingNativeResponseRegistration();
-Console.WriteLine("Native RPC response factories passed: bool, int, reference payloads, cycles, null, and raw message encoding.");
+Console.WriteLine("Native Response dispatch passed: DeepCopier<Response>, bool, int, reference cycles, null, completion/exception identity, and raw message encoding.");
