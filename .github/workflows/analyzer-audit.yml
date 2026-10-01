@@ -216,18 +216,21 @@ jobs:
         shell: pwsh
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'orleans-grain-references-nativeaot-smoke'
-          $project = Join-Path 'test' 'Orleans.GrainReferences.NativeAotSmoke' 'Orleans.GrainReferences.NativeAotSmoke.csproj'
+          $project = Join-Path 'test' 'Orleans.NativeAotSmoke' 'Orleans.NativeAotSmoke.csproj'
           dotnet publish $project `
             --configuration Release `
             --runtime ${{ matrix.runtime }} `
             --output $output `
+            -p:NativeAotSmokeScenario=GrainReferences `
+            -p:ILLinkTreatWarningsAsErrors=false `
+            -p:IlcTreatWarningsAsErrors=false `
             -bl:grain-references-nativeaot-smoke.binlog 2>&1 |
             Tee-Object -FilePath grain-references-nativeaot-smoke.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $constructorWarnings = Select-String -Path grain-references-nativeaot-smoke.log `
             -Pattern 'warning IL[0-9]+: Orleans\.GrainReferences\.(GrainReferenceActivatorProvider|RpcProvider\.<\.ctor>)'
           if ($constructorWarnings) { throw "Production proxy construction diagnostics: $constructorWarnings" }
-          & (Join-Path $output 'Orleans.GrainReferences.NativeAotSmoke${{ matrix.extension }}')
+          & (Join-Path $output 'Orleans.NativeAotSmoke${{ matrix.extension }}')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

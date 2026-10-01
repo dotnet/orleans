@@ -27,6 +27,9 @@
              Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection'" />
     <Compile Include="$(NativeAotSmokeScenario)*.cs"
              Condition="'$(NativeAotSmokeScenario)' != 'DependencyInjection'" />
+    <Compile Include="..\Orleans.Core.Tests\GrainReferences\ReferenceConstructionFixture.cs"
+             Link="ReferenceConstructionFixture.cs"
+             Condition="'$(NativeAotSmokeScenario)' == 'GrainReferences'" />
   </ItemGroup>
 
 </Project>

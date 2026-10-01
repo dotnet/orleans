@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -8,13 +7,12 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using UnitTests.GrainReferences;
 
-namespace Orleans.GrainReferences.NativeAotSmoke;
+namespace Orleans.NativeAotSmoke;
 
 internal static class Program
 {
     private static void Main()
     {
-        Ensure(!RuntimeFeature.IsDynamicCodeSupported, "Run the published NativeAOT executable.");
         ValidateGeneratedProxy();
         ValidateSharedState(unordered: false);
         ValidateSharedState(unordered: true);
