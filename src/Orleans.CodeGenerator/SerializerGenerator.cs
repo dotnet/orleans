@@ -167,39 +167,46 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             SingletonSeparatedList(VariableDeclarator(accessor.FieldName).WithInitializer(EqualsValueClause(accessor.InitializationSyntax)))))
                             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                 case FieldAccessorDescription accessor when accessor.InitializationSyntax == null:
-                    //[UnsafeAccessor(UnsafeAccessorKind.Method, Name = "set_Amount")]
-                    //extern static void SetAmount(External instance, int value);
-                    return
-                        MethodDeclaration(
-                            PredefinedType(Token(SyntaxKind.VoidKeyword)),
-                            accessor.AccessorName)
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
-                            .AddAttributeLists(AttributeList(SingletonSeparatedList(
-                                Attribute(IdentifierName("System.Runtime.CompilerServices.UnsafeAccessor"))
-                                    .AddArgumentListArguments(
-                                        AttributeArgument(
-                                            MemberAccessExpression(
-                                                    SyntaxKind.SimpleMemberAccessExpression,
-                                                    IdentifierName("System.Runtime.CompilerServices.UnsafeAccessorKind"),
-                                                    IdentifierName("Method"))),
-                                        AttributeArgument(
-                                                LiteralExpression(
-                                                    SyntaxKind.StringLiteralExpression,
-                                                    Literal($"set_{accessor.FieldName}")))
-                                        .WithNameEquals(NameEquals("Name"))))))
-                            .WithParameterList(
-                                ParameterList(SeparatedList(
-                                    [
-                                        Parameter(Identifier("instance")).WithType(accessor.ContainingType),
-                                        Parameter(Identifier("value")).WithType(description.FieldType)
-                                    ])))
-                            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+                    return GetUnsafeAccessorDeclaration(accessor);
                 default:
                     var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword));
                     return description.LazyInitialization ? declaration : declaration.AddModifiers(Token(SyntaxKind.ReadOnlyKeyword));
             }
         }
+    }
+
+    internal static MethodDeclarationSyntax GetUnsafeAccessorDeclaration(FieldAccessorDescription accessor)
+    {
+        var instance = Parameter(Identifier("instance")).WithType(accessor.ContainingType);
+        if (accessor.ContainingTypeIsValueType)
+        {
+            instance = instance.AddModifiers(Token(SyntaxKind.RefKeyword));
+        }
+
+        var parameters = new List<ParameterSyntax> { instance };
+        TypeSyntax returnType;
+        if (accessor.IsUnsafeFieldAccessor)
+        {
+            returnType = RefType(accessor.FieldType);
+        }
+        else
+        {
+            returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
+            parameters.Add(Parameter(Identifier("value")).WithType(accessor.FieldType));
+        }
+
+        return MethodDeclaration(returnType, accessor.AccessorName)
+            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(
+                Attribute(ParseName("global::System.Runtime.CompilerServices.UnsafeAccessorAttribute"))
+                    .AddArgumentListArguments(
+                        AttributeArgument(ParseName("global::System.Runtime.CompilerServices.UnsafeAccessorKind")
+                            .Member(accessor.IsUnsafeFieldAccessor ? "Field" : "Method")),
+                        AttributeArgument((accessor.IsUnsafeFieldAccessor ? accessor.FieldName : $"set_{accessor.FieldName}").GetLiteralExpression())
+                            .WithNameEquals(NameEquals("Name"))))))
+            .WithParameterList(ParameterList(SeparatedList(parameters)))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
     private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
@@ -1127,13 +1134,15 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public override bool IsInjected => false;
     }
 
-    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax? initializationSyntax = null, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName)
+    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax? initializationSyntax = null, bool lazyInitialization = false, bool isUnsafeFieldAccessor = false, bool containingTypeIsValueType = false) : GeneratedFieldDescription(fieldType, fieldName)
     {
         public override bool IsInjected => false;
         public override bool LazyInitialization { get; } = lazyInitialization;
         public readonly string AccessorName = accessorName;
         public readonly TypeSyntax ContainingType = containingType;
         public readonly ExpressionSyntax? InitializationSyntax = initializationSyntax;
+        public bool IsUnsafeFieldAccessor { get; } = isUnsafeFieldAccessor;
+        public bool ContainingTypeIsValueType { get; } = containingTypeIsValueType;
     }
 
     internal sealed class SerializationHookFieldDescription(TypeSyntax fieldType, string fieldName) : GeneratedFieldDescription(fieldType, fieldName)
@@ -1382,9 +1391,11 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 instanceArg = instanceArg.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
             }
 
-            return
-                InvocationExpression(GetAccessorExpression(GetSetterFieldDescription()!))
-                    .AddArgumentListArguments(instanceArg, Argument(value));
+            var accessor = GetSetterFieldDescription()!;
+            var invocation = InvocationExpression(GetAccessorExpression(accessor)).AddArgumentListArguments(instanceArg);
+            return accessor.IsUnsafeFieldAccessor
+                ? AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, invocation, value)
+                : invocation.AddArgumentListArguments(Argument(value));
         }
 
         private static ExpressionSyntax GetAccessorExpression(FieldAccessorDescription accessor)
@@ -1396,22 +1407,28 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         {
             if (IsGettableField || IsGettableProperty) return null;
             return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, false,
-                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe);
+                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe, UseUnsafeFieldAccessor);
         }
 
         public FieldAccessorDescription? GetSetterFieldDescription()
         {
             if (IsSettableField || IsSettableProperty) return null;
             return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, LibraryTypes, true,
-                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe);
+                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe, UseUnsafeFieldAccessor);
         }
 
-        public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false, bool lazyInitialization = false)
+        private bool UseUnsafeFieldAccessor => Field is not null
+            && !_generatorServices.Options.HotReloadSafe
+            && LibraryTypes.SupportsUnsafeAccessors
+            && (!ContainingType.IsGenericType || LibraryTypes.SupportsGenericUnsafeAccessors);
+
+        public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false, bool lazyInitialization = false, bool useUnsafeFieldAccessor = false)
         {
             var containingTypeSyntax = containingType.ToTypeSyntax();
 
-            if (useUnsafeAccessor)
-                return new(containingTypeSyntax, fieldType, fieldName, accessorName);
+            if (useUnsafeFieldAccessor || useUnsafeAccessor)
+                return new(containingTypeSyntax, fieldType, fieldName, accessorName,
+                    isUnsafeFieldAccessor: useUnsafeFieldAccessor, containingTypeIsValueType: containingType.IsValueType);
 
             var valueType = containingType.IsValueType;
 

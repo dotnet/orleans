@@ -17,8 +17,10 @@ namespace OrleansCodeGen.TestProject
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.InterfaceCtorParam> _activator;
         private readonly global::System.Type _type_IMyInterface_B86E71B69F6C2271 = typeof(global::TestProject.IMyInterface);
         private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.IMyInterface> _codec_IMyInterface_B86E71B69F6C2271;
-        private static readonly global::System.Func<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface> getField_0 = (global::System.Func<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.InterfaceCtorParam), "_iface");
-        private static readonly global::System.Action<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface> setField_0 = (global::System.Action<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.InterfaceCtorParam), "_iface");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
+        private extern static ref global::TestProject.IMyInterface getField_0(global::TestProject.InterfaceCtorParam instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
+        private extern static ref global::TestProject.IMyInterface setField_0(global::TestProject.InterfaceCtorParam instance);
         public Codec_InterfaceCtorParam(global::Orleans.Serialization.Activators.IActivator<global::TestProject.InterfaceCtorParam> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -45,7 +47,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    setField_0(instance, _codec_IMyInterface_B86E71B69F6C2271.ReadValue(ref reader, header));
+                    setField_0(instance) = _codec_IMyInterface_B86E71B69F6C2271.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -94,8 +96,10 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.InterfaceCtorParam> _activator;
         private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.IMyInterface> _copier_IMyInterface_B86E71B69F6C2271;
-        private static readonly global::System.Func<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface> getField_0 = (global::System.Func<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.InterfaceCtorParam), "_iface");
-        private static readonly global::System.Action<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface> setField_0 = (global::System.Action<global::TestProject.InterfaceCtorParam, global::TestProject.IMyInterface>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.InterfaceCtorParam), "_iface");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
+        private extern static ref global::TestProject.IMyInterface getField_0(global::TestProject.InterfaceCtorParam instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_iface")]
+        private extern static ref global::TestProject.IMyInterface setField_0(global::TestProject.InterfaceCtorParam instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.InterfaceCtorParam DeepCopy(global::TestProject.InterfaceCtorParam original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -118,7 +122,7 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.InterfaceCtorParam input, global::TestProject.InterfaceCtorParam output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output, _copier_IMyInterface_B86E71B69F6C2271.DeepCopy(getField_0(input), context));
+            setField_0(output) = _copier_IMyInterface_B86E71B69F6C2271.DeepCopy(getField_0(input), context);
         }
     }
 

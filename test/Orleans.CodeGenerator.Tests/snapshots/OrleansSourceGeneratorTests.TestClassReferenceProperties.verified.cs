@@ -15,7 +15,8 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator;
-        private static readonly global::System.Action<global::TestProject.DemoData, string> setField_3 = (global::System.Action<global::TestProject.DemoData, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoData), "<RequiredStringPropInitOnly>k__BackingField");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<RequiredStringPropInitOnly>k__BackingField")]
+        private extern static ref string setField_3(global::TestProject.DemoData instance);
         public Codec_DemoData(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -71,7 +72,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 3U)
                 {
-                    setField_3(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                    setField_3(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -119,7 +120,8 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator;
-        private static readonly global::System.Action<global::TestProject.DemoData, string> setField_3 = (global::System.Action<global::TestProject.DemoData, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoData), "<RequiredStringPropInitOnly>k__BackingField");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<RequiredStringPropInitOnly>k__BackingField")]
+        private extern static ref string setField_3(global::TestProject.DemoData instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -144,7 +146,7 @@ namespace OrleansCodeGen.TestProject
             output.NullableStringProp = input.NullableStringProp;
             output.StringProp = input.StringProp;
             output.RequiredStringProp = input.RequiredStringProp;
-            setField_3(output, input.RequiredStringPropInitOnly);
+            setField_3(output) = input.RequiredStringPropInitOnly;
         }
     }
 

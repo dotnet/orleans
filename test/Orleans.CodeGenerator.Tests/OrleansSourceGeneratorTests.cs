@@ -588,7 +588,7 @@ public class UsesGenericWithCtor
 {
     [Id(0)]
     public GenericWithCtor<string> StringGen { get; set; }
-}");
+}", snapshotName: nameof(TestGenericClassWithConstructorParameters));
 
     [Fact]
     public Task TestClassWithNoPublicConstructors() => AssertSuccessfulSourceGeneration(
@@ -2263,7 +2263,7 @@ public class DemoClass
     /// and verifies successful generation without errors.
     /// Uses snapshot testing to verify the generated code matches expectations.
     /// </summary>
-    private static async Task AssertSuccessfulSourceGeneration(string code)
+    private static async Task AssertSuccessfulSourceGeneration(string code, string? snapshotName = null)
     {
         var projectName = "TestProject";
         var compilation = await CreateCompilation(code, projectName);
@@ -2276,7 +2276,14 @@ public class DemoClass
             Assert.StartsWith($"{projectName}.orleans.", generated.HintName, StringComparison.Ordinal));
         var generatedSource = ConcatenateGeneratedSources(result);
 
-        await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
+        var snapshot = Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
+        if (snapshotName is not null)
+        {
+            var supportsGenericAccessors = LibraryTypes.FromCompilation(compilation, new CodeGeneratorOptions()).SupportsGenericUnsafeAccessors;
+            snapshot = snapshot.UseFileName($"{nameof(OrleansSourceGeneratorTests)}.{snapshotName}.{(supportsGenericAccessors ? "UnsafeAccessor" : "FieldAccessor")}");
+        }
+
+        await snapshot;
     }
 
     private static string ConcatenateGeneratedSources(GeneratorRunResult result)

@@ -15,10 +15,14 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoDataWithFields);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator;
-        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0 = (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
-        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0 = (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
-        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1 = (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
-        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1 = (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_intValue")]
+        private extern static ref int getField_0(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_intValue")]
+        private extern static ref int setField_0(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_stringValue")]
+        private extern static ref string getField_1(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_stringValue")]
+        private extern static ref string setField_1(global::TestProject.DemoDataWithFields instance);
         public Codec_DemoDataWithFields(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -45,7 +49,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    setField_0(instance, global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header));
+                    setField_0(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -54,7 +58,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1U)
                 {
-                    setField_1(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                    setField_1(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -102,10 +106,14 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_DemoDataWithFields : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoDataWithFields>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoDataWithFields>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator;
-        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0 = (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
-        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0 = (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
-        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1 = (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
-        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1 = (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_intValue")]
+        private extern static ref int getField_0(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_intValue")]
+        private extern static ref int setField_0(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_stringValue")]
+        private extern static ref string getField_1(global::TestProject.DemoDataWithFields instance);
+        [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_stringValue")]
+        private extern static ref string setField_1(global::TestProject.DemoDataWithFields instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoDataWithFields DeepCopy(global::TestProject.DemoDataWithFields original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -127,8 +135,8 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.DemoDataWithFields input, global::TestProject.DemoDataWithFields output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField_0(output, getField_0(input));
-            setField_1(output, getField_1(input));
+            setField_0(output) = getField_0(input);
+            setField_1(output) = getField_1(input);
         }
     }
 

@@ -46,6 +46,20 @@ public class MyClass
 
 When fail-closed type validation is enabled, additional types can be allowed by configuring `TypeManifestOptions.AddAllowedType` or `TypeManifestOptions.AddAllowedAssembly`.
 
+Generated serializers and copiers use ref-returning `UnsafeAccessor` methods to
+read and restore private fields, readonly fields, and auto-property backing
+fields on supported targets. Non-generic payloads use this access on .NET 8 and
+later; generic payloads use it on .NET 9 and later, with the payload's generic
+constraints preserved. Struct receivers are passed by reference. This allows
+NativeAOT-compiled generated code to restore get-only and init-only properties
+and to deep-copy values stored in readonly fields.
+
+Legacy targets and .NET 8 generic payloads use generated field-access delegates.
+Setting `OrleansHotReload=true` retains lazily initialized delegates for fields,
+so existing serializer and copier instances can access members added by hot
+reload. NativeAOT applications also need statically available codecs, copiers,
+and activators for their closed payload types.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

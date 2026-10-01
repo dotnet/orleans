@@ -26,6 +26,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Orleans.Serialization.NativeAotFieldAccessSmoke\Payloads.cs" Link="FieldAccess\Payloads.cs" />
+    <Compile Include="..\Orleans.Serialization.NativeAotFieldAccessSmoke\FieldAccessChecks.cs" Link="FieldAccess\FieldAccessChecks.cs" />
     <ProjectReference Include="..\..\src\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
