@@ -1,0 +1,13 @@
+<Project>
+  <!-- <serializer_context_native_publish> -->
+  <PropertyGroup>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption
+      Include="Orleans.Serialization.UseGeneratedSerializerContexts"
+      Value="true"
+      Trim="true" />
+  </ItemGroup>
+  <!-- </serializer_context_native_publish> -->
+</Project>
