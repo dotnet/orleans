@@ -2280,6 +2280,9 @@ public class DemoClass
         Assert.DoesNotContain("MakeGenericType", source);
         Assert.DoesNotContain("WellKnownTypeAliases", source);
         Assert.Contains("WellKnownTypeAliases.Add(\"rpc.payload\"", ConcatenateGeneratedSources(result));
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context)", source);
         var outputCompilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
             .AddSyntaxTrees(result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText,
                 options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: source.HintName)));
