@@ -12,6 +12,10 @@ dotnet add package Microsoft.Orleans.Runtime
 
 This package is automatically included when you reference the Orleans Server metapackage.
 
+## Grain construction
+
+Generated grain registrations preserve public constructor metadata for activation in trimmed and NativeAOT applications. The default grain activator uses dependency injection to select a public constructor, honors `ActivatorUtilitiesConstructorAttribute`, and resolves dependencies from each activation's service scope. Manual manifest registrations use `TypeManifestOptions.AddInterfaceImplementation(typeof(MyGrain))` to preserve the same metadata.
+
 ## File grain storage
 
 The runtime includes a file-based grain storage provider for local, single-silo development and testing. It stores one binary file per grain state record and uses persisted ETags for optimistic concurrency.
