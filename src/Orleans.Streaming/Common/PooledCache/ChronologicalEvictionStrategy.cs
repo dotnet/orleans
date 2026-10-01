@@ -17,6 +17,7 @@ namespace Orleans.Providers.Streams.Common
         /// Protected for test purposes
         /// </summary>
         protected readonly Queue<FixedSizeBuffer> inUseBuffers;
+        private readonly HashSet<FixedSizeBuffer>? inUseBufferSet;
         internal int BufferCount => inUseBuffers.Count;
         private readonly ICacheMonitor? cacheMonitor;
         private readonly PeriodicAction? periodicMonitoring;
@@ -36,6 +37,11 @@ namespace Orleans.Providers.Streams.Common
             this.logger = logger;
             this.timePurge = timePurage;
             this.inUseBuffers = new Queue<FixedSizeBuffer>();
+            // Derived strategies can mutate the protected queue directly.
+            if (GetType() == typeof(ChronologicalEvictionStrategy))
+            {
+                this.inUseBufferSet = [];
+            }
 
             // monitoring
             this.cacheMonitor = cacheMonitor;
@@ -61,7 +67,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
-            if (inUseBuffers.Contains(newBlock)) return;
+            if (inUseBufferSet is { } buffers ? !buffers.Add(newBlock) : inUseBuffers.Contains(newBlock)) return;
             this.inUseBuffers.Enqueue(newBlock);
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
@@ -142,7 +148,7 @@ namespace Orleans.Providers.Streams.Common
             {
                 while (this.inUseBuffers.Count > 0)
                 {
-                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    var purgedBuffer = DequeueBuffer();
                     memoryReleasedInByte += purgedBuffer.SizeInByte;
                     purgedBuffer.Dispose();
                 }
@@ -152,7 +158,7 @@ namespace Orleans.Providers.Streams.Common
                 // All buffers older than the last purged buffer can be returned.
                 while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
                 {
-                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    var purgedBuffer = DequeueBuffer();
                     memoryReleasedInByte += purgedBuffer.SizeInByte;
                     purgedBuffer.Dispose();
                 }
@@ -161,7 +167,7 @@ namespace Orleans.Providers.Streams.Common
                 // the last purged buffer can also be returned.
                 if (IdOfLastPurgedBufferId != IdOfLastBufferInCacheId)
                 {
-                    var purgedBuffer = this.inUseBuffers.Dequeue();
+                    var purgedBuffer = DequeueBuffer();
                     memoryReleasedInByte += purgedBuffer.SizeInByte;
                     purgedBuffer.Dispose();
                 }
@@ -172,6 +178,13 @@ namespace Orleans.Providers.Streams.Common
                 this.cacheSizeInByte -= memoryReleasedInByte;
                 this.cacheMonitor?.TrackMemoryReleased(memoryReleasedInByte);
             }
+        }
+
+        private FixedSizeBuffer DequeueBuffer()
+        {
+            var buffer = inUseBuffers.Dequeue();
+            inUseBufferSet?.Remove(buffer);
+            return buffer;
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -17,6 +18,142 @@ public class PooledQueueCacheAdmissionTests
     // An explicit timestamp beyond the initial reporting deadline, with room for the
     // next interval. No timers, sleeps, or elapsed-time assertions are involved.
     private static readonly DateTime ReportTime = DateTime.MaxValue.AddDays(-1);
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(1000)]
+    public void NativeBufferAllocationMembershipAvoidsLinearComparisons(int count)
+    {
+        var monitor = Substitute.For<ICacheMonitor>();
+        var strategy = new ChronologicalEvictionStrategy(
+            NullLogger.Instance, new AlwaysPurgePredicate(), monitor, null);
+        var buffers = Enumerable.Range(0, count).Select(index => new EqualityCountingBuffer(index)).ToArray();
+
+        foreach (var buffer in buffers) strategy.OnBlockAllocated(buffer);
+
+        Assert.Equal(0, buffers.Sum(buffer => buffer.Comparisons));
+        Assert.Equal(count, strategy.BufferCount);
+        strategy.OnBlockAllocated(buffers[count / 2]);
+        Assert.Equal(count, strategy.BufferCount);
+        monitor.Received(count).TrackMemoryAllocated(16);
+    }
+
+    [Fact]
+    public void NativeBufferMembershipTracksPartialPurgeAndPoolReuse()
+    {
+        var allocations = 0;
+        var pool = new ObjectPool<FixedSizeBuffer>(() =>
+        {
+            allocations++;
+            return new FixedSizeBuffer(16);
+        });
+        var first = pool.Allocate();
+        var second = pool.Allocate();
+        var third = pool.Allocate();
+        var cache = new PooledQueueCache(new TestAdapter(), NullLogger.Instance, null, null);
+        var view = new BoundedPurgeView(cache);
+        var strategy = new ChronologicalEvictionStrategy(
+            NullLogger.Instance, new AlwaysPurgePredicate(), null, null)
+        { PurgeObservable = view };
+        strategy.OnBlockAllocated(first);
+        strategy.OnBlockAllocated(second);
+        strategy.OnBlockAllocated(third);
+        cache.Add([Message(1, first), Message(2, first), Message(3, second), Message(4, third)], DateTime.UnixEpoch);
+
+        view.Boundary = 1;
+        strategy.PerformPurge(ReportTime);
+        Assert.Equal(3, strategy.BufferCount);
+        Assert.Equal(2, cache.Oldest?.SequenceNumber);
+        strategy.OnBlockAllocated(first);
+        Assert.Equal(3, strategy.BufferCount);
+
+        view.Boundary = 3;
+        strategy.PerformPurge(ReportTime);
+        Assert.Equal(1, strategy.BufferCount);
+        Assert.Equal(4, cache.Oldest?.SequenceNumber);
+        var reused = pool.Allocate();
+        Assert.Contains(reused, new[] { first, second });
+        Assert.Equal(3, allocations);
+        strategy.OnBlockAllocated(reused);
+        strategy.OnBlockAllocated(reused);
+        Assert.Equal(2, strategy.BufferCount);
+        cache.Add([Message(5, reused)], DateTime.UnixEpoch);
+
+        view.Boundary = 5;
+        strategy.PerformPurge(ReportTime);
+        Assert.Equal(0, strategy.BufferCount);
+        Assert.True(cache.IsEmpty);
+        var finalLease = pool.Allocate();
+        Assert.Equal(3, allocations);
+        strategy.OnBlockAllocated(finalLease);
+        Assert.Equal(1, strategy.BufferCount);
+        cache.Add([Message(6, finalLease)], DateTime.UnixEpoch);
+        view.Boundary = 6;
+        strategy.PerformPurge(ReportTime);
+        Assert.Equal(0, strategy.BufferCount);
+
+        static CachedMessage Message(int sequence, FixedSizeBuffer buffer)
+        {
+            Assert.True(buffer.TryGetSegment(4, out var segment));
+            var message = CreateMessage(sequence);
+            message.Segment = segment;
+            return message;
+        }
+    }
+
+    [Fact]
+    public void DerivedStrategyHonorsProtectedQueueMutations()
+    {
+        var strategy = new MutableEvictionStrategy();
+        var buffer = new FixedSizeBuffer(16);
+        strategy.OnBlockAllocated(buffer);
+        strategy.OnBlockAllocated(buffer);
+        Assert.Equal(1, strategy.BufferCount);
+
+        Assert.Same(buffer, strategy.TakeBuffer());
+        strategy.OnBlockAllocated(buffer);
+
+        Assert.Equal(1, strategy.BufferCount);
+        Assert.Same(buffer, strategy.TakeBuffer());
+    }
+
+    private sealed class EqualityCountingBuffer(int identity) : FixedSizeBuffer(16)
+    {
+        public int Comparisons { get; private set; }
+        public override int GetHashCode() => identity;
+        public override bool Equals(object? obj)
+        {
+            Comparisons++;
+            return ReferenceEquals(this, obj);
+        }
+    }
+
+    private sealed class AlwaysPurgePredicate() : TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero)
+    {
+        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) => true;
+    }
+
+    private sealed class MutableEvictionStrategy()
+        : ChronologicalEvictionStrategy(NullLogger.Instance, new AlwaysPurgePredicate(), null, null)
+    {
+        public FixedSizeBuffer TakeBuffer() => inUseBuffers.Dequeue();
+    }
+
+    private sealed class BoundedPurgeView(PooledQueueCache cache) : IPurgeObservable
+    {
+        public long Boundary { get; set; }
+        public CachedMessage? Oldest => cache.Oldest;
+        public CachedMessage? Newest => cache.Newest;
+        public int ItemCount => cache.ItemCount;
+        public bool IsEmpty => cache.IsEmpty;
+        public void RemoveOldestMessage() => Assert.True(TryRemoveOldestMessage());
+        public bool TryRemoveOldestMessage()
+        {
+            if (Oldest is not { } oldest || oldest.SequenceNumber > Boundary) return false;
+            cache.RemoveOldestMessage();
+            return true;
+        }
+    }
 
     [Theory]
     [InlineData(0, false)]

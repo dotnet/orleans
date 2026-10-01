@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
@@ -1247,7 +1248,19 @@ namespace UnitTests.StreamingTests
             protected override Type SequenceTokenCompatibilityDomain => typeof(EventSequenceToken);
         }
 
-        private sealed class RecordingConsumer(StreamHandshakeToken? requestedToken = null) : IStreamConsumerExtension
+        private abstract class TestStreamConsumerIdentity : IGrainBase
+        {
+            public IGrainContext GrainContext { get; } = CreateConsumerContext();
+
+            private static IGrainContext CreateConsumerContext()
+            {
+                var context = Substitute.For<IGrainContext>();
+                context.GrainId.Returns(GrainId.Create("test.stream-consumer", Guid.NewGuid().ToString("N")));
+                return context;
+            }
+        }
+
+        private sealed class RecordingConsumer(StreamHandshakeToken? requestedToken = null) : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private readonly TaskCompletionSource<bool> releaseDelivery = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -1293,7 +1306,7 @@ namespace UnitTests.StreamingTests
             public void ReleaseDelivery() => releaseDelivery.TrySetResult(true);
         }
 
-        private sealed class DroppedClientConsumer : IStreamConsumerExtension
+        private sealed class DroppedClientConsumer : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken, CancellationToken cancellationToken)
                 => throw new NotSupportedException();
@@ -1314,7 +1327,7 @@ namespace UnitTests.StreamingTests
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
-        private sealed class ImmediateRecordingConsumer : IStreamConsumerExtension
+        private sealed class ImmediateRecordingConsumer : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             public List<IBatchContainer> DeliveredBatches { get; } = [];
             public List<StreamSequenceToken> DeliveredTokens { get; } = [];
@@ -1345,7 +1358,7 @@ namespace UnitTests.StreamingTests
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
-        private sealed class RenegotiatingEarliestConsumer : IStreamConsumerExtension
+        private sealed class RenegotiatingEarliestConsumer : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private readonly StreamHandshakeToken startPositionToken =
                 StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable)!;
@@ -1382,7 +1395,7 @@ namespace UnitTests.StreamingTests
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
-        private sealed class RenegotiatingStartTokenConsumer(StreamSequenceToken token) : IStreamConsumerExtension
+        private sealed class RenegotiatingStartTokenConsumer(StreamSequenceToken token) : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private readonly StreamHandshakeToken startToken = StreamHandshakeToken.CreateStartToken(token)!;
 
@@ -1413,7 +1426,7 @@ namespace UnitTests.StreamingTests
                 => Task.FromResult<StreamHandshakeToken?>(null);
         }
 
-        private sealed class RenegotiatingDeliveryTokenConsumer(StreamSequenceToken token) : IStreamConsumerExtension
+        private sealed class RenegotiatingDeliveryTokenConsumer(StreamSequenceToken token) : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private readonly StreamHandshakeToken deliveryToken = StreamHandshakeToken.CreateDeliveyToken(token)!;
 
@@ -1446,7 +1459,7 @@ namespace UnitTests.StreamingTests
 
         private sealed class UnknownHandshakeToken : StreamHandshakeToken;
 
-        private sealed class UnknownHandshakeConsumer(bool returnDuringInitialHandshake) : IStreamConsumerExtension
+        private sealed class UnknownHandshakeConsumer(bool returnDuringInitialHandshake) : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private readonly StreamHandshakeToken unknownToken = new UnknownHandshakeToken();
 
@@ -2406,7 +2419,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, queueCache.CursorAcquisitionCount);
         }
 
-        private sealed class RewindConsumer(StreamHandshakeToken rewindToken) : IStreamConsumerExtension
+        private sealed class RewindConsumer(StreamHandshakeToken rewindToken) : TestStreamConsumerIdentity, IStreamConsumerExtension
         {
             private bool rewindRequested;
 

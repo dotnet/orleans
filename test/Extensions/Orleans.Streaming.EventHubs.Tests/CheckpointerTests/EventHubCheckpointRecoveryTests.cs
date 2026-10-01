@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
@@ -263,6 +264,52 @@ public class EventHubCheckpointRecoveryTests
         }
     }
 
+    [Fact]
+    public void CertifiedProgress_ForcedOptInRejectsIncompatibleEvictionBeforeChangingSelection()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        var eviction = Substitute.For<IEvictionStrategy>();
+        IPurgeObservable? purgeView = null;
+        eviction.When(value => value.PurgeObservable = Arg.Any<IPurgeObservable>())
+            .Do(call => purgeView = call.Arg<IPurgeObservable>());
+        using var cache = CreateCache(
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)), adapter, eviction,
+            Substitute.For<IStreamQueueCheckpointer<string>>(), defaultMaxAddCount: 2);
+
+        Assert.False(cache.TryEnableCertifiedDeliveryProgress());
+        var error = Assert.Throws<InvalidOperationException>(() => cache.EnableCertifiedDeliveryProgress());
+        Assert.Equal("Certified Event Hubs delivery progress requires a ChronologicalEvictionStrategy to track owned pool buffers.", error.Message);
+        Assert.False(cache.TryEnableCertifiedDeliveryProgress());
+        cache.Add([CreateEvent(adapter, StreamId.Create("selection", "legacy"), 1)], Now.UtcDateTime);
+        Assert.Equal(2, cache.GetMaxAddCount());
+        Assert.NotNull(purgeView);
+        Assert.True(purgeView.TryRemoveOldestMessage());
+        Assert.True(purgeView.IsEmpty);
+    }
+
+    [Fact]
+    public void CertifiedProgress_ForcedDerivedEvictionKeepsTypedSelectionAndBufferAccounting()
+    {
+        using var services = CreateServices();
+        var adapter = new EventHubDataAdapter(services.GetRequiredService<Serializer>());
+        using var cache = CreateCache(
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1024 * 1024)), adapter, new LegacyEvictionStrategy(),
+            Substitute.For<IStreamQueueCheckpointer<string>>(), defaultMaxAddCount: 2);
+
+        Assert.False(cache.TryEnableCertifiedDeliveryProgress());
+        cache.EnableCertifiedDeliveryProgress();
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
+        cache.Add([CreateEvent(adapter, StreamId.Create("selection", "forced"), 1)], Now.UtcDateTime);
+        Assert.Equal(1, cache.GetMaxAddCount());
+        cache.EnableCertifiedDeliveryProgress();
+        Assert.True(cache.TryEnableCertifiedDeliveryProgress());
+        cache.SignalPurge();
+        Assert.Equal(1, cache.GetMaxAddCount());
+        cache.UpdateDeliveryProgress(Token(1), Now.UtcDateTime);
+        Assert.Equal(2, cache.GetMaxAddCount());
+    }
+
     private sealed class LegacyEvictionStrategy()
         : ChronologicalEvictionStrategy(NullLogger.Instance, new ImmediatePurgePredicate(), null, null);
 
@@ -423,6 +470,204 @@ public class EventHubCheckpointRecoveryTests
         await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(new[] { EventPosition.FromOffset("50", true), EventPosition.FromOffset("52", false) }, positions);
         await proxy.CloseAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ReceiverClose_AttemptsBothResourcesAndPreservesFailureOrderAndStacks(bool failClient, bool failConnection)
+    {
+        var reader = Substitute.For<PartitionReceiver>();
+        var connection = Substitute.For<EventHubConnection>();
+        var clientFailure = new InvalidOperationException("Client close failed");
+        var connectionFailure = new IOException("Connection close failed");
+        var clientRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = new List<string>();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        reader.CloseAsync(cancellationToken).Returns(_ => CloseClient());
+        connection.CloseAsync(cancellationToken).Returns(_ => CloseConnection());
+        var proxy = new EventHubReceiverProxy(_ => reader, EventPosition.FromOffset("50", true), false, connection);
+
+        var close = proxy.CloseAsync(cancellationToken);
+        Assert.Equal(["client"], calls);
+        Assert.False(close.IsCompleted);
+        clientRelease.SetResult();
+        var error = await Record.ExceptionAsync(() => close.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+
+        Assert.Equal(["client", "connection"], calls);
+        if (failClient && failConnection)
+        {
+            var aggregate = Assert.IsType<AggregateException>(error);
+            Assert.Collection(aggregate.InnerExceptions,
+                first => Assert.Same(clientFailure, first),
+                second => Assert.Same(connectionFailure, second));
+        }
+        else if (failClient || failConnection)
+        {
+            Assert.Same(failClient ? (Exception)clientFailure : connectionFailure, error);
+        }
+        else
+        {
+            Assert.Null(error);
+            Assert.True(close.IsCompletedSuccessfully);
+        }
+
+        if (failClient) Assert.Contains(nameof(CloseClient), clientFailure.StackTrace);
+        if (failConnection) Assert.Contains(nameof(CloseConnection), connectionFailure.StackTrace);
+        await reader.Received(1).CloseAsync(cancellationToken);
+        await connection.Received(1).CloseAsync(cancellationToken);
+
+        async Task CloseClient()
+        {
+            calls.Add("client");
+            await clientRelease.Task;
+            if (failClient) throw clientFailure;
+        }
+
+        async Task CloseConnection()
+        {
+            calls.Add("connection");
+            await Task.CompletedTask;
+            if (failConnection) throw connectionFailure;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceiverClose_OptionalConnectionPreservesClientOutcome(bool failClient)
+    {
+        var reader = Substitute.For<PartitionReceiver>();
+        var failure = new InvalidOperationException("Client close failed");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        reader.CloseAsync(cancellationToken).Returns(failClient ? Task.FromException(failure) : Task.CompletedTask);
+        var proxy = new EventHubReceiverProxy(_ => reader, EventPosition.FromOffset("50", true), false);
+
+        var error = await Record.ExceptionAsync(() => proxy.CloseAsync(cancellationToken));
+
+        if (failClient) Assert.Same(failure, error);
+        else Assert.Null(error);
+        await reader.Received(1).CloseAsync(cancellationToken);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ReceiverClose_ClientCancellationStillAttemptsConnectionAndPreservesErrors(bool cancelConnection, bool failConnection)
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var reader = Substitute.For<PartitionReceiver>();
+        var connection = Substitute.For<EventHubConnection>();
+        var calls = new List<string>();
+        OperationCanceledException? clientCancellation = null;
+        var connectionFailure = new IOException("Connection close failed");
+        reader.CloseAsync(cancellation.Token).Returns(_ => CloseClient());
+        connection.CloseAsync(cancellation.Token).Returns(_ =>
+        {
+            calls.Add("connection");
+            Assert.True(cancellation.IsCancellationRequested);
+            return failConnection ? Task.FromException(connectionFailure)
+                : cancelConnection ? Task.FromCanceled(cancellation.Token)
+                : Task.CompletedTask;
+        });
+        var proxy = new EventHubReceiverProxy(_ => reader, EventPosition.FromOffset("50", true), false, connection);
+
+        var close = proxy.CloseAsync(cancellation.Token);
+        Assert.Equal(["client"], calls);
+        Assert.False(close.IsCompleted);
+        cancellation.Cancel();
+        var error = await Record.ExceptionAsync(() => close.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        Assert.Equal(["client", "connection"], calls);
+        Assert.NotNull(clientCancellation);
+        Assert.Contains(nameof(CloseClient), clientCancellation.StackTrace);
+        if (failConnection)
+        {
+            var aggregate = Assert.IsType<AggregateException>(error);
+            Assert.Collection(aggregate.InnerExceptions,
+                first => Assert.Same(clientCancellation, first),
+                second => Assert.Same(connectionFailure, second));
+            Assert.True(close.IsFaulted);
+        }
+        else
+        {
+            Assert.Same(clientCancellation, error);
+            Assert.Equal(cancellation.Token, clientCancellation.CancellationToken);
+            Assert.True(close.IsCanceled);
+        }
+        await reader.Received(1).CloseAsync(cancellation.Token);
+        await connection.Received(1).CloseAsync(cancellation.Token);
+
+        async Task CloseClient()
+        {
+            calls.Add("client");
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellation.Token);
+            }
+            catch (OperationCanceledException exception)
+            {
+                clientCancellation = exception;
+                throw;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ReceiverClose_ConnectionCancellationPreservesPrimaryFailure()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var reader = Substitute.For<PartitionReceiver>();
+        var connection = Substitute.For<EventHubConnection>();
+        var failure = new InvalidOperationException("Client close failed");
+        reader.CloseAsync(cancellation.Token).Returns(Task.FromException(failure));
+        connection.CloseAsync(cancellation.Token).Returns(Task.FromCanceled(cancellation.Token));
+        var proxy = new EventHubReceiverProxy(_ => reader, EventPosition.FromOffset("50", true), false, connection);
+
+        var close = proxy.CloseAsync(cancellation.Token);
+        var aggregate = await Assert.ThrowsAsync<AggregateException>(() => close);
+
+        Assert.Collection(aggregate.InnerExceptions,
+            first => Assert.Same(failure, first),
+            second => Assert.Equal(cancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(second).CancellationToken));
+        Assert.True(close.IsFaulted);
+        await reader.Received(1).CloseAsync(cancellation.Token);
+        await connection.Received(1).CloseAsync(cancellation.Token);
+    }
+
+    [Fact]
+    public async Task ReceiverClose_ConnectionCleanupRemainsCancelableAfterClientSucceeds()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var reader = Substitute.For<PartitionReceiver>();
+        var connection = Substitute.For<EventHubConnection>();
+        var calls = new List<string>();
+        reader.CloseAsync(cancellation.Token).Returns(_ =>
+        {
+            calls.Add("client");
+            return Task.CompletedTask;
+        });
+        connection.CloseAsync(cancellation.Token).Returns(_ =>
+        {
+            calls.Add("connection");
+            return Task.Delay(Timeout.InfiniteTimeSpan, cancellation.Token);
+        });
+        var proxy = new EventHubReceiverProxy(_ => reader, EventPosition.FromOffset("50", true), false, connection);
+
+        var close = proxy.CloseAsync(cancellation.Token);
+        Assert.Equal(["client", "connection"], calls);
+        Assert.False(close.IsCompleted);
+        cancellation.Cancel();
+        var error = await Record.ExceptionAsync(() => close.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        Assert.Equal(cancellation.Token, Assert.IsAssignableFrom<OperationCanceledException>(error).CancellationToken);
+        Assert.True(close.IsCanceled);
+        await reader.Received(1).CloseAsync(cancellation.Token);
+        await connection.Received(1).CloseAsync(cancellation.Token);
     }
 
     [Fact]
@@ -1056,11 +1301,19 @@ public class EventHubCheckpointRecoveryTests
         }
     }
 
-    private sealed class RecordingConsumer(StreamHandshakeToken? resumeToken = null) : IStreamConsumerExtension
+    private sealed class RecordingConsumer(StreamHandshakeToken? resumeToken = null) : IStreamConsumerExtension, IGrainBase
     {
+        public IGrainContext GrainContext { get; } = CreateConsumerContext();
         public List<int> Events { get; } = [];
         public List<Exception> Errors { get; } = [];
         public Func<IBatchContainer, Task<StreamHandshakeToken?>>? OnDelivery { get; set; }
+
+        private static IGrainContext CreateConsumerContext()
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(GrainId.Create("test.eventhub-consumer", Guid.NewGuid().ToString("N")));
+            return context;
+        }
 
         public Task<StreamHandshakeToken?> DeliverBatch(
             GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item,

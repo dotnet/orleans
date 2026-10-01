@@ -32,7 +32,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly IEventHubDataAdapter dataAdapter;
         private readonly IEvictionStrategy evictionStrategy;
         private readonly IStreamQueueCheckpointer<string> checkpointer;
-        private bool certifiedDeliveryProgress;
+        private ChronologicalEvictionStrategy? certifiedEvictionStrategy;
         private readonly ILogger logger;
         private readonly AggregatedCachePressureMonitor cachePressureMonitor;
         private readonly ICacheMonitor cacheMonitor;
@@ -115,12 +115,21 @@ namespace Orleans.Streaming.EventHubs
         // Custom compositions retain their released behavior. Only native components or
         // fault-injection tests which explicitly enabled this cache use certified progress.
         internal bool TryEnableCertifiedDeliveryProgress()
-            => certifiedDeliveryProgress = certifiedDeliveryProgress
-                || (GetType() == typeof(EventHubQueueCache)
-                    && dataAdapter.GetType() == typeof(EventHubDataAdapter)
-                    && evictionStrategy.GetType() == typeof(ChronologicalEvictionStrategy));
+        {
+            if (certifiedEvictionStrategy is null
+                && GetType() == typeof(EventHubQueueCache)
+                && dataAdapter.GetType() == typeof(EventHubDataAdapter)
+                && evictionStrategy.GetType() == typeof(ChronologicalEvictionStrategy))
+            {
+                EnableCertifiedDeliveryProgress();
+            }
 
-        internal void EnableCertifiedDeliveryProgress() => certifiedDeliveryProgress = true;
+            return certifiedEvictionStrategy is not null;
+        }
+
+        internal void EnableCertifiedDeliveryProgress()
+            => certifiedEvictionStrategy = evictionStrategy as ChronologicalEvictionStrategy
+                ?? throw new InvalidOperationException("Certified Event Hubs delivery progress requires a ChronologicalEvictionStrategy to track owned pool buffers.");
 
         private sealed class CertifiedPurgeView(EventHubQueueCache owner) : IPurgeObservable
         {
@@ -131,7 +140,7 @@ namespace Orleans.Streaming.EventHubs
 
             public bool TryRemoveOldestMessage()
             {
-                if (!owner.certifiedDeliveryProgress)
+                if (owner.certifiedEvictionStrategy is null)
                 {
                     owner.cache.RemoveOldestMessage();
                     return true;
@@ -192,8 +201,8 @@ namespace Orleans.Streaming.EventHubs
             // A native record uses at most one new pool buffer. Reserve that worst case for
             // each read, bounding certified retention by the buffers one full read can allocate.
             // Unlike averaged pressure, this limit cannot be diluted by healthy consumers.
-            return certifiedDeliveryProgress
-                ? Math.Max(0, defaultMaxAddCount - ((ChronologicalEvictionStrategy)evictionStrategy).BufferCount
+            return certifiedEvictionStrategy is { } selectedEviction
+                ? Math.Max(0, defaultMaxAddCount - selectedEviction.BufferCount
                     - (pendingBuffers.Count - pendingBufferNotification))
                 : defaultMaxAddCount;
         }
@@ -206,7 +215,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The stream positions of the cached messages.</returns>
         public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
         {
-            if (!certifiedDeliveryProgress)
+            if (certifiedEvictionStrategy is null)
             {
                 var legacyPositions = new List<StreamPosition>(messages.Count);
                 var legacyMessages = new List<CachedMessage>(messages.Count);
@@ -363,7 +372,7 @@ namespace Orleans.Streaming.EventHubs
                     new(lastItemPurged.Value.DequeueTimeUtc),
                     new(newestItem.Value.DequeueTimeUtc));
             }
-            if (!certifiedDeliveryProgress && lastItemPurged is { } purged)
+            if (certifiedEvictionStrategy is null && lastItemPurged is { } purged)
             {
                 checkpointer.Update(dataAdapter.GetOffset(purged), DateTime.UtcNow, CancellationToken.None);
             }
@@ -413,7 +422,7 @@ namespace Orleans.Streaming.EventHubs
                     throw new ArgumentOutOfRangeException(nameof(size), $"Message size is too big. MessageSize: {size}");
                 }
                 currentBuffer = newBuffer;
-                if (certifiedDeliveryProgress)
+                if (certifiedEvictionStrategy is not null)
                 {
                     pendingBuffers.Add(currentBuffer);
                 }

@@ -81,6 +81,8 @@ When an agent stops, it closes admission for new background work and stops its p
 
 The agent then reports final delivery progress to the cache, disposes subscription cursors, and shuts down the receiver so provider-specific checkpoint flushing observes the completed progress. Registrations pending when shutdown starts keep the existing checkpoint, since their subscriber positions are still uncertain. Producer unregistration follows receiver cleanup. When the manager reuses an agent for a reassigned queue, initialization waits for that full cleanup and opens admission for the new run.
 
+The Event Hubs transport attempts receiver and connection cleanup in order with the shutdown cancellation token. It preserves an individual failure's stack, reports multiple failures together, and preserves cooperative cancellation when both resources observe the caller's cancellation.
+
 Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
 
 A completed handshake establishes the subscription's current cursor and replay position. The latest requested handshake owns reconciliation; responses from superseded requests preserve that ownership. Delivery completions and error handling from an older handshake generation release their work while preserving the replacement position, so final checkpoint progress reflects the accepted rewind.
@@ -89,7 +91,7 @@ A handshake which keeps the same certified cursor also keeps its unsettled selec
 
 A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
 
-Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
+Subscription removal revokes in-flight handshake and delivery ownership. Snapshot-based retries verify that the captured consumer still owns the subscription entry before starting another handshake. Successful attachment diagnostics report the grain identity of that owned consumer endpoint. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
@@ -112,6 +114,8 @@ For certified processing, a successfully returned queue read stays owned by the 
 Event Hubs stages fetched records through packing and notification handoff. Its transport retries from the last successful raw-read position and preserves the initial `StartFromNow` boundary across failures. Checkpoint progress also bounds cache eviction: the certificate applies during the progress callback, and both time-based and pressure-based eviction preserve records beyond that boundary. The receiver updates the checkpointer from certified delivery progress, while eviction handles metadata and buffer reclamation.
 
 Certified Event Hubs admission reserves one possible new raw-data buffer per requested record against the cache's `defaultMaxAddCount` buffer budget. Admission accounts for owned buffers and staged allocation notifications, so a pinned subscription pauses new reception even when average delivery pressure remains low. Packing failures release staged buffers, and purge cleanup returns completed buffers even when an observer throws. The receiver finishes already-staged read handoffs independently of new-read capacity. The [operations guide](../../streaming/streaming-operations.md) describes the native budget and deployment sizing.
+
+Native chronological eviction indexes owned buffers for amortized constant-time allocation-notification checks. Duplicate notifications preserve a single ownership entry, and reclamation removes that entry before pool reuse. Derived eviction strategies retain their protected-queue extension behavior.
 
 ```mermaid
 flowchart TB
