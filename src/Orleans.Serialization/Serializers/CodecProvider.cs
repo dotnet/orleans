@@ -66,9 +66,9 @@ namespace Orleans.Serialization.Serializers
         private readonly List<Type> _constructingSerializerServices = new();
         private ExceptionDispatchInfo? _constructionFailure;
         private readonly List<(object Caller, object Dependency)> _constructionDependencies = new();
-        private bool _initializing;
-        private int _dependencyInjectionDepth;
+        private int _initializingThreadId;
         private readonly IServiceProvider _constructionServices;
+        private readonly IReadOnlyList<ServiceDescriptor> _serviceDescriptors;
         private bool _initialized;
 
         /// <summary>
@@ -79,6 +79,7 @@ namespace Orleans.Serialization.Serializers
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
             _serviceProvider = serviceProvider;
+            _serviceDescriptors = ServiceCollectionExtensions.GetServiceDescriptors(serviceProvider);
             _constructionServices = new ConstructionServiceProvider(this);
             _manifest = codecConfiguration.Value;
             if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !_manifest.RequireExplicitTypeRegistration)
@@ -90,11 +91,10 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IServiceProvider Services => _pendingSerializerServices is null ? _serviceProvider : _constructionServices;
+        public IServiceProvider Services => _manifest.SerializerServiceFactories.Count == 0 ? _serviceProvider : _constructionServices;
 
         private void Initialize()
         {
-            lock (_serializerServiceLock)
             lock (_initializationLock)
             {
                 if (_initialized)
@@ -102,7 +102,7 @@ namespace Orleans.Serialization.Serializers
                     return;
                 }
 
-                _initializing = true;
+                _initializingThreadId = Environment.CurrentManagedThreadId;
                 try
                 {
                     _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
@@ -117,7 +117,7 @@ namespace Orleans.Serialization.Serializers
                 }
                 finally
                 {
-                    _initializing = false;
+                    _initializingThreadId = 0;
                 }
             }
         }
@@ -217,6 +217,12 @@ namespace Orleans.Serialization.Serializers
         }
 
         private IFieldCodec? TryCreateCodec(Type fieldType)
+        {
+            try { return TryCreateCodecInner(fieldType); }
+            catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+        }
+
+        private IFieldCodec? TryCreateCodecInner(Type fieldType)
         {
             if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             if (_manifest.RequireExplicitTypeRegistration && fieldType == typeof(Invocation.ExceptionResponse))
@@ -421,6 +427,12 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier? TryCreateCopier(Type fieldType)
         {
+            try { return TryCreateCopierInner(fieldType); }
+            catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+        }
+
+        private IDeepCopier? TryCreateCopierInner(Type fieldType)
+        {
             if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             ThrowIfUnregisteredNativeResponse(fieldType);
             if (_manifest.RequireExplicitTypeRegistration) return null;
@@ -578,6 +590,16 @@ namespace Orleans.Serialization.Serializers
 #endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
+            try { return ActivateService(type, constructorArguments); }
+            catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+        }
+
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("Trimming", "IL2067",
+            Justification = "Legacy manifest registrations preserve implementation constructors through annotated TypeManifestOptions methods before the Type flows through dictionaries. Generated-only activation uses closed factories.")]
+#endif
+        private object ActivateService(Type type, object[]? constructorArguments)
+        {
             var result = OrleansGeneratedCodeHelper.TryGetService(type, this);
             if (result != null)
             {
@@ -608,14 +630,21 @@ namespace Orleans.Serialization.Serializers
                 return false;
             }
 
+            if (!SerializerRuntimeFeatures.UseGeneratedSerializerContexts
+                && !_manifest.RequireExplicitTypeRegistration && !_initialized
+                && _initializingThreadId != Environment.CurrentManagedThreadId)
+            {
+                if (Monitor.IsEntered(_serializerServiceLock) && _pendingSerializerServices is not null)
+                {
+                    var error = new InvalidOperationException("Automatic serializer initialization requires a completed construction graph.");
+                    RecordConstructionFailure(error);
+                    throw error;
+                }
+                Initialize();
+            }
             lock (_serializerServiceLock)
             {
                 _constructionFailure?.Throw();
-                if (!SerializerRuntimeFeatures.UseGeneratedSerializerContexts
-                    && !_manifest.RequireExplicitTypeRegistration && !_initialized && !_initializing)
-                {
-                    Initialize();
-                }
                 if (_serializerServices.TryGetValue(type, out result)) return true;
                 if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return true;
                 var isRoot = _pendingSerializerServices is null;
@@ -696,13 +725,6 @@ namespace Orleans.Serialization.Serializers
             lock (_serializerServiceLock)
             {
                 _constructionFailure?.Throw();
-                if (_dependencyInjectionDepth > 0
-                    && !_serializerServices.Values.Any(value => ReferenceEquals(value, dependency))
-                    && (_pendingSerializerServices?.Values.Any(value => ReferenceEquals(value, dependency)) == true
-                        || _constructingSerializerServices.Exists(type => type.IsInstanceOfType(dependency))))
-                {
-                    throw new InvalidOperationException("Dependency injection cannot cache an unpublished serialization dependency. Register closed factories for every serialization service in this dependency graph.");
-                }
                 if (_pendingSerializerServices is null || callers.Count == 0) return;
                 for (var index = 1; index < callers.Count; index++)
                 {
@@ -750,24 +772,57 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider
+        internal bool IsConstructionPending
+        {
+            get { lock (_serializerServiceLock) return _pendingSerializerServices is not null; }
+        }
+
+        internal void RecordConstructionFailure(Exception exception)
+        {
+            lock (_serializerServiceLock)
+            {
+                if (_pendingSerializerServices is not null)
+                    _constructionFailure ??= ExceptionDispatchInfo.Capture(exception);
+            }
+        }
+
+        private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider, IServiceProviderIsService
         {
             public object? GetService(Type serviceType)
             {
                 lock (owner._serializerServiceLock)
                 {
                     owner._constructionFailure?.Throw();
-                    owner._dependencyInjectionDepth++;
-                    try
+                    if (owner._pendingSerializerServices is not null)
                     {
-                        return serviceType == typeof(IServiceProvider) ? this : owner._serviceProvider.GetService(serviceType);
-                    }
-                    finally
-                    {
-                        owner._dependencyInjectionDepth--;
+                        if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)) return this;
+                        if (IsProviderService(serviceType)) return owner;
+                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.ServiceType == serviceType)
+                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => serviceType.IsConstructedGenericType
+                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
+                        if (descriptor?.ImplementationInstance is { } instance) return instance;
+                        if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
+                        if (descriptor is null) return null;
+                        var error = new InvalidOperationException($"Dependency injection cannot resolve {serviceType} while a serialization graph is unpublished. Register a closed service factory or provide an instance registration.");
+                        owner.RecordConstructionFailure(error);
+                        throw error;
                     }
                 }
+                return serviceType == typeof(IServiceProvider) ? this : owner._serviceProvider.GetService(serviceType);
             }
+
+            public bool IsService(Type serviceType)
+                => IsProviderService(serviceType)
+                    || serviceType == typeof(IServiceProvider)
+                    || serviceType == typeof(IServiceProviderIsService)
+                    || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
+                    || owner._serviceDescriptors.Any(descriptor => descriptor.ServiceType == serviceType
+                        || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
+
+            private bool IsProviderService(Type serviceType)
+                => serviceType != typeof(object)
+                    && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
+                    && serviceType.IsInstanceOfType(owner);
         }
 
         internal void EnsureDynamicServiceLookupAllowed(Type type)
@@ -779,11 +834,22 @@ namespace Orleans.Serialization.Serializers
         }
 
         [DoesNotReturn]
-        private static void ThrowContextServiceNotFound(Type type)
-            => throw CreateContextServiceNotFound(type);
+        private void ThrowContextServiceNotFound(Type type)
+            => ThrowResolutionFailure(CreateContextServiceNotFound(type));
 
-        private static CodecNotFoundException CreateContextServiceNotFound(Type type)
-            => new($"Serialization service {type} is missing from the registered serializer contexts. Register its closed codec/copier graph and required services in a serializer context.");
+        [DoesNotReturn]
+        private void ThrowResolutionFailure(Exception exception)
+        {
+            RecordConstructionFailure(exception);
+            throw exception;
+        }
+
+        private CodecNotFoundException CreateContextServiceNotFound(Type type)
+        {
+            var error = new CodecNotFoundException($"Serialization service {type} is missing from the registered serializer contexts. Register its closed codec/copier graph and required services in a serializer context.");
+            RecordConstructionFailure(error);
+            return error;
+        }
 
         private IFieldCodec? CreateCodecInstance(Type fieldType, Type searchType)
         {
@@ -980,21 +1046,21 @@ namespace Orleans.Serialization.Serializers
         private static void ThrowGenericTypeDefinition(Type fieldType) => throw new InvalidOperationException($"Type {fieldType} is a non-constructed generic type and is therefore unsupported.");
 
         [DoesNotReturn]
-        private static void ThrowCodecNotFound(Type fieldType) => throw new CodecNotFoundException($"Could not find a codec for type {fieldType}.");
+        private void ThrowCodecNotFound(Type fieldType) => ThrowResolutionFailure(new CodecNotFoundException($"Could not find a codec for type {fieldType}."));
 
         [DoesNotReturn]
-        private static void ThrowCopierNotFound(Type type) => throw new CodecNotFoundException($"Could not find a copier for type {type}.");
+        private void ThrowCopierNotFound(Type type) => ThrowResolutionFailure(new CodecNotFoundException($"Could not find a copier for type {type}."));
 
         [DoesNotReturn]
-        private static void ThrowBaseCodecNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}.");
+        private void ThrowBaseCodecNotFound(Type fieldType) => ThrowResolutionFailure(new KeyNotFoundException($"Could not find a base type serializer for type {fieldType}."));
 
         [DoesNotReturn]
-        private static void ThrowValueSerializerNotFound(Type fieldType) => throw new KeyNotFoundException($"Could not find a value serializer for type {fieldType}.");
+        private void ThrowValueSerializerNotFound(Type fieldType) => ThrowResolutionFailure(new KeyNotFoundException($"Could not find a value serializer for type {fieldType}."));
 
         [DoesNotReturn]
-        private static void ThrowActivatorNotFound(Type type) => throw new KeyNotFoundException($"Could not find an activator for type {type}.");
+        private void ThrowActivatorNotFound(Type type) => ThrowResolutionFailure(new KeyNotFoundException($"Could not find an activator for type {type}."));
 
         [DoesNotReturn]
-        private static void ThrowBaseCopierNotFound(Type type) => throw new KeyNotFoundException($"Could not find a base type copier for type {type}.");
+        private void ThrowBaseCopierNotFound(Type type) => ThrowResolutionFailure(new KeyNotFoundException($"Could not find a base type copier for type {type}."));
     }
 }

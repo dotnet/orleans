@@ -27,4 +27,16 @@ public sealed class StaticSerializerFactoryTests
 
     [Fact]
     public void DiSingletonsCannotRetainPendingServices() => StaticFactoryContracts.DiSingletonsCannotRetainPendingServices();
+
+    [Fact]
+    public void SingletonFirstLookupCannotInvertGraphLock() => StaticFactoryContracts.SingletonFirstLookupCannotInvertGraphLock();
+
+    [Fact]
+    public void CaughtAutomaticAndMissingFailuresFaultGraph() => StaticFactoryContracts.CaughtAutomaticAndMissingFailuresFaultGraph();
+
+    [Fact]
+    public void HolderCachesOnlyPublishedDependencies() => StaticFactoryContracts.HolderCachesOnlyPublishedDependencies();
+
+    [Fact]
+    public void DirectProviderServicesRemainGraphOwned() => StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
 }
