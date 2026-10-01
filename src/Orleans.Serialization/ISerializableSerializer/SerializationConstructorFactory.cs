@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
@@ -46,38 +47,60 @@ namespace Orleans.Serialization
                 return (Action<object, SerializationInfo, StreamingContext>)existing;
             }
 
-            var created = GetSerializationConstructorInvoker(
-                type,
-                typeof(object),
-                typeof(Action<object, SerializationInfo, StreamingContext>));
+            var constructor = GetRequiredSerializationConstructor(type);
+            Action<object, SerializationInfo, StreamingContext> created;
+            if (RuntimeFeature.IsDynamicCodeSupported)
+            {
+                created = (Action<object, SerializationInfo, StreamingContext>)GetSerializationConstructorInvoker(
+                    constructor, type, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
+            }
+            else
+            {
+                created = CreateNativeConstructor(constructor);
+            }
+
             return (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, created);
         }
 
         [SecurityCritical]
-        public TConstructor GetSerializationConstructorDelegate<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(SerializationConstructors)] TOwner,
-#else
-            TOwner,
-#endif
-            TConstructor>()
-            where TConstructor : Delegate
-            => (TConstructor)GetSerializationConstructorDelegate(typeof(TOwner), typeof(TConstructor));
-
-        private object GetSerializationConstructorDelegate(
+        public ValueTypeSerializer<TOwner>.ValueConstructor GetSerializationConstructorDelegate<
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(SerializationConstructors)]
 #endif
-            Type owner,
-            Type delegateType)
+            TOwner>()
+            where TOwner : struct
         {
+            var owner = typeof(TOwner);
             if (_constructors.TryGetValue(owner, out var existing))
             {
-                return existing;
+                return (ValueTypeSerializer<TOwner>.ValueConstructor)existing;
             }
 
-            var created = GetSerializationConstructorInvoker(owner, owner, delegateType);
-            return _constructors.GetOrAdd(owner, created);
+            var constructor = GetRequiredSerializationConstructor(owner);
+            ValueTypeSerializer<TOwner>.ValueConstructor created;
+            if (RuntimeFeature.IsDynamicCodeSupported)
+            {
+                created = (ValueTypeSerializer<TOwner>.ValueConstructor)GetSerializationConstructorInvoker(
+                    constructor, owner, owner, typeof(ValueTypeSerializer<TOwner>.ValueConstructor));
+            }
+            else
+            {
+                created = (ref TOwner value, SerializationInfo info, StreamingContext context) =>
+                {
+                    object boxed = value;
+                    try
+                    {
+                        constructor.Invoke(boxed, BindingFlags.DoNotWrapExceptions, null, new object[] { info, context }, null);
+                    }
+                    finally
+                    {
+                        // Preserve constructor mutations even when it throws.
+                        value = (TOwner)boxed;
+                    }
+                };
+            }
+
+            return (ValueTypeSerializer<TOwner>.ValueConstructor)_constructors.GetOrAdd(owner, created);
         }
 
         [SecurityCritical]
@@ -93,13 +116,11 @@ namespace Orleans.Serialization
                 null);
 
         [SecurityCritical]
-        private static Delegate GetSerializationConstructorInvoker(
+        private static ConstructorInfo GetRequiredSerializationConstructor(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(SerializationConstructors)]
 #endif
-            Type type,
-            Type owner,
-            Type delegateType)
+            Type type)
         {
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
             if (constructor is null)
@@ -107,6 +128,33 @@ namespace Orleans.Serialization
                 throw new SerializationException($"{nameof(ISerializable)} constructor not found on type {type}.");
             }
 
+            return constructor;
+        }
+
+        private static Action<object, SerializationInfo, StreamingContext> CreateNativeConstructor(ConstructorInfo constructor)
+        {
+#if NET8_0_OR_GREATER
+            if (constructor.DeclaringType == typeof(Exception))
+            {
+                return (value, info, context) => InitializeException((Exception)value, info, context);
+            }
+#endif
+
+            return (value, info, context) =>
+                constructor.Invoke(value, BindingFlags.DoNotWrapExceptions, null, new object[] { info, context }, null);
+        }
+
+#if NET8_0_OR_GREATER
+        [UnsafeAccessor(UnsafeAccessorKind.Method, Name = ".ctor")]
+        private static extern void InitializeException(Exception value, SerializationInfo info, StreamingContext context);
+#endif
+
+        [SecurityCritical]
+#if NET7_0_OR_GREATER
+        [RequiresDynamicCode("Serialization constructor trampolines require runtime code generation.")]
+#endif
+        private static Delegate GetSerializationConstructorInvoker(ConstructorInfo constructor, Type type, Type owner, Type delegateType)
+        {
             Type[] parameterTypes;
             if (owner.IsValueType)
             {
@@ -124,7 +172,7 @@ namespace Orleans.Serialization
             il.Emit(OpCodes.Ldarg_1);
             if (type != owner)
             {
-                il.Emit(OpCodes.Castclass, type);
+                il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
             }
 
             il.Emit(OpCodes.Ldarg_2);

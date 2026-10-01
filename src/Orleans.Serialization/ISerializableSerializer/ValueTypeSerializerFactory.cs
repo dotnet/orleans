@@ -51,9 +51,13 @@ namespace Orleans.Serialization
         public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
 
         [SecurityCritical]
-        private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct
+        private ValueTypeSerializer CreateTypedSerializer<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T>() where T : struct
         {
-            var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
+            var constructor = _constructorFactory.GetSerializationConstructorDelegate<T>();
             var callbacks =
                 _callbacksFactory.GetValueTypeCallbacks<T, ValueTypeSerializer<T>.SerializationCallback>(typeof(T));
             var serializer = new ValueTypeSerializer<T>(constructor, callbacks, _entrySerializer, _streamingContext, _formatterConverter);
