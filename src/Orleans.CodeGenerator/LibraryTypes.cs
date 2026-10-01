@@ -9,8 +9,6 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class LibraryTypes
 {
-    // Resolving the well-known types costs hundreds of metadata lookups, and the per-type pipeline step
-    // asks for them once per serializable type on every compilation.
     private static readonly ConditionalWeakTable<Compilation, LibraryTypes> Cache = new();
 
     private readonly ConcurrentDictionary<ITypeSymbol, bool> _shallowCopyableTypes = new(SymbolEqualityComparer.Default);
