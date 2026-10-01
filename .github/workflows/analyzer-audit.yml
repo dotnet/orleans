@@ -120,15 +120,16 @@ jobs:
       - name: Publish and run default activation smoke
         shell: pwsh
         run: |
-          $project = Join-Path 'test' 'Orleans.Serialization.ActivationSmoke' 'Orleans.Serialization.ActivationSmoke.csproj'
-          $output = Join-Path $env:RUNNER_TEMP 'orleans-serialization-activation-smoke'
+          $project = Join-Path 'test' 'Orleans.NativeAotSmoke' 'Orleans.NativeAotSmoke.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-native-activation-smoke'
           dotnet publish $project `
+            --framework net10.0 `
             --configuration Release `
             --runtime linux-x64 `
-            -p:NativeAotSmoke=true `
+            -p:NativeAotSmokeScenario=Activation `
             --output $output
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & (Join-Path $output 'Orleans.Serialization.ActivationSmoke')
+          & (Join-Path $output 'Orleans.NativeAotSmoke')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   compatibility:

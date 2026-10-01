@@ -41,7 +41,7 @@
     <InternalsVisibleTo Include="Orleans.Core" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Serialization.UnitTests" />
-    <InternalsVisibleTo Include="Orleans.Serialization.ActivationSmoke" />
+    <InternalsVisibleTo Include="Orleans.NativeAotSmoke" />
   </ItemGroup>
 
   <ItemGroup>

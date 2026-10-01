@@ -2,15 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Activators;
 
-namespace Orleans.Serialization.ActivationSmoke;
+namespace Orleans.NativeAotSmoke;
 
-internal static class Program
+internal static class Activation
 {
     private static void Main()
     {
-#if NATIVE_AOT_SMOKE
-        Ensure(!RuntimeFeature.IsDynamicCodeSupported, "NativeAOT smoke requires dynamic code to be disabled.");
-#endif
         ValidatePublicReferenceConstructor();
         ValidateExplicitValueConstructor();
         ValidateUninitializedAllocation();
