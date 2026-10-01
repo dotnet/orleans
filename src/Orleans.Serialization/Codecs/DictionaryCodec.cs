@@ -24,7 +24,19 @@ namespace Orleans.Serialization.Codecs
 
         private readonly IFieldCodec<TKey> _keyCodec;
         private readonly IFieldCodec<TValue> _valueCodec;
-        private readonly IFieldCodec<IEqualityComparer<TKey>> _comparerCodec;
+        private readonly IFieldCodec<IEqualityComparer<TKey>>? _comparerCodec;
+
+        /// <summary>
+        /// Initializes a serializer for dictionaries using <see cref="EqualityComparer{T}.Default"/>.
+        /// </summary>
+        /// <param name="keyCodec">The key codec.</param>
+        /// <param name="valueCodec">The value codec.</param>
+        /// <remarks>Values and payloads specifying a custom comparer produce a <see cref="NotSupportedException"/>.</remarks>
+        public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec)
+        {
+            _keyCodec = OrleansGeneratedCodeHelper.UnwrapService(this, keyCodec);
+            _valueCodec = OrleansGeneratedCodeHelper.UnwrapService(this, valueCodec);
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DictionaryCodec{TKey, TValue}"/> class.
@@ -55,7 +67,7 @@ namespace Orleans.Serialization.Codecs
 
             if (value.Comparer is var comparer && comparer != EqualityComparer<TKey>.Default)
             {
-                _comparerCodec.WriteField(ref writer, 0, null!, comparer);
+                GetComparerCodec().WriteField(ref writer, 0, null!, comparer);
             }
 
             if (value.Count > 0)
@@ -102,7 +114,7 @@ namespace Orleans.Serialization.Codecs
                 switch (fieldId)
                 {
                     case 0:
-                        comparer = _comparerCodec.ReadValue(ref reader, header);
+                        comparer = GetComparerCodec().ReadValue(ref reader, header);
                         break;
                     case 1:
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
@@ -143,6 +155,9 @@ namespace Orleans.Serialization.Codecs
         }
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+
+        private IFieldCodec<IEqualityComparer<TKey>> GetComparerCodec()
+            => _comparerCodec ?? throw new NotSupportedException($"The serializer context registration for {typeof(Dictionary<TKey, TValue>)} supports EqualityComparer<{typeof(TKey)}>.Default. Register a codec with comparer support to serialize a custom comparer.");
     }
 
     /// <summary>

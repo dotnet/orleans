@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -54,6 +55,10 @@ namespace Orleans.Serialization.Serializers
         private readonly ObjectCopier _objectCopier = new();
         private readonly IServiceProvider _serviceProvider;
         private readonly VoidCopier _voidCopier = new();
+        private readonly TypeManifestOptions _manifest;
+        private readonly object _serializerServiceLock = new();
+        private readonly Dictionary<Type, object> _serializerServices = new();
+        private Dictionary<Type, object>? _pendingSerializerServices;
         private bool _initialized;
 
         /// <summary>
@@ -64,6 +69,7 @@ namespace Orleans.Serialization.Serializers
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
             _serviceProvider = serviceProvider;
+            _manifest = codecConfiguration.Value;
 
             ConsumeMetadata(codecConfiguration);
         }
@@ -95,6 +101,7 @@ namespace Orleans.Serialization.Serializers
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
+            if (metadata.RequireExplicitTypeRegistration) return;
             AddFromMetadata(_baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
             AddFromMetadata(_valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
             AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
@@ -150,6 +157,7 @@ namespace Orleans.Serialization.Serializers
         public IFieldCodec<TField>? TryGetCodec<TField>()
         {
             var fieldType = typeof(TField);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return (IFieldCodec<TField>)factory(this);
             if (_typedCodecs.TryGetValue(fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
@@ -177,6 +185,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IFieldCodec? TryGetCodec(Type fieldType)
         {
+            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : _untypedCodecs.TryGetValue(fieldType, out var existing) ? existing
@@ -185,6 +194,11 @@ namespace Orleans.Serialization.Serializers
 
         private IFieldCodec? TryCreateCodec(Type fieldType)
         {
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.RequireExplicitTypeRegistration) return null;
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) return null;
+#endif
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -218,6 +232,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IActivator<T> GetActivator<T>()
         {
+            if (TryGetSerializerService(typeof(IActivator<T>), out var registered)) return (IActivator<T>)registered;
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IActivator<T>));
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IActivator<T>));
+#endif
             var type = typeof(T);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
@@ -273,6 +292,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IBaseCodec<TField> GetBaseCodec<TField>() where TField : class
         {
+            if (TryGetSerializerService(typeof(IBaseCodec<TField>), out var registered)) return (IBaseCodec<TField>)registered;
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IBaseCodec<TField>));
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IBaseCodec<TField>));
+#endif
             var type = typeof(TField);
             if (_typedBaseCodecs.TryGetValue(type, out var existing))
                 return (IBaseCodec<TField>)existing;
@@ -285,6 +309,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IValueSerializer<TField> GetValueSerializer<TField>() where TField : struct
         {
+            if (TryGetSerializerService(typeof(IValueSerializer<TField>), out var registered)) return (IValueSerializer<TField>)registered;
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IValueSerializer<TField>));
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IValueSerializer<TField>));
+#endif
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
@@ -296,6 +325,11 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IBaseCopier<TField> GetBaseCopier<TField>() where TField : class
         {
+            if (TryGetSerializerService(typeof(IBaseCopier<TField>), out var registered)) return (IBaseCopier<TField>)registered;
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IBaseCopier<TField>));
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IBaseCopier<TField>));
+#endif
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
 
@@ -316,6 +350,7 @@ namespace Orleans.Serialization.Serializers
         public IDeepCopier<T>? TryGetDeepCopier<T>()
         {
             var type = typeof(T);
+            if (_manifest.CopierFactories.TryGetValue(type, out var factory)) return (IDeepCopier<T>)factory(this);
             if (_typedCopiers.TryGetValue(type, out var existing))
                 return (IDeepCopier<T>)existing;
 
@@ -343,6 +378,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier? TryGetDeepCopier(Type fieldType)
         {
+            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
                 : _untypedCopiers.TryGetValue(fieldType, out var existing) ? existing
@@ -352,6 +388,11 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier? TryCreateCopier(Type fieldType)
         {
+            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.RequireExplicitTypeRegistration) return null;
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) return null;
+#endif
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -509,15 +550,71 @@ namespace Orleans.Serialization.Serializers
                 return result;
             }
 
+            if (TryGetSerializerService(type, out var registered)) return registered;
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(type);
+
             result = _serviceProvider.GetService(type);
             if (result != null)
             {
                 return result;
             }
 
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(type);
+#endif
             result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? Array.Empty<object>());
             return result;
         }
+
+        internal bool TryGetSerializerService(Type type, [NotNullWhen(true)] out object? result)
+        {
+            if (!_manifest.SerializerServiceFactories.TryGetValue(type, out var factory))
+            {
+                result = null;
+                return false;
+            }
+
+            lock (_serializerServiceLock)
+            {
+                if (_serializerServices.TryGetValue(type, out result)) return true;
+                if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return true;
+                var isRoot = _pendingSerializerServices is null;
+                _pendingSerializerServices ??= new();
+                try
+                {
+                    result = factory(this);
+                    _pendingSerializerServices.Add(type, result);
+                    if (isRoot)
+                    {
+                        foreach (var entry in _pendingSerializerServices)
+                        {
+                            _serializerServices.Add(entry.Key, entry.Value);
+                        }
+                    }
+
+                    return true;
+                }
+                finally
+                {
+                    if (isRoot) _pendingSerializerServices = null;
+                }
+            }
+        }
+
+        internal void EnsureDynamicServiceLookupAllowed(Type type)
+        {
+            if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(type);
+#if NET7_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported) ThrowContextServiceNotFound(type);
+#endif
+        }
+
+        [DoesNotReturn]
+        private static void ThrowContextServiceNotFound(Type type)
+            => throw CreateContextServiceNotFound(type);
+
+        private static CodecNotFoundException CreateContextServiceNotFound(Type type)
+            => new($"Serialization service {type} is missing from the registered serializer contexts. Declare its closed serialized type using GenerateSerializerContextAttribute.");
 
         private IFieldCodec? CreateCodecInstance(Type fieldType, Type searchType)
         {

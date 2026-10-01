@@ -79,7 +79,24 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     }
                 }
 
-                var val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                TService val;
+                if (codecProvider is CodecProvider provider)
+                {
+                    if (provider.TryGetSerializerService(typeof(TService), out var registered))
+                    {
+                        return (TService)registered;
+                    }
+
+                    provider.EnsureDynamicServiceLookupAllowed(typeof(TService));
+                }
+
+#if NET7_0_OR_GREATER
+                if (!RuntimeFeature.IsDynamicCodeSupported)
+                {
+                    throw new CodecNotFoundException($"Serialization service {typeof(TService)} requires an explicit serializer context registration.");
+                }
+#endif
+                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
