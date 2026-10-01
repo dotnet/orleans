@@ -67,7 +67,7 @@ namespace Orleans.Serialization
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(SerializationConstructors)]
 #endif
-            TOwner>()
+        TOwner>()
             where TOwner : struct
         {
             var owner = typeof(TOwner);

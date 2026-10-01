@@ -55,7 +55,7 @@ namespace Orleans.Serialization
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
 #endif
-            T>() where T : struct
+        T>() where T : struct
         {
             var constructor = _constructorFactory.GetSerializationConstructorDelegate<T>();
             var callbacks =
