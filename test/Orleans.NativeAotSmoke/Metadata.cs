@@ -37,7 +37,7 @@ internal static class Metadata
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
-        services.AddSingleton<Serializer<T>>(services => new(codec, services.GetRequiredService<SerializerSessionPool>()));
+        services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
     }
 
     private static void MetadataInitialization(IServiceProvider services)
