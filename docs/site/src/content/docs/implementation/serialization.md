@@ -131,6 +131,18 @@ For a return type marked through <xref:Orleans.Invocation.ReturnValueProxyAttrib
 
 Arguments and result values use normal Orleans.Serialization codecs and copiers. Exceptions are represented by exception responses and rethrown by the caller completion source. A grain call with a `CancellationToken` exposes cancellation through the generated request, allowing the runtime to propagate cooperative cancellation. Void methods set the one-way invocation option in their request base, so no response completion source waits for a result.
 
+### Closed RPC response factories
+
+For concrete `Task<TResult>` and `ValueTask<TResult>` method results, generated metadata supplies a closed response codec and copier graph for NativeAOT execution. The graph uses the concrete result implementations in <xref:Orleans.Serialization.Invocation.PooledResponseCodec`2> and <xref:Orleans.Serialization.Invocation.PooledResponseCopier`2>. Recursive result dependencies resolve with a construction caller after the response implementation has been allocated. Reference payload codecs and copiers preserve payload cycles and shared references, and the pooled response envelope retains the existing field and raw-message encoding.
+
+These supplemental registrations are defaults: explicit closed factory registrations take precedence in either configuration order. The automatic provider activates when runtime code generation is unavailable. JIT execution continues to use the existing serializer and copier selection, including application-provided payload implementations. Explicit factory and context registration also works in JIT execution.
+
+`OrleansValidateRpcResponseFactories` enables compile-time validation of the response graph and defaults to the executable project's `PublishAot` setting. Diagnostic `ORLEANS0116` identifies an unresolved generic result, a custom return adapter requiring an explicit response contract, or a result dependency outside the supported finite graph. Applications with runtime-selected generic results register every permitted closed <xref:Orleans.Serialization.Invocation.Response`1> graph explicitly through <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddSerializer*> and <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddSerializerService*> in a <xref:Orleans.Serialization.SerializerContext>, and set `OrleansValidateRpcResponseFactories=false` for the project supplying that contract. A missing native response registration reports the closed response type and registration guidance at lookup.
+
+The focused native smoke exercises the generated response graph for boolean, integer, and reference results, including recursive factory dependencies and payload identity. Full silo startup and RPC execution additionally require the native support for activation, request serialization, grain references, and runtime metadata.
+
+Source: [RPC response factory generation](https://github.com/dotnet/orleans/blob/main/src/Orleans.CodeGenerator/RpcResponseGenerator.cs), [closed serializer factory graphs](https://github.com/dotnet/orleans/blob/main/src/Orleans.CodeGenerator/SerializerFactoryGenerator.cs), and [native response smoke](https://github.com/dotnet/orleans/blob/main/test/Orleans.NativeAotSmoke/RpcResponses.Contracts.cs).
+
 ### Request identity and dispatch
 
 Generated request names are implementation details. Their wire identity is a compound alias containing:

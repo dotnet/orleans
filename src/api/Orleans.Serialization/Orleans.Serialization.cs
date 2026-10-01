@@ -3409,6 +3409,11 @@ namespace Orleans.Serialization.Configuration
 
         public void AddCopier(System.Type type) { }
 
+        public void AddDefaultSerializer<T>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory) { }
+
+        public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
+            where TService : class { }
+
         public void AddFieldCodec(System.Type type) { }
 
         public void AddInterface(System.Type type) { }
@@ -3571,6 +3576,31 @@ namespace Orleans.Serialization.Invocation
     {
         object? GetComponent(System.Type componentType);
         object? GetTarget();
+    }
+
+    public partial class PooledResponseCodec<TResult, TResultCodec> : ResponseCodec, Codecs.IFieldCodec<Response<TResult>>, Codecs.IFieldCodec where TResultCodec : class, Codecs.IFieldCodec<TResult>
+    {
+        public PooledResponseCodec(TResultCodec codec) { }
+
+        public PooledResponseCodec(System.Func<object, TResultCodec> codecFactory) { }
+
+        public override object ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { throw null; }
+
+        public Response<TResult> ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Response<TResult> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public override void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, object value) { }
+    }
+
+    public partial class PooledResponseCopier<TResult, TResultCopier> : Cloning.IDeepCopier<Response<TResult>>, Cloning.IDeepCopier where TResultCopier : class, Cloning.IDeepCopier<TResult>
+    {
+        public PooledResponseCopier(TResultCopier copier) { }
+
+        public PooledResponseCopier(System.Func<object, TResultCopier> copierFactory) { }
+
+        public Response<TResult>? DeepCopy(Response<TResult>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [SerializerTransparent]

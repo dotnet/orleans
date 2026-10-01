@@ -195,6 +195,7 @@ namespace Orleans.Serialization.Serializers
         private IFieldCodec? TryCreateCodec(Type fieldType)
         {
             if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            ThrowIfUnregisteredNativeResponse(fieldType);
             if (_manifest.RequireExplicitTypeRegistration) return null;
 #if NET7_0_OR_GREATER
             if (!RuntimeFeature.IsDynamicCodeSupported) return null;
@@ -389,6 +390,7 @@ namespace Orleans.Serialization.Serializers
         private IDeepCopier? TryCreateCopier(Type fieldType)
         {
             if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            ThrowIfUnregisteredNativeResponse(fieldType);
             if (_manifest.RequireExplicitTypeRegistration) return null;
 #if NET7_0_OR_GREATER
             if (!RuntimeFeature.IsDynamicCodeSupported) return null;
@@ -786,6 +788,19 @@ namespace Orleans.Serialization.Serializers
             }
 
             return copierType != null ? (IDeepCopier)GetServiceOrCreateInstance(copierType, constructorArguments) : null;
+        }
+
+        private static void ThrowIfUnregisteredNativeResponse(Type fieldType)
+        {
+#if NET5_0_OR_GREATER
+            if (!RuntimeFeature.IsDynamicCodeSupported && fieldType.IsConstructedGenericType
+                && fieldType.GetGenericTypeDefinition() == typeof(Invocation.Response<>))
+            {
+                throw new NotSupportedException(
+                    $"Invocation response {fieldType} requires a statically registered closed codec and copier. "
+                    + "Use generated RPC response factories for a concrete method result, or register the closed Response<TResult> graph in a serializer context.");
+            }
+#endif
         }
 
         [DoesNotReturn]

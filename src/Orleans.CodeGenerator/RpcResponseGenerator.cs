@@ -1,0 +1,154 @@
+using System.Collections.Immutable;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Model;
+using Orleans.CodeGenerator.SyntaxGeneration;
+
+namespace Orleans.CodeGenerator;
+
+internal static class RpcResponseGenerator
+{
+    private static readonly DiagnosticDescriptor UnsupportedResponse = new(
+        DiagnosticRuleId.UnsupportedRpcResponseFactory,
+        new LocalizableResourceString("UnsupportedRpcResponseFactoryTitle", Resources.ResourceManager, typeof(Resources)),
+        new LocalizableResourceString("UnsupportedRpcResponseFactoryMessageFormat", Resources.ResourceManager, typeof(Resources)),
+        "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static ImmutableArray<SourceOutputResult> Generate(
+        Compilation compilation,
+        ImmutableArray<ProxyOutputModel> proxies,
+        SourceGeneratorOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (proxies.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
+        var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
+        var resolver = new TypeSymbolResolver(compilation);
+        var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
+        var output = ImmutableArray.CreateBuilder<SourceOutputResult>();
+        foreach (var proxy in proxies)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!resolver.TryResolveProxyInterface(proxy.ProxyInterface, cancellationToken, out var interfaceType))
+            {
+                continue;
+            }
+
+            foreach (var method in interfaceType.GetMembers().OfType<IMethodSymbol>()
+                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetMembers().OfType<IMethodSymbol>()))
+                .Where(static method => method.MethodKind == MethodKind.Ordinary))
+            {
+                var returnType = method.ReturnType;
+                if (returnType.SpecialType == SpecialType.System_Void
+                    || SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.Task)
+                    || SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.ValueTask))
+                {
+                    continue;
+                }
+
+                if (returnType is not INamedTypeSymbol named
+                    || !(SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, services.LibraryTypes.Task_1)
+                        || SymbolEqualityComparer.Default.Equals(named.OriginalDefinition, services.LibraryTypes.ValueTask_1)))
+                {
+                    Report(method, returnType, "the selected return adapter requires an explicit response result contract");
+                    continue;
+                }
+
+                var resultType = named.TypeArguments[0].WithNullableAnnotation(NullableAnnotation.None);
+                if (ContainsTypeParameter(resultType))
+                {
+                    Report(method, resultType, "the result contains an unresolved type parameter");
+                    continue;
+                }
+
+                if (!results.ContainsKey(resultType))
+                {
+                    results.Add(resultType, method);
+                }
+            }
+        }
+
+        var supportedResults = new List<ITypeSymbol>();
+        foreach (var entry in results.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
+        {
+            var resultType = entry.Key;
+            var method = entry.Value;
+            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out _, out var failure))
+            {
+                supportedResults.Add(resultType);
+            }
+            else
+            {
+                Report(method, failure.Type, failure.Reason);
+            }
+        }
+
+        if (supportedResults.Count == 0)
+        {
+            return output.ToImmutable();
+        }
+
+        if (!SerializerFactoryGenerator.TryCreate(services, supportedResults.Select(type => responseDefinition.Construct(type)), cancellationToken, out var graph, out var graphFailure, useDefaultFactories: true))
+        {
+            if (options.ValidateRpcResponseFactories)
+            {
+                output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
+                    UnsupportedResponse, Location.None, compilation.AssemblyName, graphFailure.Type.ToDisplayString(), graphFailure.Reason)));
+            }
+
+            return output.ToImmutable();
+        }
+
+        var generatedNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(compilation.AssemblyName ?? "Assembly").EscapeIdentifier()}";
+        var source = new StringBuilder();
+        source.AppendLine("// <auto-generated />");
+        source.AppendLine("#nullable disable");
+        source.AppendLine($"[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof({generatedNamespace}.RpcResponseFactories))]");
+        source.AppendLine($"namespace {generatedNamespace}");
+        source.AppendLine("{");
+        source.AppendLine("internal sealed class RpcResponseFactories : global::Orleans.Serialization.SerializerContext");
+        source.AppendLine("{");
+        source.AppendLine("protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions options)");
+        source.AppendLine("{");
+        source.AppendLine("#if NET5_0_OR_GREATER");
+        source.AppendLine("if (global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported) return;");
+        source.AppendLine(graph.ConfigurationStatements);
+
+        source.AppendLine("#endif");
+        source.AppendLine("}");
+        source.AppendLine("}");
+        source.AppendLine("}");
+        var unit = CSharpSyntaxTree.ParseText(source.ToString(),
+            options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]),
+            cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
+        var provider = unit.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        unit = unit.ReplaceNode(provider, provider.AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes()));
+        output.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(
+            $"{compilation.AssemblyName}.orleans.rpcresponses.g.cs", unit.NormalizeWhitespace().ToFullString())));
+        return output.ToImmutable();
+
+        void Report(IMethodSymbol method, ITypeSymbol resultType, string reason)
+        {
+            if (options.ValidateRpcResponseFactories)
+            {
+                output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
+                    UnsupportedResponse, method.Locations.FirstOrDefault(), method.ToDisplayString(), resultType.ToDisplayString(), reason)));
+            }
+        }
+    }
+
+    private static bool ContainsTypeParameter(ITypeSymbol type)
+        => type is ITypeParameterSymbol
+            || type is IArrayTypeSymbol array && ContainsTypeParameter(array.ElementType)
+            || type is INamedTypeSymbol named && (named.TypeArguments.Any(ContainsTypeParameter)
+                || named.ContainingType is { } containing && ContainsTypeParameter(containing));
+}

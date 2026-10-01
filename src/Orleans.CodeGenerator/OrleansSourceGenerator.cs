@@ -203,6 +203,17 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
         });
 
+        var responseOutputs = preparedProxyOutputModels
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(
+                input.Left.Right, input.Left.Left, input.Right, ct));
+
+        context.RegisterSourceOutput(responseOutputs, static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
+
         context.RegisterSourceOutput(assemblyNameProvider, static (productionContext, assemblyName) =>
         {
             productionContext.AddSource($"{assemblyName}.orleans.g.cs", SourceText.From(string.Empty, Encoding.UTF8));

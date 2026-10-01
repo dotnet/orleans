@@ -10,3 +10,4 @@ ORLEANS0110 | Usage | Error | ReferenceAssemblyWithGenerateSerializerDiagnostic
 ORLEANS0111 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0112 | Usage | Error | Invalid RPC parameter field identifier
 ORLEANS0113 | Usage | Warning | CancellationToken parameter is not last
+ORLEANS0116 | Usage | Error | RPC response requires a closed serializer factory
