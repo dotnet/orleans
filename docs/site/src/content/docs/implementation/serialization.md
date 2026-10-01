@@ -137,6 +137,10 @@ For concrete `Task<TResult>` and `ValueTask<TResult>` method results, generated 
 
 The graph also registers polymorphic codec and copier dispatch for the non-generic <xref:Orleans.Serialization.Invocation.Response> boundary used by the runtime client. That dispatch selects the closed implementation for the actual response type and preserves the identity of immutable completed and exception responses. The native smoke uses <xref:Orleans.Serialization.DeepCopier`1> with `Response`, matching the runtime's response-copy boundary.
 
+Completed response transport uses the existing generated codec and its canonical singleton activator, restoring <xref:Orleans.Serialization.Invocation.CompletedResponse.Instance> after a round-trip.
+
+The finite strict response graph supplies successful typed results and completed-response transport, plus immutable exception-envelope copying. Exception transport in an explicit context requires an <xref:Orleans.Serialization.Invocation.ExceptionResponse> codec and the declared exception and `Data` value type graph. Lookup reports that registration contract when it is missing. Ordinary metadata mode retains the existing exception codecs and their serialization-constructor support.
+
 These supplemental registrations are defaults: explicit closed factory registrations take precedence in either configuration order. The automatic provider activates when runtime code generation is unavailable. JIT execution continues to use the existing serializer and copier selection, including application-provided payload implementations. Explicit factory and context registration also works in JIT execution.
 
 Ordinary metadata mode also supplies static response factories for non-generic generated result models. These factories construct the model's canonical generated codec and copier using their generated constructor signatures; nested model dependencies retain the existing metadata-service resolution. Explicit context mode uses the complete finite dependency graph and validates each declared member shape.

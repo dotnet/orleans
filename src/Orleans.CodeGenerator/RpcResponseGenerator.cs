@@ -158,8 +158,18 @@ internal static class RpcResponseGenerator
         source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
         source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
         source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));");
+        source.AppendLine("options.AddDefaultSerializerService<CompletedResponseActivator>(static provider => new CompletedResponseActivator());");
+        source.AppendLine("options.AddDefaultSerializerService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(static provider => new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null!, provider)));");
+        source.AppendLine("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>());");
+        source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(null!, provider));");
+        source.AppendLine("options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));");
 
         source.AppendLine("#endif");
+        source.AppendLine("}");
+        source.AppendLine("private sealed class CompletedResponseActivator : global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Invocation.CompletedResponse>");
+        source.AppendLine("{");
+        source.AppendLine("public CompletedResponseActivator() { }");
+        source.AppendLine("public global::Orleans.Serialization.Invocation.CompletedResponse Create() => global::Orleans.Serialization.Invocation.CompletedResponse.Instance;");
         source.AppendLine("}");
         source.AppendLine("private sealed class ResponseFieldCodec : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>");
         source.AppendLine("{");
