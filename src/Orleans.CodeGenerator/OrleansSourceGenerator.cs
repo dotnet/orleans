@@ -1,4 +1,5 @@
 using System.Text;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -38,6 +39,20 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
         var assemblyNameProvider = compilationProvider
             .Select(static (compilation, _) => compilation.AssemblyName ?? "assembly")
             .WithTrackingName(AssemblyNameTrackingName);
+
+        var serializerContextOutputs = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                "Orleans.GenerateSerializerContextAttribute",
+                predicate: static (node, _) => node is ClassDeclarationSyntax,
+                transform: static (ctx, _) => ctx)
+            .Combine(generatorOptions)
+            .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
+            .Collect()
+            .Select(static (outputs, _) => outputs.Distinct().ToImmutableArray());
+        context.RegisterSourceOutput(serializerContextOutputs.SelectMany(static (outputs, _) => outputs), static (productionContext, output) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, output);
+        });
 
         // Incremental discovery of [GenerateSerializer] types
         var serializableTypeContexts = context.SyntaxProvider
