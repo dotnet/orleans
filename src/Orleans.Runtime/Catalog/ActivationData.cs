@@ -1980,6 +1980,7 @@ internal sealed partial class ActivationData :
                 {
                     if (State is ActivationState.Activating)
                     {
+                        _idleDuration = CoarseStopwatch.StartNew();
                         SetState(ActivationState.Valid);
                         _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                     }
