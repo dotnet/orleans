@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <!-- due to Verify.XunitV3 requiring newer versions of these libraries -->
+    <Compile Include="..\Orleans.NativeAotSmoke\Factories.Contracts.cs" Link="Factories.Contracts.cs" />
     <PackageReference Include="System.IO.Hashing" />
     <PackageReference Include="System.CodeDom" />
     <PackageReference Include="Verify.XunitV3" />
