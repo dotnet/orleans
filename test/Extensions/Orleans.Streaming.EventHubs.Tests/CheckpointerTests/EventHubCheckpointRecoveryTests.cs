@@ -451,6 +451,83 @@ public class EventHubCheckpointRecoveryTests
     }
 
     [Fact]
+    public async Task ReadRecovery_NonemptyBeginningRetainsCapturedSequenceBoundary()
+    {
+        var positions = new List<EventPosition>();
+        var reader = Substitute.For<PartitionReceiver>();
+        reader.GetPartitionPropertiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(
+            EventHubsModelFactory.PartitionProperties("hub", "0", false, 50, 52, "52", Now)));
+        reader.ReceiveBatchAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IEnumerable<EventData>>(
+                [EventHubsModelFactory.EventData(new BinaryData(Array.Empty<byte>()), sequenceNumber: 51, offsetString: "51")]));
+        var proxy = new EventHubReceiverProxy(position =>
+        {
+            positions.Add(position);
+            return reader;
+        }, EventPosition.Earliest, captureLatestPosition: false);
+        try
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken));
+            Assert.Equal("The Event Hubs read started at sequence 51 instead of the captured partition boundary 50.", error.Message);
+            await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(new[] { EventPosition.Earliest, EventPosition.FromSequenceNumber(50, true), EventPosition.FromSequenceNumber(50, true) }, positions);
+            await reader.Received(1).GetPartitionPropertiesAsync(Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            await proxy.CloseAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, 0L)]
+    [InlineData(false, 51L)]
+    [InlineData(true, 0L)]
+    [InlineData(true, 51L)]
+    public async Task ReadRecovery_EmptyPartitionAcceptsItsFirstAvailableSequence(bool latest, long firstSequence)
+    {
+        var positions = new List<EventPosition>();
+        var readers = new List<PartitionReceiver>();
+        var failure = new InvalidOperationException("Transient source failure");
+        var offset = firstSequence.ToString(CultureInfo.InvariantCulture);
+        var batch = new[] { EventHubsModelFactory.EventData(new BinaryData(Array.Empty<byte>()), sequenceNumber: firstSequence, offsetString: offset) };
+        var reads = 0;
+        var initialPosition = latest ? EventPosition.Latest : EventPosition.Earliest;
+        var proxy = new EventHubReceiverProxy(position =>
+        {
+            positions.Add(position);
+            var reader = Substitute.For<PartitionReceiver>();
+            reader.GetPartitionPropertiesAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult(
+                EventHubsModelFactory.PartitionProperties("hub", "0", true, 0, -1, "-1", Now)));
+            reader.ReceiveBatchAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+                .Returns(_ => ++reads == 2 ? Task.FromResult<IEnumerable<EventData>>(batch) : Task.FromException<IEnumerable<EventData>>(failure));
+            readers.Add(reader);
+            return reader;
+        }, initialPosition, captureLatestPosition: latest);
+        try
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                () => proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken)));
+            await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(batch, await proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken));
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                () => proxy.ReceiveAsync(10, TimeSpan.Zero, TestContext.Current.CancellationToken)));
+            await proxy.RecoverReadAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(new[] { initialPosition, EventPosition.Earliest, EventPosition.Earliest, EventPosition.FromOffset(offset, false) }, positions);
+            Assert.Equal(3, reads);
+            await readers[0].Received(1).GetPartitionPropertiesAsync(Arg.Any<CancellationToken>());
+            foreach (var reader in readers.Skip(1))
+                await reader.DidNotReceive().GetPartitionPropertiesAsync(Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            await proxy.CloseAsync(TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task ReadRecovery_ResumesAfterLastSuccessfulRawBatch()
     {
         var positions = new List<EventPosition>();
