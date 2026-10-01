@@ -91,6 +91,14 @@ namespace Orleans
         public bool IncludePrimaryConstructorParameters { get { throw null; } init { } }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public sealed partial class GenerateSerializerContextAttribute : System.Attribute
+    {
+        public GenerateSerializerContextAttribute(System.Type type) { }
+
+        public System.Type Type { get { throw null; } }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class)]
     public sealed partial class GetCompletionSourceMethodNameAttribute : System.Attribute
     {

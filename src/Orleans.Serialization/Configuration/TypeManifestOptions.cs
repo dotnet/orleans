@@ -5,6 +5,9 @@ using System.Diagnostics.CodeAnalysis;
 #endif
 using System.Reflection;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Configuration
 {
@@ -31,6 +34,57 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _interfaces = new();
         private readonly HashSet<Type> _interfaceProxies = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
+
+        internal Dictionary<Type, Func<ICodecProvider, IFieldCodec>> CodecFactories { get; } = new();
+        internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
+        internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
+        internal HashSet<Type> ContextTypes { get; } = new();
+
+        /// <summary>
+        /// Gets or sets whether serialization services are resolved exclusively from explicit closed registrations.
+        /// </summary>
+        /// <remarks>
+        /// Serializer context registration enables this option. Unregistered runtime types produce a
+        /// <see cref="CodecNotFoundException"/> when serialization or copying is requested.
+        /// </remarks>
+        public bool RequireExplicitTypeRegistration { get; set; }
+
+        /// <summary>
+        /// Registers statically constructed serialization and copying implementations for a closed type.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="codecFactory">The factory for the field codec.</param>
+        /// <param name="copierFactory">The factory for the deep copier.</param>
+        public void AddSerializer<T>(
+            Func<ICodecProvider, IFieldCodec<T>> codecFactory,
+            Func<ICodecProvider, IDeepCopier<T>> copierFactory)
+        {
+            if (codecFactory is null) throw new ArgumentNullException(nameof(codecFactory));
+            if (copierFactory is null) throw new ArgumentNullException(nameof(copierFactory));
+            CodecFactories.TryAdd(typeof(T), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider));
+            CopierFactories.TryAdd(typeof(T), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider));
+            SerializerServiceFactories.TryAdd(typeof(IFieldCodec<T>), codecFactory);
+            SerializerServiceFactories.TryAdd(typeof(IDeepCopier<T>), copierFactory);
+            ContextTypes.Add(typeof(T));
+        }
+
+        /// <summary>
+        /// Registers a statically constructed service used by generated serializers and copiers.
+        /// </summary>
+        /// <typeparam name="TService">The closed service type.</typeparam>
+        /// <param name="factory">The service factory.</param>
+        /// <remarks>
+        /// The codec provider constructs and caches one instance per service type. Recursive generated
+        /// constructors retain references to in-progress dependencies through the generated-code helper.
+        /// The first registration for a service type is used.
+        /// </remarks>
+        public void AddSerializerService<TService>(Func<ICodecProvider, TService> factory) where TService : class
+        {
+            if (factory is null) throw new ArgumentNullException(nameof(factory));
+            SerializerServiceFactories.TryAdd(typeof(TService), factory);
+        }
 
         /// <summary>
         /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
@@ -339,6 +393,7 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedTypes.Add(RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false));
+            ContextTypes.Add(type);
         }
 
         /// <summary>
