@@ -75,6 +75,7 @@ namespace Orleans.Serialization
             {
                 context = new ConfigurationContext(services);
                 initialize?.Invoke(context.Builder);
+                context.AutomaticInitialized = initialize is not null;
 
                 services.Add(context.CreateServiceDescriptor());
                 services.AddOptions();
@@ -83,11 +84,7 @@ namespace Orleans.Serialization
                 services.AddSingleton<TypeResolver>(sp =>
                 {
                     var options = sp.GetRequiredService<IOptions<TypeManifestOptions>>();
-#if NET7_0_OR_GREATER
-                    if (RuntimeFeature.IsDynamicCodeSupported && !options.Value.RequireExplicitTypeRegistration)
-#else
-                    if (!options.Value.RequireExplicitTypeRegistration)
-#endif
+                    if (!SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !options.Value.RequireExplicitTypeRegistration)
                     {
                         return new CachedTypeResolver();
                     }
@@ -126,6 +123,11 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<DeepCopier>();
                 services.TryAddSingleton(typeof(DeepCopier<>));
             }
+            else if (initialize is not null && !context.AutomaticInitialized)
+            {
+                initialize(context.Builder);
+                context.AutomaticInitialized = true;
+            }
 
             return context;
         }
@@ -146,6 +148,7 @@ namespace Orleans.Serialization
         private sealed class ConfigurationContext
         {
             public ConfigurationContext(IServiceCollection services) => Builder = new SerializerBuilder(services);
+            public bool AutomaticInitialized { get; set; }
 
             public ServiceDescriptor CreateServiceDescriptor() => new ServiceDescriptor(typeof(ConfigurationContext), this);
 

@@ -76,6 +76,10 @@ namespace Orleans.Serialization.Serializers
 
         /// <inheritdoc/>
         public IServiceProvider Services => _serviceProvider;
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !_manifest.RequireExplicitTypeRegistration)
+            {
+                throw new InvalidOperationException("Generated-only serialization requires AddSerializerContext and a closed serialization graph.");
+            }
 
         private void Initialize()
         {
@@ -197,7 +201,7 @@ namespace Orleans.Serialization.Serializers
             if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             if (_manifest.RequireExplicitTypeRegistration) return null;
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) return null;
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) return null;
 #endif
             if (!_initialized) Initialize();
 
@@ -235,7 +239,7 @@ namespace Orleans.Serialization.Serializers
             if (TryGetSerializerService(typeof(IActivator<T>), out var registered)) return (IActivator<T>)registered;
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IActivator<T>));
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IActivator<T>));
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(typeof(IActivator<T>));
 #endif
             var type = typeof(T);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
@@ -295,7 +299,7 @@ namespace Orleans.Serialization.Serializers
             if (TryGetSerializerService(typeof(IBaseCodec<TField>), out var registered)) return (IBaseCodec<TField>)registered;
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IBaseCodec<TField>));
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IBaseCodec<TField>));
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(typeof(IBaseCodec<TField>));
 #endif
             var type = typeof(TField);
             if (_typedBaseCodecs.TryGetValue(type, out var existing))
@@ -312,7 +316,7 @@ namespace Orleans.Serialization.Serializers
             if (TryGetSerializerService(typeof(IValueSerializer<TField>), out var registered)) return (IValueSerializer<TField>)registered;
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IValueSerializer<TField>));
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IValueSerializer<TField>));
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(typeof(IValueSerializer<TField>));
 #endif
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
@@ -328,7 +332,7 @@ namespace Orleans.Serialization.Serializers
             if (TryGetSerializerService(typeof(IBaseCopier<TField>), out var registered)) return (IBaseCopier<TField>)registered;
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(typeof(IBaseCopier<TField>));
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(typeof(IBaseCopier<TField>));
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(typeof(IBaseCopier<TField>));
 #endif
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
@@ -391,7 +395,7 @@ namespace Orleans.Serialization.Serializers
             if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             if (_manifest.RequireExplicitTypeRegistration) return null;
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) return null;
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) return null;
 #endif
             if (!_initialized) Initialize();
 
@@ -560,7 +564,7 @@ namespace Orleans.Serialization.Serializers
             }
 
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) throw CreateContextServiceNotFound(type);
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(type);
 #endif
             result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? Array.Empty<object>());
             return result;
@@ -605,7 +609,7 @@ namespace Orleans.Serialization.Serializers
         {
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(type);
 #if NET7_0_OR_GREATER
-            if (!RuntimeFeature.IsDynamicCodeSupported) ThrowContextServiceNotFound(type);
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) ThrowContextServiceNotFound(type);
 #endif
         }
 

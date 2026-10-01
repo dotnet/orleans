@@ -91,7 +91,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 }
 
 #if NET7_0_OR_GREATER
-                if (!RuntimeFeature.IsDynamicCodeSupported)
+                if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts)
                 {
                     throw new CodecNotFoundException($"Serialization service {typeof(TService)} requires an explicit serializer context registration.");
                 }
