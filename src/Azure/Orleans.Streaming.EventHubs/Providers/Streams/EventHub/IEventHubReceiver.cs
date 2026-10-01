@@ -142,7 +142,7 @@ namespace Orleans.Streaming.EventHubs
                 if (properties.IsEmpty)
                 {
                     readPosition = EventPosition.Earliest;
-                    firstSequenceNumber = 0;
+                    firstSequenceNumber = null;
                 }
                 else if (captureLatestPosition)
                 {
