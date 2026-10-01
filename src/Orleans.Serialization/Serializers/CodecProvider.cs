@@ -70,16 +70,16 @@ namespace Orleans.Serialization.Serializers
         {
             _serviceProvider = serviceProvider;
             _manifest = codecConfiguration.Value;
+            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !_manifest.RequireExplicitTypeRegistration)
+            {
+                throw new InvalidOperationException("Generated-only serialization requires AddSerializerContext and a closed serialization graph.");
+            }
 
             ConsumeMetadata(codecConfiguration);
         }
 
         /// <inheritdoc/>
         public IServiceProvider Services => _serviceProvider;
-            if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !_manifest.RequireExplicitTypeRegistration)
-            {
-                throw new InvalidOperationException("Generated-only serialization requires AddSerializerContext and a closed serialization graph.");
-            }
 
         private void Initialize()
         {
