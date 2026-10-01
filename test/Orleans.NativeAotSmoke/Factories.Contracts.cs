@@ -12,7 +12,7 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.ContextSmoke;
 
-public static class StaticFactoryContracts
+public static partial class StaticFactoryContracts
 {
     public static void CaughtNestedFailureFaultsTheWholeGraph()
     {
@@ -46,11 +46,12 @@ public static class StaticFactoryContracts
         });
         using var provider = services.BuildServiceProvider();
         var codecs = provider.GetRequiredService<CodecProvider>();
-        Expect<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs), "cannot cache an unpublished");
+        Expect<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs), "cannot resolve");
+        Ensure(gate.SecondConstructions == 0, "Unpublished graph rejects the container before starting singleton construction.");
         var leaf = OrleansGeneratedCodeHelper.GetService<DiLeaf>(null!, codecs);
-        var owner = OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs);
-        Ensure(ReferenceEquals(leaf, owner.Leaf) && ReferenceEquals(leaf, owner.Bridge.Leaf), "DI singleton retains only a previously committed static service.");
-        Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 2, "Rejected DI construction neither caches its bridge nor its pending leaf.");
+        _ = provider.GetRequiredService<DiBridge>();
+        Expect<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs), "cannot resolve");
+        Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 1, "Completed container singleton is still not entered under the graph lock.");
     }
 
     public static void SupplementalFactoriesPreserveAutomaticMetadata()
@@ -213,7 +214,7 @@ public static class StaticFactoryContracts
         try { action(); }
         catch (T exception)
         {
-            Ensure(exception.Message.Contains(message, StringComparison.Ordinal), "Constructor failure retains its diagnostic.");
+            Ensure(exception.Message.Contains(message, StringComparison.Ordinal), $"Expected diagnostic '{message}', received '{exception.Message}'.");
             return;
         }
 
