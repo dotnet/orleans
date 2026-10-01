@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Streams;
@@ -120,9 +121,11 @@ namespace Orleans.Streaming.EventHubs
         internal EventHubReceiverProxy(
             Func<EventPosition, PartitionReceiver> clientFactory,
             EventPosition readPosition,
-            bool captureLatestPosition)
+            bool captureLatestPosition,
+            EventHubConnection? connection = null)
         {
             this.clientFactory = clientFactory;
+            this.connection = connection;
             this.readPosition = readPosition;
             this.captureLatestPosition = captureLatestPosition;
             recoveryEnabled = true;
@@ -206,14 +209,33 @@ namespace Orleans.Streaming.EventHubs
 
         public async Task CloseAsync(CancellationToken cancellationToken)
         {
+            ExceptionDispatchInfo? clientFailure = null;
             try
             {
                 await client.CloseAsync(cancellationToken);
             }
-            finally
+            catch (Exception exception)
+            {
+                clientFailure = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
             {
                 if (connection is not null) await connection.CloseAsync(cancellationToken);
             }
+            catch (Exception exception) when (clientFailure is not null)
+            {
+                if (cancellationToken.IsCancellationRequested
+                    && clientFailure.SourceException is OperationCanceledException
+                    && exception is OperationCanceledException)
+                {
+                    clientFailure.Throw();
+                }
+
+                throw new AggregateException("Closing the Event Hubs receiver and its connection failed.", clientFailure.SourceException, exception);
+            }
+
+            clientFailure?.Throw();
         }
 
         [LoggerMessage(

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Orleans.Configuration;
@@ -5,6 +6,7 @@ using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
+using Orleans.Streaming.Diagnostics;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
@@ -15,6 +17,108 @@ namespace UnitTests.StreamingTests;
 
 public partial class PersistentStreamPullingAgentTests
 {
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task HandshakeRetry_AttachmentReportsOwnedConsumerIdentity()
+    {
+        var backoff = Substitute.For<IBackoffProvider>();
+        backoff.Next(Arg.Any<int>()).Returns(_ => throw new TimeoutException("Handshake retry budget exhausted"));
+        await using var scenario = await CreateCheckpointScenario(deliveryBackoff: backoff);
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        var attempts = 0;
+        var consumer = new RecordingConsumer
+        {
+            OnHandshake = () => ++attempts == 1
+                ? Task.FromException<StreamHandshakeToken?>(new InvalidOperationException("Initial handshake failed"))
+                : Task.FromResult<StreamHandshakeToken?>(null),
+        };
+        scenario.Idle.StreamConsumer = consumer;
+        var observer = new AttachedEventObserver(scenario.Idle.SubscriptionId.Guid);
+        using var subscription = StreamingEvents.AllEvents.Subscribe(observer);
+
+        await scenario.Accessor.AddSubscriber(scenario.Idle);
+        Assert.True(scenario.Idle.HasUnresolvedHandshake);
+        Assert.Empty(observer.Events);
+        await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, attempts);
+        var attached = Assert.Single(observer.Events);
+        Assert.Equal(consumer.GrainContext.GrainId, attached.ConsumerGrainId);
+        Assert.False(attached.ConsumerGrainId.IsDefault);
+        Assert.Equal(scenario.Idle.StreamId.StreamId, attached.StreamId);
+        Assert.False(scenario.Idle.HasUnresolvedHandshake);
+        Assert.Equal(0, scenario.Idle.PendingHandshakes);
+    }
+
+    [Theory, TestCategory("BVT"), TestCategory("Streaming")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HandshakeRetry_SkipsRemovedOrReplacedSnapshotConsumer(bool replace)
+    {
+        await using var scenario = await CreateCheckpointScenario();
+        await scenario.Read((scenario.Idle, 1), (scenario.Busy, 2));
+        var stream = (await scenario.Accessor.GetPubSubCache())[scenario.Idle.StreamId];
+        var second = AddCheckpointConsumer(stream, scenario.Idle.StreamId, scenario.Cache);
+        StreamConsumerData? removed = null;
+        StreamConsumerData? replacement = null;
+        var attempts = 0;
+        var replacementAttempts = 0;
+        scenario.Idle.HasUnresolvedHandshake = second.HasUnresolvedHandshake = true;
+        scenario.Idle.StreamConsumer = new RecordingConsumer { OnHandshake = () => Retry(second) };
+        second.StreamConsumer = new RecordingConsumer { OnHandshake = () => Retry(scenario.Idle) };
+
+        await scenario.Accessor.RunQueuePump(QueueId.GetQueueId("queue", 0, 0), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, attempts);
+        Assert.NotNull(removed);
+        Assert.Null(removed.Cursor);
+        Assert.Equal(0, removed.PendingHandshakes);
+        Assert.Equal(replace ? 2 : 1, stream.Count);
+        Assert.Equal(0, replacementAttempts);
+        if (replace)
+        {
+            Assert.NotNull(replacement);
+            Assert.False(replacement.IsRegistered);
+            Assert.Null(replacement.Cursor);
+            Assert.Equal(0, replacement.HandshakeRequestId);
+        }
+        else
+        {
+            Assert.False(stream.Contains(removed.SubscriptionId));
+        }
+
+        Task<StreamHandshakeToken?> Retry(StreamConsumerData other)
+        {
+            attempts++;
+            removed = other;
+            ((PersistentStreamPullingAgent)scenario.Accessor).RemoveSubscriber_Impl(other.SubscriptionId, other.StreamId);
+            if (replace)
+            {
+                var consumer = new RecordingConsumer
+                {
+                    OnHandshake = () =>
+                    {
+                        replacementAttempts++;
+                        return Task.FromResult<StreamHandshakeToken?>(null);
+                    },
+                };
+                replacement = stream.AddConsumer(other.SubscriptionId, other.StreamId, consumer, null, DateTime.UtcNow);
+            }
+            return Task.FromResult<StreamHandshakeToken?>(null);
+        }
+    }
+
+    private sealed class AttachedEventObserver(Guid subscriptionId) : IObserver<StreamingEvents.StreamingEvent>
+    {
+        public ConcurrentQueue<StreamingEvents.SubscriptionAttached> Events { get; } = new();
+        public void OnCompleted() { }
+        public void OnError(Exception error) => Assert.Fail(error.ToString());
+        public void OnNext(StreamingEvents.StreamingEvent value)
+        {
+            if (value is StreamingEvents.SubscriptionAttached attached && attached.SubscriptionId == subscriptionId)
+                Events.Enqueue(attached);
+        }
+    }
+
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public void PersistentDeliveryRetriesAreOptIn()
         => Assert.False(new StreamPullingAgentOptions().RetryFailedDeliveries);

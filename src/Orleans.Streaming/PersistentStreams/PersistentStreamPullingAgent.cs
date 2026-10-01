@@ -359,7 +359,8 @@ namespace Orleans.Streams
             QualifiedStreamId streamId,
             GrainId streamConsumer,
             string? filterData,
-            StreamSequenceToken? cacheToken)
+            StreamSequenceToken? cacheToken,
+            StreamConsumerData? expectedConsumer = null)
         {
             using var admission = _workAdmission.TryEnter();
             if (!admission.Entered || IsShutdown) return;
@@ -370,7 +371,13 @@ namespace Orleans.Streams
                 return;
             }
 
-            if (!streamDataCollection.TryGetConsumer(subscriptionId, out var data))
+            streamDataCollection.TryGetConsumer(subscriptionId, out var data);
+            if (expectedConsumer is not null && !ReferenceEquals(expectedConsumer, data))
+            {
+                return;
+            }
+
+            if (data is null)
             {
                 var consumerReference = this.RuntimeClient.InternalGrainFactory
                     .GetGrain(streamConsumer)
@@ -391,7 +398,7 @@ namespace Orleans.Streams
                     data.LastProcessedToken = GetInitialDeliveryProgress(data.LastToken, data.LastProcessedToken);
                     data.PendingStartToken = null;
                     data.IsRegistered = true;
-                    StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
+                    StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, data.StreamConsumer, Silo);
                     if (data.State == StreamConsumerDataState.Inactive)
                         RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
                 }
@@ -954,7 +961,7 @@ namespace Orleans.Streams
                     var consumer = consumers[j];
                     if (consumer.PendingHandshakes == 0 && consumer.HasUnresolvedHandshake)
                     {
-                        AddSubscriber_Impl(consumer.SubscriptionId, consumer.StreamId, default, consumer.FilterData, consumer.PendingStartToken).Ignore();
+                        AddSubscriber_Impl(consumer.SubscriptionId, consumer.StreamId, default, consumer.FilterData, consumer.PendingStartToken, consumer).Ignore();
                     }
                     else if (CheckpointingCache is not null && consumer.IsRegistered && consumer.PendingHandshakes == 0
                         && consumer.State == StreamConsumerDataState.Inactive && consumer.Cursor is IQueueCacheCursorProgress
