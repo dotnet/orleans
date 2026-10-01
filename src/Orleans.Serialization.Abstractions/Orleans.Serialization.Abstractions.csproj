@@ -9,6 +9,7 @@
     <RootNamespace>Orleans</RootNamespace>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsAotCompatible Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">true</IsAotCompatible>
   </PropertyGroup>
   
   <ItemGroup>
