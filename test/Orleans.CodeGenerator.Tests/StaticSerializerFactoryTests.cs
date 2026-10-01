@@ -12,4 +12,19 @@ public sealed class StaticSerializerFactoryTests
 
     [Fact]
     public void FailedCyclicConstructionRollsBack() => StaticFactoryContracts.FailedCyclicConstructionRollsBack();
+
+    [Fact]
+    public void CaughtNestedFailureFaultsTheWholeGraph() => StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();
+
+    [Fact]
+    public void SupplementalFactoriesPreserveAutomaticMetadata() => StaticFactoryContracts.SupplementalFactoriesPreserveAutomaticMetadata();
+
+    [Fact]
+    public void AutomaticCacheEntriesRollBackWithFactoryFailures() => StaticFactoryContracts.AutomaticCacheEntriesRollBackWithFactoryFailures();
+
+    [Fact]
+    public void MixedConstructionCyclesFailBeforePublication() => StaticFactoryContracts.MixedConstructionCyclesFailBeforePublication();
+
+    [Fact]
+    public void DiSingletonsCannotRetainPendingServices() => StaticFactoryContracts.DiSingletonsCannotRetainPendingServices();
 }

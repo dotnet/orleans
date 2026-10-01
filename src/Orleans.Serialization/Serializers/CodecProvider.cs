@@ -3,7 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -59,6 +61,14 @@ namespace Orleans.Serialization.Serializers
         private readonly object _serializerServiceLock = new();
         private readonly Dictionary<Type, object> _serializerServices = new();
         private Dictionary<Type, object>? _pendingSerializerServices;
+        private Dictionary<(object Cache, Type Key), object>? _pendingLegacyCacheValues;
+        private Dictionary<(object Cache, Type Key), Action>? _pendingLegacyCacheCommits;
+        private readonly List<Type> _constructingSerializerServices = new();
+        private ExceptionDispatchInfo? _constructionFailure;
+        private readonly List<(object Caller, object Dependency)> _constructionDependencies = new();
+        private bool _initializing;
+        private int _dependencyInjectionDepth;
+        private readonly IServiceProvider _constructionServices;
         private bool _initialized;
 
         /// <summary>
@@ -69,6 +79,7 @@ namespace Orleans.Serialization.Serializers
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
             _serviceProvider = serviceProvider;
+            _constructionServices = new ConstructionServiceProvider(this);
             _manifest = codecConfiguration.Value;
             if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !_manifest.RequireExplicitTypeRegistration)
             {
@@ -79,10 +90,11 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IServiceProvider Services => _serviceProvider;
+        public IServiceProvider Services => _pendingSerializerServices is null ? _serviceProvider : _constructionServices;
 
         private void Initialize()
         {
+            lock (_serializerServiceLock)
             lock (_initializationLock)
             {
                 if (_initialized)
@@ -90,15 +102,23 @@ namespace Orleans.Serialization.Serializers
                     return;
                 }
 
-                _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
-                _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
-                _generalizedCopiers.AddRange(_serviceProvider.GetServices<IGeneralizedCopier>());
+                _initializing = true;
+                try
+                {
+                    _generalizedCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedCodec>());
+                    _generalizedBaseCodecs.AddRange(_serviceProvider.GetServices<IGeneralizedBaseCodec>());
+                    _generalizedCopiers.AddRange(_serviceProvider.GetServices<IGeneralizedCopier>());
 
-                _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
-                _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
-                _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
+                    _specializableCodecs.AddRange(_serviceProvider.GetServices<ISpecializableCodec>());
+                    _specializableCopiers.AddRange(_serviceProvider.GetServices<ISpecializableCopier>());
+                    _specializableBaseCodecs.AddRange(_serviceProvider.GetServices<ISpecializableBaseCodec>());
 
-                _initialized = true;
+                    _initialized = true;
+                }
+                finally
+                {
+                    _initializing = false;
+                }
             }
         }
 
@@ -162,7 +182,7 @@ namespace Orleans.Serialization.Serializers
         {
             var fieldType = typeof(TField);
             if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return (IFieldCodec<TField>)factory(this);
-            if (_typedCodecs.TryGetValue(fieldType, out var existing))
+            if (TryGetCached(_typedCodecs, fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
             if (TryGetCodec(fieldType) is not { } untypedResult)
@@ -175,7 +195,7 @@ namespace Orleans.Serialization.Serializers
                 _ => new UntypedCodecWrapper<TField>(untypedResult)
             };
 
-            return (IFieldCodec<TField>)_typedCodecs.GetOrAdd(fieldType, typedResult);
+            return (IFieldCodec<TField>)CacheValue(_typedCodecs, fieldType, typedResult);
         }
 
         /// <inheritdoc/>
@@ -192,8 +212,8 @@ namespace Orleans.Serialization.Serializers
             if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
-                : _untypedCodecs.TryGetValue(fieldType, out var existing) ? existing
-                : TryCreateCodec(fieldType) is { } res ? _untypedCodecs.GetOrAdd(fieldType, res) : null;
+                : TryGetCached(_untypedCodecs, fieldType, out var existing) ? existing
+                : TryCreateCodec(fieldType) is { } res ? CacheValue(_untypedCodecs, fieldType, res) : null;
         }
 
         private IFieldCodec? TryCreateCodec(Type fieldType)
@@ -289,7 +309,7 @@ namespace Orleans.Serialization.Serializers
             if (untypedResult is not IBaseCodec<TField> typedResult)
                 ThrowCannotConvert(untypedResult);
 
-            return (IBaseCodec<TField>)_typedBaseCodecs.GetOrAdd(fieldType, typedResult);
+            return (IBaseCodec<TField>)CacheValue(_typedBaseCodecs, fieldType, typedResult);
 
             static void ThrowCannotConvert(object rawCodec) => throw new InvalidOperationException($"Cannot convert codec of type {rawCodec.GetType()} to codec of type {typeof(IBaseCodec<TField>)}.");
         }
@@ -303,7 +323,7 @@ namespace Orleans.Serialization.Serializers
             if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(typeof(IBaseCodec<TField>));
 #endif
             var type = typeof(TField);
-            if (_typedBaseCodecs.TryGetValue(type, out var existing))
+            if (TryGetCached(_typedBaseCodecs, type, out var existing))
                 return (IBaseCodec<TField>)existing;
 
             var result = TryCreateBaseCodec<TField>(type);
@@ -356,7 +376,7 @@ namespace Orleans.Serialization.Serializers
         {
             var type = typeof(T);
             if (_manifest.CopierFactories.TryGetValue(type, out var factory)) return (IDeepCopier<T>)factory(this);
-            if (_typedCopiers.TryGetValue(type, out var existing))
+            if (TryGetCached(_typedCopiers, type, out var existing))
                 return (IDeepCopier<T>)existing;
 
             if (TryGetDeepCopier(type) is not { } untypedResult)
@@ -369,7 +389,7 @@ namespace Orleans.Serialization.Serializers
                 _ => new UntypedCopierWrapper<T>(untypedResult)
             };
 
-            return (IDeepCopier<T>)_typedCopiers.GetOrAdd(type, typedResult);
+            return (IDeepCopier<T>)CacheValue(_typedCopiers, type, typedResult);
         }
 
         /// <inheritdoc/>
@@ -386,8 +406,8 @@ namespace Orleans.Serialization.Serializers
             if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
-                : _untypedCopiers.TryGetValue(fieldType, out var existing) ? existing
-                : TryCreateCopier(fieldType) is { } res ? _untypedCopiers.GetOrAdd(fieldType, res)
+                : TryGetCached(_untypedCopiers, fieldType, out var existing) ? existing
+                : TryCreateCopier(fieldType) is { } res ? CacheValue(_untypedCopiers, fieldType, res)
                 : null;
         }
 
@@ -444,9 +464,9 @@ namespace Orleans.Serialization.Serializers
                 return null;
             }
 
-            if (!_instantiatedValueSerializers.TryGetValue(serializerType, out var result))
+            if (!TryGetCached(_instantiatedValueSerializers, serializerType, out var result))
             {
-                result = _instantiatedValueSerializers.GetOrAdd(serializerType, GetServiceOrCreateInstance(serializerType, constructorArguments));
+                result = CacheValue(_instantiatedValueSerializers, serializerType, GetServiceOrCreateInstance(serializerType, constructorArguments));
             }
 
             return result;
@@ -476,9 +496,9 @@ namespace Orleans.Serialization.Serializers
                 return null;
             }
 
-            if (!_instantiatedBaseCopiers.TryGetValue(copierType, out var result))
+            if (!TryGetCached(_instantiatedBaseCopiers, copierType, out var result))
             {
-                result = _instantiatedBaseCopiers.GetOrAdd(copierType, GetServiceOrCreateInstance(copierType, constructorArguments));
+                result = CacheValue(_instantiatedBaseCopiers, copierType, GetServiceOrCreateInstance(copierType, constructorArguments));
             }
 
             return result;
@@ -506,9 +526,9 @@ namespace Orleans.Serialization.Serializers
                 activatorType = activatorType.MakeGenericType(concreteType.GetGenericArguments());
             }
 
-            if (!_instantiatedActivators.TryGetValue(activatorType, out var result))
+            if (!TryGetCached(_instantiatedActivators, activatorType, out var result))
             {
-                result = _instantiatedActivators.GetOrAdd(activatorType, GetServiceOrCreateInstance(activatorType));
+                result = CacheValue(_instantiatedActivators, activatorType, GetServiceOrCreateInstance(activatorType));
             }
 
             return result;
@@ -550,7 +570,7 @@ namespace Orleans.Serialization.Serializers
 #endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
-            var result = OrleansGeneratedCodeHelper.TryGetService(type);
+            var result = OrleansGeneratedCodeHelper.TryGetService(type, this);
             if (result != null)
             {
                 return result;
@@ -559,7 +579,7 @@ namespace Orleans.Serialization.Serializers
             if (TryGetSerializerService(type, out var registered)) return registered;
             if (_manifest.RequireExplicitTypeRegistration) ThrowContextServiceNotFound(type);
 
-            result = _serviceProvider.GetService(type);
+            result = Services.GetService(type);
             if (result != null)
             {
                 return result;
@@ -568,7 +588,7 @@ namespace Orleans.Serialization.Serializers
 #if NET7_0_OR_GREATER
             if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts) throw CreateContextServiceNotFound(type);
 #endif
-            result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? Array.Empty<object>());
+            result = ActivatorUtilities.CreateInstance(Services, type, constructorArguments ?? Array.Empty<object>());
             return result;
         }
 
@@ -582,13 +602,21 @@ namespace Orleans.Serialization.Serializers
 
             lock (_serializerServiceLock)
             {
+                _constructionFailure?.Throw();
+                if (!SerializerRuntimeFeatures.UseGeneratedSerializerContexts
+                    && !_manifest.RequireExplicitTypeRegistration && !_initialized && !_initializing)
+                {
+                    Initialize();
+                }
                 if (_serializerServices.TryGetValue(type, out result)) return true;
                 if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return true;
                 var isRoot = _pendingSerializerServices is null;
                 _pendingSerializerServices ??= new();
+                _constructingSerializerServices.Add(type);
                 try
                 {
                     result = factory(this);
+                    _constructionFailure?.Throw();
                     _pendingSerializerServices.Add(type, result);
                     if (isRoot)
                     {
@@ -596,13 +624,140 @@ namespace Orleans.Serialization.Serializers
                         {
                             _serializerServices.Add(entry.Key, entry.Value);
                         }
+
+                        if (_pendingLegacyCacheCommits is { } commits)
+                        {
+                            foreach (var commit in commits.Values) commit();
+                        }
                     }
 
                     return true;
                 }
+                catch (Exception exception)
+                {
+                    _constructionFailure ??= ExceptionDispatchInfo.Capture(exception);
+                    throw;
+                }
                 finally
                 {
-                    if (isRoot) _pendingSerializerServices = null;
+                    _constructingSerializerServices.RemoveAt(_constructingSerializerServices.Count - 1);
+                    if (isRoot)
+                    {
+                        _pendingSerializerServices = null;
+                        _pendingLegacyCacheValues = null;
+                        _pendingLegacyCacheCommits = null;
+                        _constructionFailure = null;
+                        _constructionDependencies.Clear();
+                    }
+                }
+            }
+        }
+
+        private bool TryGetCached<TValue>(ConcurrentDictionary<Type, TValue> cache, Type key, [NotNullWhen(true)] out TValue? result) where TValue : class
+        {
+            if (_manifest.SerializerServiceFactories.Count == 0) return cache.TryGetValue(key, out result);
+            lock (_serializerServiceLock)
+            {
+                _constructionFailure?.Throw();
+                if (_pendingLegacyCacheValues?.TryGetValue((cache, key), out var pending) == true)
+                {
+                    result = (TValue)pending;
+                    return true;
+                }
+
+                return cache.TryGetValue(key, out result);
+            }
+        }
+
+        private TValue CacheValue<TValue>(ConcurrentDictionary<Type, TValue> cache, Type key, TValue value) where TValue : class
+        {
+            if (_manifest.SerializerServiceFactories.Count == 0) return cache.GetOrAdd(key, value);
+            lock (_serializerServiceLock)
+            {
+                _constructionFailure?.Throw();
+                if (_pendingSerializerServices is null) return cache.GetOrAdd(key, value);
+                if (TryGetCached(cache, key, out var existing)) return existing;
+                (_pendingLegacyCacheValues ??= new())[(cache, key)] = value;
+                (_pendingLegacyCacheCommits ??= new())[(cache, key)] = () => cache.GetOrAdd(key, value);
+                return value;
+            }
+        }
+
+        internal void RecordConstructionDependency(IReadOnlyList<object> callers, object dependency)
+        {
+            lock (_serializerServiceLock)
+            {
+                _constructionFailure?.Throw();
+                if (_dependencyInjectionDepth > 0
+                    && !_serializerServices.Values.Any(value => ReferenceEquals(value, dependency))
+                    && (_pendingSerializerServices?.Values.Any(value => ReferenceEquals(value, dependency)) == true
+                        || _constructingSerializerServices.Exists(type => type.IsInstanceOfType(dependency))))
+                {
+                    throw new InvalidOperationException("Dependency injection cannot cache an unpublished serialization dependency. Register closed factories for every serialization service in this dependency graph.");
+                }
+                if (_pendingSerializerServices is null || callers.Count == 0) return;
+                for (var index = 1; index < callers.Count; index++)
+                {
+                    AddEdge(callers[index - 1], callers[index]);
+                }
+
+                var caller = callers[^1];
+                AddEdge(caller, dependency);
+                var cycle = new List<object>();
+                if (!FindPath(dependency, caller, new List<object>(), cycle)) return;
+                var hasStatic = false;
+                var hasAutomatic = false;
+                foreach (var node in cycle)
+                {
+                    var isStatic = _constructingSerializerServices.Exists(type => type.IsInstanceOfType(node))
+                        || _pendingSerializerServices.Values.Any(value => ReferenceEquals(value, node));
+                    hasStatic |= isStatic;
+                    hasAutomatic |= !isStatic;
+                }
+
+                if (hasStatic && hasAutomatic)
+                {
+                    throw new InvalidOperationException("Cyclic construction combines closed serializer factories and automatic activation. Register closed factories for every serialization service in this cycle.");
+                }
+            }
+
+            void AddEdge(object caller, object dependency)
+            {
+                if (!_constructionDependencies.Any(edge => ReferenceEquals(edge.Caller, caller) && ReferenceEquals(edge.Dependency, dependency)))
+                    _constructionDependencies.Add((caller, dependency));
+            }
+
+            bool FindPath(object source, object target, List<object> visited, List<object> path)
+            {
+                if (visited.Any(node => ReferenceEquals(node, source))) return false;
+                visited.Add(source);
+                path.Add(source);
+                if (ReferenceEquals(source, target)) return true;
+                foreach (var edge in _constructionDependencies)
+                {
+                    if (ReferenceEquals(edge.Caller, source) && FindPath(edge.Dependency, target, visited, path)) return true;
+                }
+                path.RemoveAt(path.Count - 1);
+                return false;
+            }
+        }
+
+        private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider
+        {
+            public object? GetService(Type serviceType)
+            {
+                lock (owner._serializerServiceLock)
+                {
+                    owner._constructionFailure?.Throw();
+                    owner._dependencyInjectionDepth++;
+                    try
+                    {
+                        return serviceType == typeof(IServiceProvider) ? this : owner._serviceProvider.GetService(serviceType);
+                    }
+                    finally
+                    {
+                        owner._dependencyInjectionDepth--;
+                    }
                 }
             }
         }
