@@ -38,6 +38,8 @@
 
   <ItemGroup>
     <Protobuf Include="protobuf-model.proto" GrpcServices="None" />
+    <Compile Include="..\Orleans.NativeAotSmoke\RpcResponsesModels.cs" Link="RpcResponsesModels.cs" />
+    <Compile Include="..\Orleans.NativeAotSmoke\RpcResponses.Contracts.cs" Link="RpcResponses.Contracts.cs" />
   </ItemGroup>
 
   <Target
