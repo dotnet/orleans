@@ -71,6 +71,7 @@ public static partial class ContextContracts
         copy.Items[0]["referenced"] = 37;
         Ensure(copy.Value == 19 && input.Items[0]["referenced"] == 23, "Referenced generated model deep-copy isolation.");
         Ensure(SerializerContextExample.SerializeAndCopy()[0]["count"] == 7, "Compiled documentation example outcome.");
+        Ensure(RoundTrip(services, new DocumentationPrimitivePayload { Value = 67 }).Value == 67, "Referenced model uses its actual hot-reload constructor contract.");
     }
 #endif
 
@@ -167,6 +168,15 @@ public static partial class ContextContracts
         Ensure(result[0].Value == 17, "Generic model aliases round-trip.");
         Ensure(RoundTrip(services, new IdentifiedPayload { Value = 23 }).Value == 23, "Model type identifier round-trip.");
         Ensure(RoundTrip(services, new CompoundPayload { Value = 31 }).Value == 31, "Compound model alias round-trip.");
+        foreach (var split in new[] { false, true })
+        {
+            var registrations = new ServiceCollection();
+            if (split) registrations.AddSerializerContext(new PrefixContext()).AddSerializerContext(new ChildAliasContext());
+            else registrations.AddSerializerContext(new PrefixAndChildContext());
+            using var prefixes = registrations.BuildServiceProvider();
+            Ensure(RoundTrip(prefixes, new List<PrefixPayload> { new() { Value = 71 } })[0].Value == 71, "Compound prefix survives traversal through intermediate alias nodes.");
+            Ensure(RoundTrip(prefixes, new List<ChildAliasPayload> { new() { Value = 73 } })[0].Value == 73, "Compound child survives combined or separate contexts.");
+        }
     }
 
 #if !NATIVE_AOT_SMOKE
@@ -232,6 +242,7 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(ValuePayload<int>))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
+[GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
 #endif
 internal partial class SmokeContext : SerializerContext;
 
@@ -309,3 +320,19 @@ public struct ValuePayload<T>
 {
     [Id(0)] public T Value { get; set; }
 }
+
+[GenerateSerializerContext(typeof(List<PrefixPayload>))]
+[GenerateSerializerContext(typeof(List<ChildAliasPayload>))]
+internal partial class PrefixAndChildContext : SerializerContext;
+
+[GenerateSerializerContext(typeof(List<PrefixPayload>))]
+internal partial class PrefixContext : SerializerContext;
+
+[GenerateSerializerContext(typeof(List<ChildAliasPayload>))]
+internal partial class ChildAliasContext : SerializerContext;
+
+[GenerateSerializer, CompoundTypeAlias("shared")]
+public sealed class PrefixPayload { [Id(0)] public int Value { get; set; } }
+
+[GenerateSerializer, CompoundTypeAlias("shared", "child")]
+public sealed class ChildAliasPayload { [Id(0)] public int Value { get; set; } }

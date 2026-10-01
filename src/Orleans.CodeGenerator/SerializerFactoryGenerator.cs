@@ -18,6 +18,8 @@ internal static class SerializerFactoryGenerator
         public string CopierConstruction { get; set; } = "";
         public List<ITypeSymbol> Dependencies { get; } = [];
         public ISerializableTypeDescription? Model { get; set; }
+        public INamedTypeSymbol? ReferencedCodec { get; set; }
+        public INamedTypeSymbol? ReferencedCopier { get; set; }
     }
 
     internal sealed class Graph(IReadOnlyDictionary<ITypeSymbol, Registration> registrations, string configurationStatements)
@@ -70,10 +72,14 @@ internal static class SerializerFactoryGenerator
             {
                 var codecDeclaration = serializerGenerator.Generate(model);
                 var copierDeclaration = copierGenerator.GenerateCopier(model, new());
-                registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
+                registration.CodecConstruction = registration.ReferencedCodec is { } referencedCodec
+                    ? ConstructReferenced(registration.Codec, referencedCodec)
+                    : ConstructGenerated(registration.Codec, codecDeclaration);
                 registration.CopierConstruction = copierDeclaration is null
                     ? $"new {registration.Copier}()"
-                    : ConstructGenerated(registration.Copier, copierDeclaration);
+                    : registration.ReferencedCopier is { } referencedCopier
+                        ? ConstructReferenced(registration.Copier, referencedCopier)
+                        : ConstructGenerated(registration.Copier, copierDeclaration);
             }
             else if (registration.Dependencies.Count > 0)
             {
@@ -202,7 +208,33 @@ internal static class SerializerFactoryGenerator
             ? $"global::Orleans.Serialization.Cloning.ShallowCopier<{Name(type)}>"
             : $"global::{generatedNamespace}.{CopierGenerator.GetSimpleClassName(named.Name)}{argumentsSuffix}";
         registration.Model = definitionModel;
+        if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
+        {
+            var arity = named.TypeArguments.Length;
+            registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
+            if (!definitionModel.IsShallowCopyable)
+                registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
+            if (registration.ReferencedCodec is null || !definitionModel.IsShallowCopyable && registration.ReferencedCopier is null)
+                return "provide the referenced assembly's generated codec and copier implementations";
+
+            INamedTypeSymbol? ResolveImplementation(string name)
+            {
+                var metadataName = $"{generatedNamespace}.{name}" + (arity > 0 ? $"`{arity}" : "");
+                var implementation = services.Compilation.GetTypeByMetadataName(metadataName);
+                return implementation is { IsGenericType: true } ? implementation.Construct([.. named.TypeArguments]) : implementation;
+            }
+        }
         return null;
+    }
+
+    private static string ConstructReferenced(string name, INamedTypeSymbol implementation)
+    {
+        var constructor = implementation.InstanceConstructors.Single(ctor => ctor.DeclaredAccessibility == Accessibility.Public);
+        var arguments = constructor.Parameters.Select(parameter =>
+            parameter.Type.ToDisplayString() == "Orleans.Serialization.Serializers.ICodecProvider"
+                ? "provider"
+                : Resolve(Name(parameter.Type)));
+        return $"new {name}({string.Join(", ", arguments)})";
     }
 
     private static string ConstructGenerated(string name, ClassDeclarationSyntax declaration)

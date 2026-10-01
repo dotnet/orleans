@@ -18,6 +18,13 @@ public sealed class DocumentationPayload<T>
     [Id(1)]
     public List<Dictionary<string, int>> Items { get; set; } = [];
 }
+
+[GenerateSerializer]
+public sealed class DocumentationPrimitivePayload
+{
+    [Id(0)]
+    public int Value { get; set; }
+}
 #endregion
 
 public static class SerializerContextExample
