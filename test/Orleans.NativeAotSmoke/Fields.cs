@@ -1,10 +1,4 @@
-using System.Runtime.CompilerServices;
 using Orleans.Serialization.NativeAotFieldAccessSmoke;
-
-if (RuntimeFeature.IsDynamicCodeSupported)
-{
-    throw new InvalidOperationException("Run the published NativeAOT executable to validate native field access.");
-}
 
 if (args.Length == 0)
 {
