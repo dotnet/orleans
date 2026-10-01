@@ -107,6 +107,30 @@ jobs:
           category: roslyn-analyzers-net10-${{ github.event_name == 'schedule' && 'preview' || 'stable' }}
           sarif_file: ${{ env.RESULTS_DIRECTORY }}/roslyn-analyzers.sarif
 
+  serialization-activation-native-smoke:
+    name: Default serializer activation (NativeAOT, net10.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - name: Publish and run default activation smoke
+        shell: pwsh
+        run: |
+          $project = Join-Path 'test' 'Orleans.Serialization.ActivationSmoke' 'Orleans.Serialization.ActivationSmoke.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'orleans-serialization-activation-smoke'
+          dotnet publish $project `
+            --configuration Release `
+            --runtime linux-x64 `
+            -p:NativeAotSmoke=true `
+            --output $output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $output 'Orleans.Serialization.ActivationSmoke')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   compatibility:
     name: Compatibility analyzers (net10.0 core runtime)
     runs-on: ubuntu-latest
