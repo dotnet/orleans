@@ -17,9 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj"
-                      Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'GrainReferences' or '$(NativeAotSmokeScenario)' == 'Silo'" />
+                      Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'GrainReferences' or '$(NativeAotSmokeScenario)' == 'Silo' or '$(NativeAotSmokeScenario)' == 'GrainActivation'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj"
-                      Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'Silo'" />
+                      Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'Silo' or '$(NativeAotSmokeScenario)' == 'GrainActivation'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
     <Compile Include="NativeAotEnvironment.cs" />
     <Compile Include="..\Orleans.DependencyInjection.TrimmedSmoke\Program.cs"

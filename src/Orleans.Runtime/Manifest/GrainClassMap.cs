@@ -18,20 +18,34 @@ namespace Orleans.Metadata
         /// Initializes a new instance of the <see cref="GrainClassMap"/> class.
         /// </summary>
         /// <param name="typeConverter">The type converter.</param>
-        /// <param name="classes">The grain classes.</param>
+        /// <param name="classes">
+        /// The grain classes with public constructors preserved, as registered by
+        /// <see cref="Configuration.GrainTypeOptions.AddClass(Type)"/> or
+        /// <see cref="Serialization.Configuration.TypeManifestOptions.AddInterfaceImplementation(Type)"/>.
+        /// </param>
+        [RequiresUnreferencedCode("The dictionary's grain types must have public constructors preserved separately, for example by GrainTypeOptions.AddClass or TypeManifestOptions.AddInterfaceImplementation.")]
         public GrainClassMap(TypeConverter typeConverter, ImmutableDictionary<GrainType, Type> classes)
         {
             _typeConverter = typeConverter;
             _types = classes;
         }
 
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2026",
+            Justification = "SiloManifestProvider builds this dictionary from GrainTypeOptions registrations. Generated manifests preserve constructors through AddInterfaceImplementation and manual registrations through AddClass. Direct Classes access warns callers to preserve constructors separately.")]
+        internal static GrainClassMap CreateRegistered(TypeConverter typeConverter, ImmutableDictionary<GrainType, Type> classes)
+            => new(typeConverter, classes);
+
         /// <summary>
         /// Returns the grain class type corresponding to the provided grain type.
         /// </summary>
         /// <param name="grainType">Type of the grain.</param>
-        /// <param name="grainClass">The grain class.</param>
+        /// <param name="grainClass">The grain class with its public constructors preserved for activation.</param>
         /// <returns><see langword="true"/> if a corresponding grain class was found, <see langword="false"/> otherwise.</returns>
-        public bool TryGetGrainClass(GrainType grainType, [NotNullWhen(true)] out Type? grainClass)
+        public bool TryGetGrainClass(
+            GrainType grainType,
+            [NotNullWhen(true), DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] out Type? grainClass)
         {
             GrainType lookupType;
             Type[]? args;
@@ -46,17 +60,30 @@ namespace Orleans.Metadata
                 args = default;
             }
 
-            if (!_types.TryGetValue(lookupType, out grainClass))
+            if (!TryGetRegisteredGrainClass(lookupType, out var registeredClass))
             {
+                grainClass = null;
                 return false;
             }
 
-            if (args is not null)
-            {
-                grainClass = grainClass.MakeGenericType(args);
-            }
+            grainClass = args is null ? registeredClass : MakeGenericGrainClass(registeredClass, args);
 
             return true;
         }
+
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2067",
+            Justification = "Generated and manual registrations preserve public constructors through TypeManifestOptions.AddInterfaceImplementation or GrainTypeOptions.AddClass. Direct Classes access and the public dictionary constructor require callers to preserve constructors separately and warn when trimming. The collections retain those types but cannot carry their annotations.")]
+        private bool TryGetRegisteredGrainClass(
+            GrainType grainType,
+            [NotNullWhen(true), DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] out Type? grainClass)
+            => _types.TryGetValue(grainType, out grainClass);
+
+        [return: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        private static Type MakeGenericGrainClass(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type grainClass,
+            Type[] arguments)
+            => grainClass.MakeGenericType(arguments);
     }
 }

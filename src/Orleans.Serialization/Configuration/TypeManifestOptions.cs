@@ -313,12 +313,12 @@ namespace Orleans.Serialization.Configuration
             Type type) => _interfaceProxies.Add(type ?? throw new ArgumentNullException(nameof(type)));
 
         /// <summary>
-        /// Adds a generated interface implementation type and preserves its implemented interfaces.
+        /// Adds a generated interface implementation type and preserves its public constructors and implemented interfaces.
         /// </summary>
         /// <param name="type">The generated interface implementation type.</param>
         public void AddInterfaceImplementation(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
+            [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
             Type type) => _interfaceImplementations.Add(type ?? throw new ArgumentNullException(nameof(type)));
 

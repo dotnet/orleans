@@ -25,7 +25,7 @@ public class TrimFlowTests
     [InlineData(nameof(TypeManifestOptions.Converters), nameof(TypeManifestOptions.AddConverter), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
     [InlineData(nameof(TypeManifestOptions.Interfaces), nameof(TypeManifestOptions.AddInterface), DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods | DynamicallyAccessedMemberTypes.Interfaces)]
     [InlineData(nameof(TypeManifestOptions.InterfaceProxies), nameof(TypeManifestOptions.AddInterfaceProxy), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
-    [InlineData(nameof(TypeManifestOptions.InterfaceImplementations), nameof(TypeManifestOptions.AddInterfaceImplementation), DynamicallyAccessedMemberTypes.Interfaces)]
+    [InlineData(nameof(TypeManifestOptions.InterfaceImplementations), nameof(TypeManifestOptions.AddInterfaceImplementation), DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)]
     public void TypeManifestRegistrations_ExposeTrimSafeAlternative(
         string legacyPropertyName,
         string registrationMethodName,
