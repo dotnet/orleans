@@ -7,12 +7,120 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.ContextSmoke;
 
 public static class StaticFactoryContracts
 {
+    public static void CaughtNestedFailureFaultsTheWholeGraph()
+    {
+        using var gate = new ConstructionGate { FailFirst = true };
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<CatchingRoot>(provider => new CatchingRoot(provider));
+            options.AddSerializerService<FailingNode>(provider => new FailingNode(provider, gate));
+            options.AddSerializerService<DependentNode>(provider => new DependentNode(provider, gate));
+        });
+        using var provider = services.BuildServiceProvider();
+        var codecs = provider.GetRequiredService<CodecProvider>();
+        Expect<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<CatchingRoot>(null!, codecs), "injected constructor failure");
+        var root = OrleansGeneratedCodeHelper.GetService<CatchingRoot>(null!, codecs);
+        Ensure(root.Child is not null && ReferenceEquals(root.Child, root.Child.Dependent.Owner), "Caught failure cannot commit a dependency linked to the failed node.");
+        Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 2, "Caught nested failure rebuilds the entire pending graph.");
+    }
+
+#if !NATIVE_AOT_SMOKE
+    public static void DiSingletonsCannotRetainPendingServices()
+    {
+        using var gate = new ConstructionGate();
+        var services = new ServiceCollection().AddSerializer();
+        services.AddSingleton(gate);
+        services.AddSingleton<DiBridge>();
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<DiLeaf>(provider => new DiLeaf(gate));
+            options.AddSerializerService<DiOwner>(provider => new DiOwner(provider));
+        });
+        using var provider = services.BuildServiceProvider();
+        var codecs = provider.GetRequiredService<CodecProvider>();
+        Expect<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs), "cannot cache an unpublished");
+        var leaf = OrleansGeneratedCodeHelper.GetService<DiLeaf>(null!, codecs);
+        var owner = OrleansGeneratedCodeHelper.GetService<DiOwner>(null!, codecs);
+        Ensure(ReferenceEquals(leaf, owner.Leaf) && ReferenceEquals(leaf, owner.Bridge.Leaf), "DI singleton retains only a previously committed static service.");
+        Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 2, "Rejected DI construction neither caches its bridge nor its pending leaf.");
+    }
+
+    public static void SupplementalFactoriesPreserveAutomaticMetadata()
+    {
+        using var gate = new ConstructionGate();
+        using var services = CreateMixedServices(gate, copier: false, cyclic: false);
+        var provider = services.GetRequiredService<CodecProvider>();
+        Ensure(services.GetRequiredService<TypeConverter>().Parse("System.Int32") == typeof(int), "Automatic type resolution remains available beside supplemental factories.");
+        Ensure(provider.GetCodec<SecondValue>() is AutomaticLeafCodec, "Existing codec metadata remains available.");
+        Ensure(provider.GetDeepCopier<SecondValue>() is AutomaticLeafCopier, "Existing copier metadata remains available.");
+        Ensure(provider.GetCodec<FirstValue>() is AutomaticOuterCodec, "Acyclic closed factories can depend on automatic metadata.");
+    }
+
+    public static void AutomaticCacheEntriesRollBackWithFactoryFailures()
+    {
+        foreach (var copier in new[] { false, true })
+        {
+            using var gate = new ConstructionGate { FailFirst = true };
+            using var services = CreateMixedServices(gate, copier, cyclic: false);
+            var provider = services.GetRequiredService<CodecProvider>();
+            _ = provider.GetCodec<int>();
+            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "injected constructor failure");
+            _ = ResolveFirst(provider, copier);
+            Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 2, "Legacy cache entries produced by a failed factory transaction are rolled back.");
+        }
+    }
+
+    public static void MixedConstructionCyclesFailBeforePublication()
+    {
+        foreach (var copier in new[] { false, true })
+        {
+            using var gate = new ConstructionGate();
+            using var services = CreateMixedServices(gate, copier, cyclic: true);
+            var provider = services.GetRequiredService<CodecProvider>();
+            _ = provider.GetCodec<int>();
+            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
+            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
+            Ensure(gate.SecondConstructions == 2, "Rejected mixed cycles leave no stale automatic cache entry.");
+        }
+    }
+
+    private static ServiceProvider CreateMixedServices(ConstructionGate gate, bool copier, bool cyclic)
+    {
+        var services = new ServiceCollection().AddSerializer();
+        services.AddSingleton(gate);
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddFieldCodec(cyclic ? typeof(SecondCodec) : typeof(AutomaticLeafCodec));
+            options.AddCopier(cyclic ? typeof(SecondCopier) : typeof(AutomaticLeafCopier));
+            if (cyclic)
+            {
+                options.AddSerializerService<FirstCodec>(provider => new FirstCodec(provider, gate));
+                options.AddSerializerService<FirstCopier>(provider => new FirstCopier(provider, gate));
+                options.AddSerializer<FirstValue>(
+                    static provider => OrleansGeneratedCodeHelper.GetService<FirstCodec>(null!, provider),
+                    static provider => OrleansGeneratedCodeHelper.GetService<FirstCopier>(null!, provider));
+            }
+            else
+            {
+                options.AddSerializerService<AutomaticOuterCodec>(provider => new AutomaticOuterCodec(provider, gate));
+                options.AddSerializerService<AutomaticOuterCopier>(provider => new AutomaticOuterCopier(provider, gate));
+                options.AddSerializer<FirstValue>(
+                    static provider => OrleansGeneratedCodeHelper.GetService<AutomaticOuterCodec>(null!, provider),
+                    static provider => OrleansGeneratedCodeHelper.GetService<AutomaticOuterCopier>(null!, provider));
+            }
+        });
+        return services.BuildServiceProvider();
+    }
+#endif
+
     public static void CyclicConstructionPublishesCompletedGraphs()
     {
         foreach (var copier in new[] { false, true })
@@ -51,6 +159,8 @@ public static class StaticFactoryContracts
             using var services = CreateConstructionServices(gate);
             var provider = services.GetRequiredService<CodecProvider>();
             var committedLeaf = provider.GetCodec<int>();
+            var converter = services.GetRequiredService<TypeConverter>();
+            Ensure(converter.Parse(converter.Format(typeof(SecondValue))) == typeof(SecondValue), "Explicit factory registration authorizes and resolves its closed type name.");
             Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "injected constructor failure");
             var first = ResolveFirst(provider, copier);
             object dependency = copier
@@ -153,6 +263,104 @@ public static class StaticFactoryContracts
 
     private sealed class FirstValue { public int Value { get; init; } }
     private sealed class SecondValue { public int Value { get; init; } }
+
+    private sealed class CatchingRoot
+    {
+        public FailingNode? Child { get; }
+        public CatchingRoot(ICodecProvider provider)
+        {
+            try { Child = OrleansGeneratedCodeHelper.GetService<FailingNode>(this, provider); }
+            catch (InvalidOperationException) { }
+        }
+    }
+
+    private sealed class FailingNode
+    {
+        public DependentNode Dependent { get; }
+        public FailingNode(ICodecProvider provider, ConstructionGate gate)
+        {
+            Dependent = OrleansGeneratedCodeHelper.GetService<DependentNode>(this, provider);
+            gate.ConstructFirst();
+        }
+    }
+
+    private sealed class DependentNode
+    {
+        public FailingNode Owner { get; }
+        public DependentNode(ICodecProvider provider, ConstructionGate gate)
+        {
+            Interlocked.Increment(ref gate.SecondConstructions);
+            Owner = OrleansGeneratedCodeHelper.GetService<FailingNode>(this, provider);
+        }
+    }
+
+#if !NATIVE_AOT_SMOKE
+    private sealed class DiLeaf
+    {
+        public DiLeaf(ConstructionGate gate) => Interlocked.Increment(ref gate.FirstConstructions);
+    }
+
+    private sealed class DiOwner
+    {
+        public DiLeaf Leaf { get; }
+        public DiBridge Bridge { get; }
+        public DiOwner(ICodecProvider provider)
+        {
+            Leaf = OrleansGeneratedCodeHelper.GetService<DiLeaf>(this, provider);
+            Bridge = OrleansGeneratedCodeHelper.GetService<DiBridge>(this, provider);
+        }
+    }
+
+    private sealed class DiBridge
+    {
+        public DiLeaf Leaf { get; }
+        public DiBridge(ICodecProvider provider, ConstructionGate gate)
+        {
+            Interlocked.Increment(ref gate.SecondConstructions);
+            Leaf = OrleansGeneratedCodeHelper.GetService<DiLeaf>(this, provider);
+        }
+    }
+
+    private class AutomaticLeafCodec : IFieldCodec<SecondValue>
+    {
+        public AutomaticLeafCodec(ConstructionGate gate) => Interlocked.Increment(ref gate.SecondConstructions);
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] SecondValue value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public SecondValue ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    }
+
+    private class AutomaticLeafCopier : IDeepCopier<SecondValue>
+    {
+        public AutomaticLeafCopier(ConstructionGate gate) => Interlocked.Increment(ref gate.SecondConstructions);
+        [return: NotNullIfNotNull(nameof(input))]
+        public SecondValue? DeepCopy(SecondValue? input, CopyContext context) => input;
+    }
+
+    private sealed class AutomaticOuterCodec : IFieldCodec<FirstValue>
+    {
+        private readonly IFieldCodec<SecondValue> _leaf;
+        public AutomaticOuterCodec(ICodecProvider provider, ConstructionGate gate)
+        {
+            _leaf = provider.GetCodec<SecondValue>();
+            gate.ConstructFirst();
+        }
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] FirstValue value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public FirstValue ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    }
+
+    private sealed class AutomaticOuterCopier : IDeepCopier<FirstValue>
+    {
+        private readonly IDeepCopier<SecondValue> _leaf;
+        public AutomaticOuterCopier(ICodecProvider provider, ConstructionGate gate)
+        {
+            _leaf = provider.GetDeepCopier<SecondValue>();
+            gate.ConstructFirst();
+        }
+        [return: NotNullIfNotNull(nameof(input))]
+        public FirstValue? DeepCopy(FirstValue? input, CopyContext context) => input;
+    }
+#endif
 
     private sealed class FirstCodec : IFieldCodec<FirstValue>
     {

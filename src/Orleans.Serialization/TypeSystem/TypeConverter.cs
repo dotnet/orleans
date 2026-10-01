@@ -150,6 +150,11 @@ public class TypeConverter
 
     private void ConsumeMetadata(TypeManifestOptions metadata)
     {
+        foreach (var type in metadata.CodecFactories.Keys)
+        {
+            AddAllowedType(type);
+        }
+
         AddFromMetadata(metadata.SerializerTypes, typeof(IBaseCodec<>));
         AddFromMetadata(metadata.SerializerTypes, typeof(IValueSerializer<>));
         AddFromMetadata(metadata.SerializerTypes, typeof(IFieldCodec<>));
