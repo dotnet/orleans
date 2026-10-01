@@ -65,16 +65,16 @@ dotnet test --project test/Orleans.Core.Tests/Orleans.Core.Tests.csproj --framew
 
 ### NativeAOT smoke tests
 
-The dependency-injection smoke exercises placement strategy and director registration, keyed service resolution, constructor dependency identity, and lifecycle-driven startup task activation. The static analysis workflow publishes and executes these flows with both trimming and NativeAOT.
+The reusable `test\Orleans.NativeAotSmoke` project publishes selected scenarios as native executables. Its default dependency-injection scenario shares the existing trimmed smoke's source and exercises placement strategy and director registration, keyed service resolution, constructor dependency identity, and lifecycle-driven startup task activation. The static analysis workflow publishes and executes these flows with both trimming and NativeAOT.
 
 To execute the native smoke on Windows, install the [NativeAOT C++ toolchain prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/), then run:
 
 ```console
-dotnet publish test\Orleans.DependencyInjection.TrimmedSmoke\Orleans.DependencyInjection.TrimmedSmoke.csproj --framework net10.0 --configuration Release --runtime win-x64 --self-contained true -p:NativeAotSmoke=true --output Artifacts\DependencyInjectionNativeAotSmoke
-Artifacts\DependencyInjectionNativeAotSmoke\Orleans.DependencyInjection.TrimmedSmoke.exe
+dotnet publish test\Orleans.NativeAotSmoke\Orleans.NativeAotSmoke.csproj --configuration Release --runtime win-x64 --output Artifacts\NativeAotSmoke
+Artifacts\NativeAotSmoke\Orleans.NativeAotSmoke.exe
 ```
 
-`NativeAotSmoke=true` enables `PublishAot` within the smoke project, keeping build-time analyzers and source generators on their managed target frameworks. The executable verifies that runtime code generation is disabled before exercising the selected DI flows. Use `NativeAotSmoke=false` to execute the same flows in a self-contained trimmed application.
+`PublishAot` is enabled within the native smoke project, keeping build-time analyzers and source generators on their managed target frameworks. The executable verifies that runtime code generation is disabled before exercising the selected flows. Additional scenarios use `-p:NativeAotSmokeScenario=<name>` and share the same project; each build compiles that scenario's `<name>*.cs` files. The existing `Orleans.DependencyInjection.TrimmedSmoke` project exercises the same DI flows in a self-contained trimmed application.
 
 ### Work on an application with local source
 

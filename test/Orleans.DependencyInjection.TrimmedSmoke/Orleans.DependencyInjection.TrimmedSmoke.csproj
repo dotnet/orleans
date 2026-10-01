@@ -6,8 +6,6 @@
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>link</TrimMode>
-    <PublishAot Condition="'$(NativeAotSmoke)' == 'true'">true</PublishAot>
-    <DefineConstants Condition="'$(NativeAotSmoke)' == 'true'">$(DefineConstants);NATIVE_AOT_SMOKE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

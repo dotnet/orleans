@@ -15,11 +15,6 @@ internal static class Program
 
     private static async Task Main()
     {
-#if NATIVE_AOT_SMOKE
-        Ensure(
-            !System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported,
-            "The NativeAOT smoke must execute with runtime code generation disabled.");
-#endif
         ValidateCoreRegistration();
         ValidateRuntimeRegistration();
         await ValidateStartupTaskActivation();

@@ -203,9 +203,11 @@ jobs:
       matrix:
         include:
           - mode: trimmed
-            native-aot: false
+            project: test/Orleans.DependencyInjection.TrimmedSmoke/Orleans.DependencyInjection.TrimmedSmoke.csproj
+            executable: Orleans.DependencyInjection.TrimmedSmoke
           - mode: NativeAOT
-            native-aot: true
+            project: test/Orleans.NativeAotSmoke/Orleans.NativeAotSmoke.csproj
+            executable: Orleans.NativeAotSmoke
     env:
       RESULTS_DIRECTORY: Artifacts/AnalyzerAudit/DependencyInjection/${{ matrix.mode }}
     steps:
@@ -219,16 +221,15 @@ jobs:
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'orleans-dependency-injection-${{ matrix.mode }}-smoke'
           New-Item -ItemType Directory -Force $env:RESULTS_DIRECTORY | Out-Null
-          dotnet publish test/Orleans.DependencyInjection.TrimmedSmoke/Orleans.DependencyInjection.TrimmedSmoke.csproj `
+          dotnet publish ${{ matrix.project }} `
             --framework net10.0 `
             --configuration Release `
             --runtime linux-x64 `
             --self-contained true `
             --output $output `
-            -bl:$env:RESULTS_DIRECTORY/publish.binlog `
-            -p:NativeAotSmoke=${{ matrix.native-aot }}
+            -bl:$env:RESULTS_DIRECTORY/publish.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & (Join-Path $output 'Orleans.DependencyInjection.TrimmedSmoke')
+          & (Join-Path $output '${{ matrix.executable }}')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload dependency injection smoke diagnostics
         if: always()
