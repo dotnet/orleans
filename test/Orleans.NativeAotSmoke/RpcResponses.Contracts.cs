@@ -83,6 +83,13 @@ public static class RpcResponseContracts
         Ensure(ReferenceEquals(Response.Completed, Copy(services, Response.Completed)), "Completed responses retain their singleton identity.");
     }
 
+    public static void CompletedResponseRoundTrip()
+    {
+        using var services = CreateServices();
+        using var result = RoundTrip(services, Response.Completed);
+        Ensure(ReferenceEquals(Response.Completed, result), "Completed response transport restores the canonical singleton.");
+    }
+
     public static void RawResponses()
     {
         using var services = CreateServices();
@@ -113,6 +120,25 @@ public static class RpcResponseContracts
     }
 
 #if NATIVE_AOT_SMOKE
+    public static void ExceptionTransportRequiresDeclaredGraph()
+    {
+        using var services = CreateServices();
+        using var exception = Response.FromException(new InvalidOperationException("response failure"));
+        try
+        {
+            using var result = RoundTrip(services, exception);
+        }
+        catch (NotSupportedException error)
+        {
+            Ensure(error.Message.Contains("ExceptionResponse", StringComparison.Ordinal)
+                && error.Message.Contains("exception and Data value types", StringComparison.Ordinal),
+                "Strict exception transport identifies its explicit codec graph contract.");
+            return;
+        }
+
+        throw new InvalidOperationException("Strict exception transport requires its declared dependency graph.");
+    }
+
     public static void MissingNativeResponseRegistration()
     {
         using var services = CreateServices();

@@ -122,6 +122,25 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Fact]
+    public void GeneratedCompletedResponsesPreserveTransportIdentity()
+        => NativeAotSmoke.RpcResponseContracts.CompletedResponseRoundTrip();
+
+    [Fact]
+    public void ExplicitExceptionTransportRequiresDeclaredDependencyGraph()
+    {
+        using var services = new ServiceCollection().AddSerializerContext(new EmptyContext()).BuildServiceProvider();
+        var error = Assert.Throws<NotSupportedException>(() => services.GetRequiredService<CodecProvider>().GetCodec<ExceptionResponse>());
+        Assert.Contains("ExceptionResponse", error.Message);
+        Assert.Contains("exception and Data value types", error.Message);
+        Assert.Contains("serializer context", error.Message);
+    }
+
+    private sealed class EmptyContext : SerializerContext
+    {
+        protected override void ConfigureInner(TypeManifestOptions options) { }
+    }
+
+    [Fact]
     public void AutomaticResponseFactoriesPreserveCustomJitPayloadCopier()
     {
         using var services = new ServiceCollection()
