@@ -2515,6 +2515,12 @@ public class DemoClass
         Assert.NotNull(payload);
         var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
             payload, TestContext.Current.CancellationToken);
+        if (attribute.Contains("UseActivator", StringComparison.Ordinal))
+        {
+            Assert.Null(graph);
+            return;
+        }
+
         Assert.NotNull(graph);
         Assert.DoesNotContain("CreateDefaultReferenceTypeActivator", graph.ConfigurationStatements);
         Assert.DoesNotContain("CreateDefaultValueTypeActivator", graph.ConfigurationStatements);
@@ -2522,6 +2528,43 @@ public class DemoClass
         {
             Assert.Contains("new global::OrleansCodeGen.TestProject.Activator_Payload(", graph.ConfigurationStatements);
         }
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesRejectInaccessibleReferencedGeneratedActivators()
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            namespace ReferencedActivation;
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                [GeneratedActivatorConstructor]
+                public Payload(int value) => Value = value;
+            }
+            """, "ReferencedActivation");
+        var generated = RunSourceGenerator(library);
+        Assert.Empty(generated.Diagnostics);
+        library = library.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emitted = library.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var consumer = (await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            public interface IContract : IGrainWithIntegerKey
+            {
+                Task<ReferencedActivation.Payload> Get();
+            }
+            """, "ActivationConsumer")).AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+        var type = consumer.GetTypeByMetadataName("ReferencedActivation.Payload");
+        Assert.NotNull(type);
+        Assert.Null(SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(consumer, new CodeGeneratorOptions()),
+            type, TestContext.Current.CancellationToken));
+        var strict = RunSourceGenerator(consumer, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
     }
 
     [Theory]
