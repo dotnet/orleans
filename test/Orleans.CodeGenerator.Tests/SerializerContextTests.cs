@@ -230,6 +230,52 @@ public sealed class SerializerContextTests
         Assert.Contains("Hidden", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("[Orleans.CompoundTypeAlias(\"expanding-interface\")]")]
+    public void ExpandingGenericInterfaceMetadataProducesBoundedDiagnostics(string alias)
+    {
+        var (_, result) = Generate($$"""
+            {{alias}}
+            public interface ITag<T> { }
+            [Orleans.GenerateSerializer]
+            public sealed class Payload<T> : ITag<Payload<System.Collections.Generic.List<T>>>
+            {
+                [Orleans.Id(0)] public int Value { get; set; }
+            }
+            [Orleans.GenerateSerializerContext(typeof(Payload<int>))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
+        Assert.Contains("metadata dependency graph", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("finite type metadata", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FiniteGenericInterfaceMetadataCyclesPreserveAliasRegistration()
+    {
+        var (compilation, result) = Generate("""
+            [Orleans.CompoundTypeAlias("finite-interface")]
+            public interface ITag<T> { }
+            [Orleans.GenerateSerializer]
+            public sealed class Payload<T> : ITag<Payload<T>>
+            {
+                [Orleans.Id(0)] public int Value { get; set; }
+            }
+            [Orleans.GenerateSerializerContext(typeof(Payload<int>))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("\"finite-interface\"", context, StringComparison.Ordinal);
+        Assert.Contains("typeof(global::ITag<>)", context, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RecursiveCollectionFactoriesUseTypedCycleEdges()
     {

@@ -403,12 +403,17 @@ internal static class SerializerFactoryGenerator
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
-    private static Failure? AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited)
+    private static Failure? AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited, int depth = 0)
     {
-        if (!visited.Add(symbol)) return null;
+        if (visited.Contains(symbol)) return null;
+        if (visited.Count >= 1024)
+            return new Failure(symbol, "the metadata dependency graph exceeds 1024 closed types; declare finite type metadata");
+        if (depth >= 128)
+            return new Failure(symbol, "the metadata dependency graph exceeds 128 nested dependencies; declare finite type metadata");
+        visited.Add(symbol);
         if (symbol is IArrayTypeSymbol array)
         {
-            return AppendTypeMetadata(result, array.ElementType, library, visited);
+            return AppendTypeMetadata(result, array.ElementType, library, visited, depth + 1);
         }
         if (symbol is not INamedTypeSymbol type) return null;
         if (!library.Compilation.IsSymbolAccessibleWithin(type.OriginalDefinition, library.Compilation.Assembly))
@@ -421,11 +426,11 @@ internal static class SerializerFactoryGenerator
         }
         if (type.ContainingType is { } declaring)
         {
-            if (AppendTypeMetadata(result, declaring, library, visited) is { } declaringFailure) return declaringFailure;
+            if (AppendTypeMetadata(result, declaring, library, visited, depth + 1) is { } declaringFailure) return declaringFailure;
         }
         foreach (var contract in type.AllInterfaces)
         {
-            if (AppendTypeMetadata(result, contract, library, visited) is { } contractFailure) return contractFailure;
+            if (AppendTypeMetadata(result, contract, library, visited, depth + 1) is { } contractFailure) return contractFailure;
         }
         foreach (var argument in type.TypeArguments)
         {
@@ -433,7 +438,7 @@ internal static class SerializerFactoryGenerator
             {
                 if (library.Compilation.IsSymbolAccessibleWithin(argument, library.Compilation.Assembly))
                     result.Append("options.AddAllowedType(typeof(").Append(Name(argument)).AppendLine("));");
-                if (AppendTypeMetadata(result, argument, library, visited) is { } argumentFailure) return argumentFailure;
+                if (AppendTypeMetadata(result, argument, library, visited, depth + 1) is { } argumentFailure) return argumentFailure;
             }
         }
         var openType = type.ToOpenTypeSyntax().ToString();
@@ -466,7 +471,7 @@ internal static class SerializerFactoryGenerator
                 if (!library.Compilation.IsSymbolAccessibleWithin(componentType, library.Compilation.Assembly))
                     return new Failure(componentType, "required compound-alias component metadata is inaccessible to the generated context");
                 result.Append("options.AddAllowedType(typeof(").Append(Name(componentType)).AppendLine("));");
-                if (AppendTypeMetadata(result, componentType, library, visited) is { } componentFailure) return componentFailure;
+                if (AppendTypeMetadata(result, componentType, library, visited, depth + 1) is { } componentFailure) return componentFailure;
             }
 
             result.Append("options.CompoundTypeAliases");
