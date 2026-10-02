@@ -6,4 +6,6 @@ StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();
 StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
 StaticFactoryContracts.KeyedDescriptorsDoNotShadowUnkeyedInstances();
 StaticFactoryContracts.KeyedOnlyDescriptorsDoNotSelectDependencyConstructors();
+StaticFactoryContracts.KeyedFacadePreservesProviderCapabilitiesOutsideConstruction();
+StaticFactoryContracts.CapturedKeyedFacadeGuardsPendingConstruction();
 Console.WriteLine("Static serializer factory contracts passed: atomic graph publication and constructor-failure rollback.");
