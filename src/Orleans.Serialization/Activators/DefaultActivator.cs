@@ -28,7 +28,6 @@ namespace Orleans.Serialization.Activators
             }
             catch (TargetInvocationException exception) when (exception.InnerException is { } inner)
             {
-                // Generic construction wraps constructor exceptions on both CoreCLR and NativeAOT.
                 ExceptionDispatchInfo.Capture(inner).Throw();
                 throw;
             }
