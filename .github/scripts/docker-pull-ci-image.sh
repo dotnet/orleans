@@ -11,6 +11,7 @@ image_json="$(jq -ce --arg id "$1" '.[$id] // error("Unknown CI image: \($id)")'
 mirror="$(jq -er '.mirror' <<< "$image_json")"
 upstream="$(jq -er '.source' <<< "$image_json")"
 
+# Try the mirror once so private-package bootstrap does not delay unauthenticated PR jobs.
 if docker pull "$mirror" >&2; then
   image="$mirror"
 else
