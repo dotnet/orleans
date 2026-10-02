@@ -112,14 +112,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_DemoData));
-            PreserveTypeMetadata("TestProject.DemoData, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData), typeof(global::TestProject.DemoData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoData), typeof(global::TestProject.DemoData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData), typeof(global::TestProject.DemoData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData), typeof(global::TestProject.DemoData));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_DemoData), typeof(global::TestProject.DemoData));
         }
     }
 }

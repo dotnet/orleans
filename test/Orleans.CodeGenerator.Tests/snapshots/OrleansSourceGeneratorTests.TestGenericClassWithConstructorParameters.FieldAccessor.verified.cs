@@ -252,17 +252,15 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor));
-            PreserveTypeMetadata("TestProject.GenericWithCtor`1, TestProject");
-            PreserveTypeMetadata("TestProject.UsesGenericWithCtor, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>), typeof(global::TestProject.GenericWithCtor<>));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>), typeof(global::TestProject.GenericWithCtor<>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor), typeof(global::TestProject.UsesGenericWithCtor));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor), typeof(global::TestProject.UsesGenericWithCtor));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>), typeof(global::TestProject.GenericWithCtor<>));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>), typeof(global::TestProject.GenericWithCtor<>));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor), typeof(global::TestProject.UsesGenericWithCtor));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor), typeof(global::TestProject.UsesGenericWithCtor));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor), typeof(global::TestProject.UsesGenericWithCtor));
         }
     }
 }

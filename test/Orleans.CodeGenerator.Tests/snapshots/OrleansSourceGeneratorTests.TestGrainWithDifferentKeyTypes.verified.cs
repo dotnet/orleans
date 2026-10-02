@@ -767,22 +767,30 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidKey));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithStringKey_GrainReference_43570316));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithStringKey));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidCompoundKey));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithIntegerCompoundKey));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidKey));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithStringKey_GrainReference_43570316));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithStringKey));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidCompoundKey));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithIntegerCompoundKey));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidKey), typeof(global::TestProject.GrainWithGuidKey));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidKey), typeof(global::TestProject.GrainWithGuidKey));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithStringKey_GrainReference_43570316), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithStringKey), typeof(global::TestProject.GrainWithStringKey));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GrainWithStringKey), typeof(global::TestProject.GrainWithStringKey));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidCompoundKey), typeof(global::TestProject.GrainWithGuidCompoundKey));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GrainWithGuidCompoundKey), typeof(global::TestProject.GrainWithGuidCompoundKey));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GrainWithIntegerCompoundKey), typeof(global::TestProject.GrainWithIntegerCompoundKey));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GrainWithIntegerCompoundKey), typeof(global::TestProject.GrainWithIntegerCompoundKey));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidKey), typeof(global::TestProject.GrainWithGuidKey));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidKey), typeof(global::TestProject.GrainWithGuidKey));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithStringKey_GrainReference_43570316), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithStringKey), typeof(global::TestProject.GrainWithStringKey));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithStringKey), typeof(global::TestProject.GrainWithStringKey));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidCompoundKey), typeof(global::TestProject.GrainWithGuidCompoundKey));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithGuidCompoundKey), typeof(global::TestProject.GrainWithGuidCompoundKey));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A), typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithIntegerCompoundKey), typeof(global::TestProject.GrainWithIntegerCompoundKey));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GrainWithIntegerCompoundKey), typeof(global::TestProject.GrainWithIntegerCompoundKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey));
@@ -795,10 +803,10 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceImplementation(typeof(global::TestProject.GrainWithStringKey));
             config.AddInterfaceImplementation(typeof(global::TestProject.GrainWithGuidCompoundKey));
             config.AddInterfaceImplementation(typeof(global::TestProject.GrainWithIntegerCompoundKey));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidKey));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithStringKey));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidCompoundKey));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithIntegerCompoundKey));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidKey), typeof(global::TestProject.GrainWithGuidKey));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithStringKey), typeof(global::TestProject.GrainWithStringKey));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidCompoundKey), typeof(global::TestProject.GrainWithGuidCompoundKey));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithIntegerCompoundKey), typeof(global::TestProject.GrainWithIntegerCompoundKey));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IMyGrainWithGuidKey));
@@ -809,18 +817,6 @@ namespace OrleansCodeGen.TestProject
             n7.Add("A9FEF7AF", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
             var n9 = n2.Add(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
             n9.Add("9814021A", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
-            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF, TestProject");
-            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E, TestProject");
-            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A, TestProject");
-            PreserveTypeMetadata("OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316, TestProject");
-            PreserveTypeMetadata("TestProject.GrainWithGuidCompoundKey, TestProject");
-            PreserveTypeMetadata("TestProject.GrainWithGuidKey, TestProject");
-            PreserveTypeMetadata("TestProject.GrainWithIntegerCompoundKey, TestProject");
-            PreserveTypeMetadata("TestProject.GrainWithStringKey, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
         }
     }
 }

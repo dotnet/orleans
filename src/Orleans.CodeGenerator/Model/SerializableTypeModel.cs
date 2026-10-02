@@ -35,5 +35,4 @@ internal sealed record class SerializableTypeModel(
     EquatableArray<TypeRef> ActivatorConstructorParameters,
     ObjectCreationStrategy CreationStrategy,
     SourceLocationModel SourceLocation = default,
-    TypeMetadataIdentity MetadataIdentity = default,
-    EquatableArray<TypeMetadataIdentity> MetadataTypes = default);
+    TypeMetadataIdentity MetadataIdentity = default);

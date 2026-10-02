@@ -79,13 +79,24 @@ activators for their closed payload types.
 
 ## Generated manifest metadata
 
-The source generator preserves the type definitions and interface metadata used by the
-serializer manifest. This includes the target types of generated serializers and of
-implementations marked with `[RegisterSerializer]`, `[RegisterCopier]`,
-`[RegisterActivator]`, or `[RegisterConverter]`, together with their declaring types,
-generic arguments, and interface argument types. `TypeConverter` and `CodecProvider`
-use that metadata to discover serialization contracts during `AddSerializer` service
-initialization.
+The source generator registers each serialization contract with its implementation
+and target type. Field codecs, base codecs, value serializers, deep and base copiers,
+activators, and converters have explicit entries, including both the value and surrogate
+types for converters. The registration APIs preserve implementation constructors and
+target interface metadata. `TypeConverter` and `CodecProvider` consume these entries
+directly during `AddSerializer` service initialization.
+
+Types marked with `[GenerateSerializer]` and implementations marked with
+`[RegisterSerializer]`, `[RegisterCopier]`, `[RegisterActivator]`, or
+`[RegisterConverter]` receive these registrations automatically. Manual registrations
+can use the target-taking `TypeManifestOptions.Add*` overloads. Existing single-type
+registrations retain their interface-discovery behavior.
+
+Parameterized array contracts and generic converter surrogates use
+`SerializationType` descriptions. These record concrete types, generic parameter
+indices, and array shapes so the runtime can bind the selected implementation's
+generic arguments directly. Generated registrations preserve nested argument shapes
+and parameter ordering.
 
 NativeAOT applications also provide statically compiled closed codec and serializer
 instances for the generic combinations they use. The `Metadata` scenario in

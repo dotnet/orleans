@@ -123,14 +123,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithGeneratedActivatorConstructor));
-            PreserveTypeMetadata("TestProject.ClassWithGeneratedActivatorConstructor, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
         }
     }
 }

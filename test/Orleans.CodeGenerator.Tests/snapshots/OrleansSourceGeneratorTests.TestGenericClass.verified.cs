@@ -262,18 +262,16 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericData<>));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ConcreteUsage));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericData<>));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ConcreteUsage));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GenericData<>));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ConcreteUsage));
-            PreserveTypeMetadata("TestProject.ConcreteUsage, TestProject");
-            PreserveTypeMetadata("TestProject.GenericData`1, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_GenericData<>), typeof(global::TestProject.GenericData<>));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_GenericData<>), typeof(global::TestProject.GenericData<>));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ConcreteUsage), typeof(global::TestProject.ConcreteUsage));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_ConcreteUsage), typeof(global::TestProject.ConcreteUsage));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericData<>), typeof(global::TestProject.GenericData<>));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_GenericData<>), typeof(global::TestProject.GenericData<>));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ConcreteUsage), typeof(global::TestProject.ConcreteUsage));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ConcreteUsage), typeof(global::TestProject.ConcreteUsage));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GenericData<>), typeof(global::TestProject.GenericData<>));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ConcreteUsage), typeof(global::TestProject.ConcreteUsage));
         }
     }
 }

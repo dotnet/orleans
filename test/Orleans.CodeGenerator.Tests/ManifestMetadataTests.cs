@@ -65,7 +65,7 @@ public class ManifestMetadataTests
     [InlineData("Copier")]
     [InlineData("Activator")]
     [InlineData("Converter")]
-    public async Task RegisteredImplementationsPreserveTargetMetadata(string name)
+    public async Task RegisteredImplementationsDescribeTheirTargetContracts(string name)
     {
         var compilation = await TestCompilationHelper.CreateCompilation(Source);
         var symbol = compilation.GetTypeByMetadataName($"MetadataTargets.{name}`1");
@@ -79,25 +79,26 @@ public class ManifestMetadataTests
             "Converter" => RegisteredCodecKind.Converter,
             _ => throw new InvalidOperationException($"Unexpected registration: {name}.")
         };
-        var model = ModelExtractor.ExtractRegisteredCodec(symbol, kind);
-        var names = model.MetadataTypes.Select(static type => type.MetadataName).ToArray();
-
-        Assert.Contains("MetadataTargets.Outer`1", names);
-        Assert.Contains("MetadataTargets.Outer`1+Nested`1", names);
-        Assert.Contains("MetadataTargets.Target`1", names);
-        Assert.Contains("System.Int32", names);
-        Assert.Contains("System.Tuple`2", names);
-        Assert.Equal(names.Length, names.Distinct(StringComparer.Ordinal).Count());
-        Assert.DoesNotContain(names, static name => name.Contains("TItem", StringComparison.Ordinal));
+        var model = ModelExtractor.ExtractRegisteredCodec(symbol, kind, compilation);
+        var contract = Assert.Single(model.Contracts);
+        Assert.Equal("global::MetadataTargets.Outer<>.Nested<>", contract.Target.Type.SyntaxString);
+        Assert.True(contract.Target.IsAccessible);
+        Assert.Equal(name switch
+        {
+            "Codec" => "AddBaseCodec",
+            "Copier" => "AddCopier",
+            "Activator" => "AddActivator",
+            _ => "AddConverter"
+        }, contract.RegistrationMethod);
 
         if (kind == RegisteredCodecKind.Converter)
         {
-            Assert.Contains("MetadataTargets.Surrogate`1", names);
+            Assert.Equal("global::MetadataTargets.Surrogate<>", contract.Surrogate?.Type.SyntaxString);
         }
     }
 
     [Fact]
-    public async Task GeneratedManifestEmitsDeterministicAnnotatedMetadataRoots()
+    public async Task GeneratedManifestEmitsDeterministicTargetRegistrations()
     {
         var compilation = await TestCompilationHelper.CreateCompilation(Source);
         var result = RunGenerator(compilation, out var updatedCompilation);
@@ -105,24 +106,13 @@ public class ManifestMetadataTests
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         var metadata = GetMetadata(result);
-        var roots = metadata.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(static invocation => invocation.Expression.ToString() == "PreserveTypeMetadata")
-            .Select(static invocation => Assert.IsType<LiteralExpressionSyntax>(Assert.Single(invocation.ArgumentList.Arguments).Expression).Token.ValueText)
-            .ToArray();
-
-        Assert.Contains("MetadataTargets.Outer`1+Nested`1, TestProject", roots);
-        Assert.Contains("MetadataTargets.Target`1, TestProject", roots);
-        Assert.Contains("MetadataTargets.Surrogate`1, TestProject", roots);
-        Assert.Contains("MetadataTargets.Generated`1, TestProject", roots);
-        Assert.Equal(roots.Length, roots.Distinct(StringComparer.Ordinal).Count());
-
-        var helper = Assert.Single(metadata.DescendantNodes().OfType<MethodDeclarationSyntax>(),
-            static method => method.Identifier.ValueText == "PreserveTypeMetadata");
-        var attribute = Assert.Single(Assert.Single(helper.ParameterList.Parameters).AttributeLists).Attributes.Single();
-        Assert.NotNull(attribute.ArgumentList);
-        Assert.Equal("global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute", attribute.Name.ToString());
-        Assert.Equal("global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces",
-            Assert.Single(attribute.ArgumentList.Arguments).Expression.ToString());
+        var source = metadata.ToString();
+        Assert.Contains("config.AddBaseCodec(typeof(global::MetadataTargets.Codec<>), typeof(global::MetadataTargets.Outer<>.Nested<>))", source);
+        Assert.Contains("config.AddConverter(typeof(global::MetadataTargets.Converter<>), typeof(global::MetadataTargets.Outer<>.Nested<>), global::Orleans.Serialization.Configuration.SerializationType.Create", source);
+        Assert.Contains("SerializationType.Array", source);
+        Assert.Contains("SerializationType.Parameter(0)", source);
+        Assert.Contains("typeof(global::MetadataTargets.Generated<>)", source);
+        Assert.DoesNotContain("PreserveTypeMetadata", source);
 
         var reordered = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(),
             CSharpSyntaxTree.ParseText(Source.Replace(
@@ -137,20 +127,20 @@ public class ManifestMetadataTests
         var compilation = await TestCompilationHelper.CreateCompilation(Source);
         var symbol = compilation.GetTypeByMetadataName("MetadataTargets.Codec`1");
         Assert.NotNull(symbol);
-        var original = ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer);
+        var original = ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer, compilation);
 
         var changedCompilation = await TestCompilationHelper.CreateCompilation(
-            Source.Replace("Target<int>", "Target<string>", StringComparison.Ordinal));
+            Source.Replace("Outer<T>.Nested<Target<int>>", "Target<int>", StringComparison.Ordinal));
         var changedSymbol = changedCompilation.GetTypeByMetadataName("MetadataTargets.Codec`1");
         Assert.NotNull(changedSymbol);
-        var changed = ModelExtractor.ExtractRegisteredCodec(changedSymbol, RegisteredCodecKind.Serializer);
+        var changed = ModelExtractor.ExtractRegisteredCodec(changedSymbol, RegisteredCodecKind.Serializer, changedCompilation);
 
         Assert.NotEqual(original, changed);
-        Assert.Contains(changed.MetadataTypes, static type => type.MetadataName == "System.String");
+        Assert.Equal("global::MetadataTargets.Target<int>", Assert.Single(changed.Contracts).Target.Type.SyntaxString);
     }
 
     [Fact]
-    public async Task MetadataRootEmissionUsesAssemblyQualifiedNamesForInaccessibleTypes()
+    public async Task InaccessibleTargetRegistrationsResolveTheirAssemblyQualifiedType()
     {
         const string source = """
             using Orleans;
@@ -170,7 +160,37 @@ public class ManifestMetadataTests
 
         Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-        Assert.Contains("PreserveTypeMetadata(\"Container+Hidden`1, TestProject\")", GetMetadata(result).ToString());
+        Assert.Contains("global::System.Type.GetType(\"Container+Hidden`1[[System.Int32, System.Private.CoreLib]], TestProject\", true)", GetMetadata(result).ToString());
+        Assert.DoesNotContain("PreserveTypeMetadata", GetMetadata(result).ToString());
+    }
+
+    [Fact]
+    public async Task ParameterizedArrayContractsEmitTheirGenericParameterDescription()
+    {
+        const string source = """
+            using System;
+            using System.Buffers;
+            using Orleans;
+            using Orleans.Serialization.Buffers;
+            using Orleans.Serialization.Codecs;
+            using Orleans.Serialization.WireProtocol;
+            [RegisterSerializer]
+            public class Codec<T> : IFieldCodec<T[]>
+            {
+                public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, Type expected, T[] value)
+                    where TBufferWriter : IBufferWriter<byte> { }
+                public T[] ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var result = RunGenerator(compilation, out var updated);
+
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var metadata = GetMetadata(result).ToString();
+        Assert.Contains("config.AddSerializationContract(typeof(global::Codec<>), typeof(global::Orleans.Serialization.Codecs.IFieldCodec<>),", metadata);
+        Assert.Contains("SerializationType.Array(global::Orleans.Serialization.Configuration.SerializationType.Parameter(0), 1)", metadata);
+        Assert.DoesNotContain("config.AddSerializer(typeof(global::Codec<>))", metadata);
     }
 
     private static GeneratorRunResult RunGenerator(CSharpCompilation compilation, out Compilation updated)

@@ -2,7 +2,7 @@
   "scenario": "Metadata",
   "diagnostics": "legacy-visible",
   "rejectDiagnostics": [
-    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bPreserveTypeMetadata\\b",
-    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bMetadata_\\w+\\.ConfigureInner\\b"
+    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bMetadata_\\w+\\.ConfigureInner\\b",
+    "(?i)\\b(?:warning|error)\\s+IL\\d+[^\\r\\n]*\\bTypeManifestOptions\\.(?:AddSerializer|AddFieldCodec|AddBaseCodec|AddValueSerializer|AddCopier|AddBaseCopier|AddConverter|AddActivator|AddSerializationContract|AddContract)\\b"
   ]
 }

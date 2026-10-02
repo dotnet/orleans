@@ -137,13 +137,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithFields));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithFields));
-            PreserveTypeMetadata("TestProject.DemoDataWithFields, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithFields), typeof(global::TestProject.DemoDataWithFields));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoDataWithFields), typeof(global::TestProject.DemoDataWithFields));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithFields), typeof(global::TestProject.DemoDataWithFields));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataWithFields), typeof(global::TestProject.DemoDataWithFields));
         }
     }
 }
