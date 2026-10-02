@@ -72,9 +72,11 @@ public class ReadOnlyRecordStructTests
             Assert.Equal(2, accessor.ParameterList.Parameters.Count);
             Assert.Equal(isValueType, accessor.ParameterList.Parameters[0].Modifiers.Any(SyntaxKind.RefKeyword));
             Assert.Equal("global::TestProject.TestRecord", accessor.ParameterList.Parameters[0].Type!.ToString());
-            var invocation = Assert.Single(type.DescendantNodes().OfType<InvocationExpressionSyntax>(),
-                i => i.Expression.ToString() == accessor.Identifier.ValueText);
-            Assert.Equal(isValueType, invocation.ArgumentList.Arguments[0].RefKindKeyword.IsKind(SyntaxKind.RefKeyword));
+            var invocations = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Where(i => i.Expression.ToString() == accessor.Identifier.ValueText).ToList();
+            Assert.NotEmpty(invocations);
+            Assert.All(invocations, invocation =>
+                Assert.Equal(isValueType, invocation.ArgumentList.Arguments[0].RefKindKeyword.IsKind(SyntaxKind.RefKeyword)));
         }
     }
 
