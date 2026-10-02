@@ -21,6 +21,28 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Creates the default activator for a statically specified reference type.
+        /// </summary>
+        /// <typeparam name="T">The reference type to activate.</typeparam>
+        /// <returns>The default reference-type activator.</returns>
+        public static IActivator<T> CreateDefaultReferenceTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T>() where T : class => new DefaultReferenceTypeActivator<T>();
+
+        /// <summary>
+        /// Creates the default activator for a statically specified value type.
+        /// </summary>
+        /// <typeparam name="T">The value type to activate.</typeparam>
+        /// <returns>The default value-type activator.</returns>
+        public static IActivator<T> CreateDefaultValueTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T>() where T : struct => new DefaultValueTypeActivator<T>();
+
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
         private sealed class RecursiveServiceResolutionState

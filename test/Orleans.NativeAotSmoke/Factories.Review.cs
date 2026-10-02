@@ -13,6 +13,82 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void DefaultActivatorFactoriesPreserveConstructionSemantics()
+    {
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<Orleans.Serialization.Activators.IActivator<DefaultConstructedReference>>(
+                static _ => OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<DefaultConstructedReference>());
+            options.AddSerializerService<Orleans.Serialization.Activators.IActivator<UninitializedReference>>(
+                static _ => OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<UninitializedReference>());
+            options.AddSerializerService<Orleans.Serialization.Activators.IActivator<DefaultConstructedValue>>(
+                static _ => OrleansGeneratedCodeHelper.CreateDefaultValueTypeActivator<DefaultConstructedValue>());
+            options.AddSerializerService<ActivatorFactoryProbe>(provider => new ActivatorFactoryProbe(provider));
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        var result = OrleansGeneratedCodeHelper.GetService<ActivatorFactoryProbe>(null!, codecs);
+        Ensure(result.Reference.Value == 42, "Closed reference activator executes the public parameterless constructor.");
+        Ensure(result.Uninitialized.Value == 0, "Closed reference activator allocates types without a parameterless constructor.");
+        Ensure(result.Value.Value == 17, "Closed value activator executes its parameterless constructor.");
+        Ensure(ReferenceEquals(result.ReferenceActivator, codecs.GetActivator<DefaultConstructedReference>()),
+            "Root construction and direct lookup share the registered canonical activator.");
+        foreach (var explicitFirst in new[] { false, true })
+        {
+            var custom = new OverrideReferenceActivator();
+            var registrations = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            registrations.Configure<TypeManifestOptions>(options =>
+            {
+                if (explicitFirst) options.AddSerializerService<Orleans.Serialization.Activators.IActivator<DefaultConstructedReference>>(_ => custom);
+                options.AddDefaultSerializerService<Orleans.Serialization.Activators.IActivator<DefaultConstructedReference>>(
+                    static _ => OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<DefaultConstructedReference>());
+                if (!explicitFirst) options.AddSerializerService<Orleans.Serialization.Activators.IActivator<DefaultConstructedReference>>(_ => custom);
+            });
+            using var configured = registrations.BuildServiceProvider();
+            Ensure(ReferenceEquals(custom, configured.GetRequiredService<CodecProvider>().GetActivator<DefaultConstructedReference>()),
+                "Explicit activator factories replace defaults in either configuration order.");
+        }
+    }
+
+    private sealed class ActivatorFactoryProbe
+    {
+        public DefaultConstructedReference Reference { get; }
+        public UninitializedReference Uninitialized { get; }
+        public DefaultConstructedValue Value { get; }
+        public Orleans.Serialization.Activators.IActivator<DefaultConstructedReference> ReferenceActivator { get; }
+        public ActivatorFactoryProbe(ICodecProvider provider)
+        {
+            ReferenceActivator = provider.GetActivator<DefaultConstructedReference>();
+            Reference = ReferenceActivator.Create();
+            Uninitialized = provider.GetActivator<UninitializedReference>().Create();
+            Value = provider.GetActivator<DefaultConstructedValue>().Create();
+        }
+    }
+
+    private sealed class OverrideReferenceActivator : Orleans.Serialization.Activators.IActivator<DefaultConstructedReference>
+    {
+        public DefaultConstructedReference Create() => new();
+    }
+
+    public sealed class DefaultConstructedReference
+    {
+        public DefaultConstructedReference() => Value = 42;
+        public int Value { get; }
+    }
+
+    public sealed class UninitializedReference
+    {
+        public UninitializedReference(int value) => Value = value;
+        public int Value { get; }
+    }
+
+    public struct DefaultConstructedValue
+    {
+        public DefaultConstructedValue() => Value = 17;
+        public int Value { get; }
+    }
+
     public static void KeyedDescriptorsDoNotShadowUnkeyedInstances()
     {
         var unkeyed = new KeyedDependency<int>();

@@ -3456,6 +3456,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
 
+        public static Activators.IActivator<T> CreateDefaultReferenceTypeActivator<T>()
+            where T : class { throw null; }
+
+        public static Activators.IActivator<T> CreateDefaultValueTypeActivator<T>()
+            where T : struct { throw null; }
+
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
 
