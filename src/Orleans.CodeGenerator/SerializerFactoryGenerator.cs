@@ -219,10 +219,13 @@ internal static class SerializerFactoryGenerator
         foreach (var member in model.Members)
         {
             if (!member.IsSerializable && !member.IsCopyable) continue;
-            var generatedMember = new SerializerGenerator.SerializableMember(services, member);
-            if (generatedMember.GetGetterFieldDescription() is { InitializationSyntax: not null }
-                || generatedMember.GetSetterFieldDescription() is { InitializationSyntax: not null })
-                return $"serialized member '{member.Symbol.Name}' requires statically generated field accessor support";
+            if (SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
+            {
+                var generatedMember = new SerializerGenerator.SerializableMember(services, member);
+                if (generatedMember.GetGetterFieldDescription() is { InitializationSyntax: not null }
+                    || generatedMember.GetSetterFieldDescription() is { InitializationSyntax: not null })
+                    return $"serialized member '{member.Symbol.Name}' requires statically generated field accessor support";
+            }
             registration.Dependencies.Add(member.Type);
         }
 
@@ -273,6 +276,11 @@ internal static class SerializerFactoryGenerator
                 registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
             if (registration.ReferencedCodec is null || !definitionModel.IsShallowCopyable && registration.ReferencedCopier is null)
                 return "provide the referenced assembly's generated codec and copier implementations";
+            if (ReferencedSerializerImplementation.Validate(registration.ReferencedCodec) is { } codecReason)
+                return codecReason;
+            if (registration.ReferencedCopier is { } copier
+                && ReferencedSerializerImplementation.Validate(copier) is { } copierReason)
+                return copierReason;
 
             INamedTypeSymbol? ResolveImplementation(string name)
             {
