@@ -341,33 +341,44 @@ namespace UnitTests.MembershipTests
             var initial = await table.ReadAllAsync(token);
             Assert.Empty(initial.Members);
             var entry = CreateMembershipEntryForTest();
+            entry.HostName = "receipt-host";
+            entry.SiloName = "receipt-silo";
+            entry.StartTime = new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+            entry.IAmAliveTime = entry.StartTime.AddMinutes(1);
+            entry.SuspectTimes = [];
+            var expectedInsert = CaptureCanonicalEntry(entry);
             var inserted = await table.InsertRowWithResultAsync(entry, initial.Version.Next(), token);
             Assert.True(inserted.Succeeded);
             var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
             Assert.Equal(initial.Version.Version + 1, first.Version.Version);
             Assert.NotEqual(initial.Version.VersionEtag, first.Version.VersionEtag);
+            var retainedVersion = first.Version.Version;
             var retainedRowTag = first.RowETag;
             var retainedTableTag = first.Version.VersionEtag;
             if (inspectInsertSnapshot)
             {
                 var observed = await table.ReadAllAsync(token);
-                var row = Assert.Single(observed.Members);
+                Assert.Single(observed.Members);
+                var row = Assert.IsType<Tuple<MembershipEntry, string>>(observed.TryGet(entry.SiloAddress));
                 Assert.Equal(first.Version, observed.Version);
                 Assert.Equal(first.RowETag, row.Item2);
-                AssertCanonicalEntryEqual(CaptureCanonicalEntry(entry), CaptureCanonicalEntry(row.Item1));
+                AssertCanonicalEntryEqual(expectedInsert, CaptureCanonicalEntry(row.Item1));
             }
 
             entry.Status = SiloStatus.Active;
+            var expectedUpdate = CaptureCanonicalEntry(entry);
             var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
             Assert.True(updated.Succeeded);
             var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
             Assert.Equal(first.Version.Version + 1, second.Version.Version);
             Assert.NotEqual(retainedTableTag, second.Version.VersionEtag);
             var committed = await table.ReadAllAsync(token);
-            var committedRow = Assert.Single(committed.Members);
+            Assert.Single(committed.Members);
+            var committedRow = Assert.IsType<Tuple<MembershipEntry, string>>(committed.TryGet(entry.SiloAddress));
             Assert.Equal(second.Version, committed.Version);
             Assert.Equal(second.RowETag, committedRow.Item2);
-            AssertCanonicalEntryEqual(CaptureCanonicalEntry(entry), CaptureCanonicalEntry(committedRow.Item1));
+            AssertCanonicalEntryEqual(expectedUpdate, CaptureCanonicalEntry(committedRow.Item1));
+            Assert.Equal(retainedVersion, first.Version.Version);
             Assert.Equal(retainedTableTag, first.Version.VersionEtag);
             Assert.Equal(retainedRowTag, first.RowETag);
 
@@ -377,7 +388,8 @@ namespace UnitTests.MembershipTests
             Assert.Null(rejected.Receipt);
             var after = await table.ReadAllAsync(token);
             Assert.Equal(committed.Version, after.Version);
-            var unchanged = Assert.Single(after.Members);
+            Assert.Single(after.Members);
+            var unchanged = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress));
             Assert.Equal(committedRow.Item2, unchanged.Item2);
             AssertCanonicalEntryEqual(CaptureCanonicalEntry(committedRow.Item1), CaptureCanonicalEntry(unchanged.Item1));
         }
