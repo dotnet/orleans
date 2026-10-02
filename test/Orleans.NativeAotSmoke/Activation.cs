@@ -66,6 +66,12 @@ internal static class Activation
 
         var invocationValueActivator = new DefaultValueTypeActivator<ThrowingInvocationValueConstructor>();
         EnsureOriginalException(() => invocationValueActivator.Create(), ThrowingInvocationValueConstructor.Error);
+
+        var invocationReferenceWithoutInnerActivator = new DefaultReferenceTypeActivator<ThrowingInvocationReferenceConstructorWithoutInner>();
+        EnsureOriginalException(() => invocationReferenceWithoutInnerActivator.Create(), ThrowingInvocationReferenceConstructorWithoutInner.Error);
+
+        var invocationValueWithInnerActivator = new DefaultValueTypeActivator<ThrowingInvocationValueConstructorWithInner>();
+        EnsureOriginalException(() => invocationValueWithInnerActivator.Create(), ThrowingInvocationValueConstructorWithInner.Error);
     }
 
     private static void EnsureOriginalException(Action create, Exception expected)
@@ -136,7 +142,7 @@ internal static class Activation
 
     private sealed class ThrowingReferenceConstructor
     {
-        public static readonly InvalidOperationException Error = new("Reference constructor failed.");
+        public static readonly InvalidOperationException Error = new("Reference constructor failed.", new ArgumentException("Constructor inner exception."));
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingReferenceConstructor() => throw Error;
@@ -144,7 +150,7 @@ internal static class Activation
 
     private struct ThrowingValueConstructor
     {
-        public static readonly InvalidOperationException Error = new("Value constructor failed.");
+        public static readonly InvalidOperationException Error = new("Value constructor failed.", new ArgumentException("Constructor inner exception."));
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingValueConstructor() => throw Error;
@@ -164,5 +170,21 @@ internal static class Activation
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingInvocationValueConstructor() => throw Error;
+    }
+
+    private sealed class ThrowingInvocationReferenceConstructorWithoutInner
+    {
+        public static readonly TargetInvocationException Error = new(null);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationReferenceConstructorWithoutInner() => throw Error;
+    }
+
+    private struct ThrowingInvocationValueConstructorWithInner
+    {
+        public static readonly TargetInvocationException Error = new(new InvalidOperationException("Value constructor failed."));
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationValueConstructorWithInner() => throw Error;
     }
 }
