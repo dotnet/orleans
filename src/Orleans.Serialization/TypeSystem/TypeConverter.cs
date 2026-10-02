@@ -212,7 +212,10 @@ public class TypeConverter
                         }
                     }
 
-                    continue;
+                    if (!metadata.DiscoverInterfaces(type, genericType))
+                    {
+                        continue;
+                    }
                 }
 
                 var interfaces = type.GetInterfaces();
