@@ -25,6 +25,21 @@ public sealed class SerializerContextTests
     [Fact] public void ModelAliasesAndTypeIdsRoundTrip() => ContextContracts.ModelAliasesAndTypeIdsRoundTrip();
     [Fact] public void ExplicitContextsPreserveWireFormat() => ContextContracts.ExplicitContextsPreserveWireFormat();
 
+    [Fact]
+    public void AliasTreeDistinguishesPreservingTraversalAndExplicitReset()
+    {
+        var tree = Orleans.Serialization.TypeSystem.CompoundTypeAliasTree.Create();
+        var prefix = tree.Add("shared", typeof(int));
+        Assert.Same(prefix, tree.GetOrAdd("shared"));
+        Assert.Equal(typeof(int), prefix.Value);
+        tree.GetOrAdd("shared").Add("child", typeof(string));
+        Assert.Equal(typeof(int), prefix.Value);
+        tree.Add("shared");
+        Assert.Null(prefix.Value);
+        tree.Add("shared", typeof(long));
+        Assert.Equal(typeof(long), tree.GetOrAdd("shared").Value);
+    }
+
     [Theory]
     [InlineData("typeof(System.Collections.Generic.List<>)", "closed")]
     [InlineData("typeof(System.IO.Stream)", "GenerateSerializerAttribute")]

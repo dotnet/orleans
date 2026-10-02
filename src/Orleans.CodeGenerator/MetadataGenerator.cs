@@ -265,12 +265,12 @@ internal class MetadataGenerator(
                 body.Add(LocalDeclarationStatement(VariableDeclaration(
                     ParseTypeName("var"),
                     SingletonSeparatedList(VariableDeclarator(nodeName.Identifier).WithInitializer(EqualsValueClause(InvocationExpression(
-                        tree.Member("Add"),
+                        tree.Member(aliases.HasValue ? "Add" : "GetOrAdd"),
                         ArgumentList(SeparatedList(addArguments)))))))));
             }
             else
             {
-                body.Add(ExpressionStatement(InvocationExpression(tree.Member("Add"), ArgumentList(SeparatedList(addArguments)))));
+                body.Add(ExpressionStatement(InvocationExpression(tree.Member(aliases.HasValue ? "Add" : "GetOrAdd"), ArgumentList(SeparatedList(addArguments)))));
             }
         }
 

@@ -247,9 +247,9 @@ namespace OrleansCodeGen.TestProject
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass), typeof(global::TestProject.MyCompoundTypeAliasBaseClass));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass), typeof(global::TestProject.MyCompoundTypeAliasClass));
             config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
-            var n1 = config.CompoundTypeAliases.Add("xx_test_xx");
-            var n2 = n1.Add(typeof(global::TestProject.MyTypeAliasClass));
-            var n3 = n2.Add(typeof( int ));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("xx_test_xx");
+            var n2 = n1.GetOrAdd(typeof(global::TestProject.MyTypeAliasClass));
+            var n3 = n2.GetOrAdd(typeof(int));
             n3.Add("1", typeof(global::TestProject.MyCompoundTypeAliasClass));
         }
     }
