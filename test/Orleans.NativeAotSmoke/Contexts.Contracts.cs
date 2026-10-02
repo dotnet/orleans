@@ -380,6 +380,15 @@ public static partial class ContextContracts
         var aliases = services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>();
         Ensure(aliases.Parse("(\"multiple\",\"2\")") == typeof(MultipleAliasPayload)
             && aliases.Parse("(\"multiple\",\"1\")") == typeof(MultipleAliasPayload), "Both declared compound aliases resolve to the registered model.");
+        var unused = new MetadataEnvelope<UnusedAliasMarker> { Value = 97 };
+        Ensure(RoundTrip(services, unused).Value == 97, "Unused aliased generic arguments contribute type metadata.");
+        Ensure(services.GetRequiredService<DeepCopier>().Copy(unused).Value == 97, "Unused aliased generic arguments preserve copying.");
+        var unusedArray = new MetadataEnvelope<UnusedAliasMarker[]> { Value = 101 };
+        Ensure(RoundTrip(services, unusedArray).Value == 101, "Metadata-only generic array arguments register element aliases.");
+        Ensure(aliases.Parse(aliases.Format(typeof(MetadataEnvelope<UnusedAliasMarker[]>))) == typeof(MetadataEnvelope<UnusedAliasMarker[]>),
+            "Metadata-only argument aliases preserve closed type-name round-trips.");
+        Ensure(!services.GetRequiredService<Serializer>().CanSerialize<UnusedAliasMarker>(),
+            "Metadata-only alias registration preserves the marker's codec-free role.");
         using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
             .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
         {
@@ -470,6 +479,8 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(GenericArrayNode))]
 [GenerateSerializerContext(typeof(List<MultipleAliasPayload>))]
 [GenerateSerializerContext(typeof(List<NestedAliasPayload>))]
+[GenerateSerializerContext(typeof(MetadataEnvelope<UnusedAliasMarker>))]
+[GenerateSerializerContext(typeof(MetadataEnvelope<UnusedAliasMarker[]>))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
 [GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
@@ -610,3 +621,12 @@ public sealed class NestedAliasMarker;
 
 [GenerateSerializer, CompoundTypeAlias(typeof(NestedAliasMarker), "payload")]
 public sealed class NestedAliasPayload { [Id(0)] public int Value { get; set; } }
+
+[CompoundTypeAlias("unused-context-marker")]
+public sealed class UnusedAliasMarker;
+
+[GenerateSerializer]
+public sealed class MetadataEnvelope<T>
+{
+    [Id(0)] public int Value { get; set; }
+}
