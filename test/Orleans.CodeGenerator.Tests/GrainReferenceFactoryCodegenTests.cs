@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -20,7 +21,10 @@ public class GrainReferenceFactoryCodegenTests
         AssertCompiles(result, output);
         var generated = GetSource(result);
         Assert.Contains(
-            ".Add(typeof(global::TestProject.IDerived), typeof(OrleansCodeGen.TestProject.Proxy_IDerived), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IDerived(shared, key))",
+            ".Add(typeof(global::TestProject.IDerived), typeof(OrleansCodeGen.TestProject.Proxy_IDerived), OrleansCodeGen.TestProject.Proxy_IDerived.Create)",
+            generated, StringComparison.Ordinal);
+        Assert.Contains(
+            "public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IDerived(shared, key);",
             generated, StringComparison.Ordinal);
         Assert.Contains(".Add(typeof(global::TestProject.IGeneric<>), typeof(OrleansCodeGen.TestProject.Proxy_IGeneric<>))", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("GetConstructor", generated, StringComparison.Ordinal);
@@ -49,11 +53,11 @@ public class GrainReferenceFactoryCodegenTests
                     options.GetOrCreate<Factories>().Add(
                         typeof(IGeneric<int>),
                         typeof(OrleansCodeGen.TestProject.Proxy_IGeneric<int>),
-                        static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGeneric<int>(shared, key));
+                        OrleansCodeGen.TestProject.Proxy_IGeneric<int>.Create);
                     options.GetOrCreate<Factories>().Add(
                         typeof(Container<string>.INested<long>),
                         typeof(OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>),
-                        static (shared, key) => new OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>(shared, key));
+                        OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>.Create);
                 }
             }
             """;
@@ -117,7 +121,7 @@ public class GrainReferenceFactoryCodegenTests
                 public static void Configure(TypeManifestOptions options) => options.GetOrCreate<Factories>().Add(
                     typeof(Contracts.IGeneric<int>),
                     typeof(OrleansCodeGen.Contracts.Proxy_IGeneric<int>),
-                    static (shared, key) => new OrleansCodeGen.Contracts.Proxy_IGeneric<int>(shared, key));
+                    OrleansCodeGen.Contracts.Proxy_IGeneric<int>.Create);
             }
             """, "Consumer", MetadataReference.CreateFromImage(stream.ToArray()));
 
@@ -155,7 +159,81 @@ public class GrainReferenceFactoryCodegenTests
         var generated = GetSource(result);
         Assert.Contains("AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IPlain))", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("InterfaceProxyFactoryOptions", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("GrainReference Create", generated, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task GrainReferenceProxyFactoryUsesProtectedConstructor(bool generic, bool baseFactory)
+    {
+        var compilation = await TestCompilationHelper.CreateCompilation(CreateCustomProxySource(
+            "protected CustomReference(GrainReferenceShared shared, IdSpan key) : base(shared, key) { }", generic, baseFactory));
+
+        var (result, output) = Generate(compilation);
+
+        AssertCompiles(result, output);
+        Assert.DoesNotContain(output.GetDiagnostics(TestContext.Current.CancellationToken), static diagnostic => diagnostic.Id == "CS0108");
+        var generated = GetSource(result);
+        Assert.Contains(
+            generic ? "=> new Proxy_ICustom<T>(shared, key);" : "=> new Proxy_ICustom(shared, key);",
+            generated, StringComparison.Ordinal);
+        Assert.Contains(
+            generic
+                ? ".Add(typeof(global::TestProject.ICustom<>), typeof(OrleansCodeGen.TestProject.Proxy_ICustom<>))"
+                : ".Add(typeof(global::TestProject.ICustom), typeof(OrleansCodeGen.TestProject.Proxy_ICustom), OrleansCodeGen.TestProject.Proxy_ICustom.Create)",
+            generated, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task GrainReferenceProxyWithoutRequiredConstructorFailsCompilation(bool generic, bool privateConstructor)
+    {
+        var constructor = "protected CustomReference(GrainReferenceShared shared) : base(shared, default) { }";
+        if (privateConstructor)
+        {
+            constructor += "\nprivate CustomReference(GrainReferenceShared shared, IdSpan key) : base(shared, key) { }";
+        }
+
+        var compilation = await TestCompilationHelper.CreateCompilation(CreateCustomProxySource(constructor, generic));
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var (result, output) = Generate(compilation);
+
+        Assert.Empty(result.Diagnostics);
+        var diagnostic = Assert.Single(output.GetDiagnostics(TestContext.Current.CancellationToken),
+            static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Equal("CS1729", diagnostic.Id);
+        Assert.Contains("Proxy_ICustom", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("proxy", diagnostic.Location.SourceTree!.FilePath, StringComparison.Ordinal);
+        var construction = diagnostic.Location.SourceTree.GetRoot(TestContext.Current.CancellationToken)
+            .FindNode(diagnostic.Location.SourceSpan).FirstAncestorOrSelf<ObjectCreationExpressionSyntax>();
+        var errorText = Assert.IsType<ObjectCreationExpressionSyntax>(construction).ToString();
+        Assert.Contains("Proxy_ICustom", errorText, StringComparison.Ordinal);
+        Assert.Contains("shared, key", errorText, StringComparison.Ordinal);
+    }
+
+    private static string CreateCustomProxySource(string constructor, bool generic, bool baseFactory = false) => $$"""
+        using Orleans;
+        using Orleans.Runtime;
+        using Orleans.Serialization.Invocation;
+        using System.Threading.Tasks;
+        namespace TestProject;
+        public class CustomReference : GrainReference
+        {
+            {{constructor}}
+            public new ValueTask<T> InvokeAsync<T>(IRequest request) => base.InvokeAsync<T>(request);
+            public new ValueTask InvokeAsync(IRequest request) => base.InvokeAsync(request);
+            {{(baseFactory ? "public static GrainReference Create(GrainReferenceShared shared, IdSpan key) => throw new System.NotSupportedException(\"base-factory\");" : "")}}
+        }
+        [GenerateMethodSerializers(typeof(CustomReference))]
+        public interface ICustom{{(generic ? "<T>" : "")}} : IGrainWithStringKey { }
+        """;
 
     private static (GeneratorRunResult Result, Compilation Output) Generate(CSharpCompilation compilation)
     {

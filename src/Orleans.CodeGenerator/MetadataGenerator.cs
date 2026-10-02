@@ -79,7 +79,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
         }
 
-        var grainReferenceProxies = orderedProxyInterfaces.Where(static proxy => proxy.ProxyBase.SupportsGrainReferenceFactory).ToArray();
+        var grainReferenceProxies = orderedProxyInterfaces.Where(static proxy => proxy.ProxyBase.IsGrainReference).ToArray();
         if (grainReferenceProxies.Length > 0)
         {
             body.Add(ParseStatement(
@@ -162,7 +162,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private static void AddGrainReferenceFactory(List<StatementSyntax> body, TypeSyntax interfaceType, TypeSyntax proxyType, bool isClosed)
     {
-        var factory = isClosed ? $", static (shared, key) => new {proxyType}(shared, key)" : string.Empty;
+        var factory = isClosed ? $", {proxyType}.Create" : string.Empty;
         body.Add(ParseStatement($"proxyFactories.Add(typeof({interfaceType}), typeof({proxyType}){factory});"));
     }
 

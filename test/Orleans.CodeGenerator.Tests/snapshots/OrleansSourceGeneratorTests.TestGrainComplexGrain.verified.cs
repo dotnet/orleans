@@ -110,6 +110,7 @@ namespace OrleansCodeGen.TestProject
             _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IComplexGrain(shared, key);
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
@@ -450,7 +451,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
             var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
-            proxyFactories.Add(typeof(global::TestProject.IComplexGrain), typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IComplexGrain(shared, key));
+            proxyFactories.Add(typeof(global::TestProject.IComplexGrain), typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain), OrleansCodeGen.TestProject.Proxy_IComplexGrain.Create);
             config.AddInterface(typeof(global::TestProject.IComplexGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));

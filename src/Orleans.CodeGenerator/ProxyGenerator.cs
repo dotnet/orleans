@@ -32,6 +32,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
 
         var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        var factories = GenerateFactory(generatedClassName, interfaceDescription);
 
         var classDeclaration = ClassDeclaration(generatedClassName)
             .AddBaseListTypes(
@@ -41,6 +42,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(fieldDeclarations)
             .AddMembers(ctors)
+            .AddMembers(factories)
             .AddMembers(proxyMethods);
 
         var typeParameters = interfaceDescription.TypeParameters;
@@ -57,6 +59,35 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     public static string GetSimpleClassName(string name)
         => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
+
+    private MemberDeclarationSyntax[] GenerateFactory(string className, ProxyInterfaceDescription interfaceDescription)
+    {
+        if (LibraryTypes.Compilation.GetTypeByMetadataName("Orleans.Runtime.GrainReference") is not { } grainReference
+            || !interfaceDescription.ProxyBaseType.HasBaseType(grainReference))
+        {
+            return [];
+        }
+
+        var proxyType = interfaceDescription.TypeParameters.Count == 0
+            ? (TypeSyntax)IdentifierName(className)
+            : GenericName(Identifier(className), TypeArgumentList(SeparatedList<TypeSyntax>(
+                interfaceDescription.TypeParameters.Select(static parameter => parameter.Name.ToIdentifierName()))));
+        return
+        [
+            MethodDeclaration(grainReference.ToTypeSyntax(), "Create")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddParameterListParameters(
+                    Parameter(Identifier("shared")).WithType(ParseTypeName("global::Orleans.Runtime.GrainReferenceShared")),
+                    Parameter(Identifier("key")).WithType(ParseTypeName("global::Orleans.Runtime.IdSpan")))
+                .WithExpressionBody(ArrowExpressionClause(
+                    ObjectCreationExpression(proxyType).WithArgumentList(ArgumentList(SeparatedList(
+                    [
+                        Argument(IdentifierName("shared")),
+                        Argument(IdentifierName("key")),
+                    ])))))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+        ];
+    }
 
     private List<GeneratedFieldDescription> GetFieldDescriptions(
         ProxyInterfaceDescription interfaceDescription)

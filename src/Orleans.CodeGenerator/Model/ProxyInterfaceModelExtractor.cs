@@ -95,7 +95,8 @@ internal static class ProxyInterfaceModelExtractor
             isExtension,
             generatedClassNameComponent,
             TypeMetadataIdentity.Create(proxyBaseType),
-            SupportsGrainReferenceFactory(proxyBaseType));
+            compilation.GetTypeByMetadataName("Orleans.Runtime.GrainReference") is { } grainReference
+                && proxyBaseType.HasBaseType(grainReference));
 
         var name = GetProxyInterfaceName(typeSymbol, libraryTypes);
         var typeParameters = ExtractInterfaceTypeParameters(typeSymbol);
@@ -111,26 +112,6 @@ internal static class ProxyInterfaceModelExtractor
             methods,
             SourceLocation: SymbolSourceLocationExtractor.GetSourceLocation(typeSymbol),
             MetadataIdentity: TypeMetadataIdentity.Create(typeSymbol));
-    }
-
-    private static bool SupportsGrainReferenceFactory(INamedTypeSymbol proxyBaseType)
-    {
-        var isGrainReference = false;
-        for (var type = proxyBaseType; type is not null; type = type.BaseType)
-        {
-            if (type.ToDisplayString() == "Orleans.Runtime.GrainReference")
-            {
-                isGrainReference = true;
-                break;
-            }
-        }
-
-        return isGrainReference && proxyBaseType.InstanceConstructors.Any(static constructor =>
-            constructor.DeclaredAccessibility != Accessibility.Private
-            && constructor.Parameters.Length == 2
-            && constructor.Parameters.All(static parameter => parameter.RefKind == RefKind.None)
-            && constructor.Parameters[0].Type.ToDisplayString() == "Orleans.Runtime.GrainReferenceShared"
-            && constructor.Parameters[1].Type.ToDisplayString() == "Orleans.Runtime.IdSpan");
     }
 
     private static string GetProxyInterfaceName(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)

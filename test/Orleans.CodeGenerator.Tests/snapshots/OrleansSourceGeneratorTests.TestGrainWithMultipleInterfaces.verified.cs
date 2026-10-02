@@ -65,6 +65,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IGrainA(shared, key);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainA.MethodA(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
@@ -128,6 +129,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IGrainB(shared, key);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainB.MethodB(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
@@ -300,8 +302,8 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
             var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
-            proxyFactories.Add(typeof(global::TestProject.IGrainA), typeof(OrleansCodeGen.TestProject.Proxy_IGrainA), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGrainA(shared, key));
-            proxyFactories.Add(typeof(global::TestProject.IGrainB), typeof(OrleansCodeGen.TestProject.Proxy_IGrainB), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGrainB(shared, key));
+            proxyFactories.Add(typeof(global::TestProject.IGrainA), typeof(OrleansCodeGen.TestProject.Proxy_IGrainA), OrleansCodeGen.TestProject.Proxy_IGrainA.Create);
+            proxyFactories.Add(typeof(global::TestProject.IGrainB), typeof(OrleansCodeGen.TestProject.Proxy_IGrainB), OrleansCodeGen.TestProject.Proxy_IGrainB.Create);
             config.AddInterface(typeof(global::TestProject.IGrainA));
             config.AddInterface(typeof(global::TestProject.IGrainB));
             config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));

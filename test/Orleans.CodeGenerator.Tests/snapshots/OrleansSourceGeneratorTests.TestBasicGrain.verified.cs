@@ -65,6 +65,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IBasicGrain(shared, key);
         global::System.Threading.Tasks.Task<string> global::TestProject.IBasicGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1();
@@ -255,7 +256,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_BasicGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain));
             var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
-            proxyFactories.Add(typeof(global::TestProject.IBasicGrain), typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IBasicGrain(shared, key));
+            proxyFactories.Add(typeof(global::TestProject.IBasicGrain), typeof(OrleansCodeGen.TestProject.Proxy_IBasicGrain), OrleansCodeGen.TestProject.Proxy_IBasicGrain.Create);
             config.AddInterface(typeof(global::TestProject.IBasicGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));

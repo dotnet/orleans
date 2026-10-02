@@ -45,11 +45,11 @@ internal sealed class ReferenceConstructionFixture : IDisposable
         factories.Add(
             typeof(IGenericConstructionGrain<int>),
             typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>),
-            static (shared, key) => new OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>(shared, key));
+            OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>.Create);
         factories.Add(
             typeof(IGenericConstructionGrain<string>),
             typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>),
-            static (shared, key) => new OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>(shared, key));
+            OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>.Create);
 
         if (proxyType is not null)
         {
