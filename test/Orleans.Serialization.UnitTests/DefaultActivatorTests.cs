@@ -82,6 +82,7 @@ public sealed class DefaultActivatorTests
         var exception = Assert.Throws<InvalidOperationException>(() => activator.Create());
 
         Assert.Same(ThrowingReferenceConstructor.Error, exception);
+        Assert.Same(ThrowingReferenceConstructor.Error.InnerException, exception.InnerException);
         Assert.Contains(nameof(ThrowingReferenceConstructor), exception.StackTrace);
     }
 
@@ -93,6 +94,7 @@ public sealed class DefaultActivatorTests
         var exception = Assert.Throws<InvalidOperationException>(() => activator.Create());
 
         Assert.Same(ThrowingValueConstructor.Error, exception);
+        Assert.Same(ThrowingValueConstructor.Error.InnerException, exception.InnerException);
         Assert.Contains(nameof(ThrowingValueConstructor), exception.StackTrace);
     }
 
@@ -118,6 +120,30 @@ public sealed class DefaultActivatorTests
         Assert.Same(ThrowingInvocationValueConstructor.Error, exception);
         Assert.Null(exception.InnerException);
         Assert.Contains(nameof(ThrowingInvocationValueConstructor), exception.StackTrace);
+    }
+
+    [Fact]
+    public void ReferenceType_ConstructorThrowsTargetInvocationExceptionWithoutInner_PropagatesConstructorException()
+    {
+        var activator = new DefaultReferenceTypeActivator<ThrowingInvocationReferenceConstructorWithoutInner>();
+
+        var exception = Assert.Throws<TargetInvocationException>(() => activator.Create());
+
+        Assert.Same(ThrowingInvocationReferenceConstructorWithoutInner.Error, exception);
+        Assert.Null(exception.InnerException);
+        Assert.Contains(nameof(ThrowingInvocationReferenceConstructorWithoutInner), exception.StackTrace);
+    }
+
+    [Fact]
+    public void ValueType_ConstructorThrowsTargetInvocationExceptionWithInner_PropagatesConstructorException()
+    {
+        var activator = new DefaultValueTypeActivator<ThrowingInvocationValueConstructorWithInner>();
+
+        var exception = Assert.Throws<TargetInvocationException>(() => activator.Create());
+
+        Assert.Same(ThrowingInvocationValueConstructorWithInner.Error, exception);
+        Assert.Same(ThrowingInvocationValueConstructorWithInner.Error.InnerException, exception.InnerException);
+        Assert.Contains(nameof(ThrowingInvocationValueConstructorWithInner), exception.StackTrace);
     }
 
     [Fact]
@@ -178,7 +204,7 @@ public sealed class DefaultActivatorTests
 
     private sealed class ThrowingReferenceConstructor
     {
-        public static readonly InvalidOperationException Error = new("Reference constructor failed.");
+        public static readonly InvalidOperationException Error = new("Reference constructor failed.", new ArgumentException("Constructor inner exception."));
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingReferenceConstructor() => throw Error;
@@ -186,7 +212,7 @@ public sealed class DefaultActivatorTests
 
     private struct ThrowingValueConstructor
     {
-        public static readonly InvalidOperationException Error = new("Value constructor failed.");
+        public static readonly InvalidOperationException Error = new("Value constructor failed.", new ArgumentException("Constructor inner exception."));
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingValueConstructor() => throw Error;
@@ -206,5 +232,21 @@ public sealed class DefaultActivatorTests
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         public ThrowingInvocationValueConstructor() => throw Error;
+    }
+
+    private sealed class ThrowingInvocationReferenceConstructorWithoutInner
+    {
+        public static readonly TargetInvocationException Error = new(null);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationReferenceConstructorWithoutInner() => throw Error;
+    }
+
+    private struct ThrowingInvocationValueConstructorWithInner
+    {
+        public static readonly TargetInvocationException Error = new(new InvalidOperationException("Value constructor failed."));
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public ThrowingInvocationValueConstructorWithInner() => throw Error;
     }
 }
