@@ -19,6 +19,18 @@ public class ReadOnlyRecordStructTests
     public async Task InitOnlyPrimaryConstructorPropertyAccessorsUseMatchingReceivers(
         string declaration, bool isValueType, bool referencedAssembly)
     {
+        var property = referencedAssembly
+            ? "public byte[] Value { get; init; } = Value;"
+            : """
+              [System.NonSerialized]
+              private readonly byte[] _storage = Value;
+
+              public byte[] Value
+              {
+                  get => _storage;
+                  init => _storage = value;
+              }
+              """;
         var source = $$"""
             using Orleans;
 
@@ -27,14 +39,7 @@ public class ReadOnlyRecordStructTests
             [GenerateSerializer]
             public {{declaration}} TestRecord(byte[] Value)
             {
-                [System.NonSerialized]
-                private readonly byte[] _storage = Value;
-
-                public byte[] Value
-                {
-                    get => _storage;
-                    init => _storage = value;
-                }
+                {{property}}
             }
             """;
         var compilation = await TestCompilationHelper.CreateCompilation(source);
