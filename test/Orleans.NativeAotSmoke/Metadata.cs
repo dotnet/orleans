@@ -23,6 +23,7 @@ internal static class Metadata
         using var services = registrations.BuildServiceProvider();
         MetadataInitialization(services);
         TupleDefinitionMetadata(services);
+        ValidateInheritedInterfaceTarget(services.GetRequiredService<TypeConverter>());
         PrivateContractContainer.Validate(services.GetRequiredService<TypeConverter>());
         PrimitiveRoundTrip(services);
         ReferenceTupleRoundTrip(services);
@@ -70,6 +71,17 @@ internal static class Metadata
         Console.WriteLine($"{nameof(MetadataInitialization)} passed.");
     }
 
+    private static void ValidateInheritedInterfaceTarget(TypeConverter converter)
+    {
+        var type = converter.Parse("Orleans.NativeAotSmoke.InheritedInterfaceTarget,Orleans.NativeAotSmoke");
+        if (converter.Parse(converter.Format(type)) != type)
+        {
+            throw new InvalidOperationException("The inherited interface target was not preserved.");
+        }
+
+        Console.WriteLine("InheritedInterfaceTarget passed.");
+    }
+
     private static void TupleDefinitionMetadata(IServiceProvider services)
     {
         var converter = services.GetRequiredService<TypeConverter>();
@@ -113,3 +125,11 @@ internal static class Metadata
         Console.WriteLine($"{testName}<{typeof(T)}> passed.");
     }
 }
+
+internal interface ITargetMetadata<T>;
+internal sealed class InterfaceOnlyArgument<T>;
+internal class TargetMetadataBase : ITargetMetadata<InterfaceOnlyArgument<int>>;
+internal sealed class InheritedInterfaceTarget : TargetMetadataBase;
+
+[RegisterCopier]
+internal sealed class InheritedInterfaceTargetCopier : ShallowCopier<InheritedInterfaceTarget>;
