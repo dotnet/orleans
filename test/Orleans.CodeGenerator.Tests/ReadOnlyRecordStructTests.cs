@@ -124,7 +124,7 @@ public class ReadOnlyRecordStructTests
         public int Number { get; init; }
 
         [Id(1)]
-        public byte[] Extra { get; init; }
+        public byte[] Extra { get; init; } = [];
     }
 
     [GenerateSerializer]
