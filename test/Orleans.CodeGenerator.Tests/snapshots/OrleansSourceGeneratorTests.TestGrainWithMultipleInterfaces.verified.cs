@@ -302,11 +302,11 @@ namespace OrleansCodeGen.TestProject
             config.AddInterface(typeof(global::TestProject.IGrainA));
             config.AddInterface(typeof(global::TestProject.IGrainB));
             config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IGrainA));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IGrainA));
             n3.Add("11405B98", typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98));
-            var n5 = n2.Add(typeof(global::TestProject.IGrainB));
+            var n5 = n2.GetOrAdd(typeof(global::TestProject.IGrainB));
             n5.Add("6B5D7809", typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809));
         }
     }

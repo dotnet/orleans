@@ -168,6 +168,16 @@ public static partial class ContextContracts
         Ensure(result[0].Value == 17, "Generic model aliases round-trip.");
         Ensure(RoundTrip(services, new IdentifiedPayload { Value = 23 }).Value == 23, "Model type identifier round-trip.");
         Ensure(RoundTrip(services, new CompoundPayload { Value = 31 }).Value == 31, "Compound model alias round-trip.");
+        Ensure(RoundTrip(services, new List<NestedAliasPayload> { new() { Value = 89 } })[0].Value == 89, "Metadata-only alias components retain their own nested aliases.");
+        Ensure(RoundTrip(services, new List<MultipleAliasPayload> { new() { Value = 79 } })[0].Value == 79, "Every numeric compound alias is registered, including the formatter's lowest alias.");
+        var aliases = services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>();
+        Ensure(aliases.Parse("(\"multiple\",\"2\")") == typeof(MultipleAliasPayload)
+            && aliases.Parse("(\"multiple\",\"1\")") == typeof(MultipleAliasPayload), "Both declared compound aliases resolve to the registered model.");
+        using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
+            .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
+        {
+            Ensure(RoundTrip(separate, new List<MultipleAliasPayload> { new() { Value = 83 } })[0].Value == 83, "Multiple aliases remain registered when contexts are combined.");
+        }
         foreach (var split in new[] { false, true })
         {
             var registrations = new ServiceCollection();
@@ -240,6 +250,8 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(IdentifiedPayload))]
 [GenerateSerializerContext(typeof(List<CompoundPayload>))]
 [GenerateSerializerContext(typeof(ValuePayload<int>))]
+[GenerateSerializerContext(typeof(List<MultipleAliasPayload>))]
+[GenerateSerializerContext(typeof(List<NestedAliasPayload>))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
 [GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
@@ -336,3 +348,15 @@ public sealed class PrefixPayload { [Id(0)] public int Value { get; set; } }
 
 [GenerateSerializer, CompoundTypeAlias("shared", "child")]
 public sealed class ChildAliasPayload { [Id(0)] public int Value { get; set; } }
+
+[GenerateSerializer, CompoundTypeAlias("multiple", "2"), CompoundTypeAlias("multiple", "1")]
+public sealed class MultipleAliasPayload { [Id(0)] public int Value { get; set; } }
+
+[GenerateSerializerContext(typeof(List<MultipleAliasPayload>))]
+internal partial class MultipleAliasContext : SerializerContext;
+
+[CompoundTypeAlias("metadata-marker")]
+public sealed class NestedAliasMarker;
+
+[GenerateSerializer, CompoundTypeAlias(typeof(NestedAliasMarker), "payload")]
+public sealed class NestedAliasPayload { [Id(0)] public int Value { get; set; } }
