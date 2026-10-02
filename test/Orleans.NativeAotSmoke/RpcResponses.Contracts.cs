@@ -14,6 +14,38 @@ namespace Orleans.NativeAotSmoke;
 
 public static class RpcResponseContracts
 {
+    public static void CanonicalValueAndArrayServices()
+    {
+        using var services = CreateServices();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var sessions = services.GetRequiredService<SerializerSessionPool>();
+        var valueSerializer = new ValueSerializer<RpcGeneratedValue<int>>(provider, sessions);
+        var original = new RpcGeneratedValue<int> { Value = 47 };
+        var output = new ArrayBufferWriter<byte>();
+        valueSerializer.Serialize(ref original, output);
+        var value = new RpcGeneratedValue<int>();
+        valueSerializer.Deserialize(output.WrittenMemory, ref value);
+        Ensure(value.Value == 47, "The public value serializer uses the generated struct codec.");
+#if NATIVE_AOT_SMOKE
+        Ensure(ReferenceEquals(provider.GetValueSerializer<RpcGeneratedValue<int>>(), provider.GetCodec<RpcGeneratedValue<int>>()),
+            "Value and field serializer services share the same generated codec instance.");
+#endif
+
+        var box = new RpcResponseBox<byte> { Value = [7, 9] };
+        using var response = Response.FromResult(box);
+        using var copied = Copy(services, response);
+        using var roundTrip = RoundTrip(services, response);
+        var copy = copied.GetResult<RpcResponseBox<byte>>();
+        var result = roundTrip.GetResult<RpcResponseBox<byte>>();
+        Ensure(copy is not null && result is not null && result.Value.Length == 2 && result.Value[0] == 7 && result.Value[1] == 9,
+            "Closed generic array codecs preserve the response payload.");
+        Ensure(!ReferenceEquals(box, copy) && !ReferenceEquals(box.Value, copy.Value), "Canonical generic array copying isolates the result.");
+        copy.Value[0] = 3;
+        Ensure(box.Value[0] == 7, "Mutating the copied generic byte array leaves the original unchanged.");
+        Ensure(provider.GetCodec<byte[]>() is ByteArrayCodec && provider.GetDeepCopier<byte[]>() is ByteArrayCopier,
+            "Auxiliary generic array services preserve optimized direct byte-array dispatch.");
+    }
+
     public static void PrimitiveResponses()
     {
         using var services = CreateServices();

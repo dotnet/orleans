@@ -14,6 +14,26 @@ public interface IRpcResponses : IGrainWithIntegerKey
 
     [Id(2)]
     Task<RpcResponsePayload> Payload();
+
+    [Id(3)]
+    Task<RpcGeneratedValue<int>> Value();
+
+    [Id(4)]
+    Task<RpcResponseBox<byte>> Bytes();
+}
+
+[GenerateSerializer]
+public struct RpcGeneratedValue<T>
+{
+    [Id(0)]
+    public T Value { get; set; }
+}
+
+[GenerateSerializer]
+public sealed class RpcResponseBox<T>
+{
+    [Id(0)]
+    public T[] Value { get; set; } = null!;
 }
 
 [GenerateSerializer]
