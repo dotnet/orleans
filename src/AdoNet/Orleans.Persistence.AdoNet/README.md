@@ -96,9 +96,7 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [SQLite Persistence Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
 The SQLite scripts are idempotent: reapplying them refreshes the persistence
-queries and records `StorageSchemaVersion` in `OrleansQuery`, preserving grain
-state. Provider startup checks that version and reports an upgrade error naming
-the current scripts when the database schema is insufficiently up to date.
+queries while preserving grain state.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

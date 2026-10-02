@@ -62,8 +62,7 @@ namespace Tester.AdoNet.Persistence
 
         public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(
             CancellationToken cancellationToken,
-            string storageName = "SqliteGrainStorageForTest",
-            string? connectionString = null)
+            string storageName = "SqliteGrainStorageForTest")
         {
             var providerRuntime = new ClientProviderRuntime(
                 this.InternalGrainFactory,
@@ -72,7 +71,7 @@ namespace Tester.AdoNet.Persistence
 
             var options = new AdoNetGrainStorageOptions
             {
-                ConnectionString = connectionString ?? this.ConnectionString,
+                ConnectionString = this.ConnectionString,
                 Invariant = AdoInvariant,
                 GrainStorageSerializer = new JsonGrainStorageSerializer(providerRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!)
             };

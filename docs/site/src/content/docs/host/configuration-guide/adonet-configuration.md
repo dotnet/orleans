@@ -45,10 +45,7 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the 
 - [SQLite](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
 The SQLite scripts are idempotent. Reapplying them refreshes persistence queries
-and records `StorageSchemaVersion` in `OrleansQuery`, preserving grain state.
-Provider startup reads this version and requires a sufficiently up-to-date
-schema. An upgrade error identifies the provider and directs the developer to
-apply the current SQLite main and persistence scripts.
+while preserving grain state.
 
 ## Reminders
 
