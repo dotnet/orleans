@@ -2272,8 +2272,10 @@ public class DemoClass
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(provider)", source);
         Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_Payload>(caller, provider)", source);
         Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_Payload>(caller, provider)", source);
-        Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>>"));
-        Assert.Contains("RuntimeFeature.IsDynamicCodeSupported", source);
+        Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>,"));
+        Assert.DoesNotContain("RuntimeFeature.IsDynamicCodeSupported", source);
+        Assert.Contains("codecDependencies: new global::System.Type[]", source);
+        Assert.Contains("copierDependencies: new global::System.Type[]", source);
         Assert.DoesNotContain("GetService<global::Orleans.Serialization.Codecs.IFieldCodec<", source);
         Assert.DoesNotContain("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<", source);
         Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
@@ -2334,7 +2336,7 @@ public class DemoClass
     }
 
     [Fact]
-    public async Task RpcResponseFactoriesRootCanonicalModelsInMetadataMode()
+    public async Task RpcResponseFactoriesRootCanonicalModelsInCommonPipeline()
     {
         var compilation = await CreateCompilation("""
             using Orleans;
@@ -2352,11 +2354,12 @@ public class DemoClass
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
         var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
-        Assert.Contains("if (!options.RequireExplicitTypeRegistration)", source);
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+        Assert.DoesNotContain("RuntimeFeature.IsDynamicCodeSupported", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Copier_Payload(", source);
         Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
-        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<global::TestProject.Payload>>", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<global::TestProject.Payload>,", source);
         Assert.Contains("OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<global::TestProject.Payload>()", source);
         Assert.DoesNotContain("MakeGenericType", source);
         var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
