@@ -792,7 +792,8 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider, IServiceProviderIsService
+        private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider, IServiceProviderIsService,
+            IKeyedServiceProvider, IServiceProviderIsKeyedService
         {
             public object? GetService(Type serviceType)
             {
@@ -801,7 +802,8 @@ namespace Orleans.Serialization.Serializers
                     owner._constructionFailure?.Throw();
                     if (owner._pendingSerializerServices is not null)
                     {
-                        if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)) return this;
+                        if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
+                            || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
                         if (IsProviderService(serviceType)) return owner;
                         var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == serviceType)
                             ?? owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && serviceType.IsConstructedGenericType
@@ -817,10 +819,74 @@ namespace Orleans.Serialization.Serializers
                 return serviceType == typeof(IServiceProvider) ? this : owner._serviceProvider.GetService(serviceType);
             }
 
+            public object? GetKeyedService(Type serviceType, object? serviceKey)
+                => ResolveKeyedService(serviceType, serviceKey, required: false);
+
+            public object GetRequiredKeyedService(Type serviceType, object? serviceKey)
+                => ResolveKeyedService(serviceType, serviceKey, required: true)!;
+
+            private object? ResolveKeyedService(Type serviceType, object? serviceKey, bool required)
+            {
+                if (serviceKey is null)
+                {
+                    var unkeyed = GetService(serviceType);
+                    if (unkeyed is null && required)
+                        owner.ThrowResolutionFailure(new InvalidOperationException($"No service for type '{serviceType}' has been registered."));
+                    return unkeyed;
+                }
+
+                lock (owner._serializerServiceLock)
+                {
+                    owner._constructionFailure?.Throw();
+                    if (owner._pendingSerializerServices is not null)
+                    {
+                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
+                            && Equals(descriptor.ServiceKey, serviceKey) && descriptor.ServiceType == serviceType)
+                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
+                                && Equals(descriptor.ServiceKey, serviceKey) && serviceType.IsConstructedGenericType
+                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition())
+                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
+                                && Equals(descriptor.ServiceKey, KeyedService.AnyKey) && descriptor.ServiceType == serviceType)
+                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
+                                && Equals(descriptor.ServiceKey, KeyedService.AnyKey) && serviceType.IsConstructedGenericType
+                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
+                        if (descriptor?.KeyedImplementationInstance is { } instance) return instance;
+                        if (descriptor is null && !required) return null;
+                        var error = new InvalidOperationException($"Dependency injection cannot resolve keyed service {serviceType} while a serialization graph is unpublished. Provide an explicit keyed instance registration.");
+                        owner.ThrowResolutionFailure(error);
+                    }
+                }
+
+                if (owner._serviceProvider is not IKeyedServiceProvider keyedProvider)
+                    throw new InvalidOperationException("This service provider doesn't support keyed services.");
+                return required
+                    ? keyedProvider.GetRequiredKeyedService(serviceType, serviceKey)
+                    : keyedProvider.GetKeyedService(serviceType, serviceKey);
+            }
+
+            public bool IsKeyedService(Type serviceType, object? serviceKey)
+            {
+                if (serviceKey is null) return IsService(serviceType);
+                lock (owner._serializerServiceLock)
+                {
+                    owner._constructionFailure?.Throw();
+                    if (owner._pendingSerializerServices is not null)
+                    {
+                        return owner._serviceDescriptors.Any(descriptor => descriptor.IsKeyedService
+                            && (Equals(descriptor.ServiceKey, serviceKey) || Equals(descriptor.ServiceKey, KeyedService.AnyKey))
+                            && (descriptor.ServiceType == serviceType
+                                || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition()));
+                    }
+                }
+
+                return owner._serviceProvider.GetRequiredService<IServiceProviderIsKeyedService>().IsKeyedService(serviceType, serviceKey);
+            }
+
             public bool IsService(Type serviceType)
                 => IsProviderService(serviceType)
                     || serviceType == typeof(IServiceProvider)
                     || serviceType == typeof(IServiceProviderIsService)
+                    || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
                     || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
                     || owner._serviceDescriptors.Any(descriptor => !descriptor.IsKeyedService
                         && (descriptor.ServiceType == serviceType

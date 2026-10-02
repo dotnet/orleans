@@ -13,6 +13,123 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void KeyedFacadePreservesProviderCapabilitiesOutsideConstruction()
+    {
+        var unkeyed = new KeyedDependency<int>();
+        var keyed = new KeyedDependency<int>();
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.AddSingleton<IKeyedDependency<int>>(unkeyed);
+        services.AddKeyedSingleton<IKeyedDependency<int>>("instance", keyed);
+        var constructions = 0;
+        services.AddKeyedSingleton<IKeyedDependency<string>>("factory", (_, _) =>
+        {
+            constructions++;
+            return new KeyedDependency<string>();
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        var facade = codecs.Services;
+        Ensure(facade is IKeyedServiceProvider, "The stable facade retains keyed resolution capability.");
+        Ensure(ReferenceEquals(keyed, facade.GetRequiredKeyedService<IKeyedDependency<int>>("instance")),
+            "Required keyed lookup preserves the registered instance.");
+        Ensure(facade.GetKeyedService<IKeyedDependency<int>>("missing") is null, "Optional missing keyed lookup returns null outside construction.");
+        Expect<InvalidOperationException>(() => facade.GetRequiredKeyedService<IKeyedDependency<int>>("missing"), "registered");
+        Ensure(ReferenceEquals(unkeyed, facade.GetRequiredKeyedService<IKeyedDependency<int>>(null)),
+            "A null key retains the ordinary unkeyed lookup contract.");
+        var availability = facade.GetRequiredService<IServiceProviderIsKeyedService>();
+        Ensure(availability.IsKeyedService(typeof(IKeyedDependency<int>), "instance")
+            && availability.IsKeyedService(typeof(IKeyedDependency<string>), "factory")
+            && availability.IsKeyedService(typeof(IKeyedDependency<int>), null)
+            && !availability.IsKeyedService(typeof(IKeyedDependency<int>), "missing"),
+            "Keyed availability retains required, optional, and null-key semantics.");
+        Ensure(((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "instance"),
+            "Direct keyed availability queries preserve the provider capability.");
+        var fromFactory = facade.GetRequiredKeyedService<IKeyedDependency<string>>("factory");
+        Ensure(ReferenceEquals(fromFactory, facade.GetRequiredKeyedService<IKeyedDependency<string>>("factory")) && constructions == 1,
+            "Outside construction, keyed singleton creation remains container-owned and cached once.");
+        Ensure(ReferenceEquals(facade, codecs.Services), "The facade identity remains stable after keyed resolution.");
+    }
+
+    public static void CapturedKeyedFacadeGuardsPendingConstruction()
+    {
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        var instance = new KeyedDependency<int>();
+        services.AddSingleton<IKeyedDependency<int>>(instance);
+        var keyedConstructions = 0;
+        services.AddKeyedSingleton<IKeyedDependency<int>>("instance", instance);
+        services.AddKeyedSingleton<IKeyedDependency<int>>("factory", (_, _) =>
+        {
+            keyedConstructions++;
+            return new KeyedDependency<int>();
+        });
+        IServiceProvider facade = null!;
+        var leaves = 0;
+        var attempts = 0;
+        InvalidOperationException? caught = null;
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<KeyedConstructionLeaf>(_ => new KeyedConstructionLeaf(++leaves));
+            options.AddSerializerService<KeyedConstructionRoot>(provider =>
+            {
+                var leaf = OrleansGeneratedCodeHelper.GetService<KeyedConstructionLeaf>(null!, provider);
+                if (++attempts == 1)
+                {
+                    Ensure(((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "factory"),
+                        "Captured availability remains observable without entering keyed singleton construction.");
+                    try
+                    {
+                        _ = facade.GetRequiredKeyedService<IKeyedDependency<int>>("factory");
+                    }
+                    catch (InvalidOperationException error)
+                    {
+                        caught = error;
+                    }
+                }
+                Ensure(((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "instance"),
+                    "The explicit keyed instance is available during pending construction.");
+                Ensure(ReferenceEquals(instance, facade.GetRequiredKeyedService<IKeyedDependency<int>>(null)),
+                    "A captured null-key lookup retains safe unkeyed-instance resolution during construction.");
+                Ensure(facade.GetKeyedService<IKeyedDependency<int>>("missing") is null,
+                    "Optional absent keyed services remain absent without container entry during construction.");
+                return new KeyedConstructionRoot(leaf, facade.GetRequiredKeyedService<IKeyedDependency<int>>("instance"));
+            });
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        facade = codecs.Services;
+        var committed = codecs.GetCodec<int>();
+        InvalidOperationException? failed = null;
+        try
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<KeyedConstructionRoot>(null!, codecs);
+        }
+        catch (InvalidOperationException error)
+        {
+            failed = error;
+        }
+        Ensure(failed is not null && ReferenceEquals(failed, caught), "A caught keyed DI rejection faults the root with the original exception.");
+        Ensure(keyedConstructions == 0 && leaves == 1, "The captured facade rejects keyed singleton construction before entering DI.");
+        var rebuilt = OrleansGeneratedCodeHelper.GetService<KeyedConstructionRoot>(null!, codecs);
+        Ensure(ReferenceEquals(instance, rebuilt.Dependency), "Explicit keyed instances remain safe during construction.");
+        Ensure(leaves == 2 && rebuilt.Leaf.Generation == 2
+            && ReferenceEquals(rebuilt.Leaf, OrleansGeneratedCodeHelper.GetService<KeyedConstructionLeaf>(null!, codecs)),
+            "Retry rebuilds and commits the canonical leaf after keyed rejection.");
+        Ensure(ReferenceEquals(committed, codecs.GetCodec<int>()), "Keyed rejection preserves committed leaves.");
+        _ = facade.GetRequiredKeyedService<IKeyedDependency<int>>("factory");
+        Ensure(keyedConstructions == 1, "The captured facade forwards keyed factory lookup once the graph is complete.");
+    }
+
+    private sealed class KeyedConstructionLeaf(int generation)
+    {
+        public int Generation { get; } = generation;
+    }
+
+    private sealed class KeyedConstructionRoot(KeyedConstructionLeaf leaf, IKeyedDependency<int> dependency)
+    {
+        public KeyedConstructionLeaf Leaf { get; } = leaf;
+        public IKeyedDependency<int> Dependency { get; } = dependency;
+    }
+
     public static void DefaultActivatorFactoriesPreserveConstructionSemantics()
     {
         var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());

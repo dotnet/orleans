@@ -51,4 +51,10 @@ public sealed class StaticSerializerFactoryTests
 
     [Fact]
     public void DefaultActivatorFactoriesPreserveConstructionSemantics() => StaticFactoryContracts.DefaultActivatorFactoriesPreserveConstructionSemantics();
+
+    [Fact]
+    public void KeyedFacadePreservesProviderCapabilitiesOutsideConstruction() => StaticFactoryContracts.KeyedFacadePreservesProviderCapabilitiesOutsideConstruction();
+
+    [Fact]
+    public void CapturedKeyedFacadeGuardsPendingConstruction() => StaticFactoryContracts.CapturedKeyedFacadeGuardsPendingConstruction();
 }
