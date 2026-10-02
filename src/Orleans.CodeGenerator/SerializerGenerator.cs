@@ -69,7 +69,6 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddBaseListTypes(SimpleBaseType(baseType))
             .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-            .AddAttributeLists(ReferencedSerializerImplementation.GetAccessorContract(fieldDescriptions))
             .AddMembers(fieldDeclarations);
 
         if (ctor != null)

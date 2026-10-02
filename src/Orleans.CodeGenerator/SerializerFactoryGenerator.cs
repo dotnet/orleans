@@ -572,11 +572,6 @@ internal static class SerializerFactoryGenerator
                 return "provide the referenced assembly's generated codec and copier implementations";
             }
 
-            if (ReferencedSerializerImplementation.Validate(registration.ReferencedCodec) is { } codecReason)
-                return codecReason;
-            if (registration.ReferencedCopier is { } copier
-                && ReferencedSerializerImplementation.Validate(copier) is { } copierReason)
-                return copierReason;
 
             INamedTypeSymbol? ResolveImplementation(string name)
             {

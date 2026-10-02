@@ -11,7 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithGeneratedActivatorConstructor);
@@ -90,7 +89,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

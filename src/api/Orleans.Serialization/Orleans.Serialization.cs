@@ -4488,7 +4488,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_CodecNotFoundException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.CodecNotFoundException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_CodecNotFoundException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.CodecNotFoundException> _activator) { }
@@ -4507,7 +4506,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ExtendedWireTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ExtendedWireTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ExtendedWireTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4526,7 +4524,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_FieldIdNotPresentException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldIdNotPresentException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_FieldIdNotPresentException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4545,7 +4542,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_FieldTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_FieldTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4564,7 +4560,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_FieldTypeMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FieldTypeMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_FieldTypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.FieldTypeMissingException> _activator) { }
@@ -4583,7 +4578,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_IllegalTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.IllegalTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_IllegalTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.IllegalTypeException> _activator) { }
@@ -4602,7 +4596,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ReferenceFieldNotSupportedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ReferenceFieldNotSupportedException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ReferenceFieldNotSupportedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.ReferenceFieldNotSupportedException> _activator) { }
@@ -4621,7 +4614,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ReferenceNotFoundException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.ReferenceNotFoundException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ReferenceNotFoundException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.ReferenceNotFoundException> _activator) { }
@@ -4640,7 +4632,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_RequiredFieldMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.RequiredFieldMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_RequiredFieldMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.RequiredFieldMissingException> _activator) { }
@@ -4659,7 +4650,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SchemaTypeInvalidException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.SchemaTypeInvalidException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_SchemaTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4678,7 +4668,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SerializerException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.SerializerException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Serialization.SerializerException>, global::Orleans.Serialization.Serializers.IBaseCodec
     {
         public Codec_SerializerException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer) { }
@@ -4697,7 +4686,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_TypeMissingException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.TypeMissingException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_TypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4716,7 +4704,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_UnexpectedLengthPrefixValueException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnexpectedLengthPrefixValueException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnexpectedLengthPrefixValueException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnexpectedLengthPrefixValueException> _activator) { }
@@ -4735,7 +4722,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_UnknownReferencedTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownReferencedTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnknownReferencedTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownReferencedTypeException> _activator) { }
@@ -4754,7 +4740,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_UnknownWellKnownTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnknownWellKnownTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnknownWellKnownTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.UnknownWellKnownTypeException> _activator) { }
@@ -4773,7 +4758,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_UnsupportedWireTypeException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.UnsupportedWireTypeException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_UnsupportedWireTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4792,7 +4776,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_CodecNotFoundException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.CodecNotFoundException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_CodecNotFoundException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4801,7 +4784,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ExtendedWireTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ExtendedWireTypeInvalidException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_ExtendedWireTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4810,7 +4792,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_FieldIdNotPresentException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldIdNotPresentException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_FieldIdNotPresentException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4819,7 +4800,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_FieldTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldTypeInvalidException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_FieldTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4828,7 +4808,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_FieldTypeMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.FieldTypeMissingException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_FieldTypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4837,7 +4816,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_IllegalTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.IllegalTypeException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_IllegalTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4848,7 +4826,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ReferenceFieldNotSupportedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ReferenceFieldNotSupportedException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_ReferenceFieldNotSupportedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4859,7 +4836,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ReferenceNotFoundException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.ReferenceNotFoundException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_ReferenceNotFoundException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4870,7 +4846,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_RequiredFieldMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.RequiredFieldMissingException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_RequiredFieldMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4879,7 +4854,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SchemaTypeInvalidException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.SchemaTypeInvalidException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_SchemaTypeInvalidException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4888,7 +4862,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SerializerException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.SerializerException, System.Exception>
     {
         public Copier_SerializerException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4897,7 +4870,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_TypeMissingException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.TypeMissingException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_TypeMissingException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4906,7 +4878,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_UnexpectedLengthPrefixValueException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnexpectedLengthPrefixValueException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_UnexpectedLengthPrefixValueException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4915,7 +4886,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_UnknownReferencedTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownReferencedTypeException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_UnknownReferencedTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4926,7 +4896,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_UnknownWellKnownTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnknownWellKnownTypeException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_UnknownWellKnownTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4937,7 +4906,6 @@ namespace OrleansCodeGen.Orleans.Serialization
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_UnsupportedWireTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnsupportedWireTypeException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_UnsupportedWireTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -4949,7 +4917,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ArrayListSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ArrayListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4968,7 +4935,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ConcurrentDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ConcurrentDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4987,7 +4953,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ConcurrentQueueSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ConcurrentQueueSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5006,7 +4971,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_CultureInfoSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.CultureInfoSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.CultureInfoSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.CultureInfoSurrogate instance) { }
@@ -5023,7 +4987,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5042,7 +5005,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_FrozenSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5061,7 +5023,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableArraySurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableArraySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5080,7 +5041,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5099,7 +5059,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableHashSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableHashSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5118,7 +5077,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableListSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5137,7 +5095,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableQueueSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableQueueSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5156,7 +5113,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableSortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableSortedDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5175,7 +5131,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableSortedSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableSortedSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5194,7 +5149,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ImmutableStackSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ImmutableStackSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5213,7 +5167,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_NameValueCollectionSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_NameValueCollectionSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5232,7 +5185,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ReadOnlyCollectionSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ReadOnlyCollectionSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5251,7 +5203,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ReadOnlyDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_ReadOnlyDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5270,7 +5221,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_SortedDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5289,7 +5239,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SortedListSurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_SortedListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5308,7 +5257,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SortedSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public Codec_SortedSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5327,7 +5275,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_VersionSurrogate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Codecs.VersionSurrogate>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.Codecs.VersionSurrogate>, global::Orleans.Serialization.Serializers.IValueSerializer
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Serialization.Codecs.VersionSurrogate instance) { }
@@ -5344,7 +5291,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ArrayListSurrogate : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ArrayListSurrogate>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ArrayListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5355,7 +5301,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ConcurrentDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ConcurrentDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5366,7 +5311,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ConcurrentQueueSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ConcurrentQueueSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ConcurrentQueueSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5377,7 +5321,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_FrozenDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_FrozenDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5388,7 +5331,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_FrozenSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.FrozenSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_FrozenSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5399,7 +5341,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableArraySurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableArraySurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableArraySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5410,7 +5351,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5421,7 +5361,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableHashSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableHashSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5432,7 +5371,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableListSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableListSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5443,7 +5381,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableQueueSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableQueueSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableQueueSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5454,7 +5391,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableSortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableSortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableSortedDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5465,7 +5401,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableSortedSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableSortedSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableSortedSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5476,7 +5411,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ImmutableStackSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ImmutableStackSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ImmutableStackSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5487,7 +5421,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_NameValueCollectionSurrogate : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.NameValueCollectionSurrogate>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_NameValueCollectionSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5498,7 +5431,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ReadOnlyCollectionSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ReadOnlyCollectionSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5509,7 +5441,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_ReadOnlyDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_ReadOnlyDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5520,7 +5451,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SortedDictionarySurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedDictionarySurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_SortedDictionarySurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5531,7 +5461,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SortedListSurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedListSurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_SortedListSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5542,7 +5471,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Codecs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SortedSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Codecs.SortedSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_SortedSetSurrogate(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5556,7 +5484,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Invocation
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_CompletedResponse : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Invocation.CompletedResponse>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_CompletedResponse(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Invocation.CompletedResponse> _activator) { }
@@ -5575,7 +5502,6 @@ namespace OrleansCodeGen.Orleans.Serialization.Invocation
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ExceptionResponse : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Invocation.ExceptionResponse>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ExceptionResponse(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
