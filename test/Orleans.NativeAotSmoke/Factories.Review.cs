@@ -273,7 +273,8 @@ public static partial class StaticFactoryContracts
     {
         public BaseSpecializationLeaf Leaf { get; } = leaf;
         public void Serialize<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, BaseSpecializationValue value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+            where TBufferWriter : System.Buffers.IBufferWriter<byte>
+        { }
         public void Deserialize<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, BaseSpecializationValue value) { }
     }
 

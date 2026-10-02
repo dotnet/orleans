@@ -102,6 +102,13 @@ internal static class SerializerFactoryGenerator
             }
         }
 
+        if (requiresActivator
+            && (type.HasAttribute(services.LibraryTypes.UseActivatorAttribute) && !constructionModel.HasActivatorConstructor
+                || constructionModel.HasActivatorConstructor && !SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly)))
+        {
+            return null;
+        }
+
         var responseType = services.Compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!.Construct(type);
         var codec = $"global::Orleans.Serialization.Invocation.PooledResponseCodec<{Name(type)}, {registration.Codec}>";
         var copier = $"global::Orleans.Serialization.Invocation.PooledResponseCopier<{Name(type)}, {registration.Copier}>";

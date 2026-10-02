@@ -30,7 +30,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
 #endif
-            T>() where T : class => new DefaultReferenceTypeActivator<T>();
+        T>() where T : class => new DefaultReferenceTypeActivator<T>();
 
         /// <summary>
         /// Creates the default activator for a statically specified value type.
@@ -41,7 +41,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
 #endif
-            T>() where T : struct => new DefaultValueTypeActivator<T>();
+        T>() where T : struct => new DefaultValueTypeActivator<T>();
 
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
