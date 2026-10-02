@@ -92,12 +92,13 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [MySQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
-- [SQLite Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
+- [SQLite Main Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Sqlite-Main.sql)
+- [SQLite Persistence Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
-Existing SQLite databases store persistence queries in `OrleansQuery`. Apply
-the [SQLite 10.4.0 persistence migration](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations/Sqlite-Persistence-10.4.0.sql)
-before restarting silos to install the current persistence queries while
-preserving grain state.
+Existing SQLite databases must run both current SQLite scripts before restarting
+silos. The scripts are idempotent and update the stored persistence queries
+while preserving grain state. Running silos continue using their cached queries
+until restart.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

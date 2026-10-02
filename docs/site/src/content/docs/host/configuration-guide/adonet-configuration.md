@@ -1,7 +1,7 @@
 ---
 title: ADO.NET database configuration
 description: Find Orleans ADO.NET schema scripts and provider invariants.
-ms.date: 08/02/2026
+ms.date: 10/02/2026
 ms.topic: reference
 ---
 
@@ -43,6 +43,11 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the 
 - [MySQL/MariaDB](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
 - [SQLite](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
+
+Existing SQLite databases must run the current SQLite main and persistence
+scripts before restarting silos. The scripts are idempotent and update the
+stored persistence queries while preserving grain state. Running silos continue
+using their cached queries until restart.
 
 ## Reminders
 

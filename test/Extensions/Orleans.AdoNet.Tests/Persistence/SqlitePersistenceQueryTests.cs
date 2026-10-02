@@ -107,36 +107,32 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
     }
 
     [Fact]
-    public void LatestPersistenceMigrationInstallsCurrentQueries()
+    public void ReapplyingScriptsInstallsCurrentQueriesAndPreservesState()
     {
         var expected = new Dictionary<string, string>
         {
             ["WriteToStorageKey"] = GetQuery("WriteToStorageKey"),
+            ["ReadFromStorageKey"] = GetQuery("ReadFromStorageKey"),
             ["ClearStorageKey"] = GetQuery("ClearStorageKey")
         };
+        InsertRow(7);
 
         using (var command = _connection.CreateCommand())
         {
             command.CommandText = """
                 UPDATE OrleansQuery
                 SET QueryText = 'outdated'
-                WHERE QueryKey IN ('WriteToStorageKey', 'ClearStorageKey');
+                WHERE QueryKey IN ('WriteToStorageKey', 'ReadFromStorageKey', 'ClearStorageKey');
                 """;
-            Assert.Equal(2, command.ExecuteNonQuery());
+            Assert.Equal(3, command.ExecuteNonQuery());
         }
 
-        var migrationPath = Directory
-            .EnumerateFiles(AppContext.BaseDirectory, "Sqlite-Persistence-*.sql")
-            .MaxBy(path => Version.Parse(Path.GetFileNameWithoutExtension(path)["Sqlite-Persistence-".Length..]));
-        Assert.NotNull(migrationPath);
-        using (var command = _connection.CreateCommand())
-        {
-            command.CommandText = File.ReadAllText(migrationPath);
-            Assert.Equal(2, command.ExecuteNonQuery());
-        }
+        InitializeDatabase(_connection);
 
         Assert.Equal(expected["WriteToStorageKey"], GetQuery("WriteToStorageKey"));
+        Assert.Equal(expected["ReadFromStorageKey"], GetQuery("ReadFromStorageKey"));
         Assert.Equal(expected["ClearStorageKey"], GetQuery("ClearStorageKey"));
+        Assert.Equal([(7, "original")], ReadRows());
     }
 
     private static void AssertStoredState(string connectionString, int version, string? payload)

@@ -43,7 +43,7 @@
 --
 -- 7. In the storage operations queries the columns need to be in the exact same order
 -- since the storage table operations support optionally streaming.
-CREATE TABLE OrleansStorage
+CREATE TABLE IF NOT EXISTS OrleansStorage
 (
     -- These are for the book keeping. Orleans calculates
     -- these hashes (see RelationalStorageProvide implementation),
@@ -73,7 +73,7 @@ CREATE TABLE OrleansStorage
     -- rows down to [0, n] relevant ones, n being the number of collided value pairs.
 );
 
-CREATE INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
+CREATE INDEX IF NOT EXISTS IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
 
 
 -- Updates an existing grain state with optimistic concurrency control or inserts it if it does not exist.
@@ -140,7 +140,8 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
     FROM OrleansStorageWriteRequest_10_4
     WHERE Applied = 0
         AND @GrainStateVersion IS NOT NULL;
-');
+')
+ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
 
 -- Retrieves the binary payload and the current version of a specific grain state.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
@@ -157,7 +158,8 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId
     LIMIT 1;
-');
+')
+ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
 
 -- Clears the grain state by setting the payload to null and incrementing the version for consistency.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
@@ -181,4 +183,5 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
     SELECT @GrainStateVersion AS NewGrainStateVersion
     WHERE changes() = 0
         AND @GrainStateVersion IS NOT NULL;
-');
+')
+ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
