@@ -13,6 +13,71 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void KeyedDescriptorsDoNotShadowUnkeyedInstances()
+    {
+        var unkeyed = new KeyedDependency<int>();
+        var keyed = new KeyedDependency<int>();
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.AddSingleton<IKeyedDependency<int>>(unkeyed);
+        services.AddKeyedSingleton<IKeyedDependency<int>>("keyed", keyed);
+        services.AddKeyedSingleton(typeof(IKeyedDependency<>), "open-keyed", typeof(KeyedDependency<>));
+        services.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<KeyedLookupResult>(provider =>
+            {
+                var dependency = provider.Services.GetRequiredService<IKeyedDependency<int>>();
+                var availability = (IServiceProviderIsService)provider.Services.GetRequiredService(typeof(IServiceProviderIsService));
+                Ensure(availability.IsService(typeof(IKeyedDependency<int>)), "Unkeyed instance is available during graph construction.");
+                Ensure(!availability.IsService(typeof(IKeyedDependency<string>)), "Keyed open generic is absent from unkeyed availability.");
+                Ensure(provider.Services.GetService(typeof(IKeyedDependency<string>)) is null, "Keyed open generic is absent from unkeyed resolution.");
+                return new KeyedLookupResult(dependency);
+            }));
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        var result = OrleansGeneratedCodeHelper.GetService<KeyedLookupResult>(null!, codecs);
+        Ensure(ReferenceEquals(result.Dependency, unkeyed), "Later keyed descriptors preserve the exact unkeyed instance.");
+        Ensure(ReferenceEquals(scope.GetRequiredKeyedService<IKeyedDependency<int>>("keyed"), keyed), "Keyed registration remains independently available.");
+    }
+
+    public static void KeyedOnlyDescriptorsDoNotSelectDependencyConstructors()
+    {
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.AddKeyedSingleton<IKeyedDependency<int>>("exact-keyed", new KeyedDependency<int>());
+        services.AddKeyedSingleton(typeof(IKeyedDependency<>), "open-keyed", typeof(KeyedDependency<>));
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<ExactKeyedConstructorProbe>(provider =>
+                ActivatorUtilities.CreateInstance<ExactKeyedConstructorProbe>(provider.Services));
+            options.AddSerializerService<OpenKeyedConstructorProbe>(provider =>
+                ActivatorUtilities.CreateInstance<OpenKeyedConstructorProbe>(provider.Services));
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        var exact = OrleansGeneratedCodeHelper.GetService<ExactKeyedConstructorProbe>(null!, codecs);
+        var open = OrleansGeneratedCodeHelper.GetService<OpenKeyedConstructorProbe>(null!, codecs);
+        Ensure(!exact.UsedDependency && !open.UsedDependency, "Keyed-only exact and open registrations select the parameterless constructors.");
+    }
+
+    public interface IKeyedDependency<T> { }
+    public sealed class KeyedDependency<T> : IKeyedDependency<T> { }
+    private sealed class KeyedLookupResult(IKeyedDependency<int> dependency)
+    {
+        public IKeyedDependency<int> Dependency { get; } = dependency;
+    }
+
+    public sealed class ExactKeyedConstructorProbe
+    {
+        public ExactKeyedConstructorProbe() { }
+        public ExactKeyedConstructorProbe(IKeyedDependency<int> dependency) => UsedDependency = true;
+        public bool UsedDependency { get; }
+    }
+
+    public sealed class OpenKeyedConstructorProbe
+    {
+        public OpenKeyedConstructorProbe() { }
+        public OpenKeyedConstructorProbe(IKeyedDependency<string> dependency) => UsedDependency = true;
+        public bool UsedDependency { get; }
+    }
+
     public static void DirectProviderServicesRemainGraphOwned()
     {
         using var gate = new ConstructionGate();
@@ -36,6 +101,106 @@ public static partial class StaticFactoryContracts
     }
 
 #if !NATIVE_AOT_SMOKE
+    public static void CaughtBaseCodecSpecializationFailureFaultsGraph()
+    {
+        var state = new BaseSpecializationState();
+        var specializer = new FailingBaseSpecializer(state);
+        var services = new ServiceCollection().AddSerializer();
+        services.AddSingleton<ISpecializableBaseCodec>(specializer);
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<BaseSpecializationLeaf>(_ => new BaseSpecializationLeaf(state));
+            options.AddSerializerService<BaseSpecializationRoot>(provider => new BaseSpecializationRoot(provider, state));
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        state.Provider = codecs;
+        var committed = codecs.GetCodec<int>();
+        Exception? failure = null;
+        try
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<BaseSpecializationRoot>(null!, codecs);
+        }
+        catch (InvalidOperationException exception)
+        {
+            failure = exception;
+        }
+
+        Ensure(ReferenceEquals(state.Failure, failure) && ReferenceEquals(state.Failure, state.CaughtFailure),
+            "Caught direct base-codec specialization failure aborts the graph with the original exception.");
+        var root = OrleansGeneratedCodeHelper.GetService<BaseSpecializationRoot>(null!, codecs);
+        var leaf = OrleansGeneratedCodeHelper.GetService<BaseSpecializationLeaf>(null!, codecs);
+        var baseCodec = (SpecializedBaseCodec)codecs.GetBaseCodec<BaseSpecializationValue>();
+        Ensure(ReferenceEquals(root.Leaf, leaf) && ReferenceEquals(baseCodec.Leaf, leaf),
+            "Retry rebuilds canonical pending services and the specialized base codec.");
+        Ensure(!ReferenceEquals(state.FailedLeaf, leaf), "Failed specialization publishes no pending leaf.");
+        Ensure(ReferenceEquals(root, OrleansGeneratedCodeHelper.GetService<BaseSpecializationRoot>(null!, codecs)),
+            "Successful retry commits one canonical root.");
+        Ensure(ReferenceEquals(committed, codecs.GetCodec<int>()), "Rollback retains already committed codec leaves.");
+        Ensure(state.RootConstructions == 2 && state.LeafConstructions == 2 && state.Specializations == 2,
+            "Retry reconstructs the root, leaf, and specialization exactly once.");
+    }
+
+    private sealed class BaseSpecializationState
+    {
+        public CodecProvider Provider { get; set; } = null!;
+        public InvalidOperationException Failure { get; } = new("base specialization failure");
+        public Exception? CaughtFailure { get; set; }
+        public BaseSpecializationLeaf? FailedLeaf { get; set; }
+        public int RootConstructions;
+        public int LeafConstructions;
+        public int Specializations;
+    }
+
+    private sealed class BaseSpecializationLeaf
+    {
+        public BaseSpecializationLeaf(BaseSpecializationState state) => state.LeafConstructions++;
+    }
+
+    private sealed class BaseSpecializationRoot
+    {
+        public BaseSpecializationLeaf Leaf { get; }
+        public BaseSpecializationRoot(ICodecProvider provider, BaseSpecializationState state)
+        {
+            state.RootConstructions++;
+            Leaf = OrleansGeneratedCodeHelper.GetService<BaseSpecializationLeaf>(this, provider);
+            try
+            {
+                _ = provider.GetBaseCodec<BaseSpecializationValue>();
+            }
+            catch (InvalidOperationException exception)
+            {
+                state.CaughtFailure = exception;
+            }
+        }
+    }
+
+    private sealed class BaseSpecializationValue { }
+
+    private sealed class FailingBaseSpecializer(BaseSpecializationState state) : ISpecializableBaseCodec
+    {
+        public bool IsSupportedType(Type type) => type == typeof(BaseSpecializationValue);
+        public IBaseCodec GetSpecializedCodec(Type type)
+        {
+            var leaf = OrleansGeneratedCodeHelper.GetService<BaseSpecializationLeaf>(this, state.Provider);
+            if (++state.Specializations == 1)
+            {
+                state.FailedLeaf = leaf;
+                throw state.Failure;
+            }
+
+            return new SpecializedBaseCodec(leaf);
+        }
+    }
+
+    private sealed class SpecializedBaseCodec(BaseSpecializationLeaf leaf) : IBaseCodec<BaseSpecializationValue>
+    {
+        public BaseSpecializationLeaf Leaf { get; } = leaf;
+        public void Serialize<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, BaseSpecializationValue value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, BaseSpecializationValue value) { }
+    }
+
     public static void SingletonFirstLookupCannotInvertGraphLock()
     {
         using var singletonStarted = new ManualResetEventSlim();
