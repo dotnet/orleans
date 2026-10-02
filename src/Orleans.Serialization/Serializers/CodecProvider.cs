@@ -46,6 +46,7 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, Type> _converters = new();
         private readonly Dictionary<Type, List<(Type Implementation, SerializationContract Contract)>> _converterContracts = new();
         private readonly Dictionary<(Type Contract, Type Target, Type Implementation), List<SerializationType>> _targetDescriptions = new();
+        private readonly Dictionary<(Type Contract, Type Target), List<(Type Implementation, SerializationType? Target)>> _implementationCandidates = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -187,6 +188,13 @@ namespace Orleans.Serialization.Serializers
                             if (target != typeof(object))
                             {
                                 resultCollection[target] = type;
+                                var candidateKey = (genericType, target);
+                                if (!_implementationCandidates.TryGetValue(candidateKey, out var candidates))
+                                {
+                                    _implementationCandidates[candidateKey] = candidates = new();
+                                }
+
+                                candidates.Add((type, registration.TargetDescription));
                                 if (registration.TargetDescription is { } targetDescription)
                                 {
                                     var key = (genericType, target, type);
@@ -251,6 +259,13 @@ namespace Orleans.Serialization.Serializers
                         }
 
                         resultCollection[genericArgument] = type;
+                        var legacyKey = (genericType, genericArgument);
+                        if (!_implementationCandidates.TryGetValue(legacyKey, out var legacyCandidates))
+                        {
+                            _implementationCandidates[legacyKey] = legacyCandidates = new();
+                        }
+
+                        legacyCandidates.Add((type, null));
                         if (genericType == typeof(IConverter<,>))
                         {
                             _converterContracts.Remove(genericArgument);
@@ -523,7 +538,7 @@ namespace Orleans.Serialization.Serializers
             ThrowIfUnsupportedType(concreteType);
 
             object[]? constructorArguments = null;
-            if (_valueSerializers.TryGetValue(searchType, out var serializerType))
+            if (TrySelectImplementation(typeof(IValueSerializer<>), concreteType, searchType, out var serializerType))
             {
                 if (serializerType.IsGenericTypeDefinition)
                 {
@@ -558,7 +573,7 @@ namespace Orleans.Serialization.Serializers
             ThrowIfUnsupportedType(concreteType);
 
             object[]? constructorArguments = null;
-            if (_baseCopiers.TryGetValue(searchType, out var copierType))
+            if (TrySelectImplementation(typeof(IBaseCopier<>), concreteType, searchType, out var copierType))
             {
                 // Use the detected copier type.
                 if (copierType.IsGenericTypeDefinition)
@@ -593,7 +608,7 @@ namespace Orleans.Serialization.Serializers
 
             ThrowIfUnsupportedType(concreteType);
 
-            if (!_activators.TryGetValue(searchType, out var activatorType))
+            if (!TrySelectImplementation(typeof(IActivator<>), concreteType, searchType, out var activatorType))
             {
                 if (searchType.IsValueType)
                 {
@@ -1018,7 +1033,7 @@ namespace Orleans.Serialization.Serializers
                 return _objectCodec;
 
             object[]? constructorArguments = null;
-            if (_fieldCodecs.TryGetValue(searchType, out var codecType))
+            if (TrySelectImplementation(typeof(IFieldCodec<>), fieldType, searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
                 {
@@ -1029,7 +1044,7 @@ namespace Orleans.Serialization.Serializers
                     }
                 }
             }
-            else if (_baseCodecs.TryGetValue(searchType, out var baseCodecType))
+            else if (TrySelectImplementation(typeof(IBaseCodec<>), fieldType, searchType, out var baseCodecType))
             {
                 if (baseCodecType.IsGenericTypeDefinition)
                 {
@@ -1044,7 +1059,7 @@ namespace Orleans.Serialization.Serializers
                 codecType = ConstructGenericImplementation(typeof(ConcreteTypeSerializer<,>), fieldType, baseCodecType);
                 constructorArguments = new[] { GetServiceOrCreateInstance(baseCodecType) };
             }
-            else if (_valueSerializers.TryGetValue(searchType, out var valueSerializerType))
+            else if (TrySelectImplementation(typeof(IValueSerializer<>), fieldType, searchType, out var valueSerializerType))
             {
                 if (valueSerializerType.IsGenericTypeDefinition)
                 {
@@ -1098,7 +1113,7 @@ namespace Orleans.Serialization.Serializers
 #endif
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
-            if (_converters.TryGetValue(searchType, out var converterDefinition))
+            if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterDefinition))
             {
                 Type converterType;
                 var converterInterfaceArgs = Array.Empty<Type>();
@@ -1131,13 +1146,6 @@ namespace Orleans.Serialization.Serializers
                 }
                 else
                 {
-                    if (_converterContracts.ContainsKey(searchType))
-                    {
-                        surrogateCodecType = null;
-                        constructorArguments = null;
-                        return false;
-                    }
-
                     converterType = converterDefinition.IsGenericTypeDefinition
                         ? converterDefinition.MakeGenericType(fieldType.GetGenericArguments())
                         : converterDefinition;
@@ -1175,10 +1183,47 @@ namespace Orleans.Serialization.Serializers
             return false;
         }
 
+        private bool TrySelectImplementation(
+            Type contractType,
+            Type targetType,
+            Type searchType,
+            [NotNullWhen(true)] out Type? implementation)
+        {
+            if (targetType != searchType && TrySelect(targetType, out implementation))
+            {
+                return true;
+            }
+
+            return TrySelect(searchType, out implementation);
+
+            bool TrySelect(Type key, [NotNullWhen(true)] out Type? result)
+            {
+                if (_implementationCandidates.TryGetValue((contractType, key), out var candidates))
+                {
+                    for (var i = candidates.Count - 1; i >= 0; i--)
+                    {
+                        var candidate = candidates[i];
+                        if (candidate.Target is { } description
+                            && !BindTypeArguments(description, targetType, new Type?[candidate.Implementation.GetGenericArguments().Length]))
+                        {
+                            continue;
+                        }
+
+                        result = candidate.Implementation;
+                        return true;
+                    }
+                }
+
+                result = null;
+                return false;
+            }
+        }
+
         private Type? CloseImplementation(Type implementation, Type targetType, Type contractType)
         {
             var searchType = targetType.IsConstructedGenericType ? targetType.GetGenericTypeDefinition() : targetType;
-            if (!_targetDescriptions.TryGetValue((contractType, searchType, implementation), out var descriptions))
+            if (!_targetDescriptions.TryGetValue((contractType, targetType, implementation), out var descriptions)
+                && !_targetDescriptions.TryGetValue((contractType, searchType, implementation), out descriptions))
             {
                 return implementation.MakeGenericType(targetType.GetGenericArguments());
             }
@@ -1207,29 +1252,39 @@ namespace Orleans.Serialization.Serializers
 
         private bool TryGetConverterContract(Type searchType, Type implementation, Type target, out SerializationContract contract)
         {
-            if (_converterContracts.TryGetValue(searchType, out var registrations))
+            if (target != searchType && TryFind(target, out contract))
             {
-                for (var i = registrations.Count - 1; i >= 0; i--)
-                {
-                    var candidate = registrations[i];
-                    if (candidate.Implementation != implementation)
-                    {
-                        continue;
-                    }
-
-                    if (candidate.Contract.TargetDescription is { } description
-                        && !BindTypeArguments(description, target, new Type?[implementation.GetGenericArguments().Length]))
-                    {
-                        continue;
-                    }
-
-                    contract = candidate.Contract;
-                    return true;
-                }
+                return true;
             }
 
-            contract = default;
-            return false;
+            return TryFind(searchType, out contract);
+
+            bool TryFind(Type key, out SerializationContract result)
+            {
+                if (_converterContracts.TryGetValue(key, out var registrations))
+                {
+                    for (var i = registrations.Count - 1; i >= 0; i--)
+                    {
+                        var candidate = registrations[i];
+                        if (candidate.Implementation != implementation)
+                        {
+                            continue;
+                        }
+
+                        if (candidate.Contract.TargetDescription is { } description
+                            && !BindTypeArguments(description, target, new Type?[implementation.GetGenericArguments().Length]))
+                        {
+                            continue;
+                        }
+
+                        result = candidate.Contract;
+                        return true;
+                    }
+                }
+
+                result = default;
+                return false;
+            }
         }
 
         private static bool BindTypeArguments(SerializationType description, Type target, Type?[] arguments)
@@ -1316,7 +1371,7 @@ namespace Orleans.Serialization.Serializers
         private IBaseCodec? CreateBaseCodecInstance(Type fieldType, Type searchType)
         {
             object[]? constructorArguments = null;
-            if (_baseCodecs.TryGetValue(searchType, out var codecType))
+            if (TrySelectImplementation(typeof(IBaseCodec<>), fieldType, searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
                 {
@@ -1341,7 +1396,7 @@ namespace Orleans.Serialization.Serializers
                 return _objectCopier;
 
             object[]? constructorArguments = null;
-            if (_copiers.TryGetValue(searchType, out var copierType))
+            if (TrySelectImplementation(typeof(IDeepCopier<>), fieldType, searchType, out var copierType))
             {
                 if (copierType.IsGenericTypeDefinition)
                 {
