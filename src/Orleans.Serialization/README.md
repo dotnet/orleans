@@ -96,7 +96,9 @@ Parameterized array contracts and generic converter surrogates use
 `SerializationType` descriptions. These record concrete types, generic parameter
 indices, and array shapes so the runtime can bind the selected implementation's
 generic arguments directly. Generated registrations preserve nested argument shapes
-and parameter ordering.
+and parameter ordering. For a described generic target, the runtime matches the
+requested closed type against that shape and binds implementation parameters,
+preserving fixed arguments and reordered parameters.
 
 NativeAOT applications also provide statically compiled closed codec and serializer
 instances for the generic combinations they use. The `Metadata` scenario in

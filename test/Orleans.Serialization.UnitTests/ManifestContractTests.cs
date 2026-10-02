@@ -187,6 +187,59 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void TargetDescriptionsBindFixedNestedArgumentsWithoutUsingTargetArity()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(PatternCodec<>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(PatternOuter<>.Nested<>),
+                SerializationType.Parameter(0), SerializationType.Create(typeof(FixedArgument<int>))));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<PatternCodec<string>>(provider.GetBaseCodec<PatternOuter<string>.Nested<FixedArgument<int>>>());
+        Assert.Null(provider.GetType().GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider,
+            [typeof(PatternCodec<>), typeof(PatternOuter<string>.Nested<FixedArgument<Guid>>), typeof(IBaseCodec<>)]));
+    }
+
+    [Fact]
+    public void TargetDescriptionsBindReorderedImplementationParameters()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(ReorderedCodec<,>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(1), SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<ReorderedCodec<int, string>>(provider.GetBaseCodec<GenericTarget<string, int>>());
+    }
+
+    [Fact]
+    public void ConverterSelectsTheSurrogateForItsMatchingTargetPattern()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(PatternConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)));
+        options.AddSerializationContract(typeof(PatternConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(string))),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Array(SerializationType.Parameter(0))));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        foreach (var (target, surrogate) in new[]
+        {
+            (typeof(GenericTarget<Guid, int>), typeof(GenericSurrogate<Guid>)),
+            (typeof(GenericTarget<Guid, string>), typeof(GenericSurrogate<Guid[]>))
+        })
+        {
+            object?[] arguments = [target, typeof(GenericTarget<,>), null, null];
+            var result = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments);
+            Assert.Equal(true, result);
+            Assert.Equal(surrogate, Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+            Assert.IsType<PatternConverter<Guid>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+        }
+    }
+
+    [Fact]
     public void SerializationDescriptionsValidateAndCopyTheirArguments()
     {
         var first = SerializationType.Parameter(0);
@@ -268,6 +321,32 @@ public class ManifestContractTests
     }
     public sealed class GenericTarget<TFirst, TSecond>;
     public struct GenericSurrogate<T>;
+    public class PatternOuter<T>
+    {
+        public sealed class Nested<TItem>;
+    }
+    public sealed class FixedArgument<T>;
+    public sealed class PatternCodec<T> : IBaseCodec<PatternOuter<T>.Nested<FixedArgument<int>>>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, PatternOuter<T>.Nested<FixedArgument<int>> value)
+            where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, PatternOuter<T>.Nested<FixedArgument<int>> value) { }
+    }
+    public sealed class ReorderedCodec<TFirst, TSecond> : IBaseCodec<GenericTarget<TSecond, TFirst>>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<TSecond, TFirst> value)
+            where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<TSecond, TFirst> value) { }
+    }
+    public sealed class PatternConverter<T> :
+        IConverter<GenericTarget<T, int>, GenericSurrogate<T>>,
+        IConverter<GenericTarget<T, string>, GenericSurrogate<T[]>>
+    {
+        public GenericTarget<T, int> ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<T, int> value) => default;
+        public GenericTarget<T, string> ConvertFromSurrogate(in GenericSurrogate<T[]> surrogate) => new();
+        public GenericSurrogate<T[]> ConvertToSurrogate(in GenericTarget<T, string> value) => default;
+    }
     public sealed class GenericConverter<TFirst, TSecond> : IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<(TSecond, TFirst)[]>>
     {
         public GenericTarget<TFirst, TSecond> ConvertFromSurrogate(in GenericSurrogate<(TSecond, TFirst)[]> surrogate) => new();

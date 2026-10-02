@@ -83,6 +83,7 @@ public class ManifestMetadataTests
         var contract = Assert.Single(model.Contracts);
         Assert.Equal("global::MetadataTargets.Outer<>.Nested<>", contract.Target.Type.SyntaxString);
         Assert.True(contract.Target.IsAccessible);
+        Assert.NotNull(contract.TargetDescription);
         Assert.Equal(name switch
         {
             "Codec" => "AddBaseCodec",
@@ -107,8 +108,12 @@ public class ManifestMetadataTests
 
         var metadata = GetMetadata(result);
         var source = metadata.ToString();
-        Assert.Contains("config.AddBaseCodec(typeof(global::MetadataTargets.Codec<>), typeof(global::MetadataTargets.Outer<>.Nested<>))", source);
-        Assert.Contains("config.AddConverter(typeof(global::MetadataTargets.Converter<>), typeof(global::MetadataTargets.Outer<>.Nested<>), global::Orleans.Serialization.Configuration.SerializationType.Create", source);
+        Assert.Contains("config.AddSerializationContract(typeof(global::MetadataTargets.Codec<>), typeof(global::Orleans.Serialization.Serializers.IBaseCodec<>),", source);
+        var converterRegistration = Assert.Single(metadata.DescendantNodes().OfType<InvocationExpressionSyntax>(),
+            static invocation => invocation.Expression.ToString() == "config.AddSerializationContract"
+                && invocation.ArgumentList.Arguments[0].ToString().Contains("MetadataTargets.Converter<>", StringComparison.Ordinal));
+        var converterInterface = Assert.IsType<TypeOfExpressionSyntax>(converterRegistration.ArgumentList.Arguments[1].Expression);
+        Assert.Equal("global::Orleans.IConverter<,>", converterInterface.Type.ToString().Replace(" ", string.Empty, StringComparison.Ordinal));
         Assert.Contains("SerializationType.Array", source);
         Assert.Contains("SerializationType.Parameter(0)", source);
         Assert.Contains("typeof(global::MetadataTargets.Generated<>)", source);
