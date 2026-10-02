@@ -399,6 +399,10 @@ public static partial class ContextContracts
             "Implemented interface and declaring-type aliases resolve without codec registrations.");
         Ensure(!services.GetRequiredService<Serializer>().CanSerialize<AliasedContainer>(),
             "Declaring-type metadata contributes its alias independently of codec availability.");
+        Ensure(RoundTrip(services, new IncidentalPrivateInterfacePayload { Value = 127 }).Value == 127,
+            "Inaccessible incidental interface arguments preserve serializer initialization and payload serialization.");
+        Ensure(aliases.Parse("(\"context-private-argument-interface\")") == typeof(IIncidentalMetadataTag<>),
+            "Accessible open-interface alias metadata is preserved while its private argument remains incidental.");
         using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
             .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
         {
@@ -510,6 +514,7 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(MetadataEnvelope<UnusedAliasMarker[]>))]
 [GenerateSerializerContext(typeof(InterfaceTaggedPayload))]
 [GenerateSerializerContext(typeof(AliasedContainer.Payload))]
+[GenerateSerializerContext(typeof(IncidentalPrivateInterfacePayload))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
 [GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
@@ -681,4 +686,14 @@ public sealed class AliasedContainer
     {
         [Id(0)] public int Value { get; set; }
     }
+}
+
+[CompoundTypeAlias("context-private-argument-interface")]
+public interface IIncidentalMetadataTag<T>;
+
+[GenerateSerializer]
+public sealed class IncidentalPrivateInterfacePayload : IIncidentalMetadataTag<IncidentalPrivateInterfacePayload.Hidden>
+{
+    private sealed class Hidden;
+    [Id(0)] public int Value { get; set; }
 }

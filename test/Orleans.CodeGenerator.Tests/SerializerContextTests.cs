@@ -186,6 +186,51 @@ public sealed class SerializerContextTests
     }
 
     [Fact]
+    public void IncidentalPrivateInterfaceArgumentsPreserveAccessibleAliasMetadata()
+    {
+        var (compilation, result) = Generate("""
+            [Orleans.CompoundTypeAlias("private-argument-tag")]
+            public interface ITag<T> { }
+            [Orleans.GenerateSerializer]
+            public sealed class Payload : ITag<Payload.Hidden>
+            {
+                private sealed class Hidden { }
+                [Orleans.Id(0)] public int Value { get; set; }
+            }
+            [Orleans.GenerateSerializerContext(typeof(Payload))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("typeof(global::ITag<>)", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("typeof(global::Payload.Hidden)", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddSerializer<global::ITag", context, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RequiredPrivateArgumentAliasesProduceClearGeneratorErrors()
+    {
+        var (_, result) = Generate("""
+            public interface ITag<T> { }
+            [Orleans.GenerateSerializer]
+            public sealed class Payload : ITag<Payload.Hidden>
+            {
+                [Orleans.CompoundTypeAlias("required-private-alias")]
+                private sealed class Hidden { }
+                [Orleans.Id(0)] public int Value { get; set; }
+            }
+            [Orleans.GenerateSerializerContext(typeof(Payload))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        var diagnostic = Assert.Single(result.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0115");
+        Assert.Contains("inaccessible", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("Hidden", diagnostic.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RecursiveCollectionFactoriesUseTypedCycleEdges()
     {
         var (_, result) = Generate("""

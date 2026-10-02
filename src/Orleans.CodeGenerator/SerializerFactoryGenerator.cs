@@ -147,7 +147,11 @@ internal static class SerializerFactoryGenerator
             }
 
             result.Append("options.AddAllowedType(typeof(").Append(typeName).AppendLine("));");
-            AppendTypeMetadata(result, registration.Type, services.LibraryTypes, metadataTypes);
+            if (AppendTypeMetadata(result, registration.Type, services.LibraryTypes, metadataTypes) is { } metadataFailure)
+            {
+                failure = metadataFailure;
+                return false;
+            }
         }
 
         graph = new Graph(registrations, result.ToString());
@@ -399,28 +403,45 @@ internal static class SerializerFactoryGenerator
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
-    private static void AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited)
+    private static Failure? AppendTypeMetadata(StringBuilder result, ITypeSymbol symbol, LibraryTypes library, HashSet<ITypeSymbol> visited)
     {
-        if (!visited.Add(symbol)) return;
+        if (!visited.Add(symbol)) return null;
         if (symbol is IArrayTypeSymbol array)
         {
-            AppendTypeMetadata(result, array.ElementType, library, visited);
-            return;
+            return AppendTypeMetadata(result, array.ElementType, library, visited);
         }
-        if (symbol is not INamedTypeSymbol type) return;
+        if (symbol is not INamedTypeSymbol type) return null;
+        if (!library.Compilation.IsSymbolAccessibleWithin(type.OriginalDefinition, library.Compilation.Assembly))
+        {
+            return type.HasAttribute(library.AliasAttribute)
+                || type.HasAttribute(library.CompoundTypeAliasAttribute)
+                || GeneratedCodeUtilities.GetId(library, type) is not null
+                ? new Failure(type, "required alias or type-identifier metadata is inaccessible to the generated context")
+                : null;
+        }
         if (type.ContainingType is { } declaring)
-            AppendTypeMetadata(result, declaring, library, visited);
+        {
+            if (AppendTypeMetadata(result, declaring, library, visited) is { } declaringFailure) return declaringFailure;
+        }
         foreach (var contract in type.AllInterfaces)
-            AppendTypeMetadata(result, contract, library, visited);
+        {
+            if (AppendTypeMetadata(result, contract, library, visited) is { } contractFailure) return contractFailure;
+        }
         foreach (var argument in type.TypeArguments)
         {
             if (!ContainsTypeParameter(argument))
             {
-                result.Append("options.AddAllowedType(typeof(").Append(Name(argument)).AppendLine("));");
-                AppendTypeMetadata(result, argument, library, visited);
+                if (library.Compilation.IsSymbolAccessibleWithin(argument, library.Compilation.Assembly))
+                    result.Append("options.AddAllowedType(typeof(").Append(Name(argument)).AppendLine("));");
+                if (AppendTypeMetadata(result, argument, library, visited) is { } argumentFailure) return argumentFailure;
             }
         }
         var openType = type.ToOpenTypeSyntax().ToString();
+        if (type.HasAttribute(library.AliasAttribute) || type.HasAttribute(library.CompoundTypeAliasAttribute)
+            || GeneratedCodeUtilities.GetId(library, type) is not null)
+        {
+            result.Append("options.AddAllowedType(typeof(").Append(openType).AppendLine("));");
+        }
         if (GeneratedCodeUtilities.GetAlias(library, type) is { } alias)
         {
             result.AppendLine(MetadataGenerator.CreateTypeMetadataRegistration(
@@ -442,8 +463,10 @@ internal static class SerializerFactoryGenerator
             var components = compound.ConstructorArguments[0].Values;
             foreach (var componentType in components.Select(component => component.Value).OfType<ITypeSymbol>())
             {
+                if (!library.Compilation.IsSymbolAccessibleWithin(componentType, library.Compilation.Assembly))
+                    return new Failure(componentType, "required compound-alias component metadata is inaccessible to the generated context");
                 result.Append("options.AddAllowedType(typeof(").Append(Name(componentType)).AppendLine("));");
-                AppendTypeMetadata(result, componentType, library, visited);
+                if (AppendTypeMetadata(result, componentType, library, visited) is { } componentFailure) return componentFailure;
             }
 
             result.Append("options.CompoundTypeAliases");
@@ -463,6 +486,7 @@ internal static class SerializerFactoryGenerator
 
             result.AppendLine(";");
         }
+        return null;
     }
 
     private static bool Reaches(Registration current, ITypeSymbol target,
