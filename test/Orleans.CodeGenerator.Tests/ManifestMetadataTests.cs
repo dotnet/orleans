@@ -193,6 +193,40 @@ public class ManifestMetadataTests
         Assert.DoesNotContain("config.AddSerializer(typeof(global::Codec<>))", metadata);
     }
 
+    [Fact]
+    public async Task CustomInvokableBaseRegistersTheGeneratedInvokableAsItsTarget()
+    {
+        const string source = """
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+            public interface IMetadata<T> { }
+            public class OnlyInInterface<T> { }
+            public abstract class CustomRequest : TaskRequest, IMetadata<OnlyInInterface<int>> { }
+            [InvokableBaseType(typeof(GrainReference), typeof(Task), typeof(CustomRequest))]
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class CustomRequestAttribute : Attribute { }
+            public interface ICustomGrain : IGrainWithIntegerKey
+            {
+                [CustomRequest]
+                Task Invoke();
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var result = RunGenerator(compilation, out var updated);
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var registration = Assert.Single(GetMetadata(result).DescendantNodes().OfType<InvocationExpressionSyntax>(),
+            static invocation => invocation.Expression.ToString() == "config.AddSerializer"
+                && invocation.ArgumentList.Arguments[0].ToString().Contains("Codec_Invokable_", StringComparison.Ordinal));
+        var target = Assert.IsType<TypeOfExpressionSyntax>(registration.ArgumentList.Arguments[1].Expression);
+        Assert.Contains("Invokable_ICustomGrain_", target.Type.ToString());
+        Assert.DoesNotContain("Codec_Invokable_", target.Type.ToString());
+        Assert.DoesNotContain("PreserveTypeMetadata", GetMetadata(result).ToString());
+    }
+
     private static GeneratorRunResult RunGenerator(CSharpCompilation compilation, out Compilation updated)
     {
         GeneratorDriver driver = CSharpGeneratorDriver.Create(new OrleansSerializationSourceGenerator().AsSourceGenerator());
