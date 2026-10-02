@@ -143,7 +143,10 @@ namespace Orleans.Serialization.Serializers
                             }
                         }
 
-                        continue;
+                        if (!metadata.DiscoverInterfaces(type, genericType))
+                        {
+                            continue;
+                        }
                     }
 
                     var interfaces = type.GetInterfaces();
@@ -168,6 +171,15 @@ namespace Orleans.Serialization.Serializers
                         if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
                         {
                             genericArgument = genericArgument.GetGenericTypeDefinition();
+                        }
+
+                        if (registrations is not null && registrations.Exists(registration =>
+                            registration.ContractType == genericType
+                            && (registration.TargetDescription is { } description
+                                ? ResolveSerializationType(description, type.GetGenericArguments())
+                                : registration.TargetType) == genericArgument))
+                        {
+                            continue;
                         }
 
                         resultCollection[genericArgument] = type;

@@ -1,15 +1,18 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
@@ -79,6 +82,46 @@ public class ManifestContractTests
         options.SerializerTypes.Remove(typeof(ReplacementCodec));
         provider = new CodecProvider(services, Options.Create(options));
         AssertMapping(provider, "_fieldCodecs", typeof(int), typeof(Int32Codec));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LegacyDiscoveryRetainsOtherContractKindsWhenOneKindIsExplicit(bool useCollection)
+    {
+        var options = new TypeManifestOptions();
+        if (useCollection)
+        {
+            options.Serializers.Add(typeof(MixedImplementation));
+        }
+        else
+        {
+            options.AddSerializer(typeof(MixedImplementation));
+        }
+
+        options.AddBaseCodec(typeof(MixedImplementation), typeof(SecondTarget));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        AssertMapping(provider, "_fieldCodecs", typeof(FirstTarget), typeof(MixedImplementation));
+        AssertMapping(provider, "_baseCodecs", typeof(SecondTarget), typeof(MixedImplementation));
+        var converter = CreateConverter(options);
+        Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
+        Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
+    }
+
+    [Fact]
+    public void LegacyDiscoveryRetainsOtherTargetsOfTheSameContractKind()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializer(typeof(MixedImplementation));
+        options.AddSerializer(typeof(MixedImplementation), typeof(SecondTarget));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        AssertMapping(provider, "_fieldCodecs", typeof(FirstTarget), typeof(MixedImplementation));
+        AssertMapping(provider, "_fieldCodecs", typeof(SecondTarget), typeof(MixedImplementation));
+        var converter = CreateConverter(options);
+        Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
+        Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
     }
 
     [Fact]
@@ -214,6 +257,15 @@ public class ManifestContractTests
     private struct ValueTarget;
     private struct Surrogate;
     private sealed class ReplacementCodec;
+    private sealed class MixedImplementation : IFieldCodec<FirstTarget>, IBaseCodec<SecondTarget>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] FirstTarget value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public FirstTarget ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, SecondTarget value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public void Deserialize<TInput>(ref Reader<TInput> reader, SecondTarget value) => throw new NotSupportedException();
+    }
     public sealed class GenericTarget<TFirst, TSecond>;
     public struct GenericSurrogate<T>;
     public sealed class GenericConverter<TFirst, TSecond> : IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<(TSecond, TFirst)[]>>

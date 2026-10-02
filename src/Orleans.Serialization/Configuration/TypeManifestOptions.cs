@@ -35,6 +35,15 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _interfaces = new();
         private readonly HashSet<Type> _interfaceProxies = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
+        private readonly HashSet<Type> _legacySerializers = new();
+        private readonly HashSet<Type> _legacyCopiers = new();
+        private readonly HashSet<Type> _legacyActivators = new();
+        private readonly HashSet<Type> _legacyConverters = new();
+        // Mutable collection access requests legacy discovery, including types added through retained collection references.
+        private bool _serializerCollectionAccessed;
+        private bool _copierCollectionAccessed;
+        private bool _activatorCollectionAccessed;
+        private bool _converterCollectionAccessed;
         internal Dictionary<Type, List<SerializationContract>> SerializerContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> CopierContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ActivatorContracts { get; } = new();
@@ -59,7 +68,11 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve activator members required by trimming. "
                 + "Use AddActivator(Type) when registering activators.")]
 #endif
-            get => _activators;
+            get
+            {
+                _activatorCollectionAccessed = true;
+                return _activators;
+            }
         }
 
         /// <summary>
@@ -72,7 +85,11 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve field codec members required by trimming. "
                 + "Use AddFieldCodec(Type) when registering field codecs.")]
 #endif
-            get => _fieldCodecs;
+            get
+            {
+                _serializerCollectionAccessed = true;
+                return _fieldCodecs;
+            }
         }
 
         /// <summary>
@@ -85,7 +102,11 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve serializer members required by trimming. "
                 + "Use AddSerializer(Type) when registering serializers.")]
 #endif
-            get => _serializers;
+            get
+            {
+                _serializerCollectionAccessed = true;
+                return _serializers;
+            }
         }
 
         /// <summary>
@@ -98,7 +119,11 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve copier members required by trimming. "
                 + "Use AddCopier(Type) when registering copiers.")]
 #endif
-            get => _copiers;
+            get
+            {
+                _copierCollectionAccessed = true;
+                return _copiers;
+            }
         }
 
         /// <summary>
@@ -111,7 +136,11 @@ namespace Orleans.Serialization.Configuration
                 "Direct collection access cannot preserve converter members required by trimming. "
                 + "Use AddConverter(Type) when registering converters.")]
 #endif
-            get => _converters;
+            get
+            {
+                _converterCollectionAccessed = true;
+                return _converters;
+            }
         }
 
         /// <summary>
@@ -249,6 +278,15 @@ namespace Orleans.Serialization.Configuration
 
         internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
 
+        internal bool DiscoverInterfaces(Type type, Type contractType)
+            => contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
+                ? _serializerCollectionAccessed || _legacySerializers.Contains(type)
+                : contractType == typeof(IDeepCopier<>) || contractType == typeof(IBaseCopier<>)
+                    ? _copierCollectionAccessed || _legacyCopiers.Contains(type)
+                    : contractType == typeof(IActivator<>)
+                        ? _activatorCollectionAccessed || _legacyActivators.Contains(type)
+                        : _converterCollectionAccessed || _legacyConverters.Contains(type);
+
         /// <summary>
         /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
         /// </summary>
@@ -257,7 +295,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _serializers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => AddImplementation(_serializers, _legacySerializers, type);
 
         /// <summary>
         /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
@@ -267,7 +305,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _fieldCodecs.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => AddImplementation(_fieldCodecs, _legacySerializers, type);
 
         /// <summary>
         /// Adds a copier implementation type and preserves the members used to inspect and activate it.
@@ -277,7 +315,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _copiers.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => AddImplementation(_copiers, _legacyCopiers, type);
 
         /// <summary>
         /// Adds a converter implementation type and preserves the members used to inspect and activate it.
@@ -287,7 +325,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _converters.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => AddImplementation(_converters, _legacyConverters, type);
 
         /// <summary>
         /// Adds an activator implementation type and preserves the members used to inspect and activate it.
@@ -297,7 +335,18 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => _activators.Add(type ?? throw new ArgumentNullException(nameof(type)));
+            Type type) => AddImplementation(_activators, _legacyActivators, type);
+
+        private static void AddImplementation(HashSet<Type> types, HashSet<Type> legacyTypes, Type type)
+        {
+            if (type is null)
+            {
+                throw new ArgumentNullException(nameof(type));
+            }
+
+            types.Add(type);
+            legacyTypes.Add(type);
+        }
 
         /// <summary>
         /// Registers a field codec for its target type and preserves its activation and target interface metadata.
