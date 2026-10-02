@@ -7,7 +7,7 @@ ms.topic: reference
 
 # ADO.NET database configuration
 
-Orleans keeps its ADO.NET schema scripts beside each provider's source. For externally managed schemas, run the main script before the capability scripts. Use scripts from the same Orleans release as the packages deployed by the application.
+Orleans keeps its ADO.NET schema scripts beside each provider's source. Run the main script before the capability scripts. Use scripts from the same Orleans release as the packages deployed by the application.
 
 ## Driver invariants
 
@@ -44,14 +44,11 @@ Orleans keeps its ADO.NET schema scripts beside each provider's source. For exte
 - [Oracle](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
 - [SQLite](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
-SQLite grain storage automatically creates missing schema objects and updates
-stored persistence queries during provider initialization, preserving grain
-state. Each startup installs the bundled default queries. Set
-<xref:Orleans.Configuration.AdoNetGrainStorageOptions.InitializeSqliteDatabase*>
-to `false` before startup, including upgrades, to use an externally managed
-schema or customized queries. Initialization uses the configured SQLite command
-timeout when waiting for database locks. A script failure stops provider startup;
-the idempotent scripts can be reapplied on the next initialization attempt.
+The SQLite scripts are idempotent. Reapplying them refreshes persistence queries
+and records `StorageSchemaVersion` in `OrleansQuery`, preserving grain state.
+Provider startup reads this version and requires a sufficiently up-to-date
+schema. An upgrade error identifies the provider and directs the developer to
+apply the current SQLite main and persistence scripts.
 
 ## Reminders
 
@@ -69,9 +66,6 @@ the idempotent scripts can be reapplied on the next initialization attempt.
 Not every capability supports every database. The presence of a script in the provider directory is the authoritative support signal for that Orleans release.
 
 ## Apply and upgrade schemas
-
-SQLite grain storage applies its main and persistence scripts automatically
-when initialization is enabled. For externally managed schemas:
 
 1. Back up application data according to the database recovery policy.
 2. Apply the main script for a new database.

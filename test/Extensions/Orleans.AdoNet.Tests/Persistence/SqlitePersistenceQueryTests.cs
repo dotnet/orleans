@@ -122,9 +122,9 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
             command.CommandText = """
                 UPDATE OrleansQuery
                 SET QueryText = 'outdated'
-                WHERE QueryKey IN ('WriteToStorageKey', 'ReadFromStorageKey', 'ClearStorageKey');
+                WHERE QueryKey IN ('WriteToStorageKey', 'ReadFromStorageKey', 'ClearStorageKey', 'StorageSchemaVersion');
                 """;
-            Assert.Equal(3, command.ExecuteNonQuery());
+            Assert.Equal(4, command.ExecuteNonQuery());
         }
 
         InitializeDatabase(_connection);
@@ -132,6 +132,7 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
         Assert.Equal(expected["WriteToStorageKey"], GetQuery("WriteToStorageKey"));
         Assert.Equal(expected["ReadFromStorageKey"], GetQuery("ReadFromStorageKey"));
         Assert.Equal(expected["ClearStorageKey"], GetQuery("ClearStorageKey"));
+        Assert.Equal("1", GetQuery("StorageSchemaVersion"));
         Assert.Equal([(7, "original")], ReadRows());
     }
 

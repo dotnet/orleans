@@ -86,14 +86,7 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 
 ## Database Setup
 
-SQLite grain storage automatically creates missing schema objects and updates
-stored persistence queries during initialization, preserving grain state.
-Each startup installs the bundled default queries. Set
-`AdoNetGrainStorageOptions.InitializeSqliteDatabase` to `false` before startup,
-including upgrades, to use an externally managed schema or customized queries.
-
-For other database systems, apply the main and persistence scripts before
-starting the provider. The scripts are available in the Orleans source repository:
+Before using the ADO.NET provider, you need to set up the necessary database tables. Scripts for different database systems are available in the Orleans source repository:
 
 - [SQL Server Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/SQLServer-Persistence.sql)
 - [MySQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
@@ -101,6 +94,11 @@ starting the provider. The scripts are available in the Orleans source repositor
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
 - [SQLite Main Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Sqlite-Main.sql)
 - [SQLite Persistence Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
+
+The SQLite scripts are idempotent: reapplying them refreshes the persistence
+queries and records `StorageSchemaVersion` in `OrleansQuery`, preserving grain
+state. Provider startup checks that version and reports an upgrade error naming
+the current scripts when the database schema is insufficiently up to date.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

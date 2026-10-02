@@ -46,16 +46,6 @@ namespace Orleans.Configuration
         /// </summary>
         public string Invariant { get; set; } = DEFAULT_ADONET_INVARIANT;
 
-        /// <summary>
-        /// Gets or sets whether SQLite schema objects and persistence queries are initialized or updated during provider startup.
-        /// </summary>
-        /// <remarks>
-        /// Defaults to <see langword="true"/>. Applies when <see cref="Invariant"/> is <c>System.Data.SQLite</c>.
-        /// Initialization installs the bundled default persistence queries at each startup.
-        /// Set to <see langword="false"/> before startup to use an externally managed schema or customized persistence queries.
-        /// </remarks>
-        public bool InitializeSqliteDatabase { get; set; } = true;
-
         /// <inheritdoc/>
         public IGrainStorageSerializer GrainStorageSerializer { get; set; } = null!;
 

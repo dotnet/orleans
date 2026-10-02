@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -42,8 +41,7 @@ namespace Orleans.Storage
         RelationalProviderReadError = RelationalProviderBase + 16,
         RelationalProviderWriting = RelationalProviderBase + 17,
         RelationalProviderWrote = RelationalProviderBase + 18,
-        RelationalProviderWriteError = RelationalProviderBase + 19,
-        RelationalProviderInitSqliteDatabase = RelationalProviderBase + 20
+        RelationalProviderWriteError = RelationalProviderBase + 19
     }
 
     /// <summary>
@@ -125,6 +123,8 @@ namespace Orleans.Storage
         /// The default query to initialize this structure from the Orleans database.
         /// </summary>
         public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey' OR QueryKey = 'DeleteStorageKey'";
+
+        private const int MinimumSqlitePersistenceSchemaVersion = 1;
 
         /// <summary>
         /// The queries currently used. When this is updated, the new queries will take effect immediately.
@@ -362,22 +362,37 @@ namespace Orleans.Storage
         private async Task Init(CancellationToken cancellationToken)
         {
             Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString, options.DataSource);
-            if (options.InitializeSqliteDatabase && options.Invariant == AdoNetInvariants.InvariantNameSqlLite)
+            var isSqlite = options.Invariant == AdoNetInvariants.InvariantNameSqlLite;
+            if (isSqlite)
             {
-                LogInfoInitializingSqliteDatabase(name);
-                foreach (var script in new[] { "Sqlite-Main.sql", "Sqlite-Persistence.sql" })
+                var queryTableExists = (await Storage.ReadAsync(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'OrleansQuery' COLLATE NOCASE;",
+                    null,
+                    (reader, _, _) => Task.FromResult(reader.GetInt32(0)),
+                    cancellationToken: cancellationToken).ConfigureAwait(false)).Single() == 1;
+                if (!queryTableExists)
                 {
-                    using var stream = typeof(AdoNetGrainStorage).Assembly.GetManifestResourceStream($"Orleans.Persistence.AdoNet.{script}")!;
-                    using var reader = new StreamReader(stream);
-                    var query = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-                    await Storage.ExecuteAsync(query, null, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    throw CreateSqliteSchemaVersionException(null);
                 }
             }
 
-            var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
+            var initializationQuery = isSqlite
+                ? DefaultInitializationQuery + " OR QueryKey = 'StorageSchemaVersion'"
+                : DefaultInitializationQuery;
+            var queries = await Storage.ReadAsync(initializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
             }, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            if (isSqlite)
+            {
+                var schemaVersion = queries.SingleOrDefault(i => i.Item1 == "StorageSchemaVersion")?.Item2;
+                if (!int.TryParse(schemaVersion, NumberStyles.None, CultureInfo.InvariantCulture, out var version)
+                    || version < MinimumSqlitePersistenceSchemaVersion)
+                {
+                    throw CreateSqliteSchemaVersionException(schemaVersion);
+                }
+            }
 
             // This check is for backward compatibility:
             // 1. Some AdoNet storage invariants may not support delete on clear.
@@ -399,6 +414,11 @@ namespace Orleans.Storage
                 Storage.InvariantName,
                 new(Storage.ConnectionString));
         }
+
+        private OrleansConfigurationException CreateSqliteSchemaVersionException(string? schemaVersion)
+            => new($"SQLite persistence database for ADO.NET grain storage provider '{name}' has schema version '{schemaVersion ?? "unversioned"}'; "
+                + $"version {MinimumSqlitePersistenceSchemaVersion} or later is required. "
+                + "Upgrade the database by applying the current Sqlite-Main.sql and Sqlite-Persistence.sql scripts.");
 
         /// <summary>
         /// Close this provider
@@ -596,13 +616,6 @@ namespace Orleans.Storage
         {
             public override string ToString() => ConfigUtilities.RedactConnectionStringInfo(connectionString);
         }
-
-        [LoggerMessage(
-            EventId = (int)RelationalStorageProviderCodes.RelationalProviderInitSqliteDatabase,
-            Level = LogLevel.Information,
-            Message = "Initializing SQLite schema and installing default persistence queries: ProviderName={Name}."
-        )]
-        private partial void LogInfoInitializingSqliteDatabase(string name);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderInitProvider,

@@ -79,7 +79,7 @@ CREATE INDEX IF NOT EXISTS IX_OrleansStorage ON OrleansStorage(GrainIdHash, Grai
 -- Updates an existing grain state with optimistic concurrency control or inserts it if it does not exist.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
 ('WriteToStorageKey', '
-    -- TEMP objects survive pooled connection reuse. Bump the suffix on both object names whenever the trigger body changes.
+    -- TEMP objects survive pooled connection reuse. Bump both object suffixes and StorageSchemaVersion whenever the trigger body changes.
     CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest_10_4
     (
         GrainIdHash INT NOT NULL,
@@ -184,4 +184,9 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
     WHERE changes() = 0
         AND @GrainStateVersion IS NOT NULL;
 ')
+ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;
+
+-- Record the version last so an interrupted upgrade is not marked current.
+-- Bump this value and the provider's minimum version when the persistence contract changes.
+INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES ('StorageSchemaVersion', '1')
 ON CONFLICT(QueryKey) DO UPDATE SET QueryText = excluded.QueryText;

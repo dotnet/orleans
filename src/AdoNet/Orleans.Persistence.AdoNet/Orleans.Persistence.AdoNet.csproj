@@ -17,8 +17,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
-    <EmbeddedResource Include="..\Shared\Sqlite-Main.sql" LogicalName="Orleans.Persistence.AdoNet.Sqlite-Main.sql" />
-    <EmbeddedResource Include="Sqlite-Persistence.sql" LogicalName="Orleans.Persistence.AdoNet.Sqlite-Persistence.sql" />
   </ItemGroup>
 
   <ItemGroup>
