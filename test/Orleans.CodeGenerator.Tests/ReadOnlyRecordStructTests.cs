@@ -68,13 +68,15 @@ public class ReadOnlyRecordStructTests
         var classes = driver.GetRunResult().Results.Single().GeneratedSources
             .SelectMany(s => s.SyntaxTree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes().OfType<ClassDeclarationSyntax>())
             .ToList();
+        var usesFieldAccessor = referencedAssembly && isValueType;
         foreach (var className in new[] { "Codec_TestRecord", "Copier_TestRecord" })
         {
             var type = Assert.Single(classes, c => c.Identifier.ValueText == className);
             var accessor = Assert.Single(type.Members.OfType<MethodDeclarationSyntax>(), m => m.Modifiers.Any(SyntaxKind.ExternKeyword));
-            Assert.Contains("UnsafeAccessorKind.Method", accessor.ToString(), StringComparison.Ordinal);
-            Assert.Contains("Name = \"set_Value\"", accessor.ToString(), StringComparison.Ordinal);
-            Assert.Equal(2, accessor.ParameterList.Parameters.Count);
+            Assert.Contains(usesFieldAccessor ? "UnsafeAccessorKind.Field" : "UnsafeAccessorKind.Method", accessor.ToString(), StringComparison.Ordinal);
+            Assert.Contains(usesFieldAccessor ? "Name = \"<Value>k__BackingField\"" : "Name = \"set_Value\"", accessor.ToString(), StringComparison.Ordinal);
+            Assert.Equal(usesFieldAccessor ? 1 : 2, accessor.ParameterList.Parameters.Count);
+            Assert.Equal(usesFieldAccessor, accessor.ReturnType is RefTypeSyntax);
             Assert.Equal(isValueType, accessor.ParameterList.Parameters[0].Modifiers.Any(SyntaxKind.RefKeyword));
             Assert.Equal("global::TestProject.TestRecord", accessor.ParameterList.Parameters[0].Type!.ToString());
             var invocations = type.DescendantNodes().OfType<InvocationExpressionSyntax>()
