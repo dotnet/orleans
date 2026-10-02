@@ -727,7 +727,7 @@ namespace Orleans.Serialization.Serializers
                 else
                 {
                     converterType = converterDefinition.IsGenericTypeDefinition
-                        ? converterDefinition.MakeGenericType(fieldType.GetGenericArguments())
+                        ? ConstructGenericImplementation(converterDefinition, fieldType.GetGenericArguments())
                         : converterDefinition;
                     foreach (var @interface in converterType.GetInterfaces())
                     {
@@ -805,7 +805,7 @@ namespace Orleans.Serialization.Serializers
             if (!_targetDescriptions.TryGetValue((contractType, targetType, implementation), out var descriptions)
                 && !_targetDescriptions.TryGetValue((contractType, searchType, implementation), out descriptions))
             {
-                return implementation.MakeGenericType(targetType.GetGenericArguments());
+                return ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
             }
 
             var count = implementation.GetGenericArguments().Length;
@@ -824,7 +824,7 @@ namespace Orleans.Serialization.Serializers
                         $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
                 }
 
-                return implementation.MakeGenericType(resolved);
+                return ConstructGenericImplementation(implementation, resolved);
             }
 
             return null;
