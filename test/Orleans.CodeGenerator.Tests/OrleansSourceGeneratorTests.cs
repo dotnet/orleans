@@ -2766,6 +2766,161 @@ public class DemoClass
         Assert.DoesNotContain(graph.Registrations.Keys, static type => type.Name.EndsWith("Marker", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("TestProject.GeneratedValue<int>", false)]
+    [InlineData("TestProject.Box<byte>", true)]
+    [InlineData("TestProject.Box<int>", true)]
+    public async Task RpcResponseFactoriesCloseCanonicalFullGraphServices(string rootName, bool arrayCase)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public struct GeneratedValue<T> { [Id(0)] public T Value { get; set; } }
+            [GenerateSerializer]
+            public sealed class Box<T> { [Id(0)] public T[] Value { get; set; } }
+            """, $"FullGraphProof{Guid.NewGuid():N}");
+        var definition = compilation.GetTypeByMetadataName(arrayCase ? "TestProject.Box`1" : "TestProject.GeneratedValue`1");
+        Assert.NotNull(definition);
+        var element = compilation.GetSpecialType(rootName.Contains("byte", StringComparison.Ordinal) ? SpecialType.System_Byte : SpecialType.System_Int32);
+        var type = definition.Construct(element);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [type], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = arrayCase ? $$"""
+            var provider = services.GetRequiredService<CodecProvider>();
+            var serializer = new Serializer<{{rootName}}>(provider.GetCodec<{{rootName}}>(), sessions);
+            var copier = new DeepCopier<{{rootName}}>(provider.GetDeepCopier<{{rootName}}>(), services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+            var original = new {{rootName}} { Value = new[] { ({{(rootName.Contains("byte", StringComparison.Ordinal) ? "byte" : "int")}})7, ({{(rootName.Contains("byte", StringComparison.Ordinal) ? "byte" : "int")}})9 } };
+            var copy = copier.Copy(original);
+            var wire = serializer.SerializeToArray(original);
+            using var legacy = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof({{rootName}}).Assembly)).BuildServiceProvider();
+            var legacySerializer = new Serializer<{{rootName}}>(
+                legacy.GetRequiredService<CodecProvider>().GetCodec<{{rootName}}>(),
+                legacy.GetRequiredService<SerializerSessionPool>());
+            var legacyWire = legacySerializer.SerializeToArray(original);
+            var result = serializer.Deserialize(wire);
+            copy.Value[0] = 3;
+            return original.Value[0] == 7 && result.Value[0] == 7 && result.Value[1] == 9
+                && !ReferenceEquals(original, copy) && !ReferenceEquals(original.Value, copy.Value)
+                && System.MemoryExtensions.SequenceEqual<byte>(wire, legacyWire)
+                && (!typeof({{rootName}}).GenericTypeArguments[0].Equals(typeof(byte))
+                    || provider.GetCodec<byte[]>() is Orleans.Serialization.Codecs.ByteArrayCodec
+                        && provider.GetDeepCopier<byte[]>() is Orleans.Serialization.Codecs.ByteArrayCopier);
+            """ : """
+            var provider = services.GetRequiredService<CodecProvider>();
+            var serializer = new ValueSerializer<TestProject.GeneratedValue<int>>(provider, sessions);
+            var original = new TestProject.GeneratedValue<int> { Value = 47 };
+            var output = new System.Buffers.ArrayBufferWriter<byte>();
+            serializer.Serialize(ref original, output);
+            var result = new TestProject.GeneratedValue<int>();
+            serializer.Deserialize(output.WrittenMemory, ref result);
+            return result.Value == 47 && ReferenceEquals(
+                provider.GetValueSerializer<TestProject.GeneratedValue<int>>(),
+                provider.GetCodec<TestProject.GeneratedValue<int>>());
+            """;
+        var contextSource = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            using Orleans.Serialization.Session;
+            public sealed class ClosedContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class FullGraphProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new ClosedContext()).BuildServiceProvider();
+                    var sessions = services.GetRequiredService<SerializerSessionPool>();
+                    {{exercise}}
+                }
+            }
+            """;
+        var outputCompilation = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = outputCompilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("FullGraphProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesPreserveGenericArrayGraphCycles()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Box<T> { [Id(0)] public T[] Value { get; set; } }
+            [GenerateSerializer]
+            public sealed class Node { [Id(0)] public Box<Node> Children { get; set; } }
+            """, $"ArrayCycleProof{Guid.NewGuid():N}");
+        var node = compilation.GetTypeByMetadataName("TestProject.Node");
+        Assert.NotNull(node);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [node], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class CycleContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class ArrayCycleProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new CycleContext()).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var serializer = new Serializer<TestProject.Node>(provider.GetCodec<TestProject.Node>(),
+                        services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    var copier = new DeepCopier<TestProject.Node>(provider.GetDeepCopier<TestProject.Node>(),
+                        services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+                    var original = new TestProject.Node();
+                    original.Children = new TestProject.Box<TestProject.Node> { Value = new[] { original, original } };
+                    var copy = copier.Copy(original);
+                    var result = serializer.Deserialize(serializer.SerializeToArray(original));
+                    return !ReferenceEquals(original, copy) && ReferenceEquals(copy, copy.Children.Value[0])
+                        && ReferenceEquals(copy.Children.Value[0], copy.Children.Value[1])
+                        && ReferenceEquals(result, result.Children.Value[0])
+                        && ReferenceEquals(result.Children.Value[0], result.Children.Value[1]);
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ArrayCycleProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
