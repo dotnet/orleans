@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Versions;
@@ -180,12 +179,13 @@ namespace Orleans.GrainReferences
     }
 
     /// <summary>
-    /// Provides functionality for mapping from a <see cref="GrainInterfaceType"/> to the corresponding generated proxy type.
+    /// Maps a <see cref="GrainInterfaceType"/> to its grain-reference factory.
     /// </summary>
     internal class RpcProvider
     {
         private readonly TypeConverter _typeConverter;
         private readonly Dictionary<GrainInterfaceType, Type> _mapping;
+        private readonly Dictionary<GrainInterfaceType, Func<GrainReferenceShared, IdSpan, GrainReference>> _factories = new();
 
         /// <summary>
         /// Initializes a new  instance of the <see cref="RpcProvider"/> class.
@@ -201,8 +201,29 @@ namespace Orleans.GrainReferences
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxyTypes;
             _mapping = new Dictionary<GrainInterfaceType, Type>();
+            var registrations = config.Value.GetOrCreate<GrainReferenceFactoryOptions>().Factories;
+            var registeredProxies = new HashSet<Type>();
+            foreach (var (interfaceType, registration) in registrations)
+            {
+                var id = resolver.GetGrainInterfaceType(interfaceType);
+                registeredProxies.Add(registration.ProxyType);
+                if (registration.Factory is { } factory)
+                {
+                    _factories[id] = factory;
+                }
+                else
+                {
+                    _mapping[id] = registration.ProxyType;
+                }
+            }
+
             foreach (var proxyType in proxyTypes)
             {
+                if (registeredProxies.Contains(proxyType))
+                {
+                    continue;
+                }
+
                 if (!typeof(IAddressable).IsAssignableFrom(proxyType))
                 {
                     continue;
@@ -217,6 +238,7 @@ namespace Orleans.GrainReferences
                 var grainInterface = GetMainInterface(type);
                 var id = resolver.GetGrainInterfaceType(grainInterface);
                 _mapping[id] = type;
+                _factories.Remove(id);
             }
 
             [UnconditionalSuppressMessage(
@@ -251,13 +273,18 @@ namespace Orleans.GrainReferences
         }
 
         /// <summary>
-        /// Gets the generated proxy object type corresponding to the specified <see cref="GrainInterfaceType"/>.
+        /// Gets the factory corresponding to the specified <see cref="GrainInterfaceType"/>.
         /// </summary>
         /// <param name="interfaceType">The grain interface type.</param>
-        /// <param name="result">The proxy object type.</param>
-        /// <returns>A value indicating whether a suitable type was found and was able to be constructed.</returns>
-        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type? result)
+        /// <param name="result">The grain-reference factory.</param>
+        /// <returns>A value indicating whether a suitable factory was found.</returns>
+        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Func<GrainReferenceShared, IdSpan, GrainReference>? result)
         {
+            if (_factories.TryGetValue(interfaceType, out result))
+            {
+                return true;
+            }
+
             GrainInterfaceType lookupId;
             Type[]? args;
             if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericId))
@@ -271,17 +298,33 @@ namespace Orleans.GrainReferences
                 args = default;
             }
 
-            if (!_mapping.TryGetValue(lookupId, out result))
+            if (!_mapping.TryGetValue(lookupId, out var proxyType))
             {
+                result = null;
                 return false;
             }
 
             if (args is not null)
             {
-                result = result.MakeGenericType(args);
+                proxyType = proxyType.MakeGenericType(args);
             }
 
+            result = CreateLegacyFactory(proxyType);
             return true;
+        }
+
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2070",
+            Justification = "Legacy proxy constructors are preserved by AddInterfaceProxy. Custom non-public constructors require explicit preservation.")]
+        private static Func<GrainReferenceShared, IdSpan, GrainReference> CreateLegacyFactory(Type proxyType)
+        {
+            var constructor = proxyType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                [typeof(GrainReferenceShared), typeof(IdSpan)])
+                ?? throw new SerializerException("Invalid proxy type: " + proxyType);
+            var invoker = ConstructorInvoker.Create(constructor);
+            return (shared, key) => (GrainReference)invoker.Invoke(shared, key);
         }
     }
 
@@ -324,13 +367,9 @@ namespace Orleans.GrainReferences
         }
 
         /// <inheritdoc />
-        [UnconditionalSuppressMessage(
-            "Trimming",
-            "IL2067",
-            Justification = "Generated proxies are registered using TypeManifestOptions.AddInterfaceProxy, which preserves their public constructors before they enter RpcProvider's mapping.")]
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
-            if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
+            if (!_rpcProvider.TryGet(interfaceType, out var factory))
             {
                 activator = default;
                 return false;
@@ -357,7 +396,7 @@ namespace Orleans.GrainReferences
                 _codecProvider,
                 _copyContextPool,
                 _serviceProvider);
-            activator = new GrainReferenceActivator(proxyType, shared);
+            activator = new GrainReferenceActivator(factory, shared);
             return true;
         }
 
@@ -372,36 +411,14 @@ namespace Orleans.GrainReferences
             /// <summary>
             /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
             /// </summary>
-            /// <param name="referenceType">The generated proxy object type.</param>
+            /// <param name="factory">The grain-reference factory.</param>
             /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
-            [UnconditionalSuppressMessage(
-                "Trimming",
-                "IL2070",
-                Justification = "Generated proxy public constructors are preserved by AddInterfaceProxy. Non-public constructors remain supported for explicitly preserved custom proxies.")]
             public GrainReferenceActivator(
-                [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type referenceType,
+                Func<GrainReferenceShared, IdSpan, GrainReference> factory,
                 GrainReferenceShared shared)
             {
                 _shared = shared;
-
-                var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
-                    ?? throw new SerializerException("Invalid proxy type: " + referenceType);
-
-                if (!RuntimeFeature.IsDynamicCodeSupported)
-                {
-                    var invoker = ConstructorInvoker.Create(ctor);
-                    _create = (shared, key) => (GrainReference)invoker.Invoke(shared, key);
-                    return;
-                }
-
-                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
-                var il = method.GetILGenerator();
-                // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Newobj, ctor);
-                il.Emit(OpCodes.Ret);
-                _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+                _create = factory;
             }
 
             public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);

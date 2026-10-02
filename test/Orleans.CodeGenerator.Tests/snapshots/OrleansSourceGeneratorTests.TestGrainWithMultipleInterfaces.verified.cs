@@ -299,6 +299,8 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
+            config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>().Add(typeof(global::TestProject.IGrainA), typeof(OrleansCodeGen.TestProject.Proxy_IGrainA), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGrainA(shared, key));
+            config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>().Add(typeof(global::TestProject.IGrainB), typeof(OrleansCodeGen.TestProject.Proxy_IGrainB), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGrainB(shared, key));
             config.AddInterface(typeof(global::TestProject.IGrainA));
             config.AddInterface(typeof(global::TestProject.IGrainB));
             config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));

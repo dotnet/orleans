@@ -259,6 +259,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
+            config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>().Add(typeof(global::TestProject.IHelloGrain), typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IHelloGrain(shared, key));
             config.AddInterface(typeof(global::TestProject.IHelloGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));

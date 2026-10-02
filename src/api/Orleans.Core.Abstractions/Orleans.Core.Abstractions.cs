@@ -1065,6 +1065,14 @@ namespace Orleans
         OS_InvalidOS = 104601
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
+    public sealed partial class GenerateGrainReferenceAttribute : System.Attribute
+    {
+        public GenerateGrainReferenceAttribute(System.Type interfaceType) { }
+
+        public System.Type InterfaceType { get { throw null; } }
+    }
+
     public abstract partial class Grain : IGrainBase, Runtime.IAddressable
     {
         protected Grain() { }
@@ -1500,6 +1508,16 @@ namespace Orleans.Concurrency
     [System.Obsolete("Message ordering is not guaranteed regardless of whether this attribute is used. This attribute has no effect.")]
     public sealed partial class UnorderedAttribute : System.Attribute
     {
+    }
+}
+
+namespace Orleans.Configuration
+{
+    public sealed partial class GrainReferenceFactoryOptions
+    {
+        public void Add(System.Type interfaceType, System.Type proxyType, System.Func<Runtime.GrainReferenceShared, Runtime.IdSpan, Runtime.GrainReference> factory) { }
+
+        public void Add(System.Type interfaceType, System.Type proxyType) { }
     }
 }
 

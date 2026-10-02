@@ -14,11 +14,28 @@ internal static class Program
     private static void Main()
     {
         ValidateGeneratedProxy();
+        ValidateClosedGenericFactories();
         ValidateSharedState(unordered: false);
         ValidateSharedState(unordered: true);
         ValidateConstructorFailures();
         ValidateNonPublicConstructor();
         Console.WriteLine("Production grain-reference provider constructed generated proxies under NativeAOT.");
+    }
+
+    private static void ValidateClosedGenericFactories()
+    {
+        using var fixture = new ReferenceConstructionFixture();
+        var number = fixture.CreateReference<int>("number-key");
+        var text = fixture.CreateReference<string>("text-key");
+        var repeated = fixture.CreateReference<int>("number-key");
+
+        Ensure(number is IGenericConstructionGrain<int>, "The statically closed value-type proxy was not constructed.");
+        Ensure(text is IGenericConstructionGrain<string>, "The statically closed reference-type proxy was not constructed.");
+        Ensure(number.GetType() != text.GetType(), "Closed proxy types must retain their type arguments.");
+        Ensure(number.InterfaceType == fixture.Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<int>)), "Closed value-type interface identity changed.");
+        Ensure(text.InterfaceType == fixture.Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<string>)), "Closed reference-type interface identity changed.");
+        Ensure(number.GrainId.Key == IdSpan.Create("number-key") && text.GrainId.Key == IdSpan.Create("text-key"), "Closed generic grain keys changed.");
+        Ensure(!ReferenceEquals(number, repeated) && number.Equals(repeated), "Closed generic reference identity changed.");
     }
 
     private static void ValidateGeneratedProxy()
@@ -46,7 +63,8 @@ internal static class Program
 
     private static void ValidateSharedState(bool unordered)
     {
-        using var fixture = new ReferenceConstructionFixture(unordered, proxyType: typeof(InspectableConstructionProxy));
+        using var fixture = new ReferenceConstructionFixture(
+            unordered, proxyType: typeof(InspectableConstructionProxy), factory: static (shared, key) => new InspectableConstructionProxy(shared, key));
         var first = (InspectableConstructionProxy)fixture.CreateReference("first-key");
         var second = (InspectableConstructionProxy)fixture.CreateReference("second-key");
         var shared = first.ConstructionShared;
@@ -69,14 +87,15 @@ internal static class Program
             () => invalid.CreateReference("key"),
             "Invalid proxy type: " + typeof(MissingConstructorProxy));
 
-        using var throwing = new ReferenceConstructionFixture(unordered: false, proxyType: typeof(ThrowingConstructorProxy));
+        using var throwing = new ReferenceConstructionFixture(
+            unordered: false, proxyType: typeof(ThrowingConstructorProxy), factory: static (shared, key) => new ThrowingConstructorProxy(shared, key));
         ExpectException<ConstructionException>(() => throwing.CreateReference("key"), "proxy-constructor");
     }
 
-    [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicConstructors, typeof(NonPublicConstructorProxy))]
     private static void ValidateNonPublicConstructor()
     {
-        using var fixture = new ReferenceConstructionFixture(unordered: false, proxyType: typeof(NonPublicConstructorProxy));
+        using var fixture = new ReferenceConstructionFixture(
+            unordered: false, proxyType: typeof(NonPublicConstructorProxy), factory: NonPublicConstructorProxy.Create);
         var reference = fixture.CreateReference("private-constructor");
         Ensure(reference is NonPublicConstructorProxy, "The preserved non-public proxy constructor was not invoked.");
         Ensure(reference.GrainId.Key == IdSpan.Create("private-constructor"), "The non-public constructor changed the grain key.");

@@ -3403,6 +3403,9 @@ namespace Orleans.Serialization.Configuration
         public void AddInterfaceProxy(System.Type type) { }
 
         public void AddSerializer(System.Type type) { }
+
+        public T GetOrCreate<T>()
+            where T : class, new() { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]

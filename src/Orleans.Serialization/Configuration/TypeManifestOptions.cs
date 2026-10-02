@@ -31,6 +31,23 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _interfaces = new();
         private readonly HashSet<Type> _interfaceProxies = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
+        private readonly Dictionary<Type, object> _extensions = new();
+
+        /// <summary>
+        /// Gets or creates strongly typed configuration associated with this manifest.
+        /// </summary>
+        /// <typeparam name="T">The configuration type.</typeparam>
+        /// <returns>The configuration instance owned by this manifest.</returns>
+        public T GetOrCreate<T>() where T : class, new()
+        {
+            if (!_extensions.TryGetValue(typeof(T), out var value))
+            {
+                value = new T();
+                _extensions.Add(typeof(T), value);
+            }
+
+            return (T)value;
+        }
 
         /// <summary>
         /// Gets or sets a value indicating whether <see cref="SerializerConfigurationAnalyzer"/> should be enabled.
