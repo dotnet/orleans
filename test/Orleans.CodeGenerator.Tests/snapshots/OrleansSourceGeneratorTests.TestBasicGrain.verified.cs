@@ -321,9 +321,9 @@ namespace OrleansCodeGen.TestProject
             config.AddInterface(typeof(global::TestProject.IBasicGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.BasicGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_BasicGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IBasicGrain));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IBasicGrain));
             n3.Add("6B0E24A1", typeof(OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1));
         }
     }

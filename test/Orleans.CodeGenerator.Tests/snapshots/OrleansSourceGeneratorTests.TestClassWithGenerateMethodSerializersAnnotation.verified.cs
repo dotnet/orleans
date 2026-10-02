@@ -225,9 +225,9 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.Proxy_IMyGrain));
             config.AddInterface(typeof(global::IMyGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::IMyGrain));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::IMyGrain));
             n3.Add("6D39E404", typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
         }
     }

@@ -141,14 +141,45 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Fact]
-    public void CompoundAliasPrefixSurvivesChildRegistration()
+    public void CompoundAliasTraversalPreservesPrefixesAndAddClearsThem()
     {
         var tree = Orleans.Serialization.TypeSystem.CompoundTypeAliasTree.Create();
         var prefix = tree.Add("rpc.prefix", typeof(int));
-        var child = tree.Add("rpc.prefix").Add("child", typeof(string));
-        Assert.Same(prefix, tree.Add("rpc.prefix"));
+        var child = tree.GetOrAdd("rpc.prefix").Add("child", typeof(string));
+        Assert.Same(prefix, tree.GetOrAdd("rpc.prefix"));
         Assert.Equal(typeof(int), prefix.Value);
         Assert.Equal(typeof(string), child.Value);
+        tree.Add("rpc.prefix");
+        Assert.Null(prefix.Value);
+        tree.Add("rpc.prefix", typeof(long));
+        Assert.Equal(typeof(long), tree.GetOrAdd("rpc.prefix").Value);
+
+        var typePrefix = tree.Add(typeof(RpcResponseTests), typeof(int));
+        Assert.Same(typePrefix, tree.GetOrAdd(typeof(RpcResponseTests)));
+        Assert.Equal(typeof(int), typePrefix.Value);
+        tree.Add(typeof(RpcResponseTests));
+        Assert.Null(typePrefix.Value);
+        tree.Add(typeof(RpcResponseTests), typeof(long));
+        Assert.Equal(typeof(long), tree.GetOrAdd(typeof(RpcResponseTests)).Value);
+    }
+
+    [Fact]
+    public void CompoundResponseAliasesResolveAndRoundTrip()
+    {
+        var converter = _services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>();
+        Assert.Equal(typeof(RpcMultipleAliasPayload), converter.Parse("(\"rpc.response.multiple\",\"2\")"));
+        Assert.Equal(typeof(RpcMultipleAliasPayload), converter.Parse("(\"rpc.response.multiple\",\"1\")"));
+        var serializer = _services.GetRequiredService<Serializer>();
+        var multiple = new List<RpcMultipleAliasPayload> { new() { Value = 79 } };
+        var result = serializer.Deserialize<List<RpcMultipleAliasPayload>>(serializer.SerializeToArray(multiple));
+        Assert.NotNull(result);
+        Assert.Single(result);
+        Assert.Equal(79, result[0].Value);
+        var nested = new List<RpcNestedAliasPayload> { new() { Value = 89 } };
+        var nestedResult = serializer.Deserialize<List<RpcNestedAliasPayload>>(serializer.SerializeToArray(nested));
+        Assert.NotNull(nestedResult);
+        Assert.Single(nestedResult);
+        Assert.Equal(89, nestedResult[0].Value);
     }
 
     [Fact]
@@ -164,6 +195,23 @@ public sealed class RpcResponseTests : IDisposable
         Assert.Same(payload, copy.GetResult<NativeAotSmoke.RpcResponsePayload>());
         Assert.IsType<PooledResponseCopier<NativeAotSmoke.RpcResponsePayload>>(
             services.GetRequiredService<CodecProvider>().GetDeepCopier(response.GetType()));
+    }
+
+    [GenerateSerializer, CompoundTypeAlias("rpc.response.multiple", "2"), CompoundTypeAlias("rpc.response.multiple", "1")]
+    public sealed class RpcMultipleAliasPayload
+    {
+        [Id(0)]
+        public int Value { get; set; }
+    }
+
+    [CompoundTypeAlias("rpc.response.marker")]
+    public sealed class RpcAliasMarker { }
+
+    [GenerateSerializer, CompoundTypeAlias(typeof(RpcAliasMarker), "payload")]
+    public sealed class RpcNestedAliasPayload
+    {
+        [Id(0)]
+        public int Value { get; set; }
     }
 
     [Fact]

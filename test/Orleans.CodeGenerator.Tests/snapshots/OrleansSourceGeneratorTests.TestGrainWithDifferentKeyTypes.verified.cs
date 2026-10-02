@@ -871,15 +871,15 @@ namespace OrleansCodeGen.TestProject
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithStringKey));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidCompoundKey));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithIntegerCompoundKey));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IMyGrainWithGuidKey));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithGuidKey));
             n3.Add("8F0FEC0E", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
-            var n5 = n2.Add(typeof(global::TestProject.IMyGrainWithStringKey));
+            var n5 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithStringKey));
             n5.Add("43570316", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316));
-            var n7 = n2.Add(typeof(global::TestProject.IMyGrainWithGuidCompoundKey));
+            var n7 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithGuidCompoundKey));
             n7.Add("A9FEF7AF", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
-            var n9 = n2.Add(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
+            var n9 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
             n9.Add("9814021A", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
         }
     }

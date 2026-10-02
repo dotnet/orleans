@@ -101,9 +101,11 @@ internal static class ReferenceAssemblyModelExtractor
                     typeAliases.Add(new TypeAliasModel(typeRef, alias));
                 }
 
-                if (TryExtractCompoundTypeAlias(symbol, libraryTypes.CompoundTypeAliasAttribute, out var components))
+                foreach (var compoundAlias in symbol.GetAttributes().Where(attribute =>
+                    SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, libraryTypes.CompoundTypeAliasAttribute)))
                 {
-                    compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
+                    if (TryExtractCompoundTypeAlias(compoundAlias, out var components))
+                        compoundTypeAliases.Add(new CompoundTypeAliasModel(components, typeRef));
                 }
 
                 if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct)
@@ -335,11 +337,9 @@ internal static class ReferenceAssemblyModelExtractor
     }
 
     private static bool TryExtractCompoundTypeAlias(
-        INamedTypeSymbol symbol,
-        INamedTypeSymbol compoundTypeAliasAttribute,
+        AttributeData attr,
         out ImmutableArray<CompoundAliasComponentModel> components)
     {
-        var attr = symbol.GetAttribute(compoundTypeAliasAttribute);
         if (attr is null)
         {
             components = [];

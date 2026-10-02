@@ -4088,6 +4088,10 @@ namespace Orleans.Serialization.TypeSystem
         public CompoundTypeAliasTree Add(System.Type key) { throw null; }
 
         public static CompoundTypeAliasTree Create() { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(string key) { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(System.Type key) { throw null; }
     }
 
     public partial class ConstructedGenericTypeSpec : TypeSpec

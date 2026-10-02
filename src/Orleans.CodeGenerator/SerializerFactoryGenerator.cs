@@ -143,6 +143,7 @@ internal static class SerializerFactoryGenerator
 
         var addService = useDefaultFactories ? "AddDefaultSerializerService" : "AddSerializerService";
         var addSerializer = useDefaultFactories ? "AddDefaultSerializer" : "AddSerializer";
+        var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
@@ -184,7 +185,7 @@ internal static class SerializerFactoryGenerator
             result.Append("options.AddAllowedType(typeof(").Append(typeName).AppendLine("));");
             if (!useDefaultFactories && registration.Type is INamedTypeSymbol named)
             {
-                AppendTypeMetadata(result, named, services.LibraryTypes);
+                AppendTypeMetadata(result, named, services.LibraryTypes, metadataTypes);
             }
         }
 
@@ -368,8 +369,9 @@ internal static class SerializerFactoryGenerator
         return $"new {name}({string.Join(", ", arguments)})";
     }
 
-    private static void AppendTypeMetadata(StringBuilder result, INamedTypeSymbol type, LibraryTypes library)
+    private static void AppendTypeMetadata(StringBuilder result, INamedTypeSymbol type, LibraryTypes library, HashSet<ITypeSymbol> visited)
     {
+        if (!visited.Add(type)) return;
         var openType = type.ToOpenTypeSyntax().ToString();
         if (GeneratedCodeUtilities.GetAlias(library, type) is { } alias)
         {
@@ -382,12 +384,16 @@ internal static class SerializerFactoryGenerator
             result.Append("options.WellKnownTypeIds.TryAdd(").Append(id).Append("U, typeof(").Append(openType).AppendLine("));");
         }
 
-        if (type.GetAttribute(library.CompoundTypeAliasAttribute) is { ConstructorArguments.Length: 1 } compound)
+        foreach (var compound in type.GetAttributes().Where(attribute =>
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, library.CompoundTypeAliasAttribute)
+            && attribute.ConstructorArguments.Length == 1))
         {
             var components = compound.ConstructorArguments[0].Values;
             foreach (var componentType in components.Select(component => component.Value).OfType<ITypeSymbol>())
             {
                 result.Append("options.AddAllowedType(typeof(").Append(Name(componentType)).AppendLine("));");
+                if (componentType is INamedTypeSymbol named)
+                    AppendTypeMetadata(result, named, library, visited);
             }
 
             result.Append("options.CompoundTypeAliases");
@@ -399,7 +405,7 @@ internal static class SerializerFactoryGenerator
                     ITypeSymbol symbol => $"typeof({Name(symbol)})",
                     _ => throw new InvalidOperationException("Compound aliases contain type or string components.")
                 };
-                result.Append(".Add(").Append(component);
+                result.Append(index == components.Length - 1 ? ".Add(" : ".GetOrAdd(").Append(component);
                 if (index == components.Length - 1)
                     result.Append(", typeof(").Append(openType).Append(')');
                 result.Append(')');

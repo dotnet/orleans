@@ -225,9 +225,9 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IResponseTimeoutGrain));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IResponseTimeoutGrain));
             n3.Add("6BE752C8", typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
         }
     }
