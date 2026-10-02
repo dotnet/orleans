@@ -48,4 +48,10 @@ public sealed class StaticSerializerFactoryTests
 
     [Fact]
     public void CaughtBaseCodecSpecializationFailureFaultsGraph() => StaticFactoryContracts.CaughtBaseCodecSpecializationFailureFaultsGraph();
+
+    [Fact]
+    public void KeyedFacadePreservesProviderCapabilitiesOutsideConstruction() => StaticFactoryContracts.KeyedFacadePreservesProviderCapabilitiesOutsideConstruction();
+
+    [Fact]
+    public void CapturedKeyedFacadeGuardsPendingConstruction() => StaticFactoryContracts.CapturedKeyedFacadeGuardsPendingConstruction();
 }
