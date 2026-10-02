@@ -12,6 +12,7 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class SerializerContextTests
 {
     [Fact] public void NestedCollectionsRoundTripAndCopy() => ContextContracts.NestedCollectionsRoundTripAndCopy();
+    [Fact] public void GeneratedFactoriesComposeWithMetadataAndReflection() => ContextContracts.GeneratedFactoriesComposeWithMetadataAndReflection();
     [Fact] public void GeneratedModelsTraverseDependencies() => ContextContracts.GeneratedModelsTraverseDependencies();
     [Fact] public void CanonicalValueSerializerUsesGeneratedCodec() => ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
     [Fact] public void GenericArraysRoundTripAndCopy() => ContextContracts.GenericArraysRoundTripAndCopy();

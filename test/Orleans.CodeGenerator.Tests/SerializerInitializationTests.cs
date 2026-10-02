@@ -21,19 +21,20 @@ public sealed class SerializerInitializationTests
             .AddSerializer()
             .AddSerializer();
         Assert.Equal(3, services.Count(descriptor => descriptor.ServiceType == typeof(IGeneralizedCodec)));
-        services.Configure<TypeManifestOptions>(options => options.RequireExplicitTypeRegistration = false);
         using var provider = services.BuildServiceProvider();
         Assert.IsType<CachedTypeResolver>(provider.GetRequiredService<TypeResolver>());
         Assert.IsType<StringCodec>(provider.GetRequiredService<CodecProvider>().GetCodec<string>());
     }
 
     [Fact]
-    public void ContextServicesUseTheClosedTypeResolver()
+    public void ContextServicesUseTheCommonTypeResolver()
     {
         using var provider = new ServiceCollection().AddSerializerContext(new ManualContext()).BuildServiceProvider();
         var resolver = provider.GetRequiredService<TypeResolver>();
-        Assert.IsNotType<CachedTypeResolver>(resolver);
+        Assert.IsType<CachedTypeResolver>(resolver);
         Assert.Equal(typeof(int), resolver.ResolveType("System.Int32"));
+        Assert.Equal(typeof(string), resolver.ResolveType("System.String"));
+        Assert.False(resolver.TryResolveType("Missing.Serialization.Type", out _));
     }
 
     private sealed class ManualContext : SerializerContext

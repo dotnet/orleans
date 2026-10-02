@@ -14,7 +14,7 @@ namespace Orleans.Serialization
         private static readonly object _assembliesKey = new();
 
         /// <summary>
-        /// Adds the context's closed type graph and enables explicit serialization service lookup.
+        /// Adds the context's closed type graph to serializer resolution.
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <param name="context">The generated serializer context.</param>
@@ -23,7 +23,6 @@ namespace Orleans.Serialization
         {
             if (builder is null) throw new ArgumentNullException(nameof(builder));
             if (context is null) throw new ArgumentNullException(nameof(context));
-            builder.Configure(options => options.RequireExplicitTypeRegistration = true);
             return builder.Configure(context);
         }
 

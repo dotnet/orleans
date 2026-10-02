@@ -57,7 +57,7 @@ namespace Orleans.Serialization
         /// <param name="services">The service collection.</param>
         /// <param name="context">The generated serializer context.</param>
         /// <returns>The service collection.</returns>
-        /// <remarks>Repeated calls combine the registered contexts. Lookup is restricted to their closed type graphs.</remarks>
+        /// <remarks>Repeated calls combine the registered contexts. Closed factories take priority over metadata-based resolution.</remarks>
         public static IServiceCollection AddSerializerContext(this IServiceCollection services, SerializerContext context)
         {
             if (services is null) throw new ArgumentNullException(nameof(services));
@@ -84,12 +84,7 @@ namespace Orleans.Serialization
                 services.AddSingleton<TypeResolver>(sp =>
                 {
                     var options = sp.GetRequiredService<IOptions<TypeManifestOptions>>();
-                    if (!SerializerRuntimeFeatures.UseGeneratedSerializerContexts && !options.Value.RequireExplicitTypeRegistration)
-                    {
-                        return new CachedTypeResolver();
-                    }
-
-                    return new SerializerContextTypeResolver(options.Value);
+                    return new CachedTypeResolver(options.Value.ContextTypes);
                 });
                 services.AddSingleton<TypeConverter>();
                 services.TryAddSingleton<CodecProvider>();
