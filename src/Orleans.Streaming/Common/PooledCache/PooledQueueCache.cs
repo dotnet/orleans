@@ -841,11 +841,13 @@ namespace Orleans.Providers.Streams.Common
             // Once insertion starts, only the internal metadata pool is involved: no
             // provider/adapter or observer callbacks may throw after a partial commit.
             // Allocation failures are outside this recoverable admission contract.
-            cacheMonitor?.TrackMessagesAdded(messages.Count);
             if (nextReportTime.HasValue)
             {
                 ReportCacheMessageStatistics(messages, projectedItemCount);
             }
+
+            // Complete retryable snapshot reporting before publishing the additive count.
+            cacheMonitor?.TrackMessagesAdded(messages.Count);
 
             foreach (var message in messages)
             {
