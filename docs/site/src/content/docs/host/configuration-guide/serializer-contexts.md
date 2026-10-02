@@ -14,7 +14,7 @@ Apply <xref:Orleans.GenerateSerializerContextAttribute> to a top-level, non-gene
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 
-Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies can provide generated model codecs and copiers; the context constructs their closed implementations. For traversal of referenced models, provide the implementation assembly to the compiler, for example by setting `ProduceReferenceAssembly=false` on the model project. This preserves the member information consumed by the existing Orleans model generator.
+Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies can provide generated model codecs and copiers; the context constructs their closed implementations and validates the producer's generated accessor contract. Compile those implementations with direct member access or static accessors for each serialized member. For traversal of referenced models, provide the implementation assembly to the compiler, for example by setting `ProduceReferenceAssembly=false` on the model project. This preserves the member information consumed by the existing Orleans model generator.
 
 The supported graph includes primitive leaf codecs with parameterless construction, generated enums, `List<T>`, `Dictionary<TKey, TValue>`, nullable value types, and single-dimensional zero-based arrays. Generated models use default construction, an `object` base for classes, and members supported by direct access or statically generated accessors. The context generator uses the existing model generator's accessor guarantees. Model hooks, custom activation, and additional collection families require their corresponding implementation support before being included in a context. The generator reports `ORLEANS0115` for a dependency requiring dynamic field access, another unsupported dependency, or a graph exceeding 1,024 closed types.
 
@@ -25,6 +25,8 @@ The supported graph includes primitive leaf codecs with parameterless constructi
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_usage":::
 
 The context also registers the type names used during deserialization. Codecs and copiers preserve Orleans field identifiers, reference tracking, and deep-copy isolation. Object cycles and shared references retain their identity within the restored or copied graph.
+
+Generated struct value serializers and field codecs share one canonical codec instance. Closed generic models include the concrete array services requested by their generated implementations, while direct byte-array serialization and copying retain the optimized byte-array implementations.
 
 ## Dependency construction and concurrency
 
