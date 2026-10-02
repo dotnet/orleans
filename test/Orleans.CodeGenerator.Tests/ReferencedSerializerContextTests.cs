@@ -18,16 +18,36 @@ public sealed class ReferencedSerializerContextTests
     [InlineData("v8.0", MetadataImportOptions.All)]
     [InlineData("v10.0", MetadataImportOptions.Public)]
     [InlineData("v10.0", MetadataImportOptions.All)]
-    public async Task ReferencedImplicitMemberDependenciesUseProducerImplementations(
+    public Task ReferencedImplicitMemberDependenciesUseProducerImplementations(
         string frameworkVersion, MetadataImportOptions metadataImport)
+        => VerifyProducerDependencies(frameworkVersion, metadataImport, privateField: false);
+
+    [Theory]
+    [InlineData(MetadataImportOptions.Public)]
+    [InlineData(MetadataImportOptions.All)]
+    public Task ReferencedStaticPrivateFieldRoundTripsAndCopies(MetadataImportOptions metadataImport)
+        => VerifyProducerDependencies("v10.0", metadataImport, privateField: true);
+
+    private static async Task VerifyProducerDependencies(
+        string frameworkVersion, MetadataImportOptions metadataImport, bool privateField)
     {
-        var producer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.GenerateSerializer]
-            public sealed class ImplicitPayload<T>
-            {
+        var declaration = privateField ? "ImplicitPayload" : "ImplicitPayload<T>";
+        var closedType = privateField ? "ImplicitPayload" : "ImplicitPayload<byte>";
+        var members = privateField ? """
+                [Orleans.Id(0)] private System.Collections.Generic.List<int> _values = new();
+                public System.Collections.Generic.List<int> Values { get => _values; set => _values = value; }
+                [Orleans.Id(1)] public byte[] Flat { get; set; } = System.Array.Empty<byte>();
+                [Orleans.Id(2)] public byte[][] Nested { get; set; } = System.Array.Empty<byte[]>();
+                """ : """
                 public System.Collections.Generic.List<T> Values { get; set; } = new();
                 public T[] Flat { get; set; } = System.Array.Empty<T>();
                 public T[][] Nested { get; set; } = System.Array.Empty<T[]>();
+                """;
+        var producer = await TestCompilationHelper.CreateCompilation($$"""
+            [Orleans.GenerateSerializer]
+            public sealed class {{declaration}}
+            {
+                {{members}}
             }
             """, $"ImplicitProducer{Guid.NewGuid():N}");
         var (producerOutput, producerResult) = Generate(producer, frameworkVersion, hotReload: false,
@@ -35,8 +55,8 @@ public sealed class ReferencedSerializerContextTests
         Assert.Empty(producerResult.Diagnostics);
         AssertNoCompilationErrors(producerOutput);
         var reference = EmitReference(producerOutput);
-        var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.GenerateSerializerContext(typeof(ImplicitPayload<byte>))]
+        var consumer = await TestCompilationHelper.CreateCompilation($$"""
+            [Orleans.GenerateSerializerContext(typeof({{closedType}}))]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """, $"ImplicitConsumer{Guid.NewGuid():N}", reference);
         consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));
@@ -45,13 +65,16 @@ public sealed class ReferencedSerializerContextTests
         AssertNoCompilationErrors(output);
         var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
             static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
-        Assert.Contains("ListCodec<byte>", context, StringComparison.Ordinal);
-        Assert.Contains("ListCopier<byte>", context, StringComparison.Ordinal);
-        Assert.Contains("ArrayCodec<byte>", context, StringComparison.Ordinal);
-        Assert.Contains("ArrayCopier<byte>", context, StringComparison.Ordinal);
+        Assert.Contains(privateField ? "ListCodec<int>" : "ListCodec<byte>", context, StringComparison.Ordinal);
+        Assert.Contains(privateField ? "ListCopier<int>" : "ListCopier<byte>", context, StringComparison.Ordinal);
+        if (!privateField)
+        {
+            Assert.Contains("ArrayCodec<byte>", context, StringComparison.Ordinal);
+            Assert.Contains("ArrayCopier<byte>", context, StringComparison.Ordinal);
+        }
         Assert.Contains("ByteArrayCodec", context, StringComparison.Ordinal);
 
-        var proof = CSharpSyntaxTree.ParseText("""
+        var proof = CSharpSyntaxTree.ParseText($$"""
             public static class ProducerGraphProof
             {
                 public static bool Run()
@@ -62,8 +85,8 @@ public sealed class ReferencedSerializerContextTests
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
                     var values = new byte[] { 13, 17 };
-                    var original = new ImplicitPayload<byte> { Values = new() { 13, 17 }, Flat = values, Nested = new[] { values, values } };
-                    var result = serializer.Deserialize<ImplicitPayload<byte>>(serializer.SerializeToArray(original));
+                    var original = new {{closedType}} { Values = new() { 13, 17 }, Flat = values, Nested = new[] { values, values } };
+                    var result = serializer.Deserialize<{{closedType}}>(serializer.SerializeToArray(original));
                     var copy = copier.Copy(original);
                     copy.Values[0] = 23;
                     copy.Nested[0][0] = 29;
