@@ -58,6 +58,20 @@ public static class RpcResponseContracts
             using var result = await ((IResponseInvokable)request).InvokeAndCopy(provider, contexts,
                 new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
             Ensure(result is IRawResponseWriter && Equals(expected, result.GetResult<T>()), "Generated primitive responses bind direct writers.");
+            var output = new ArrayBufferWriter<byte>();
+            using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
+            {
+                var writer = Writer.Create(output, session);
+                ((IRawResponseWriter)result).WriteRaw(ref writer);
+                writer.Commit();
+            }
+            Ensure(provider.TryGetRawResponseReader(typeof(T), out var registered), "The primitive result reader is statically registered.");
+            using var readerSession = services.GetRequiredService<SerializerSessionPool>().GetSession();
+            var reader = Reader.Create(output.WrittenMemory, readerSession);
+            var field = reader.ReadFieldHeader();
+            using var decoded = registered.ReadRaw(ref reader, ref field);
+            Ensure(decoded is IRawResponseWriter && Equals(expected, decoded.GetResult<T>()),
+                "Generated primitive writers and readers round-trip through the native message session.");
         }
 #else
         await System.Threading.Tasks.Task.CompletedTask;
