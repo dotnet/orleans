@@ -114,22 +114,22 @@ internal static class ReferenceAssemblyModelExtractor
                 {
                     if (symbol.HasAttribute(libraryTypes.RegisterSerializerAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Serializer));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterCopierAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Copier));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Copier, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterActivatorAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Activator));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Activator, compilation));
                     }
 
                     if (symbol.HasAttribute(libraryTypes.RegisterConverterAttribute))
                     {
-                        registeredCodecs.Add(new RegisteredCodecModel(typeRef, RegisteredCodecKind.Converter));
+                        registeredCodecs.Add(ExtractRegisteredCodec(symbol, RegisteredCodecKind.Converter, compilation));
                     }
 
                     foreach (var iface in symbol.AllInterfaces)
@@ -395,10 +395,11 @@ internal static class ReferenceAssemblyModelExtractor
     /// <summary>
     /// Extracts a <see cref="RegisteredCodecModel"/> from a symbol with one of the Register* attributes.
     /// </summary>
-    internal static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind)
+    internal static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind, Compilation compilation)
     {
         return new RegisteredCodecModel(
             new TypeRef(symbol.ToOpenTypeSyntax().ToString()),
-            kind);
+            kind,
+            SerializationContractModelExtractor.Extract(symbol, kind, compilation));
     }
 }
