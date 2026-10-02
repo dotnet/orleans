@@ -32,6 +32,7 @@ internal static class Metadata
         ReferenceTupleRoundTrip(services);
         ValueTupleRoundTrip(services);
         ValidateTargetParameterBinding();
+        ValidateMatchingImplementationCandidates();
     }
 
     internal static class PrivateContractContainer
@@ -73,6 +74,27 @@ internal static class Metadata
         }
 
         Console.WriteLine("TargetParameterBinding passed.");
+    }
+
+    private static void ValidateMatchingImplementationCandidates()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(IntPairActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddSerializationContract(typeof(StringPairActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(string))));
+        using var services = new ServiceCollection()
+            .AddSingleton<IntPairActivator<Guid>>()
+            .AddSingleton<StringPairActivator<Guid>>()
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetActivator<BindingPair<Guid, int>>().GetType() != typeof(IntPairActivator<Guid>)
+            || provider.GetActivator<BindingPair<Guid, string>>().GetType() != typeof(StringPairActivator<Guid>))
+        {
+            throw new InvalidOperationException("Target pattern lookup did not select the matching implementation.");
+        }
+
+        Console.WriteLine("MatchingImplementationCandidates passed.");
     }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
@@ -159,4 +181,14 @@ internal sealed class BindingPair<TFirst, TSecond>;
 internal sealed class ReversedPairActivator<TFirst, TSecond> : IActivator<BindingPair<TSecond, TFirst>>
 {
     public BindingPair<TSecond, TFirst> Create() => new();
+}
+
+internal sealed class IntPairActivator<T> : IActivator<BindingPair<T, int>>
+{
+    public BindingPair<T, int> Create() => new();
+}
+
+internal sealed class StringPairActivator<T> : IActivator<BindingPair<T, string>>
+{
+    public BindingPair<T, string> Create() => new();
 }
