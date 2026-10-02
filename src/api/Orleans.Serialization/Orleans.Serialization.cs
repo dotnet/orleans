@@ -3339,6 +3339,8 @@ namespace Orleans.Serialization.Configuration
     public sealed partial class InterfaceProxyFactoryOptions<TFactory>
         where TFactory : System.Delegate
     {
+        public System.Collections.Generic.IReadOnlyDictionary<System.Type, (System.Type ProxyType, TFactory? Factory)> Factories { get { throw null; } }
+
         public void Add(System.Type interfaceType, System.Type proxyType, TFactory factory) { }
 
         public void Add(System.Type interfaceType, System.Type proxyType) { }

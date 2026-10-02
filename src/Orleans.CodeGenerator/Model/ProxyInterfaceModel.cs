@@ -8,7 +8,7 @@ internal sealed record class ProxyBaseModel(
     bool IsExtension,
     string GeneratedClassNameComponent,
     TypeMetadataIdentity MetadataIdentity = default,
-    bool IsGrainReference = false);
+    TypeRef FactoryType = default);
 
 /// <summary>
 /// Describes a <c>[GenerateMethodSerializers]</c>-annotated interface for incremental proxy/invokable generation.

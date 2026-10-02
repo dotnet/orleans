@@ -65,7 +65,7 @@ namespace OrleansCodeGen
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IMyGrain(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrain(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::IMyGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404();

@@ -62,8 +62,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private MemberDeclarationSyntax[] GenerateFactory(string className, ProxyInterfaceDescription interfaceDescription)
     {
-        if (LibraryTypes.Compilation.GetTypeByMetadataName("Orleans.Runtime.GrainReference") is not { } grainReference
-            || !interfaceDescription.ProxyBaseType.HasBaseType(grainReference))
+        if (interfaceDescription.FactorySignature is not { } signature)
         {
             return [];
         }
@@ -74,17 +73,23 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                 interfaceDescription.TypeParameters.Select(static parameter => parameter.Name.ToIdentifierName()))));
         return
         [
-            MethodDeclaration(grainReference.ToTypeSyntax(), "Create")
+            MethodDeclaration(signature.ReturnType.ToTypeSyntax(), "Create")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("shared")).WithType(ParseTypeName("global::Orleans.Runtime.GrainReferenceShared")),
-                    Parameter(Identifier("key")).WithType(ParseTypeName("global::Orleans.Runtime.IdSpan")))
+                    [.. signature.Parameters.Select((parameter, index) => GetParameterSyntax(index, parameter, typeParameterSubstitutions: null))])
                 .WithExpressionBody(ArrowExpressionClause(
                     ObjectCreationExpression(proxyType).WithArgumentList(ArgumentList(SeparatedList(
-                    [
-                        Argument(IdentifierName("shared")),
-                        Argument(IdentifierName("key")),
-                    ])))))
+                        signature.Parameters.Select((parameter, index) =>
+                        {
+                            var argument = Argument(IdentifierName($"arg{index}"));
+                            return parameter.RefKind switch
+                            {
+                                RefKind.Ref => argument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
+                                RefKind.Out => argument.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword)),
+                                RefKind.In => argument.WithRefOrOutKeyword(Token(SyntaxKind.InKeyword)),
+                                _ => argument,
+                            };
+                        }))))))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
         ];
     }

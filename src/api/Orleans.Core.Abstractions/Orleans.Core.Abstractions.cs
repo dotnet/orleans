@@ -2266,6 +2266,7 @@ namespace Orleans.Runtime
     }
 
     [Alias("GrainRef")]
+    [GenerateProxyFactory(typeof(System.Func<GrainReferenceShared, IdSpan, GrainReference>))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.ValueTask<>), typeof(Request<>))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.ValueTask), typeof(Request))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.Task<>), typeof(TaskRequest<>))]

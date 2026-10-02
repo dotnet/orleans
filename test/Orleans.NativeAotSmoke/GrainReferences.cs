@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Invocation;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -15,11 +17,26 @@ internal static class Program
     {
         ValidateGeneratedProxy();
         ValidateClosedGenericFactories();
+        ValidateNonGrainFactory();
         ValidateSharedState(unordered: false);
         ValidateSharedState(unordered: true);
         ValidateConstructorFailures();
         ValidateNonPublicConstructor();
         Console.WriteLine("Production grain-reference provider constructed generated proxies under NativeAOT.");
+    }
+
+    private static void ValidateNonGrainFactory()
+    {
+        using var fixture = new ReferenceConstructionFixture();
+        var registration = fixture.ManifestOptions
+            .GetOrCreate<InterfaceProxyFactoryOptions<Func<string, int, NonGrainProxyBase>>>()
+            .Factories[typeof(INonGrainProxy)];
+        var factory = registration.Factory ?? throw new InvalidOperationException("The non-grain factory was not registered.");
+        var proxy = factory("non-grain", 42);
+
+        Ensure(proxy is INonGrainProxy, "The non-grain factory did not construct the generated interface proxy.");
+        Ensure(proxy.Label == "non-grain" && proxy.Number == 42, "The non-grain factory changed its arguments.");
+        Ensure(registration.ProxyType == proxy.GetType(), "The non-grain factory changed its registered proxy type.");
     }
 
     private static void ValidateClosedGenericFactories()
@@ -37,6 +54,19 @@ internal static class Program
         Ensure(number.GrainId.Key == IdSpan.Create("number-key") && text.GrainId.Key == IdSpan.Create("text-key"), "Closed generic grain keys changed.");
         Ensure(!ReferenceEquals(number, repeated) && number.Equals(repeated), "Closed generic reference identity changed.");
     }
+
+    [GenerateProxyFactory(typeof(Func<string, int, NonGrainProxyBase>))]
+    public class NonGrainProxyBase(string label, int number)
+    {
+        public string Label { get; } = label;
+        public int Number { get; } = number;
+
+        public ValueTask<T> InvokeAsync<T>(IInvokable request) => throw new NotSupportedException();
+        public ValueTask InvokeAsync(IInvokable request) => throw new NotSupportedException();
+    }
+
+    [GenerateMethodSerializers(typeof(NonGrainProxyBase))]
+    public interface INonGrainProxy;
 
     private static void ValidateGeneratedProxy()
     {

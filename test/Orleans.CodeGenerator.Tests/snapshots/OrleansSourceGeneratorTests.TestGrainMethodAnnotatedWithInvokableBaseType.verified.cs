@@ -70,7 +70,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IHelloGrain(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IHelloGrain(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IHelloGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F();

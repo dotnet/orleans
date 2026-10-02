@@ -38,7 +38,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IMyGrainWithGuidKey(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithGuidKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Guid> global::TestProject.IMyGrainWithGuidKey.GetGuidValue()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
@@ -74,7 +74,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IMyGrainWithStringKey(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithStringKey(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IMyGrainWithStringKey.GetStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316();
@@ -110,7 +110,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IMyGrainWithGuidCompoundKey(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithGuidCompoundKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> global::TestProject.IMyGrainWithGuidCompoundKey.GetGuidAndStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
@@ -146,7 +146,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IMyGrainWithIntegerCompoundKey(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithIntegerCompoundKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> global::TestProject.IMyGrainWithIntegerCompoundKey.GetIntegerAndStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A();

@@ -65,7 +65,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IGrainA(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IGrainA(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainA.MethodA(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
@@ -129,7 +129,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
-        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared shared, global::Orleans.Runtime.IdSpan key) => new Proxy_IGrainB(shared, key);
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IGrainB(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainB.MethodB(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();

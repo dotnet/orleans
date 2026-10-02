@@ -12,7 +12,16 @@ namespace Orleans.Serialization.Configuration;
 /// <typeparam name="TFactory">The delegate type used to construct proxies.</typeparam>
 public sealed class InterfaceProxyFactoryOptions<TFactory> where TFactory : Delegate
 {
-    internal Dictionary<Type, (Type ProxyType, TFactory? Factory)> Factories { get; } = new();
+    private readonly Dictionary<Type, (Type ProxyType, TFactory? Factory)> _factories = new();
+
+    /// <summary>
+    /// Gets proxy registrations keyed by their declared interfaces.
+    /// </summary>
+    /// <remarks>
+    /// Concrete registrations contain a construction delegate. Generic definitions contain a proxy
+    /// type mapping for runtime-selected arguments. The latest registration for an interface is used.
+    /// </remarks>
+    public IReadOnlyDictionary<Type, (Type ProxyType, TFactory? Factory)> Factories => _factories;
 
     // Superseded registrations remain explicit proxies, so legacy discovery cannot displace their replacements.
     internal HashSet<Type> ProxyTypes { get; } = new();
@@ -41,7 +50,7 @@ public sealed class InterfaceProxyFactoryOptions<TFactory> where TFactory : Dele
         }
 
         ProxyTypes.Add(proxyType);
-        Factories[interfaceType] = (proxyType, factory);
+        _factories[interfaceType] = (proxyType, factory);
     }
 
     /// <summary>
@@ -71,6 +80,6 @@ public sealed class InterfaceProxyFactoryOptions<TFactory> where TFactory : Dele
         }
 
         ProxyTypes.Add(proxyType);
-        Factories[interfaceType] = (proxyType, null);
+        _factories[interfaceType] = (proxyType, null);
     }
 }
