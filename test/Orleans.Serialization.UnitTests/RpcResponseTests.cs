@@ -126,6 +126,10 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.CompletedResponseRoundTrip();
 
     [Fact]
+    public void GeneratedValueAndArrayServicesRoundTripAndCopy()
+        => NativeAotSmoke.RpcResponseContracts.CanonicalValueAndArrayServices();
+
+    [Fact]
     public void ExplicitExceptionTransportRequiresDeclaredDependencyGraph()
     {
         using var services = new ServiceCollection().AddSerializerContext(new EmptyContext()).BuildServiceProvider();
@@ -356,6 +360,8 @@ public sealed class RpcResponseTests : IDisposable
         public Task<bool> Boolean() => Fail ? throw new InvalidOperationException("response failure") : Task.FromResult(true);
         public ValueTask<int> Integer() => ValueTask.FromResult(42);
         public Task<NativeAotSmoke.RpcResponsePayload> Payload() => Task.FromResult(Result);
+        public Task<NativeAotSmoke.RpcGeneratedValue<int>> Value() => Task.FromResult(new NativeAotSmoke.RpcGeneratedValue<int> { Value = 47 });
+        public Task<NativeAotSmoke.RpcResponseBox<byte>> Bytes() => Task.FromResult(new NativeAotSmoke.RpcResponseBox<byte> { Value = [7, 9] });
     }
 
     public sealed class FactoryService
