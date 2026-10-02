@@ -231,15 +231,17 @@ public sealed class SerializerContextTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("[Orleans.CompoundTypeAlias(\"expanding-interface\")]")]
-    public void ExpandingGenericInterfaceMetadataProducesBoundedDiagnostics(string alias)
+    [InlineData("System.Collections.Generic.List<T>", "")]
+    [InlineData("System.Collections.Generic.List<T>", "[Orleans.CompoundTypeAlias(\"expanding-interface\")]")]
+    [InlineData("T[]", "")]
+    [InlineData("T[]", "[Orleans.CompoundTypeAlias(\"expanding-interface\")]")]
+    public void ExpandingGenericInterfaceMetadataProducesBoundedDiagnostics(string argument, string alias)
     {
         var (_, result) = Generate($$"""
             {{alias}}
             public interface ITag<T> { }
             [Orleans.GenerateSerializer]
-            public sealed class Payload<T> : ITag<Payload<System.Collections.Generic.List<T>>>
+            public sealed class Payload<T> : ITag<Payload<{{argument}}>>
             {
                 [Orleans.Id(0)] public int Value { get; set; }
             }
