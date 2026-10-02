@@ -18,4 +18,4 @@ internal enum RegisteredCodecKind : byte
 internal readonly record struct RegisteredCodecModel(
     TypeRef Type,
     RegisteredCodecKind Kind,
-    EquatableArray<TypeMetadataIdentity> MetadataTypes = default);
+    EquatableArray<SerializationContractModel> Contracts = default);

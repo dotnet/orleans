@@ -127,13 +127,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
-            PreserveTypeMetadata("TestProject.InterfaceCtorParam, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam), typeof(global::TestProject.InterfaceCtorParam));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam), typeof(global::TestProject.InterfaceCtorParam));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam), typeof(global::TestProject.InterfaceCtorParam));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam), typeof(global::TestProject.InterfaceCtorParam));
         }
     }
 }

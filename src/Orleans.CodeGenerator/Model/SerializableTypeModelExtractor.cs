@@ -53,10 +53,7 @@ internal static class SerializableTypeModelExtractor
             SourceLocation: sourceLocation,
             MetadataIdentity: description is SerializableTypeDescription serializableDescription
                 ? TypeMetadataIdentity.Create(serializableDescription.Type)
-                : TypeMetadataIdentity.Empty,
-            MetadataTypes: description is SerializableTypeDescription metadataDescription
-                ? TypeMetadataDependencyCollector.Collect(metadataDescription.Type, includeType: true)
-                : default);
+                : TypeMetadataIdentity.Empty);
     }
 
     private static ImmutableArray<TypeParameterModel> ExtractTypeParameters(

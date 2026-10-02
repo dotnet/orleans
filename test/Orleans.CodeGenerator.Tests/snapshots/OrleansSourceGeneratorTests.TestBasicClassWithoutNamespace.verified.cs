@@ -118,14 +118,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.Codec_DemoData));
-            config.AddCopier(typeof(OrleansCodeGen.Copier_DemoData));
-            config.AddActivator(typeof(OrleansCodeGen.Activator_DemoData));
-            PreserveTypeMetadata("DemoData, TestProject");
-        }
-
-        private static void PreserveTypeMetadata([global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute(global::System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.Interfaces)] string typeName)
-        {
+            config.AddSerializer(typeof(OrleansCodeGen.Codec_DemoData), typeof(global::DemoData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.Codec_DemoData), typeof(global::DemoData));
+            config.AddCopier(typeof(OrleansCodeGen.Copier_DemoData), typeof(global::DemoData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.Copier_DemoData), typeof(global::DemoData));
+            config.AddActivator(typeof(OrleansCodeGen.Activator_DemoData), typeof(global::DemoData));
         }
     }
 }

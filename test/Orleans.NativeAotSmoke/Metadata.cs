@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -22,9 +23,34 @@ internal static class Metadata
         using var services = registrations.BuildServiceProvider();
         MetadataInitialization(services);
         TupleDefinitionMetadata(services);
+        PrivateContractContainer.Validate(services.GetRequiredService<TypeConverter>());
         PrimitiveRoundTrip(services);
         ReferenceTupleRoundTrip(services);
         ValueTupleRoundTrip(services);
+    }
+
+    internal static class PrivateContractContainer
+    {
+        private sealed class Hidden<T>;
+
+        [RegisterCopier]
+        internal sealed class Copier : IDeepCopier<Hidden<int>>
+        {
+            [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+            Hidden<int>? IDeepCopier<Hidden<int>>.DeepCopy(Hidden<int>? input, CopyContext context) => input;
+        }
+
+        internal static void Validate(TypeConverter converter)
+        {
+            var type = converter.Parse(
+                "Orleans.NativeAotSmoke.Metadata+PrivateContractContainer+Hidden`1[[System.Int32,System.Private.CoreLib]],Orleans.NativeAotSmoke");
+            if (type != typeof(Hidden<int>))
+            {
+                throw new InvalidOperationException("The private target contract was not registered.");
+            }
+
+            Console.WriteLine("PrivateTargetContract passed.");
+        }
     }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
