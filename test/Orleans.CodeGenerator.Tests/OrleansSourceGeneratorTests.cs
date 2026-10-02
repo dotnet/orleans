@@ -2486,6 +2486,85 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task RpcResponseFactoriesPreserveAllAliasesAndMetadataOnlyComponents()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            [CompoundTypeAlias("rpc.marker")]
+            public sealed class Marker { }
+            [GenerateSerializer, CompoundTypeAlias("rpc.multiple", "2"), CompoundTypeAlias("rpc.multiple", "1")]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            [GenerateSerializer, CompoundTypeAlias(typeof(Marker), "payload")]
+            public sealed class NestedPayload { [Id(0)] public int Value { get; set; } }
+            public interface IAliases : IGrainWithIntegerKey
+            {
+                Task<Payload> Multiple();
+                Task<NestedPayload> Nested();
+            }
+            """);
+        var generated = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(generated.Diagnostics);
+        var metadata = Assert.Single(generated.GeneratedSources, static item => item.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("GetOrAdd(\"rpc.multiple\")", metadata);
+        Assert.Contains(".Add(\"1\", typeof(global::TestProject.Payload))", metadata);
+        Assert.Contains(".Add(\"2\", typeof(global::TestProject.Payload))", metadata);
+
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var multiple = compilation.GetTypeByMetadataName("TestProject.Payload");
+        var nested = compilation.GetTypeByMetadataName("TestProject.NestedPayload");
+        Assert.NotNull(multiple);
+        Assert.NotNull(nested);
+        Assert.True(SerializerFactoryGenerator.TryCreate(services, [multiple, nested], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Contains("GetOrAdd(\"rpc.multiple\").Add(\"2\", typeof(global::TestProject.Payload))", graph.ConfigurationStatements);
+        Assert.Contains("GetOrAdd(\"rpc.multiple\").Add(\"1\", typeof(global::TestProject.Payload))", graph.ConfigurationStatements);
+        Assert.Contains("options.CompoundTypeAliases.Add(\"rpc.marker\", typeof(global::TestProject.Marker))", graph.ConfigurationStatements);
+        Assert.Contains("options.CompoundTypeAliases.GetOrAdd(typeof(global::TestProject.Marker)).Add(\"payload\"", graph.ConfigurationStatements);
+        Assert.DoesNotContain(graph.Registrations.Keys, static type => type.Name == "Marker");
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, "options.CompoundTypeAliases.Add(\"rpc.marker\""));
+
+        var contextSource = $$"""
+            public sealed class AliasContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesVisitRecursiveAliasMetadataOnce()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [CompoundTypeAlias(typeof(SecondMarker), "first")]
+            public sealed class FirstMarker { }
+            [CompoundTypeAlias(typeof(FirstMarker), "second")]
+            public sealed class SecondMarker { }
+            [GenerateSerializer, CompoundTypeAlias(typeof(FirstMarker), "payload")]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            """);
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [payload], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, ".Add(\"first\", typeof(global::TestProject.FirstMarker))"));
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, ".Add(\"second\", typeof(global::TestProject.SecondMarker))"));
+        Assert.DoesNotContain(graph.Registrations.Keys, static type => type.Name.EndsWith("Marker", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {
         var compilation = await CreateCompilation("""
