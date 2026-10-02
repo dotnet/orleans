@@ -94,6 +94,11 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
 - [SQLite Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
+Existing SQLite databases store persistence queries in `OrleansQuery`. Apply
+the [SQLite 10.4.0 persistence migration](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Migrations/Sqlite-Persistence-10.4.0.sql)
+before restarting silos to install the current persistence queries while
+preserving grain state.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

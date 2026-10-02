@@ -79,7 +79,8 @@ CREATE INDEX IX_OrleansStorage ON OrleansStorage(GrainIdHash, GrainTypeHash);
 -- Updates an existing grain state with optimistic concurrency control or inserts it if it does not exist.
 INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES 
 ('WriteToStorageKey', '
-    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest
+    -- TEMP objects survive pooled connection reuse. Bump the suffix on both object names whenever the trigger body changes.
+    CREATE TEMP TABLE IF NOT EXISTS OrleansStorageWriteRequest_10_4
     (
         GrainIdHash INT NOT NULL,
         GrainIdN0 BIGINT NOT NULL,
@@ -93,8 +94,8 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         Applied INT NOT NULL DEFAULT 0
     );
 
-    CREATE TEMP TRIGGER IF NOT EXISTS OrleansStorageWriteApply
-    AFTER INSERT ON OrleansStorageWriteRequest
+    CREATE TEMP TRIGGER IF NOT EXISTS OrleansStorageWriteApply_10_4
+    AFTER INSERT ON OrleansStorageWriteRequest_10_4
     BEGIN
         UPDATE OrleansStorage
         SET
@@ -109,7 +110,7 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
             AND ServiceId = NEW.ServiceId
             AND Version = NEW.GrainStateVersion;
 
-        UPDATE OrleansStorageWriteRequest SET Applied = changes() WHERE rowid = NEW.rowid;
+        UPDATE OrleansStorageWriteRequest_10_4 SET Applied = changes() WHERE rowid = NEW.rowid;
 
         INSERT INTO OrleansStorage (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, ModifiedOn, Version)
         SELECT NEW.GrainIdHash, NEW.GrainIdN0, NEW.GrainIdN1, NEW.GrainTypeHash, NEW.GrainTypeString, NEW.GrainIdExtensionString, NEW.ServiceId, NEW.PayloadBinary, datetime(''now''), 1
@@ -123,20 +124,20 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
             AND ServiceId = NEW.ServiceId
         );
 
-        UPDATE OrleansStorageWriteRequest SET Applied = Applied + changes(), PayloadBinary = NULL WHERE rowid = NEW.rowid;
+        UPDATE OrleansStorageWriteRequest_10_4 SET Applied = Applied + changes(), PayloadBinary = NULL WHERE rowid = NEW.rowid;
     END;
 
-    DELETE FROM OrleansStorageWriteRequest;
+    DELETE FROM OrleansStorageWriteRequest_10_4;
 
-    INSERT INTO OrleansStorageWriteRequest (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, GrainStateVersion)
+    INSERT INTO OrleansStorageWriteRequest_10_4 (GrainIdHash, GrainIdN0, GrainIdN1, GrainTypeHash, GrainTypeString, GrainIdExtensionString, ServiceId, PayloadBinary, GrainStateVersion)
     VALUES (@GrainIdHash, @GrainIdN0, @GrainIdN1, @GrainTypeHash, @GrainTypeString, @GrainIdExtensionString, @ServiceId, @PayloadBinary, @GrainStateVersion);
 
     SELECT CASE WHEN @GrainStateVersion IS NULL THEN 1 ELSE @GrainStateVersion + 1 END AS NewGrainStateVersion
-    FROM OrleansStorageWriteRequest
+    FROM OrleansStorageWriteRequest_10_4
     WHERE Applied > 0;
 
     SELECT @GrainStateVersion AS NewGrainStateVersion
-    FROM OrleansStorageWriteRequest
+    FROM OrleansStorageWriteRequest_10_4
     WHERE Applied = 0
         AND @GrainStateVersion IS NOT NULL;
 ');

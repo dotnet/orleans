@@ -55,6 +55,9 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
                     connection.Open();
                     var exception = Assert.Throws<SqliteException>(() => ExecuteQuery(connection, "WriteToStorageKey", 1));
                     Assert.Equal(5, exception.SqliteErrorCode);
+                    using var begin = connection.CreateCommand();
+                    begin.CommandText = "BEGIN; ROLLBACK;";
+                    begin.ExecuteNonQuery();
                 }
 
                 using var rollback = blocker.CreateCommand();
@@ -65,6 +68,12 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
             using (var connection = new SqliteConnection(connectionString))
             {
                 connection.Open();
+                using (var begin = connection.CreateCommand())
+                {
+                    begin.CommandText = "BEGIN; ROLLBACK;";
+                    begin.ExecuteNonQuery();
+                }
+
                 Assert.Equal([2], ExecuteQuery(connection, "ClearStorageKey", 1));
             }
 
@@ -84,6 +93,50 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
             SqliteConnection.ClearPool(connection);
             File.Delete(databasePath);
         }
+    }
+
+    [Fact]
+    public void ConflictAfterSuccessfulWritePreservesVersionProgression()
+    {
+        Assert.Equal([1], ExecuteQuery("WriteToStorageKey", null));
+        Assert.Equal([2], ExecuteQuery("WriteToStorageKey", 1));
+        Assert.Equal([99], ExecuteQuery("WriteToStorageKey", 99));
+        Assert.Equal([3], ExecuteQuery("WriteToStorageKey", 2));
+        Assert.Equal([99], ExecuteQuery("WriteToStorageKey", 99));
+        Assert.Equal([(3, "updated")], ReadRows());
+    }
+
+    [Fact]
+    public void LatestPersistenceMigrationInstallsCurrentQueries()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["WriteToStorageKey"] = GetQuery("WriteToStorageKey"),
+            ["ClearStorageKey"] = GetQuery("ClearStorageKey")
+        };
+
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = """
+                UPDATE OrleansQuery
+                SET QueryText = 'outdated'
+                WHERE QueryKey IN ('WriteToStorageKey', 'ClearStorageKey');
+                """;
+            Assert.Equal(2, command.ExecuteNonQuery());
+        }
+
+        var migrationPath = Directory
+            .EnumerateFiles(AppContext.BaseDirectory, "Sqlite-Persistence-*.sql")
+            .MaxBy(path => Version.Parse(Path.GetFileNameWithoutExtension(path)["Sqlite-Persistence-".Length..]));
+        Assert.NotNull(migrationPath);
+        using (var command = _connection.CreateCommand())
+        {
+            command.CommandText = File.ReadAllText(migrationPath);
+            Assert.Equal(2, command.ExecuteNonQuery());
+        }
+
+        Assert.Equal(expected["WriteToStorageKey"], GetQuery("WriteToStorageKey"));
+        Assert.Equal(expected["ClearStorageKey"], GetQuery("ClearStorageKey"));
     }
 
     private static void AssertStoredState(string connectionString, int version, string? payload)
@@ -235,12 +288,8 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
 
     private static List<int> ExecuteQuery(SqliteConnection connection, string queryKey, int? version, string? extension = null)
     {
-        using var lookup = connection.CreateCommand();
-        lookup.CommandText = "SELECT QueryText FROM OrleansQuery WHERE QueryKey = @QueryKey";
-        lookup.Parameters.AddWithValue("QueryKey", queryKey);
-
         using var command = connection.CreateCommand();
-        command.CommandText = Assert.IsType<string>(lookup.ExecuteScalar());
+        command.CommandText = GetQuery(connection, queryKey);
         AddParameters(command, version, extension);
 
         using var reader = command.ExecuteReader();
@@ -257,6 +306,16 @@ public sealed class SqlitePersistenceQueryTests : IDisposable
         while (reader.NextResult());
 
         return versions;
+    }
+
+    private string GetQuery(string queryKey) => GetQuery(_connection, queryKey);
+
+    private static string GetQuery(SqliteConnection connection, string queryKey)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT QueryText FROM OrleansQuery WHERE QueryKey = @QueryKey";
+        command.Parameters.AddWithValue("QueryKey", queryKey);
+        return Assert.IsType<string>(command.ExecuteScalar());
     }
 
     private void InsertRow(int? version, string? extension = null, string? differentIdentityColumn = null)
