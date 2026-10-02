@@ -30,6 +30,7 @@ public class GrainReferenceFactoryCodegenTests
         Assert.Contains(".Add(typeof(global::TestProject.IGeneric<>), typeof(OrleansCodeGen.TestProject.Proxy_IGeneric<>))", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("GetConstructor", generated, StringComparison.Ordinal);
         Assert.DoesNotContain("GetInterfaces", generated, StringComparison.Ordinal);
+        Assert.Contains("InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>", generated, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -40,7 +41,7 @@ public class GrainReferenceFactoryCodegenTests
             using Orleans.Runtime;
             using Orleans.Serialization.Configuration;
             using Factories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<
-                System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
+                Orleans.Runtime.GrainReferenceFactory>;
             namespace TestProject;
             public interface IGeneric<T> : IGrainWithStringKey where T : struct { }
             public class Container<T> where T : class
@@ -115,7 +116,7 @@ public class GrainReferenceFactoryCodegenTests
             using Orleans;
             using Orleans.Serialization.Configuration;
             using Factories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<
-                System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
+                Orleans.Runtime.GrainReferenceFactory>;
             [assembly: GenerateCodeForDeclaringAssembly(typeof(Contracts.IGeneric<>))]
             public static class Registration
             {
@@ -266,7 +267,7 @@ public class GrainReferenceFactoryCodegenTests
                         && generic is IPlain<int> && generic.Label == "generic" && generic.Number == 17 && !generic.Enabled
                         && factories.Factories[typeof(IPlain<>)].ProxyType == typeof(OrleansCodeGen.TestProject.Proxy_IPlain<>)
                         && factories.Factories[typeof(IPlain<>)].Factory is null
-                        && options.GetOrCreate<InterfaceProxyFactoryOptions<System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>>()
+                        && options.GetOrCreate<InterfaceProxyFactoryOptions<Orleans.Runtime.GrainReferenceFactory>>()
                             .Factories[typeof(IGrainLike)].Factory is not null;
                 }
             }
@@ -411,6 +412,38 @@ public class GrainReferenceFactoryCodegenTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(DiagnosticRuleId.IncorrectProxyBaseClassSpecification, diagnostic.Id);
         Assert.Contains("GenerateProxyFactory", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.True(diagnostic.Location.IsInSource);
+    }
+
+    [Fact]
+    public async Task ProxyFactoryRejectsUserDefinedResultConversion()
+    {
+        const string source = """
+            using Orleans;
+            using Orleans.Serialization.Invocation;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public sealed class ConvertedProxy { }
+            [GenerateProxyFactory(typeof(System.Func<ConvertedProxy>))]
+            public class PlainProxy
+            {
+                public static implicit operator ConvertedProxy(PlainProxy proxy) => new ConvertedProxy();
+                public ValueTask<T> InvokeAsync<T>(IInvokable request) => default;
+                public ValueTask InvokeAsync(IInvokable request) => default;
+            }
+            [GenerateMethodSerializers(typeof(PlainProxy))]
+            public interface IPlain { }
+            """;
+
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var (result, _) = Generate(compilation);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.IncorrectProxyBaseClassSpecification, diagnostic.Id);
+        Assert.Contains("identity or implicit reference conversion", diagnostic.GetMessage(), StringComparison.Ordinal);
         Assert.True(diagnostic.Location.IsInSource);
     }
 

@@ -135,12 +135,14 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
                     proxyBaseType, location, "GenerateProxyFactory requires a closed delegate with a non-void, by-value return type."));
         }
 
-        if (!libraryTypes.Compilation.ClassifyCommonConversion(proxyBaseType, signature.ReturnType).IsImplicit
-            && !libraryTypes.Compilation.ClassifyCommonConversion(interfaceType, signature.ReturnType).IsImplicit)
+        var baseConversion = libraryTypes.Compilation.ClassifyCommonConversion(proxyBaseType, signature.ReturnType);
+        var interfaceConversion = libraryTypes.Compilation.ClassifyCommonConversion(interfaceType, signature.ReturnType);
+        if (!(baseConversion.IsIdentity || baseConversion.IsImplicit && baseConversion.IsReference)
+            && !(interfaceConversion.IsIdentity || interfaceConversion.IsImplicit && interfaceConversion.IsReference))
         {
             throw new OrleansGeneratorDiagnosticAnalysisException(
                 IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(
-                    proxyBaseType, location, "GenerateProxyFactory's return type must accept the generated proxy base or interface."));
+                    proxyBaseType, location, "GenerateProxyFactory's return type must accept the generated proxy base or interface through an identity or implicit reference conversion."));
         }
 
         if (signature.Parameters.Any(static parameter => parameter.RefKind is not (RefKind.None or RefKind.Ref or RefKind.Out or RefKind.In)))

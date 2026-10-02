@@ -14,7 +14,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
-using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
+using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<Orleans.Runtime.GrainReferenceFactory>;
 
 namespace UnitTests.GrainReferences;
 
@@ -26,7 +26,7 @@ internal sealed class ReferenceConstructionFixture : IDisposable
     public ReferenceConstructionFixture(
         bool unordered = false,
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type? proxyType = null,
-        Func<GrainReferenceShared, IdSpan, GrainReference>? factory = null,
+        GrainReferenceFactory? factory = null,
         bool legacy = false,
         bool includeGeneratedFactories = false)
     {

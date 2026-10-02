@@ -9,7 +9,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using TestExtensions;
 using Xunit;
-using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
+using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<Orleans.Runtime.GrainReferenceFactory>;
 
 namespace UnitTests.GrainReferences;
 

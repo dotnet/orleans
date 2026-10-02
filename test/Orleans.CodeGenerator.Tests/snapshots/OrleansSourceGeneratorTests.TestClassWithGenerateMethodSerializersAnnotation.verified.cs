@@ -164,7 +164,7 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.Proxy_IMyGrain));
-            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
             proxyFactories.Add(typeof(global::IMyGrain), typeof(OrleansCodeGen.Proxy_IMyGrain), OrleansCodeGen.Proxy_IMyGrain.Create);
             config.AddInterface(typeof(global::IMyGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");

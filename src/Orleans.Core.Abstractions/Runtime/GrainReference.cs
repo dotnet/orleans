@@ -259,7 +259,7 @@ namespace Orleans.Runtime
     /// This is the base class for all grain references.
     /// </summary>
     [Alias("GrainRef")]
-    [GenerateProxyFactory(typeof(Func<GrainReferenceShared, IdSpan, GrainReference>))]
+    [GenerateProxyFactory(typeof(GrainReferenceFactory))]
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]

@@ -184,7 +184,7 @@ namespace Orleans.GrainReferences
     {
         private readonly TypeConverter _typeConverter;
         private readonly Dictionary<GrainInterfaceType, Type> _mapping;
-        private readonly Dictionary<GrainInterfaceType, Func<GrainReferenceShared, IdSpan, GrainReference>> _factories = new();
+        private readonly Dictionary<GrainInterfaceType, GrainReferenceFactory> _factories = new();
 
         /// <summary>
         /// Initializes a new  instance of the <see cref="RpcProvider"/> class.
@@ -200,7 +200,7 @@ namespace Orleans.GrainReferences
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxyTypes;
             _mapping = new Dictionary<GrainInterfaceType, Type>();
-            var registrations = config.Value.GetOrCreate<InterfaceProxyFactoryOptions<Func<GrainReferenceShared, IdSpan, GrainReference>>>();
+            var registrations = config.Value.GetOrCreate<InterfaceProxyFactoryOptions<GrainReferenceFactory>>();
             var registeredProxies = registrations.ProxyTypes;
             foreach (var (interfaceType, registration) in registrations.Factories)
             {
@@ -276,7 +276,7 @@ namespace Orleans.GrainReferences
         /// <param name="interfaceType">The grain interface type.</param>
         /// <param name="result">The grain-reference factory.</param>
         /// <returns>A value indicating whether a suitable factory was found.</returns>
-        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Func<GrainReferenceShared, IdSpan, GrainReference>? result)
+        public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out GrainReferenceFactory? result)
         {
             if (_factories.TryGetValue(interfaceType, out result))
             {
@@ -315,7 +315,7 @@ namespace Orleans.GrainReferences
             "Trimming",
             "IL2070",
             Justification = "Legacy proxy constructors are preserved by AddInterfaceProxy. Custom non-public constructors require explicit preservation.")]
-        private static Func<GrainReferenceShared, IdSpan, GrainReference> CreateLegacyFactory(Type proxyType)
+        private static GrainReferenceFactory CreateLegacyFactory(Type proxyType)
         {
             var constructor = proxyType.GetConstructor(
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
@@ -404,7 +404,7 @@ namespace Orleans.GrainReferences
         private sealed class GrainReferenceActivator : IGrainReferenceActivator
         {
             private readonly GrainReferenceShared _shared;
-            private readonly Func<GrainReferenceShared, IdSpan, GrainReference> _create;
+            private readonly GrainReferenceFactory _create;
 
             /// <summary>
             /// Initializes a new instance of the <see cref="GrainReferenceActivator"/> class.
@@ -412,7 +412,7 @@ namespace Orleans.GrainReferences
             /// <param name="factory">The grain-reference factory.</param>
             /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
             public GrainReferenceActivator(
-                Func<GrainReferenceShared, IdSpan, GrainReference> factory,
+                GrainReferenceFactory factory,
                 GrainReferenceShared shared)
             {
                 _shared = shared;

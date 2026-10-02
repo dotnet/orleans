@@ -791,7 +791,7 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithIntegerCompoundKey));
-            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
             proxyFactories.Add(typeof(global::TestProject.IMyGrainWithGuidKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidKey.Create);
             proxyFactories.Add(typeof(global::TestProject.IMyGrainWithStringKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey.Create);
             proxyFactories.Add(typeof(global::TestProject.IMyGrainWithGuidCompoundKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey.Create);

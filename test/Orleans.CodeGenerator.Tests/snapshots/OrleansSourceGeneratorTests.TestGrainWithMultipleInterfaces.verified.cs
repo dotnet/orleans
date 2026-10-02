@@ -301,7 +301,7 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
-            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
             proxyFactories.Add(typeof(global::TestProject.IGrainA), typeof(OrleansCodeGen.TestProject.Proxy_IGrainA), OrleansCodeGen.TestProject.Proxy_IGrainA.Create);
             proxyFactories.Add(typeof(global::TestProject.IGrainB), typeof(OrleansCodeGen.TestProject.Proxy_IGrainB), OrleansCodeGen.TestProject.Proxy_IGrainB.Create);
             config.AddInterface(typeof(global::TestProject.IGrainA));
