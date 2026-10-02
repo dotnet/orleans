@@ -64,7 +64,8 @@ internal static class Program
     private static void ValidateSharedState(bool unordered)
     {
         using var fixture = new ReferenceConstructionFixture(
-            unordered, proxyType: typeof(InspectableConstructionProxy), factory: static (shared, key) => new InspectableConstructionProxy(shared, key));
+            unordered, proxyType: typeof(InspectableConstructionProxy),
+            factory: static (shared, key) => new InspectableConstructionProxy(shared, key), includeGeneratedFactories: true);
         var first = (InspectableConstructionProxy)fixture.CreateReference("first-key");
         var second = (InspectableConstructionProxy)fixture.CreateReference("second-key");
         var shared = first.ConstructionShared;
@@ -88,7 +89,8 @@ internal static class Program
             "Invalid proxy type: " + typeof(MissingConstructorProxy));
 
         using var throwing = new ReferenceConstructionFixture(
-            unordered: false, proxyType: typeof(ThrowingConstructorProxy), factory: static (shared, key) => new ThrowingConstructorProxy(shared, key));
+            unordered: false, proxyType: typeof(ThrowingConstructorProxy),
+            factory: static (shared, key) => new ThrowingConstructorProxy(shared, key), includeGeneratedFactories: true);
         ExpectException<ConstructionException>(() => throwing.CreateReference("key"), "proxy-constructor");
     }
 

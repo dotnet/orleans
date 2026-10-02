@@ -12,6 +12,9 @@ public sealed class GrainReferenceFactoryOptions
 {
     internal Dictionary<Type, (Type ProxyType, Func<GrainReferenceShared, IdSpan, GrainReference>? Factory)> Factories { get; } = new();
 
+    // Superseded registrations remain explicit proxies, so legacy discovery cannot displace their replacements.
+    internal HashSet<Type> ProxyTypes { get; } = new();
+
     /// <summary>
     /// Registers a factory for a concrete grain interface.
     /// </summary>
@@ -23,6 +26,7 @@ public sealed class GrainReferenceFactoryOptions
         ArgumentNullException.ThrowIfNull(interfaceType);
         ArgumentNullException.ThrowIfNull(proxyType);
         ArgumentNullException.ThrowIfNull(factory);
+        ProxyTypes.Add(proxyType);
         Factories[interfaceType] = (proxyType, factory);
     }
 
@@ -41,6 +45,7 @@ public sealed class GrainReferenceFactoryOptions
     {
         ArgumentNullException.ThrowIfNull(interfaceType);
         ArgumentNullException.ThrowIfNull(proxyType);
+        ProxyTypes.Add(proxyType);
         Factories[interfaceType] = (proxyType, null);
     }
 }

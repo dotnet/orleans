@@ -83,7 +83,7 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
         {
             var interfaceType = GetOpenTypeSyntax(proxy.InterfaceType);
             var proxyType = GetGeneratedProxyTypeSyntax(proxy);
-            AddGrainReferenceFactory(body, interfaceType, proxyType, proxy.TypeParameters.Count == 0);
+            AddGrainReferenceFactory(body, interfaceType, proxyType, GetProxyGenericArity(proxy) == 0);
         }
 
         foreach (var factory in model.ReferenceAssemblyData.GrainReferenceFactories)
@@ -604,9 +604,12 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private static TypeSyntax GetGeneratedProxyTypeSyntax(ProxyInterfaceModel proxy)
     {
-        var genericArity = Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
+        var genericArity = GetProxyGenericArity(proxy);
         return CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), genericArity);
     }
+
+    private static int GetProxyGenericArity(ProxyInterfaceModel proxy)
+        => Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
 
     private static int CountGenericArguments(TypeRef typeRef)
     {

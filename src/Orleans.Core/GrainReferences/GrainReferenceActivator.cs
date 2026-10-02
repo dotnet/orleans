@@ -201,12 +201,11 @@ namespace Orleans.GrainReferences
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxyTypes;
             _mapping = new Dictionary<GrainInterfaceType, Type>();
-            var registrations = config.Value.GetOrCreate<GrainReferenceFactoryOptions>().Factories;
-            var registeredProxies = new HashSet<Type>();
-            foreach (var (interfaceType, registration) in registrations)
+            var registrations = config.Value.GetOrCreate<GrainReferenceFactoryOptions>();
+            var registeredProxies = registrations.ProxyTypes;
+            foreach (var (interfaceType, registration) in registrations.Factories)
             {
                 var id = resolver.GetGrainInterfaceType(interfaceType);
-                registeredProxies.Add(registration.ProxyType);
                 if (registration.Factory is { } factory)
                 {
                     _factories[id] = factory;

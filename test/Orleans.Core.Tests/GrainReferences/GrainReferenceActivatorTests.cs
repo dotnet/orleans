@@ -178,6 +178,19 @@ public class GrainReferenceActivatorTests
     }
 
     [Fact]
+    public void CreateReference_RegisteredCustomFactoryOverridesGeneratedFactory()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(ThrowingConstructorProxy),
+            factory: static (shared, key) => new ThrowingConstructorProxy(shared, key),
+            includeGeneratedFactories: true);
+
+        var exception = Assert.Throws<ConstructionException>(() => fixture.CreateReference("override-key"));
+
+        Assert.Equal("proxy-constructor", exception.Message);
+    }
+
+    [Fact]
     public void CreateReference_RegisteredFactoryUsesExplicitInterfaceForMultipleInterfaceProxy()
     {
         using var fixture = new ReferenceConstructionFixture(

@@ -53,6 +53,42 @@ public class GrainReferenceFactoryCodegenTests
             ".Add(typeof(global::TestProject.IGeneric<int>)", StringSplitOptions.None).Length - 1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NestedInterfacesCaptureContainingGenericParameters(bool registerClosedFactory)
+    {
+        var registration = registerClosedFactory
+            ? "[assembly: GenerateGrainReference(typeof(TestProject.Container<string>.INested))]"
+            : string.Empty;
+        var source = $$"""
+            using Orleans;
+            {{registration}}
+            namespace TestProject;
+            public class Container<T> where T : class
+            {
+                public interface INested : IGrainWithStringKey
+                {
+                    System.Threading.Tasks.Task<T> Echo(T value);
+                }
+            }
+            """;
+
+        var (result, output) = Generate(await TestCompilationHelper.CreateCompilation(source));
+
+        AssertCompiles(result, output);
+        var generated = GetSource(result);
+        Assert.Contains(
+            ".Add(typeof(global::TestProject.Container<>.INested), typeof(OrleansCodeGen.TestProject.Container.Proxy_INested<>))",
+            generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("new OrleansCodeGen.TestProject.Container.Proxy_INested<>", generated, StringComparison.Ordinal);
+        if (registerClosedFactory)
+        {
+            Assert.Contains("static (shared, key) => new global::OrleansCodeGen.TestProject.Container.Proxy_INested<string>(shared, key)",
+                generated, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task ClosedGenericFactoriesSupportReferencedInterfaces()
     {
