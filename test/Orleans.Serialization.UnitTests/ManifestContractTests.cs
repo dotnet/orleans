@@ -376,19 +376,22 @@ public class ManifestContractTests
     public sealed class PatternCodec<T> : IBaseCodec<PatternOuter<T>.Nested<FixedArgument<int>>>
     {
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, PatternOuter<T>.Nested<FixedArgument<int>> value)
-            where TBufferWriter : IBufferWriter<byte> { }
+            where TBufferWriter : IBufferWriter<byte>
+        { }
         public void Deserialize<TInput>(ref Reader<TInput> reader, PatternOuter<T>.Nested<FixedArgument<int>> value) { }
     }
     public sealed class OtherPatternCodec<T> : IBaseCodec<PatternOuter<T>.Nested<FixedArgument<string>>>
     {
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, PatternOuter<T>.Nested<FixedArgument<string>> value)
-            where TBufferWriter : IBufferWriter<byte> { }
+            where TBufferWriter : IBufferWriter<byte>
+        { }
         public void Deserialize<TInput>(ref Reader<TInput> reader, PatternOuter<T>.Nested<FixedArgument<string>> value) { }
     }
     public sealed class ReorderedCodec<TFirst, TSecond> : IBaseCodec<GenericTarget<TSecond, TFirst>>
     {
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<TSecond, TFirst> value)
-            where TBufferWriter : IBufferWriter<byte> { }
+            where TBufferWriter : IBufferWriter<byte>
+        { }
         public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<TSecond, TFirst> value) { }
     }
     public sealed class PatternConverter<T> :
