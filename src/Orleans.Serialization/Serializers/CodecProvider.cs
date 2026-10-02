@@ -244,7 +244,7 @@ namespace Orleans.Serialization.Serializers
         public IFieldCodec<TField>? TryGetCodec<TField>()
         {
             var fieldType = typeof(TField);
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return (IFieldCodec<TField>)factory(this);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return (IFieldCodec<TField>)factory(this);
             if (TryGetCached(_typedCodecs, fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
@@ -272,7 +272,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IFieldCodec? TryGetCodec(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return factory(this);
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : TryGetCached(_untypedCodecs, fieldType, out var existing) ? existing
@@ -287,7 +287,7 @@ namespace Orleans.Serialization.Serializers
 
         private IFieldCodec? TryCreateCodecInner(Type fieldType)
         {
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -429,7 +429,7 @@ namespace Orleans.Serialization.Serializers
         public IDeepCopier<T>? TryGetDeepCopier<T>()
         {
             var type = typeof(T);
-            if (_manifest.CopierFactories.TryGetValue(type, out var factory)) return (IDeepCopier<T>)factory(this);
+            if (_manifest.CopierFactories.TryGetValue(type, out var factory) && IsDefaultCopierEligible(type)) return (IDeepCopier<T>)factory(this);
             if (TryGetCached(_typedCopiers, type, out var existing))
                 return (IDeepCopier<T>)existing;
 
@@ -457,7 +457,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier? TryGetDeepCopier(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultCopierEligible(fieldType)) return factory(this);
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
                 : TryGetCached(_untypedCopiers, fieldType, out var existing) ? existing
@@ -473,7 +473,7 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier? TryCreateCopierInner(Type fieldType)
         {
-            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory)) return factory(this);
+            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultCopierEligible(fieldType)) return factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -651,9 +651,62 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
+        private bool IsDefaultCodecEligible(Type type)
+            => !_manifest.DefaultCodecFactoryContracts.TryGetValue(type, out var contract)
+                || IsDefaultContractEligible(contract, []);
+
+        private bool IsDefaultCopierEligible(Type type)
+            => !_manifest.DefaultCopierFactoryContracts.TryGetValue(type, out var contract)
+                || IsDefaultContractEligible(contract, []);
+
+        private bool IsDefaultServiceEligible(Type service)
+            => !_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
+                || IsDefaultContractEligible(contract, []);
+
+        private bool IsDefaultContractEligible(TypeManifestOptions.DefaultSerializerContract contract, HashSet<Type> visited)
+        {
+            if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
+            var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
+            var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
+            var implementations = role == typeof(IFieldCodec<>) ? _fieldCodecs
+                : role == typeof(IDeepCopier<>) ? _copiers
+                : role == typeof(IBaseCodec<>) ? _baseCodecs
+                : role == typeof(IValueSerializer<>) ? _valueSerializers
+                : role == typeof(IBaseCopier<>) ? _baseCopiers
+                : role == typeof(IActivator<>) ? _activators
+                : null;
+            if (implementations is not null && (implementations.TryGetValue(target, out var selected)
+                    || target.IsConstructedGenericType && implementations.TryGetValue(target.GetGenericTypeDefinition(), out selected))
+                && !MatchesDefaultImplementation(selected, contract.Implementation, contract.CompatibleImplementation, target))
+                return false;
+            foreach (var dependency in contract.Dependencies)
+            {
+                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required)
+                    && !IsDefaultContractEligible(required, visited))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool MatchesDefaultImplementation(Type selected, Type expected, Type? compatible, Type target)
+        {
+            if (selected == expected || selected == compatible) return true;
+            if (!selected.IsGenericTypeDefinition) return false;
+            if (expected.IsConstructedGenericType && selected == expected.GetGenericTypeDefinition()) return true;
+            if (compatible is { IsConstructedGenericType: true } && selected == compatible.GetGenericTypeDefinition()) return true;
+            if (target.IsConstructedGenericType && target.GetGenericTypeDefinition() == typeof(Invocation.Response<>)
+                && expected.IsConstructedGenericType && expected.GenericTypeArguments[0] == target.GenericTypeArguments[0])
+            {
+                var definition = expected.GetGenericTypeDefinition();
+                return selected == typeof(Invocation.PooledResponseCodec<>) && definition == typeof(Invocation.PooledResponseCodec<,>)
+                    || selected == typeof(Invocation.PooledResponseCopier<>) && definition == typeof(Invocation.PooledResponseCopier<,>);
+            }
+            return false;
+        }
+
         internal bool TryGetSerializerService(Type type, [NotNullWhen(true)] out object? result)
         {
-            if (!_manifest.SerializerServiceFactories.TryGetValue(type, out var factory))
+            if (!_manifest.SerializerServiceFactories.TryGetValue(type, out var factory) || !IsDefaultServiceEligible(type))
             {
                 result = null;
                 return false;
@@ -909,7 +962,7 @@ namespace Orleans.Serialization.Serializers
                     || serviceType == typeof(IServiceProvider)
                     || serviceType == typeof(IServiceProviderIsService)
                     || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
-                    || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
+                    || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType) && owner.IsDefaultServiceEligible(serviceType)
                     || owner._serviceDescriptors.Any(descriptor => !descriptor.IsKeyedService
                         && (descriptor.ServiceType == serviceType
                             || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition()));

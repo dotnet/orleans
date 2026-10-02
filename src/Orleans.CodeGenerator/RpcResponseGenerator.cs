@@ -216,7 +216,6 @@ internal static class RpcResponseGenerator
             source.AppendLine($"options.AddRawResponseReader<{type}>(static provider => {resolve});");
         }
         source.AppendLine("#if NET5_0_OR_GREATER");
-        source.AppendLine("if (global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported) return;");
         if (graph is not null)
         {
             source.AppendLine(graph.ConfigurationStatements);

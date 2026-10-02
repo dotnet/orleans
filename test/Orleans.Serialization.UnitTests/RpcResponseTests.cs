@@ -135,13 +135,10 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.ConstructTupleArgumentProxyBeforeInvocation();
 
     [Fact]
-    public void ExplicitExceptionTransportRequiresDeclaredDependencyGraph()
+    public void ContextRegistrationPreservesExistingExceptionMetadata()
     {
-        using var services = new ServiceCollection().AddSerializerContext(new EmptyContext()).BuildServiceProvider();
-        var error = Assert.Throws<NotSupportedException>(() => services.GetRequiredService<CodecProvider>().GetCodec<ExceptionResponse>());
-        Assert.Contains("ExceptionResponse", error.Message);
-        Assert.Contains("exception and Data value types", error.Message);
-        Assert.Contains("serializer context", error.Message);
+        using var services = new ServiceCollection().AddSerializer().AddSerializerContext(new EmptyContext()).BuildServiceProvider();
+        Assert.NotNull(services.GetRequiredService<CodecProvider>().GetCodec<ExceptionResponse>());
     }
 
     private sealed class EmptyContext : SerializerContext
@@ -277,20 +274,20 @@ public sealed class RpcResponseTests : IDisposable
         var codec = new Int32Codec();
         var copier = new ShallowCopier<int>();
         var service = new FactoryService();
-        using var services = new ServiceCollection().AddSerializer(builder =>
-        {
-            builder.Configure(options =>
+        using var services = new ServiceCollection()
+            .Configure<TypeManifestOptions>(options =>
             {
                 options.AddDefaultSerializer<int>(_ => codec, _ => copier);
                 options.AddDefaultSerializerService<FactoryService>(_ => service);
-            });
-            builder.Configure(options =>
+            })
+            .Configure<TypeManifestOptions>(options =>
             {
                 options.AddDefaultSerializer<int>(static _ => throw new InvalidOperationException("second manifest codec"),
                     static _ => throw new InvalidOperationException("second manifest copier"));
                 options.AddDefaultSerializerService<FactoryService>(static _ => throw new InvalidOperationException("second manifest service"));
-            });
-        }).BuildServiceProvider();
+            })
+            .AddSerializer()
+            .BuildServiceProvider();
         var provider = services.GetRequiredService<CodecProvider>();
         Assert.Same(codec, provider.GetCodec<int>());
         Assert.Same(copier, provider.GetDeepCopier<int>());
@@ -398,6 +395,77 @@ public sealed class RpcResponseTests : IDisposable
         Assert.IsAssignableFrom<IRawResponseWriter>(decoded);
         if (methodName == "Payload") Assert.Equal(17, decoded.GetResult<NativeAotSmoke.RpcResponsePayload>()!.Value);
         else Assert.Equal(response.Result, decoded.Result);
+    }
+
+    [Theory]
+    [InlineData("Boolean", typeof(bool), "ContextOnly")]
+    [InlineData("Integer", typeof(int), "ContextOnly")]
+    [InlineData("Payload", typeof(NativeAotSmoke.RpcResponsePayload), "ContextOnly")]
+    [InlineData("Boolean", typeof(bool), "ProviderBeforeContext")]
+    [InlineData("Integer", typeof(int), "ProviderBeforeContext")]
+    [InlineData("Payload", typeof(NativeAotSmoke.RpcResponsePayload), "ProviderBeforeContext")]
+    [InlineData("Boolean", typeof(bool), "SameProviderBeforeContext")]
+    [InlineData("Integer", typeof(int), "SameProviderBeforeContext")]
+    [InlineData("Payload", typeof(NativeAotSmoke.RpcResponsePayload), "SameProviderBeforeContext")]
+    public async Task GeneratedResponseHoldersUseContextInJit(string methodName, Type resultType, string configurationOrder)
+    {
+        Assert.True(System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported);
+        var serviceCollection = new ServiceCollection();
+        var context = new global::OrleansCodeGen.OrleansSerializationUnitTests.RpcResponseFactories();
+        var beforeStrictCalls = 0;
+        if (configurationOrder != "ContextOnly")
+        {
+            if (configurationOrder == "SameProviderBeforeContext")
+                serviceCollection.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>>(context);
+            else
+                serviceCollection.AddSingleton<Microsoft.Extensions.Options.IConfigureOptions<TypeManifestOptions>,
+                    global::OrleansCodeGen.OrleansSerializationUnitTests.RpcResponseFactories>();
+            serviceCollection.Configure<TypeManifestOptions>(options =>
+            {
+                beforeStrictCalls++;
+            });
+        }
+        serviceCollection.AddSerializerContext(context);
+        using var services = serviceCollection.BuildServiceProvider();
+        _ = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<TypeManifestOptions>>().Value;
+        Assert.Equal(configurationOrder == "ContextOnly" ? 0 : 1, beforeStrictCalls);
+        var provider = services.GetRequiredService<CodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        var target = new RpcResponseTarget();
+        var compatibility = new CountingResponseCopier();
+        using var invokable = CreateInvokable(methodName);
+        invokable.SetTarget(new TargetHolder(target));
+        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+            provider, contexts, new DeepCopier<Response>(compatibility, contexts));
+
+        Assert.IsAssignableFrom<IRawResponseWriter>(response);
+        Assert.Equal(0, compatibility.Copies);
+        Assert.Equal(resultType, response.GetSimpleResultType());
+        Assert.True(provider.TryGetRawResponseReader(resultType, out var registered));
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
+        {
+            var writer = Writer.Create(buffer, session);
+            ((IRawResponseWriter)response).WriteRaw(ref writer);
+            writer.Commit();
+        }
+        using var readerSession = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(buffer.WrittenMemory, readerSession);
+        var field = reader.ReadFieldHeader();
+        using var decoded = registered!.ReadRaw(ref reader, ref field);
+        Assert.IsAssignableFrom<IRawResponseWriter>(decoded);
+        if (methodName == "Payload")
+        {
+            var value = decoded.GetResult<NativeAotSmoke.RpcResponsePayload>();
+            Assert.NotNull(value);
+            Assert.NotSame(target.Result, response.GetResult<NativeAotSmoke.RpcResponsePayload>());
+            Assert.NotSame(target.Result, value);
+            Assert.Equal(17, value.Value);
+        }
+        else if (methodName == "Boolean")
+            Assert.True(decoded.GetResult<bool>());
+        else
+            Assert.Equal(42, decoded.GetResult<int>());
     }
 
     [Fact]
