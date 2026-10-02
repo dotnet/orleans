@@ -12,24 +12,19 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IHelloGrain), "5336307F")]
-    public sealed class Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IResponseInvokable
+    [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IGrainA), "11405B98")]
+    public sealed class Invokable_IGrainA_GrainReference_11405B98 : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public string arg0;
-        global::TestProject.IHelloGrain _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IHelloGrain).GetMethod("SayHello", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, new[] { typeof(string) }, null);
-        public Invokable_IHelloGrain_GrainReference_5336307F() : base()
-        {
-            SetLoggingOptions("Hello");
-        }
-
+        global::TestProject.IGrainA _target;
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IGrainA).GetMethod("MethodA", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, new[] { typeof(string) }, null);
         public override int GetArgumentCount() => 1;
-        public override string GetMethodName() => "SayHello";
-        public override string GetInterfaceName() => "TestProject.IHelloGrain";
-        public override string GetActivityName() => "IHelloGrain/SayHello";
-        public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IHelloGrain);
+        public override string GetMethodName() => "MethodA";
+        public override string GetInterfaceName() => "TestProject.IGrainA";
+        public override string GetActivityName() => "IGrainA/MethodA";
+        public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IGrainA);
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IHelloGrain)holder.GetTarget();
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IGrainA)holder.GetTarget();
         public override object GetTarget() => _target;
         public override void Dispose()
         {
@@ -61,7 +56,7 @@ namespace OrleansCodeGen.TestProject
             }
         }
 
-        protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.SayHello(arg0);
+        protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.MethodA(arg0);
         async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
         {
             try
@@ -80,15 +75,93 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Proxy_IHelloGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IHelloGrain
+    internal sealed class Proxy_IGrainA : global::Orleans.Runtime.GrainReference, global::TestProject.IGrainA
     {
-        public Proxy_IHelloGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        public Proxy_IGrainA(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
         }
 
-        global::System.Threading.Tasks.Task<string> global::TestProject.IHelloGrain.SayHello(string arg0)
+        global::System.Threading.Tasks.Task<string> global::TestProject.IGrainA.MethodA(string arg0)
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F();
+            var request = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
+            request.arg0 = arg0;
+            return base.InvokeAsync<string>(request).AsTask();
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IGrainB), "6B5D7809")]
+    public sealed class Invokable_IGrainB_GrainReference_6B5D7809 : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IResponseInvokable
+    {
+        public string arg0;
+        global::TestProject.IGrainB _target;
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IGrainB).GetMethod("MethodB", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, new[] { typeof(string) }, null);
+        public override int GetArgumentCount() => 1;
+        public override string GetMethodName() => "MethodB";
+        public override string GetInterfaceName() => "TestProject.IGrainB";
+        public override string GetActivityName() => "IGrainB/MethodB";
+        public override global::System.Type GetInterfaceType() => typeof(global::TestProject.IGrainB);
+        public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::TestProject.IGrainB)holder.GetTarget();
+        public override object GetTarget() => _target;
+        public override void Dispose()
+        {
+            arg0 = default;
+            _target = default;
+        }
+
+        public override object GetArgument(int index)
+        {
+            switch (index)
+            {
+                case 0:
+                    return arg0;
+                default:
+                    return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, 0);
+            }
+        }
+
+        public override void SetArgument(int index, object value)
+        {
+            switch (index)
+            {
+                case 0:
+                    arg0 = (string)value;
+                    return;
+                default:
+                    OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange(index, 0);
+                    return;
+            }
+        }
+
+        protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.MethodB(arg0);
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory.Resolve(provider);
+                if (!factory.IsSupported)
+                    return responseCopier.Copy(await Invoke());
+                string value = await InvokeInner();
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Proxy_IGrainB : global::Orleans.Runtime.GrainReference, global::TestProject.IGrainB
+    {
+        public Proxy_IGrainB(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        {
+        }
+
+        global::System.Threading.Tasks.Task<string> global::TestProject.IGrainB.MethodB(string arg0)
+        {
+            var request = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
             request.arg0 = arg0;
             return base.InvokeAsync<string>(request).AsTask();
         }
@@ -96,18 +169,18 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
-    public sealed class Codec_Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F>
+    public sealed class Codec_Invokable_IGrainA_GrainReference_11405B98 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98>
     {
-        private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F);
+        private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F instance)
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.arg0);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F instance)
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 instance)
         {
             uint id = 0U;
             global::Orleans.Serialization.WireProtocol.Field header = default;
@@ -129,7 +202,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F @value)
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             if (@value is null)
@@ -145,12 +218,12 @@ namespace OrleansCodeGen.TestProject
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        public OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             if (field.IsReference)
-                return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F, TReaderInput>(ref reader, field);
+                return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F();
+            var result = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -159,14 +232,14 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
-    public sealed class Copier_Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F>
+    public sealed class Copier_Invokable_IGrainA_GrainReference_11405B98 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F DeepCopy(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F original, global::Orleans.Serialization.Cloning.CopyContext context)
+        public OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 DeepCopy(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F();
+            var result = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
             result.arg0 = original.arg0;
             return result;
         }
@@ -174,99 +247,80 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
-    public sealed class Codec_HelloGrain : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.HelloGrain>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.HelloGrain>
+    public sealed class Codec_Invokable_IGrainB_GrainReference_6B5D7809 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809>
     {
-        private readonly global::System.Type _codecFieldType = typeof(global::TestProject.HelloGrain);
-        private readonly global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Grain> _baseTypeSerializer;
-        public Codec_HelloGrain(global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Grain> _baseTypeSerializer)
-        {
-            this._baseTypeSerializer = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeSerializer);
-        }
-
+        private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.HelloGrain instance)
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            _baseTypeSerializer.Serialize(ref writer, instance);
-            writer.WriteEndBase();
+            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.arg0);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::TestProject.HelloGrain instance)
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 instance)
         {
-            _baseTypeSerializer.Deserialize(ref reader, instance);
-            reader.ConsumeEndBaseOrEndObject();
-        }
-
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::TestProject.HelloGrain @value)
-            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
-        {
-            if (@value is null || @value.GetType() == typeof(global::TestProject.HelloGrain))
+            uint id = 0U;
+            global::Orleans.Serialization.WireProtocol.Field header = default;
+            while (true)
             {
-                if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, @value))
-                    return;
-                writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
-                Serialize(ref writer, @value);
-                writer.WriteEndObject();
+                reader.ReadFieldHeader(ref header);
+                if (header.IsEndBaseOrEndObject)
+                    break;
+                id += header.FieldIdDelta;
+                if (id == 0U)
+                {
+                    instance.arg0 = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                    reader.ReadFieldHeader(ref header);
+                }
+
+                reader.ConsumeEndBaseOrEndObject(ref header);
+                break;
             }
-            else
-                writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public global::TestProject.HelloGrain ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 @value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (@value is null)
+            {
+                ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
+            Serialize(ref writer, @value);
+            writer.WriteEndObject();
+        }
+
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        public OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             if (field.IsReference)
-                return ReferenceCodec.ReadReference<global::TestProject.HelloGrain, TReaderInput>(ref reader, field);
+                return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            global::System.Type valueType = field.FieldType;
-            if (valueType is null || valueType == _codecFieldType)
-            {
-                var result = new global::TestProject.HelloGrain();
-                ReferenceCodec.RecordObject(reader.Session, result);
-                Deserialize(ref reader, result);
-                return result;
-            }
-
-            return reader.DeserializeUnexpectedType<TReaderInput, global::TestProject.HelloGrain>(ref field);
+            var result = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
+            ReferenceCodec.MarkValueField(reader.Session);
+            Deserialize(ref reader, result);
+            return result;
         }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
-    public sealed class Copier_HelloGrain : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.HelloGrain>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.HelloGrain>
+    public sealed class Copier_Invokable_IGrainB_GrainReference_6B5D7809 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809>
     {
-        private readonly global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public global::TestProject.HelloGrain DeepCopy(global::TestProject.HelloGrain original, global::Orleans.Serialization.Cloning.CopyContext context)
+        public OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 DeepCopy(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            if (context.TryGetCopy(original, out global::TestProject.HelloGrain existing))
-                return existing;
-            if (original.GetType() != typeof(global::TestProject.HelloGrain))
-                return context.DeepCopy(original);
-            var result = new global::TestProject.HelloGrain();
-            context.RecordCopy(original, result);
-            DeepCopy(original, result, context);
+            if (original is null)
+                return null;
+            var result = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
+            result.arg0 = original.arg0;
             return result;
         }
-
-        public Copier_HelloGrain(global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier)
-        {
-            this._baseTypeCopier = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeCopier);
-        }
-
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-        public void DeepCopy(global::TestProject.HelloGrain input, global::TestProject.HelloGrain output, global::Orleans.Serialization.Cloning.CopyContext context)
-        {
-            _baseTypeCopier.DeepCopy(input, output, context);
-        }
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_HelloGrain : global::Orleans.Serialization.Activators.IActivator<global::TestProject.HelloGrain>
-    {
-        public global::TestProject.HelloGrain Create() => new global::TestProject.HelloGrain();
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -486,20 +540,21 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F), typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F), typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
-            config.AddInterface(typeof(global::TestProject.IHelloGrain));
-            config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain), typeof(global::TestProject.HelloGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainA_GrainReference_11405B98));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainA_GrainReference_11405B98));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
+            config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
+            config.AddInterface(typeof(global::TestProject.IGrainA));
+            config.AddInterface(typeof(global::TestProject.IGrainB));
+            config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
             var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.GetOrAdd(typeof(global::TestProject.IHelloGrain));
-            n3.Add("5336307F", typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IGrainA));
+            n3.Add("11405B98", typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98));
+            var n5 = n2.GetOrAdd(typeof(global::TestProject.IGrainB));
+            n5.Add("6B5D7809", typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809));
         }
     }
 }

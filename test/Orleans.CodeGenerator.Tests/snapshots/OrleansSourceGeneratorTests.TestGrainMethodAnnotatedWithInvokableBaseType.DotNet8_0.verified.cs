@@ -350,6 +350,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (string)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(string);
@@ -486,16 +487,14 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F), typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F), typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain), typeof(global::TestProject.HelloGrain));
-            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain), typeof(global::TestProject.HelloGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
             config.AddInterface(typeof(global::TestProject.IHelloGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain), typeof(global::TestProject.HelloGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
             var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.GetOrAdd(typeof(global::TestProject.IHelloGrain));

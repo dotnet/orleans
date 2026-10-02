@@ -11,6 +11,7 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_DemoDataWithFields : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoDataWithFields>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoDataWithFields>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoDataWithFields);
@@ -99,6 +100,7 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_DemoDataWithFields : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoDataWithFields>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoDataWithFields>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator;
