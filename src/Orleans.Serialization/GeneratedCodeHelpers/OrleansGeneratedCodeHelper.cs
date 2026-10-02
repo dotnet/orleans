@@ -122,15 +122,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                         return (TService)registered;
                     }
 
-                    provider.EnsureDynamicServiceLookupAllowed(typeof(TService));
                 }
 
-#if NET7_0_OR_GREATER
-                if (SerializerRuntimeFeatures.UseGeneratedSerializerContexts)
-                {
-                    throw new CodecNotFoundException($"Serialization service {typeof(TService)} requires an explicit serializer context registration.");
-                }
-#endif
                 val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {

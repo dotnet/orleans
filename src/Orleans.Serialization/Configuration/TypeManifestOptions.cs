@@ -70,15 +70,6 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<Type> ContextTypes { get; } = new();
 
         /// <summary>
-        /// Gets or sets whether serialization services are resolved exclusively from explicit closed registrations.
-        /// </summary>
-        /// <remarks>
-        /// Serializer context registration enables this option. Unregistered runtime types produce a
-        /// <see cref="CodecNotFoundException"/> when serialization or copying is requested.
-        /// </remarks>
-        public bool RequireExplicitTypeRegistration { get; set; }
-
-        /// <summary>
         /// Registers statically constructed serialization and copying implementations for a closed type.
         /// </summary>
         /// <typeparam name="T">The serialized type.</typeparam>

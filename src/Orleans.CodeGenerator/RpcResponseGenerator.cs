@@ -229,14 +229,10 @@ internal static class RpcResponseGenerator
 
         if (metadataModelRoots.Count > 0)
         {
-            source.AppendLine("if (!options.RequireExplicitTypeRegistration)");
-            source.AppendLine("{");
             foreach (var metadataRoot in metadataModelRoots)
             {
                 source.AppendLine(metadataRoot.ConfigurationStatements);
             }
-
-            source.AppendLine("}");
         }
         if (hasResponseRoots)
         {
