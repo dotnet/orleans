@@ -20,6 +20,7 @@ internal static class SerializerFactoryGenerator
         public ISerializableTypeDescription? Model { get; set; }
         public INamedTypeSymbol? ReferencedCodec { get; set; }
         public INamedTypeSymbol? ReferencedCopier { get; set; }
+        public List<IArrayTypeSymbol> CanonicalArrays { get; } = [];
     }
 
     internal sealed class Graph(IReadOnlyDictionary<ITypeSymbol, Registration> registrations, string configurationStatements)
@@ -52,7 +53,7 @@ internal static class SerializerFactoryGenerator
                 return false;
             }
             var registration = new Registration(type);
-            if (Describe(registration, services) is { } reason)
+            if (Describe(registration, services, cancellationToken) is { } reason)
             {
                 failure = new(type, reason);
                 return false;
@@ -65,6 +66,7 @@ internal static class SerializerFactoryGenerator
         var copierGenerator = new CopierGenerator(services);
         var result = new StringBuilder();
         var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
@@ -108,6 +110,33 @@ internal static class SerializerFactoryGenerator
                 .Append(registration.CopierConstruction).AppendLine(");");
             result.Append("options.AddSerializer<").Append(typeName).Append(">(static provider => ")
                 .Append(Resolve(registration.Codec)).Append(", static provider => ").Append(Resolve(registration.Copier)).AppendLine(");");
+            if (registration.Model is { IsValueType: true, IsEnumType: false })
+            {
+                result.Append("options.AddSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<")
+                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+            }
+
+            foreach (var array in registration.CanonicalArrays)
+            {
+                var arrayRegistration = registrations[array.WithNullableAnnotation(NullableAnnotation.None)];
+                var element = registrations[array.ElementType.WithNullableAnnotation(NullableAnnotation.None)];
+                var canonicalCodec = Name(services.LibraryTypes.ArrayCodec.Construct(array.ElementType));
+                var canonicalCopier = Name(services.LibraryTypes.ArrayCopier.Construct(array.ElementType));
+                var cyclic = Reaches(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
+                if (arrayRegistration.Codec != canonicalCodec && auxiliaryServices.Add(canonicalCodec))
+                {
+                    var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : Resolve(element.Codec);
+                    result.Append("options.AddSerializerService<").Append(canonicalCodec).Append(">(static provider => new ")
+                        .Append(canonicalCodec).Append('(').Append(codecDependency).AppendLine("));");
+                }
+                if (arrayRegistration.Copier != canonicalCopier && auxiliaryServices.Add(canonicalCopier))
+                {
+                    var copierDependency = cyclic ? $"CreateCopierHolder<{Name(array.ElementType)}>(provider)" : Resolve(element.Copier);
+                    result.Append("options.AddSerializerService<").Append(canonicalCopier).Append(">(static provider => new ")
+                        .Append(canonicalCopier).Append('(').Append(copierDependency).AppendLine("));");
+                }
+            }
+
             result.Append("options.AddAllowedType(typeof(").Append(typeName).AppendLine("));");
             if (registration.Type is INamedTypeSymbol named)
             {
@@ -119,7 +148,7 @@ internal static class SerializerFactoryGenerator
         return true;
     }
 
-    private static string? Describe(Registration registration, IGeneratorServices services)
+    private static string? Describe(Registration registration, IGeneratorServices services, CancellationToken cancellationToken)
     {
         var type = registration.Type;
         if (type is INamedTypeSymbol { IsUnboundGenericType: true } || ContainsTypeParameter(type))
@@ -209,6 +238,33 @@ internal static class SerializerFactoryGenerator
             ? $"global::Orleans.Serialization.Cloning.ShallowCopier<{Name(type)}>"
             : $"global::{generatedNamespace}.{CopierGenerator.GetSimpleClassName(named.Name)}{argumentsSuffix}";
         registration.Model = definitionModel;
+        var substitutions = definitionModel.TypeParameters
+            .Zip(named.GetAllTypeArguments(), static (parameter, argument) => (parameter.Parameter.Name, Type: argument.ToTypeSyntax()))
+            .ToDictionary(static entry => entry.Name, static entry => entry.Type, StringComparer.Ordinal);
+        var binding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
+        var declarations = new List<ClassDeclarationSyntax> { new SerializerGenerator(services).Generate(definitionModel) };
+        if (new CopierGenerator(services).GenerateCopier(definitionModel, new()) is { } copierDeclaration)
+            declarations.Add(copierDeclaration);
+        foreach (var request in declarations.SelectMany(static declaration => declaration.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
+            .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name).TypeArgumentList.Arguments.Single()))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var substituted = request.ReplaceNodes(request.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+                .Where(identifier => substitutions.ContainsKey(identifier.Identifier.ValueText)),
+                (original, _) => substitutions[original.Identifier.ValueText]);
+            if (binding.GetSpeculativeTypeInfo(0, substituted, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
+                && (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCodec)
+                    || SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCopier)))
+            {
+                var canonicalArray = services.Compilation.CreateArrayTypeSymbol(service.TypeArguments[0]);
+                if (!registration.CanonicalArrays.Any(existing => SymbolEqualityComparer.Default.Equals(existing, canonicalArray)))
+                    registration.CanonicalArrays.Add(canonicalArray);
+                registration.Dependencies.Add(canonicalArray);
+                registration.Dependencies.Add(canonicalArray.ElementType);
+            }
+        }
+
         if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
         {
             var arity = named.TypeArguments.Length;
