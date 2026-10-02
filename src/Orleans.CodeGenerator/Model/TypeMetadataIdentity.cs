@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.CodeAnalysis;
 
@@ -9,8 +8,6 @@ namespace Orleans.CodeGenerator.Model;
 /// </summary>
 internal readonly record struct TypeMetadataIdentity
 {
-    private static readonly ConditionalWeakTable<INamedTypeSymbol, CachedIdentity> Cache = new();
-
     public TypeMetadataIdentity(string metadataName, string assemblyName, string assemblyIdentity)
     {
         MetadataName = metadataName ?? string.Empty;
@@ -35,14 +32,10 @@ internal readonly record struct TypeMetadataIdentity
             return Empty;
         }
 
-        return Cache.GetValue(symbol.OriginalDefinition, static definition => new(CreateCore(definition))).Value;
-    }
-
-    private static TypeMetadataIdentity CreateCore(INamedTypeSymbol definition)
-    {
-        var assembly = definition.ContainingAssembly;
+        var originalDefinition = symbol.OriginalDefinition;
+        var assembly = originalDefinition.ContainingAssembly;
         return new TypeMetadataIdentity(
-            GetMetadataName(definition),
+            GetMetadataName(originalDefinition),
             assembly?.Identity.Name ?? string.Empty,
             assembly?.Identity.GetDisplayName() ?? string.Empty);
     }
@@ -70,10 +63,5 @@ internal readonly record struct TypeMetadataIdentity
 
             builder.Append(current.MetadataName);
         }
-    }
-
-    private sealed class CachedIdentity(TypeMetadataIdentity value)
-    {
-        public TypeMetadataIdentity Value { get; } = value;
     }
 }
