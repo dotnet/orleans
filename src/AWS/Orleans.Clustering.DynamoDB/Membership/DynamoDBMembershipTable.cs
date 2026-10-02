@@ -171,38 +171,14 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var siloEntryKeys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
-                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.ConstructSiloIdentity(siloAddress)) }
-                };
-
-                var versionEntryKeys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
-                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
-                };
-
-                var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] { siloEntryKeys, versionEntryKeys }, ParseRecord, cancellationToken);
-
-                MembershipTableData data = Convert(entries.ToList());
-                LogTraceReadMyEntry(siloAddress, data);
-                return data;
-            }
-            catch (Exception exc)
-            {
-                LogWarningIntermediateErrorReadingSiloEntry(exc, siloAddress, this.options.TableName);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -260,6 +236,10 @@ namespace Orleans.Clustering.DynamoDB
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -270,7 +250,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningInsertFailedInvalidETag(entry, tableVersion.VersionEtag);
-                    return false;
+                    return new(false);
                 }
 
                 versionEntry.ETag++;
@@ -309,7 +289,10 @@ namespace Orleans.Clustering.DynamoDB
                     LogWarningInsertFailedDueToContention(entry);
                 }
 
-                return result;
+                return result
+                    ? new(true, new(new TableVersion(versionEntry.MembershipVersion, versionEntry.ETag.ToString(CultureInfo.InvariantCulture)),
+                        tableEntry.ETag.ToString(CultureInfo.InvariantCulture)))
+                    : new(false);
             }
             catch (Exception exc)
             {
@@ -322,6 +305,10 @@ namespace Orleans.Clustering.DynamoDB
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc />
+        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -331,7 +318,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!int.TryParse(etag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var currentEtag))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, etag);
-                    return false;
+                    return new(false);
                 }
 
                 siloEntry.ETag = currentEtag + 1;
@@ -339,7 +326,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, tableVersion.VersionEtag);
-                    return false;
+                    return new(false);
                 }
 
                 versionEntry.ETag++;
@@ -378,7 +365,10 @@ namespace Orleans.Clustering.DynamoDB
                     LogWarningUpdateFailedDueToContention(canceledException, entry, etag);
                 }
 
-                return result;
+                return result
+                    ? new(true, new(new TableVersion(versionEntry.MembershipVersion, versionEntry.ETag.ToString(CultureInfo.InvariantCulture)),
+                        siloEntry.ETag.ToString(CultureInfo.InvariantCulture)))
+                    : new(false);
             }
             catch (Exception exc)
             {

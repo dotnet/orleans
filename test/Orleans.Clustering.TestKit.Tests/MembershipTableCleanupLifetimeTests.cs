@@ -343,7 +343,9 @@ public sealed class MembershipTableCleanupLifetimeTests
         }
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => inner.CleanupDefunctSiloEntriesAsync(beforeDate);
         public Task<MembershipTableData> ReadAll() => inner.ReadAllAsync();
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => inner.ReadRowAsync(key);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+            Task.FromException<MembershipTableData>(new NotSupportedException());
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => inner.InsertRowAsync(entry, tableVersion);
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => inner.UpdateRowAsync(entry, etag, tableVersion);
         public Task UpdateIAmAlive(MembershipEntry entry) => inner.UpdateIAmAliveAsync(entry);

@@ -195,8 +195,9 @@ namespace Orleans
         System.Threading.Tasks.Task<MembershipTableData> ReadAll();
         [Alias("00BCE16F")]
         System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(System.Threading.CancellationToken cancellationToken = default);
-        [System.Obsolete("Use ReadRowAsync instead.")]
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRow(Runtime.SiloAddress key);
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         [Alias("D851FB33")]
         System.Threading.Tasks.Task<MembershipTableData> ReadRowAsync(Runtime.SiloAddress key, System.Threading.CancellationToken cancellationToken = default);
         [System.Obsolete("Use UpdateIAmAliveAsync instead.")]

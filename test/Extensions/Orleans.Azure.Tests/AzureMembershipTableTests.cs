@@ -144,8 +144,14 @@ namespace Tester.AzureUtils
             await MembershipTable_InsertRow();
         }
 
+        [Theory, TestCategory("Functional")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public Task MembershipTable_Azure_NativeBatchReceiptProvenance(bool inspectInsertSnapshot)
+            => MembershipTable_NativeReceiptProvenance(inspectInsertSnapshot);
+
         [Fact, TestCategory("Functional")]
-        public async Task MembershipTable_Azure_ReadRow_Insert_Read()
+        public async Task MembershipTable_Azure_ReadAll_Insert_TryGet()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }

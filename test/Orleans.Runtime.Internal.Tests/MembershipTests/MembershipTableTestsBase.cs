@@ -282,7 +282,7 @@ namespace UnitTests.MembershipTests
             foreach (var membershipEntry in membershipEntries)
             {
                 Assert.True(await membershipTable.InsertRowAsync(membershipEntry, version.Next(), cancellationToken));
-                version = (await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, cancellationToken)).Version;
+                version = (await membershipTable.ReadAllAsync(cancellationToken)).Version;
             }
 
             var gateways = await gatewayListProvider.GetGateways();
@@ -334,6 +334,54 @@ namespace UnitTests.MembershipTests
             Assert.Single(data.Members);
         }
 
+        protected async Task MembershipTable_NativeReceiptProvenance(bool inspectInsertSnapshot)
+        {
+            var token = TestContext.Current.CancellationToken;
+            var table = await GetLegacyMembershipTableAsync(token);
+            var initial = await table.ReadAllAsync(token);
+            Assert.Empty(initial.Members);
+            var entry = CreateMembershipEntryForTest();
+            var inserted = await table.InsertRowWithResultAsync(entry, initial.Version.Next(), token);
+            Assert.True(inserted.Succeeded);
+            var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
+            Assert.Equal(initial.Version.Version + 1, first.Version.Version);
+            Assert.NotEqual(initial.Version.VersionEtag, first.Version.VersionEtag);
+            var retainedRowTag = first.RowETag;
+            var retainedTableTag = first.Version.VersionEtag;
+            if (inspectInsertSnapshot)
+            {
+                var observed = await table.ReadAllAsync(token);
+                var row = Assert.Single(observed.Members);
+                Assert.Equal(first.Version, observed.Version);
+                Assert.Equal(first.RowETag, row.Item2);
+                AssertCanonicalEntryEqual(CaptureCanonicalEntry(entry), CaptureCanonicalEntry(row.Item1));
+            }
+
+            entry.Status = SiloStatus.Active;
+            var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
+            Assert.True(updated.Succeeded);
+            var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
+            Assert.Equal(first.Version.Version + 1, second.Version.Version);
+            Assert.NotEqual(retainedTableTag, second.Version.VersionEtag);
+            var committed = await table.ReadAllAsync(token);
+            var committedRow = Assert.Single(committed.Members);
+            Assert.Equal(second.Version, committed.Version);
+            Assert.Equal(second.RowETag, committedRow.Item2);
+            AssertCanonicalEntryEqual(CaptureCanonicalEntry(entry), CaptureCanonicalEntry(committedRow.Item1));
+            Assert.Equal(retainedTableTag, first.Version.VersionEtag);
+            Assert.Equal(retainedRowTag, first.RowETag);
+
+            entry.Status = SiloStatus.ShuttingDown;
+            var rejected = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
+            Assert.False(rejected.Succeeded);
+            Assert.Null(rejected.Receipt);
+            var after = await table.ReadAllAsync(token);
+            Assert.Equal(committed.Version, after.Version);
+            var unchanged = Assert.Single(after.Members);
+            Assert.Equal(committedRow.Item2, unchanged.Item2);
+            AssertCanonicalEntryEqual(CaptureCanonicalEntry(committedRow.Item1), CaptureCanonicalEntry(unchanged.Item1));
+        }
+
         protected async Task MembershipTable_ReadRow_Insert_Read()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -370,7 +418,7 @@ namespace UnitTests.MembershipTests
 
             Assert.Single(data.Members);
 
-            data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.Equal(newTableVersion.Version, data.Version.Version);
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
@@ -379,12 +427,13 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(data.Version.VersionEtag);
             Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
             Assert.Equal(newTableVersion.Version, data.Version.Version);
-            var membershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.LogInformation("Membership.ReadRow returned MembershipEntry ETag={ETag} Entry={Entry}", eTag, membershipEntry);
+            var selected = Assert.IsType<Tuple<MembershipEntry, string>>(data.TryGet(newEntry.SiloAddress));
+            var membershipEntry = selected.Item1;
+            string eTag = selected.Item2;
+            logger.LogInformation("Membership.ReadAll snapshot selected MembershipEntry ETag={ETag} Entry={Entry}", eTag, membershipEntry);
 
             Assert.NotNull(eTag);
-            Assert.NotNull(membershipEntry);
+            Assert.Equal(newEntry.ToFullString(), membershipEntry.ToFullString());
         }
 
         protected async Task MembershipTable_ReadAll_Insert_ReadAll()

@@ -55,13 +55,15 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
         return Task.CompletedTask;
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
-    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+        Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(_table.Read(key));
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     [Obsolete("Use ReadAllAsync instead.")]
@@ -79,6 +81,12 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
     public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Insert(entry, tableVersion).Succeeded);
+    }
+
+    public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_table.Insert(entry, tableVersion));
     }
 
@@ -86,6 +94,12 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
     public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
     public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(_table.Update(entry, etag, tableVersion).Succeeded);
+    }
+
+    public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(_table.Update(entry, etag, tableVersion));
@@ -151,16 +165,6 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
             }
         }
 
-        public MembershipTableData Read(SiloAddress key)
-        {
-            lock (_lock)
-            {
-                return _table.TryGetValue(key, out var data) ?
-                    new MembershipTableData(Tuple.Create(data.Entry.Copy(), data.ETag), _tableVersion)
-                    : new MembershipTableData(_tableVersion);
-            }
-        }
-
         public MembershipTableData ReadAll()
         {
             lock (_lock)
@@ -171,43 +175,45 @@ internal sealed class InProcessMembershipTable : IMembershipTable, IGatewayListP
 
         public TableVersion ReadTableVersion() => _tableVersion;
 
-        public bool Insert(MembershipEntry entry, TableVersion version)
+        public MembershipTableWriteResult Insert(MembershipEntry entry, TableVersion version)
         {
             lock (_lock)
             {
                 if (_table.TryGetValue(entry.SiloAddress, out var data))
                 {
-                    return false;
+                    return default;
                 }
 
                 if (!_tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal))
                 {
-                    return false;
+                    return default;
                 }
 
-                _table[entry.SiloAddress] = (entry.Copy(), _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                var rowETag = NewETag();
+                _table[entry.SiloAddress] = (entry.Copy(), rowETag);
                 _tableVersion = new TableVersion(version.Version, NewETag());
-                return true;
+                return new(true, new(_tableVersion, rowETag));
             }
         }
 
-        public bool Update(MembershipEntry entry, string etag, TableVersion version)
+        public MembershipTableWriteResult Update(MembershipEntry entry, string etag, TableVersion version)
         {
             lock (_lock)
             {
                 if (!_table.TryGetValue(entry.SiloAddress, out var data))
                 {
-                    return false;
+                    return default;
                 }
 
                 if (!data.ETag.Equals(etag, StringComparison.Ordinal) || !_tableVersion.VersionEtag.Equals(version.VersionEtag, StringComparison.Ordinal))
                 {
-                    return false;
+                    return default;
                 }
 
-                _table[entry.SiloAddress] = (entry.Copy(), _lastETagCounter++.ToString(CultureInfo.InvariantCulture));
+                var rowETag = NewETag();
+                _table[entry.SiloAddress] = (entry.Copy(), rowETag);
                 _tableVersion = new TableVersion(version.Version, NewETag());
-                return true;
+                return new(true, new(_tableVersion, rowETag));
             }
         }
 

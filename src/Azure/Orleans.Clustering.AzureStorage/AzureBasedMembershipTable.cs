@@ -78,24 +78,14 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key, cancellationToken);
-                MembershipTableData data = Convert(entries);
-                LogDebugReadMyEntry(key, data);
-                return data;
-            }
-            catch (Exception exc)
-            {
-                LogWarningIntermediateErrorReadingSiloEntry(exc, key, tableManager.TableName);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -123,6 +113,10 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc/>
+        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -131,12 +125,14 @@ namespace Orleans.Runtime.MembershipService
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.InsertSiloEntryConditionally(
+                var result = await tableManager.InsertSiloEntryConditionally(
                     tableEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
 
-                if (result == false)
+                if (result is null)
                     LogWarningTableContention(entry, tableVersion);
-                return result;
+                return result is { } etags
+                    ? new(true, new(new TableVersion(tableVersion.Version, etags.VersionETag), etags.RowETag))
+                    : new(false);
             }
             catch (Exception exc)
             {
@@ -152,6 +148,10 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
+
+        /// <inheritdoc/>
+        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -160,10 +160,12 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
-                if (result == false)
+                var result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
+                if (result is null)
                     LogWarningTableContentionEtag(entry, etag, tableVersion);
-                return result;
+                return result is { } etags
+                    ? new(true, new(new TableVersion(tableVersion.Version, etags.VersionETag), etags.RowETag))
+                    : new(false);
             }
             catch (Exception exc)
             {

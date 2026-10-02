@@ -19,6 +19,8 @@ public sealed class InProcessMembershipTableCancellationTests
     [InlineData(nameof(IMembershipTable.ReadAllAsync))]
     [InlineData(nameof(IMembershipTable.InsertRowAsync))]
     [InlineData(nameof(IMembershipTable.UpdateRowAsync))]
+    [InlineData(nameof(IMembershipTable.InsertRowWithResultAsync))]
+    [InlineData(nameof(IMembershipTable.UpdateRowWithResultAsync))]
     [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync))]
     public async Task PreCanceledOperation_PreservesTable(string operation)
     {
@@ -69,10 +71,14 @@ public sealed class InProcessMembershipTableCancellationTests
             nameof(IMembershipTable.InitializeMembershipTableAsync) => table.InitializeMembershipTableAsync(true, cancellationToken),
             nameof(IMembershipTable.DeleteMembershipTableEntriesAsync) => table.DeleteMembershipTableEntriesAsync("cluster", cancellationToken),
             nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync) => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), cancellationToken),
+#pragma warning disable CS0618 // Intentional retired-row cancellation coverage.
             nameof(IMembershipTable.ReadRowAsync) => table.ReadRowAsync(entry.SiloAddress, cancellationToken),
+#pragma warning restore CS0618
             nameof(IMembershipTable.ReadAllAsync) => table.ReadAllAsync(cancellationToken),
             nameof(IMembershipTable.InsertRowAsync) => table.InsertRowAsync(entry, version, cancellationToken),
             nameof(IMembershipTable.UpdateRowAsync) => table.UpdateRowAsync(entry, etag, version, cancellationToken),
+            nameof(IMembershipTable.InsertRowWithResultAsync) => table.InsertRowWithResultAsync(entry, version, cancellationToken),
+            nameof(IMembershipTable.UpdateRowWithResultAsync) => table.UpdateRowWithResultAsync(entry, etag, version, cancellationToken),
             nameof(IMembershipTable.UpdateIAmAliveAsync) => table.UpdateIAmAliveAsync(entry, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(operation)),
         };

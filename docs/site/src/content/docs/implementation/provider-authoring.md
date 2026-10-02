@@ -87,6 +87,8 @@ When a lifecycle callback must execute its cancellation or cleanup logic, schedu
 
 Use <xref:Orleans.IMembershipTable.ReadAllAsync*> to obtain the membership rows and their corresponding table version in one atomic snapshot. <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag from that snapshot.
 
+Both legacy row-read signatures are obsolete. Built-in providers report <xref:System.NotSupportedException>; cancellation-aware calls observe pre-cancellation first. Custom providers using the default row-read adapter retain their legacy dispatch and cancellation behavior.
+
 <xref:Orleans.IMembershipTable.InsertRowWithResultAsync*> and <xref:Orleans.IMembershipTable.UpdateRowWithResultAsync*> return a <xref:Orleans.MembershipTableWriteResult>. Its success status records the conditional write's outcome. When the provider supplies a <xref:Orleans.MembershipTableWriteReceipt>, the receipt contains the table version and written row's ETag from that specific commit. Providers obtain this metadata from their native write result or the values which the conditional mutation committed.
 
 The default implementations call the corresponding bool-returning operation once and return its outcome with an absent receipt. A caller which needs current state can explicitly refresh with a full snapshot. That snapshot describes the read's observation; the receipt describes the originating write.

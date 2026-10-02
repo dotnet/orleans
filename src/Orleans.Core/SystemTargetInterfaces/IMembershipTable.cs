@@ -90,19 +90,23 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Atomically reads the Membership Table information about a given silo.
-        /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
-        /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
+        /// Reads membership information through the provider's legacy row-read operation.
         /// </summary>
+        /// <remarks>
+        /// Use <see cref="ReadAllAsync"/> to obtain an atomic snapshot and
+        /// <see cref="MembershipTableData.TryGet"/> to select a silo and its entity tag.
+        /// Built-in providers report <see cref="NotSupportedException"/> for row reads.
+        /// </remarks>
         /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         Task<MembershipTableData> ReadRow(SiloAddress key);
 
         /// <inheritdoc cref="ReadRow(SiloAddress)"/>
         /// <param name="key">The address of the silo to read.</param>
         /// <param name="cancellationToken">A token which cancels the operation.</param>
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         [Alias("D851FB33")]
         async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {

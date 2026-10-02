@@ -103,7 +103,7 @@ tokens, identities, and mismatched persisted fields.
 
 ## Independently discoverable direct guarantees
 
-Expose each runner method as a separate fact/test in your framework. All return
+Expose each active runner method below as a separate fact/test in your framework. All return
 `Task` and take `CancellationToken cancellationToken = default`. Every provider
 runs the same behavioral assertions.
 
@@ -123,19 +123,24 @@ runs the same behavioral assertions.
 | G12 | `UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects` |
 | G13 | `InsertRow_DuplicateIdentity_ReturnsFalseWithoutSideEffects` |
 | G14 | `UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects` |
-| G15 | `ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities` |
+| G15 | `ReadAll_SelectsPresentAndAbsentIdentities` |
 | G16 | `Reads_RetainedObjectsRemainUnchangedAfterLaterWrites` |
 | G17 | `InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState` |
 | G18 | `UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState` |
 | G19 | `Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState` |
 | G20 | `ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner` |
 | G21 | `ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews` |
-| G22 | `ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews` |
 | G23 | `InitializeMembershipTable_RepeatedWithData_PreservesCommittedState` |
 | G24 | `Clusters_SharedBackendWithOverlappingSiloAddresses_AreIsolated` |
 | G25 | `CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows` |
 | G26 | `DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster` |
 | G27 | `DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster` |
+
+The previous G15 method `ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities`
+is an obsolete alias for the full-snapshot lookup case. G22
+`ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews` is an obsolete alias for G21.
+Existing callers keep those entry points; normal discovery exposes each supported
+scenario once, for 26 direct cases plus generated conformance.
 
 The generated fact is conventionally named
 `MembershipTable_ModelBased_GeneratedConformance`; it calls
@@ -145,6 +150,10 @@ asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
 The public runner executes the complete generated suite. Repository hosted
 system-target tests distribute the same seed-17 manifest across four xUnit cases
 (240, 240, 240, and 239 histories), preserving every history and operation count.
+The internal `ReadPresentRow` and `ReadAbsentRow` operation identities now select
+entries from `ReadAllAsync` snapshots using `TryGet`. Their generated histories,
+multiplicities, and 18-kind manifest remain stable while their storage reads use
+the supported full-snapshot operation.
 
 ## Comparison and protocol rules
 
@@ -242,8 +251,8 @@ errors and infrastructure exceptions propagate.
 
 Concurrency uses materialized ready/start/completion gates, exact winner counts,
 and immediate per-observation checks against known before/after histories.
-ReadAll and ReadRow scenarios race readers against both forward updates and
-Dead-row cleanup, including the transition from a present point row to absence.
+The ReadAll scenario races readers against both forward updates and Dead-row
+cleanup, including the transition from a present row to absence in the snapshot.
 The cleanup scenario checks idempotent cleanup through both handles and accepts
 either an unchanged version or one atomic increment. Provider-native tests cover
 overlapping cleanup attempts and their contention/error behavior; the runtime
@@ -253,13 +262,20 @@ range 3–10000) bounds the multi-row workload without changing any assertion.
 An adapter must select a safe count which crosses its backend's actual paging
 or streaming boundary. Retain provider-specific pagination tests which force
 those boundaries explicitly.
-Setup uses one initial point read, one insert and verifying point read per row,
-then two full views checked against independently constructed canonical entries.
-Each insertion verifies an exact +1 commit, a fresh table token, and expected
-canonical row fields. For N rows this is
-N+1 point reads, N inserts, two full reads, and 3N membership-row observations.
-These count provider API calls; provider-specific instrumentation measures their
-native request costs.
+Setup uses one initial empty full snapshot, then one actual
+`InsertRowWithResultAsync` call per row, chaining each successful receipt's table
+version into the next insert. Two final full views are checked against independently
+constructed canonical entries. A missing receipt produces an explicit setup-prerequisite
+error after the successful write; it triggers neither a repeated write nor a hidden read.
+Each insertion verifies an exact +1 receipt and a fresh table token. The final
+views verify canonical row fields against the independent expected entries.
+For N rows this is N actual richer inserts, three full reads, and 2N returned
+membership rows, plus constant-size metadata on each insert response. No
+intermediate point read, native metadata hook, or bulk-population adapter is used.
+Providers supplying only the compatibility bool result remain valid implementations
+of that older contract; this large setup explicitly requires commit receipts.
+These are provider API and returned-row counts. Provider-specific instrumentation
+measures native requests, paging, and retry costs.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach stale table snapshots after cross-row and same-row commits,
