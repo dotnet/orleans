@@ -41,6 +41,51 @@ public static partial class ContextContracts
         Ensure(valueKeys[7].Count == 2, "Value-key collection deep-copy isolation.");
     }
 
+    public static void GeneratedFactoriesComposeWithMetadataAndReflection()
+    {
+        var registrations = new ServiceCollection().AddSerializerContext(new DuplicateContext());
+        var integerCodec = new UInt32Codec();
+        var elementCopier = new ShallowCopier<uint>();
+        var rootedArrayCodec = new ArrayCodec<uint>(integerCodec);
+        var rootedArrayCopier = new ArrayCopier<uint>(elementCopier);
+        registrations.AddSingleton<IFieldCodec<uint>>(integerCodec);
+        registrations.AddSingleton<IDeepCopier<uint>>(elementCopier);
+        registrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddFieldCodec(typeof(UInt32Codec));
+            options.AddCopier(typeof(ArrayCopier<uint>));
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Ensure(provider.GetCodec<uint>() is UInt32Codec, "Closed metadata codecs retain reflection-based activation beside generated factories.");
+        var arrayCodec = provider.GetCodec<uint[]>();
+        var arrayCopier = provider.GetDeepCopier<uint[]>();
+        Ensure(arrayCodec is ArrayCodec<uint> && !ReferenceEquals(rootedArrayCodec, arrayCodec)
+            && ReferenceEquals(arrayCodec, provider.GetCodec<uint[]>()),
+            "A statically rooted generic implementation can be materialized and activated through the common provider.");
+        Ensure(arrayCopier is ArrayCopier<uint> && !ReferenceEquals(rootedArrayCopier, arrayCopier)
+            && ReferenceEquals(arrayCopier, provider.GetDeepCopier<uint[]>()),
+            "Closed metadata copying uses one canonical reflection-activated implementation.");
+        uint[] input = [7, 11, uint.MaxValue];
+        Ensure(RoundTrip(services, input).SequenceEqual(input), "Reflection-activated generic codecs preserve the wire payload.");
+        var copy = services.GetRequiredService<DeepCopier>().Copy(input);
+        copy[0] = 19;
+        Ensure(input[0] == 7 && copy[1] == 11, "Reflection-activated generic copiers retain isolation.");
+        var resolver = services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeResolver>();
+        Ensure(resolver is Orleans.Serialization.TypeSystem.CachedTypeResolver
+            && resolver.ResolveType("System.UInt32[]") == typeof(uint[]),
+            "The common type resolver resolves rooted reflection metadata beside cached generated types.");
+        Ensure(services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeConverter>().Parse("uint[]") == typeof(uint[]),
+            "Reflection type resolution retains component validation.");
+        Ensure(!resolver.TryResolveType("Missing.Serialization.Type", out _), "Unknown reflection metadata remains unresolved.");
+        Expect<TypeAccessException>(() => resolver.ResolveType("Missing.Serialization.Type"), "Missing.Serialization.Type");
+#if NATIVE_AOT_SMOKE
+        Expect<InvalidOperationException>(() => provider.GetCodec(typeof(UnrootedValue[])), "native AOT");
+#endif
+    }
+
+    private struct UnrootedValue { public int Value { get; set; } }
+
     public static void GeneratedModelsTraverseDependencies()
     {
         using var services = CreateServices();

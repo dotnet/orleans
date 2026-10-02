@@ -20,11 +20,11 @@ The supported graph includes primitive leaf codecs with parameterless constructi
 
 ## Register and use the context
 
-<xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext*> registers the normal <xref:Orleans.Serialization.Serializer> and <xref:Orleans.Serialization.DeepCopier> services with explicit type lookup. Repeated calls combine contexts. Duplicate closed registrations use the first registered implementation.
+<xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext*> registers the normal <xref:Orleans.Serialization.Serializer> and <xref:Orleans.Serialization.DeepCopier> services. Resolution uses closed factories first, then registered implementation metadata and dependency injection. Repeated calls combine contexts. Duplicate closed registrations use the first registered implementation.
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_usage":::
 
-The context also registers the type names used during deserialization. Codecs and copiers preserve Orleans field identifiers, reference tracking, and deep-copy isolation. Object cycles and shared references retain their identity within the restored or copied graph.
+The context also registers the closed type names used during deserialization in the common type resolver's cache. Additional names resolve through reflection when the application preserves their metadata. Type-name filters and component validation apply to both forms of resolution. Codecs and copiers preserve Orleans field identifiers, reference tracking, and deep-copy isolation. Object cycles and shared references retain their identity within the restored or copied graph.
 
 Generated struct value serializers and field codecs share one canonical codec instance. Closed generic models include the concrete array services requested by their generated implementations, while direct byte-array serialization and copying retain the optimized byte-array implementations.
 
@@ -34,7 +34,9 @@ Generated factories construct known closed concrete codecs and copiers. Generate
 
 Each service provider caches one completed instance per implementation type. Construction is serialized per provider. A construction transaction publishes the complete dependency graph after its outermost constructor succeeds. If construction fails, the pending graph is discarded and the next resolution constructs fresh dependencies, preserving previously completed services. Serializer sessions and copy contexts track each operation's reference identities independently.
 
-Supplemental closed factories can use acyclic automatically activated dependencies in ordinary mode. Automatic cache entries created during a factory transaction participate in its publication and rollback. A constructor cycle combining automatic activation and closed factories produces a diagnostic requesting closed factories for every service in that cycle. Dependency injection reuses previously published services; a DI singleton requesting an unpublished serialization dependency receives guidance to register that participant through `AddSerializerService`.
+Closed factories can use acyclic metadata-based dependencies in the same resolution pipeline. Automatic cache entries created during a factory transaction participate in its publication and rollback. A constructor cycle combining automatic activation and closed factories produces a diagnostic requesting closed factories for every service in that cycle. Dependency injection reuses previously published services; a DI singleton requesting an unpublished serialization dependency receives guidance to register that participant through `AddSerializerService`.
+
+Reflection-based activation uses constructors preserved by generated manifests, annotated manual registrations, or typed generated dependencies. NativeAOT can materialize a generic implementation when its closed native code is rooted. Context factories make those instantiations visible to the compiler. A runtime request for an unavailable native instantiation produces registration guidance; add its closed graph to a context or supply closed factories.
 
 ## Diagnose unsupported input
 
@@ -44,10 +46,10 @@ Supplemental closed factories can use acyclic automatically activated dependenci
 
 The generated dictionary registration serializes dictionaries using `EqualityComparer<TKey>.Default`. A custom comparer in a value or serialized payload produces `NotSupportedException`. Applications with custom comparer requirements can register a comparer-aware closed codec through <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddSerializer*>.
 
-For a .NET 10 NativeAOT executable, enable generated-only serialization at build time:
+For a NativeAOT executable, enable native publication:
 
 :::code language="xml" source="snippets/serializer-contexts/NativeContextPublish.props" id="serializer_context_native_publish":::
 
-Import these properties into the executable project and register a context using `AddSerializerContext`. The feature switch lets the native compiler remove the automatic runtime activation and type-resolution paths. Enabling the switch requires an explicit closed graph; a missing context produces a configuration error.
+Import these properties into the executable project and register a context using `AddSerializerContext`. JIT and NativeAOT applications use the same generated-first resolution pipeline. Register the complete graph used by the application so each required codec, copier, and native generic implementation is available.
 
-The switch defaults to `false`, preserving ordinary JIT and NativeAOT metadata resolution. Context registration supplies the runtime explicit-lookup boundary, while the build switch supplies the generated-only compilation boundary. The strict NativeAOT contract targets .NET 10, where the framework recognizes the feature-switch annotation. Keep trim and AOT warnings as errors. The repository's centralized native smoke matrix discovers the strict `Contexts` and `Factories` scenarios from their manifests.
+Keep trim and AOT warnings as errors. The repository's centralized native smoke matrix exercises the strict `Contexts` and `Factories` scenarios on .NET 10, including closed metadata activation, rooted generic materialization, and reflection type lookup alongside generated registrations.
