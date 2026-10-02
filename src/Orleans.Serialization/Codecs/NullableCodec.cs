@@ -77,7 +77,8 @@ namespace Orleans.Serialization.Codecs
         /// Initializes a new instance of the <see cref="NullableCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The copier.</param>
-        public NullableCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+        public NullableCopier(IDeepCopier<T> copier)
+            => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(OrleansGeneratedCodeHelper.UnwrapService(this, copier));
 
         /// <inheritdoc />
         public bool IsShallowCopyable() => _copier is null;
