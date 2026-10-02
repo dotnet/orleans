@@ -691,6 +691,10 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("Trimming", "IL2075",
+            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). Materialization erases the registration annotation; explicit contracts use their stored surrogate descriptions instead.")]
+#endif
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
             if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterDefinition))
