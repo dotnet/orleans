@@ -24,6 +24,8 @@ namespace Orleans.Configuration
 
         public Storage.IStorageHasherPicker HashPicker { get { throw null; } set { } }
 
+        public bool InitializeSqliteDatabase { get { throw null; } set { } }
+
         public int InitStage { get { throw null; } set { } }
 
         public string Invariant { get { throw null; } set { } }

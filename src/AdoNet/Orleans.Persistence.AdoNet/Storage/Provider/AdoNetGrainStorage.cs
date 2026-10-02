@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -41,7 +42,8 @@ namespace Orleans.Storage
         RelationalProviderReadError = RelationalProviderBase + 16,
         RelationalProviderWriting = RelationalProviderBase + 17,
         RelationalProviderWrote = RelationalProviderBase + 18,
-        RelationalProviderWriteError = RelationalProviderBase + 19
+        RelationalProviderWriteError = RelationalProviderBase + 19,
+        RelationalProviderInitSqliteDatabase = RelationalProviderBase + 20
     }
 
     /// <summary>
@@ -360,6 +362,18 @@ namespace Orleans.Storage
         private async Task Init(CancellationToken cancellationToken)
         {
             Storage = RelationalStorage.CreateInstance(options.Invariant, options.ConnectionString, options.DataSource);
+            if (options.InitializeSqliteDatabase && options.Invariant == AdoNetInvariants.InvariantNameSqlLite)
+            {
+                LogInfoInitializingSqliteDatabase(name);
+                foreach (var script in new[] { "Sqlite-Main.sql", "Sqlite-Persistence.sql" })
+                {
+                    using var stream = typeof(AdoNetGrainStorage).Assembly.GetManifestResourceStream($"Orleans.Persistence.AdoNet.{script}")!;
+                    using var reader = new StreamReader(stream);
+                    var query = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+                    await Storage.ExecuteAsync(query, null, cancellationToken: cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
@@ -582,6 +596,13 @@ namespace Orleans.Storage
         {
             public override string ToString() => ConfigUtilities.RedactConnectionStringInfo(connectionString);
         }
+
+        [LoggerMessage(
+            EventId = (int)RelationalStorageProviderCodes.RelationalProviderInitSqliteDatabase,
+            Level = LogLevel.Information,
+            Message = "Initializing SQLite schema and installing default persistence queries: ProviderName={Name}."
+        )]
+        private partial void LogInfoInitializingSqliteDatabase(string name);
 
         [LoggerMessage(
             EventId = (int)RelationalStorageProviderCodes.RelationalProviderInitProvider,
