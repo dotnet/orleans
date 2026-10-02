@@ -303,6 +303,29 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void MaterializationBoundariesConstructRegisteredGenericAndArrayMetadata()
+    {
+        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
+        Assert.Equal(typeof(GenericSurrogate<string>), generic.Invoke(null, [typeof(GenericSurrogate<>), new[] { typeof(string) }]));
+        var array = typeof(CodecProvider).GetMethod("ConstructArrayMetadata", BindingFlags.Static | BindingFlags.NonPublic)!;
+        Assert.Equal(typeof(string[]), array.Invoke(null, [typeof(string), 1]));
+        Assert.Equal(typeof(string[,]), array.Invoke(null, [typeof(string), 2]));
+        var parameter = typeof(GenericSurrogate<>).GetGenericArguments()[0];
+        Assert.Equal(parameter.MakeArrayType(), array.Invoke(null, [parameter, 1]));
+    }
+
+    [Fact]
+    public void MaterializationBoundariesPreserveInvalidShapeErrorsOnJit()
+    {
+        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var exception = Assert.Throws<TargetInvocationException>(() => generic.Invoke(null, [typeof(GenericSurrogate<>), Type.EmptyTypes]));
+        Assert.IsType<ArgumentException>(exception.InnerException);
+        var array = typeof(CodecProvider).GetMethod("ConstructArrayMetadata", BindingFlags.Static | BindingFlags.NonPublic)!;
+        exception = Assert.Throws<TargetInvocationException>(() => array.Invoke(null, [typeof(string), 0]));
+        Assert.IsType<IndexOutOfRangeException>(exception.InnerException);
+    }
+
+    [Fact]
     public void ParameterizedArrayContractsInitializeWithoutImplementationInterfaceDiscovery()
     {
         var implementation = new UninspectableImplementation(typeof(ArrayCodec<>));
