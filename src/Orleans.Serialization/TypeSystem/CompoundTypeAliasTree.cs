@@ -116,7 +116,7 @@ public class CompoundTypeAliasTree
                 return existing;
             }
 
-            existing.Value = value ?? existing.Value;
+            existing.Value = value;
             return existing;
         }
         else
