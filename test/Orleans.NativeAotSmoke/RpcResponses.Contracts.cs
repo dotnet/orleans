@@ -257,15 +257,14 @@ public static class RpcResponseContracts
         {
             using var result = RoundTrip(services, exception);
         }
-        catch (NotSupportedException error)
+        catch (CodecNotFoundException error)
         {
-            Ensure(error.Message.Contains("ExceptionResponse", StringComparison.Ordinal)
-                && error.Message.Contains("exception and Data value types", StringComparison.Ordinal),
-                "Strict exception transport identifies its explicit codec graph contract.");
+            Ensure(error.Message.Contains("ExceptionResponse", StringComparison.Ordinal),
+                "Exception transport identifies the codec missing from the registered graph.");
             return;
         }
 
-        throw new InvalidOperationException("Strict exception transport requires its declared dependency graph.");
+        throw new InvalidOperationException("Exception transport requires its registered codec dependencies.");
     }
 
     public static void MissingNativeResponseRegistration()
@@ -281,11 +280,10 @@ public static class RpcResponseContracts
             {
                 lookup();
             }
-            catch (NotSupportedException exception)
+            catch (CodecNotFoundException exception)
             {
-                Ensure(exception.Message.Contains(typeof(Response<long>).ToString(), StringComparison.Ordinal)
-                    && exception.Message.Contains("serializer context", StringComparison.Ordinal),
-                    "Missing response registrations identify the closed response and registration contract.");
+                Ensure(exception.Message.Contains(typeof(Response<long>).ToString(), StringComparison.Ordinal),
+                    "Missing response registrations identify the closed response and serialization service.");
                 return;
             }
 

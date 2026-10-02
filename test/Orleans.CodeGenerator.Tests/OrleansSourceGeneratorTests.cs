@@ -2254,6 +2254,7 @@ public class DemoClass
                 ValueTask<int> Integer();
                 Task<Payload> Reference();
                 Task<int> Repeated();
+                Task<System.Collections.Generic.KeyValuePair<string, string>> Pair();
             }
             [GenerateSerializer, Alias("rpc.payload")]
             public sealed class Payload
@@ -2270,6 +2271,8 @@ public class DemoClass
         Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCopier<int, global::Orleans.Serialization.Cloning.ShallowCopier<int>>", source);
         Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(provider)", source);
+        Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCodec<string, string>", source);
+        Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCopier<string, string>", source);
         Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_Payload>(caller, provider)", source);
         Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_Payload>(caller, provider)", source);
         Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>,"));

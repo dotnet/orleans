@@ -507,6 +507,7 @@ internal static class SerializerFactoryGenerator
         {
             "System.Collections.Generic.List<T>" => "List",
             "System.Collections.Generic.Dictionary<TKey, TValue>" => "Dictionary",
+            "System.Collections.Generic.KeyValuePair<TKey, TValue>" => "KeyValuePair",
             "System.Nullable<T>" => "Nullable",
             _ => null
         };
