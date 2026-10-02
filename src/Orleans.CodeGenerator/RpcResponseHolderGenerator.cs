@@ -35,7 +35,7 @@ internal static class RpcResponseHolderGenerator
             if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
             {
                 var codecType = services.Compilation.GetTypeByMetadataName($"{SerializerGenerator.GetGeneratedNamespaceName(named)}.{SerializerGenerator.GetSimpleClassName(named.Name)}");
-                if (codecType is null || ReferencedSerializerImplementation.Validate(codecType) is not null)
+                if (codecType is null)
                     return false;
             }
             codec = registration.Codec;
