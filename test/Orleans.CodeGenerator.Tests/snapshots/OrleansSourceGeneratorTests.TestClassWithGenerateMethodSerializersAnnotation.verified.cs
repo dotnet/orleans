@@ -74,6 +74,7 @@ namespace OrleansCodeGen
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404);
@@ -136,6 +137,7 @@ namespace OrleansCodeGen
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
