@@ -512,6 +512,95 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(typeof(TypeConverterTestsCompoundAliasedType), converter.Parse(alias));
         }
 
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        [InlineData(typeof(List<TypeConverterTestsAttributedCompoundAliasedType[]>))]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenResolvedTypeNameIsDenied(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)),
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) =>
+                        typeName == typeof(TypeConverterTestsAttributedCompoundAliasedType).FullName ? false : null)
+                ]);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(RuntimeTypeNameFormatter.Format(type)));
+
+            Assert.Contains("not allowed", exception.Message);
+            Assert.Contains(typeof(TypeConverterTestsAttributedCompoundAliasedType).FullName!, exception.Message);
+        }
+
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        [InlineData(typeof(List<TypeConverterTestsAttributedCompoundAliasedType[]>))]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenElementTypeFilterDeniesThem(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)),
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) =>
+                        typeName.StartsWith("System.Collections.", StringComparison.Ordinal) ? true : null)
+                ],
+                typeFilters:
+                [
+                    new DelegateTypeFilter(candidate =>
+                        candidate == typeof(TypeConverterTestsAttributedCompoundAliasedType) ? false : null)
+                ]);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(RuntimeTypeNameFormatter.Format(type)));
+
+            Assert.Contains("not allowed", exception.Message);
+        }
+
+        [Theory]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[]))]
+        [InlineData(typeof(TypeConverterTestsAttributedCompoundAliasedType[][]))]
+        public void TypeConverter_FailsClosed_ForUnconfiguredCompoundAliasArrayElements(Type type)
+        {
+            var converter = CreateConverter(
+                configureOptions: options => options.CompoundTypeAliases
+                    .Add("type_converter_attributed_alias")
+                    .Add("v1", typeof(TypeConverterTestsAttributedCompoundAliasedType)));
+
+            AssertTypeNotAllowed(converter, type);
+        }
+
+        [Theory]
+        [InlineData("[]")]
+        [InlineData("[][]")]
+        [InlineData("[,]")]
+        public void TypeConverter_RejectsCompoundAliasedArrays_WhenAliasComponentNameIsDenied(string suffix)
+        {
+            var component = typeof(TypeConverterTestsAliasComponentType);
+            var converter = CreateConverter(
+                configureOptions: options =>
+                {
+                    options.AddAllowedType(typeof(TypeConverterTestsCompoundAliasedWithComponentType));
+                    options.CompoundTypeAliases
+                        .Add("type_converter_compound_alias_with_component")
+                        .Add(component)
+                        .Add("v1", typeof(TypeConverterTestsCompoundAliasedWithComponentType));
+                },
+                typeNameFilters:
+                [
+                    new DelegateTypeNameFilter((typeName, _) => typeName == component.FullName ? false : null)
+                ]);
+            var alias = $"(\"type_converter_compound_alias_with_component\",[{RuntimeTypeNameFormatter.Format(component)}],\"v1\"){suffix}";
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Parse(alias));
+
+            Assert.Contains("not allowed", exception.Message);
+            Assert.Contains(component.FullName!, exception.Message);
+        }
+
         private static void AssertRoundTrips(TypeConverter converter, Type type)
         {
             var formatted = converter.Format(type);
