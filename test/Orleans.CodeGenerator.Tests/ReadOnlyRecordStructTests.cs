@@ -27,6 +27,7 @@ public class ReadOnlyRecordStructTests
             [GenerateSerializer]
             public {{declaration}} TestRecord(byte[] Value)
             {
+                [System.NonSerialized]
                 private readonly byte[] _storage = Value;
 
                 public byte[] Value
@@ -129,6 +130,7 @@ public class ReadOnlyRecordStructTests
     [GenerateSerializer]
     public readonly record struct CustomInitRecord(byte[] Value)
     {
+        [NonSerialized]
         private readonly byte[] _storage = Value;
 
         public byte[] Value
