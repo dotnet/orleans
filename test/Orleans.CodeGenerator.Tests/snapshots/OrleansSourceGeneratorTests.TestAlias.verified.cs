@@ -72,7 +72,15 @@ namespace OrleansCodeGen.TestProject
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_MyTypeAliasStruct));
             config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.MyTypeAliasStruct>));
-            config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
+            {
+                var registeredType = typeof(global::TestProject.MyTypeAliasClass);
+                if (config.WellKnownTypeAliases.TryGetValue("_custom_type_alias_", out var existingType) && existingType != registeredType)
+                {
+                    throw new global::System.InvalidOperationException("Conflicting type metadata registration for " + "_custom_type_alias_" + ".");
+                }
+
+                config.WellKnownTypeAliases["_custom_type_alias_"] = registeredType;
+            }
         }
     }
 }

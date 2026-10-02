@@ -30,6 +30,7 @@ public sealed class SerializerContextTests
     [Fact] public void MissingTypesAndCustomComparersFailClearly() => ContextContracts.MissingTypesAndCustomComparersFailClearly();
     [Fact] public void ModelAliasesAndTypeIdsRoundTrip() => ContextContracts.ModelAliasesAndTypeIdsRoundTrip();
     [Fact] public void ExplicitContextsPreserveWireFormat() => ContextContracts.ExplicitContextsPreserveWireFormat();
+    [Fact] public void ContextAndAutomaticMetadataRegistrationAreIdempotent() => ContextContracts.ContextAndAutomaticMetadataRegistrationAreIdempotent();
 
     [Fact]
     public void AliasTreeDistinguishesPreservingTraversalAndExplicitReset()

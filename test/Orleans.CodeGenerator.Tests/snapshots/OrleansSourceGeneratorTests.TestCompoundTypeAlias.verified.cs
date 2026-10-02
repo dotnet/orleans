@@ -246,7 +246,16 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasClass));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass));
-            config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
+            {
+                var registeredType = typeof(global::TestProject.MyTypeAliasClass);
+                if (config.WellKnownTypeAliases.TryGetValue("_custom_type_alias_", out var existingType) && existingType != registeredType)
+                {
+                    throw new global::System.InvalidOperationException("Conflicting type metadata registration for " + "_custom_type_alias_" + ".");
+                }
+
+                config.WellKnownTypeAliases["_custom_type_alias_"] = registeredType;
+            }
+
             var n1 = config.CompoundTypeAliases.GetOrAdd("xx_test_xx");
             var n2 = n1.GetOrAdd(typeof(global::TestProject.MyTypeAliasClass));
             var n3 = n2.GetOrAdd(typeof(int));
