@@ -42,6 +42,7 @@ internal sealed class LibraryTypes
         IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
         InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
         RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers");
+        HasUnsafeAccessorAttribute = TypeOrDefault("System.Runtime.CompilerServices.UnsafeAccessorAttribute") is not null;
         InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute");
         DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute");
         GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute");
@@ -206,6 +207,7 @@ internal sealed class LibraryTypes
     }
 
     public INamedTypeSymbol Action_2 { get; private set; }
+    public bool HasUnsafeAccessorAttribute { get; }
     public INamedTypeSymbol TypeManifestProviderBase { get; private set; }
     public INamedTypeSymbol Field { get; private set; }
     public INamedTypeSymbol DeepCopier_1 { get; private set; }
