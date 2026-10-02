@@ -715,15 +715,8 @@ namespace Orleans.Serialization.Serializers
             if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
             var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
             var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
-            var implementations = role == typeof(IFieldCodec<>) ? _fieldCodecs
-                : role == typeof(IDeepCopier<>) ? _copiers
-                : role == typeof(IBaseCodec<>) ? _baseCodecs
-                : role == typeof(IValueSerializer<>) ? _valueSerializers
-                : role == typeof(IBaseCopier<>) ? _baseCopiers
-                : role == typeof(IActivator<>) ? _activators
-                : null;
-            if (implementations is not null && (implementations.TryGetValue(target, out var selected)
-                    || target.IsConstructedGenericType && implementations.TryGetValue(target.GetGenericTypeDefinition(), out selected))
+            if (role is not null
+                && TrySelectImplementation(role, target, target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target, out var selected)
                 && !MatchesDefaultImplementation(selected, contract.Implementation, contract.CompatibleImplementation, target))
                 return false;
             foreach (var dependency in contract.Dependencies)
