@@ -154,6 +154,36 @@ public sealed class SerializerContextTests
         Assert.DoesNotContain("#pragma warning disable", context, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Orleans")]
+    [InlineData("Serialization")]
+    [InlineData("Codecs")]
+    [InlineData("Cloning")]
+    [InlineData("System")]
+    [InlineData("global")]
+    public void GenericArrayParameterNamesPreserveQualifiedNamespaces(string parameter)
+    {
+        var (compilation, result) = Generate($$"""
+            [global::Orleans.GenerateSerializer]
+            public sealed class Box<{{parameter}}>
+            {
+                [global::Orleans.Id(0)] public {{parameter}}[] Values { get; set; }
+                [global::Orleans.Id(1)] public {{parameter}}[][] Nested { get; set; }
+            }
+            [global::Orleans.GenerateSerializerContext(typeof(Box<byte>))]
+            public partial class DemoContext : global::Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCodec<byte>>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCopier<byte>>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCodec<byte[]>>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ByteArrayCodec>", context, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RecursiveCollectionFactoriesUseTypedCycleEdges()
     {

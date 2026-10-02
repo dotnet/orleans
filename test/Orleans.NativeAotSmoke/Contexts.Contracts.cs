@@ -148,6 +148,18 @@ public static partial class ContextContracts
         Ensure(control.Values[0] == 13 && controlCopy.Other[0] == 19, "The generic integer array control copies independently.");
         Ensure(provider.GetCodec<byte[]>() is ByteArrayCodec && provider.GetDeepCopier<byte[]>() is ByteArrayCopier,
             "Canonical generic array dependencies preserve specialized direct byte-array dispatch.");
+        byte[] collidingValues = [5, 7];
+        var colliding = new NamespaceBox<byte> { Values = collidingValues, Nested = [collidingValues, collidingValues] };
+        var collidingResult = RoundTrip(services, colliding);
+        Ensure(collidingResult.Values.SequenceEqual(collidingValues)
+            && ReferenceEquals(collidingResult.Values, collidingResult.Nested[0])
+            && ReferenceEquals(collidingResult.Nested[0], collidingResult.Nested[1]),
+            "Namespace-colliding generic parameters preserve nested-array round-trip identity.");
+        var collidingCopy = services.GetRequiredService<DeepCopier>().Copy(colliding);
+        collidingCopy.Nested[0][0] = 13;
+        Ensure(colliding.Values[0] == 5 && collidingCopy.Values[0] == 13
+            && ReferenceEquals(collidingCopy.Nested[0], collidingCopy.Nested[1]),
+            "Namespace-colliding generic parameters preserve nested-array copy identity and isolation.");
     }
 
     public static void GenericArrayCyclesPreserveIdentity()
@@ -254,6 +266,19 @@ public static partial class ContextContracts
         Ensure(copy.Value == 19 && input.Items[0]["referenced"] == 23, "Referenced generated model deep-copy isolation.");
         Ensure(SerializerContextExample.SerializeAndCopy()[0]["count"] == 7, "Compiled documentation example outcome.");
         Ensure(RoundTrip(services, new DocumentationPrimitivePayload { Value = 67 }).Value == 67, "Referenced model uses its actual hot-reload constructor contract.");
+        byte[] values = [13, 17];
+        var implicitInput = new DocumentationImplicitPayload<byte> { Values = [13, 17], Flat = values, Nested = [values, values] };
+        var implicitResult = RoundTrip(services, implicitInput);
+        Ensure(implicitResult.Values.SequenceEqual(implicitInput.Values)
+            && ReferenceEquals(implicitResult.Flat, implicitResult.Nested[0])
+            && ReferenceEquals(implicitResult.Nested[0], implicitResult.Nested[1]),
+            "Referenced producer-selected implicit members preserve their actual graph and wire identity.");
+        var implicitCopy = services.GetRequiredService<DeepCopier>().Copy(implicitInput);
+        implicitCopy.Values[0] = 23;
+        implicitCopy.Nested[0][0] = 29;
+        Ensure(implicitInput.Values[0] == 13 && implicitInput.Flat[0] == 13
+            && implicitCopy.Flat[0] == 29 && implicitCopy.Nested[1][0] == 29,
+            "Referenced producer-selected implicit members preserve copying identity and source isolation.");
     }
 #endif
 
@@ -441,12 +466,14 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(ValuePayload<int>))]
 [GenerateSerializerContext(typeof(Box<byte>))]
 [GenerateSerializerContext(typeof(Box<int>))]
+[GenerateSerializerContext(typeof(NamespaceBox<byte>))]
 [GenerateSerializerContext(typeof(GenericArrayNode))]
 [GenerateSerializerContext(typeof(List<MultipleAliasPayload>))]
 [GenerateSerializerContext(typeof(List<NestedAliasPayload>))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
 [GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
+[GenerateSerializerContext(typeof(DocumentationImplicitPayload<byte>))]
 #endif
 internal partial class SmokeContext : SerializerContext;
 
@@ -541,6 +568,13 @@ public sealed class Box<T>
 {
     [Id(0)] public T[] Values { get; set; } = [];
     [Id(1)] public T[] Other { get; set; } = [];
+}
+
+[GenerateSerializer]
+public sealed class NamespaceBox<Orleans>
+{
+    [global::Orleans.Id(0)] public Orleans[] Values { get; set; } = [];
+    [global::Orleans.Id(1)] public Orleans[][] Nested { get; set; } = [];
 }
 
 [GenerateSerializer]
