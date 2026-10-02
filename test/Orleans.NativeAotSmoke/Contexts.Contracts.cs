@@ -389,6 +389,15 @@ public static partial class ContextContracts
             "Metadata-only argument aliases preserve closed type-name round-trips.");
         Ensure(!services.GetRequiredService<Serializer>().CanSerialize<UnusedAliasMarker>(),
             "Metadata-only alias registration preserves the marker's codec-free role.");
+        Ensure(RoundTrip(services, new InterfaceTaggedPayload { Value = 103 }).Value == 103,
+            "Aliased implemented interfaces contribute initialization metadata.");
+        Ensure(RoundTrip(services, new AliasedContainer.Payload { Value = 107 }).Value == 107,
+            "Aliased declaring types contribute initialization metadata.");
+        Ensure(aliases.Parse("(\"context-interface-tag\")") == typeof(IContextMetadataTag)
+            && aliases.Parse("(\"context-declaring-tag\")") == typeof(AliasedContainer),
+            "Implemented interface and declaring-type aliases resolve without codec registrations.");
+        Ensure(!services.GetRequiredService<Serializer>().CanSerialize<AliasedContainer>(),
+            "Declaring-type metadata contributes its alias independently of codec availability.");
         using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
             .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
         {
@@ -481,6 +490,8 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(List<NestedAliasPayload>))]
 [GenerateSerializerContext(typeof(MetadataEnvelope<UnusedAliasMarker>))]
 [GenerateSerializerContext(typeof(MetadataEnvelope<UnusedAliasMarker[]>))]
+[GenerateSerializerContext(typeof(InterfaceTaggedPayload))]
+[GenerateSerializerContext(typeof(AliasedContainer.Payload))]
 #if NET10_0_OR_GREATER
 [GenerateSerializerContext(typeof(DocumentationPayload<int>))]
 [GenerateSerializerContext(typeof(DocumentationPrimitivePayload))]
@@ -629,4 +640,23 @@ public sealed class UnusedAliasMarker;
 public sealed class MetadataEnvelope<T>
 {
     [Id(0)] public int Value { get; set; }
+}
+
+[CompoundTypeAlias("context-interface-tag")]
+public interface IContextMetadataTag;
+
+[GenerateSerializer]
+public sealed class InterfaceTaggedPayload : IContextMetadataTag
+{
+    [Id(0)] public int Value { get; set; }
+}
+
+[CompoundTypeAlias("context-declaring-tag")]
+public sealed class AliasedContainer
+{
+    [GenerateSerializer]
+    public sealed class Payload
+    {
+        [Id(0)] public int Value { get; set; }
+    }
 }

@@ -408,6 +408,10 @@ internal static class SerializerFactoryGenerator
             return;
         }
         if (symbol is not INamedTypeSymbol type) return;
+        if (type.ContainingType is { } declaring)
+            AppendTypeMetadata(result, declaring, library, visited);
+        foreach (var contract in type.AllInterfaces)
+            AppendTypeMetadata(result, contract, library, visited);
         foreach (var argument in type.TypeArguments)
         {
             if (!ContainsTypeParameter(argument))
