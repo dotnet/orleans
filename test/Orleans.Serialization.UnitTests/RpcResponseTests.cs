@@ -130,6 +130,10 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.CanonicalValueAndArrayServices();
 
     [Fact]
+    public void CanonicalTupleArgumentConstructionPreservesIdentity()
+        => NativeAotSmoke.RpcResponseContracts.ConstructTupleArgumentProxyBeforeInvocation();
+
+    [Fact]
     public void ExplicitExceptionTransportRequiresDeclaredDependencyGraph()
     {
         using var services = new ServiceCollection().AddSerializerContext(new EmptyContext()).BuildServiceProvider();

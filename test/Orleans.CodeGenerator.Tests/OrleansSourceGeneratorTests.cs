@@ -2921,6 +2921,169 @@ public class DemoClass
         Assert.Equal(true, assembly.GetType("ArrayCycleProof")!.GetMethod("Run")!.Invoke(null, null));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task RpcResponseFactoriesCloseCanonicalTupleConstruction(int arity)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Item { [Id(0)] public int Value { get; set; } }
+            """, $"TupleConstructionProof{Guid.NewGuid():N}");
+        var item = compilation.GetTypeByMetadataName("TestProject.Item");
+        Assert.NotNull(item);
+        var elementTypes = Enumerable.Repeat<Microsoft.CodeAnalysis.ITypeSymbol>(item, arity).ToArray();
+        var tuple = compilation.GetTypeByMetadataName($"System.Tuple`{arity}")!.Construct(elementTypes);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [tuple], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var tupleName = tuple.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var arguments = string.Join(", ", Enumerable.Repeat("item", arity));
+        var values = string.Join(" && ", Enumerable.Range(1, arity).Select(index => $"copy.Item{index}.Value == 47 && result.Item{index}.Value == 47"));
+        var aliasing = arity > 1 ? "&& ReferenceEquals(copy.Item1, copy.Item2) && ReferenceEquals(result.Item1, result.Item2)" : "";
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class TupleContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class TupleProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new TupleContext()).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var serializer = new Serializer<{{tupleName}}>(provider.GetCodec<{{tupleName}}>(),
+                        services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    var copier = new DeepCopier<{{tupleName}}>(provider.GetDeepCopier<{{tupleName}}>(),
+                        services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+                    var item = new TestProject.Item { Value = 47 };
+                    var original = new {{tupleName}}({{arguments}});
+                    var copy = copier.Copy(original);
+                    var wire = serializer.SerializeToArray(original);
+                    var result = serializer.Deserialize(wire);
+                    using var legacy = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof(TestProject.Item).Assembly)).BuildServiceProvider();
+                    var oldSerializer = new Serializer<{{tupleName}}>(legacy.GetRequiredService<CodecProvider>().GetCodec<{{tupleName}}>(),
+                        legacy.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    return !ReferenceEquals(original, copy) && !ReferenceEquals(item, copy.Item1)
+                        && {{values}} {{aliasing}}
+                        && System.MemoryExtensions.SequenceEqual<byte>(wire, oldSerializer.SerializeToArray(original));
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("TupleProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData("Task<int>", true)]
+    [InlineData("Task", true)]
+    [InlineData("void", false)]
+    public async Task RpcResponseFactoriesConstructActualTupleArgumentProxies(string returnType, bool responseExpected)
+    {
+        var compilation = await CreateCompilation($$"""
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+            using Orleans.Serialization.Cloning;
+            using Orleans.Serialization.Invocation;
+            using Orleans.Serialization.Serializers;
+            namespace TestProject;
+            [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
+            [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
+            [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+            public abstract class TupleProxyBase
+            {
+                protected TupleProxyBase(ICodecProvider provider, CopyContextPool pool)
+                {
+                    CodecProvider = provider;
+                    CopyContextPool = pool;
+                }
+                protected ICodecProvider CodecProvider { get; }
+                protected CopyContextPool CopyContextPool { get; }
+                protected T GetInvokable<T>() where T : class, IInvokable, new() => new T();
+                protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+                protected ValueTask InvokeAsync(IInvokable body) => default;
+                protected void Invoke(IInvokable body) { }
+            }
+            [GenerateMethodSerializers(typeof(TupleProxyBase))]
+            public interface IContract
+            {
+                {{returnType}} InvokeTuple(System.Collections.Generic.List<Tuple<SiloAddress, DateTime>> value);
+            }
+            """, $"ProxyConstructionProof{Guid.NewGuid():N}");
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var source = Assert.Single(generated.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("new global::Orleans.Serialization.Codecs.TupleCopier<global::Orleans.Runtime.SiloAddress, global::System.DateTime>", source);
+        Assert.Equal(responseExpected, source.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", StringComparison.Ordinal));
+        var tuple = compilation.GetTypeByMetadataName("System.Tuple`2")!.Construct(
+            compilation.GetTypeByMetadataName("Orleans.Runtime.SiloAddress")!, compilation.GetTypeByMetadataName("System.DateTime")!);
+        var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.Construct(tuple);
+        var construction = SerializerFactoryGenerator.CreateRpcConstructionRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            list, TestContext.Current.CancellationToken);
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class ProxyContext : TypeManifestProviderBase
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{construction.ConfigurationStatements}}
+                }
+            }
+            public static class ProxyProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(new ProxyContext())).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var pool = services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>();
+                    var proxy = new OrleansCodeGen.TestProject.Proxy_IContract(provider, pool);
+                    var copier = provider.GetDeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>();
+                    var input = Tuple.Create(Orleans.Runtime.SiloAddress.New(System.Net.IPAddress.Loopback, 1234, 1), new DateTime(638000000000000000L, DateTimeKind.Utc));
+                    var copy = new DeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>(copier, pool).Copy(input);
+                    return proxy is TestProject.IContract && ReferenceEquals(input, copy)
+                        && ReferenceEquals(copier, provider.GetDeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>());
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ProxyProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
     {

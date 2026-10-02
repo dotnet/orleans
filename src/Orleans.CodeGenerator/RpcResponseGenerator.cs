@@ -33,7 +33,12 @@ internal static class RpcResponseGenerator
         var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
         var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var resolver = new TypeSymbolResolver(compilation);
+        var proxyContext = new ProxyGenerationContext(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
+        ProxySourceOutputGenerator.PopulateProxyInterfaces(proxyContext, resolver,
+            proxies.Select(static proxy => proxy.ProxyInterface).ToImmutableArray(), cancellationToken);
+        var binding = compilation.GetSemanticModel(compilation.SyntaxTrees.First());
         var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
+        var arguments = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var hasCompletionMethods = false;
         var output = ImmutableArray.CreateBuilder<SourceOutputResult>();
         foreach (var proxy in proxies)
@@ -44,10 +49,39 @@ internal static class RpcResponseGenerator
                 continue;
             }
 
+            var description = ProxySourceOutputGenerator.GetProxyInterfaceDescription(proxyContext, resolver, proxy.ProxyInterface, cancellationToken);
+            var (proxyClass, _) = new ProxyGenerator(proxyContext, new CopierGenerator(proxyContext)).Generate(description);
+            foreach (var request in proxyClass.Members.OfType<ConstructorDeclarationSyntax>()
+                .SelectMany(static constructor => constructor.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
+                .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name).TypeArgumentList.Arguments.Single()))
+            {
+                if (binding.GetSpeculativeTypeInfo(0, request, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
+                    && service.AllInterfaces.Concat([service]).FirstOrDefault(type =>
+                        SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, services.LibraryTypes.DeepCopier_1)) is { } copier
+                    && !ContainsTypeParameter(copier.TypeArguments[0]) && !arguments.ContainsKey(copier.TypeArguments[0]))
+                {
+                    arguments.Add(copier.TypeArguments[0], description.Methods[0].Method);
+                }
+            }
+
             foreach (var method in interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
                 .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>()))
                 .Where(static method => method.MethodKind == MethodKind.Ordinary))
             {
+                if (method.TypeParameters.Length == 0)
+                {
+                    foreach (var parameter in method.Parameters)
+                    {
+                        var parameterType = parameter.Type.WithNullableAnnotation(NullableAnnotation.None);
+                        if (!ContainsTypeParameter(parameterType) && !services.LibraryTypes.IsShallowCopyable(parameterType)
+                            && !arguments.ContainsKey(parameterType))
+                        {
+                            arguments.Add(parameterType, method);
+                        }
+                    }
+                }
+
                 var returnType = method.ReturnType;
                 if (returnType.SpecialType == SpecialType.System_Void)
                 {
@@ -84,7 +118,9 @@ internal static class RpcResponseGenerator
         }
 
         var supportedResults = new List<ITypeSymbol>();
+        var coveredConstructionTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var metadataModelRoots = new List<SerializerFactoryGenerator.Graph>();
+        var argumentRoots = new List<SerializerFactoryGenerator.Graph>();
         var dictionaryDefinition = compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2");
         foreach (var entry in results.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
         {
@@ -101,6 +137,7 @@ internal static class RpcResponseGenerator
                 }
 
                 supportedResults.Add(resultType);
+                foreach (var known in candidate.Registrations.Keys) coveredConstructionTypes.Add(known);
             }
             else
             {
@@ -115,7 +152,27 @@ internal static class RpcResponseGenerator
             }
         }
 
-        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0 && !hasCompletionMethods)
+        var hasResponseRoots = supportedResults.Count > 0 || metadataModelRoots.Count > 0 || hasCompletionMethods;
+        foreach (var argument in arguments.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
+        {
+            if (coveredConstructionTypes.Contains(argument.Key)) continue;
+            if (SerializerFactoryGenerator.TryCreate(services, [argument.Key], cancellationToken, out var argumentGraph, out var failure, useDefaultFactories: true)
+                && !argumentGraph.Registrations.Keys.OfType<INamedTypeSymbol>().Any(type => SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, dictionaryDefinition)))
+            {
+                argumentRoots.Add(argumentGraph);
+                foreach (var known in argumentGraph.Registrations.Keys) coveredConstructionTypes.Add(known);
+            }
+            else if (!options.ValidateRpcResponseFactories)
+            {
+                metadataModelRoots.Add(SerializerFactoryGenerator.CreateRpcConstructionRoot(services, argument.Key, cancellationToken));
+            }
+            else
+            {
+                Report(argument.Value, argument.Key, failure?.Reason ?? "the argument graph requires an explicit closed construction contract");
+            }
+        }
+
+        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0 && argumentRoots.Count == 0 && !hasCompletionMethods)
         {
             return output.ToImmutable();
         }
@@ -150,6 +207,11 @@ internal static class RpcResponseGenerator
             source.AppendLine(graph.ConfigurationStatements);
         }
 
+        foreach (var argumentRoot in argumentRoots)
+        {
+            source.AppendLine(argumentRoot.ConfigurationStatements);
+        }
+
         if (metadataModelRoots.Count > 0)
         {
             source.AppendLine("if (!options.RequireExplicitTypeRegistration)");
@@ -161,14 +223,17 @@ internal static class RpcResponseGenerator
 
             source.AppendLine("}");
         }
-        source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
-        source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
-        source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));");
-        source.AppendLine("options.AddDefaultSerializerService<CompletedResponseActivator>(static provider => new CompletedResponseActivator());");
-        source.AppendLine("options.AddDefaultSerializerService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(static provider => new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null!, provider)));");
-        source.AppendLine("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>());");
-        source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(null!, provider));");
-        source.AppendLine("options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));");
+        if (hasResponseRoots)
+        {
+            source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
+            source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
+            source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null!, provider));");
+            source.AppendLine("options.AddDefaultSerializerService<CompletedResponseActivator>(static provider => new CompletedResponseActivator());");
+            source.AppendLine("options.AddDefaultSerializerService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(static provider => new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null!, provider)));");
+            source.AppendLine("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>());");
+            source.AppendLine("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null!, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(null!, provider));");
+            source.AppendLine("options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));");
+        }
 
         source.AppendLine("#endif");
         source.AppendLine("}");
@@ -215,7 +280,7 @@ internal static class RpcResponseGenerator
     }
 
     private static bool ContainsTypeParameter(ITypeSymbol type)
-        => type is ITypeParameterSymbol
+        => type is ITypeParameterSymbol or IErrorTypeSymbol
             || type is IArrayTypeSymbol array && ContainsTypeParameter(array.ElementType)
             || type is INamedTypeSymbol named && (named.TypeArguments.Any(ContainsTypeParameter)
                 || named.ContainingType is { } containing && ContainsTypeParameter(containing));
