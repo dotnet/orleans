@@ -186,13 +186,15 @@ public class PooledQueueCacheAdmissionTests
         Assert.Equal(existingCount == 0 ? (long?)null : 1, cache.Oldest?.SequenceNumber);
         Assert.Equal(existingCount == 0 ? (long?)null : existingCount, cache.Newest?.SequenceNumber);
         Assert.All(monitor.ObservedCacheCounts, count => Assert.Equal(existingCount, count));
+        Assert.Equal(0, monitor.MessagesAdded);
 
         // Retrying at the identical timestamp also retries a failed periodic report.
         cache.Add(incoming, ReportTime);
 
         Assert.Equal(existingCount + 2, cache.ItemCount);
-        Assert.Equal(2, monitor.TrackCalls);
-        Assert.Equal(failStatistics ? 2 : 1, monitor.ReportCalls);
+        Assert.Equal(incoming.Count, monitor.MessagesAdded);
+        Assert.Equal(failStatistics ? 1 : 2, monitor.TrackCalls);
+        Assert.Equal(2, monitor.ReportCalls);
         Assert.All(monitor.ObservedCacheCounts, count => Assert.Equal(existingCount, count));
         var statistics = monitor.LastReport!.Value;
         var oldest = CreateMessage(existingCount == 0 ? existingCount + 1 : 1);
@@ -216,9 +218,9 @@ public class PooledQueueCacheAdmissionTests
 
         // A successful commit advances the reporting deadline exactly once.
         cache.Add([], ReportTime);
-        Assert.Equal(failStatistics ? 2 : 1, monitor.ReportCalls);
+        Assert.Equal(2, monitor.ReportCalls);
         cache.Add([], ReportTime.AddMinutes(1));
-        Assert.Equal(failStatistics ? 3 : 2, monitor.ReportCalls);
+        Assert.Equal(3, monitor.ReportCalls);
     }
 
     [Fact]
@@ -316,6 +318,7 @@ public class PooledQueueCacheAdmissionTests
         public bool FailNextReport { get; set; }
         public int TrackCalls { get; private set; }
         public int ReportCalls { get; private set; }
+        public long MessagesAdded { get; private set; }
         public List<int> ObservedCacheCounts { get; } = [];
         public (DateTime? OldestEnqueued, DateTime? OldestDequeued, DateTime? NewestEnqueued, long Count)? LastReport { get; private set; }
 
@@ -328,6 +331,7 @@ public class PooledQueueCacheAdmissionTests
                 FailNextTrack = false;
                 throw Failure;
             }
+            MessagesAdded += messagesAdded;
         }
 
         public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc,
@@ -347,6 +351,7 @@ public class PooledQueueCacheAdmissionTests
         {
             TrackCalls = 0;
             ReportCalls = 0;
+            MessagesAdded = 0;
             LastReport = null;
             ObservedCacheCounts.Clear();
         }
