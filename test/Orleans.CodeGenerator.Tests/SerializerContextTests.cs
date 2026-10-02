@@ -13,6 +13,11 @@ public sealed class SerializerContextTests
 {
     [Fact] public void NestedCollectionsRoundTripAndCopy() => ContextContracts.NestedCollectionsRoundTripAndCopy();
     [Fact] public void GeneratedModelsTraverseDependencies() => ContextContracts.GeneratedModelsTraverseDependencies();
+    [Fact] public void CanonicalValueSerializerUsesGeneratedCodec() => ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
+    [Fact] public void GenericArraysRoundTripAndCopy() => ContextContracts.GenericArraysRoundTripAndCopy();
+    [Fact] public void GenericArrayCyclesPreserveIdentity() => ContextContracts.GenericArrayCyclesPreserveIdentity();
+    [Fact] public void NullableRootCyclesPreserveCopyIdentity() => ContextContracts.NullableRootCyclesPreserveCopyIdentity();
+    [Fact] public void NullableRootFailureRollsBackAndRetriesCanonically() => ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
 #if NET10_0_OR_GREATER
     [Fact] public void ReferencedGeneratedModelsTraverseDependencies() => ContextContracts.ReferencedGeneratedModelsTraverseDependencies();
 #endif
@@ -114,6 +119,37 @@ public sealed class SerializerContextTests
         Assert.Contains("GetService<global::Orleans.Serialization.Codecs.DictionaryCopier<string, int>>", context, StringComparison.Ordinal);
         Assert.DoesNotContain("CreateCodecHolder", context, StringComparison.Ordinal);
         Assert.DoesNotContain("CreateCopierHolder", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("#pragma warning disable", context, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GenericValueAndArrayFactoriesCloseCanonicalServices()
+    {
+        var (compilation, result) = Generate("""
+            using Orleans;
+            using Orleans.Serialization;
+            [GenerateSerializer]
+            public struct ValuePayload<T> { [Id(0)] public T Value { get; set; } }
+            [GenerateSerializer]
+            public sealed class Box<T> { [Id(0)] public T[] Values { get; set; } }
+            [GenerateSerializerContext(typeof(ValuePayload<int>))]
+            [GenerateSerializerContext(typeof(Box<byte>))]
+            [GenerateSerializerContext(typeof(Box<int>))]
+            public partial class DemoContext : SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var context = Assert.Single(result.Results.SelectMany(result => result.GeneratedSources),
+            source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<global::ValuePayload<int>>>(static provider =>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCodec<byte>>(static provider => new global::Orleans.Serialization.Codecs.ArrayCodec<byte>(", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCopier<byte>>(static provider => new global::Orleans.Serialization.Codecs.ArrayCopier<byte>(", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ArrayCodec<int>>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ByteArrayCodec>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializerService<global::Orleans.Serialization.Codecs.ByteArrayCopier>", context, StringComparison.Ordinal);
+        Assert.Contains("AddSerializer<byte[]>", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateCodecHolder", context, StringComparison.Ordinal);
+        Assert.DoesNotContain("MakeGenericType", context, StringComparison.Ordinal);
         Assert.DoesNotContain("#pragma warning disable", context, StringComparison.Ordinal);
     }
 

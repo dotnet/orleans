@@ -3,6 +3,11 @@ using Orleans.Serialization.ContextSmoke;
 
 ContextContracts.NestedCollectionsRoundTripAndCopy();
 ContextContracts.GeneratedModelsTraverseDependencies();
+ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
+ContextContracts.GenericArraysRoundTripAndCopy();
+ContextContracts.GenericArrayCyclesPreserveIdentity();
+ContextContracts.NullableRootCyclesPreserveCopyIdentity();
+ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
 ContextContracts.ReferencedGeneratedModelsTraverseDependencies();
 ContextContracts.NullableArrayAndEnumRoundTrip();
 ContextContracts.RecursiveModelsPreserveIdentity();

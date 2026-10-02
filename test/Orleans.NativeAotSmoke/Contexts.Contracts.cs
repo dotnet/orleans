@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
+using System.Buffers;
 #if NET10_0_OR_GREATER
 using Documentation.SerializerContexts;
 #endif
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.ContextSmoke;
@@ -58,6 +61,140 @@ public static partial class ContextContracts
         var genericValue = new ValuePayload<int> { Value = 53 };
         Ensure(RoundTrip(services, genericValue).Value == 53, "Generated generic value-type serialization.");
         Ensure(services.GetRequiredService<DeepCopier>().Copy(genericValue).Value == 53, "Generated generic value-type copying.");
+    }
+
+    public static void CanonicalValueSerializerUsesGeneratedCodec()
+    {
+        using var services = CreateServices();
+        var provider = services.GetRequiredService<CodecProvider>();
+#if NATIVE_AOT_SMOKE
+        var serializer = new ValueSerializer<ValuePayload<int>>(provider, services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+#else
+        var serializer = services.GetRequiredService<ValueSerializer<ValuePayload<int>>>();
+#endif
+        var original = new ValuePayload<int> { Value = 47 };
+        var output = new ArrayBufferWriter<byte>();
+        serializer.Serialize(ref original, output);
+        var result = new ValuePayload<int>();
+        serializer.Deserialize(output.WrittenMemory, ref result);
+        Ensure(result.Value == 47, "ValueSerializer<T> serializes and deserializes using the generated struct codec.");
+        Ensure(ReferenceEquals(provider.GetValueSerializer<ValuePayload<int>>(), provider.GetCodec<ValuePayload<int>>()),
+            "Value and field serializer services share the same canonical generated codec.");
+    }
+
+    public static void GenericArraysRoundTripAndCopy()
+    {
+        using var services = CreateServices();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var original = new Box<byte> { Values = [7, 9], Other = null! };
+        original.Other = original.Values;
+        var result = RoundTrip(services, original);
+        var copy = services.GetRequiredService<DeepCopier>().Copy(original);
+        Ensure(result.Values.SequenceEqual(original.Values) && ReferenceEquals(result.Values, result.Other),
+            "Closed generic byte arrays preserve content and shared round-trip identity.");
+        Ensure(!ReferenceEquals(original, copy) && !ReferenceEquals(original.Values, copy.Values)
+            && ReferenceEquals(copy.Values, copy.Other), "Closed generic byte arrays preserve shared copy identity and isolation.");
+        copy.Values[0] = 3;
+        Ensure(original.Values[0] == 7 && copy.Other[0] == 3, "Generic byte array mutations preserve source isolation and copied identity.");
+        var control = new Box<int> { Values = [13, 17], Other = [19] };
+        Ensure(RoundTrip(services, control).Values.SequenceEqual(control.Values), "The generic integer array control round-trips.");
+        var controlCopy = services.GetRequiredService<DeepCopier>().Copy(control);
+        controlCopy.Values[0] = 23;
+        Ensure(control.Values[0] == 13 && controlCopy.Other[0] == 19, "The generic integer array control copies independently.");
+        Ensure(provider.GetCodec<byte[]>() is ByteArrayCodec && provider.GetDeepCopier<byte[]>() is ByteArrayCopier,
+            "Canonical generic array dependencies preserve specialized direct byte-array dispatch.");
+    }
+
+    public static void GenericArrayCyclesPreserveIdentity()
+    {
+        using var services = CreateServices();
+        var original = new GenericArrayNode { Children = new Box<GenericArrayNode>() };
+        original.Children.Values = [original, original];
+        original.Children.Other = original.Children.Values;
+        var result = RoundTrip(services, original);
+        Ensure(ReferenceEquals(result, result.Children.Values[0]) && ReferenceEquals(result, result.Children.Values[1])
+            && ReferenceEquals(result.Children.Values, result.Children.Other), "Generic-array cycles preserve round-trip identity.");
+        var copy = services.GetRequiredService<DeepCopier>().Copy(original);
+        Ensure(!ReferenceEquals(original, copy) && !ReferenceEquals(original.Children.Values, copy.Children.Values)
+            && ReferenceEquals(copy, copy.Children.Values[0]) && ReferenceEquals(copy, copy.Children.Values[1])
+            && ReferenceEquals(copy.Children.Values, copy.Children.Other), "Generic-array cycles preserve copy identity and isolation.");
+    }
+
+    public static void NullableRootCyclesPreserveCopyIdentity()
+    {
+        using var services = new ServiceCollection().AddSerializerContext(new NullableCycleContext()).BuildServiceProvider();
+        var children = new RecursiveValue?[2];
+        RecursiveValue? original = new RecursiveValue { Value = 31, Children = children, Other = children };
+        children[0] = original;
+        children[1] = original;
+        var provider = services.GetRequiredService<CodecProvider>();
+        var copier = provider.GetDeepCopier<RecursiveValue?>();
+        Ensure(ReferenceEquals(copier, provider.GetDeepCopier<RecursiveValue?>()), "Nullable-root resolution commits one canonical copier.");
+        var copy = services.GetRequiredService<DeepCopier>().Copy(original);
+        Ensure(copy.HasValue && copy.Value.Value == 31 && !ReferenceEquals(children, copy.Value.Children),
+            "Nullable roots deep-copy struct content and isolate the recursive array.");
+        Ensure(ReferenceEquals(copy.Value.Children, copy.Value.Other)
+            && ReferenceEquals(copy.Value.Children, copy.Value.Children[0]!.Value.Children)
+            && ReferenceEquals(copy.Value.Children, copy.Value.Children[1]!.Value.Other),
+            "Nullable-root copies preserve shared arrays and recursive identity.");
+        copy.Value.Children[0] = null;
+        Ensure(children[0].HasValue && copy.Value.Other[0] is null, "Nullable-root copy mutations retain source isolation and shared identity.");
+        var result = RoundTrip(services, original);
+        Ensure(result.HasValue && ReferenceEquals(result.Value.Children, result.Value.Other)
+            && ReferenceEquals(result.Value.Children, result.Value.Children[0]!.Value.Children),
+            "Nullable-root round-trips preserve recursive array identity.");
+        Ensure(services.GetRequiredService<DeepCopier>().Copy<RecursiveValue?>(null) is null, "Nullable roots preserve null values.");
+    }
+
+    public static void NullableRootFailureRollsBackAndRetriesCanonically()
+    {
+        var registrations = new ServiceCollection().AddSerializerContext(new NullableCycleContext());
+        var attempts = 0;
+        NullableCopier<RecursiveValue>? failedCopier = null;
+        ArrayCopier<RecursiveValue?>? failedArray = null;
+        var failure = new InvalidOperationException("nullable graph failure");
+        registrations.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<NullableRetryOwner>(provider =>
+            {
+                var copier = OrleansGeneratedCodeHelper.GetService<NullableCopier<RecursiveValue>>(null!, provider);
+                var array = OrleansGeneratedCodeHelper.GetService<ArrayCopier<RecursiveValue?>>(null!, provider);
+                if (++attempts == 1)
+                {
+                    failedCopier = copier;
+                    failedArray = array;
+                    throw failure;
+                }
+
+                return new NullableRetryOwner(copier, array);
+            }));
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var committed = provider.GetCodec<int>();
+        Exception? observed = null;
+        try { _ = OrleansGeneratedCodeHelper.GetService<NullableRetryOwner>(null!, provider); }
+        catch (InvalidOperationException exception) { observed = exception; }
+        Ensure(ReferenceEquals(failure, observed), "Nullable graph failure preserves the original exception.");
+        var rebuilt = OrleansGeneratedCodeHelper.GetService<NullableRetryOwner>(null!, provider);
+        Ensure(attempts == 2 && !ReferenceEquals(failedCopier, rebuilt.Copier) && !ReferenceEquals(failedArray, rebuilt.Array),
+            "Nullable graph retry reconstructs every pending cycle service.");
+        Ensure(ReferenceEquals(rebuilt.Copier, provider.GetDeepCopier<RecursiveValue?>())
+            && ReferenceEquals(rebuilt.Array, provider.GetDeepCopier<RecursiveValue?[]>())
+            && ReferenceEquals(rebuilt, OrleansGeneratedCodeHelper.GetService<NullableRetryOwner>(null!, provider)),
+            "Nullable graph retry publishes canonical nullable, array, and root services.");
+        Ensure(ReferenceEquals(committed, provider.GetCodec<int>()), "Nullable rollback preserves previously committed leaves.");
+        var children = new RecursiveValue?[1];
+        RecursiveValue? original = new RecursiveValue { Value = 37, Children = children, Other = children };
+        children[0] = original;
+        var copy = services.GetRequiredService<DeepCopier>().Copy(original);
+        Ensure(copy.HasValue && !ReferenceEquals(children, copy.Value.Children)
+            && ReferenceEquals(copy.Value.Children, copy.Value.Children[0]!.Value.Other),
+            "Retried nullable copier preserves isolated cycle identity.");
+    }
+
+    private sealed class NullableRetryOwner(NullableCopier<RecursiveValue> copier, ArrayCopier<RecursiveValue?> array)
+    {
+        public NullableCopier<RecursiveValue> Copier { get; } = copier;
+        public ArrayCopier<RecursiveValue?> Array { get; } = array;
     }
 
 #if NET10_0_OR_GREATER
@@ -209,6 +346,13 @@ public static partial class ContextContracts
         Ensure(contextSerializer.SerializeToArray(aliased).SequenceEqual(legacySerializer.SerializeToArray(aliased)), "Closed contexts preserve generic model aliases.");
         var compound = new List<CompoundPayload> { new() { Value = 41 } };
         Ensure(contextSerializer.SerializeToArray(compound).SequenceEqual(legacySerializer.SerializeToArray(compound)), "Closed contexts preserve compound aliases.");
+        var box = new Box<byte> { Values = [7, 9] };
+        box.Other = box.Values;
+        var boxBytes = contextSerializer.SerializeToArray(box);
+        Ensure(boxBytes.SequenceEqual(legacySerializer.SerializeToArray(box)), "Closed generic array models preserve ordinary serializer wire bytes.");
+        Ensure(legacySerializer.Deserialize<Box<byte>>(boxBytes)!.Values.SequenceEqual(box.Values), "Ordinary serializers read context generic array models.");
+        var value = new ValuePayload<int> { Value = 47 };
+        Ensure(contextSerializer.SerializeToArray(value).SequenceEqual(legacySerializer.SerializeToArray(value)), "Generated value aliases preserve ordinary serializer wire bytes.");
     }
 #endif
 
@@ -250,6 +394,9 @@ public static partial class ContextContracts
 [GenerateSerializerContext(typeof(IdentifiedPayload))]
 [GenerateSerializerContext(typeof(List<CompoundPayload>))]
 [GenerateSerializerContext(typeof(ValuePayload<int>))]
+[GenerateSerializerContext(typeof(Box<byte>))]
+[GenerateSerializerContext(typeof(Box<int>))]
+[GenerateSerializerContext(typeof(GenericArrayNode))]
 [GenerateSerializerContext(typeof(List<MultipleAliasPayload>))]
 [GenerateSerializerContext(typeof(List<NestedAliasPayload>))]
 #if NET10_0_OR_GREATER
@@ -260,6 +407,17 @@ internal partial class SmokeContext : SerializerContext;
 
 [GenerateSerializerContext(typeof(List<Dictionary<string, int>>))]
 internal partial class DuplicateContext : SerializerContext;
+
+[GenerateSerializerContext(typeof(RecursiveValue?))]
+internal partial class NullableCycleContext : SerializerContext;
+
+[GenerateSerializer]
+public struct RecursiveValue
+{
+    [Id(0)] public int Value { get; set; }
+    [Id(1)] public RecursiveValue?[] Children { get; set; }
+    [Id(2)] public RecursiveValue?[] Other { get; set; }
+}
 
 [GenerateSerializer]
 public sealed class Payload<T>
@@ -331,6 +489,19 @@ public sealed class AliasMarker;
 public struct ValuePayload<T>
 {
     [Id(0)] public T Value { get; set; }
+}
+
+[GenerateSerializer]
+public sealed class Box<T>
+{
+    [Id(0)] public T[] Values { get; set; } = [];
+    [Id(1)] public T[] Other { get; set; } = [];
+}
+
+[GenerateSerializer]
+public sealed class GenericArrayNode
+{
+    [Id(0)] public Box<GenericArrayNode> Children { get; set; } = null!;
 }
 
 [GenerateSerializerContext(typeof(List<PrefixPayload>))]
