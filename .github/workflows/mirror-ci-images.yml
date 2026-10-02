@@ -1,0 +1,56 @@
+name: Mirror CI test images
+on:
+  workflow_dispatch:
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/mirror-ci-images.yml
+    - .github/workflows/ci.yml
+    - .github/ci-images.json
+    - .github/scripts/docker-pull-ci-image.sh
+permissions:
+  contents: read
+  packages: write
+jobs:
+  mirror:
+    name: Mirror pinned Linux test images
+    if: github.repository == 'dotnet/orleans' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Install pinned registry copier
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl --fail --location --silent --show-error \
+          https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz \
+          --output crane.tar.gz
+        echo "0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0  crane.tar.gz" | sha256sum --check
+        tar -xzf crane.tar.gz crane
+    - name: Copy and verify redistributable CI images
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        jq -e 'type == "object" and length > 0' .github/ci-images.json > /dev/null
+        while IFS=$'\t' read -r name copy_source mirror; do
+          echo "Publishing $name"
+          digest="${mirror##*@}"
+          destination="${mirror%@*}"
+          upstream="$(jq -r --arg name "$name" '.[$name].source' .github/ci-images.json)"
+          test "$(./crane digest "$upstream")" = "${upstream##*@}"
+          ./crane manifest "$upstream" | jq -e --arg digest "$digest" --arg upstream_digest "${upstream##*@}" \
+            'if .manifests then [.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest] == [$digest] else .config != null and $digest == $upstream_digest end' > /dev/null
+          if [ "${upstream##*@}" = "$digest" ]; then
+            ./crane config "$upstream" | jq -e '.os == "linux" and .architecture == "amd64"' > /dev/null
+          fi
+          test "$(./crane digest "$copy_source")" = "$digest"
+          if [ "$(./crane digest "$destination" 2>/dev/null || true)" != "$digest" ]; then
+            ./crane copy "$copy_source" "$destination"
+          fi
+          test "$(./crane digest "$destination")" = "$digest"
+        done < <(jq -r 'to_entries[] | [.key, .value.copy_source, .value.mirror] | @tsv' .github/ci-images.json)
+        echo "GHCR creates packages private by default. Set ghcr.io/dotnet/orleans-ci-test-images to public after its first publication so PR jobs can pull it without credentials." >> "$GITHUB_STEP_SUMMARY"

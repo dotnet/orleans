@@ -9,11 +9,11 @@ internal static class SeaweedFSTestContainer
     internal const string AccessKey = "orleans-test";
     internal const string SecretKey = "orleans-test-secret";
 
-    // Keep in sync with SEAWEEDFS_IMAGE in .github/workflows/ci.yml.
+    // Keep in sync with seaweedfs in .github/ci-images.json.
     private const string Image = "ghcr.io/chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62";
 
     internal static IContainer Create() =>
-        new ContainerBuilder(Image)
+        new ContainerBuilder(Environment.GetEnvironmentVariable("ORLEANS_SEAWEEDFS_TEST_IMAGE") ?? Image)
             .WithEnvironment("AWS_ACCESS_KEY_ID", AccessKey)
             .WithEnvironment("AWS_SECRET_ACCESS_KEY", SecretKey)
             .WithCommand(

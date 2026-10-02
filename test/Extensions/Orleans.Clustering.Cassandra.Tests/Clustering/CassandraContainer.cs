@@ -106,6 +106,12 @@ public class CassandraContainer
 
     private static string? GetImage()
     {
+        var selectedImage = Environment.GetEnvironmentVariable("ORLEANS_CASSANDRA_TEST_IMAGE");
+        if (!string.IsNullOrWhiteSpace(selectedImage))
+        {
+            return selectedImage;
+        }
+
         var version = Environment.GetEnvironmentVariable("CASSANDRAVERSION");
         return string.IsNullOrWhiteSpace(version) ? null : $"cassandra:{version}";
     }

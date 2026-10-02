@@ -1,0 +1,57 @@
+{
+  "azurite": {
+    "source": "mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37",
+    "copy_source": "mcr.microsoft.com/azure-storage/azurite@sha256:dae2a5f96553962901304b94e72ef87e299d0825e4b679673bcc527a25076fe4",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:azurite-3.35.0-amd64@sha256:dae2a5f96553962901304b94e72ef87e299d0825e4b679673bcc527a25076fe4"
+  },
+  "cassandra-4.0": {
+    "source": "docker.io/library/cassandra:4.0@sha256:41736b3b5353d5f5771fa148174bbfccb5edf149fc6035c8d9b84010d175952b",
+    "copy_source": "docker.io/library/cassandra@sha256:65105b4a4c4007acf4c6034c9e09587372b3ccd2eb57155b7b2e0034105daa74",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:cassandra-4.0-amd64@sha256:65105b4a4c4007acf4c6034c9e09587372b3ccd2eb57155b7b2e0034105daa74"
+  },
+  "cassandra-4.1": {
+    "source": "docker.io/library/cassandra:4.1@sha256:d395ac5ce37d85f0e4e64387c162c78609e1fae957acd9a97ca77df85ffd9226",
+    "copy_source": "docker.io/library/cassandra@sha256:c5ab83a85e2e0b73452a52e67cf7497cdf33a57be497d25411d8fbce4331b4c9",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:cassandra-4.1-amd64@sha256:c5ab83a85e2e0b73452a52e67cf7497cdf33a57be497d25411d8fbce4331b4c9"
+  },
+  "cassandra-5.0": {
+    "source": "docker.io/library/cassandra:5.0@sha256:8819d1b7877ee6621751a761cc163332e9c3eaf671c8ef672f7c77a7c5bff05f",
+    "copy_source": "docker.io/library/cassandra@sha256:7d377a6e96474564e0745097b62dc2ba395724962ce853854acf6bdadf688714",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:cassandra-5.0-amd64@sha256:7d377a6e96474564e0745097b62dc2ba395724962ce853854acf6bdadf688714"
+  },
+  "elasticmq": {
+    "source": "docker.io/softwaremill/elasticmq-native:latest@sha256:e4580ab9ad1bd5cd37b4ba04911bc5ccc8cd2d9ab4de56ece65acee71c24e05c",
+    "copy_source": "docker.io/softwaremill/elasticmq-native@sha256:e2a117210124256cd61ab9ae1a7856527d959aa2e92842f2f81826e30d17460e",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:elasticmq-e4580ab9-amd64@sha256:e2a117210124256cd61ab9ae1a7856527d959aa2e92842f2f81826e30d17460e"
+  },
+  "ministack": {
+    "source": "docker.io/ministackorg/ministack:1.4.11@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1",
+    "copy_source": "docker.io/ministackorg/ministack@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:ministack-1.4.11-amd64@sha256:8b05715b9effc23d998d4a4e0c0a0c4af7f9435f0ff076a30cf27a77326f14b1"
+  },
+  "nats": {
+    "source": "docker.io/library/nats:latest@sha256:cd3fcd4ecdda44e3a66728a5334af0a959bc3979b32810e033d1c547241cd0f4",
+    "copy_source": "docker.io/library/nats@sha256:fdae708d900cb150ce13f203359719bdd9cefd3dbbbc32a4c6224b23ea3e0b2c",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:nats-cd3fcd4e-amd64@sha256:fdae708d900cb150ce13f203359719bdd9cefd3dbbbc32a4c6224b23ea3e0b2c"
+  },
+  "postgres": {
+    "source": "docker.io/library/postgres:latest@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722",
+    "copy_source": "docker.io/library/postgres@sha256:0377e72c5289ed2f98cf61b1a9c2db9eb9d300317fe14244492fbc94343b3d04",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:postgres-5a5a84b1-amd64@sha256:0377e72c5289ed2f98cf61b1a9c2db9eb9d300317fe14244492fbc94343b3d04"
+  },
+  "ryuk": {
+    "source": "docker.io/testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0",
+    "copy_source": "docker.io/testcontainers/ryuk@sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:ryuk-0.14.0-amd64@sha256:f0456560ea5b4acdbed0da0efc33b5f9dd6bc1e59f2337106826dcb5b0b0e981"
+  },
+  "seaweedfs": {
+    "source": "ghcr.io/chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62",
+    "copy_source": "ghcr.io/chrislusf/seaweedfs@sha256:6a602956ac4915057199a5271343e9c86c403a561db7c21033362f6791aa29c9",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:seaweedfs-4.46-amd64@sha256:6a602956ac4915057199a5271343e9c86c403a561db7c21033362f6791aa29c9"
+  },
+  "zookeeper": {
+    "source": "docker.io/library/zookeeper:3.9@sha256:8c073100106595cc70087e0218fb96b55e8f1f48d39568cd0b9cf547ff536211",
+    "copy_source": "docker.io/library/zookeeper@sha256:65c127784e63a9b6e48750d722820fc0597ccdc032d5c41af921a8ed28d8d9b8",
+    "mirror": "ghcr.io/dotnet/orleans-ci-test-images:zookeeper-3.9-amd64@sha256:65c127784e63a9b6e48750d722820fc0597ccdc032d5c41af921a8ed28d8d9b8"
+  }
+}
