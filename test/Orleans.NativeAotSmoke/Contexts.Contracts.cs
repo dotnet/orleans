@@ -17,6 +17,7 @@ public static partial class ContextContracts
         .AddSerializerContext(new SmokeContext())
         .AddSerializerContext(new SmokeContext())
         .AddSerializerContext(new DuplicateContext())
+        .AddSerializerContext(new AliasRegistrationContext())
         .BuildServiceProvider();
 
     public static void NestedCollectionsRoundTripAndCopy()
@@ -415,6 +416,23 @@ public static partial class ContextContracts
     }
 
 #if !NATIVE_AOT_SMOKE
+    public static void ContextAndAutomaticMetadataRegistrationAreIdempotent()
+    {
+        foreach (var contextFirst in new[] { true, false })
+        {
+            var registrations = new ServiceCollection();
+            if (contextFirst) registrations.AddSerializerContext(new AliasRegistrationContext()).AddSerializer();
+            else registrations.AddSerializer().AddSerializerContext(new AliasRegistrationContext());
+            using var services = registrations.BuildServiceProvider();
+            Ensure(RoundTrip(services, new AliasedPayload<int> { Value = 109 }).Value == 109,
+                "Identical alias mappings compose in either context/ordinary registration order.");
+            Ensure(RoundTrip(services, new IdentifiedPayload { Value = 113 }).Value == 113,
+                "Identical type-ID mappings compose in either context/ordinary registration order.");
+        }
+    }
+#endif
+
+#if !NATIVE_AOT_SMOKE
     public static void ExplicitContextsPreserveWireFormat()
     {
         using var context = CreateServices();
@@ -501,6 +519,10 @@ internal partial class SmokeContext : SerializerContext;
 
 [GenerateSerializerContext(typeof(List<Dictionary<string, int>>))]
 internal partial class DuplicateContext : SerializerContext;
+
+[GenerateSerializerContext(typeof(AliasedPayload<int>))]
+[GenerateSerializerContext(typeof(IdentifiedPayload))]
+internal partial class AliasRegistrationContext : SerializerContext;
 
 [GenerateSerializerContext(typeof(RecursiveValue?))]
 internal partial class NullableCycleContext : SerializerContext;

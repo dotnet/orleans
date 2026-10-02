@@ -119,26 +119,18 @@ internal class MetadataGenerator(
             AddContracts(body, configParam, type, addActivatorMethod);
         }
 
-        var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.WellKnownTypeIds)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            body.Add(CreateTypeMetadataRegistration(configParam.Member("WellKnownTypeIds"),
+                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id)),
+                CreateTypeOfExpression(type.Type)));
         }
 
-        var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
         foreach (var type in model.ReferenceAssemblyData.TypeAliases)
         {
-            body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
-                ArgumentList(SeparatedList(
-                [
-                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))),
-                    Argument(CreateTypeOfExpression(type.Type)),
-                ])))));
+            body.Add(CreateTypeMetadataRegistration(configParam.Member("WellKnownTypeAliases"),
+                LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias)),
+                CreateTypeOfExpression(type.Type)));
         }
 
         foreach (var provider in model.ReferenceAssemblyData.RegisteredProviders)
@@ -744,6 +736,18 @@ internal class MetadataGenerator(
         arguments.AddRange(description.Arguments.Select(argument => Argument(GetSerializationTypeExpression(argument))));
         return InvocationExpression(type.Member("Create"), ArgumentList(SeparatedList(arguments)));
     }
+    internal static StatementSyntax CreateTypeMetadataRegistration(
+        ExpressionSyntax dictionary, ExpressionSyntax key, ExpressionSyntax type)
+        => ParseStatement($$"""
+            {
+                var registeredType = {{type}};
+                if ({{dictionary}}.TryGetValue({{key}}, out var existingType) && existingType != registeredType)
+                {
+                    throw new global::System.InvalidOperationException("Conflicting type metadata registration for " + {{key}} + ".");
+                }
+                {{dictionary}}[{{key}}] = registeredType;
+            }
+            """);
 
     private static bool ShouldGenerateActivator(SerializableTypeModel type)
         => !type.IsAbstractType

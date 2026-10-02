@@ -423,13 +423,16 @@ internal static class SerializerFactoryGenerator
         var openType = type.ToOpenTypeSyntax().ToString();
         if (GeneratedCodeUtilities.GetAlias(library, type) is { } alias)
         {
-            result.Append("options.WellKnownTypeAliases.TryAdd(").Append(alias.GetLiteralExpression())
-                .Append(", typeof(").Append(openType).AppendLine("));");
+            result.AppendLine(MetadataGenerator.CreateTypeMetadataRegistration(
+                SyntaxFactory.ParseExpression("options.WellKnownTypeAliases"), alias.GetLiteralExpression(),
+                SyntaxFactory.ParseExpression($"typeof({openType})")).NormalizeWhitespace().ToFullString());
         }
 
         if (GeneratedCodeUtilities.GetId(library, type) is { } id)
         {
-            result.Append("options.WellKnownTypeIds.TryAdd(").Append(id).Append("U, typeof(").Append(openType).AppendLine("));");
+            result.AppendLine(MetadataGenerator.CreateTypeMetadataRegistration(
+                SyntaxFactory.ParseExpression("options.WellKnownTypeIds"), SyntaxFactory.ParseExpression($"{id}U"),
+                SyntaxFactory.ParseExpression($"typeof({openType})")).NormalizeWhitespace().ToFullString());
         }
 
         foreach (var compound in type.GetAttributes().Where(attribute =>
