@@ -957,6 +957,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (global::System.Guid)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(global::System.Guid);
@@ -1093,6 +1094,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (global::System.Tuple<global::System.Guid, string>)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(global::System.Tuple<global::System.Guid, string>);
@@ -1235,6 +1237,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (global::System.Tuple<long, string>)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(global::System.Tuple<long, string>);
@@ -1377,6 +1380,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (string)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(string);

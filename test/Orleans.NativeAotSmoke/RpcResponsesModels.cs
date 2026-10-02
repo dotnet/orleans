@@ -47,6 +47,7 @@ public sealed class RpcTupleReference
 }
 
 [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
+[DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
 public abstract class RpcTupleProxyBase
 {
     protected RpcTupleProxyBase(ICodecProvider provider, CopyContextPool pool)
@@ -57,8 +58,13 @@ public abstract class RpcTupleProxyBase
 
     protected ICodecProvider CodecProvider { get; }
     protected CopyContextPool CopyContextPool { get; }
+    public IInvokable? Captured { get; private set; }
     protected T GetInvokable<T>() where T : class, IInvokable, new() => new T();
-    protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+    protected ValueTask<T> InvokeAsync<T>(IInvokable body)
+    {
+        Captured = body;
+        return default;
+    }
     protected ValueTask InvokeAsync(IInvokable body) => default;
     protected void Invoke(IInvokable body) { }
 }
@@ -67,6 +73,14 @@ public abstract class RpcTupleProxyBase
 public interface IRpcTupleArguments
 {
     Task<int> Accept(System.Collections.Generic.List<System.Tuple<RpcTupleReference, System.DateTime>> input);
+}
+
+[GenerateMethodSerializers(typeof(RpcTupleProxyBase))]
+public interface IRpcSelfWriting
+{
+    Task<bool> Boolean();
+    ValueTask<int> Integer();
+    Task<RpcResponsePayload> Payload();
 }
 
 [GenerateSerializer]

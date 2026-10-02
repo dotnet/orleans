@@ -345,6 +345,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (string)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(string);

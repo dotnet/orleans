@@ -93,6 +93,29 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IServiceProvider Services => _manifest.SerializerServiceFactories.Count == 0 ? _serviceProvider : _constructionServices;
 
+        /// <summary>
+        /// Resolves a statically registered reader for a raw invocation result.
+        /// </summary>
+        /// <param name="resultType">The closed result type from the message field header.</param>
+        /// <param name="reader">The registered reader, when supported by the selected response codec.</param>
+        /// <returns>Whether a compatible registered reader is available.</returns>
+        public bool TryGetRawResponseReader(Type resultType, [NotNullWhen(true)] out Invocation.IRawResponseReader? reader)
+        {
+            if (resultType is null) throw new ArgumentNullException(nameof(resultType));
+            if (_manifest.RawResponseReaderFactories.TryGetValue(resultType, out var factory))
+            {
+                var candidate = factory(this);
+                if (candidate.IsSupported)
+                {
+                    reader = candidate;
+                    return true;
+                }
+            }
+
+            reader = null;
+            return false;
+        }
+
         private void Initialize()
         {
             lock (_initializationLock)

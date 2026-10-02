@@ -379,15 +379,23 @@ namespace Orleans
                         Response response;
                         if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
                         {
-                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
+                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping,
+                                _manager._responseCopier, _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
+                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
                             await invoker.Invoke();
                             response = invoker.Response!;
                         }
                         else
                         {
-                            response = await request.Invoke();
-                            // The copier preserves the null state of its input.
-                            response = _manager._responseCopier.Copy(response)!;
+                            if (request is IResponseInvokable direct)
+                                response = await direct.InvokeAndCopy(
+                                    _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
+                                    _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(), _manager._responseCopier);
+                            else
+                            {
+                                response = await request.Invoke();
+                                response = _manager._responseCopier.Copy(response)!;
+                            }
                         }
 
                         if (message.Direction != Message.Directions.OneWay)

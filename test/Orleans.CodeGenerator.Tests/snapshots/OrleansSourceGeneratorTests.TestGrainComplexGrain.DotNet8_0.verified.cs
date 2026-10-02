@@ -100,7 +100,6 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override bool IsCancellable => true;
-
         async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
         {
             try
@@ -549,6 +548,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override object Result { get => Value; set => Value = (global::TestProject.ComplexData)value; }
+
         public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
 
         public override global::System.Type GetSimpleResultType() => typeof(global::TestProject.ComplexData);

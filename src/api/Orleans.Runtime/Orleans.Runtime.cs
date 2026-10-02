@@ -1495,6 +1495,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_5C7B2877 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_5C7B2877>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_ILeaseProvider_GrainReference_5C7B2877(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1513,6 +1514,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_ACF8E0DD : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_ACF8E0DD>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_ILeaseProvider_GrainReference_ACF8E0DD(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1531,6 +1533,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_Invokable_ILeaseProvider_GrainReference_F2BF11D0 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILeaseProvider_GrainReference_F2BF11D0>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_ILeaseProvider_GrainReference_F2BF11D0(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1549,6 +1552,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_5C7B2877 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_5C7B2877>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_ILeaseProvider_GrainReference_5C7B2877(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1559,6 +1563,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_ACF8E0DD : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_ACF8E0DD>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_ILeaseProvider_GrainReference_ACF8E0DD(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1569,6 +1574,7 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_Invokable_ILeaseProvider_GrainReference_F2BF11D0 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILeaseProvider_GrainReference_F2BF11D0>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_ILeaseProvider_GrainReference_F2BF11D0(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1681,6 +1687,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ClusterMember : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMember>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ClusterMember(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ClusterMember> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1699,6 +1706,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ClusterMembershipSnapshot : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMembershipSnapshot>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ClusterMembershipSnapshot(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ClusterMembershipSnapshot> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1717,6 +1725,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_ClusterMembershipUpdate : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.ClusterMembershipUpdate>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_ClusterMembershipUpdate(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Runtime.ClusterMembershipUpdate> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1738,6 +1747,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_OrleansClusterConnectivityCheckFailedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.OrleansClusterConnectivityCheckFailedException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_OrleansClusterConnectivityCheckFailedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1756,6 +1766,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_OrleansMissingMembershipEntryException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.OrleansMissingMembershipEntryException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_OrleansMissingMembershipEntryException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1774,6 +1785,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_OrleansClusterConnectivityCheckFailedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.MembershipService.OrleansClusterConnectivityCheckFailedException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_OrleansClusterConnectivityCheckFailedException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -1782,6 +1794,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_OrleansMissingMembershipEntryException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Runtime.MembershipService.OrleansMissingMembershipEntryException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_OrleansMissingMembershipEntryException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -1793,6 +1806,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService.SiloMetadata
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Codec_SiloMetadata : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Serializers.IBaseCodec
     {
         public Codec_SiloMetadata(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1811,6 +1825,7 @@ namespace OrleansCodeGen.Orleans.Runtime.MembershipService.SiloMetadata
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [System.ComponentModel.Description("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed partial class Copier_SiloMetadata : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>, global::Orleans.Serialization.Cloning.IBaseCopier
     {
         public void DeepCopy(global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata input, global::Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata output, global::Orleans.Serialization.Cloning.CopyContext context) { }

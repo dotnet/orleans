@@ -14,6 +14,69 @@ namespace Orleans.NativeAotSmoke;
 
 public static class RpcResponseContracts
 {
+    public static async System.Threading.Tasks.Task GeneratedInvokablesWriteCopiedResponses()
+    {
+#if NATIVE_AOT_SMOKE
+        using var services = CreateServices();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        var target = new SelfWritingTarget();
+        IRpcSelfWriting proxy = new global::OrleansCodeGen.Orleans.NativeAotSmoke.Proxy_IRpcSelfWriting(provider, contexts);
+        _ = proxy.Boolean();
+        await Check(((RpcTupleProxyBase)proxy).Captured!, true);
+        _ = proxy.Integer();
+        await Check(((RpcTupleProxyBase)proxy).Captured!, 42);
+        _ = proxy.Payload();
+        using var request = ((RpcTupleProxyBase)proxy).Captured!;
+        request.SetTarget(target);
+        using var response = await ((IResponseInvokable)request).InvokeAndCopy(provider, contexts,
+            new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
+        Ensure(response is IRawResponseWriter && !response.GetType().IsGenericType,
+            "The actual generated invokable creates a non-generic self-writing holder.");
+        var value = response.GetResult<RpcResponsePayload>();
+        Ensure(value is not null && !ReferenceEquals(value, target.Result) && ReferenceEquals(value, value.Left),
+            "Generated result creation copies the mutable cyclic payload before returning.");
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
+        {
+            var writer = Writer.Create(buffer, session);
+            ((IRawResponseWriter)response).WriteRaw(ref writer);
+            writer.Commit();
+        }
+        Ensure(provider.TryGetRawResponseReader(typeof(RpcResponsePayload), out var registered), "The result reader is statically registered.");
+        using var readerSession = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(buffer.WrittenMemory, readerSession);
+        var field = reader.ReadFieldHeader();
+        using var reconstructed = registered.ReadRaw(ref reader, ref field);
+        var decoded = reconstructed.GetResult<RpcResponsePayload>();
+        Ensure(decoded is not null && ReferenceEquals(decoded, decoded.Left), "The static reader reconstructs the self-writing cyclic holder.");
+
+        async System.Threading.Tasks.Task Check<T>(IInvokable invocation, T expected)
+        {
+            using var request = invocation;
+            request.SetTarget(target);
+            using var result = await ((IResponseInvokable)request).InvokeAndCopy(provider, contexts,
+                new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
+            Ensure(result is IRawResponseWriter && Equals(expected, result.GetResult<T>()), "Generated primitive responses bind direct writers.");
+        }
+#else
+        await System.Threading.Tasks.Task.CompletedTask;
+#endif
+    }
+
+#if NATIVE_AOT_SMOKE
+    private sealed class SelfWritingTarget : IRpcSelfWriting, ITargetHolder
+    {
+        public RpcResponsePayload Result { get; } = new() { Value = 47 };
+        public SelfWritingTarget() => Result.Left = Result;
+        public object GetTarget() => this;
+        public object? GetComponent(Type type) => type.IsInstanceOfType(this) ? this : null;
+        public System.Threading.Tasks.Task<bool> Boolean() => System.Threading.Tasks.Task.FromResult(true);
+        public System.Threading.Tasks.ValueTask<int> Integer() => new(42);
+        public System.Threading.Tasks.Task<RpcResponsePayload> Payload() => System.Threading.Tasks.Task.FromResult(Result);
+    }
+#endif
+
     public static void ConstructTupleArgumentProxyBeforeInvocation()
     {
         using var services = CreateServices();

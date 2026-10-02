@@ -25,6 +25,7 @@ namespace Orleans.Runtime.Messaging
         private const int MessageSizeHint = 4096;
         private const int MaxRequestContextInitialCapacity = 1024;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
+        private readonly Dictionary<Type, IRawResponseReader> _rawResponseReaders = [];
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddressCacheUpdate> _grainAddressCacheUpdateCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
@@ -147,6 +148,15 @@ namespace Orleans.Runtime.Messaging
             if (message.Result == ResponseTypes.Success)
             {
                 message.Result = ResponseTypes.None; // reset raw response indicator
+                if (!_rawResponseReaders.TryGetValue(fieldType, out var registered)
+                    && _codecProvider.TryGetRawResponseReader(fieldType, out registered))
+                    _rawResponseReaders.Add(fieldType, registered);
+                if (registered is not null)
+                {
+                    message.BodyObject = registered.ReadRaw(ref reader, ref field);
+                    return;
+                }
+
                 if (!_rawResponseCodecs.TryGetValue(fieldType, out var rawCodec))
                     rawCodec = GetRawCodec(fieldType);
                 message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
@@ -170,7 +180,13 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message.BodyObject is not null)
+            IRawResponseWriter? rawWriter = null;
+            if (headers.ResponseType is ResponseTypes.None && message.BodyObject is IRawResponseWriter responseWriter)
+            {
+                rawWriter = responseWriter;
+                headers.ResponseType = ResponseTypes.Success;
+            }
+            else if (message.BodyObject is not null)
             {
                 bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
@@ -195,11 +211,12 @@ namespace Orleans.Runtime.Messaging
 
                 _serializationSession.PartialReset();
 
-                if (bodyCodec is not null)
+                if (bodyCodec is not null || rawWriter is not null)
                 {
                     innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
-                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
+                    if (rawWriter is not null) rawWriter.WriteRaw(ref innerWriter);
+                    else if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
+                    else bodyCodec!.WriteField(ref innerWriter, 0, null, message.BodyObject);
                     innerWriter.Commit();
                 }
 
