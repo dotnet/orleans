@@ -33,7 +33,7 @@ public class TrimFlowTests
     {
         var property = typeof(TypeManifestOptions).GetProperty(legacyPropertyName)!;
         var legacyWarning = property.GetMethod!.GetCustomAttribute<RequiresUnreferencedCodeAttribute>();
-        var registrationParameter = typeof(TypeManifestOptions).GetMethod(registrationMethodName)!.GetParameters()[0];
+        var registrationParameter = typeof(TypeManifestOptions).GetMethod(registrationMethodName, [typeof(Type)])!.GetParameters()[0];
         var preservedMembers = registrationParameter.GetCustomAttribute<DynamicallyAccessedMembersAttribute>();
 
         Assert.NotNull(legacyWarning);
