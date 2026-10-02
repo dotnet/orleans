@@ -14,6 +14,86 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class ReferencedSerializerContextTests
 {
     [Theory]
+    [InlineData("v8.0", MetadataImportOptions.Public)]
+    [InlineData("v8.0", MetadataImportOptions.All)]
+    [InlineData("v10.0", MetadataImportOptions.Public)]
+    [InlineData("v10.0", MetadataImportOptions.All)]
+    public async Task ReferencedImplicitMemberDependenciesUseProducerImplementations(
+        string frameworkVersion, MetadataImportOptions metadataImport)
+    {
+        var producer = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializer]
+            public sealed class ImplicitPayload<T>
+            {
+                public System.Collections.Generic.List<T> Values { get; set; } = new();
+                public T[] Flat { get; set; } = System.Array.Empty<T>();
+                public T[][] Nested { get; set; } = System.Array.Empty<T[]>();
+            }
+            """, $"ImplicitProducer{Guid.NewGuid():N}");
+        var (producerOutput, producerResult) = Generate(producer, frameworkVersion, hotReload: false,
+            generateFieldIds: "PublicProperties");
+        Assert.Empty(producerResult.Diagnostics);
+        AssertNoCompilationErrors(producerOutput);
+        var reference = EmitReference(producerOutput);
+        var consumer = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializerContext(typeof(ImplicitPayload<byte>))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """, $"ImplicitConsumer{Guid.NewGuid():N}", reference);
+        consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));
+        var (output, result) = Generate(consumer, frameworkVersion, hotReload: false);
+        Assert.Empty(result.Diagnostics);
+        AssertNoCompilationErrors(output);
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("ListCodec<byte>", context, StringComparison.Ordinal);
+        Assert.Contains("ListCopier<byte>", context, StringComparison.Ordinal);
+        Assert.Contains("ArrayCodec<byte>", context, StringComparison.Ordinal);
+        Assert.Contains("ArrayCopier<byte>", context, StringComparison.Ordinal);
+        Assert.Contains("ByteArrayCodec", context, StringComparison.Ordinal);
+
+        var proof = CSharpSyntaxTree.ParseText("""
+            public static class ProducerGraphProof
+            {
+                public static bool Run()
+                {
+                    using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                            new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
+                    var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
+                    var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
+                    var values = new byte[] { 13, 17 };
+                    var original = new ImplicitPayload<byte> { Values = new() { 13, 17 }, Flat = values, Nested = new[] { values, values } };
+                    var result = serializer.Deserialize<ImplicitPayload<byte>>(serializer.SerializeToArray(original));
+                    var copy = copier.Copy(original);
+                    copy.Values[0] = 23;
+                    copy.Nested[0][0] = 29;
+                    return result.Values[0] == 13 && result.Values[1] == 17
+                        && object.ReferenceEquals(result.Flat, result.Nested[0])
+                        && object.ReferenceEquals(result.Nested[0], result.Nested[1])
+                        && original.Values[0] == 13 && original.Nested[0][0] == 13
+                        && copy.Values[0] == 23 && copy.Flat[0] == 29 && copy.Nested[1][0] == 29
+                        && !object.ReferenceEquals(original.Values, copy.Values)
+                        && !object.ReferenceEquals(original.Nested[0], copy.Nested[0]);
+                }
+            }
+            """, new CSharpParseOptions(LanguageVersion.Preview), cancellationToken: TestContext.Current.CancellationToken);
+        var executable = producerOutput.AddSyntaxTrees(output.SyntaxTrees)
+            .AddSyntaxTrees(proof)
+            .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceProvider).Assembly.Location));
+        foreach (var tree in executable.SyntaxTrees)
+        {
+            var root = (CompilationUnitSyntax)tree.GetRoot(TestContext.Current.CancellationToken);
+            executable = executable.ReplaceSyntaxTree(tree,
+                tree.WithRootAndOptions(root.WithAttributeLists(default), tree.Options));
+        }
+        using var image = new MemoryStream();
+        var emitted = executable.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ProducerGraphProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ReferencedGenericReadonlyFieldRejectsNet8Producer(bool referenceAssembly)
@@ -226,7 +306,7 @@ public sealed class ReferencedSerializerContextTests
             """, "ReferencedContextConsumer", reference), frameworkVersion, hotReload);
 
     private static (Compilation Compilation, GeneratorDriverRunResult Result) Generate(
-        CSharpCompilation compilation, string frameworkVersion, bool hotReload)
+        CSharpCompilation compilation, string frameworkVersion, bool hotReload, string generateFieldIds = "None")
     {
         var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         compilation = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(),
@@ -238,6 +318,7 @@ public sealed class ReferencedSerializerContextTests
             {
                 ["build_property.TargetFrameworkVersion"] = frameworkVersion,
                 ["build_property.orleanshotreload"] = hotReload ? "true" : "false",
+                ["build_property.orleans_generatefieldids"] = generateFieldIds,
             }));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _, TestContext.Current.CancellationToken);
         return (output, driver.GetRunResult());

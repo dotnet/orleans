@@ -40,6 +40,9 @@ internal static class SerializerFactoryGenerator
     {
         graph = null;
         failure = null;
+        var implementationCompilation = services.Compilation is CSharpCompilation csharp
+            ? csharp.WithOptions(csharp.Options.WithMetadataImportOptions(MetadataImportOptions.All))
+            : services.Compilation;
         var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
         var pending = new Queue<ITypeSymbol>(roots);
         while (pending.Count > 0)
@@ -53,7 +56,7 @@ internal static class SerializerFactoryGenerator
                 return false;
             }
             var registration = new Registration(type);
-            if (Describe(registration, services, cancellationToken) is { } reason)
+            if (Describe(registration, services, implementationCompilation, cancellationToken) is { } reason)
             {
                 failure = new(type, reason);
                 return false;
@@ -73,16 +76,22 @@ internal static class SerializerFactoryGenerator
             var typeName = Name(registration.Type);
             if (registration.Model is { } model)
             {
-                var codecDeclaration = serializerGenerator.Generate(model);
-                var copierDeclaration = copierGenerator.GenerateCopier(model, new());
-                registration.CodecConstruction = registration.ReferencedCodec is { } referencedCodec
-                    ? ConstructReferenced(registration.Codec, referencedCodec)
-                    : ConstructGenerated(registration.Codec, codecDeclaration);
-                registration.CopierConstruction = copierDeclaration is null
-                    ? $"new {registration.Copier}()"
-                    : registration.ReferencedCopier is { } referencedCopier
+                if (registration.ReferencedCodec is { } referencedCodec)
+                {
+                    registration.CodecConstruction = ConstructReferenced(registration.Codec, referencedCodec);
+                    registration.CopierConstruction = registration.ReferencedCopier is { } referencedCopier
                         ? ConstructReferenced(registration.Copier, referencedCopier)
+                        : $"new {registration.Copier}()";
+                }
+                else
+                {
+                    var codecDeclaration = serializerGenerator.Generate(model);
+                    var copierDeclaration = copierGenerator.GenerateCopier(model, new());
+                    registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
+                    registration.CopierConstruction = copierDeclaration is null
+                        ? $"new {registration.Copier}()"
                         : ConstructGenerated(registration.Copier, copierDeclaration);
+                }
             }
             else if (registration.Dependencies.Count > 0)
             {
@@ -148,7 +157,7 @@ internal static class SerializerFactoryGenerator
         return true;
     }
 
-    private static string? Describe(Registration registration, IGeneratorServices services, CancellationToken cancellationToken)
+    private static string? Describe(Registration registration, IGeneratorServices services, Compilation implementationCompilation, CancellationToken cancellationToken)
     {
         var type = registration.Type;
         if (type is INamedTypeSymbol { IsUnboundGenericType: true } || ContainsTypeParameter(type))
@@ -204,6 +213,8 @@ internal static class SerializerFactoryGenerator
             return "apply GenerateSerializerAttribute to the model, or use List<T>, Dictionary<TKey, TValue>, Nullable<T>, or T[]";
         if (named.IsAbstract || named.TypeKind == TypeKind.Interface)
             return "declare concrete model types";
+        if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
+            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken);
         ISerializableTypeDescription? model;
         try
         {
@@ -254,7 +265,8 @@ internal static class SerializerFactoryGenerator
         {
             cancellationToken.ThrowIfCancellationRequested();
             var substituted = request.ReplaceNodes(request.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
-                .Where(identifier => substitutions.ContainsKey(identifier.Identifier.ValueText)),
+                .Where(identifier => identifier.Parent is not QualifiedNameSyntax and not AliasQualifiedNameSyntax
+                    && substitutions.ContainsKey(identifier.Identifier.ValueText)),
                 (original, _) => substitutions[original.Identifier.ValueText]);
             if (binding.GetSpeculativeTypeInfo(0, substituted, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
                 && (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCodec)
@@ -268,28 +280,105 @@ internal static class SerializerFactoryGenerator
             }
         }
 
-        if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
-        {
-            var arity = named.TypeArguments.Length;
-            registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
-            if (!definitionModel.IsShallowCopyable)
-                registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
-            if (registration.ReferencedCodec is null || !definitionModel.IsShallowCopyable && registration.ReferencedCopier is null)
-                return "provide the referenced assembly's generated codec and copier implementations";
-            if (ReferencedSerializerImplementation.Validate(registration.ReferencedCodec) is { } codecReason)
-                return codecReason;
-            if (registration.ReferencedCopier is { } copier
-                && ReferencedSerializerImplementation.Validate(copier) is { } copierReason)
-                return copierReason;
+        return null;
+    }
 
-            INamedTypeSymbol? ResolveImplementation(string name)
+    private static string? DescribeReferenced(
+        Registration registration, INamedTypeSymbol named, IGeneratorServices services,
+        Compilation implementationCompilation, CancellationToken cancellationToken)
+    {
+        var binding = implementationCompilation.GetSemanticModel(implementationCompilation.SyntaxTrees.First());
+        var implementationType = binding.GetSpeculativeTypeInfo(0, named.ToTypeSyntax(),
+            SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol;
+        if (implementationType is null) return "provide the referenced model's implementation metadata";
+        var library = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
+        var model = new SerializableTypeDescription(implementationCompilation, implementationType,
+            SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(implementationType, library), [], library);
+        if (model.HasComplexBaseType || model.UseActivator || model.SerializationHooks.Count > 0)
+            return "this context supports models with default construction, an object base, and generated member serialization";
+        registration.Model = model;
+        registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
+        registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
+        if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
+            return "provide the referenced assembly's generated codec and copier implementations";
+        if (ReferencedSerializerImplementation.Validate(registration.ReferencedCodec) is { } codecReason)
+            return codecReason;
+        if (registration.ReferencedCopier is { } copier
+            && ReferencedSerializerImplementation.Validate(copier) is { } copierReason)
+            return copierReason;
+        registration.Codec = Name(registration.ReferencedCodec);
+        registration.Copier = registration.ReferencedCopier is { } referencedCopier
+            ? Name(referencedCopier)
+            : Name(services.LibraryTypes.ShallowCopier.Construct(named));
+
+        var consumerBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
+        foreach (var implementation in new[] { registration.ReferencedCodec, registration.ReferencedCopier })
+        {
+            if (implementation is null) continue;
+            cancellationToken.ThrowIfCancellationRequested();
+            if (SerializableSourceOutputGenerator.HasReferenceAssemblyAttribute(implementation.ContainingAssembly))
             {
-                var metadataName = $"{generatedNamespace}.{name}" + (arity > 0 ? $"`{arity}" : "");
-                var implementation = services.Compilation.GetTypeByMetadataName(metadataName);
-                return implementation is { IsGenericType: true } ? implementation.Construct([.. named.TypeArguments]) : implementation;
+                var options = new CodeGeneratorOptions();
+                try
+                {
+                    var declared = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(
+                        services.Compilation, services.LibraryTypes, options, named);
+                    if (declared is not null)
+                        registration.Dependencies.AddRange(declared.Members.Where(static member => member.IsSerializable || member.IsCopyable)
+                            .Select(static member => member.Type));
+                }
+                catch (OrleansGeneratorDiagnosticAnalysisException)
+                {
+                    return "provide complete generated implementation metadata to discover the producer's serialization dependencies";
+                }
+            }
+
+            foreach (var member in implementation.GetMembers())
+            {
+                IEnumerable<ITypeSymbol> serviceTypes = member switch
+                {
+                    IFieldSymbol field => new[] { field.Type },
+                    IPropertySymbol property => new[] { property.Type },
+                    IMethodSymbol method => method.Parameters.Select(static parameter => parameter.Type).Prepend(method.ReturnType),
+                    _ => []
+                };
+                foreach (var serviceType in serviceTypes.OfType<INamedTypeSymbol>())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var service = consumerBinding.GetSpeculativeTypeInfo(0, serviceType.ToTypeSyntax(),
+                        SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol;
+                    if (service is null) continue;
+                    foreach (var contract in service.AllInterfaces.Prepend(service))
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.FieldCodec_1)
+                            || SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.DeepCopier_1))
+                        {
+                            registration.Dependencies.Add(contract.TypeArguments[0]);
+                        }
+                    }
+
+                    if (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCodec)
+                        || SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCopier))
+                    {
+                        var array = services.Compilation.CreateArrayTypeSymbol(service.TypeArguments[0]);
+                        if (!registration.CanonicalArrays.Any(existing => SymbolEqualityComparer.Default.Equals(existing, array)))
+                            registration.CanonicalArrays.Add(array);
+                        registration.Dependencies.Add(array);
+                        registration.Dependencies.Add(array.ElementType);
+                    }
+                }
             }
         }
+
         return null;
+
+        INamedTypeSymbol? ResolveImplementation(string name)
+        {
+            var metadataName = $"{SerializerGenerator.GetGeneratedNamespaceName(named)}.{name}"
+                + (named.TypeArguments.Length > 0 ? $"`{named.TypeArguments.Length}" : "");
+            var implementation = implementationCompilation.GetTypeByMetadataName(metadataName);
+            return implementation is { IsGenericType: true } ? implementation.Construct([.. implementationType.TypeArguments]) : implementation;
+        }
     }
 
     private static string ConstructReferenced(string name, INamedTypeSymbol implementation)

@@ -27,6 +27,14 @@ public sealed class DocumentationPrimitivePayload
 }
 #endregion
 
+[GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
+public sealed class DocumentationImplicitPayload<T>
+{
+    public List<T> Values { get; set; } = [];
+    public T[] Flat { get; set; } = [];
+    public T[][] Nested { get; set; } = [];
+}
+
 public static class SerializerContextExample
 {
     public static List<Dictionary<string, int>> SerializeAndCopy()
