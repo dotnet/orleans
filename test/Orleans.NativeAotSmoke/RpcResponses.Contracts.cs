@@ -14,6 +14,26 @@ namespace Orleans.NativeAotSmoke;
 
 public static class RpcResponseContracts
 {
+    public static void ConstructTupleArgumentProxyBeforeInvocation()
+    {
+        using var services = CreateServices();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var pool = services.GetRequiredService<CopyContextPool>();
+#if NATIVE_AOT_SMOKE
+        IRpcTupleArguments proxy = new global::OrleansCodeGen.Orleans.NativeAotSmoke.Proxy_IRpcTupleArguments(provider, pool);
+        Ensure(proxy is not null, "The actual generated tuple-argument proxy constructs before invocation.");
+#endif
+        var reference = new RpcTupleReference { Value = 47 };
+        var tuple = Tuple.Create(reference, new DateTime(638000000000000000L, DateTimeKind.Utc));
+        var input = new System.Collections.Generic.List<Tuple<RpcTupleReference, DateTime>> { tuple, tuple };
+        var copier = provider.GetDeepCopier<System.Collections.Generic.List<Tuple<RpcTupleReference, DateTime>>>();
+        var copy = new DeepCopier<System.Collections.Generic.List<Tuple<RpcTupleReference, DateTime>>>(copier, pool).Copy(input);
+        Ensure(!ReferenceEquals(input, copy) && ReferenceEquals(tuple, copy[0]) && ReferenceEquals(copy[0], copy[1]),
+            "Canonical tuple and list construction preserves immutable tuple identity.");
+        Ensure(copy[0].Item1.Value == 47 && copy[0].Item2 == tuple.Item2,
+            "Mixed reference/value argument tuples preserve their values.");
+    }
+
     public static void CanonicalValueAndArrayServices()
     {
         using var services = CreateServices();
