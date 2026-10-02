@@ -55,7 +55,7 @@ internal static class SerializableTypeModelExtractor
                 ? TypeMetadataIdentity.Create(serializableDescription.Type)
                 : TypeMetadataIdentity.Empty,
             MetadataTypes: description is SerializableTypeDescription metadataDescription
-                ? TypeMetadataDependencyCollector.Collect(metadataDescription.Type, includeType: true)
+                ? TypeMetadataDependencyCollector.Collect(metadataDescription.Compilation, metadataDescription.Type, includeType: true)
                 : default);
     }
 
@@ -490,4 +490,3 @@ internal static class SerializableTypeModelExtractor
         return members.Values;
     }
 }
-

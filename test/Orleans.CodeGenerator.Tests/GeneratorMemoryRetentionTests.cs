@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Orleans.CodeGenerator.Model;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -54,6 +55,12 @@ public class GeneratorMemoryRetentionTests
         var result = driver.GetRunResult();
         Assert.Empty(result.Diagnostics);
         Assert.NotEmpty(Assert.Single(result.Results).GeneratedSources);
+
+        var metadata = TypeMetadataDependencyCollector.Collect(compilation, symbol, includeType: true);
+        Assert.Contains(metadata, static type => type.MetadataName.EndsWith(".Payload", StringComparison.Ordinal));
+        Assert.True(metadata.Values == TypeMetadataDependencyCollector.Collect(compilation, symbol, includeType: true).Values);
+        var identity = TypeMetadataIdentity.Create(symbol);
+        Assert.Same(identity.MetadataName, TypeMetadataIdentity.Create(symbol).MetadataName);
 
         return (new(compilation), new(symbol));
     }
