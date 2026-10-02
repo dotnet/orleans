@@ -1,13 +1,17 @@
+using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Serialization.Activators;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.NativeAotSmoke;
 
@@ -33,6 +37,7 @@ internal static class Metadata
         ValueTupleRoundTrip(services);
         ValidateTargetParameterBinding();
         ValidateMatchingImplementationCandidates();
+        ValidatePatternContractSelection(services);
     }
 
     internal static class PrivateContractContainer
@@ -95,6 +100,37 @@ internal static class Metadata
         }
 
         Console.WriteLine("MatchingImplementationCandidates passed.");
+    }
+
+    private static void ValidatePatternContractSelection(IServiceProvider serializerServices)
+    {
+        var options = new TypeManifestOptions();
+        var arrayTarget = SerializationType.Array(SerializationType.Parameter(0));
+        options.AddSerializationContract(typeof(MetadataParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(typeof(MetadataArrayCodec<>), typeof(IFieldCodec<>), arrayTarget);
+        options.AddSerializationContract(typeof(MetadataArrayCopier<>), typeof(IDeepCopier<>), arrayTarget);
+        using var services = new ServiceCollection()
+            .AddSingleton(new MetadataArrayCodec<int>(new Int32Codec()))
+            .AddSingleton<MetadataArrayCopier<int>>()
+            .AddSingleton<MetadataParameterCopier<Guid>>()
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var codec = provider.GetCodec<int[]>();
+        if (codec.GetType() != typeof(MetadataArrayCodec<int>)
+            || provider.GetDeepCopier<int[]>().GetType() != typeof(MetadataArrayCopier<int>))
+        {
+            throw new InvalidOperationException("The most recently registered matching pattern was not selected.");
+        }
+
+        var serializer = new Serializer<int[]>(codec, serializerServices.GetRequiredService<SerializerSessionPool>());
+        var input = new[] { 13, 29, 47 };
+        if (!input.SequenceEqual(serializer.Deserialize(serializer.SerializeToArray(input)))
+            || provider.GetDeepCopier<Guid>().GetType() != typeof(MetadataParameterCopier<Guid>))
+        {
+            throw new InvalidOperationException("Array or bare-parameter contract binding failed.");
+        }
+
+        Console.WriteLine("PatternContractSelection passed.");
     }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
@@ -192,3 +228,18 @@ internal sealed class StringPairActivator<T> : IActivator<BindingPair<T, string>
 {
     public BindingPair<T, string> Create() => new();
 }
+
+internal sealed class MetadataArrayCodec<T>(IFieldCodec<T> elementCodec) : IFieldCodec<T[]>
+{
+    private readonly ArrayCodec<T> _codec = new(elementCodec);
+
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] T[] value)
+        where TBufferWriter : IBufferWriter<byte>
+        => _codec.WriteField(ref writer, id, expected, value);
+
+    [return: MaybeNull]
+    public T[] ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
+}
+
+internal sealed class MetadataArrayCopier<T> : ShallowCopier<T[]>;
+internal sealed class MetadataParameterCopier<T> : ShallowCopier<T>;
