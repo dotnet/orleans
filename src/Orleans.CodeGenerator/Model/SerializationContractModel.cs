@@ -52,10 +52,9 @@ internal static class SerializationContractModelExtractor
                 contract.TypeArguments.Length == 2 && ContainsTypeParameter(contract.TypeArguments[1])
                     ? CreateDescription(contract.TypeArguments[1], implementation.GetAllTypeParameters().ToArray(), compilation)
                     : null,
-                contract.TypeArguments[0] is ITypeParameterSymbol
-                    || contract.TypeArguments[0] is IArrayTypeSymbol array && ContainsTypeParameter(array)
-                        ? CreateDescription(contract.TypeArguments[0], implementation.GetAllTypeParameters().ToArray(), compilation)
-                        : null));
+                ContainsTypeParameter(contract.TypeArguments[0])
+                    ? CreateDescription(contract.TypeArguments[0], implementation.GetAllTypeParameters().ToArray(), compilation)
+                    : null));
         }
 
         static SerializationTypeModel CreateDescription(ITypeSymbol type, ITypeParameterSymbol[] parameters, Compilation compilation)

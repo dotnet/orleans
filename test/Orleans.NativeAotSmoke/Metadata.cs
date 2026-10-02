@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization;
+using Orleans.Serialization.Activators;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -28,6 +31,7 @@ internal static class Metadata
         PrimitiveRoundTrip(services);
         ReferenceTupleRoundTrip(services);
         ValueTupleRoundTrip(services);
+        ValidateTargetParameterBinding();
     }
 
     internal static class PrivateContractContainer
@@ -52,6 +56,23 @@ internal static class Metadata
 
             Console.WriteLine("PrivateTargetContract passed.");
         }
+    }
+
+    private static void ValidateTargetParameterBinding()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(ReversedPairActivator<,>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(1), SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().AddSingleton<ReversedPairActivator<string, int>>().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var activator = provider.GetActivator<BindingPair<int, string>>();
+        if (activator.GetType() != typeof(ReversedPairActivator<string, int>)
+            || activator.Create() is not BindingPair<int, string>)
+        {
+            throw new InvalidOperationException("The target description did not bind reordered implementation parameters.");
+        }
+
+        Console.WriteLine("TargetParameterBinding passed.");
     }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
@@ -133,3 +154,9 @@ internal sealed class InheritedInterfaceTarget : TargetMetadataBase;
 
 [RegisterCopier]
 internal sealed class InheritedInterfaceTargetCopier : ShallowCopier<InheritedInterfaceTarget>;
+
+internal sealed class BindingPair<TFirst, TSecond>;
+internal sealed class ReversedPairActivator<TFirst, TSecond> : IActivator<BindingPair<TSecond, TFirst>>
+{
+    public BindingPair<TSecond, TFirst> Create() => new();
+}
