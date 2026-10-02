@@ -159,7 +159,8 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
-            config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>().Add(typeof(global::TestProject.IResponseTimeoutGrain), typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain(shared, key));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
+            proxyFactories.Add(typeof(global::TestProject.IResponseTimeoutGrain), typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain(shared, key));
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");

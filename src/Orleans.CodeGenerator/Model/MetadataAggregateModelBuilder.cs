@@ -121,10 +121,7 @@ internal static class MetadataAggregateModelBuilder
             ReferencedProxyInterfaces: referencedProxyInterfaces,
             RegisteredCodecs: registeredCodecs,
             RegisteredProviders: normalizedRegisteredProviders,
-            InterfaceImplementations: interfaceImplementations)
-        {
-            GrainReferenceFactories = referenceData.GrainReferenceFactories,
-        };
+            InterfaceImplementations: interfaceImplementations);
     }
 
     internal static ImmutableArray<SerializableTypeModel> MergeSerializableTypes(

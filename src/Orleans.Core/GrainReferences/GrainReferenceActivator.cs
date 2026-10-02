@@ -7,7 +7,6 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
-using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Versions;
@@ -201,7 +200,7 @@ namespace Orleans.GrainReferences
             _typeConverter = typeConverter;
             var proxyTypes = config.Value.InterfaceProxyTypes;
             _mapping = new Dictionary<GrainInterfaceType, Type>();
-            var registrations = config.Value.GetOrCreate<GrainReferenceFactoryOptions>();
+            var registrations = config.Value.GetOrCreate<InterfaceProxyFactoryOptions<Func<GrainReferenceShared, IdSpan, GrainReference>>>();
             var registeredProxies = registrations.ProxyTypes;
             foreach (var (interfaceType, registration) in registrations.Factories)
             {

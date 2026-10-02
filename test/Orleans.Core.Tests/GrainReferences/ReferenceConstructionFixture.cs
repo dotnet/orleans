@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.CodeGeneration;
-using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -15,9 +14,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
-
-[assembly: GenerateGrainReference(typeof(UnitTests.GrainReferences.IGenericConstructionGrain<int>))]
-[assembly: GenerateGrainReference(typeof(UnitTests.GrainReferences.IGenericConstructionGrain<string>))]
+using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
 
 namespace UnitTests.GrainReferences;
 
@@ -43,13 +40,24 @@ internal sealed class ReferenceConstructionFixture : IDisposable
             .BuildServiceProvider();
         var options = Services.GetRequiredService<IOptions<TypeManifestOptions>>();
         ManifestOptions = options.Value;
+        // This fixture owns the generated proxies in the same assembly and supplies concrete AOT factory roots.
+        var factories = ManifestOptions.GetOrCreate<ReferenceFactories>();
+        factories.Add(
+            typeof(IGenericConstructionGrain<int>),
+            typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>),
+            static (shared, key) => new OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>(shared, key));
+        factories.Add(
+            typeof(IGenericConstructionGrain<string>),
+            typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>),
+            static (shared, key) => new OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>(shared, key));
+
         if (proxyType is not null)
         {
             var manifestOptions = includeGeneratedFactories ? ManifestOptions : new TypeManifestOptions();
             manifestOptions.AddInterfaceProxy(proxyType);
             if (factory is not null)
             {
-                manifestOptions.GetOrCreate<GrainReferenceFactoryOptions>().Add(typeof(IConstructionGrain), proxyType, factory);
+                manifestOptions.GetOrCreate<ReferenceFactories>().Add(typeof(IConstructionGrain), proxyType, factory);
             }
 
             options = Options.Create(manifestOptions);

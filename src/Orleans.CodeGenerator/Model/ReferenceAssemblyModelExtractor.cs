@@ -48,40 +48,6 @@ internal static class ReferenceAssemblyModelExtractor
         var hasUnrepresentableProviderRegistration = false;
         var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
         var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
-        var grainReferenceFactories = new HashSet<GrainReferenceFactoryModel>();
-
-        foreach (var attribute in compilation.Assembly.GetAttributes())
-        {
-            if (attribute.AttributeClass?.ToDisplayString() != "Orleans.GenerateGrainReferenceAttribute")
-            {
-                continue;
-            }
-
-            if (attribute.ConstructorArguments.Length != 1
-                || attribute.ConstructorArguments[0].Value is not INamedTypeSymbol interfaceType
-                || interfaceType.IsUnboundGenericType
-                || interfaceType.GetAllTypeArguments().Any(static argument => argument.TypeKind == TypeKind.TypeParameter)
-                || !compilation.IsSymbolAccessibleWithin(interfaceType, compilation.Assembly)
-                || ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(interfaceType.OriginalDefinition, compilation, cancellationToken) is not { } proxy
-                || !proxy.ProxyBase.SupportsGrainReferenceFactory)
-            {
-                diagnosticBuilder.Add(Diagnostic.Create(
-                    InvalidGrainReferenceFactoryDiagnostic.Rule,
-                    attribute.ApplicationSyntaxReference?.GetSyntax(cancellationToken).GetLocation()));
-                continue;
-            }
-
-            referencedProxyInterfaces.Add(proxy);
-            var arguments = interfaceType.GetAllTypeArguments().ToArray();
-            var proxyName = $"global::{proxy.GeneratedNamespace}.{ProxyGenerator.GetSimpleClassName(proxy.Name)}";
-            if (arguments.Length > 0)
-            {
-                proxyName += $"<{string.Join(", ", arguments.Select(static argument => argument.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))}>";
-            }
-
-            grainReferenceFactories.Add(new GrainReferenceFactoryModel(
-                new TypeRef(interfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)), new TypeRef(proxyName)));
-        }
 
         CollectAssemblyAttributes(compilation.Assembly, includeApplicationParts: false);
 
@@ -228,10 +194,7 @@ internal static class ReferenceAssemblyModelExtractor
             ReferencedProxyInterfaces: sortedReferencedProxyInterfaces,
             RegisteredCodecs: sortedRegisteredCodecs,
             RegisteredProviders: sortedRegisteredProviders,
-            InterfaceImplementations: sortedInterfaceImplementations)
-        {
-            GrainReferenceFactories = grainReferenceFactories.OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal).ToImmutableArray(),
-        };
+            InterfaceImplementations: sortedInterfaceImplementations);
 
         void AddApplicationPart(string applicationPart)
         {

@@ -449,7 +449,8 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IComplexGrain_GrainReference_67FE5808));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
-            config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>().Add(typeof(global::TestProject.IComplexGrain), typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IComplexGrain(shared, key));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();
+            proxyFactories.Add(typeof(global::TestProject.IComplexGrain), typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain), static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IComplexGrain(shared, key));
             config.AddInterface(typeof(global::TestProject.IComplexGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));

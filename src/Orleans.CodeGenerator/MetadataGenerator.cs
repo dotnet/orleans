@@ -79,16 +79,18 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
         }
 
-        foreach (var proxy in orderedProxyInterfaces.Where(static proxy => proxy.ProxyBase.SupportsGrainReferenceFactory))
+        var grainReferenceProxies = orderedProxyInterfaces.Where(static proxy => proxy.ProxyBase.SupportsGrainReferenceFactory).ToArray();
+        if (grainReferenceProxies.Length > 0)
+        {
+            body.Add(ParseStatement(
+                "var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::System.Func<global::Orleans.Runtime.GrainReferenceShared, global::Orleans.Runtime.IdSpan, global::Orleans.Runtime.GrainReference>>>();"));
+        }
+
+        foreach (var proxy in grainReferenceProxies)
         {
             var interfaceType = GetOpenTypeSyntax(proxy.InterfaceType);
             var proxyType = GetGeneratedProxyTypeSyntax(proxy);
             AddGrainReferenceFactory(body, interfaceType, proxyType, GetProxyGenericArity(proxy) == 0);
-        }
-
-        foreach (var factory in model.ReferenceAssemblyData.GrainReferenceFactories)
-        {
-            AddGrainReferenceFactory(body, ParseTypeName(factory.InterfaceType.SyntaxString), ParseTypeName(factory.ProxyType.SyntaxString), isClosed: true);
         }
 
         var addInterfaceMethod = configParam.Member("AddInterface");
@@ -160,9 +162,8 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private static void AddGrainReferenceFactory(List<StatementSyntax> body, TypeSyntax interfaceType, TypeSyntax proxyType, bool isClosed)
     {
-        var options = "config.GetOrCreate<global::Orleans.Configuration.GrainReferenceFactoryOptions>()";
         var factory = isClosed ? $", static (shared, key) => new {proxyType}(shared, key)" : string.Empty;
-        body.Add(ParseStatement($"{options}.Add(typeof({interfaceType}), typeof({proxyType}){factory});"));
+        body.Add(ParseStatement($"proxyFactories.Add(typeof({interfaceType}), typeof({proxyType}){factory});"));
     }
 
     private ClassDeclarationSyntax CreateMetadataClass(

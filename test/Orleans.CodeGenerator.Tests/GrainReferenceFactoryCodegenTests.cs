@@ -1,6 +1,5 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -29,41 +28,48 @@ public class GrainReferenceFactoryCodegenTests
     }
 
     [Fact]
-    public async Task ClosedGenericFactoriesSupportConstraintsAndCoalesceDuplicates()
+    public async Task ClosedGenericFactoriesUseOrdinaryTypedRegistration()
     {
         const string source = """
             using Orleans;
-            [assembly: GenerateGrainReference(typeof(TestProject.IGeneric<int>))]
-            [assembly: GenerateGrainReference(typeof(TestProject.IGeneric<int>))]
-            [assembly: GenerateGrainReference(typeof(TestProject.Container<string>.INested<long>))]
+            using Orleans.Runtime;
+            using Orleans.Serialization.Configuration;
+            using Factories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<
+                System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
             namespace TestProject;
             public interface IGeneric<T> : IGrainWithStringKey where T : struct { }
             public class Container<T> where T : class
             {
                 public interface INested<U> : IGrainWithStringKey where U : struct { }
             }
+            public static class Registration
+            {
+                public static void Configure(TypeManifestOptions options)
+                {
+                    options.GetOrCreate<Factories>().Add(
+                        typeof(IGeneric<int>),
+                        typeof(OrleansCodeGen.TestProject.Proxy_IGeneric<int>),
+                        static (shared, key) => new OrleansCodeGen.TestProject.Proxy_IGeneric<int>(shared, key));
+                    options.GetOrCreate<Factories>().Add(
+                        typeof(Container<string>.INested<long>),
+                        typeof(OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>),
+                        static (shared, key) => new OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>(shared, key));
+                }
+            }
             """;
 
         var (result, output) = Generate(await TestCompilationHelper.CreateCompilation(source));
         AssertCompiles(result, output);
         var generated = GetSource(result);
-        Assert.Contains("static (shared, key) => new global::OrleansCodeGen.TestProject.Proxy_IGeneric<int>(shared, key)", generated, StringComparison.Ordinal);
-        Assert.Contains("static (shared, key) => new global::OrleansCodeGen.TestProject.Container.Proxy_INested<string, long>(shared, key)", generated, StringComparison.Ordinal);
-        Assert.Equal(1, generated.Split(
-            ".Add(typeof(global::TestProject.IGeneric<int>)", StringSplitOptions.None).Length - 1);
+        Assert.Contains(".Add(typeof(global::TestProject.IGeneric<>), typeof(OrleansCodeGen.TestProject.Proxy_IGeneric<>))", generated, StringComparison.Ordinal);
+        Assert.Contains("internal sealed class Proxy_INested<T, U>", generated, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NestedInterfacesCaptureContainingGenericParameters(bool registerClosedFactory)
+    [Fact]
+    public async Task NestedInterfacesCaptureContainingGenericParameters()
     {
-        var registration = registerClosedFactory
-            ? "[assembly: GenerateGrainReference(typeof(TestProject.Container<string>.INested))]"
-            : string.Empty;
-        var source = $$"""
+        const string source = """
             using Orleans;
-            {{registration}}
             namespace TestProject;
             public class Container<T> where T : class
             {
@@ -82,11 +88,6 @@ public class GrainReferenceFactoryCodegenTests
             ".Add(typeof(global::TestProject.Container<>.INested), typeof(OrleansCodeGen.TestProject.Container.Proxy_INested<>))",
             generated, StringComparison.Ordinal);
         Assert.DoesNotContain("new OrleansCodeGen.TestProject.Container.Proxy_INested<>", generated, StringComparison.Ordinal);
-        if (registerClosedFactory)
-        {
-            Assert.Contains("static (shared, key) => new global::OrleansCodeGen.TestProject.Container.Proxy_INested<string>(shared, key)",
-                generated, StringComparison.Ordinal);
-        }
     }
 
     [Fact]
@@ -107,7 +108,17 @@ public class GrainReferenceFactoryCodegenTests
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
         var consumer = await TestCompilationHelper.CreateCompilation("""
             using Orleans;
-            [assembly: GenerateGrainReference(typeof(Contracts.IGeneric<int>))]
+            using Orleans.Serialization.Configuration;
+            using Factories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<
+                System.Func<Orleans.Runtime.GrainReferenceShared, Orleans.Runtime.IdSpan, Orleans.Runtime.GrainReference>>;
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(Contracts.IGeneric<>))]
+            public static class Registration
+            {
+                public static void Configure(TypeManifestOptions options) => options.GetOrCreate<Factories>().Add(
+                    typeof(Contracts.IGeneric<int>),
+                    typeof(OrleansCodeGen.Contracts.Proxy_IGeneric<int>),
+                    static (shared, key) => new OrleansCodeGen.Contracts.Proxy_IGeneric<int>(shared, key));
+            }
             """, "Consumer", MetadataReference.CreateFromImage(stream.ToArray()));
 
         var (result, output) = Generate(consumer);
@@ -116,30 +127,8 @@ public class GrainReferenceFactoryCodegenTests
         var generated = GetSource(result);
         Assert.Contains("internal sealed class Proxy_IGeneric<T>", generated, StringComparison.Ordinal);
         Assert.Contains(
-            ".Add(typeof(global::Contracts.IGeneric<int>), typeof(global::OrleansCodeGen.Contracts.Proxy_IGeneric<int>), static (shared, key) => new global::OrleansCodeGen.Contracts.Proxy_IGeneric<int>(shared, key))",
+            ".Add(typeof(global::Contracts.IGeneric<>), typeof(OrleansCodeGen.Contracts.Proxy_IGeneric<>))",
             generated, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("int")]
-    [InlineData("TestProject.IGeneric<>")]
-    [InlineData("TestProject.IPlain")]
-    public async Task InvalidFactoryRegistrationProducesDiagnostic(string type)
-    {
-        var compilation = await TestCompilationHelper.CreateCompilation($$"""
-            using Orleans;
-            [assembly: GenerateGrainReference(typeof({{type}}))]
-            namespace TestProject;
-            public interface IGeneric<T> : IGrainWithStringKey { }
-            public interface IPlain { }
-            """);
-
-        var (result, _) = Generate(compilation);
-
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal(DiagnosticRuleId.InvalidGrainReferenceFactory, diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.True(diagnostic.Location.IsInSource);
     }
 
     [Fact]
@@ -165,7 +154,7 @@ public class GrainReferenceFactoryCodegenTests
         AssertCompiles(result, output);
         var generated = GetSource(result);
         Assert.Contains("AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IPlain))", generated, StringComparison.Ordinal);
-        Assert.DoesNotContain("GrainReferenceFactoryOptions", generated, StringComparison.Ordinal);
+        Assert.DoesNotContain("InterfaceProxyFactoryOptions", generated, StringComparison.Ordinal);
     }
 
     private static (GeneratorRunResult Result, Compilation Output) Generate(CSharpCompilation compilation)

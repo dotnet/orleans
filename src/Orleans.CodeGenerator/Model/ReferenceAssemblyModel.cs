@@ -61,8 +61,6 @@ internal readonly record struct InterfaceImplementationModel
 /// </summary>
 internal readonly record struct RegisteredProviderModel(string Target, string Kind, string Name, TypeRef Type);
 
-internal readonly record struct GrainReferenceFactoryModel(TypeRef InterfaceType, TypeRef ProxyType);
-
 /// <summary>
 /// Aggregated data extracted from referenced assemblies via <c>[GenerateCodeForDeclaringAssembly]</c>
 /// and <c>[ApplicationPart]</c> attributes. This model is produced by a <c>CompilationProvider</c>-based
@@ -78,7 +76,4 @@ internal sealed record class ReferenceAssemblyModel(
     EquatableArray<ProxyInterfaceModel> ReferencedProxyInterfaces,
     EquatableArray<RegisteredCodecModel> RegisteredCodecs,
     EquatableArray<RegisteredProviderModel> RegisteredProviders,
-    EquatableArray<InterfaceImplementationModel> InterfaceImplementations)
-{
-    public EquatableArray<GrainReferenceFactoryModel> GrainReferenceFactories { get; init; } = EquatableArray<GrainReferenceFactoryModel>.Empty;
-}
+    EquatableArray<InterfaceImplementationModel> InterfaceImplementations);
