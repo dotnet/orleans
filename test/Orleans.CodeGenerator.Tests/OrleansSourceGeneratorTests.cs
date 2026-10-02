@@ -3133,6 +3133,66 @@ public class DemoClass
         Assert.DoesNotContain("Response<void>", source);
     }
 
+    [Theory]
+    [InlineData("Task<int>")]
+    [InlineData("ValueTask<int>")]
+    public async Task RpcResponseHoldersGenerateDirectPrimitiveWritesAndCopiedInvocations(string returnType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IWriter : IGrainWithIntegerKey { {{returnType}} Get(); }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var response = Assert.Single(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("IRawResponseWriter", response);
+        Assert.Contains("IRawResponseReader", response);
+        Assert.Contains("Int32Codec.WriteField(ref writer, 0, Value)", response);
+        Assert.Contains("ResponsePool.GetGenerated<", response);
+        Assert.Contains("_factory = null", response);
+        Assert.Contains("options.AddRawResponseReader<int>", response);
+        Assert.Contains("IResponseInvokable.InvokeAndCopy", proxy);
+        Assert.Contains("factory.RentCopied(value, contexts)", proxy);
+        Assert.DoesNotContain("MakeGenericType", response);
+        var holders = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
+            .OfType<ClassDeclarationSyntax>().Where(static type => type.BaseList?.ToString().Contains("IRawResponseWriter", StringComparison.Ordinal) == true).ToArray();
+        var holder = Assert.Single(holders);
+        Assert.Null(holder.TypeParameterList);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseHoldersKeepCustomAndGenericInvokerContracts()
+    {
+        var compilation = await CreateCompilation("""
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+            namespace TestProject;
+            [InvokableBaseType(typeof(GrainReference), typeof(Task<>), typeof(CustomRequest<>))]
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class CustomAttribute : Attribute { }
+            public abstract class CustomRequest<T> : TaskRequest<T> { }
+            public interface ICompatibility : IGrainWithIntegerKey
+            {
+                [Custom] Task<int> Custom();
+                Task<int> Generic<T>();
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.DoesNotContain("IResponseInvokable", proxy);
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
@@ -3169,6 +3229,10 @@ public class DemoClass
         {
             var supportsGenericAccessors = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider().GlobalOptions).SupportsGenericUnsafeAccessors;
             snapshot = snapshot.UseFileName($"{nameof(OrleansSourceGeneratorTests)}.{snapshotName}.{(supportsGenericAccessors ? "UnsafeAccessor" : "FieldAccessor")}");
+        }
+        if (generatedSource.Contains("global::Orleans.Serialization.Invocation.IRawResponseWriter", StringComparison.Ordinal))
+        {
+            snapshot = snapshot.UniqueForRuntimeAndVersion();
         }
 
         await snapshot;

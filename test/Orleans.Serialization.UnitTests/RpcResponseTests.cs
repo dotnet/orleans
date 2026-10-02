@@ -12,6 +12,7 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -349,6 +350,275 @@ public sealed class RpcResponseTests : IDisposable
             .Select(static type => (IInvokable)Activator.CreateInstance(type)!);
         var result = invokables.Single(invokable => invokable.GetMethodName() == methodName);
         return result;
+    }
+
+    [Theory]
+    [InlineData("Boolean")]
+    [InlineData("Integer")]
+    [InlineData("Payload")]
+    public async Task GeneratedResponseHoldersCopyAndWriteDirectly(string methodName)
+    {
+        var target = new RpcResponseTarget();
+        using var invokable = CreateInvokable(methodName);
+        invokable.SetTarget(new TargetHolder(target));
+        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var provider = _services.GetRequiredService<CodecProvider>();
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        var compatibility = new CountingResponseCopier();
+        using var response = await direct.InvokeAndCopy(provider, contexts, new DeepCopier<Response>(compatibility, contexts));
+        var writer = Assert.IsAssignableFrom<IRawResponseWriter>(response);
+        Assert.False(response.GetType().IsGenericType);
+        Assert.Equal(0, compatibility.Copies);
+        if (methodName == "Payload")
+        {
+            var value = response.GetResult<NativeAotSmoke.RpcResponsePayload>();
+            Assert.NotNull(value);
+            Assert.NotSame(target.Result, value);
+            Assert.Equal(17, value.Value);
+            target.Result.Value = 91;
+            Assert.Equal(17, value.Value);
+        }
+
+        Assert.NotNull(response.GetSimpleResultType());
+        var expected = response.GetSimpleResultType()!;
+        Assert.True(provider.TryGetRawResponseReader(expected, out var registered));
+        var output = new ArrayBufferWriter<byte>();
+        using (var session = _services.GetRequiredService<SerializerSessionPool>().GetSession())
+        {
+            var body = Writer.Create(output, session);
+            writer.WriteRaw(ref body);
+            body.Commit();
+        }
+
+        using var readerSession = _services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(output.WrittenMemory, readerSession);
+        var field = reader.ReadFieldHeader();
+        Assert.Equal(expected, field.FieldType);
+        using var decoded = registered!.ReadRaw(ref reader, ref field);
+        Assert.IsAssignableFrom<IRawResponseWriter>(decoded);
+        if (methodName == "Payload") Assert.Equal(17, decoded.GetResult<NativeAotSmoke.RpcResponsePayload>()!.Value);
+        else Assert.Equal(response.Result, decoded.Result);
+    }
+
+    [Fact]
+    public async Task GeneratedResponseHolderPreservesRawWireBytesAndPoolReset()
+    {
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+        var provider = _services.GetRequiredService<CodecProvider>();
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var response = await direct.InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        var body = new ArrayBufferWriter<byte>();
+        var legacy = new ArrayBufferWriter<byte>();
+        var sessions = _services.GetRequiredService<SerializerSessionPool>();
+        using (var session = sessions.GetSession())
+        {
+            var writer = Writer.Create(body, session);
+            Assert.IsAssignableFrom<IRawResponseWriter>(response).WriteRaw(ref writer);
+            writer.Commit();
+        }
+        using (var session = sessions.GetSession())
+        {
+            using var original = Response.FromResult(42);
+            var writer = Writer.Create(legacy, session);
+            ((ResponseCodec)provider.GetCodec(original.GetType())).WriteRaw(ref writer, original);
+            writer.Commit();
+        }
+        Assert.Equal(legacy.WrittenSpan.ToArray(), body.WrittenSpan.ToArray());
+        response.Dispose();
+        Assert.Equal(0, response.GetResult<int>());
+        var factory = response.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Single(static field => field.Name == "_factory");
+        Assert.Null(factory.GetValue(response));
+        using var reused = await direct.InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        Assert.Same(response, reused);
+        Assert.Equal(42, reused.GetResult<int>());
+    }
+
+    [Fact]
+    public async Task GeneratedResponseHolderKeepsExceptionBehavior()
+    {
+        using var invokable = CreateInvokable("Boolean");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget { Fail = true }));
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        var compatibility = new CountingResponseCopier();
+        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+            _services.GetRequiredService<CodecProvider>(), contexts, new DeepCopier<Response>(compatibility, contexts));
+        Assert.IsType<ExceptionResponse>(response);
+        Assert.Equal("response failure", response.Exception!.Message);
+        Assert.Equal(0, compatibility.Copies);
+    }
+
+    [Fact]
+    public async Task GeneratedResponseHolderPreservesCyclesAndNullPayloads()
+    {
+        var target = new RpcResponseTarget();
+        target.Result.Left = target.Result;
+        target.Result.Right = target.Result;
+        using var invokable = CreateInvokable("Payload");
+        invokable.SetTarget(new TargetHolder(target));
+        var provider = _services.GetRequiredService<CodecProvider>();
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+            provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        var value = response.GetResult<NativeAotSmoke.RpcResponsePayload>();
+        Assert.NotNull(value);
+        Assert.NotSame(target.Result, value);
+        Assert.Same(value, value.Left);
+        Assert.Same(value.Left, value.Right);
+        Assert.True(provider.TryGetRawResponseReader(typeof(NativeAotSmoke.RpcResponsePayload), out var registered));
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var session = _services.GetRequiredService<SerializerSessionPool>().GetSession())
+        {
+            var writer = Writer.Create(buffer, session);
+            ((IRawResponseWriter)response).WriteRaw(ref writer);
+            writer.Commit();
+        }
+        using var readerSession = _services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(buffer.WrittenMemory, readerSession);
+        var field = reader.ReadFieldHeader();
+        using var result = registered!.ReadRaw(ref reader, ref field);
+        var copied = result.GetResult<NativeAotSmoke.RpcResponsePayload>();
+        Assert.NotNull(copied);
+        Assert.Same(copied, copied.Left);
+        Assert.Same(copied.Left, copied.Right);
+
+        invokable.SetTarget(new TargetHolder(new NullPayloadTarget()));
+        using var empty = await ((IResponseInvokable)invokable).InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        Assert.IsAssignableFrom<IRawResponseWriter>(empty);
+        Assert.Null(empty.GetResult<NativeAotSmoke.RpcResponsePayload>());
+    }
+
+    [Fact]
+    public async Task GeneratedResponseHolderHonorsCustomPayloadCopier()
+    {
+        using var services = new ServiceCollection().AddSerializer(builder =>
+            builder.Configure(options => options.AddCopier(typeof(CustomPayloadCopier)))).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        var target = new RpcResponseTarget();
+        using var invokable = CreateInvokable("Payload");
+        invokable.SetTarget(new TargetHolder(target));
+        using var result = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+            provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        Assert.IsType<Response<NativeAotSmoke.RpcResponsePayload>>(result);
+        Assert.Same(target.Result, result.GetResult<NativeAotSmoke.RpcResponsePayload>());
+        Assert.False(provider.TryGetRawResponseReader(typeof(NativeAotSmoke.RpcResponsePayload), out _));
+    }
+
+    [Theory]
+    [InlineData("PayloadCodec")]
+    [InlineData("ResponseCodec")]
+    [InlineData("ResponseCopier")]
+    public async Task GeneratedResponseHolderHonorsCustomResultAndResponseServices(string service)
+    {
+        var payloadCodec = new DelegatingCodec<int>(new Int32Codec());
+        var responseCodec = new DelegatingCodec<Response<int>>(new PooledResponseCodec<int, Int32Codec>(new Int32Codec()));
+        var responseCopier = new TransformingResponseCopier();
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            if (service == "PayloadCodec")
+                options.AddSerializer<int>(_ => payloadCodec, _ => new ShallowCopier<int>());
+            else if (service == "ResponseCodec")
+                options.AddSerializer<Response<int>>(_ => responseCodec, _ => new PooledResponseCopier<int, ShallowCopier<int>>(new ShallowCopier<int>()));
+            else
+                options.AddSerializer<Response<int>>(_ => new PooledResponseCodec<int, Int32Codec>(new Int32Codec()), _ => responseCopier);
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+        using var result = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+            provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+
+        Assert.IsType<Response<int>>(result);
+        Assert.Equal(service == "ResponseCopier" ? 43 : 42, result.GetResult<int>());
+        Assert.Equal(service == "ResponseCopier" ? 1 : 0, responseCopier.Copies);
+        Assert.False(provider.TryGetRawResponseReader(typeof(int), out _));
+        if (service == "PayloadCodec") Assert.Same(payloadCodec, provider.GetCodec<int>());
+        if (service == "ResponseCodec") Assert.Same(responseCodec, provider.GetCodec<Response<int>>());
+        if (service == "ResponseCopier") Assert.Same(responseCopier, provider.GetDeepCopier<Response<int>>());
+    }
+
+    [Fact]
+    public async Task GeneratedResponseReaderReturnsHolderAfterMalformedPayload()
+    {
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+        var provider = _services.GetRequiredService<CodecProvider>();
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var copier = _services.GetRequiredService<DeepCopier>().GetCopier<Response>();
+        var original = await direct.InvokeAndCopy(provider, contexts, copier);
+        original.Dispose();
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var registered));
+        var sessions = _services.GetRequiredService<SerializerSessionPool>();
+        var malformed = new ArrayBufferWriter<byte>();
+        using (var session = sessions.GetSession())
+        {
+            var writer = Writer.Create(malformed, session);
+            writer.WriteStartObject(0, null!, typeof(int));
+            writer.WriteFieldHeaderExpected(0, WireType.TagDelimited);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+            writer.Commit();
+        }
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+        {
+            using var session = sessions.GetSession();
+            var reader = Reader.Create(malformed.WrittenMemory, session);
+            var field = reader.ReadFieldHeader();
+            registered!.ReadRaw(ref reader, ref field);
+        });
+        Assert.Equal("wireType", error.ParamName);
+        Assert.Equal(0, original.GetResult<int>());
+        Assert.Null(original.GetType().GetField("_factory", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(original));
+        using var reused = await direct.InvokeAndCopy(provider, contexts, copier);
+        Assert.Same(original, reused);
+        Assert.Equal(42, reused.GetResult<int>());
+    }
+
+    private sealed class DelegatingCodec<T>(IFieldCodec<T> codec) : IFieldCodec<T>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T value)
+            where TBufferWriter : IBufferWriter<byte> => codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        public T ReadValue<TInput>(ref Reader<TInput> reader, Field field) => codec.ReadValue(ref reader, field);
+    }
+
+    private sealed class TransformingResponseCopier : IDeepCopier<Response<int>>
+    {
+        public int Copies { get; private set; }
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Response<int>? DeepCopy(Response<int>? input, CopyContext context)
+        {
+            if (input is null) return null;
+            Copies++;
+            return (Response<int>)Response.FromResult(input.TypedResult + 1);
+        }
+    }
+
+    private sealed class NullPayloadTarget : NativeAotSmoke.IRpcResponses
+    {
+        public Task<bool> Boolean() => Task.FromResult(true);
+        public ValueTask<int> Integer() => new(42);
+        public Task<NativeAotSmoke.RpcResponsePayload> Payload() => Task.FromResult<NativeAotSmoke.RpcResponsePayload>(null!);
+        public Task<NativeAotSmoke.RpcGeneratedValue<int>> Value() => Task.FromResult(new NativeAotSmoke.RpcGeneratedValue<int>());
+        public Task<NativeAotSmoke.RpcResponseBox<byte>> Bytes() => Task.FromResult(new NativeAotSmoke.RpcResponseBox<byte> { Value = [7, 9] });
+    }
+
+    private sealed class CountingResponseCopier : IDeepCopier<Response>
+    {
+        public int Copies { get; private set; }
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public Response? DeepCopy(Response? input, CopyContext context)
+        {
+            Copies++;
+            return input;
+        }
     }
 
     private sealed class TargetHolder(object target) : ITargetHolder

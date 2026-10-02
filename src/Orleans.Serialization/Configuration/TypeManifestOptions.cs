@@ -7,6 +7,7 @@ using System.Reflection;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 
@@ -47,6 +48,19 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, Func<ICodecProvider, IFieldCodec>> CodecFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
+        internal Dictionary<Type, Func<ICodecProvider, IRawResponseReader>> RawResponseReaderFactories { get; } = new();
+
+        /// <summary>
+        /// Registers a statically constructed raw response reader for a closed invocation result type.
+        /// </summary>
+        /// <typeparam name="TResult">The invocation result type encoded in the wire header.</typeparam>
+        /// <param name="factory">The reader factory.</param>
+        /// <remarks>The first reader registration for a result type is used.</remarks>
+        public void AddRawResponseReader<TResult>(Func<ICodecProvider, IRawResponseReader> factory)
+        {
+            if (factory is null) throw new ArgumentNullException(nameof(factory));
+            RawResponseReaderFactories.TryAdd(typeof(TResult), factory);
+        }
         private readonly HashSet<Type> _defaultSerializerServices = new();
         internal HashSet<Type> ContextTypes { get; } = new();
 

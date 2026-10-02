@@ -680,21 +680,17 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ComplexData), typeof(global::TestProject.ComplexData));
-            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_ComplexData), typeof(global::TestProject.ComplexData));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IComplexGrain_GrainReference_67FE5808), typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ComplexGrain), typeof(global::TestProject.ComplexGrain));
-            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_ComplexGrain), typeof(global::TestProject.ComplexGrain));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexData), typeof(global::TestProject.ComplexData));
-            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexData), typeof(global::TestProject.ComplexData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IComplexGrain_GrainReference_67FE5808), typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain), typeof(global::TestProject.ComplexGrain));
-            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain), typeof(global::TestProject.ComplexGrain));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ComplexData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IComplexGrain_GrainReference_67FE5808));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ComplexGrain));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IComplexGrain_GrainReference_67FE5808));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
             config.AddInterface(typeof(global::TestProject.IComplexGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData), typeof(global::TestProject.ComplexData));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain), typeof(global::TestProject.ComplexGrain));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain));
             var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
             var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.GetOrAdd(typeof(global::TestProject.IComplexGrain));

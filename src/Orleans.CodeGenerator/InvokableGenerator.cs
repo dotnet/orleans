@@ -153,6 +153,37 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 GenerateTryCancelMethod(method, fieldDescriptions),
                 GenerateIsCancellableProperty(method));
 
+        if (method.AllTypeParameters.Count == 0
+            && method.Method.ReturnType is INamedTypeSymbol { TypeArguments.Length: 1 } result
+            && baseClassType.OriginalDefinition.ToDisplayString() is "Orleans.Runtime.TaskRequest<TResult>" or "Orleans.Runtime.Request<TResult>"
+            && RpcResponseHolderGenerator.TryDescribe(_generationContext, result.TypeArguments[0], out _, out _))
+        {
+            var type = result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var factory = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{RpcResponseHolderGenerator.GetName(result.TypeArguments[0])}Factory";
+            classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IResponseInvokable")));
+            classDeclaration = classDeclaration.AddMembers(ParseMemberDeclaration($$"""
+                async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
+                    global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(
+                        global::Orleans.Serialization.Serializers.ICodecProvider provider,
+                        global::Orleans.Serialization.Cloning.CopyContextPool contexts,
+                        global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+                {
+                    try
+                    {
+                        var factory = {{factory}}.Resolve(provider);
+                        if (!factory.IsSupported)
+                            return responseCopier.Copy(await Invoke());
+                        {{type}} value = await InvokeInner();
+                        return factory.RentCopied(value, contexts);
+                    }
+                    catch (global::System.Exception exception)
+                    {
+                        return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+                    }
+                }
+                """)!);
+        }
+
         if (method.AllTypeParameters.Count > 0)
         {
             classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, method.AllTypeParameters);
@@ -738,21 +769,24 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             {
                 var methodTypeArguments = GetTypesArray(method, method.MethodTypeParameters.Select(p => p.Parameter));
                 var parameterTypes = GetTypesArray(method, method.Method.Parameters.Select(p => p.Type));
+                var methodLookup = method.AllTypeParameters.Count == 0
+                    ? ParseExpression($"typeof({method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions)}).GetMethod({method.Method.Name.GetLiteralExpression()}, 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, {(method.Method.Parameters.Length == 0 ? "global::System.Type.EmptyTypes" : parameterTypes.ToString())}, null)")
+                    : InvocationExpression(
+                        IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
+                        ArgumentList(SeparatedList(
+                        [
+                            Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
+                            Argument(method.Method.Name.GetLiteralExpression()),
+                            Argument(methodTypeArguments),
+                            Argument(parameterTypes),
+                        ])));
 
                 field = FieldDeclaration(
                     VariableDeclaration(
                         LibraryTypes.MethodInfo.ToTypeSyntax(),
                         SingletonSeparatedList(VariableDeclarator(description.FieldName)
                         .WithInitializer(EqualsValueClause(
-                            InvocationExpression(
-                                IdentifierName("OrleansGeneratedCodeHelper").Member("GetMethodInfoOrDefault"),
-                                ArgumentList(SeparatedList(
-                                [
-                                    Argument(TypeOfExpression(method.Method.ContainingType.ToTypeSyntax(method.TypeParameterSubstitutions))),
-                                    Argument(method.Method.Name.GetLiteralExpression()),
-                                    Argument(methodTypeArguments),
-                                    Argument(parameterTypes),
-                                ]))))))))
+                            methodLookup)))))
                     .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
             }
             else

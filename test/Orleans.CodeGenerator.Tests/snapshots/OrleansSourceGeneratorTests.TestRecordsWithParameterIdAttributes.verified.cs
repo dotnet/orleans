@@ -11,6 +11,7 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_SimpleRecord : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.SimpleRecord>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.SimpleRecord>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.SimpleRecord);
@@ -109,6 +110,7 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_SimpleRecord : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.SimpleRecord>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.SimpleRecord>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.SimpleRecord> _activator;
@@ -143,6 +145,7 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_RecordWithExtraProperty : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.RecordWithExtraProperty>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.RecordWithExtraProperty>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.RecordWithExtraProperty);
@@ -257,6 +260,7 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_RecordWithExtraProperty : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.RecordWithExtraProperty>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.RecordWithExtraProperty>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.RecordWithExtraProperty> _activator;
@@ -294,6 +298,7 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_RecordStructWithParameterId : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.RecordStructWithParameterId>, global::Orleans.Serialization.Serializers.IValueSerializer<global::TestProject.RecordStructWithParameterId>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.RecordStructWithParameterId);

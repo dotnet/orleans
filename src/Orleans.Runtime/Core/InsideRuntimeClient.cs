@@ -17,6 +17,8 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
@@ -52,6 +54,8 @@ namespace Orleans.Runtime
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
+        private readonly ICodecProvider responseCodecProvider;
+        private readonly CopyContextPool responseCopyContexts;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -83,6 +87,8 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
+            this.responseCodecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
+            this.responseCopyContexts = serviceProvider.GetRequiredService<CopyContextPool>();
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
@@ -315,15 +321,20 @@ namespace Orleans.Runtime
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
                                 if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
-                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
+                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping,
+                                        this.responseCopier, this.responseCodecProvider, this.responseCopyContexts);
                                     await invoker.Invoke();
                                     response = invoker.Response!;
                                 }
                                 else
                                 {
-                                    response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
-                                    response = this.responseCopier.Copy(response)!;
+                                    if (invokable is IResponseInvokable direct)
+                                        response = await direct.InvokeAndCopy(this.responseCodecProvider, this.responseCopyContexts, this.responseCopier);
+                                    else
+                                    {
+                                        response = await invokable.Invoke();
+                                        response = this.responseCopier.Copy(response)!;
+                                    }
                                 }
 
                                 invokable.Dispose();

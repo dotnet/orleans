@@ -2,6 +2,7 @@ using System;
 using Orleans.NativeAotSmoke;
 
 RpcResponseContracts.PrimitiveResponses();
+await RpcResponseContracts.GeneratedInvokablesWriteCopiedResponses();
 RpcResponseContracts.CanonicalValueAndArrayServices();
 RpcResponseContracts.ConstructTupleArgumentProxyBeforeInvocation();
 RpcResponseContracts.ReferenceResponsePreservesCycles();
