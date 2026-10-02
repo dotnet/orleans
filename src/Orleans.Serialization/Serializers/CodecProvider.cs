@@ -286,6 +286,12 @@ namespace Orleans.Serialization.Serializers
 
         private IBaseCodec<TField>? TryCreateBaseCodec<TField>(Type fieldType) where TField : class
         {
+            try { return TryCreateBaseCodecInner<TField>(fieldType); }
+            catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+        }
+
+        private IBaseCodec<TField>? TryCreateBaseCodecInner<TField>(Type fieldType) where TField : class
+        {
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -797,8 +803,8 @@ namespace Orleans.Serialization.Serializers
                     {
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)) return this;
                         if (IsProviderService(serviceType)) return owner;
-                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.ServiceType == serviceType)
-                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => serviceType.IsConstructedGenericType
+                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == serviceType)
+                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && serviceType.IsConstructedGenericType
                                 && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
                         if (descriptor?.ImplementationInstance is { } instance) return instance;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
@@ -816,8 +822,9 @@ namespace Orleans.Serialization.Serializers
                     || serviceType == typeof(IServiceProvider)
                     || serviceType == typeof(IServiceProviderIsService)
                     || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
-                    || owner._serviceDescriptors.Any(descriptor => descriptor.ServiceType == serviceType
-                        || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
+                    || owner._serviceDescriptors.Any(descriptor => !descriptor.IsKeyedService
+                        && (descriptor.ServiceType == serviceType
+                            || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition()));
 
             private bool IsProviderService(Type serviceType)
                 => serviceType != typeof(object)

@@ -39,4 +39,13 @@ public sealed class StaticSerializerFactoryTests
 
     [Fact]
     public void DirectProviderServicesRemainGraphOwned() => StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
+
+    [Fact]
+    public void KeyedDescriptorsDoNotShadowUnkeyedInstances() => StaticFactoryContracts.KeyedDescriptorsDoNotShadowUnkeyedInstances();
+
+    [Fact]
+    public void KeyedOnlyDescriptorsDoNotSelectDependencyConstructors() => StaticFactoryContracts.KeyedOnlyDescriptorsDoNotSelectDependencyConstructors();
+
+    [Fact]
+    public void CaughtBaseCodecSpecializationFailureFaultsGraph() => StaticFactoryContracts.CaughtBaseCodecSpecializationFailureFaultsGraph();
 }
