@@ -100,6 +100,11 @@ and parameter ordering. For a described generic target, the runtime matches the
 requested closed type against that shape and binds implementation parameters,
 preserving fixed arguments and reordered parameters.
 
+Contract lookup selects exact closed targets first, then matching named generic
+targets, then array and bare-parameter patterns. Matching patterns use reverse
+registration order and bind the requested type's element shape and implementation
+parameters before activating the selected codec, copier, or converter.
+
 NativeAOT applications also provide statically compiled closed codec and serializer
 instances for the generic combinations they use. The `Metadata` scenario in
 `test/Orleans.NativeAotSmoke` exercises the default manifest and primitive, reference
