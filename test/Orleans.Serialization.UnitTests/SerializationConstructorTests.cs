@@ -70,6 +70,50 @@ public sealed class SerializationConstructorTests
     }
 
     [Fact]
+    public void StructConstructorCache_BoxedThenRef_PreservesBothDelegates()
+        => ValidateStructConstructorCache(boxedFirst: true);
+
+    [Fact]
+    public void StructConstructorCache_RefThenBoxed_PreservesBothDelegates()
+        => ValidateStructConstructorCache(boxedFirst: false);
+
+    private static void ValidateStructConstructorCache(bool boxedFirst)
+    {
+        var factory = new SerializationConstructorFactory();
+        Action<object, SerializationInfo, StreamingContext> boxedConstructor;
+        ValueTypeSerializer<StructValue>.ValueConstructor refConstructor;
+        if (boxedFirst)
+        {
+            boxedConstructor = factory.GetSerializationConstructorDelegate(typeof(StructValue));
+            refConstructor = factory.GetSerializationConstructorDelegate<StructValue>();
+        }
+        else
+        {
+            refConstructor = factory.GetSerializationConstructorDelegate<StructValue>();
+            boxedConstructor = factory.GetSerializationConstructorDelegate(typeof(StructValue));
+        }
+
+        var context = new object();
+        var info = CreateInfo(typeof(StructValue));
+        info.AddValue("Payload", 83);
+        var streamingContext = new StreamingContext(StreamingContextStates.All, context);
+        object boxed = default(StructValue);
+        var alias = boxed;
+        StructValue value = default;
+
+        boxedConstructor(boxed, info, streamingContext);
+        refConstructor(ref value, info, streamingContext);
+
+        Assert.Same(alias, boxed);
+        Assert.Equal(83, ((StructValue)alias).Payload);
+        Assert.Same(context, ((StructValue)alias).Context);
+        Assert.Equal(83, value.Payload);
+        Assert.Same(context, value.Context);
+        Assert.Same(boxedConstructor, factory.GetSerializationConstructorDelegate(typeof(StructValue)));
+        Assert.Same(refConstructor, factory.GetSerializationConstructorDelegate<StructValue>());
+    }
+
+    [Fact]
     public void ReferenceConstructor_PropagatesOriginalExceptionAndPartialMutation()
     {
         var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(ThrowingReference));

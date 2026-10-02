@@ -20,7 +20,7 @@ namespace Orleans.Serialization
 #endif
 
         private static readonly Type[] SerializationConstructorParameterTypes = { typeof(SerializationInfo), typeof(StreamingContext) };
-        private readonly ConcurrentDictionary<Type, object> _constructors = new();
+        private readonly ConcurrentDictionary<(Type Owner, Type DelegateType), Delegate> _constructors = new();
 
         /// <summary>
         /// Determines whether the provided type has a serialization constructor.
@@ -42,7 +42,8 @@ namespace Orleans.Serialization
 #endif
             Type type)
         {
-            if (_constructors.TryGetValue(type, out var existing))
+            var key = (type, typeof(Action<object, SerializationInfo, StreamingContext>));
+            if (_constructors.TryGetValue(key, out var existing))
             {
                 return (Action<object, SerializationInfo, StreamingContext>)existing;
             }
@@ -59,7 +60,7 @@ namespace Orleans.Serialization
                 created = CreateNativeConstructor(constructor);
             }
 
-            return (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, created);
+            return (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(key, created);
         }
 
         [SecurityCritical]
@@ -71,7 +72,8 @@ namespace Orleans.Serialization
             where TOwner : struct
         {
             var owner = typeof(TOwner);
-            if (_constructors.TryGetValue(owner, out var existing))
+            var key = (owner, typeof(ValueTypeSerializer<TOwner>.ValueConstructor));
+            if (_constructors.TryGetValue(key, out var existing))
             {
                 return (ValueTypeSerializer<TOwner>.ValueConstructor)existing;
             }
@@ -100,7 +102,7 @@ namespace Orleans.Serialization
                 };
             }
 
-            return (ValueTypeSerializer<TOwner>.ValueConstructor)_constructors.GetOrAdd(owner, created);
+            return (ValueTypeSerializer<TOwner>.ValueConstructor)_constructors.GetOrAdd(key, created);
         }
 
         [SecurityCritical]

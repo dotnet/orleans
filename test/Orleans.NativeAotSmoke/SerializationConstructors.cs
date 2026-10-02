@@ -14,12 +14,13 @@ internal static class SerializationConstructors
     private static void Main()
     {
         ValidateReferenceConstructor();
-        ValidateValueConstructor();
+        ValidateValueConstructor(boxedFirst: true);
+        ValidateValueConstructor(boxedFirst: false);
         ValidateConstructorExceptions();
         ValidateExceptionFallback();
         ValidateExceptionCodec();
         ValidateMissingConstructor();
-        Console.WriteLine("Native serialization constructors passed: existing-object identity and cycles, private constructors, ref/boxed structs, original exceptions, base Exception fallback, ordinary ExceptionCodec. Dynamic code: False.");
+        Console.WriteLine("Native serialization constructors passed: existing-object identity and cycles, private constructors, ref/boxed structs, shape-isolated caches, original exceptions, base Exception fallback, ordinary ExceptionCodec. Dynamic code: False.");
     }
 
     private static void ValidateReferenceConstructor()
@@ -40,10 +41,22 @@ internal static class SerializationConstructors
         Ensure(ReferenceEquals(constructor, factory.GetSerializationConstructorDelegate(typeof(ReferenceValue))), "Reference constructor delegates must be cached.");
     }
 
-    private static void ValidateValueConstructor()
+    private static void ValidateValueConstructor(bool boxedFirst)
     {
         var factory = new SerializationConstructorFactory();
-        var constructor = factory.GetSerializationConstructorDelegate<StructValue>();
+        Action<object, SerializationInfo, StreamingContext> boxedConstructor;
+        ValueTypeSerializer<StructValue>.ValueConstructor constructor;
+        if (boxedFirst)
+        {
+            boxedConstructor = factory.GetSerializationConstructorDelegate(typeof(StructValue));
+            constructor = factory.GetSerializationConstructorDelegate<StructValue>();
+        }
+        else
+        {
+            constructor = factory.GetSerializationConstructorDelegate<StructValue>();
+            boxedConstructor = factory.GetSerializationConstructorDelegate(typeof(StructValue));
+        }
+
         var context = new object();
         var info = CreateInfo(typeof(StructValue));
         info.AddValue("Payload", 73);
@@ -54,11 +67,12 @@ internal static class SerializationConstructors
         Ensure(value.Payload == 73 && ReferenceEquals(value.Context, context), "The private struct constructor must update the caller's ref value.");
         Ensure(ReferenceEquals(constructor, factory.GetSerializationConstructorDelegate<StructValue>()), "Struct constructor delegates must be cached.");
 
-        var boxedConstructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(StructValue));
         object boxed = default(StructValue);
         var alias = boxed;
-        boxedConstructor(boxed, info, default);
+        boxedConstructor(boxed, info, new StreamingContext(StreamingContextStates.All, context));
         Ensure(ReferenceEquals(alias, boxed) && ((StructValue)alias).Payload == 73, "The object constructor delegate must mutate the existing box.");
+        Ensure(ReferenceEquals(((StructValue)alias).Context, context), "The boxed constructor must receive the streaming context.");
+        Ensure(ReferenceEquals(boxedConstructor, factory.GetSerializationConstructorDelegate(typeof(StructValue))), "Boxed constructor delegates must be cached independently of ref delegates.");
     }
 
     private static void ValidateConstructorExceptions()
