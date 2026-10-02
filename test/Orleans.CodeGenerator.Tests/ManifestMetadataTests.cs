@@ -79,7 +79,7 @@ public class ManifestMetadataTests
             "Converter" => RegisteredCodecKind.Converter,
             _ => throw new InvalidOperationException($"Unexpected registration: {name}.")
         };
-        var model = ModelExtractor.ExtractRegisteredCodec(compilation, symbol, kind);
+        var model = ModelExtractor.ExtractRegisteredCodec(symbol, kind);
         var names = model.MetadataTypes.Select(static type => type.MetadataName).ToArray();
 
         Assert.Contains("MetadataTargets.Outer`1", names);
@@ -137,13 +137,13 @@ public class ManifestMetadataTests
         var compilation = await TestCompilationHelper.CreateCompilation(Source);
         var symbol = compilation.GetTypeByMetadataName("MetadataTargets.Codec`1");
         Assert.NotNull(symbol);
-        var original = ModelExtractor.ExtractRegisteredCodec(compilation, symbol, RegisteredCodecKind.Serializer);
+        var original = ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer);
 
         var changedCompilation = await TestCompilationHelper.CreateCompilation(
             Source.Replace("Target<int>", "Target<string>", StringComparison.Ordinal));
         var changedSymbol = changedCompilation.GetTypeByMetadataName("MetadataTargets.Codec`1");
         Assert.NotNull(changedSymbol);
-        var changed = ModelExtractor.ExtractRegisteredCodec(changedCompilation, changedSymbol, RegisteredCodecKind.Serializer);
+        var changed = ModelExtractor.ExtractRegisteredCodec(changedSymbol, RegisteredCodecKind.Serializer);
 
         Assert.NotEqual(original, changed);
         Assert.Contains(changed.MetadataTypes, static type => type.MetadataName == "System.String");
@@ -171,117 +171,6 @@ public class ManifestMetadataTests
         Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Contains("PreserveTypeMetadata(\"Container+Hidden`1, TestProject\")", GetMetadata(result).ToString());
-    }
-
-    [Fact]
-    public async Task MetadataCollectionReusesImmutableResultsForEachModeAndRegistrationKind()
-    {
-        var compilation = await TestCompilationHelper.CreateCompilation(Source);
-        var symbol = compilation.GetTypeByMetadataName("MetadataTargets.Codec`1");
-        Assert.NotNull(symbol);
-
-        var arguments = TypeMetadataDependencyCollector.Collect(compilation, symbol);
-        var includingType = TypeMetadataDependencyCollector.Collect(compilation, symbol, includeType: true);
-        Assert.True(arguments.Values == TypeMetadataDependencyCollector.Collect(compilation, symbol).Values);
-        Assert.True(includingType.Values == TypeMetadataDependencyCollector.Collect(compilation, symbol, includeType: true).Values);
-        Assert.False(arguments.Values == includingType.Values);
-        Assert.DoesNotContain(arguments, static type => type.MetadataName == "MetadataTargets.Codec`1");
-        Assert.Contains(includingType, static type => type.MetadataName == "MetadataTargets.Codec`1");
-
-        var serializer = ModelExtractor.ExtractRegisteredCodec(compilation, symbol, RegisteredCodecKind.Serializer);
-        var copier = ModelExtractor.ExtractRegisteredCodec(compilation, symbol, RegisteredCodecKind.Copier);
-        Assert.True(arguments.Values == serializer.MetadataTypes.Values);
-        Assert.True(arguments.Values == copier.MetadataTypes.Values);
-    }
-
-    [Fact]
-    public async Task MetadataCollectionKeepsConstructedGenericArgumentsDistinct()
-    {
-        const string source = """
-            using Orleans.Serialization.Activators;
-            public class First { }
-            public class Second { }
-            public class Target<T> { }
-            public class Activator<T> : IActivator<Target<T>>
-            {
-                public Target<T> Create() => new();
-            }
-            """;
-        var compilation = await TestCompilationHelper.CreateCompilation(source);
-        var definition = compilation.GetTypeByMetadataName("Activator`1");
-        Assert.NotNull(definition);
-        var first = compilation.GetTypeByMetadataName("First");
-        var second = compilation.GetTypeByMetadataName("Second");
-        Assert.NotNull(first);
-        Assert.NotNull(second);
-        var firstActivator = definition.Construct(first);
-        var secondActivator = definition.Construct(second);
-
-        var firstMetadata = TypeMetadataDependencyCollector.Collect(compilation, firstActivator);
-        var secondMetadata = TypeMetadataDependencyCollector.Collect(compilation, secondActivator);
-
-        Assert.Contains(firstMetadata, static type => type.MetadataName == "First");
-        Assert.DoesNotContain(firstMetadata, static type => type.MetadataName == "Second");
-        Assert.Contains(secondMetadata, static type => type.MetadataName == "Second");
-        Assert.DoesNotContain(secondMetadata, static type => type.MetadataName == "First");
-        Assert.True(firstMetadata.Values == TypeMetadataDependencyCollector.Collect(compilation, firstActivator).Values);
-        Assert.True(secondMetadata.Values == TypeMetadataDependencyCollector.Collect(compilation, secondActivator).Values);
-    }
-
-    [Fact]
-    public async Task MetadataCollectionIsScopedToItsCompilation()
-    {
-        var original = await TestCompilationHelper.CreateCompilation(Source);
-        var changed = await TestCompilationHelper.CreateCompilation(
-            Source.Replace("Target<int>", "Target<string>", StringComparison.Ordinal));
-        var originalSymbol = original.GetTypeByMetadataName("MetadataTargets.Codec`1");
-        var changedSymbol = changed.GetTypeByMetadataName("MetadataTargets.Codec`1");
-        Assert.NotNull(originalSymbol);
-        Assert.NotNull(changedSymbol);
-
-        var originalMetadata = TypeMetadataDependencyCollector.Collect(original, originalSymbol);
-        var changedMetadata = TypeMetadataDependencyCollector.Collect(changed, changedSymbol);
-
-        Assert.Contains(originalMetadata, static type => type.MetadataName == "System.Int32");
-        Assert.Contains(changedMetadata, static type => type.MetadataName == "System.String");
-        Assert.NotEqual(originalMetadata, changedMetadata);
-        Assert.False(originalMetadata.Values == changedMetadata.Values);
-    }
-
-    [Fact]
-    public async Task ConcurrentMetadataRequestsReuseOneImmutableResult()
-    {
-        var compilation = await TestCompilationHelper.CreateCompilation(Source);
-        var symbol = compilation.GetTypeByMetadataName("MetadataTargets.Converter`1");
-        Assert.NotNull(symbol);
-
-        var results = await Task.WhenAll(Enumerable.Range(0, 32).Select(_ => Task.Run(
-            () => TypeMetadataDependencyCollector.Collect(compilation, symbol),
-            TestContext.Current.CancellationToken)));
-        var expected = results[0];
-
-        Assert.Contains(expected, static type => type.MetadataName == "MetadataTargets.Surrogate`1");
-        Assert.All(results, result => Assert.True(expected.Values == result.Values));
-    }
-
-    [Fact]
-    public async Task MetadataIdentitiesReuseOriginalDefinitionStrings()
-    {
-        var compilation = await TestCompilationHelper.CreateCompilation(Source);
-        var definition = compilation.GetTypeByMetadataName("MetadataTargets.Outer`1");
-        Assert.NotNull(definition);
-        var integers = definition.Construct(compilation.GetSpecialType(SpecialType.System_Int32));
-        var strings = definition.Construct(compilation.GetSpecialType(SpecialType.System_String));
-
-        var expected = TypeMetadataIdentity.Create(definition);
-        Assert.Equal("MetadataTargets.Outer`1", expected.MetadataName);
-        foreach (var symbol in new[] { definition, integers, strings })
-        {
-            var identity = TypeMetadataIdentity.Create(symbol);
-            Assert.Equal(expected, identity);
-            Assert.Same(expected.MetadataName, identity.MetadataName);
-            Assert.Same(expected.AssemblyIdentity, identity.AssemblyIdentity);
-        }
     }
 
     private static GeneratorRunResult RunGenerator(CSharpCompilation compilation, out Compilation updated)

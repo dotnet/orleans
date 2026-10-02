@@ -1,18 +1,11 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Model;
 
 internal static class TypeMetadataDependencyCollector
 {
-    private static readonly ConditionalWeakTable<Compilation, CollectionCache> Cache = new();
-
-    public static EquatableArray<TypeMetadataIdentity> Collect(Compilation compilation, INamedTypeSymbol type, bool includeType = false)
-        => Cache.GetValue(compilation, static _ => new CollectionCache()).Collect(type, includeType);
-
-    private static EquatableArray<TypeMetadataIdentity> CollectCore(INamedTypeSymbol type, bool includeType)
+    public static EquatableArray<TypeMetadataIdentity> Collect(INamedTypeSymbol type, bool includeType = false)
     {
         var result = new HashSet<TypeMetadataIdentity>();
         if (includeType)
@@ -67,18 +60,5 @@ internal static class TypeMetadataDependencyCollector
                 }
             }
         }
-    }
-
-    private sealed class CollectionCache
-    {
-        private readonly ConcurrentDictionary<INamedTypeSymbol, Lazy<EquatableArray<TypeMetadataIdentity>>> _interfaceArguments =
-            new(SymbolEqualityComparer.Default);
-        private readonly ConcurrentDictionary<INamedTypeSymbol, Lazy<EquatableArray<TypeMetadataIdentity>>> _includingType =
-            new(SymbolEqualityComparer.Default);
-
-        public EquatableArray<TypeMetadataIdentity> Collect(INamedTypeSymbol type, bool includeType)
-            => includeType
-                ? _includingType.GetOrAdd(type, static symbol => new(() => CollectCore(symbol, includeType: true))).Value
-                : _interfaceArguments.GetOrAdd(type, static symbol => new(() => CollectCore(symbol, includeType: false))).Value;
     }
 }
