@@ -3365,6 +3365,17 @@ namespace Orleans.Serialization.Configuration
         public static void Register(IProviderMetadataProvider provider) { }
     }
 
+    public sealed partial class SerializationType
+    {
+        internal SerializationType() { }
+
+        public static SerializationType Array(SerializationType element, int rank = 1) { throw null; }
+
+        public static SerializationType Create(System.Type type, params SerializationType[] arguments) { throw null; }
+
+        public static SerializationType Parameter(int index) { throw null; }
+    }
+
     public sealed partial class TypeManifestOptions
     {
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
@@ -3399,13 +3410,25 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
 
+        public void AddActivator(System.Type type, System.Type targetType) { }
+
         public void AddActivator(System.Type type) { }
 
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }
 
+        public void AddBaseCodec(System.Type type, System.Type targetType) { }
+
+        public void AddBaseCopier(System.Type type, System.Type targetType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, SerializationType surrogateType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, System.Type surrogateType) { }
+
         public void AddConverter(System.Type type) { }
+
+        public void AddCopier(System.Type type, System.Type targetType) { }
 
         public void AddCopier(System.Type type) { }
 
@@ -3413,6 +3436,8 @@ namespace Orleans.Serialization.Configuration
 
         public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
             where TService : class { }
+
+        public void AddFieldCodec(System.Type type, System.Type targetType) { }
 
         public void AddFieldCodec(System.Type type) { }
 
@@ -3424,12 +3449,18 @@ namespace Orleans.Serialization.Configuration
 
         public void AddRawResponseReader<TResult>(System.Func<Serializers.ICodecProvider, Invocation.IRawResponseReader> factory) { }
 
+        public void AddSerializationContract(System.Type type, System.Type contractType, SerializationType targetType, SerializationType? surrogateType = null) { }
+
+        public void AddSerializer(System.Type type, System.Type targetType) { }
+
         public void AddSerializer(System.Type type) { }
 
         public void AddSerializer<T>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory) { }
 
         public void AddSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
             where TService : class { }
+
+        public void AddValueSerializer(System.Type type, System.Type targetType) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
