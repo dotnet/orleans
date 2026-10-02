@@ -104,6 +104,9 @@ Contract lookup selects exact closed targets first, then matching named generic
 targets, then array and bare-parameter patterns. Matching patterns use reverse
 registration order and bind the requested type's element shape and implementation
 parameters before activating the selected codec, copier, or converter.
+The selected registration supplies the arguments for implementation closure:
+plain open-target entries use positional arguments, and described entries use
+their matched parameter bindings, including when both belong to one implementation.
 
 NativeAOT applications also provide statically compiled closed codec and serializer
 instances for the generic combinations they use. The `Metadata` scenario in

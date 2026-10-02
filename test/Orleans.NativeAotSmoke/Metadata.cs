@@ -38,6 +38,7 @@ internal static class Metadata
         ValidateTargetParameterBinding();
         ValidateMatchingImplementationCandidates();
         ValidatePatternContractSelection(services);
+        ValidateMixedRegistrationClosure();
     }
 
     internal static class PrivateContractContainer
@@ -131,6 +132,43 @@ internal static class Metadata
         }
 
         Console.WriteLine("PatternContractSelection passed.");
+    }
+
+    private static void ValidateMixedRegistrationClosure()
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton<MetadataMixedActivator<string>>()
+            .AddSingleton<MetadataMixedActivator<MetadataMixedTarget<string>>>()
+            .BuildServiceProvider();
+        foreach (var plainLast in new[] { false, true })
+        {
+            var options = new TypeManifestOptions();
+            if (!plainLast)
+            {
+                options.AddActivator(typeof(MetadataMixedActivator<>), typeof(MetadataMixedTarget<>));
+            }
+
+            options.AddSerializationContract(typeof(MetadataMixedActivator<>), typeof(IActivator<>),
+                SerializationType.Create(typeof(MetadataMixedTarget<>),
+                    SerializationType.Create(typeof(MetadataMixedTarget<>), SerializationType.Parameter(0))));
+            if (plainLast)
+            {
+                options.AddActivator(typeof(MetadataMixedActivator<>), typeof(MetadataMixedTarget<>));
+            }
+
+            var provider = new CodecProvider(services, Options.Create(options));
+            var plain = provider.GetActivator<MetadataMixedTarget<string>>();
+            var nested = provider.GetActivator<MetadataMixedTarget<MetadataMixedTarget<string>>>();
+            if (plain.GetType() != typeof(MetadataMixedActivator<string>)
+                || nested.GetType() != (plainLast ? typeof(MetadataMixedActivator<MetadataMixedTarget<string>>) : typeof(MetadataMixedActivator<string>))
+                || plain.Create() is not MetadataMixedTarget<string>
+                || nested.Create() is not MetadataMixedTarget<MetadataMixedTarget<string>>)
+            {
+                throw new InvalidOperationException("Implementation closure did not honor the selected plain or described registration.");
+            }
+        }
+
+        Console.WriteLine("MixedRegistrationClosure passed.");
     }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
@@ -243,3 +281,9 @@ internal sealed class MetadataArrayCodec<T>(IFieldCodec<T> elementCodec) : IFiel
 
 internal sealed class MetadataArrayCopier<T> : ShallowCopier<T[]>;
 internal sealed class MetadataParameterCopier<T> : ShallowCopier<T>;
+internal sealed class MetadataMixedTarget<T>;
+internal sealed class MetadataMixedActivator<T> : IActivator<MetadataMixedTarget<T>>, IActivator<MetadataMixedTarget<MetadataMixedTarget<T>>>
+{
+    MetadataMixedTarget<T> IActivator<MetadataMixedTarget<T>>.Create() => new();
+    MetadataMixedTarget<MetadataMixedTarget<T>> IActivator<MetadataMixedTarget<MetadataMixedTarget<T>>>.Create() => new();
+}

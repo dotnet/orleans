@@ -213,6 +213,36 @@ public class ManifestContractTests
         Assert.IsType<ReorderedCodec<int, string>>(provider.GetBaseCodec<GenericTarget<string, int>>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedPlainAndDescribedRegistrationsCloseTheSelectedCandidate(bool plainLast)
+    {
+        var options = new TypeManifestOptions();
+        if (!plainLast)
+        {
+            options.AddActivator(typeof(MixedRegistrationActivator<>), typeof(FixedArgument<>));
+        }
+
+        options.AddSerializationContract(typeof(MixedRegistrationActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(FixedArgument<>),
+                SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0))));
+        if (plainLast)
+        {
+            options.AddActivator(typeof(MixedRegistrationActivator<>), typeof(FixedArgument<>));
+        }
+
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        var plain = provider.GetActivator<FixedArgument<string>>();
+        Assert.IsType<MixedRegistrationActivator<string>>(plain);
+        Assert.IsType<FixedArgument<string>>(plain.Create());
+        var nested = provider.GetActivator<FixedArgument<GenericSurrogate<string>>>();
+        Assert.IsType(plainLast ? typeof(MixedRegistrationActivator<GenericSurrogate<string>>) : typeof(MixedRegistrationActivator<string>), nested);
+        Assert.IsType<FixedArgument<GenericSurrogate<string>>>(nested.Create());
+    }
+
     [Fact]
     public void DifferentImplementationsWithTheSameOpenTargetSelectMatchingPatterns()
     {
@@ -379,7 +409,8 @@ public class ManifestContractTests
         Assert.IsType<PatternNestedArrayCopier<string>>(provider.GetDeepCopier<GenericTarget<string, int>[]>());
         var nonVector = typeof(int).MakeArrayType(1);
         object?[] arguments = [typeof(IDeepCopier<>), nonVector, nonVector, null];
-        Assert.Equal(false, typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(false, typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic,
+            [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType()])!.Invoke(provider, arguments));
         Assert.Null(arguments[3]);
     }
 
@@ -518,6 +549,11 @@ public class ManifestContractTests
         public sealed class Nested<TItem>;
     }
     public sealed class FixedArgument<T>;
+    public sealed class MixedRegistrationActivator<T> : IActivator<FixedArgument<T>>, IActivator<FixedArgument<GenericSurrogate<T>>>
+    {
+        FixedArgument<T> IActivator<FixedArgument<T>>.Create() => new();
+        FixedArgument<GenericSurrogate<T>> IActivator<FixedArgument<GenericSurrogate<T>>>.Create() => new();
+    }
     public sealed class PatternCodec<T> : IBaseCodec<PatternOuter<T>.Nested<FixedArgument<int>>>
     {
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, PatternOuter<T>.Nested<FixedArgument<int>> value)
