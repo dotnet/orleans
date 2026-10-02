@@ -42,7 +42,6 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger logger;
 
         internal const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
-        internal const int MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS = 5;
         internal const int MAX_CLEANUP_ROW_ATTEMPTS = 5;
 
         private readonly ZooKeeperWatcher watcher;
@@ -153,7 +152,7 @@ namespace Orleans.Runtime.Membership
         /// Before each retry, the operation waits up to the session timeout for that session's next connected event.
         /// When the wait expires or the session becomes terminal, the retry proceeds and preserves the native outcome.
         /// The table and child versions fence each complete snapshot pass. Concurrent canonical
-        /// modifications restart the pass up to five total attempts.
+        /// modifications restart the pass until the fence is stable or the caller cancels the operation.
         /// </remarks>
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
@@ -175,7 +174,8 @@ namespace Orleans.Runtime.Membership
         /// Rows are read sequentially on an operation-owned connection.
         /// Each membership record is read before its heartbeat.
         /// Table and child-version checks fence the complete snapshot. Concurrent canonical
-        /// modifications restart the complete sequential pass up to five total attempts.
+        /// modifications restart the complete sequential pass until the fence is stable or the caller cancels the
+        /// operation.
         /// Connection-loss failures in native reads are retried up to four times on the same session.
         /// Before each retry, the operation waits up to the session timeout for that session's next connected event.
         /// When the wait expires or the session becomes terminal, the retry proceeds and preserves the native outcome.
@@ -220,8 +220,9 @@ namespace Orleans.Runtime.Membership
         {
             cancellationToken.ThrowIfCancellationRequested();
             await zk.Sync("/");
-            // Retries retain this session's ordered view.
-            for (var attempt = 0; attempt < MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS; attempt++)
+            // Each mismatch proves that a canonical update committed during the pass. Retain this session's ordered
+            // view and let caller cancellation bound convergence instead of rejecting finite forward progress.
+            while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 Stat before;
@@ -269,9 +270,6 @@ namespace Orleans.Runtime.Membership
                     return new MembershipTableData(rows, ConvertToTableVersion(after.Stat));
                 }
             }
-
-            throw new OrleansException(
-                $"Unable to read a consistent ZooKeeper membership snapshot after {MAX_MEMBERSHIP_SNAPSHOT_ATTEMPTS} attempts.");
         }
 
         private static bool SameVersion(Stat before, Stat after) =>
