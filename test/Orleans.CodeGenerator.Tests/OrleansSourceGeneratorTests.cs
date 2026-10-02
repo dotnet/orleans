@@ -2356,6 +2356,8 @@ public class DemoClass
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Copier_Payload(", source);
         Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<global::TestProject.Payload>>", source);
+        Assert.Contains("OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<global::TestProject.Payload>()", source);
         Assert.DoesNotContain("MakeGenericType", source);
         var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
             .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
@@ -2363,6 +2365,163 @@ public class DemoClass
         Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         var strict = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
         Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesConstructPartialModelRootsWithinPendingGraphs()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                [Id(1)] public System.Collections.Generic.IReadOnlyList<System.Tuple<Item, string>> Members { get; private set; }
+                public Payload(int value) { Value = value; Members = new[] { System.Tuple.Create(new Item { Value = value }, "entry") }; }
+            }
+            [GenerateSerializer]
+            public sealed class Item { [Id(0)] public int Value { get; set; } }
+            """, $"RootActivatorProof{Guid.NewGuid():N}");
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            payload, TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains("provider.GetCodec<global::System.Collections.Generic.IReadOnlyList<", graph.ConfigurationStatements);
+        Assert.DoesNotContain("options.AddDefaultSerializer<global::System.Collections.Generic.IReadOnlyList<", graph.ConfigurationStatements);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var statements = graph.ConfigurationStatements.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var activationRegistration = string.Join(Environment.NewLine, statements.Where(static statement => statement.Contains("CreateDefaultReferenceTypeActivator", StringComparison.Ordinal)));
+        var modelRegistrations = string.Join(Environment.NewLine, statements.Where(static statement => !statement.Contains("CreateDefaultReferenceTypeActivator", StringComparison.Ordinal)));
+        var exerciseSource = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Invocation;
+            using Orleans.Serialization.Serializers;
+            public sealed class RootContext : TypeManifestProviderBase
+            {
+                private readonly bool includeActivator;
+                private int attempts;
+                public RootContext(bool includeActivator) { this.includeActivator = includeActivator; }
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    if (includeActivator)
+                    {
+                        {{activationRegistration}}
+                    }
+                    {{modelRegistrations}}
+                    options.AddSerializerService<ConstructionProbe>(provider =>
+                    {
+                        var probe = new ConstructionProbe(
+                            provider.GetCodec<Response<TestProject.Payload>>(),
+                            provider.GetDeepCopier<Response<TestProject.Payload>>(),
+                            provider.GetActivator<TestProject.Payload>());
+                        if (++attempts == 1)
+                        {
+                            ConstructionProbe.Failed = probe;
+                            throw new InvalidOperationException("injected root failure");
+                        }
+                        return probe;
+                    });
+                }
+            }
+            public sealed class ConstructionProbe
+            {
+                public static ConstructionProbe Failed;
+                public Orleans.Serialization.Codecs.IFieldCodec<Response<TestProject.Payload>> Codec { get; }
+                public Orleans.Serialization.Cloning.IDeepCopier<Response<TestProject.Payload>> Copier { get; }
+                public Orleans.Serialization.Activators.IActivator<TestProject.Payload> Activator { get; }
+                public ConstructionProbe(
+                    Orleans.Serialization.Codecs.IFieldCodec<Response<TestProject.Payload>> codec,
+                    Orleans.Serialization.Cloning.IDeepCopier<Response<TestProject.Payload>> copier,
+                    Orleans.Serialization.Activators.IActivator<TestProject.Payload> activator)
+                { Codec = codec; Copier = copier; Activator = activator; }
+            }
+            public static class RootProof
+            {
+                public static bool Run(bool includeActivator)
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(new RootContext(includeActivator))).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var committed = provider.GetCodec<int>();
+                    try
+                    {
+                        Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstructionProbe>(null, provider);
+                        throw new InvalidOperationException("expected injected root failure");
+                    }
+                    catch (InvalidOperationException error) when (error.Message == "injected root failure") { }
+                    var rebuilt = Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstructionProbe>(null, provider);
+                    using var original = Response.FromResult(new TestProject.Payload(47));
+                    using var copied = services.GetRequiredService<DeepCopier>().Copy(original);
+                    var value = copied.GetResult<TestProject.Payload>();
+                    var codec = provider.GetCodec<Response<TestProject.Payload>>();
+                    using var sessions = services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>().GetSession();
+                    var output = new System.Buffers.ArrayBufferWriter<byte>();
+                    var writer = Orleans.Serialization.Buffers.Writer.Create(output, sessions);
+                    codec.WriteField(ref writer, 0, typeof(Response<TestProject.Payload>), (Response<TestProject.Payload>)original);
+                    writer.Commit();
+                    var activator = provider.GetActivator<TestProject.Payload>();
+                    return value.Value == 47 && !ReferenceEquals(original.Result, value)
+                        && value.Members[0].Item1.Value == 47 && value.Members[0].Item2 == "entry"
+                        && !ReferenceEquals(((TestProject.Payload)original.Result).Members, value.Members)
+                        && !ReferenceEquals(((TestProject.Payload)original.Result).Members[0].Item1, value.Members[0].Item1)
+                        && ReferenceEquals(activator, provider.GetActivator<TestProject.Payload>())
+                        && ReferenceEquals(rebuilt.Activator, activator) && ReferenceEquals(rebuilt.Codec, codec)
+                        && !ReferenceEquals(ConstructionProbe.Failed.Activator, activator)
+                        && !ReferenceEquals(ConstructionProbe.Failed.Copier, rebuilt.Copier)
+                        && ReferenceEquals(committed, provider.GetCodec<int>())
+                        && activator.Create().Value == 0 && output.WrittenCount > 0;
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exerciseSource, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        var run = assembly.GetType("RootProof")!.GetMethod("Run")!;
+        var rejected = Assert.Throws<System.Reflection.TargetInvocationException>(() => run.Invoke(null, [false]));
+        var error = Assert.IsType<InvalidOperationException>(rejected.InnerException);
+        Assert.Contains("IActivator", error.Message);
+        Assert.Contains("graph is unpublished", error.Message);
+        Assert.Equal(true, run.Invoke(null, [true]));
+    }
+
+    [Theory]
+    [InlineData("[UseActivator]", "public Payload(int value) => Value = value;")]
+    [InlineData("", "[GeneratedActivatorConstructor] public Payload(int value) => Value = value;")]
+    public async Task RpcResponseFactoriesPreserveCustomActivatorSelection(string attribute, string constructor)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            {{attribute}}
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                {{constructor}}
+            }
+            """);
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            payload, TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.DoesNotContain("CreateDefaultReferenceTypeActivator", graph.ConfigurationStatements);
+        Assert.DoesNotContain("CreateDefaultValueTypeActivator", graph.ConfigurationStatements);
+        if (constructor.Contains("GeneratedActivatorConstructor", StringComparison.Ordinal))
+        {
+            Assert.Contains("new global::OrleansCodeGen.TestProject.Activator_Payload(", graph.ConfigurationStatements);
+        }
     }
 
     [Theory]
