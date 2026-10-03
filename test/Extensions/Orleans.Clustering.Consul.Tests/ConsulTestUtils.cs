@@ -24,7 +24,7 @@ namespace Consul.Tests
 
         private static readonly ConsulContainer _container = new ConsulBuilder(
             Environment.GetEnvironmentVariable("CONSUL_IMAGE")
-            ?? "mirror.gcr.io/hashicorp/consul:1.19@sha256:e244c64df77ab3586f177f1692e98575086eb40343dc82a6320f5e79543490eb")
+            ?? "mirror.gcr.io/hashicorp/consul:1.22.7@sha256:a230dcea0bb107bd7958a912d1429fb7f9d399637de7ffb814b34412b9e8c543")
             .WithCreateParameterModifier(parameters =>
             {
                 if (parameters.HostConfig is not null && !IsWindowsDockerDaemon())
