@@ -559,6 +559,179 @@ public class ManifestContractTests
         }
     }
 
+    [Theory]
+    [InlineData("Codec", false)]
+    [InlineData("Copier", false)]
+    [InlineData("Converter", false)]
+    [InlineData("Codec", true)]
+    [InlineData("Copier", true)]
+    [InlineData("Converter", true)]
+    public void InterleavedContractsPreserveGlobalOrderAndCollectionMembership(string role, bool arrayTarget)
+    {
+        var options = CreateInterleavedOptions(role, arrayTarget);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var first = role == "Converter" ? typeof(InterleavedConverter<>) : typeof(InterleavedCodecCopier<>);
+        var expected = role == "Converter" ? typeof(InterleavedConverter<int>) : typeof(InterleavedCodecCopier<int>);
+        Assert.IsType(expected, ResolveInterleaved(provider, role, arrayTarget, typeof(GenericSurrogate<int>)));
+
+        var types = role switch
+        {
+            "Codec" => options.SerializerTypes,
+            "Copier" => options.CopierTypes,
+            _ => options.ConverterTypes
+        };
+        Assert.True(types.Remove(first));
+        provider = new CodecProvider(services, Options.Create(options));
+        Assert.IsType(role == "Converter" ? typeof(AlternativeInterleavedConverter<string, int>) : typeof(AlternativeInterleavedCodecCopier<string, int>),
+            ResolveInterleaved(provider, role, arrayTarget, typeof(GenericSurrogate<(string, int)>)));
+
+        Assert.True(types.Add(first));
+        provider = new CodecProvider(services, Options.Create(options));
+        Assert.IsType(expected, ResolveInterleaved(provider, role, arrayTarget, typeof(GenericSurrogate<int>)));
+    }
+
+    [Fact]
+    public void DuplicateIdenticalContractsRetainTheirOriginalPriority()
+    {
+        var options = CreateInterleavedOptions("Copier", false, includeLast: false);
+        var original = options.CopierContracts[typeof(InterleavedCodecCopier<>)][0];
+        options.AddSerializationContract(typeof(InterleavedCodecCopier<>), typeof(IDeepCopier<>), original.TargetDescription!);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<AlternativeInterleavedCodecCopier<string, int>>(provider.GetDeepCopier<GenericTarget<string, int>>());
+        Assert.Single(options.CopierContracts[typeof(InterleavedCodecCopier<>)]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InterleavedExplicitContractsPreserveRawLegacyCollectionPriority(bool legacyLast)
+    {
+        var options = new TypeManifestOptions();
+        var copiers = options.Copiers;
+        if (!legacyLast)
+        {
+            copiers.Add(typeof(LegacyOrderedCopier<,>));
+        }
+        AddInterleavedContracts(options, "Copier", false);
+        if (legacyLast)
+        {
+            copiers.Add(typeof(LegacyOrderedCopier<,>));
+        }
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType(legacyLast ? typeof(LegacyOrderedCopier<string, int>) : typeof(InterleavedCodecCopier<int>),
+            provider.GetDeepCopier<GenericTarget<string, int>>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InterleavedConverterRecordsPreserveLegacySelection(bool legacyLast)
+    {
+        var options = new TypeManifestOptions();
+        var converters = options.Converters;
+        if (!legacyLast)
+        {
+            converters.Add(typeof(LegacyOrderedConverter<,>));
+        }
+        AddInterleavedContracts(options, "Converter", false);
+        if (legacyLast)
+        {
+            converters.Add(typeof(LegacyOrderedConverter<,>));
+        }
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType(legacyLast ? typeof(LegacyOrderedConverter<string, int>) : typeof(InterleavedConverter<int>),
+            ResolveInterleaved(provider, "Converter", false, legacyLast ? typeof(GenericSurrogate<string>) : typeof(GenericSurrogate<int>)));
+    }
+
+    [Fact]
+    public void ClosedServiceFactoriesRetainExactTargetAndActivationPriority()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializer(typeof(InterleavedCodecCopier<string>), typeof(GenericTarget<string, int>));
+        options.AddCopier(typeof(InterleavedCodecCopier<string>), typeof(GenericTarget<string, int>));
+        AddInterleavedContracts(options, "Codec", false);
+        AddInterleavedContracts(options, "Copier", false);
+        var probe = new ClosedFactoryProbe();
+        using var services = new ServiceCollection()
+            .AddSingleton(probe)
+            .AddSingleton(static provider => provider.GetRequiredService<ClosedFactoryProbe>().Create())
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.Same(probe.Instance, provider.GetCodec<GenericTarget<string, int>>());
+        Assert.Same(probe.Instance, provider.GetDeepCopier<GenericTarget<string, int>>());
+        Assert.Equal(1, probe.Calls);
+    }
+
+    private static TypeManifestOptions CreateInterleavedOptions(string role, bool arrayTarget, bool includeLast = true)
+    {
+        var options = new TypeManifestOptions();
+        AddInterleavedContracts(options, role, arrayTarget, includeLast);
+        return options;
+    }
+
+    private static void AddInterleavedContracts(TypeManifestOptions options, string role, bool arrayTarget, bool includeLast = true)
+    {
+        var contract = role == "Codec" ? typeof(IFieldCodec<>) : role == "Copier" ? typeof(IDeepCopier<>) : typeof(IConverter<,>);
+        var first = role == "Converter" ? typeof(InterleavedConverter<>) : typeof(InterleavedCodecCopier<>);
+        var second = role == "Converter" ? typeof(AlternativeInterleavedConverter<,>) : typeof(AlternativeInterleavedCodecCopier<,>);
+        var firstTarget = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int)));
+        var secondTarget = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1));
+        var lastTarget = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Create(typeof(string)), SerializationType.Parameter(0));
+        if (arrayTarget)
+        {
+            firstTarget = SerializationType.Array(firstTarget);
+            secondTarget = SerializationType.Array(secondTarget);
+            lastTarget = SerializationType.Array(lastTarget);
+        }
+        var firstSurrogate = role == "Converter" ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null;
+        var secondSurrogate = role == "Converter" ? SerializationType.Create(typeof(GenericSurrogate<>),
+            SerializationType.Create(typeof(ValueTuple<,>), SerializationType.Parameter(0), SerializationType.Parameter(1))) : null;
+        options.AddSerializationContract(first, contract, firstTarget, firstSurrogate);
+        options.AddSerializationContract(second, contract, secondTarget, secondSurrogate);
+        if (includeLast)
+        {
+            options.AddSerializationContract(first, contract, lastTarget, firstSurrogate);
+        }
+    }
+
+    private static object ResolveInterleaved(CodecProvider provider, string role, bool arrayTarget, Type surrogate)
+    {
+        if (role == "Codec")
+        {
+            if (arrayTarget) return provider.GetCodec<GenericTarget<string, int>[]>();
+            return provider.GetCodec<GenericTarget<string, int>>();
+        }
+        if (role == "Copier")
+        {
+            if (arrayTarget)
+            {
+                var copier = provider.GetDeepCopier<GenericTarget<string, int>[]>();
+                var input = new[] { new GenericTarget<string, int>() };
+                var result = copier.DeepCopy(input, null!);
+                Assert.NotSame(input, result);
+                Assert.Equal(input, result);
+                return copier;
+            }
+            var scalar = provider.GetDeepCopier<GenericTarget<string, int>>();
+            var value = new GenericTarget<string, int>();
+            Assert.NotSame(value, scalar.DeepCopy(value, null!));
+            return scalar;
+        }
+        var target = arrayTarget ? typeof(GenericTarget<string, int>[]) : typeof(GenericTarget<string, int>);
+        object?[] arguments = [target, arrayTarget ? target : typeof(GenericTarget<,>), null, null];
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(surrogate, Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        return Assert.Single(Assert.IsType<object[]>(arguments[3]));
+    }
+
     [Fact]
     public void InvalidContractArgumentsThrowBeforeMutatingOptions()
     {
@@ -687,5 +860,84 @@ public class ManifestContractTests
     {
         public T[] ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => [];
         public GenericSurrogate<T> ConvertToSurrogate(in T[] value) => default;
+    }
+    public sealed class InterleavedCodecCopier<T> :
+        IFieldCodec<GenericTarget<T, int>>, IFieldCodec<GenericTarget<string, T>>,
+        IFieldCodec<GenericTarget<T, int>[]>, IFieldCodec<GenericTarget<string, T>[]>,
+        IDeepCopier<GenericTarget<T, int>>, IDeepCopier<GenericTarget<string, T>>,
+        IDeepCopier<GenericTarget<T, int>[]>, IDeepCopier<GenericTarget<string, T>[]>
+    {
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, object? value) => throw new NotSupportedException();
+        object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<T, int>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<T, int> value) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<string, T>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<string, T> value) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<T, int>[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<T, int>[] value) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<string, T>[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<string, T>[] value) => throw new NotSupportedException();
+        GenericTarget<T, int> IFieldCodec<GenericTarget<T, int>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        GenericTarget<string, T> IFieldCodec<GenericTarget<string, T>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        GenericTarget<T, int>[] IFieldCodec<GenericTarget<T, int>[]>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        GenericTarget<string, T>[] IFieldCodec<GenericTarget<string, T>[]>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        [return: NotNullIfNotNull(nameof(input))]
+        GenericTarget<T, int>? IDeepCopier<GenericTarget<T, int>>.DeepCopy(GenericTarget<T, int>? input, CopyContext context) => input is null ? null : new();
+        [return: NotNullIfNotNull(nameof(input))]
+        GenericTarget<string, T>? IDeepCopier<GenericTarget<string, T>>.DeepCopy(GenericTarget<string, T>? input, CopyContext context) => input is null ? null : new();
+        [return: NotNullIfNotNull(nameof(input))]
+        GenericTarget<T, int>[]? IDeepCopier<GenericTarget<T, int>[]>.DeepCopy(GenericTarget<T, int>[]? input, CopyContext context) => input is null ? null : (GenericTarget<T, int>[])input.Clone();
+        [return: NotNullIfNotNull(nameof(input))]
+        GenericTarget<string, T>[]? IDeepCopier<GenericTarget<string, T>[]>.DeepCopy(GenericTarget<string, T>[]? input, CopyContext context) => input is null ? null : (GenericTarget<string, T>[])input.Clone();
+    }
+    public sealed class AlternativeInterleavedCodecCopier<TFirst, TSecond> : IFieldCodec<GenericTarget<TFirst, TSecond>>,
+        IFieldCodec<GenericTarget<TFirst, TSecond>[]>, IDeepCopier<GenericTarget<TFirst, TSecond>>, IDeepCopier<GenericTarget<TFirst, TSecond>[]>
+    {
+        void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, object? value) => throw new NotSupportedException();
+        object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<TFirst, TSecond>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<TFirst, TSecond> value) => throw new NotSupportedException();
+        void IFieldCodec<GenericTarget<TFirst, TSecond>[]>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] GenericTarget<TFirst, TSecond>[] value) => throw new NotSupportedException();
+        GenericTarget<TFirst, TSecond> IFieldCodec<GenericTarget<TFirst, TSecond>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        GenericTarget<TFirst, TSecond>[] IFieldCodec<GenericTarget<TFirst, TSecond>[]>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+        [return: NotNullIfNotNull(nameof(input))]
+        public GenericTarget<TFirst, TSecond>? DeepCopy(GenericTarget<TFirst, TSecond>? input, CopyContext context) => input is null ? null : new();
+        [return: NotNullIfNotNull(nameof(input))]
+        public GenericTarget<TFirst, TSecond>[]? DeepCopy(GenericTarget<TFirst, TSecond>[]? input, CopyContext context) => input is null ? null : (GenericTarget<TFirst, TSecond>[])input.Clone();
+    }
+    public sealed class InterleavedConverter<T> :
+        IConverter<GenericTarget<T, int>, GenericSurrogate<T>>, IConverter<GenericTarget<string, T>, GenericSurrogate<T>>,
+        IConverter<GenericTarget<T, int>[], GenericSurrogate<T>>, IConverter<GenericTarget<string, T>[], GenericSurrogate<T>>
+    {
+        GenericTarget<T, int> IConverter<GenericTarget<T, int>, GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        GenericTarget<string, T> IConverter<GenericTarget<string, T>, GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        GenericTarget<T, int>[] IConverter<GenericTarget<T, int>[], GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => [];
+        GenericTarget<string, T>[] IConverter<GenericTarget<string, T>[], GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => [];
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<T, int> value) => default;
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<string, T> value) => default;
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<T, int>[] value) => default;
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<string, T>[] value) => default;
+    }
+    public sealed class AlternativeInterleavedConverter<TFirst, TSecond> :
+        IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<(TFirst, TSecond)>>,
+        IConverter<GenericTarget<TFirst, TSecond>[], GenericSurrogate<(TFirst, TSecond)>>
+    {
+        GenericTarget<TFirst, TSecond> IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<(TFirst, TSecond)>>.ConvertFromSurrogate(in GenericSurrogate<(TFirst, TSecond)> surrogate) => new();
+        GenericTarget<TFirst, TSecond>[] IConverter<GenericTarget<TFirst, TSecond>[], GenericSurrogate<(TFirst, TSecond)>>.ConvertFromSurrogate(in GenericSurrogate<(TFirst, TSecond)> surrogate) => [];
+        public GenericSurrogate<(TFirst, TSecond)> ConvertToSurrogate(in GenericTarget<TFirst, TSecond> value) => default;
+        public GenericSurrogate<(TFirst, TSecond)> ConvertToSurrogate(in GenericTarget<TFirst, TSecond>[] value) => default;
+    }
+    public sealed class LegacyOrderedCopier<TFirst, TSecond> : ShallowCopier<GenericTarget<TFirst, TSecond>>;
+    public sealed class LegacyOrderedConverter<TFirst, TSecond> : IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<TFirst>>
+    {
+        public GenericTarget<TFirst, TSecond> ConvertFromSurrogate(in GenericSurrogate<TFirst> surrogate) => new();
+        public GenericSurrogate<TFirst> ConvertToSurrogate(in GenericTarget<TFirst, TSecond> value) => default;
+    }
+    private sealed class ClosedFactoryProbe
+    {
+        public InterleavedCodecCopier<string> Instance { get; } = new();
+        public int Calls { get; private set; }
+        public InterleavedCodecCopier<string> Create()
+        {
+            Calls++;
+            return Instance;
+        }
     }
 }

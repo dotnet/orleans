@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, List<(Type Implementation, SerializationContract Contract)>> _converterContracts = new();
         private readonly List<(Type Implementation, SerializationContract Contract)> _patternConverterContracts = new();
         // A null target groups array and bare-parameter patterns for shape matching.
-        private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationType? Target)>> _implementationCandidates = new();
+        private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationType? Target, int? Order)>> _implementationCandidates = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -201,7 +201,7 @@ namespace Orleans.Serialization.Serializers
                                     _implementationCandidates[candidateKey] = candidates = new();
                                 }
 
-                                candidates.Add((type, registration.TargetDescription));
+                                candidates.Add((type, registration.TargetDescription, metadata.GetContractRegistrationOrder(type, registration)));
                                 if (genericType == typeof(IConverter<,>))
                                 {
                                     var converterRegistrations = _patternConverterContracts;
@@ -265,11 +265,65 @@ namespace Orleans.Serialization.Serializers
                             _implementationCandidates[legacyKey] = legacyCandidates = new();
                         }
 
-                        legacyCandidates.Add((type, null));
-                        if (genericType == typeof(IConverter<,>))
-                        {
-                            _converterContracts.Remove(genericArgument);
-                        }
+                        legacyCandidates.Add((type, null, null));
+                    }
+                }
+
+                foreach (var (key, candidates) in _implementationCandidates)
+                {
+                    if (key.Contract != genericType)
+                    {
+                        continue;
+                    }
+
+                    OrderExplicitCandidates(candidates);
+                    if (key.Target is { } target)
+                    {
+                        resultCollection[target] = candidates[^1].Implementation;
+                    }
+                }
+
+                if (genericType == typeof(IConverter<,>))
+                {
+                    foreach (var registrations in _converterContracts.Values)
+                    {
+                        registrations.Sort(CompareConverterOrder);
+                    }
+                    _patternConverterContracts.Sort(CompareConverterOrder);
+                }
+
+                int CompareConverterOrder(
+                    (Type Implementation, SerializationContract Contract) left,
+                    (Type Implementation, SerializationContract Contract) right)
+                    => metadata.GetContractRegistrationOrder(left.Implementation, left.Contract)
+                        .CompareTo(metadata.GetContractRegistrationOrder(right.Implementation, right.Contract));
+            }
+
+            static void OrderExplicitCandidates(List<(Type Implementation, SerializationType? Target, int? Order)> candidates)
+            {
+                if (candidates.Count < 2)
+                {
+                    return;
+                }
+
+                var explicitCandidates = new List<(Type Implementation, SerializationType? Target, int Order)>();
+                foreach (var candidate in candidates)
+                {
+                    if (candidate.Order is { } order)
+                    {
+                        explicitCandidates.Add((candidate.Implementation, candidate.Target, order));
+                    }
+                }
+                explicitCandidates.Sort(static (left, right) => left.Order.CompareTo(right.Order));
+
+                // Retain raw legacy collection positions while ordering explicit contracts globally.
+                var next = 0;
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    if (candidates[i].Order is not null)
+                    {
+                        var candidate = explicitCandidates[next++];
+                        candidates[i] = (candidate.Implementation, candidate.Target, candidate.Order);
                     }
                 }
             }
