@@ -345,6 +345,8 @@ items:
         href: implementation/grain-directory.md
       - name: Cluster membership
         href: implementation/cluster-management.md
+      - name: View-synchronous cluster services
+        href: implementation/view-synchronous-cluster-services.md
       - name: Cluster manifest retrieval
         href: implementation/cluster-manifest-retrieval.md
       - name: Runtime lifecycle
