@@ -14,7 +14,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext
+    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext, IDisposable
     {
         private readonly Message message;
         private readonly IInvokable request;
@@ -24,6 +24,9 @@ namespace Orleans.Runtime
         private readonly IGrainContext grainContext;
         private readonly ICodecProvider codecProvider;
         private readonly CopyContextPool copyContexts;
+        private Response? ownedResponse;
+        private bool ownedResponseIsCopied;
+        private List<(Response Response, bool IsCopied)>? otherOwnedResponses;
         private int stage;
 
         /// <summary>
@@ -76,6 +79,82 @@ namespace Orleans.Runtime
         }
 
         public Response? Response { get; set; }
+
+        internal (Response Response, bool IsCopied) TakeResponse()
+        {
+            var response = Response!;
+            var isCopied = false;
+            if (ReferenceEquals(response, ownedResponse))
+            {
+                isCopied = ownedResponseIsCopied;
+                ownedResponse = null;
+            }
+
+            if (otherOwnedResponses is { } others)
+            {
+                for (var i = others.Count - 1; i >= 0; i--)
+                {
+                    if (ReferenceEquals(response, others[i].Response))
+                    {
+                        isCopied = others[i].IsCopied;
+                        others.RemoveAt(i);
+                    }
+                }
+            }
+
+            Response = null;
+            return (response, isCopied);
+        }
+
+        public void Dispose()
+        {
+            var response = ownedResponse;
+            ownedResponse = null;
+            var current = Response;
+            Response = null;
+            try
+            {
+                if (current is not null && !ReferenceEquals(current, response)
+                    && (otherOwnedResponses is null || !otherOwnedResponses.Exists(entry => ReferenceEquals(current, entry.Response))))
+                {
+                    current.Dispose();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    response?.Dispose();
+                }
+                finally
+                {
+                    if (otherOwnedResponses is { } others)
+                    {
+                        otherOwnedResponses = null;
+                        foreach (var entry in others) entry.Response.Dispose();
+                    }
+                }
+            }
+        }
+
+        private void SetOwnedResponse(Response response, bool isCopied)
+        {
+            if (ownedResponse is { } previous && !ReferenceEquals(previous, response))
+            {
+                (otherOwnedResponses ??= []).Add((previous, ownedResponseIsCopied));
+            }
+
+            if (otherOwnedResponses is { } others)
+            {
+                for (var i = others.Count - 1; i >= 0; i--)
+                {
+                    if (ReferenceEquals(response, others[i].Response)) others.RemoveAt(i);
+                }
+            }
+
+            ownedResponse = Response = response;
+            ownedResponseIsCopied = isCopied;
+        }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
@@ -134,18 +213,21 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Response = request is IResponseInvokable direct
+                    var response = request is IResponseInvokable direct
                         ? await direct.InvokeAndCopy(codecProvider, copyContexts, responseCopier)
                         : await request.Invoke();
 
                     // Propagate exceptions to other filters.
-                    if (this.Response.Exception is { } exception)
+                    if (response.Exception is { } exception)
                     {
+                        SetOwnedResponse(response, isCopied: false);
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
                     if (request is not IResponseInvokable)
-                        this.Response = this.responseCopier.Copy(this.Response);
+                        response = ResponseCopyBoundary.CopyAndDispose(response, this.responseCopier);
+
+                    SetOwnedResponse(response, isCopied: true);
 
                     return;
                 }

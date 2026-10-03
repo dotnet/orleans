@@ -46,6 +46,9 @@ namespace Orleans.Runtime
 
         void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options);
 
+        /// <summary>
+        /// Transfers the response to the messaging pipeline for delivery.
+        /// </summary>
         void SendResponse(Message request, Response response);
 
         void ReceiveResponse(Message message);
