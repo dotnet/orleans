@@ -38,12 +38,61 @@ internal static class Program
             .BuildServiceProvider();
 
         var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
+        ValidateArrayFallbacks(serviceProvider);
         ValidateGeneratedSerializer(serviceProvider);
         ValidateManualRegistrations(codecProvider);
         ValidateSerializableCallbacks(serviceProvider);
         ValidateGeneratedHelper(codecProvider);
         ValidateConfigurationAnalyzer(serviceProvider, codecProvider);
         ValidateGeneratedProxy(serviceProvider, codecProvider);
+    }
+
+    private static void ValidateArrayFallbacks(IServiceProvider serviceProvider)
+    {
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var copier = serviceProvider.GetRequiredService<DeepCopier>();
+        foreach (var bounds in new[] { new[] { 0, 0 }, new[] { -2, 3 }, new[] { 4 } })
+        {
+            var original = Array.CreateInstance(typeof(string), Enumerable.Repeat(2, bounds.Length).ToArray(), bounds);
+            original.SetValue("first", bounds);
+            var last = bounds.Select(static bound => bound + 1).ToArray();
+            original.SetValue("last", last);
+            var copied = copier.Copy(original) ?? throw new InvalidOperationException("Array copying returned null.");
+            var results = new List<Array> { copied };
+            if (bounds.All(static bound => bound == 0))
+            {
+                results.Add(serializer.Deserialize<Array>(serializer.SerializeToArray<Array>(original))
+                    ?? throw new InvalidOperationException("Array deserialization returned null."));
+            }
+            else
+            {
+                try
+                {
+                    _ = serializer.SerializeToArray<Array>(original);
+                    throw new InvalidOperationException("Array serialization must diagnose non-zero lower bounds.");
+                }
+                catch (NotSupportedException exception)
+                {
+                    Ensure(exception.Message.Contains("non-zero lower bounds", StringComparison.Ordinal),
+                        "Array serialization retains its lower-bound diagnostic.");
+                }
+            }
+            foreach (var result in results)
+            {
+                Ensure(result.GetType() == original.GetType(), "Array fallback preserves the concrete array type.");
+                Ensure(result.Rank == original.Rank, "Array fallback preserves array rank.");
+                for (var dimension = 0; dimension < bounds.Length; dimension++)
+                {
+                    Ensure(result.GetLowerBound(dimension) == bounds[dimension], "Array fallback preserves lower bounds.");
+                    Ensure(result.GetLength(dimension) == 2, "Array fallback preserves dimension lengths.");
+                }
+                Ensure(Equals(result.GetValue(bounds), "first") && Equals(result.GetValue(last), "last"),
+                    "Array fallback preserves values.");
+                Ensure(!ReferenceEquals(original, result), "Array serialization and copying create independent arrays.");
+                result.SetValue("changed", bounds);
+                Ensure(Equals(original.GetValue(bounds), "first"), "Array copy isolation preserves the original values.");
+            }
+        }
     }
 
     private static void ValidateManualRegistrations(CodecProvider codecProvider)

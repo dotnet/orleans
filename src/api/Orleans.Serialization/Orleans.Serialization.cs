@@ -1775,6 +1775,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed partial class DictionaryCodec<TKey, TValue> : IFieldCodec<System.Collections.Generic.Dictionary<TKey, TValue>>, IFieldCodec
     {
+        [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
         public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec, IFieldCodec<System.Collections.Generic.IEqualityComparer<TKey>> comparerCodec) { }
 
         public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec) { }

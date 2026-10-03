@@ -41,7 +41,7 @@ public sealed class StaticSerializerFactoryTests
     public void DirectProviderServicesRemainGraphOwned() => StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
 
     [Fact]
-    public void KeyedDescriptorsDoNotShadowUnkeyedInstances() => StaticFactoryContracts.KeyedDescriptorsDoNotShadowUnkeyedInstances();
+    public void ClosedDependenciesRemainIndependentOfKeyedDiRegistrations() => StaticFactoryContracts.ClosedDependenciesRemainIndependentOfKeyedDiRegistrations();
 
     [Fact]
     public void KeyedOnlyDescriptorsDoNotSelectDependencyConstructors() => StaticFactoryContracts.KeyedOnlyDescriptorsDoNotSelectDependencyConstructors();
