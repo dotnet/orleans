@@ -23,6 +23,7 @@ internal static class RpcResponseGenerator
         Compilation compilation,
         ImmutableArray<ProxyOutputModel> proxies,
         SourceGeneratorOptions options,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames,
         CancellationToken cancellationToken)
     {
         if (proxies.IsDefaultOrEmpty)
@@ -33,7 +34,7 @@ internal static class RpcResponseGenerator
         var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
         var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var resolver = new TypeSymbolResolver(compilation);
-        var proxyContext = new ProxyGenerationContext(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
+        var proxyContext = new ProxyGenerationContext(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options), responseNames);
         ProxySourceOutputGenerator.PopulateProxyInterfaces(proxyContext, resolver,
             proxies.Select(static proxy => proxy.ProxyInterface).ToImmutableArray(), cancellationToken);
         var binding = compilation.GetSemanticModel(compilation.SyntaxTrees.First());
@@ -202,7 +203,7 @@ internal static class RpcResponseGenerator
         source.AppendLine("{");
         foreach (var holder in responseHolders)
         {
-            var name = RpcResponseHolderGenerator.GetName(holder.Key);
+            var name = proxyContext.RpcResponseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
             var factory = name + "Factory";
             var type = holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var resolve = $"{factory}.Resolve(provider)";
@@ -269,7 +270,8 @@ internal static class RpcResponseGenerator
         source.AppendLine("}");
         foreach (var holder in responseHolders)
         {
-            source.AppendLine(RpcResponseHolderGenerator.Generate(services, holder.Key, holder.Value.Codec, holder.Value.Copier));
+            var name = proxyContext.RpcResponseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
+            source.AppendLine(RpcResponseHolderGenerator.Generate(services, holder.Key, name, holder.Value.Codec, holder.Value.Copier));
         }
         source.AppendLine("}");
         var unit = CSharpSyntaxTree.ParseText(source.ToString(),
