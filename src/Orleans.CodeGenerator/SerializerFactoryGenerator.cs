@@ -99,10 +99,14 @@ internal static class SerializerFactoryGenerator
         var copierDependencies = new List<string>();
         if (SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
         {
-            var model = constructionModel;
+            var model = type.IsGenericType
+                ? SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type.OriginalDefinition)!
+                : constructionModel;
             DescribeGeneratedModel(registration, type, model);
-            var codecDeclaration = new SerializerGenerator(services).Generate(model);
+            var codecDeclaration = SpecializeGeneratedSyntax(new SerializerGenerator(services).Generate(model), model, type);
             var copierDeclaration = new CopierGenerator(services).GenerateCopier(model, new());
+            if (copierDeclaration is not null)
+                copierDeclaration = SpecializeGeneratedSyntax(copierDeclaration, model, type);
             registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
             registration.CopierConstruction = copierDeclaration is null
                 ? $"new {registration.Copier}()"
@@ -195,7 +199,10 @@ internal static class SerializerFactoryGenerator
             && SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
         {
             var activatorName = $"global::{constructionModel.GeneratedNamespace}.{ActivatorGenerator.GetSimpleClassName(constructionModel)}";
-            var activator = new ActivatorGenerator(services).GenerateActivator(constructionModel);
+            var activatorModel = type.IsGenericType
+                ? SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type.OriginalDefinition)!
+                : constructionModel;
+            var activator = SpecializeGeneratedSyntax(new ActivatorGenerator(services).GenerateActivator(activatorModel), activatorModel, type);
             result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<")
                 .Append(Name(type)).Append(">, ").Append(activatorName).Append(">(static provider => ")
                 .Append(ConstructGenerated(activatorName, activator))
@@ -658,9 +665,6 @@ internal static class SerializerFactoryGenerator
             ? SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, named.OriginalDefinition)!
             : model;
         DescribeGeneratedModel(registration, named, definitionModel);
-        var substitutions = definitionModel.TypeParameters
-            .Zip(named.GetAllTypeArguments(), static (parameter, argument) => (parameter.Parameter.Name, Type: argument.ToTypeSyntax()))
-            .ToDictionary(static entry => entry.Name, static entry => entry.Type, StringComparer.Ordinal);
         var binding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         var declarations = new List<ClassDeclarationSyntax> { new SerializerGenerator(services).Generate(definitionModel) };
         if (new CopierGenerator(services).GenerateCopier(definitionModel, new()) is { } copierDeclaration)
@@ -670,9 +674,7 @@ internal static class SerializerFactoryGenerator
             .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name).TypeArgumentList.Arguments.Single()))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var substituted = request.ReplaceNodes(request.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
-                .Where(identifier => substitutions.ContainsKey(identifier.Identifier.ValueText)),
-                (original, _) => substitutions[original.Identifier.ValueText]);
+            var substituted = SpecializeGeneratedSyntax(request, definitionModel, named);
             if (binding.GetSpeculativeTypeInfo(0, substituted, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
                 && (SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCodec)
                     || SymbolEqualityComparer.Default.Equals(service.OriginalDefinition, services.LibraryTypes.ArrayCopier)))
@@ -825,6 +827,17 @@ internal static class SerializerFactoryGenerator
                 ? "provider"
                 : Resolve(parameter.Type.ToString())) ?? [];
         return $"new {name}({string.Join(", ", arguments)})";
+    }
+
+    private static TSyntax SpecializeGeneratedSyntax<TSyntax>(TSyntax syntax, ISerializableTypeDescription definition, INamedTypeSymbol type)
+        where TSyntax : SyntaxNode
+    {
+        var substitutions = definition.TypeParameters
+            .Zip(type.GetAllTypeArguments(), static (parameter, argument) => (parameter.Parameter.Name, Type: argument.ToTypeSyntax()))
+            .ToDictionary(static entry => entry.Name, static entry => entry.Type, StringComparer.Ordinal);
+        return syntax.ReplaceNodes(syntax.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+            .Where(identifier => substitutions.ContainsKey(identifier.Identifier.ValueText)),
+            (original, _) => substitutions[original.Identifier.ValueText]);
     }
 
     private static void AppendTypeMetadata(StringBuilder result, INamedTypeSymbol type, LibraryTypes library, HashSet<ITypeSymbol> visited)
