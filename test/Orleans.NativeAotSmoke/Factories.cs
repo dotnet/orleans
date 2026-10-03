@@ -8,4 +8,5 @@ StaticFactoryContracts.ClosedDependenciesRemainIndependentOfKeyedDiRegistrations
 StaticFactoryContracts.KeyedOnlyDescriptorsDoNotSelectDependencyConstructors();
 StaticFactoryContracts.KeyedFacadePreservesProviderCapabilitiesOutsideConstruction();
 StaticFactoryContracts.CapturedKeyedFacadeGuardsPendingConstruction();
+StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
 Console.WriteLine("Static serializer factory contracts passed: atomic graph publication and constructor-failure rollback.");

@@ -22,4 +22,5 @@ StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
 StaticFactoryContracts.FailedCyclicConstructionRollsBack();
 StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();
 StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
+StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
 Console.WriteLine("Serializer context contracts passed: nested collections, generated models, value types, cycles, identity, concurrency, and diagnostics.");

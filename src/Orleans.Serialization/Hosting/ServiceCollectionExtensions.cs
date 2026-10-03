@@ -157,6 +157,19 @@ namespace Orleans.Serialization
             public IServiceCollection Services { get; }
         }
 
+        internal static Type? GetServiceHolderType(Type serviceType)
+        {
+            if (!serviceType.IsConstructedGenericType) return null;
+            var definition = serviceType.GetGenericTypeDefinition();
+            if (definition == typeof(IFieldCodec<>)) return typeof(FieldCodecHolder<>);
+            if (definition == typeof(IBaseCodec<>)) return typeof(BaseCodecHolder<>);
+            if (definition == typeof(IValueSerializer<>)) return typeof(ValueSerializerHolder<>);
+            if (definition == typeof(IActivator<>)) return typeof(ActivatorHolder<>);
+            if (definition == typeof(IDeepCopier<>)) return typeof(CopierHolder<>);
+            if (definition == typeof(IBaseCopier<>)) return typeof(BaseCopierHolder<>);
+            return null;
+        }
+
         private sealed class ActivatorHolder<T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {
             private readonly IActivatorProvider _activatorProvider;
@@ -271,7 +284,7 @@ namespace Orleans.Serialization
     /// Holds a reference to a service.
     /// </summary>
     /// <typeparam name="T">The service type.</typeparam>
-    internal interface IServiceHolder<T>
+    internal interface IServiceHolder<out T>
     {
         /// <summary>
         /// Gets the service.

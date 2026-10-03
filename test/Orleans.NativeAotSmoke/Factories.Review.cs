@@ -13,6 +13,64 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void GeneratedMetadataCollectionsComposeWithClosedFactories()
+    {
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializer(typeof(ListCodec<>));
+            options.AddCopier(typeof(ListCopier<>));
+            options.AddSerializer(typeof(global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Codec_MetadataCompositionValue));
+            options.AddCopier(typeof(global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Copier_MetadataCompositionValue));
+            options.AddAllowedType(typeof(MetadataCompositionValue));
+            options.AddSerializerService<MetadataCompositionRoot>(provider =>
+                new MetadataCompositionRoot(provider.GetCodec<MetadataCompositionValue>(), provider.GetDeepCopier<MetadataCompositionValue>()));
+        });
+        using var scope = services.BuildServiceProvider();
+        var codecs = scope.GetRequiredService<CodecProvider>();
+        var committed = codecs.GetCodec<int>();
+        var root = OrleansGeneratedCodeHelper.GetService<MetadataCompositionRoot>(null!, codecs);
+        Ensure(ReferenceEquals(root.Codec, codecs.GetCodec<MetadataCompositionValue>())
+            && ReferenceEquals(root.Copier, codecs.GetDeepCopier<MetadataCompositionValue>()),
+            "Generated metadata implementations remain canonical after closed-factory construction.");
+        Ensure(ReferenceEquals(committed, codecs.GetCodec<int>()), "Metadata composition reuses the committed closed element codec.");
+        var original = new MetadataCompositionValue { Values = new() { 13, 17 } };
+        original.Alias = original.Values;
+        original.Nested = new() { original.Values, original.Values };
+        original.Next = original;
+        var serializer = scope.GetRequiredService<Serializer>();
+        var restored = serializer.Deserialize<MetadataCompositionValue>(serializer.SerializeToArray(original))!;
+        var copied = scope.GetRequiredService<DeepCopier>().Copy(original)!;
+        foreach (var value in new[] { restored, copied })
+        {
+            Ensure(value.Values.Count == 2 && value.Values[0] == 13 && value.Values[1] == 17,
+                "Generated metadata collections preserve element values.");
+            Ensure(ReferenceEquals(value.Values, value.Alias)
+                && ReferenceEquals(value.Values, value.Nested[0]) && ReferenceEquals(value.Values, value.Nested[1])
+                && ReferenceEquals(value, value.Next), "Generated metadata preserves nested aliases and cycles.");
+            Ensure(!ReferenceEquals(original, value) && !ReferenceEquals(original.Values, value.Values),
+                "Generated metadata restores independent values.");
+        }
+        copied.Values[0] = 23;
+        Ensure(original.Values[0] == 13 && copied.Alias[0] == 23, "Generated metadata copying isolates original collections.");
+    }
+
+    [GenerateSerializer]
+    public sealed class MetadataCompositionValue
+    {
+        [Id(0)] public List<int> Values { get; set; } = new();
+        [Id(1)] public List<int> Alias { get; set; } = new();
+        [Id(2)] public List<List<int>> Nested { get; set; } = new();
+        [Id(3)] public MetadataCompositionValue? Next { get; set; }
+    }
+
+    private sealed class MetadataCompositionRoot(IFieldCodec<MetadataCompositionValue> codec,
+        Orleans.Serialization.Cloning.IDeepCopier<MetadataCompositionValue> copier)
+    {
+        public IFieldCodec<MetadataCompositionValue> Codec { get; } = codec;
+        public Orleans.Serialization.Cloning.IDeepCopier<MetadataCompositionValue> Copier { get; } = copier;
+    }
+
     public static void KeyedFacadePreservesProviderCapabilitiesOutsideConstruction()
     {
         var unkeyed = new KeyedDependency<int>();
