@@ -18,6 +18,7 @@ ContextContracts.CollectionRecursionPreservesIdentity();
 ContextContracts.DuplicateContextsAndConcurrentResolution();
 ContextContracts.MissingTypesAndCustomComparersFailClearly();
 ContextContracts.ModelAliasesAndTypeIdsRoundTrip();
+StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
 StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
 StaticFactoryContracts.FailedCyclicConstructionRollsBack();
 StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();

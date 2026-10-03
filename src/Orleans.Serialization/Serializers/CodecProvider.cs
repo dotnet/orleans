@@ -619,6 +619,11 @@ namespace Orleans.Serialization.Serializers
                 _constructionFailure?.Throw();
                 if (_serializerServices.TryGetValue(type, out result)) return true;
                 if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return true;
+                if (_constructingSerializerServices.Contains(type))
+                {
+                    ThrowResolutionFailure(new InvalidOperationException(
+                        $"Recursive serializer factory resolution for {type} requires an in-progress instance. Use caller-aware generated-code helpers or statically closed holders to resolve recursive constructor dependencies."));
+                }
                 var isRoot = _pendingSerializerServices is null;
                 _pendingSerializerServices ??= new();
                 _constructingSerializerServices.Add(type);
