@@ -776,31 +776,31 @@ public sealed class CassandraGrainStorageTests
                         case "read":
                             return Read(new RowKey((string)values[0], (string)values[1], (string)values[2]));
                         case "insert":
-                        {
-                            var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
-                            if (_rows.ContainsKey(key)) return Applied(false);
-                            _rows[key] = new StoredRow((Guid)values[4], true, (byte[])values[5]);
-                            return Applied(true);
-                        }
+                            {
+                                var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
+                                if (_rows.ContainsKey(key)) return Applied(false);
+                                _rows[key] = new StoredRow((Guid)values[4], true, (byte[])values[5]);
+                                return Applied(true);
+                            }
                         case "update":
                             return Update(new RowKey((string)values[4], (string)values[5], (string)values[6]), (Guid)values[7], (Guid)values[1], (byte[])values[2]);
                         case "clear":
                             return UpdateClear(new RowKey((string)values[2], (string)values[3], (string)values[4]), (Guid)values[5], (Guid)values[0]);
                         case "delete":
-                        {
-                            var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
-                            if (!_rows.TryGetValue(key, out var existing) || existing.ETag != (Guid)values[3]) return Applied(false);
-                            _rows.Remove(key);
-                            return Applied(true);
-                        }
+                            {
+                                var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
+                                if (!_rows.TryGetValue(key, out var existing) || existing.ETag != (Guid)values[3]) return Applied(false);
+                                _rows.Remove(key);
+                                return Applied(true);
+                            }
                         case "delete-without-etag":
-                        {
-                            var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
-                            if (!_rows.TryGetValue(key, out var row)) return Applied(true);
-                            if (row.RecordExists) return Applied(false, row);
-                            _rows.Remove(key);
-                            return Applied(true);
-                        }
+                            {
+                                var key = new RowKey((string)values[0], (string)values[1], (string)values[2]);
+                                if (!_rows.TryGetValue(key, out var row)) return Applied(true);
+                                if (row.RecordExists) return Applied(false, row);
+                                _rows.Remove(key);
+                                return Applied(true);
+                            }
                         default:
                             return default;
                     }
