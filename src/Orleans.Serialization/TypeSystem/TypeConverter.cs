@@ -257,7 +257,13 @@ public class TypeConverter
                 genericArgument = genericArgument.GetGenericTypeDefinition();
             }
 
-            if (genericArgument.IsGenericParameter || genericArgument.IsArray)
+            if (genericArgument.IsArray)
+            {
+                FormatAndAddAllowedType(genericArgument);
+                return;
+            }
+
+            if (genericArgument.IsGenericParameter)
             {
                 return;
             }

@@ -114,6 +114,8 @@ descriptors such as `SerializationType.Create(typeof(MyValue[]))`. The generator
 emits these concrete descriptors for fully known array shapes, including arrays
 nested in partly generic contracts. Target-taking registrations can likewise supply
 closed codec, copier, and converter types and concrete surrogate types.
+Concrete array descriptors also register their element and generic-argument type
+names with `TypeConverter`.
 
 Resolving an array matching pattern as an executable type reports
 `NotSupportedException` with closed-registration guidance on both JIT and NativeAOT
