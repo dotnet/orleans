@@ -9,7 +9,7 @@ using Orleans.Serialization.Invocation;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable, IMessageReceiverCache, IDisposable
+    internal sealed class Message : ISpanFormattable, IDisposable
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -19,9 +19,6 @@ namespace Orleans.Runtime
         private short _retryCount;
 
         public CoarseStopwatch _timeToExpiry;
-
-        [field: NonSerialized]
-        public object? MessageReceiver { get; set; }
 
         internal object? _bodyObject;
 

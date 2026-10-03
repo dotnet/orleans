@@ -130,7 +130,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         {
             messageSerializer = Shared.GetMessageSerializer();
             messageSerializer.ReadHeaders(this, out message);
-            message.MessageReceiver = connection;
             connection.MarkMessageReceived();
             connection.RecordMessageReceive(message, PayloadLength, HeaderLength);
 

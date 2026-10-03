@@ -16,7 +16,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract partial class Connection : IMessageReceiver
+    internal abstract partial class Connection
     {
         private readonly ConnectionCommon _shared;
         private readonly TaskCompletionSource _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -478,18 +478,6 @@ namespace Orleans.Runtime.Messaging
             {
                 message.Dispose();
             }
-        }
-
-        public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
-        {
-            if (!IsValid)
-            {
-                cache.MessageReceiver = null;
-                RetryMessage(message);
-                return;
-            }
-
-            Send(message);
         }
 
         [LoggerMessage(
