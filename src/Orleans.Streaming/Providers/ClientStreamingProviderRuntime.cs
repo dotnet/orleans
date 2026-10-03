@@ -9,9 +9,9 @@ namespace Orleans.Providers
 {
     internal class ClientStreamingProviderRuntime : IStreamProviderRuntime, ILifecycleParticipant<IClusterClientLifecycle>
     {
-        private readonly IStreamPubSub grainBasedPubSub;
-        private readonly IStreamPubSub implicitPubSub;
-        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
+        private readonly IStreamPubSubRuntime grainBasedPubSub;
+        private readonly IStreamPubSubRuntime implicitPubSub;
+        private readonly IStreamPubSubRuntime combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory? streamDirectory;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
@@ -71,7 +71,7 @@ namespace Orleans.Providers
             return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
         }
 
-        public IStreamPubSub? PubSub(StreamPubSubType pubSubType)
+        public IStreamPubSubRuntime? PubSub(StreamPubSubType pubSubType)
         {
             switch (pubSubType)
             {

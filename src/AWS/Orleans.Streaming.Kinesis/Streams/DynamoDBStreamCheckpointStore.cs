@@ -13,15 +13,7 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.Kinesis
 {
-    internal interface IDynamoDBStreamCheckpointStore
-    {
-        ValueTask<string> Load(CancellationToken cancellationToken);
-
-        ValueTask<string> Update(
-            string checkpoint,
-            string expectedCheckpoint,
-            CancellationToken cancellationToken);
-    }
+    internal interface IDynamoDBStreamCheckpointStore : IStreamCheckpointStore;
 
     internal sealed partial class DynamoDBStreamCheckpointStore : IDynamoDBStreamCheckpointStore
     {
@@ -57,13 +49,13 @@ namespace Orleans.Streaming.Kinesis
             };
         }
 
-        public async ValueTask<string> Load(CancellationToken cancellationToken)
+        public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
         {
             await _mutex.WaitAsync(cancellationToken);
             try
             {
                 await LoadCore(cancellationToken);
-                return _checkpoint;
+                return GetState();
             }
             finally
             {
@@ -71,13 +63,13 @@ namespace Orleans.Streaming.Kinesis
             }
         }
 
-        public async ValueTask<string> Update(
+        public async ValueTask<StreamCheckpointStoreState> Update(
             string checkpoint,
-            string expectedCheckpoint,
+            string expectedVersion,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(checkpoint);
-            ArgumentNullException.ThrowIfNull(expectedCheckpoint);
+            ArgumentNullException.ThrowIfNull(expectedVersion);
 
             await _mutex.WaitAsync(cancellationToken);
             try
@@ -87,9 +79,12 @@ namespace Orleans.Streaming.Kinesis
                     await LoadCore(cancellationToken);
                 }
 
-                if (!string.Equals(_checkpoint, expectedCheckpoint, StringComparison.Ordinal))
+                var currentVersion = _version == 0
+                    ? string.Empty
+                    : _version.ToString(CultureInfo.InvariantCulture);
+                if (!string.Equals(currentVersion, expectedVersion, StringComparison.Ordinal))
                 {
-                    return _checkpoint;
+                    return GetState();
                 }
 
                 try
@@ -137,13 +132,19 @@ namespace Orleans.Streaming.Kinesis
                     await LoadCore(cancellationToken);
                 }
 
-                return _checkpoint;
+                return GetState();
             }
+
             finally
             {
                 _mutex.Release();
             }
         }
+
+        private StreamCheckpointStoreState GetState()
+            => new(
+                _checkpoint,
+                _version == 0 ? string.Empty : _version.ToString(CultureInfo.InvariantCulture));
 
         internal static async Task InitializeTable(
             IAmazonDynamoDB client,

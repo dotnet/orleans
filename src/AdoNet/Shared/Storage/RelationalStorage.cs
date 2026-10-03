@@ -286,6 +286,8 @@ namespace Orleans.Tests.SqlUtils
         {
             using (var reader = await command.ExecuteReaderAsync(commandBehavior, cancellationToken).ConfigureAwait(continueOnCapturedContext: false))
             {
+                // MySql.Data can return a null reader after canceling a synchronous command.
+                cancellationToken.ThrowIfCancellationRequested();
                 CancellationTokenRegistration cancellationRegistration = default;
                 try
                 {

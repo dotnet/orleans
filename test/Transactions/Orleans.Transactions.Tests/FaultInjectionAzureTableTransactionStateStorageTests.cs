@@ -145,10 +145,13 @@ public class FaultInjectionAzureTableTransactionStateStorageTests
         Assert.Empty(table.SubmittedTransactions);
     }
 
-    [Fact]
-    public async Task Participate_CanceledStart_ForwardsCancellationTokenWithoutContactingStorage()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Participate_CancellationStopsTableInitialization(bool cancelBeforeStart)
     {
-        var table = new RecordingTableClient([]);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var table = new RecordingTableClient([]) { OnCreate = cancellation.Cancel };
         var tableService = new RecordingTableServiceClient(table);
         using var services = CreateServices(options => options.TableServiceClient = tableService);
         var inner = new AzureTableTransactionalStateStorageFactory(
@@ -160,17 +163,20 @@ public class FaultInjectionAzureTableTransactionStateStorageTests
         var factory = new FaultInjectionAzureTableTransactionStateStorageFactory(inner);
         var lifecycle = new RecordingSiloLifecycle();
         factory.Participate(lifecycle);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        if (cancelBeforeStart)
+        {
+            cancellation.Cancel();
+        }
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => lifecycle.StartAsync(cancellation.Token));
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         Assert.Equal(AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE, lifecycle.Stage);
-        Assert.Equal(0, tableService.GetTableClientCallCount);
-        Assert.Equal(0, table.CreateIfNotExistsCallCount);
-        Assert.Equal(CancellationToken.None, table.CreateCancellationToken);
+        var expectedCreateCalls = cancelBeforeStart ? 0 : 1;
+        Assert.Equal(expectedCreateCalls, tableService.GetTableClientCallCount);
+        Assert.Equal(expectedCreateCalls, table.CreateIfNotExistsCallCount);
+        Assert.Equal(cancelBeforeStart ? default : cancellation.Token, table.CreateCancellationToken);
         Assert.Equal(0, table.QueryCallCount);
         Assert.Empty(table.SubmittedTransactions);
     }
@@ -297,6 +303,8 @@ public class FaultInjectionAzureTableTransactionStateStorageTests
 
         public CancellationToken CreateCancellationToken { get; private set; }
 
+        public Action? OnCreate { get; init; }
+
         public List<IReadOnlyList<SubmittedAction>> SubmittedTransactions { get; } = [];
 
         public override AsyncPageable<T> QueryAsync<T>(
@@ -341,6 +349,7 @@ public class FaultInjectionAzureTableTransactionStateStorageTests
         {
             CreateIfNotExistsCallCount++;
             CreateCancellationToken = cancellationToken;
+            OnCreate?.Invoke();
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(
                 Response.FromValue(

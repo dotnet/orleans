@@ -140,7 +140,7 @@ namespace Orleans.Runtime
                 rehydrationContext?.Dispose();
                 return result;
             }
-            else if (grainId.IsSystemTarget())
+            else if (grainId.IsSystemTarget() || grainId.IsClient())
             {
                 rehydrationContext?.Dispose();
                 return null;

@@ -54,6 +54,12 @@ If spans appear as separate traces, confirm <xref:Orleans.Hosting.ClientBuilderE
 
 Avoid recording grain keys and state values by default. They can be high-cardinality or sensitive. If an incident requires them, use restricted, time-limited capture and remove it afterward.
 
+## Stream consumer cleanup
+
+Subscribe to <xref:Orleans.Streaming.Diagnostics.StreamingEvents.AllEvents*> to correlate a consumer's delivery and cleanup transitions by provider, stream, subscription, consumer endpoint, and silo. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.MessageDeliveryFailed> includes the attempted position and original exception. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.SubscriptionUnregistration> reports when the pulling agent requests pubsub cleanup and when that request completes or fails. <xref:Orleans.Streaming.Diagnostics.StreamingEvents.SubscriptionUnregistered> marks the successful durable removal.
+
+When a client route becomes stale, the runtime refreshes its candidate routes at the owning gateways while preserving the directory's versioned routing state. An available gateway receives the request; an unavailable client produces <xref:Orleans.Runtime.ClientNotAvailableException>, which initiates subscription cleanup. Owner-refresh failures retain the pending refresh so that a subsequent lookup can retry. For a cleanup timeout, capture the last observed transition and its exception: a delivery failure identifies the routing or consumer failure, a pending unregistration identifies the pubsub request, and a failed unregistration identifies its storage or callback failure. Keep diagnostic capture bounded and retain positions and identifiers rather than event payloads.
+
 ## Baseline alerts
 
 Tune alerts against normal traffic and service objectives. A practical initial set is:
@@ -73,4 +79,4 @@ Page on user impact or imminent data/availability risk. Route isolated warnings 
 
 ## Dashboard and telemetry backends
 
-The Orleans Dashboard provides a current operational view and method profiling. It isn't a replacement for retained logs, metrics, traces, or alerts. Secure it as an administrative endpoint and use OTLP for durable telemetry. See [Orleans Dashboard](../../dashboard/index.md).
+The Orleans Dashboard provides a current operational view and method profiling. Use logs, metrics, traces, and alerts for durable telemetry. Secure the dashboard as an administrative endpoint and export telemetry through OTLP. See [Orleans Dashboard](../../dashboard/index.md).
