@@ -108,6 +108,20 @@ The selected registration supplies the arguments for implementation closure:
 plain open-target entries use positional arguments, and described entries use
 their matched parameter bindings, including when both belong to one implementation.
 
+`SerializationType.Array` describes a structural target-matching pattern, including
+generic element parameters. Executable array types use source-known closed
+descriptors such as `SerializationType.Create(typeof(MyValue[]))`. The generator
+emits these concrete descriptors for fully known array shapes, including arrays
+nested in partly generic contracts. Target-taking registrations can likewise supply
+closed codec, copier, and converter types and concrete surrogate types.
+
+Resolving an array matching pattern as an executable type reports
+`NotSupportedException` with closed-registration guidance on both JIT and NativeAOT
+runtimes. Register each closed converter/surrogate combination used by an executable
+surrogate description containing parameterized arrays. This gives both runtimes the
+same registration contract and supplies the native array representations through
+typed code and source-known type references.
+
 NativeAOT applications also provide statically compiled closed codec and serializer
 instances for the generic combinations they use. The `Metadata` scenario in
 `test/Orleans.NativeAotSmoke` exercises the default manifest and primitive, reference

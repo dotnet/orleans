@@ -30,6 +30,10 @@ public sealed class SerializationType
     /// <param name="type">The concrete type or generic definition.</param>
     /// <param name="arguments">The generic arguments, in declaration order.</param>
     /// <returns>The type description.</returns>
+    /// <remarks>
+    /// Array types supplied to this method must be closed. Use <see cref="Array"/>
+    /// to describe a structural target-matching pattern with generic element parameters.
+    /// </remarks>
     public static SerializationType Create(
 #if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
@@ -45,6 +49,13 @@ public sealed class SerializationType
         if (arguments is null)
         {
             throw new ArgumentNullException(nameof(arguments));
+        }
+
+        if (type.IsArray && type.ContainsGenericParameters)
+        {
+            throw new ArgumentException(
+                "An executable array type must be closed. Use SerializationType.Array to describe a structural target-matching pattern.",
+                nameof(type));
         }
 
         if (arguments.Length > 0 && (!type.IsGenericTypeDefinition || type.GetGenericArguments().Length != arguments.Length))
@@ -79,11 +90,17 @@ public sealed class SerializationType
     }
 
     /// <summary>
-    /// Describes an array of a serialized type.
+    /// Describes an array shape for matching a serialization contract's target.
     /// </summary>
     /// <param name="element">The element type description.</param>
     /// <param name="rank">The array rank, starting at one for a vector.</param>
     /// <returns>The array description.</returns>
+    /// <remarks>
+    /// Array descriptions bind element parameters when matching a requested target type.
+    /// Executable type resolution requires a source-known closed array supplied using
+    /// <see cref="Create"/> or a closed converter registration. Resolving an array shape
+    /// as an executable type throws <see cref="NotSupportedException"/> on all runtimes.
+    /// </remarks>
     public static SerializationType Array(SerializationType element, int rank = 1)
     {
         if (element is null)

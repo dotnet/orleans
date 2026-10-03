@@ -1368,8 +1368,8 @@ namespace Orleans.Serialization.Serializers
 
             if (description.ArrayRank > 0)
             {
-                var element = ResolveSerializationType(description.Arguments[0], parameters);
-                return ConstructArrayMetadata(element, description.ArrayRank);
+                throw new NotSupportedException(
+                    "Supply a source-known closed array type using SerializationType.Create(typeof(ClosedArray)) or an explicit closed converter registration when resolving executable serialization metadata. Array descriptions are structural matching patterns.");
             }
 
             var type = description.Type!;
@@ -1385,24 +1385,6 @@ namespace Orleans.Serialization.Serializers
             }
 
             return ConstructGenericImplementation(type, arguments);
-        }
-
-#if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("AOT", "IL3050",
-            Justification = "Array descriptions bind registered metadata shapes, including generic parameter arrays. Closed arrays need native code supplied by a closed factory or typed generated dependency; unavailable native shapes fail with registration guidance.")]
-#endif
-        private static Type ConstructArrayMetadata(Type element, int rank)
-        {
-            try
-            {
-                return rank == 1 ? element.MakeArrayType() : element.MakeArrayType(rank);
-            }
-            catch (NotSupportedException exception) when (!RuntimeFeature.IsDynamicCodeSupported)
-            {
-                throw new NotSupportedException(
-                    $"The runtime cannot materialize serialization array metadata for {element} with rank {rank}. Register the closed array codec/copier and dependencies using a serializer context or closed factories.",
-                    exception);
-            }
         }
 
         private IBaseCodec? CreateBaseCodecInstance(Type fieldType, Type searchType)
