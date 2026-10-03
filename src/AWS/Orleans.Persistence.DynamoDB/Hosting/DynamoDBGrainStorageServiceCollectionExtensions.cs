@@ -49,6 +49,7 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator>(sp => new DynamoDBGrainStorageOptionsValidator(sp.GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>().Get(name), name));
             services.ConfigureNamedOptionForLogging<DynamoDBStorageOptions>(name);
             services.AddTransient<IPostConfigureOptions<DynamoDBStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<DynamoDBStorageOptions>>();
+            services.TryAddEnumerable(ServiceDescriptor.Transient<IPostConfigureOptions<DynamoDBStorageOptions>, DynamoDBStorageClusterServiceIdConfigurator>());
             return services.AddGrainStorage(name, DynamoDBGrainStorageFactory.Create);
         }
     }

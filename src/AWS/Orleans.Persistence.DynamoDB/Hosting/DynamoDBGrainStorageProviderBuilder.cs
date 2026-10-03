@@ -56,6 +56,16 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
                     options.ServiceId = serviceId;
                 }
 
+                if (bool.TryParse(configurationSection[nameof(options.UseClusterServiceId)], out var useClusterServiceId))
+                {
+                    options.UseClusterServiceId = useClusterServiceId;
+                }
+
+                if (bool.TryParse(configurationSection[nameof(options.MigrateLegacyKeys)], out var migrateLegacyKeys))
+                {
+                    options.MigrateLegacyKeys = migrateLegacyKeys;
+                }
+
                 var tableName = configurationSection[nameof(options.TableName)];
                 if (!string.IsNullOrEmpty(tableName))
                 {
