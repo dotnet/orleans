@@ -12,4 +12,5 @@ RpcResponseContracts.CompletedResponseRoundTrip();
 RpcResponseContracts.ExceptionTransportRequiresDeclaredGraph();
 RpcResponseContracts.RawResponses();
 RpcResponseContracts.MissingNativeResponseRegistration();
-Console.WriteLine("Native Response dispatch passed: DeepCopier<Response>, bool, int, reference cycles, null, completion/exception identity, and raw message encoding.");
+RpcConstructionContracts.DefaultGraphsRespectConstructorDependencies();
+Console.WriteLine("Native Response dispatch passed: DeepCopier<Response>, bool, int, reference cycles, null, completion/exception identity, raw message encoding, and canonical constructor activation after default graph declination.");

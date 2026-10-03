@@ -238,6 +238,68 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Theory]
+    [InlineData("None", false)]
+    [InlineData("ImplementationType", false)]
+    [InlineData("ImplementationFactory", false)]
+    [InlineData("Instance", true)]
+    [InlineData("SerializerFactory", true)]
+    public void DefaultFactoryConstructorDependenciesRespectPublicationBoundary(string registration, bool eligible)
+    {
+        var dependency = new FactoryDependency();
+        var codec = new Int32Codec();
+        var calls = 0;
+        var collection = new ServiceCollection();
+        if (registration == "ImplementationType") collection.AddSingleton<FactoryDependency>();
+        if (registration == "ImplementationFactory") collection.AddSingleton(_ => dependency);
+        if (registration == "Instance") collection.AddSingleton(dependency);
+        using var services = collection.Configure<TypeManifestOptions>(options =>
+        {
+            if (registration == "SerializerFactory")
+                options.AddSerializerService<FactoryDependency>(_ => dependency);
+            options.AddDefaultSerializerService<DependencyBoundFactoryService, DependencyBoundFactoryService>(
+                provider => new(OrleansGeneratedCodeHelper.GetService<FactoryDependency>(null!, provider)),
+                dependencies: [typeof(FactoryDependency)]);
+            var bridgeDependencies = new[] { typeof(DependencyBoundFactoryService) };
+            options.AddDefaultSerializerService<ConstructorBridge>(
+                provider => new(OrleansGeneratedCodeHelper.GetService<DependencyBoundFactoryService>(null!, provider)),
+                bridgeDependencies);
+            bridgeDependencies[0] = typeof(InvalidOperationException);
+            options.AddDefaultSerializer<int, Int32Codec, ShallowCopier<int>>(provider =>
+            {
+                calls++;
+                var bridge = OrleansGeneratedCodeHelper.GetService<ConstructorBridge>(null!, provider);
+                Assert.Same(dependency, bridge.Service.Dependency);
+                return codec;
+            }, static _ => new ShallowCopier<int>(), codecDependencies: [typeof(ConstructorBridge)]);
+        }).AddSerializer().BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var result = provider.GetCodec<int>();
+        Assert.Equal(eligible ? 1 : 0, calls);
+        if (eligible)
+        {
+            Assert.Same(codec, result);
+            Assert.Same(dependency, OrleansGeneratedCodeHelper.GetService<DependencyBoundFactoryService>(null!, provider).Dependency);
+        }
+        else
+        {
+            Assert.IsType<Int32Codec>(result);
+            Assert.NotSame(codec, result);
+        }
+    }
+
+    private sealed class FactoryDependency;
+
+    private sealed class DependencyBoundFactoryService(FactoryDependency dependency)
+    {
+        public FactoryDependency Dependency { get; } = dependency;
+    }
+
+    private sealed class ConstructorBridge(DependencyBoundFactoryService service)
+    {
+        public DependencyBoundFactoryService Service { get; } = service;
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void DefaultFactoryRegistrationsYieldToExplicitFactories(bool explicitFirst)
