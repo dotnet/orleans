@@ -585,7 +585,7 @@ namespace Orleans.Serialization.Configuration
             }
 
             var registration = new SerializationContract(contractType, targetType, surrogateType, surrogateDescription, targetDescription);
-            if (!registrations.Contains(registration))
+            if (!registrations.Exists(existing => existing.IsEquivalentTo(registration)))
             {
                 registrations.Add(registration);
                 _contractRegistrationOrders.Add((type, registration), _contractRegistrationOrders.Count);

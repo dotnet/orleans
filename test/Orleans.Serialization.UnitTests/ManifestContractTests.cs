@@ -605,6 +605,93 @@ public class ManifestContractTests
     }
 
     [Theory]
+    [InlineData("Codec", false)]
+    [InlineData("Copier", false)]
+    [InlineData("Converter", false)]
+    [InlineData("Codec", true)]
+    [InlineData("Copier", true)]
+    [InlineData("Converter", true)]
+    public void IndependentlyBuiltEquivalentDescriptorsPreserveOriginalPriority(string role, bool arrayTarget)
+    {
+        var options = CreateInterleavedOptions(role, arrayTarget, includeLast: false);
+        var contract = role == "Codec" ? typeof(IFieldCodec<>) : role == "Copier" ? typeof(IDeepCopier<>) : typeof(IConverter<,>);
+        var first = role == "Converter" ? typeof(InterleavedConverter<>) : typeof(InterleavedCodecCopier<>);
+        var registrations = role == "Codec" ? options.SerializerContracts : role == "Copier" ? options.CopierContracts : options.ConverterContracts;
+        var original = Assert.Single(registrations[first]);
+        var copiedTarget = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int)));
+        if (arrayTarget)
+        {
+            copiedTarget = SerializationType.Array(copiedTarget);
+        }
+        var copiedSurrogate = role == "Converter" ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null;
+        Assert.NotSame(original.TargetDescription, copiedTarget);
+        if (role == "Converter")
+        {
+            Assert.NotSame(original.SurrogateDescription, copiedSurrogate);
+        }
+        options.AddSerializationContract(first, contract, copiedTarget, copiedSurrogate);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType(role == "Converter" ? typeof(AlternativeInterleavedConverter<string, int>) : typeof(AlternativeInterleavedCodecCopier<string, int>),
+            ResolveInterleaved(provider, role, arrayTarget, typeof(GenericSurrogate<(string, int)>)));
+        Assert.Single(registrations[first]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitPartialShapesPreserveLegacyTargetsAndOtherRoles(bool rawCollection)
+    {
+        var options = new TypeManifestOptions();
+        if (rawCollection)
+        {
+            options.Serializers.Add(typeof(LegacyMultiShapeCodec<>));
+        }
+        else
+        {
+            options.AddSerializer(typeof(LegacyMultiShapeCodec<>));
+        }
+        options.AddSerializationContract(typeof(LegacyMultiShapeCodec<>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, int>>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, string>>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<FixedArgument<string>, Guid>>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, string>[]>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, FixedArgument<int>>>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetValueSerializer<GenericSurrogate<Guid>>());
+        Assert.Null(provider.GetType().GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider,
+            [typeof(LegacyMultiShapeCodec<>), typeof(GenericTarget<Guid, decimal>), typeof(IBaseCodec<>)]));
+        options.AddSerializationContract(typeof(ReplacementStringShapeCodec<>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(string))));
+        provider = new CodecProvider(services, Options.Create(options));
+        Assert.IsType<ReplacementStringShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, string>>());
+        Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, int>>());
+    }
+
+    [Fact]
+    public void LegacyConvertersUseTheSelectedPartialTargetBindings()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(LegacyMultiShapeConverter<>));
+        options.AddSerializationContract(typeof(LegacyMultiShapeConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        foreach (var target in new[] { typeof(GenericTarget<Guid, int>), typeof(GenericTarget<Guid, string>), typeof(GenericTarget<FixedArgument<string>, Guid>) })
+        {
+            object?[] arguments = [target, typeof(GenericTarget<,>), null, null];
+            Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+            Assert.Equal(typeof(GenericSurrogate<Guid>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+            Assert.IsType<LegacyMultiShapeConverter<Guid>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void InterleavedExplicitContractsPreserveRawLegacyCollectionPriority(bool legacyLast)
@@ -925,6 +1012,38 @@ public class ManifestContractTests
         public GenericSurrogate<(TFirst, TSecond)> ConvertToSurrogate(in GenericTarget<TFirst, TSecond>[] value) => default;
     }
     public sealed class LegacyOrderedCopier<TFirst, TSecond> : ShallowCopier<GenericTarget<TFirst, TSecond>>;
+    public sealed class LegacyMultiShapeCodec<T> :
+        IBaseCodec<GenericTarget<T, int>>, IBaseCodec<GenericTarget<T, string>>, IBaseCodec<GenericTarget<FixedArgument<string>, T>>,
+        IBaseCodec<GenericTarget<T, string>[]>, IBaseCodec<GenericTarget<T, FixedArgument<int>>>, IValueSerializer<GenericSurrogate<T>>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<T, int> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<T, int> value) { }
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<T, string> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<T, string> value) { }
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<FixedArgument<string>, T> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<FixedArgument<string>, T> value) { }
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<T, string>[] value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<T, string>[] value) { }
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<T, FixedArgument<int>> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<T, FixedArgument<int>> value) { }
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref GenericSurrogate<T> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref GenericSurrogate<T> value) { }
+    }
+    public sealed class ReplacementStringShapeCodec<T> : IBaseCodec<GenericTarget<T, string>>
+    {
+        public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, GenericTarget<T, string> value) where TBufferWriter : IBufferWriter<byte> { }
+        public void Deserialize<TInput>(ref Reader<TInput> reader, GenericTarget<T, string> value) { }
+    }
+    public sealed class LegacyMultiShapeConverter<T> : IConverter<GenericTarget<T, int>, GenericSurrogate<T>>,
+        IConverter<GenericTarget<T, string>, GenericSurrogate<T>>, IConverter<GenericTarget<FixedArgument<string>, T>, GenericSurrogate<T>>
+    {
+        public GenericTarget<T, int> ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        GenericTarget<T, string> IConverter<GenericTarget<T, string>, GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        GenericTarget<FixedArgument<string>, T> IConverter<GenericTarget<FixedArgument<string>, T>, GenericSurrogate<T>>.ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => new();
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<T, int> value) => default;
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<T, string> value) => default;
+        public GenericSurrogate<T> ConvertToSurrogate(in GenericTarget<FixedArgument<string>, T> value) => default;
+    }
     public sealed class LegacyOrderedConverter<TFirst, TSecond> : IConverter<GenericTarget<TFirst, TSecond>, GenericSurrogate<TFirst>>
     {
         public GenericTarget<TFirst, TSecond> ConvertFromSurrogate(in GenericSurrogate<TFirst> surrogate) => new();

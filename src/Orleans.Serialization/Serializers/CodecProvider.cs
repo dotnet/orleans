@@ -193,32 +193,33 @@ namespace Orleans.Serialization.Serializers
                             continue;
                         }
 
-                        if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
-                        {
-                            genericArgument = genericArgument.GetGenericTypeDefinition();
-                        }
-
                         if (registrations is not null && registrations.Exists(registration =>
                             registration.ContractType == genericType
                             && (registration.TargetDescription is { } description
-                                ? description.Type is null
-                                    ? BindTypeArguments(description, genericArgument, new Type?[type.GetGenericArguments().Length])
-                                    : (description.Type is { IsGenericTypeDefinition: true } definition
-                                        ? definition
-                                        : ResolveSerializationType(description, type.GetGenericArguments())) == genericArgument
-                                : registration.TargetType == genericArgument)))
+                                ? BindTypeArguments(description, genericArgument, new Type?[type.GetGenericArguments().Length])
+                                : registration.TargetType == genericArgument
+                                    || genericArgument.IsConstructedGenericType && registration.TargetType == genericArgument.GetGenericTypeDefinition())))
                         {
                             continue;
                         }
 
-                        resultCollection[genericArgument] = type;
-                        var legacyKey = (genericType, genericArgument);
+                        var legacyDescription = genericArgument.ContainsGenericParameters
+                            ? SerializationType.FromType(genericArgument, type.GetGenericArguments())
+                            : null;
+                        var target = legacyDescription is { } shape
+                            ? shape.Type
+                            : genericArgument;
+                        if (target is not null)
+                        {
+                            resultCollection[target] = type;
+                        }
+                        var legacyKey = (genericType, target);
                         if (!_implementationCandidates.TryGetValue(legacyKey, out var legacyCandidates))
                         {
                             _implementationCandidates[legacyKey] = legacyCandidates = new();
                         }
 
-                        legacyCandidates.Add((type, null, null));
+                        legacyCandidates.Add((type, legacyDescription, null));
                     }
                 }
 
@@ -753,24 +754,21 @@ namespace Orleans.Serialization.Serializers
         {
             if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterDefinition))
             {
-                Type converterType;
+                var converterType = converterDefinition;
+                if (converterType.IsGenericTypeDefinition)
+                {
+                    var closed = CloseImplementation(converterType, fieldType, typeof(IConverter<,>));
+                    if (closed is null)
+                    {
+                        surrogateCodecType = null;
+                        constructorArguments = null;
+                        return false;
+                    }
+                    converterType = closed;
+                }
                 var converterInterfaceArgs = Array.Empty<Type>();
                 if (TryGetConverterContract(searchType, converterDefinition, fieldType, out var registration))
                 {
-                    converterType = converterDefinition;
-                    if (converterType.IsGenericTypeDefinition)
-                    {
-                        var closed = CloseImplementation(converterType, fieldType, typeof(IConverter<,>));
-                        if (closed is null)
-                        {
-                            surrogateCodecType = null;
-                            constructorArguments = null;
-                            return false;
-                        }
-
-                        converterType = closed;
-                    }
-
                     var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
                     var surrogate = registration.SurrogateDescription is { } description
                         ? ResolveSerializationType(description, arguments)
@@ -784,9 +782,6 @@ namespace Orleans.Serialization.Serializers
                 }
                 else
                 {
-                    converterType = converterDefinition.IsGenericTypeDefinition
-                        ? ConstructGenericImplementation(converterDefinition, fieldType.GetGenericArguments())
-                        : converterDefinition;
                     foreach (var @interface in converterType.GetInterfaces())
                     {
                         if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
