@@ -11,7 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_GenericWithCtor<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.GenericWithCtor<T>>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.GenericWithCtor<T>>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.GenericWithCtor<T>);
@@ -103,7 +102,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_GenericWithCtor<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.GenericWithCtor<T>>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.GenericWithCtor<T>>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.GenericWithCtor<T>> _activator;
@@ -140,7 +138,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_UsesGenericWithCtor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.UsesGenericWithCtor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.UsesGenericWithCtor>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.UsesGenericWithCtor);
@@ -216,7 +213,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_UsesGenericWithCtor : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.UsesGenericWithCtor>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.UsesGenericWithCtor>
     {
         private readonly OrleansCodeGen.TestProject.Copier_GenericWithCtor<string> _copier_GenericWithCtor_String_C8ECFC0964C2C2C3;

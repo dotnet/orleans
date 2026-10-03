@@ -302,11 +302,6 @@ internal static class SerializerFactoryGenerator
         registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
         if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
             return "provide the referenced assembly's generated codec and copier implementations";
-        if (ReferencedSerializerImplementation.Validate(registration.ReferencedCodec) is { } codecReason)
-            return codecReason;
-        if (registration.ReferencedCopier is { } copier
-            && ReferencedSerializerImplementation.Validate(copier) is { } copierReason)
-            return copierReason;
         registration.Codec = Name(registration.ReferencedCodec);
         registration.Copier = registration.ReferencedCopier is { } referencedCopier
             ? Name(referencedCopier)

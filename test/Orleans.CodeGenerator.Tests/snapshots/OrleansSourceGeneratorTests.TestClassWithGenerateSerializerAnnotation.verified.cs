@@ -11,7 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_MyCustomEnum : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyCustomEnum>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyCustomEnum);
@@ -30,7 +29,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_ClassWithImplicitFieldIds : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithImplicitFieldIds>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithImplicitFieldIds);
@@ -118,7 +116,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_ClassWithImplicitFieldIds : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithImplicitFieldIds>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

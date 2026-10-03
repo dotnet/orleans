@@ -11,7 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_PublicDemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.PublicDemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.PublicDemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.PublicDemoData);
@@ -80,7 +79,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Copier_PublicDemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.PublicDemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.PublicDemoData>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -110,7 +108,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     internal sealed class Codec_InternalDemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.InternalDemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.InternalDemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.InternalDemoData);
@@ -179,7 +176,6 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     internal sealed class Copier_InternalDemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.InternalDemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.InternalDemoData>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

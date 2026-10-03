@@ -80,7 +80,6 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
             var ctor = GenerateConstructor(simpleClassName, fieldDescriptions, isExceptionType);
 
-            classDeclaration = classDeclaration.AddAttributeLists(ReferencedSerializerImplementation.GetAccessorContract(fieldDescriptions));
             classDeclaration = classDeclaration.AddMembers(fieldDeclarations);
 
             if (!isExceptionType)
@@ -100,10 +99,6 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
                 if (!isExceptionType)
                     classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(LibraryTypes.BaseCopier_1.ToTypeSyntax(type.TypeSyntax)));
             }
-        }
-        else
-        {
-            classDeclaration = classDeclaration.AddAttributeLists(ReferencedSerializerImplementation.GetAccessorContract([]));
         }
 
         if (type.IsGenericType)

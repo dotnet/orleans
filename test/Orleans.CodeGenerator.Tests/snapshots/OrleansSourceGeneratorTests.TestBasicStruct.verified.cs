@@ -11,7 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    [global::System.ComponentModel.DescriptionAttribute("OrleansCodeGen.FieldAccessors.v1:Static")]
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoData>, global::Orleans.Serialization.Serializers.IValueSerializer<global::TestProject.DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
