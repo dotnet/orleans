@@ -889,6 +889,10 @@ namespace Orleans.Serialization.Serializers
                 // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
                 var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
                 codecType = ConstructGenericImplementation(arrayCodecType, fieldType.GetElementType()!);
+                if (!fieldType.IsSZArray)
+                {
+                    constructorArguments = new[] { fieldType };
+                }
             }
             else if (fieldType.IsEnum)
             {
