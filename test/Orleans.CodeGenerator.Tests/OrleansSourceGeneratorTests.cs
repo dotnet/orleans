@@ -2374,6 +2374,73 @@ public class DemoClass
     }
 
     [Theory]
+    [InlineData(510, false)]
+    [InlineData(510, true)]
+    [InlineData(511, false)]
+    [InlineData(511, true)]
+    public async Task RpcCombinedGraphLimitKeepsHolderDeclarations(int membersPerResult, bool validateFactories)
+    {
+        var source = new System.Text.StringBuilder("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace CombinedGraph;
+            [GenerateSerializer] public sealed class Tag<T> { }
+            public interface IContract : IGrainWithIntegerKey
+            {
+                Task<First> ReadFirst();
+                Task<Second> ReadSecond();
+            }
+            """);
+        foreach (var name in new[] { "First", "Second" })
+        {
+            for (var index = 0; index < membersPerResult; index++)
+                source.AppendLine($"public sealed class {name}Marker{index} {{ }}");
+            source.AppendLine($"[GenerateSerializer] public sealed class {name} {{");
+            for (var index = 0; index < membersPerResult; index++)
+                source.AppendLine($"[Id({index})] public Tag<{name}Marker{index}> Member{index} {{ get; set; }}");
+            source.AppendLine("}");
+        }
+        var compilation = await CreateCompilation(source.ToString());
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var response = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
+        foreach (var name in new[] { "First", "Second" })
+        {
+            var resultType = compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!;
+            Assert.True(SerializerFactoryGenerator.TryCreate(services, [response.Construct(resultType)],
+                TestContext.Current.CancellationToken, out var individual, out var failure), failure?.Reason);
+            Assert.Equal(membersPerResult + 2, individual.Registrations.Count);
+        }
+        if (membersPerResult == 510)
+        {
+            Assert.True(SerializerFactoryGenerator.TryCreate(services,
+                new[] { "First", "Second" }.Select(name => response.Construct(compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!)),
+                TestContext.Current.CancellationToken, out var combined, out var failure), failure?.Reason);
+            Assert.Equal(1024, combined.Registrations.Count);
+        }
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.OrleansValidateRpcResponseFactories"] = validateFactories.ToString()
+        });
+        var errors = result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (membersPerResult == 510)
+        {
+            Assert.Empty(errors);
+        }
+        else
+        {
+            var diagnostic = Assert.Single(errors);
+            Assert.Equal("ORLEANS0116", diagnostic.Id);
+            Assert.Contains("exceeds 1024 closed types", diagnostic.GetMessage());
+        }
+        Assert.Contains(result.GeneratedSources, static entry => entry.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+        compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static entry => CSharpSyntaxTree.ParseText(entry.SourceText,
+                options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]), path: entry.HintName)));
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
     [InlineData("string")]
     [InlineData("int")]
     public async Task RpcClosedGenericModelFactoriesUseDefinitionConstructorContracts(string argument)
