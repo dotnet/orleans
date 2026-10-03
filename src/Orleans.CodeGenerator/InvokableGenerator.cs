@@ -156,10 +156,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         if (method.AllTypeParameters.Count == 0
             && method.Method.ReturnType is INamedTypeSymbol { TypeArguments.Length: 1 } result
             && baseClassType.OriginalDefinition.ToDisplayString() is "Orleans.Runtime.TaskRequest<TResult>" or "Orleans.Runtime.Request<TResult>"
-            && RpcResponseHolderGenerator.TryDescribe(_generationContext, result.TypeArguments[0], out _, out _))
+            && _generationContext.RpcResponseNames.TryGetValue(
+                result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), out var responseName))
         {
             var type = result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var factory = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{RpcResponseHolderGenerator.GetName(result.TypeArguments[0])}Factory";
+            var factory = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{responseName}Factory";
             classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IResponseInvokable")));
             classDeclaration = classDeclaration.AddMembers(ParseMemberDeclaration($$"""
                 async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
