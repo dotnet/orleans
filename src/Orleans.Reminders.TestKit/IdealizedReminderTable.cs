@@ -21,7 +21,7 @@ namespace Orleans.Reminders.TestKit;
 /// <para>Introspection: <see cref="Snapshot"/>, <see cref="Operations"/>, <see cref="OperationCount"/>.</para>
 /// <para>
 /// Controls: <see cref="SetAvailable"/> (storage outage), <see cref="InjectFailure"/> (transient failures),
-/// <see cref="BlockNext"/> (deterministic synchronization barriers), <see cref="FreezeReads"/> (stale snapshots) and
+/// <see cref="BlockNext"/> (deterministic synchronization barriers), <see cref="FreezeReads()"/> (stale snapshots) and
 /// cancellation observation on <see cref="StartAsync"/> and <see cref="StopAsync"/>.
 /// </para>
 /// <para>
@@ -39,6 +39,7 @@ public sealed class IdealizedReminderTable : IReminderTable
     private readonly Dictionary<ReminderTableOperationKind, Queue<Func<Exception>>> _injectedFailures = [];
 
     private Dictionary<(GrainId GrainId, string ReminderName), ReminderTableRecord>? _frozenReads;
+    private HashSet<ReminderTableOperationKind>? _frozenReadKinds;
     private long _etagCounter;
     private long _sequence;
     private long _versionCounter;
@@ -221,10 +222,23 @@ public sealed class IdealizedReminderTable : IReminderTable
     /// </summary>
     /// <returns>A handle which restores live reads when disposed.</returns>
     public IDisposable FreezeReads()
+        => FreezeReadsCore(readKinds: null);
+
+    /// <summary>
+    /// Freezes reads of the specified kind against the current durable state, so matching reads observe a stale
+    /// snapshot while writes and other read kinds continue against live state.
+    /// </summary>
+    /// <param name="kind">The read operation kind to freeze.</param>
+    /// <returns>A handle which restores live reads when disposed.</returns>
+    public IDisposable FreezeReads(ReminderTableOperationKind kind)
+        => FreezeReadsCore([kind]);
+
+    private IDisposable FreezeReadsCore(HashSet<ReminderTableOperationKind>? readKinds)
     {
         lock (_gate)
         {
             _frozenReads = new Dictionary<(GrainId, string), ReminderTableRecord>(_records);
+            _frozenReadKinds = readKinds;
         }
 
         return new ReadFreeze(this);
@@ -235,6 +249,7 @@ public sealed class IdealizedReminderTable : IReminderTable
         lock (_gate)
         {
             _frozenReads = null;
+            _frozenReadKinds = null;
         }
     }
 
@@ -286,7 +301,7 @@ public sealed class IdealizedReminderTable : IReminderTable
 
         lock (_gate)
         {
-            var source = _frozenReads ?? _records;
+            var source = GetReadSource(ReminderTableOperationKind.ReadRow);
             var found = source.TryGetValue((grainId, reminderName), out var record);
             Record(ReminderTableOperationKind.ReadRow, grainId, reminderName, null, null, null, record?.ETag, true, found ? 1 : 0, null);
             return found ? ToEntry(record!) : null;
@@ -300,7 +315,7 @@ public sealed class IdealizedReminderTable : IReminderTable
 
         lock (_gate)
         {
-            var source = _frozenReads ?? _records;
+            var source = GetReadSource(ReminderTableOperationKind.ReadGrainRows);
             var matches = OrderRecords(source.Values.Where(record => record.GrainId.Equals(grainId))).Select(ToEntry).ToList();
             Record(ReminderTableOperationKind.ReadGrainRows, grainId, null, null, null, null, null, true, matches.Count, null);
             return new ReminderTableData(matches);
@@ -314,7 +329,7 @@ public sealed class IdealizedReminderTable : IReminderTable
 
         lock (_gate)
         {
-            var source = _frozenReads ?? _records;
+            var source = GetReadSource(ReminderTableOperationKind.ReadRange);
             var matches = OrderRecords(source.Values.Where(record => InRange(record.UniformHashCode, begin, end))).Select(ToEntry).ToList();
             Record(ReminderTableOperationKind.ReadRange, null, null, begin, end, null, null, true, matches.Count, null);
             return new ReminderTableData(matches);
@@ -522,6 +537,11 @@ public sealed class IdealizedReminderTable : IReminderTable
             .OrderBy(record => record.UniformHashCode)
             .ThenBy(record => record.GrainId.ToString(), StringComparer.Ordinal)
             .ThenBy(record => record.ReminderName, StringComparer.Ordinal);
+
+    private Dictionary<(GrainId GrainId, string ReminderName), ReminderTableRecord> GetReadSource(ReminderTableOperationKind kind)
+        => _frozenReads is not null && (_frozenReadKinds is null || _frozenReadKinds.Contains(kind))
+            ? _frozenReads
+            : _records;
 
     private static ReminderEntry ToEntry(ReminderTableRecord record) => new()
     {

@@ -354,7 +354,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
             await using var staleRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
             await using var followingRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
-            using (oracle.FreezeReads())
+            using (oracle.FreezeReads(ReminderTableOperationKind.ReadRange))
             {
                 await AdvanceUntilAsync(clock, staleRead.WaitUntilBlockedAsync(cancellation.Token), cancellation.Token);
 
