@@ -7,4 +7,12 @@ internal readonly record struct SerializationContract(
     Type? TargetType,
     Type? SurrogateType,
     SerializationType? SurrogateDescription = null,
-    SerializationType? TargetDescription = null);
+    SerializationType? TargetDescription = null)
+{
+    internal bool IsEquivalentTo(SerializationContract other)
+        => ContractType == other.ContractType
+            && TargetType == other.TargetType
+            && SurrogateType == other.SurrogateType
+            && SerializationType.AreEquivalent(TargetDescription, other.TargetDescription)
+            && SerializationType.AreEquivalent(SurrogateDescription, other.SurrogateDescription);
+}

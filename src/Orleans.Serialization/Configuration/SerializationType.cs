@@ -24,6 +24,55 @@ public sealed class SerializationType
     internal int ArrayRank { get; }
     internal SerializationType[] Arguments { get; }
 
+    internal static bool AreEquivalent(SerializationType? left, SerializationType? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+        if (left is null || right is null || left.Type != right.Type || left.ParameterIndex != right.ParameterIndex
+            || left.ArrayRank != right.ArrayRank || left.Arguments.Length != right.Arguments.Length)
+        {
+            return false;
+        }
+        for (var i = 0; i < left.Arguments.Length; i++)
+        {
+            if (!AreEquivalent(left.Arguments[i], right.Arguments[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    internal static SerializationType FromType(Type type, Type[] implementationParameters)
+    {
+        if (type.IsGenericParameter)
+        {
+            var index = System.Array.IndexOf(implementationParameters, type);
+            if (index < 0)
+            {
+                throw new InvalidOperationException($"Legacy serialization target parameter {type} is not declared by its implementation.");
+            }
+            return Parameter(index);
+        }
+        if (type.IsArray && type.ContainsGenericParameters)
+        {
+            return Array(FromType(type.GetElementType()!, implementationParameters), type.GetArrayRank());
+        }
+        if (type.IsGenericType && type.ContainsGenericParameters)
+        {
+            var arguments = type.GetGenericArguments();
+            var descriptions = new SerializationType[arguments.Length];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                descriptions[i] = FromType(arguments[i], implementationParameters);
+            }
+            return new(type.GetGenericTypeDefinition(), -1, 0, descriptions);
+        }
+        return new(type, -1, 0, System.Array.Empty<SerializationType>());
+    }
+
     /// <summary>
     /// Describes a concrete type or a generic type definition with its argument descriptions.
     /// </summary>

@@ -44,6 +44,7 @@ internal static class Metadata
         ValidateMixedRegistrationClosure();
         ValidateArrayMetadataAvailability(services);
         ValidateInterleavedRegistrationOrder();
+        ValidateEquivalentDescriptorsAndLegacyShapes();
     }
 
     internal static class PrivateContractContainer
@@ -317,6 +318,66 @@ internal static class Metadata
         Console.WriteLine("InterleavedRegistrationOrder passed.");
     }
 
+    private static void ValidateEquivalentDescriptorsAndLegacyShapes()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(IntPairActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddSerializationContract(typeof(MetadataAlternativeIntPairActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddSerializationContract(typeof(IntPairActivator<>), typeof(IActivator<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddSerializationContract(typeof(MetadataArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0)));
+        options.AddSerializationContract(typeof(MetadataAlternativeArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0)));
+        options.AddSerializationContract(typeof(MetadataArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0)));
+        options.AddSerializer(typeof(MetadataLegacyShapeCodec<>));
+        options.AddSerializationContract(typeof(MetadataLegacyShapeCodec<>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddConverter(typeof(MetadataLegacyShapeConverter<>));
+        options.AddSerializationContract(typeof(MetadataLegacyShapeConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        using var services = new ServiceCollection()
+            .AddSingleton<IntPairActivator<Guid>>()
+            .AddSingleton<MetadataAlternativeIntPairActivator<Guid>>()
+            .AddSingleton<MetadataArrayCopier<int>>()
+            .AddSingleton<MetadataAlternativeArrayCopier<int>>()
+            .AddSingleton<MetadataLegacyShapeCodec<Guid>>()
+            .AddSingleton<MetadataLegacyShapeConverter<Guid>>()
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetActivator<BindingPair<Guid, int>>().GetType() != typeof(MetadataAlternativeIntPairActivator<Guid>)
+            || provider.GetDeepCopier<int[]>().GetType() != typeof(MetadataAlternativeArrayCopier<int>))
+        {
+            throw new InvalidOperationException("Independently built equivalent descriptors changed their original registration priority.");
+        }
+        if (provider.GetBaseCodec<BindingPair<Guid, int>>().GetType() != typeof(MetadataLegacyShapeCodec<Guid>)
+            || provider.GetBaseCodec<BindingPair<Guid, string>>().GetType() != typeof(MetadataLegacyShapeCodec<Guid>)
+            || provider.GetBaseCodec<BindingPair<MetadataMixedTarget<string>, Guid>>().GetType() != typeof(MetadataLegacyShapeCodec<Guid>)
+            || provider.GetBaseCodec<BindingPair<Guid, string>[]>().GetType() != typeof(MetadataLegacyShapeCodec<Guid>))
+        {
+            throw new InvalidOperationException("Explicit target descriptions suppressed or misbound another legacy target shape.");
+        }
+        var selectConverter = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<SurrogateSelection>(provider);
+        foreach (var (target, expectedCodec) in new[]
+        {
+            (typeof(BindingPair<Guid, int>), typeof(SurrogateCodec<BindingPair<Guid, int>, MetadataKnownArraySurrogate<Guid, int>, MetadataLegacyShapeConverter<Guid>>)),
+            (typeof(BindingPair<Guid, string>), typeof(SurrogateCodec<BindingPair<Guid, string>, MetadataKnownArraySurrogate<Guid, int>, MetadataLegacyShapeConverter<Guid>>))
+        })
+        {
+            if (!selectConverter(target, typeof(BindingPair<,>), out var codec, out var arguments)
+                || codec != expectedCodec || arguments is not [MetadataLegacyShapeConverter<Guid>])
+            {
+                throw new InvalidOperationException("Legacy converter closure did not reuse its selected target parameter bindings.");
+            }
+        }
+        Console.WriteLine("EquivalentDescriptorsAndLegacyShapes passed.");
+    }
+
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
         services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
@@ -484,4 +545,30 @@ internal sealed class MetadataAlternativeOrderedConverter : IConverter<BindingPa
 {
     public BindingPair<string, int> ConvertFromSurrogate(in MetadataKnownArraySurrogate<int, int> surrogate) => new();
     public MetadataKnownArraySurrogate<int, int> ConvertToSurrogate(in BindingPair<string, int> value) => default;
+}
+internal sealed class MetadataAlternativeIntPairActivator<T> : IActivator<BindingPair<T, int>>
+{
+    public BindingPair<T, int> Create() => new();
+}
+internal sealed class MetadataAlternativeArrayCopier<T> : ShallowCopier<T[]>;
+internal sealed class MetadataLegacyShapeCodec<T> : IBaseCodec<BindingPair<T, int>>, IBaseCodec<BindingPair<T, string>>,
+    IBaseCodec<BindingPair<MetadataMixedTarget<string>, T>>, IBaseCodec<BindingPair<T, string>[]>
+{
+    public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BindingPair<T, int> value) where TBufferWriter : IBufferWriter<byte> { }
+    public void Deserialize<TInput>(ref Reader<TInput> reader, BindingPair<T, int> value) { }
+    public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BindingPair<T, string> value) where TBufferWriter : IBufferWriter<byte> { }
+    public void Deserialize<TInput>(ref Reader<TInput> reader, BindingPair<T, string> value) { }
+    public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BindingPair<MetadataMixedTarget<string>, T> value) where TBufferWriter : IBufferWriter<byte> { }
+    public void Deserialize<TInput>(ref Reader<TInput> reader, BindingPair<MetadataMixedTarget<string>, T> value) { }
+    public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BindingPair<T, string>[] value) where TBufferWriter : IBufferWriter<byte> { }
+    public void Deserialize<TInput>(ref Reader<TInput> reader, BindingPair<T, string>[] value) { }
+}
+internal sealed class MetadataLegacyShapeConverter<T> :
+    IConverter<BindingPair<T, int>, MetadataKnownArraySurrogate<T, int>>,
+    IConverter<BindingPair<T, string>, MetadataKnownArraySurrogate<T, int>>
+{
+    public BindingPair<T, int> ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int> surrogate) => new();
+    BindingPair<T, string> IConverter<BindingPair<T, string>, MetadataKnownArraySurrogate<T, int>>.ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int> surrogate) => new();
+    public MetadataKnownArraySurrogate<T, int> ConvertToSurrogate(in BindingPair<T, int> value) => default;
+    public MetadataKnownArraySurrogate<T, int> ConvertToSurrogate(in BindingPair<T, string> value) => default;
 }
