@@ -22,7 +22,17 @@ public class TlsClientAuthenticationOptions
     public ClientCertificateSelectionCallback? LocalCertificateSelectionCallback
     {
         get => Value.LocalCertificateSelectionCallback is null ? null : new ClientCertificateSelectionCallback(Value.LocalCertificateSelectionCallback);
-        set => Value.LocalCertificateSelectionCallback = value is null ? null : new LocalCertificateSelectionCallback(value!);
+        set
+        {
+#if NET10_0_OR_GREATER
+            Value.LocalCertificateSelectionCallback = value is null ? null : new LocalCertificateSelectionCallback(value);
+#else
+            Value.LocalCertificateSelectionCallback = value is null
+                ? null
+                : (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
+                    value(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers)!;
+#endif
+        }
     }
 
     public X509CertificateCollection? ClientCertificates
