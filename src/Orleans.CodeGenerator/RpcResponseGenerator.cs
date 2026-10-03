@@ -183,13 +183,8 @@ internal static class RpcResponseGenerator
         SerializerFactoryGenerator.Graph? graph = null;
         if (supportedResults.Count > 0 && !SerializerFactoryGenerator.TryCreate(services, supportedResults.Select(type => responseDefinition.Construct(type)), cancellationToken, out graph, out var graphFailure, useDefaultFactories: true))
         {
-            if (options.ValidateRpcResponseFactories)
-            {
-                output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
-                    UnsupportedResponse, Location.None, compilation.AssemblyName, graphFailure.Type.ToDisplayString(), graphFailure.Reason)));
-            }
-
-            return output.ToImmutable();
+            output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
+                UnsupportedResponse, Location.None, compilation.AssemblyName, graphFailure.Type.ToDisplayString(), graphFailure.Reason)));
         }
 
         var generatedNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(compilation.AssemblyName ?? "Assembly").EscapeIdentifier()}";
