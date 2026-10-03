@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.AWSUtils.Tests;
 using Orleans.Configuration;
@@ -20,7 +21,7 @@ namespace AWSUtils.Tests.StorageTests;
 [TestSuite("Functional")]
 [TestProvider("DynamoDB")]
 [TestArea("Persistence")]
-public class DynamoDBGrainStorageKeyFormatTests
+public class DynamoDBGrainStorageKeyFormatTests : IAsyncLifetime
 {
     private const string GrainType = "KeyFormatGrain";
     private const string ClusterServiceId = "cluster-service";
@@ -31,6 +32,25 @@ public class DynamoDBGrainStorageKeyFormatTests
     public DynamoDBGrainStorageKeyFormatTests(TestEnvironmentFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        // every test has its own table, since the key format is recorded per table
+        if (!AWSTestConstants.IsDynamoDbAvailable)
+        {
+            return;
+        }
+
+        try
+        {
+            await new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService).DeleTableAsync(_tableName);
+        }
+        catch (ResourceNotFoundException)
+        {
+        }
     }
 
     [Fact, TestCategory("Functional")]
@@ -171,12 +191,12 @@ public class DynamoDBGrainStorageKeyFormatTests
     [Fact, TestCategory("Functional")]
     public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithDeleteStateOnClear_ClearingCurrentStateRetiresTheLegacyItem()
     {
-        // written on the current key before the migration was enabled, so the legacy item is still there
+        // written on the current key by another silo that does not migrate, so the legacy item is still there
         var grainId = NewGrainId();
         await WriteAsync(await CreateStorage(), grainId, "legacy");
-        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
-
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; o.DeleteStateOnClear = true; });
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; }), grainId, "current");
+
         await storage.ClearStateAsync(GrainType, grainId, await ReadAsync(storage, grainId));
 
         Assert.False((await ReadAsync(storage, grainId)).RecordExists);
@@ -188,9 +208,9 @@ public class DynamoDBGrainStorageKeyFormatTests
     {
         var grainId = NewGrainId();
         await WriteAsync(await CreateStorage(), grainId, "legacy");
-        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
-
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; }), grainId, "current");
+
         await storage.ClearStateAsync(GrainType, grainId, await ReadAsync(storage, grainId));
 
         Assert.False(await RowExists($"_{grainId}"));
@@ -203,9 +223,9 @@ public class DynamoDBGrainStorageKeyFormatTests
     {
         var grainId = NewGrainId();
         await WriteAsync(await CreateStorage(), grainId, "legacy");
-        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
-
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; }), grainId, "current");
+
         await WriteAsync(storage, grainId, "current again");
 
         Assert.False(await RowExists($"_{grainId}"));
@@ -219,9 +239,9 @@ public class DynamoDBGrainStorageKeyFormatTests
         // an orphaned legacy item with the same ETag must not stand in for a current item deleted meanwhile
         var grainId = NewGrainId();
         await WriteAsync(await CreateStorage(), grainId, "orphan");
-        await WriteAsync(await CreateStorage(o => o.UseClusterServiceId = true), grainId, "current");
-
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; }), grainId, "current");
+
         var state = await ReadAsync(storage, grainId);
         Assert.Equal("current", state.State!.A);
         var other = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = false; o.DeleteStateOnClear = true; });
@@ -343,6 +363,108 @@ public class DynamoDBGrainStorageKeyFormatTests
         await Assert.ThrowsAsync<OrleansConfigurationException>(() => CreateStorageUntil(TestContext.Current.CancellationToken));
     }
 
+    [Theory, TestCategory("Functional")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DynamoDBGrainStorage_UseClusterServiceIdFalseOverRecordedClusterServiceId_FailsToStart(bool migrating)
+    {
+        // going back to the empty ServiceId would hide this state, for this silo and every one that follows the record
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = migrating; }), grainId, "current");
+
+        var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(() => CreateStorage(o => o.UseClusterServiceId = false));
+
+        Assert.Contains("UseClusterServiceId is false", exception.Message);
+        Assert.Equal(migrating ? "MigratingToClusterServiceId" : "ClusterServiceId", (await ReadRow("__OrleansKeyFormat", "__OrleansKeyFormat"))!["KeyFormat"].S);
+        Assert.Equal("current", (await ReadAsync(await CreateStorage(), grainId)).State!.A);
+    }
+
+    [Theory, TestCategory("Functional")]
+    [InlineData(true)]
+    [InlineData(null)]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysOverRecordedClusterServiceId_FailsToStart(bool? useClusterServiceId)
+    {
+        // the grain's state under ClusterOptions.ServiceId was deleted while the migration was off, and a migration would
+        // read back the legacy item it left behind
+        var grainId = NewGrainId();
+        await WriteAsync(await CreateStorage(), grainId, "legacy");
+        var withoutMigration = await CreateStorage(o => { o.UseClusterServiceId = true; o.DeleteStateOnClear = true; });
+        await WriteAsync(withoutMigration, grainId, "current");
+        await withoutMigration.ClearStateAsync(GrainType, grainId, await ReadAsync(withoutMigration, grainId));
+
+        var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
+            () => CreateStorage(o => { o.UseClusterServiceId = useClusterServiceId; o.MigrateLegacyKeys = true; }));
+
+        Assert.Contains("MigrateLegacyKeys is true", exception.Message);
+        Assert.Equal("ClusterServiceId", (await ReadRow("__OrleansKeyFormat", "__OrleansKeyFormat"))!["KeyFormat"].S);
+        Assert.False((await ReadAsync(await CreateStorage(), grainId)).RecordExists);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysOnceTheRecordIsDeleted_Starts()
+    {
+        // what the refusal says to do, to migrate anyway
+        await CreateStorage(o => o.UseClusterServiceId = true);
+        await DeleteKeyFormatRecord();
+
+        await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+
+        Assert.Equal("MigratingToClusterServiceId", (await ReadRow("__OrleansKeyFormat", "__OrleansKeyFormat"))!["KeyFormat"].S);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeys_WriteWithAnETagThatIsNotANumberIsInconsistent()
+    {
+        var grainId = NewGrainId();
+        var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
+        await WriteAsync(storage, grainId, "a");
+        await WriteAsync(storage, grainId, "b");
+
+        var state = await ReadAsync(storage, grainId);
+        state.ETag = "not a number";
+
+        await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(GrainType, grainId, state));
+        Assert.Equal("b", (await ReadAsync(storage, grainId)).State!.A);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_KeyFormatOptionsWithExplicitServiceId_LogsThatTheyHaveNoEffect()
+    {
+        var logger = new CapturingLogger();
+        await CreateStorage(o => { o.ServiceId = "explicit"; o.MigrateLegacyKeys = true; }, logger: logger);
+
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("UseClusterServiceId and MigrateLegacyKeys have no effect"));
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_MigrateLegacyKeysWithEmptyServiceId_LogsThatItHasNoEffect()
+    {
+        var logger = new CapturingLogger();
+        await CreateStorage(o => { o.UseClusterServiceId = false; o.MigrateLegacyKeys = true; }, logger: logger);
+
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && entry.Message.Contains("MigrateLegacyKeys has no effect"));
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task DynamoDBGrainStorage_Init_LogsTheKeyFormat()
+    {
+        var logger = new CapturingLogger();
+        await CreateStorage(o => o.UseClusterServiceId = true, logger: logger);
+
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Information
+            && entry.Message.Contains($"from the ServiceId '{ClusterServiceId}' (key format ClusterServiceId)"));
+    }
+
+    private async Task DeleteKeyFormatRecord()
+    {
+        var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
+        await storage.DeleteEntryAsync(_tableName, new Dictionary<string, AttributeValue>
+        {
+            { "GrainReference", new AttributeValue("__OrleansKeyFormat") },
+            { "GrainType", new AttributeValue("__OrleansKeyFormat") }
+        });
+    }
+
     private async Task WriteKeyFormatRecord(string? format)
     {
         var storage = new DynamoDBStorage(NullLogger<DynamoDBStorage>.Instance, AWSTestConstants.DynamoDbService);
@@ -361,10 +483,10 @@ public class DynamoDBGrainStorageKeyFormatTests
 
     private static GrainId NewGrainId() => GrainId.Create("keyformat", Guid.NewGuid().ToString("N"));
 
-    private Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null) =>
-        CreateStorageUntil(CancellationToken.None, configure, beforeInit);
+    private Task<DynamoDBGrainStorage> CreateStorage(Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null, ILogger<DynamoDBGrainStorage>? logger = null) =>
+        CreateStorageUntil(CancellationToken.None, configure, beforeInit, logger);
 
-    private async Task<DynamoDBGrainStorage> CreateStorageUntil(CancellationToken cancellationToken, Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null)
+    private async Task<DynamoDBGrainStorage> CreateStorageUntil(CancellationToken cancellationToken, Action<DynamoDBStorageOptions>? configure = null, Action<DynamoDBGrainStorage>? beforeInit = null, ILogger<DynamoDBGrainStorage>? logger = null)
     {
         if (!AWSTestConstants.IsDynamoDbAvailable)
         {
@@ -380,7 +502,7 @@ public class DynamoDBGrainStorageKeyFormatTests
         };
         configure?.Invoke(options);
 
-        var storage = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(_fixture.Services, "KeyFormatTests", options, NullLogger<DynamoDBGrainStorage>.Instance);
+        var storage = ActivatorUtilities.CreateInstance<DynamoDBGrainStorage>(_fixture.Services, "KeyFormatTests", options, logger ?? NullLogger<DynamoDBGrainStorage>.Instance);
         beforeInit?.Invoke(storage);
         await storage.Init(cancellationToken);
         return storage;
@@ -413,5 +535,17 @@ public class DynamoDBGrainStorageKeyFormatTests
             },
             fields => fields);
         return row;
+    }
+
+    private sealed class CapturingLogger : ILogger<DynamoDBGrainStorage>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 }
