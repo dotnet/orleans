@@ -53,26 +53,32 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
     {
         var options = _tcpOptions.Get(ListenerName);
         var listenerOptions = _listenerOptions.Get(ListenerName);
-        var listenSocket = new Socket(listenerOptions.Endpoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+        var listenSocket = new Socket(listenerOptions.Endpoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try
         {
-            LingerState = options.LingerOption,
-            NoDelay = options.NoDelay,
-        };
+            listenSocket.LingerState = options.LingerOption;
+            listenSocket.NoDelay = options.NoDelay;
 
-        listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
-        if (options.FastPath)
-        {
-            listenSocket.EnableFastPath(noDelay: options.NoDelay);
+            if (options.FastPath)
+            {
+                listenSocket.EnableFastPath(noDelay: options.NoDelay);
+            }
+
+            // IPv6Any is expected to bind to both IPv6 and IPv4
+            if (listenerOptions.Endpoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+            {
+                listenSocket.DualMode = options.DualMode;
+            }
+
+            return listenSocket;
         }
-
-        // IPv6Any is expected to bind to both IPv6 and IPv4
-        if (listenerOptions.Endpoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+        catch
         {
-            listenSocket.DualMode = options.DualMode;
+            listenSocket.Dispose();
+            throw;
         }
-
-        return listenSocket;
     }
 
     private void OnAcceptSocket(Socket socket)
@@ -88,22 +94,26 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
             throw new InvalidOperationException("Transport already bound");
         }
 
-        var listenSocket = CreateListenSocket();
+        Socket? listenSocket = CreateListenSocket();
 
         try
         {
             var listenerOptions = _listenerOptions.Get(ListenerName);
             listenSocket.Bind(listenerOptions.Endpoint!);
+            listenSocket.Listen(512);
+
+            _listenSocket = listenSocket;
+            listenSocket = null;
+            return default;
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
             throw new AddressInUseException(e.Message, e);
         }
-
-        listenSocket.Listen(512);
-
-        _listenSocket = listenSocket;
-        return default;
+        finally
+        {
+            listenSocket?.Dispose();
+        }
     }
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
@@ -114,12 +124,17 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
             try
             {
                 var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
-                OnAcceptSocket(acceptSocket);
+                try
+                {
+                    OnAcceptSocket(acceptSocket);
+                }
+                catch
+                {
+                    acceptSocket.Dispose();
+                    throw;
+                }
 
-                var transport = new SocketMessageTransport(acceptSocket, Logger);
-                transport.Start();
-
-                return transport;
+                return await SocketMessageTransport.CreateAndStartAsync(acceptSocket, Logger).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

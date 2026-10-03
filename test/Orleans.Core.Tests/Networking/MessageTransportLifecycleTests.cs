@@ -608,12 +608,14 @@ public class MessageTransportLifecycleTests
     {
         var inner = new TrackingTransport();
         var callbackOptions = new TaskCompletionSource<TlsClientAuthenticationOptions>(TaskCreationOptions.RunContinuationsAsynchronously);
+        SslStream? callbackStream = null;
         var options = Substitute.For<IOptionsMonitor<TlsOptions>>();
         options.CurrentValue.Returns(new TlsOptions
         {
             ClientCertificateMode = RemoteCertificateMode.NoCertificate,
-            OnAuthenticateAsClient = (_, sslOptions) =>
+            OnAuthenticateAsClient = (connection, sslOptions) =>
             {
+                callbackStream = connection.Features.Get<SslStream>();
                 sslOptions.TargetHost = "localhost";
                 callbackOptions.TrySetResult(sslOptions);
             }
@@ -626,8 +628,10 @@ public class MessageTransportLifecycleTests
         var configuredOptions = await callbackOptions.Task.WaitAsync(TestContext.Current.CancellationToken);
         var sslOptions = Assert.IsType<SslClientAuthenticationOptions>(configuredOptions.SslClientAuthenticationOptions);
 
+        Assert.NotNull(callbackStream);
+        Assert.Same(transport.Features.Get<SslStream>(), callbackStream);
         Assert.Equal("localhost", sslOptions.TargetHost);
-        Assert.Equal([new SslApplicationProtocol("orleans")], sslOptions.ApplicationProtocols);
+        Assert.Equal([new SslApplicationProtocol("Orleans1")], sslOptions.ApplicationProtocols);
     }
 
     [Fact]

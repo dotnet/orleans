@@ -41,15 +41,13 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
         try
         {
             await socket.ConnectAsync(unixEndPoint, cancellationToken).ConfigureAwait(false);
-
-            var connection = new SocketMessageTransport(socket, _logger);
-            connection.Start();
-            return connection;
         }
         catch
         {
             socket.Dispose();
             throw;
         }
+
+        return await SocketMessageTransport.CreateAndStartAsync(socket, _logger).ConfigureAwait(false);
     }
 }

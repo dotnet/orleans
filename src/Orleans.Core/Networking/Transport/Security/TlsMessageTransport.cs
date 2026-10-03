@@ -78,6 +78,7 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
 
                     return true;
                 });
+        Features.Set(_sslStream);
     }
 
     /// <inheritdoc/>

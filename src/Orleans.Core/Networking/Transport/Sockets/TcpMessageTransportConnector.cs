@@ -49,34 +49,31 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
 
         var options = _options.CurrentValue;
 
-        var socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-        {
-            LingerState = options.LingerOption,
-            NoDelay = options.NoDelay
-        };
-
-        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            socket.DualMode = options.DualMode;
-        }
-
-        if (options.FastPath)
-        {
-            socket.EnableFastPath(noDelay: options.NoDelay);
-        }
+        var socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
         try
         {
-            await socket.ConnectAsync(ip, cancellationToken).ConfigureAwait(false);
+            socket.LingerState = options.LingerOption;
+            socket.NoDelay = options.NoDelay;
 
-            var connection = new SocketMessageTransport(socket, _logger);
-            connection.Start();
-            return connection;
+            if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+            {
+                socket.DualMode = options.DualMode;
+            }
+
+            if (options.FastPath)
+            {
+                socket.EnableFastPath(noDelay: options.NoDelay);
+            }
+
+            await socket.ConnectAsync(ip, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
             socket.Dispose();
             throw;
         }
+
+        return await SocketMessageTransport.CreateAndStartAsync(socket, _logger).ConfigureAwait(false);
     }
 }

@@ -23,8 +23,8 @@ The TLS APIs are included in the Orleans server and client packages.
 
 The two similarly named options apply at different stages:
 
-- <xref:Orleans.Connections.Transport.Security.TlsOptions.RemoteCertificateMode> controls whether the remote endpoint must present a certificate. In server middleware, `RequireCertificate` requires a certificate from an inbound Orleans client or silo, `AllowCertificate` requests one but permits none, and `NoCertificate` doesn't request one. Silo configuration uses this same value for outbound middleware; the TLS server still presents a certificate and platform validation authenticates it when no custom callback is installed.
-- <xref:Orleans.Connections.Transport.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate in client middleware. On a silo, it applies when the silo initiates a silo-to-silo connection. On an Orleans client, it applies when the client initiates a gateway connection. It doesn't control inbound silo behavior.
+- <xref:Orleans.Connections.Transport.Security.TlsOptions.RemoteCertificateMode> controls peer certificate requirements. On inbound silo connections, `RequireCertificate` requires a certificate from the connecting Orleans client or silo, `AllowCertificate` requests one and accepts its absence, and `NoCertificate` omits client-certificate requests. On outbound connections, this option governs validation of the TLS server's certificate.
+- <xref:Orleans.Connections.Transport.Security.TlsOptions.ClientCertificateMode> controls selection of the local client certificate whenever Orleans initiates a TLS connection: silo-to-silo connections for a silo and gateway connections for an Orleans client.
 
 `ClientCertificateMode` defaults to `AllowCertificate`: a configured local certificate is sent when it's valid for client authentication, but a missing or unsuitable local certificate is tolerated. Setting it to `RequireCertificate` makes the outbound requirement explicit and fails configuration or connection setup when an appropriate local certificate isn't available.
 
@@ -90,6 +90,8 @@ Treat these as separate trust decisions:
 Keep trust stores narrow. Don't place unrelated public or corporate roots in a workload-specific trust bundle when any certificate from those roots would be accepted as a cluster identity. Network policy should still restrict silo and gateway ports to expected peers.
 
 ## Protocols and revocation
+
+The TLS transports negotiate the `Orleans1` application-layer protocol identifier, preserving protocol negotiation with existing Orleans endpoints. Authentication callbacks can access the <xref:System.Net.Security.SslStream> through the message transport's feature collection.
 
 <xref:Orleans.Connections.Transport.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 

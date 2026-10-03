@@ -37,6 +37,12 @@ A listener middleware receives the next <xref:Orleans.Connections.Transport.Mess
 
 Preserve the listener name so Orleans can select the silo and gateway listeners by role. Return `null` from `AcceptAsync` when the inner listener has stopped, matching the listener contract.
 
+## Migrate byte-stream middleware
+
+Customizations previously registered through `ClientConnectionOptions`, `SiloConnectionOptions`, or `IConnectionMiddleware` migrate to the connector and listener decorators shown above. Register outbound behavior as connector middleware and inbound behavior as listener middleware. Listener decorators can use the listener name to configure the `silo` and `gateway` roles independently.
+
+The message transport request contracts own framing, completion, and buffer lifetimes. Decorators preserve those contracts while applying per-connection behavior.
+
 ## See also
 
 - <xref:Orleans.Connections.Transport.MessageTransport>

@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         IEnumerable<IMessageTransportListenerMiddleware> listenerMiddleware,
         IOptions<ConnectionOptions> connectionOptions,
         MessageCenter messageCenter,
-        IOptions<EndpointOptions> endpointOptions,
         ILocalSiloDetails localSiloDetails,
         ConnectionManager connectionManager,
         ConnectionCommon connectionShared,
@@ -30,7 +29,6 @@ namespace Orleans.Runtime.Messaging
         public const string DefaultListenerName = "silo";
         private readonly ILocalSiloDetails _localSiloDetails = localSiloDetails;
         private readonly MessageCenter _messageCenter = messageCenter;
-        private readonly EndpointOptions _endpointOptions = endpointOptions.Value;
         private readonly ConnectionManager _connectionManager = connectionManager;
         private readonly ConnectionCommon _connectionShared = connectionShared;
         private readonly ProbeRequestMonitor _probeRequestMonitor = probeRequestMonitor;

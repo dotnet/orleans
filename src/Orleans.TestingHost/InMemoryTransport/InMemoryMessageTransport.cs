@@ -35,6 +35,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
     private bool _writesCompleted;
     private Task? _processingTask;
     private volatile Exception? _shutdownReason;
+    private int _disposeStarted;
 
     public InMemoryMessageTransport(IDuplexPipe pipe, ILogger logger)
     {
@@ -162,28 +163,15 @@ internal class InMemoryMessageTransport : MessageTransportBase
             return;
         }
 
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _processingCompleted.Token.Register(OnClosed, completion, useSynchronizationContext: false);
-
         // Wait for completion or cancellation
         try
         {
-            await completion.Task.WaitAsync(cancellationToken);
+            await _processingTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // If cancellation was requested, force close
             _connectionClosingCts.Cancel();
-        }
-
-        static void OnClosed(object? state)
-        {
-            if (state is not TaskCompletionSource completion)
-            {
-                throw new ArgumentException("Expected a task completion source.", nameof(state));
-            }
-
-            completion.TrySetResult();
         }
     }
 
@@ -199,8 +187,31 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
     public override async ValueTask DisposeAsync()
     {
-        await CloseAsync(null);
-        await base.DisposeAsync();
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await CloseAsync(null).ConfigureAwait(false);
+            if (_processingTask is { } processingTask)
+            {
+                await processingTask.ConfigureAwait(false);
+            }
+            else
+            {
+                await _processingCompleted.CancelAsync().ConfigureAwait(false);
+            }
+
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _connectionClosingCts.Dispose();
+            _processingCompleted.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 
     private async Task ProcessReads()

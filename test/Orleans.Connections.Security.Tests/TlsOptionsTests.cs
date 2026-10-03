@@ -1,10 +1,24 @@
 using Orleans.Connections.Transport.Security;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Connections.Security.Tests;
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public class TlsOptionsTests
 {
+    [Fact]
+    public void CertificateModes_DefaultToRequiredPeerAndOptionalLocalClientCertificate()
+    {
+        var options = new TlsOptions();
+
+        Assert.Equal(RemoteCertificateMode.RequireCertificate, options.RemoteCertificateMode);
+        Assert.Equal(RemoteCertificateMode.AllowCertificate, options.ClientCertificateMode);
+    }
+
     [Fact]
     public void HandshakeTimeout_InfiniteTimeSpan_RoundTripsAndCreatesUntimedTokenSource()
     {

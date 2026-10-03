@@ -48,7 +48,6 @@ internal sealed class ServerTlsMessageTransport : TlsMessageTransport
             selector = (sender, name) =>
             {
                 TlsConnectionFeature.HostName = name ?? string.Empty;
-                transport.Features.Set(Stream);
                 var cert = _certificateSelector(transport, name);
                 if (cert != null)
                 {

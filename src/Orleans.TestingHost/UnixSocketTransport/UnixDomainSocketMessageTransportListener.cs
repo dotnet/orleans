@@ -103,10 +103,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
             try
             {
                 var acceptSocket = await listenSocket.AcceptAsync(ct.Token).ConfigureAwait(false);
-                var connection = new SocketMessageTransport(acceptSocket, Logger);
-                connection.Start();
-
-                return connection;
+                return await SocketMessageTransport.CreateAndStartAsync(acceptSocket, Logger).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

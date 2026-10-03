@@ -20,9 +20,6 @@ public class TlsOptions
     private TimeSpan _handshakeTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Gets or sets a value indicating whether TLS is enabled.
-    /// </summary>
-    /// <summary>
     /// <para>
     /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if <see cref="LocalServerCertificateSelector"/> is set.
     /// </para>
@@ -63,9 +60,10 @@ public class TlsOptions
     public RemoteCertificateMode RemoteCertificateMode { get; set; } = RemoteCertificateMode.RequireCertificate;
 
     /// <summary>
-    /// Specifies the client authentication certificate requirements for a TLS connection to Silo. Defaults to <see cref="RemoteCertificateMode.RequireCertificate"/>.
+    /// Controls selection of the local client certificate when Orleans initiates a TLS connection.
+    /// Defaults to <see cref="RemoteCertificateMode.AllowCertificate"/>.
     /// </summary>
-    public RemoteCertificateMode ClientCertificateMode { get; set; } = RemoteCertificateMode.RequireCertificate;
+    public RemoteCertificateMode ClientCertificateMode { get; set; } = RemoteCertificateMode.AllowCertificate;
 
     /// <summary>
     /// Specifies a callback for additional remote certificate validation that will be invoked during authentication. This will be ignored

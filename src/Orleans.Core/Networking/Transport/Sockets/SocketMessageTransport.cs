@@ -69,6 +69,30 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         _localEndpointString = localEndPoint?.ToString() ?? "null";
     }
 
+    internal static async ValueTask<SocketMessageTransport> CreateAndStartAsync(Socket socket, ILogger logger)
+    {
+        SocketMessageTransport? transport = null;
+        try
+        {
+            transport = new SocketMessageTransport(socket, logger);
+            transport.Start();
+            return transport;
+        }
+        catch
+        {
+            if (transport is not null)
+            {
+                await transport.DisposeAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                socket.Dispose();
+            }
+
+            throw;
+        }
+    }
+
     public override CancellationToken Closed => _connectionClosedCts.Token;
 
     public void Start()

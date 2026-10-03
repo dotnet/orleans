@@ -17,7 +17,6 @@ namespace Orleans.Runtime.Messaging
         IOptions<ConnectionOptions> connectionOptions,
         OverloadDetector overloadDetector,
         ILocalSiloDetails localSiloDetails,
-        IOptions<EndpointOptions> endpointOptions,
         MessageCenter messageCenter,
         ConnectionManager connectionManager,
         ConnectionCommon connectionShared,
@@ -35,7 +34,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionCommon _connectionShared = connectionShared;
         private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
         private readonly ILogger<GatewayConnectionListener> _logger = logger;
-        private readonly EndpointOptions _endpointOptions = endpointOptions.Value;
         private readonly OverloadDetector _overloadDetector = overloadDetector;
         private readonly Gateway _gateway = messageCenter.Gateway;
 

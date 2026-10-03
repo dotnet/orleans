@@ -1262,11 +1262,6 @@ namespace Orleans.Messaging
         System.Threading.Tasks.Task InitializeGatewayListProvider();
     }
 
-    public partial interface ITransportProtocolFeature
-    {
-        TransportProtocol Protocol { get; }
-    }
-
     public partial class StaticGatewayListProvider : IGatewayListProvider
     {
         public StaticGatewayListProvider(Microsoft.Extensions.Options.IOptions<Configuration.StaticGatewayListProviderOptions> options, Microsoft.Extensions.Options.IOptions<Configuration.GatewayOptions> gatewayOptions) { }
@@ -1280,11 +1275,6 @@ namespace Orleans.Messaging
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
     }
 
-    public enum TransportProtocol
-    {
-        Cluster = 0,
-        Gateway = 1
-    }
 }
 
 namespace Orleans.Metadata

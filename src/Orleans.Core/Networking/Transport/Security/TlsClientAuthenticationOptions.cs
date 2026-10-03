@@ -15,7 +15,7 @@ public class TlsClientAuthenticationOptions
     {
         ApplicationProtocols = new List<SslApplicationProtocol>
         {
-            new SslApplicationProtocol("orleans")
+            new SslApplicationProtocol("Orleans1")
         }
     };
 

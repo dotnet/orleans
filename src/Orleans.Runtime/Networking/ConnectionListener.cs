@@ -109,7 +109,18 @@ internal abstract partial class ConnectionListener
                 var context = await listener.AcceptAsync(_shutdownCancellation.Token).ConfigureAwait(false);
                 if (context == null) break;
 
-                var connection = CreateConnection(context);
+                Connection connection;
+                try
+                {
+                    connection = CreateConnection(context);
+                }
+                catch (Exception exception)
+                {
+                    LogConnectionCreationFailure(TransportTrace, exception, listener);
+                    await context.DisposeAsync().ConfigureAwait(false);
+                    continue;
+                }
+
                 StartConnection(connection);
             }
         }
@@ -199,6 +210,9 @@ internal abstract partial class ConnectionListener
 
     [LoggerMessage(Level = LogLevel.Critical, Message = "Exception in AcceptAsync for listener {Listener}")]
     private static partial void LogAcceptFailure(ILogger logger, Exception exception, MessageTransportListener listener);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Exception creating a connection for listener {Listener}")]
+    private static partial void LogConnectionCreationFailure(ILogger logger, Exception exception, MessageTransportListener listener);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Exception during shutdown")]
     private static partial void LogShutdownFailure(ILogger logger, Exception exception);
