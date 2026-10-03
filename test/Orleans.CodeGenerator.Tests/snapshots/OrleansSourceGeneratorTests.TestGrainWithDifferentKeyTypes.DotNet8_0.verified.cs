@@ -36,7 +36,20 @@ namespace OrleansCodeGen.TestProject
             {
                 var factory = global::OrleansCodeGen.TestProject.RpcResponse_5C3A711CFactory.Resolve(provider);
                 if (!factory.IsSupported)
-                    return responseCopier.Copy(await Invoke());
+                {
+                    var original = await Invoke();
+                    global::Orleans.Serialization.Invocation.Response copy = null;
+                    try
+                    {
+                        return copy = responseCopier.Copy(original);
+                    }
+                    finally
+                    {
+                        if (!global::System.Object.ReferenceEquals(original, copy))
+                            original.Dispose();
+                    }
+                }
+
                 global::System.Guid value = await InvokeInner();
                 return factory.RentCopied(value, contexts);
             }
@@ -86,7 +99,20 @@ namespace OrleansCodeGen.TestProject
             {
                 var factory = global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory.Resolve(provider);
                 if (!factory.IsSupported)
-                    return responseCopier.Copy(await Invoke());
+                {
+                    var original = await Invoke();
+                    global::Orleans.Serialization.Invocation.Response copy = null;
+                    try
+                    {
+                        return copy = responseCopier.Copy(original);
+                    }
+                    finally
+                    {
+                        if (!global::System.Object.ReferenceEquals(original, copy))
+                            original.Dispose();
+                    }
+                }
+
                 string value = await InvokeInner();
                 return factory.RentCopied(value, contexts);
             }
@@ -136,7 +162,20 @@ namespace OrleansCodeGen.TestProject
             {
                 var factory = global::OrleansCodeGen.TestProject.RpcResponse_6A3EE8F4Factory.Resolve(provider);
                 if (!factory.IsSupported)
-                    return responseCopier.Copy(await Invoke());
+                {
+                    var original = await Invoke();
+                    global::Orleans.Serialization.Invocation.Response copy = null;
+                    try
+                    {
+                        return copy = responseCopier.Copy(original);
+                    }
+                    finally
+                    {
+                        if (!global::System.Object.ReferenceEquals(original, copy))
+                            original.Dispose();
+                    }
+                }
+
                 global::System.Tuple<global::System.Guid, string> value = await InvokeInner();
                 return factory.RentCopied(value, contexts);
             }
@@ -186,7 +225,20 @@ namespace OrleansCodeGen.TestProject
             {
                 var factory = global::OrleansCodeGen.TestProject.RpcResponse_AFB713E4Factory.Resolve(provider);
                 if (!factory.IsSupported)
-                    return responseCopier.Copy(await Invoke());
+                {
+                    var original = await Invoke();
+                    global::Orleans.Serialization.Invocation.Response copy = null;
+                    try
+                    {
+                        return copy = responseCopier.Copy(original);
+                    }
+                    finally
+                    {
+                        if (!global::System.Object.ReferenceEquals(original, copy))
+                            original.Dispose();
+                    }
+                }
+
                 global::System.Tuple<long, string> value = await InvokeInner();
                 return factory.RentCopied(value, contexts);
             }

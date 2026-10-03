@@ -27,6 +27,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Serialization;
@@ -37,6 +38,65 @@ namespace UnitTests.Serialization;
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class SelfWritingResponseOwnershipTests
 {
+    [Theory]
+    [InlineData(false, false, "Distinct")]
+    [InlineData(false, true, "Distinct")]
+    [InlineData(true, false, "Distinct")]
+    [InlineData(true, true, "Distinct")]
+    [InlineData(false, false, "Same")]
+    [InlineData(false, true, "Same")]
+    [InlineData(true, false, "Same")]
+    [InlineData(true, true, "Same")]
+    [InlineData(false, false, "Throw")]
+    [InlineData(false, true, "Throw")]
+    [InlineData(true, false, "Throw")]
+    [InlineData(true, true, "Throw")]
+    public async Task GeneratedCompatibilityFallback_TransfersOrReturnsOriginalExactlyOnce(bool observer, bool filtered, string behavior)
+    {
+        var counts = new Counts { ReturnInput = behavior == "Same", ThrowCopy = behavior == "Throw" };
+        var values = new List<int> { 17, 23, 41 };
+        var target = Substitute.For<IConcurrentGrain>();
+        target.ModifyReturnList_Test().Returns(Task.FromResult(values));
+        var request = typeof(IConcurrentGrain).Assembly.GetTypes()
+            .Where(static type => !type.IsAbstract && !type.ContainsGenericParameters && typeof(IInvokable).IsAssignableFrom(type)
+                && type.Name.StartsWith("Invokable_IConcurrentGrain_", StringComparison.Ordinal))
+            .Select(static type => (IInvokable)Activator.CreateInstance(type)!)
+            .Single(static request => request.GetMethodName() == nameof(IConcurrentGrain.ModifyReturnList_Test));
+        Assert.IsAssignableFrom<IResponseInvokable>(request);
+        var filter = filtered ? new CallbackFilter(context => context.Invoke()) : null;
+        await using var fixture = new SendFixture(counts, filter, target);
+        using var response = await fixture.Invoke(request, observer);
+        Assert.Equal(1, counts.ResponseCopies);
+        Assert.NotNull(counts.FallbackOriginal);
+        Assert.False(fixture.Provider.TryGetRawResponseReader(typeof(List<int>), out _));
+        if (behavior == "Same")
+        {
+            Assert.Same(counts.FallbackOriginal, response);
+            Assert.Same(values, response.Result);
+            Assert.Equal(0, counts.PayloadCopies);
+            Assert.False(counts.OriginalWasPooledAtSend);
+        }
+        else
+        {
+            Assert.Null(counts.FallbackOriginal.TypedResult);
+            Assert.True(counts.OriginalWasPooledAtSend);
+            Assert.True(counts.OriginalWasReturnedOnce);
+            Assert.Equal(1, counts.PayloadCopies);
+            if (behavior == "Throw")
+            {
+                Assert.Same(counts.CopyFailure, response.Exception);
+            }
+            else
+            {
+                Assert.Null(response.Exception);
+                Assert.NotSame(counts.FallbackOriginal, response);
+                Assert.NotSame(values, response.Result);
+                values.Clear();
+                Assert.Equal(new[] { 17, 23, 41 }, Assert.IsType<List<int>>(response.Result));
+            }
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -350,6 +410,9 @@ public sealed class SelfWritingResponseOwnershipTests
         public bool ThrowCopy;
         public bool ReturnInput;
         public Exception CopyFailure { get; } = new InvalidOperationException("payload copy failed");
+        public Response<List<int>>? FallbackOriginal;
+        public bool OriginalWasPooledAtSend;
+        public bool OriginalWasReturnedOnce;
 
         public Payload Copy(Payload source)
         {
@@ -447,11 +510,29 @@ public sealed class SelfWritingResponseOwnershipTests
         public Response? DeepCopy(Response? input, CopyContext context)
         {
             if (input is null) return null;
+            if (input is Response<List<int>> list) return CopyListResponse(list, counts);
             counts.ResponseCopies++;
             if (counts.ReturnInput) return input;
             if (input.Exception is not null) return input;
             return CountedResponse.Rent(counts.Copy(Assert.IsType<Payload>(input.Result)), counts, provider.GetCodec<Payload>());
         }
+    }
+
+    private static Response<List<int>> CopyListResponse(Response<List<int>> input, Counts counts)
+    {
+        counts.ResponseCopies++;
+        counts.FallbackOriginal = input;
+        if (counts.ReturnInput) return input;
+        counts.PayloadCopies++;
+        if (counts.ThrowCopy) throw counts.CopyFailure;
+        return (Response<List<int>>)Response.FromResult(new List<int>(input.TypedResult!));
+    }
+
+    private sealed class FallbackListCopier(Counts counts) : IDeepCopier<Response<List<int>>>
+    {
+        [return: NotNullIfNotNull(nameof(input))]
+        public Response<List<int>>? DeepCopy(Response<List<int>>? input, CopyContext context)
+            => input is null ? null : CopyListResponse(input, counts);
     }
 
     private sealed class UnusedResponseCodec : IFieldCodec<Response>
@@ -495,7 +576,8 @@ public sealed class SelfWritingResponseOwnershipTests
         private readonly InsideRuntimeClient _runtime;
         private readonly HostedClient _hosted;
         private readonly InvokableObjectManager _manager;
-        private readonly Observer _observer = new();
+        private readonly IAddressable _observer;
+        private readonly Counts _counts;
         private readonly ObserverGrainId _observerId = ObserverGrainId.Create(ClientGrainId.Create("response-copy"), IdSpan.Create("observer"));
         private readonly TaskCompletionSource<Response> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SharedMemoryPool _memory = new();
@@ -505,15 +587,21 @@ public sealed class SelfWritingResponseOwnershipTests
         public bool HasResponse => _sentResponse is not null;
         public Exception? HandoffFailure { get; set; }
         public Dictionary<string, object>? InitialContext { get; set; }
+        public CodecProvider Provider => _services.GetRequiredService<CodecProvider>();
 
-        public SendFixture(Counts counts, IIncomingGrainCallFilter? filter)
+        public SendFixture(Counts counts, IIncomingGrainCallFilter? filter, IAddressable? target = null)
         {
+            _counts = counts;
+            _observer = target ?? new Observer();
             var services = new ServiceCollection();
             services.AddSerializer(builder => builder.Configure(options =>
             {
                 options.AddSerializer<Response>(_ => new UnusedResponseCodec(), provider => new CountingResponseCopier(counts, provider));
                 options.AddSerializer<CountedResponse>(_ => new UnusedHolderCodec(), provider => new CountingHolderCopier(counts, provider));
                 options.AddCopier(typeof(SendFailureCopier));
+                options.AddSerializer<Response<List<int>>>(
+                    provider => new PooledResponseCodec<List<int>, IFieldCodec<List<int>>>(provider.GetCodec<List<int>>()),
+                    _ => new FallbackListCopier(counts));
             }));
             services.AddLogging();
             services.AddMetrics();
@@ -566,16 +654,18 @@ public sealed class SelfWritingResponseOwnershipTests
             _serializer = new MessageSerializer(_services.GetRequiredService<SerializerSessionPool>(), _memory, options.Value);
         }
 
-        public async Task<Response> Invoke(LegacyRequest request, bool observer)
+        public async Task<Response> Invoke(IInvokable request, bool observer)
         {
             await Execute(request, observer);
-            return await _completion.Task.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+            var response = await _completion.Task.WaitAsync(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken);
+            _sentResponse = null;
+            return response;
         }
 
-        public async Task Execute(LegacyRequest request, bool observer,
+        public async Task Execute(IInvokable request, bool observer,
             Message.Directions direction = Message.Directions.Request, bool expireAfterInvocation = false)
         {
-            request.Bind(_services.GetRequiredService<ICodecProvider>());
+            if (request is LegacyRequest legacy) legacy.Bind(_services.GetRequiredService<ICodecProvider>());
             _request = new Message
             {
                 Id = new CorrelationId(7123),
@@ -587,7 +677,8 @@ public sealed class SelfWritingResponseOwnershipTests
                 BodyObject = request,
                 RequestContextData = InitialContext,
             };
-            if (expireAfterInvocation) request.AfterInvocation = () => _request.TimeToLive = TimeSpan.FromMilliseconds(-1);
+            if (expireAfterInvocation)
+                Assert.IsAssignableFrom<LegacyRequest>(request).AfterInvocation = () => _request.TimeToLive = TimeSpan.FromMilliseconds(-1);
             if (observer)
             {
                 _manager.Dispatch(_request);
@@ -604,6 +695,7 @@ public sealed class SelfWritingResponseOwnershipTests
                         new OrleansInstruments(_services.GetRequiredService<IMeterFactory>())))));
                 var target = Substitute.For<IGrainContext>();
                 target.GrainInstance.Returns(_observer);
+                target.GetTarget().Returns(_observer);
                 target.GrainId.Returns(_request.TargetGrain);
                 target.ActivationServices.Returns(_services);
                 await _runtime.Invoke(target, _request);
@@ -650,6 +742,16 @@ public sealed class SelfWritingResponseOwnershipTests
         void IResponseCompletionSource.Complete(Response value)
         {
             Assert.Null(_sentResponse);
+            if (_counts.FallbackOriginal is { } original && (!_counts.ReturnInput || _counts.ThrowCopy))
+            {
+                var first = ResponsePool.Get<List<int>>();
+                var second = ResponsePool.Get<List<int>>();
+                _counts.OriginalWasPooledAtSend = ReferenceEquals(original, first);
+                _counts.OriginalWasReturnedOnce = !ReferenceEquals(original, second);
+                second.Dispose();
+                first.Dispose();
+            }
+
             _sentResponse = value;
             _completion.TrySetResult(value);
         }
