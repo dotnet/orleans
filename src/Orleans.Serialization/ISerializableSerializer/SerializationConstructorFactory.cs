@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
@@ -49,16 +48,7 @@ namespace Orleans.Serialization
             }
 
             var constructor = GetRequiredSerializationConstructor(type);
-            Action<object, SerializationInfo, StreamingContext> created;
-            if (RuntimeFeature.IsDynamicCodeSupported)
-            {
-                created = (Action<object, SerializationInfo, StreamingContext>)GetSerializationConstructorInvoker(
-                    constructor, type, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
-            }
-            else
-            {
-                created = CreateNativeConstructor(constructor);
-            }
+            var created = CreateConstructor(constructor);
 
             return (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(key, created);
         }
@@ -79,28 +69,19 @@ namespace Orleans.Serialization
             }
 
             var constructor = GetRequiredSerializationConstructor(owner);
-            ValueTypeSerializer<TOwner>.ValueConstructor created;
-            if (RuntimeFeature.IsDynamicCodeSupported)
+            ValueTypeSerializer<TOwner>.ValueConstructor created = (ref TOwner value, SerializationInfo info, StreamingContext context) =>
             {
-                created = (ValueTypeSerializer<TOwner>.ValueConstructor)GetSerializationConstructorInvoker(
-                    constructor, owner, owner, typeof(ValueTypeSerializer<TOwner>.ValueConstructor));
-            }
-            else
-            {
-                created = (ref TOwner value, SerializationInfo info, StreamingContext context) =>
+                object boxed = value;
+                try
                 {
-                    object boxed = value;
-                    try
-                    {
-                        constructor.Invoke(boxed, BindingFlags.DoNotWrapExceptions, null, new object[] { info, context }, null);
-                    }
-                    finally
-                    {
-                        // Preserve constructor mutations even when it throws.
-                        value = (TOwner)boxed;
-                    }
-                };
-            }
+                    constructor.Invoke(boxed, BindingFlags.DoNotWrapExceptions, null, new object[] { info, context }, null);
+                }
+                finally
+                {
+                    // Preserve constructor mutations even when it throws.
+                    value = (TOwner)boxed;
+                }
+            };
 
             return (ValueTypeSerializer<TOwner>.ValueConstructor)_constructors.GetOrAdd(key, created);
         }
@@ -133,7 +114,7 @@ namespace Orleans.Serialization
             return constructor;
         }
 
-        private static Action<object, SerializationInfo, StreamingContext> CreateNativeConstructor(ConstructorInfo constructor)
+        private static Action<object, SerializationInfo, StreamingContext> CreateConstructor(ConstructorInfo constructor)
         {
 #if NET8_0_OR_GREATER
             if (constructor.DeclaringType == typeof(Exception))
@@ -150,39 +131,5 @@ namespace Orleans.Serialization
         [UnsafeAccessor(UnsafeAccessorKind.Method, Name = ".ctor")]
         private static extern void InitializeException(Exception value, SerializationInfo info, StreamingContext context);
 #endif
-
-        [SecurityCritical]
-#if NET7_0_OR_GREATER
-        [RequiresDynamicCode("Serialization constructor trampolines require runtime code generation.")]
-#endif
-        private static Delegate GetSerializationConstructorInvoker(ConstructorInfo constructor, Type type, Type owner, Type delegateType)
-        {
-            Type[] parameterTypes;
-            if (owner.IsValueType)
-            {
-                parameterTypes = new[] { typeof(object), owner.MakeByRefType(), typeof(SerializationInfo), typeof(StreamingContext) };
-            }
-            else
-            {
-                parameterTypes = new[] { typeof(object), typeof(object), typeof(SerializationInfo), typeof(StreamingContext) };
-            }
-
-            var method = new DynamicMethod($"{type}_serialization_ctor", null, parameterTypes, type, skipVisibility: true);
-            var il = method.GetILGenerator();
-
-            // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
-            il.Emit(OpCodes.Ldarg_1);
-            if (type != owner)
-            {
-                il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
-            }
-
-            il.Emit(OpCodes.Ldarg_2);
-            il.Emit(OpCodes.Ldarg_3);
-            il.Emit(OpCodes.Call, constructor);
-            il.Emit(OpCodes.Ret);
-
-            return method.CreateDelegate(delegateType);
-        }
     }
 }

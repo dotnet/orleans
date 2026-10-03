@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Options;
@@ -14,13 +15,15 @@ internal static class SerializationConstructors
     private static void Main()
     {
         ValidateReferenceConstructor();
+        ValidatePublicReferenceConstructor();
         ValidateValueConstructor(boxedFirst: true);
         ValidateValueConstructor(boxedFirst: false);
-        ValidateConstructorExceptions();
+        ValidateConstructorExceptions(targetInvocationException: false);
+        ValidateConstructorExceptions(targetInvocationException: true);
         ValidateExceptionFallback();
         ValidateExceptionCodec();
         ValidateMissingConstructor();
-        Console.WriteLine("Native serialization constructors passed: existing-object identity and cycles, private constructors, ref/boxed structs, shape-isolated caches, original exceptions, base Exception fallback, ordinary ExceptionCodec. Dynamic code: False.");
+        Console.WriteLine("Native serialization constructors passed: existing-object identity and cycles, public/private constructors, ref/boxed structs, shape-isolated caches, original exception identity and constructor stacks, base Exception fallback, ordinary ExceptionCodec. Dynamic code: False.");
     }
 
     private static void ValidateReferenceConstructor()
@@ -38,7 +41,22 @@ internal static class SerializationConstructors
 
         Ensure(ReferenceEquals(alias, value) && ReferenceEquals(value, value.Self), "Reference identity and the self-cycle must survive constructor initialization.");
         Ensure(value.Payload == 42 && ReferenceEquals(value.Context, context), "The private constructor must restore fields and receive the streaming context.");
+        Ensure(ReferenceEquals(value.Info, info) && value.ContextState == StreamingContextStates.All, "The constructor must receive the original serialization info and context state.");
         Ensure(ReferenceEquals(constructor, factory.GetSerializationConstructorDelegate(typeof(ReferenceValue))), "Reference constructor delegates must be cached.");
+    }
+
+    private static void ValidatePublicReferenceConstructor()
+    {
+        var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(PublicReferenceValue));
+        var value = (PublicReferenceValue)RuntimeHelpers.GetUninitializedObject(typeof(PublicReferenceValue));
+        var alias = value;
+        var info = CreateInfo(typeof(PublicReferenceValue));
+        var context = new object();
+
+        constructor(value, info, new StreamingContext(StreamingContextStates.All, context));
+
+        Ensure(ReferenceEquals(alias, value) && ReferenceEquals(value.Info, info), "The public constructor must initialize the existing object with the original serialization info.");
+        Ensure(ReferenceEquals(value.Context.Context, context) && value.Context.State == StreamingContextStates.All, "The public constructor must receive the original streaming context.");
     }
 
     private static void ValidateValueConstructor(bool boxedFirst)
@@ -65,6 +83,7 @@ internal static class SerializationConstructors
         constructor(ref value, info, new StreamingContext(StreamingContextStates.All, context));
 
         Ensure(value.Payload == 73 && ReferenceEquals(value.Context, context), "The private struct constructor must update the caller's ref value.");
+        Ensure(ReferenceEquals(value.Info, info) && value.ContextState == StreamingContextStates.All, "The ref constructor must receive the original serialization info and context state.");
         Ensure(ReferenceEquals(constructor, factory.GetSerializationConstructorDelegate<StructValue>()), "Struct constructor delegates must be cached.");
 
         object boxed = default(StructValue);
@@ -75,33 +94,50 @@ internal static class SerializationConstructors
         Ensure(ReferenceEquals(boxedConstructor, factory.GetSerializationConstructorDelegate(typeof(StructValue))), "Boxed constructor delegates must be cached independently of ref delegates.");
     }
 
-    private static void ValidateConstructorExceptions()
+    private static void ValidateConstructorExceptions(bool targetInvocationException)
     {
         var factory = new SerializationConstructorFactory();
         var referenceConstructor = factory.GetSerializationConstructorDelegate(typeof(ThrowingReference));
         var reference = (ThrowingReference)RuntimeHelpers.GetUninitializedObject(typeof(ThrowingReference));
-        var referenceFailure = new InvalidOperationException("reference constructor");
+        var referenceFailure = CreateFailure(targetInvocationException);
         try
         {
             referenceConstructor(reference, CreateInfo(typeof(ThrowingReference)), new StreamingContext(StreamingContextStates.All, referenceFailure));
             throw new InvalidOperationException("The reference constructor must throw.");
         }
-        catch (InvalidOperationException exception) when (ReferenceEquals(exception, referenceFailure))
+        catch (Exception exception) when (ReferenceEquals(exception, referenceFailure))
         {
             Ensure(reference.Payload == 17, "Reference mutations before a constructor exception must remain visible.");
+            Ensure(exception.StackTrace!.Contains(nameof(ThrowingReference), StringComparison.Ordinal), "The reference constructor must remain in the original exception stack.");
         }
 
         var valueConstructor = factory.GetSerializationConstructorDelegate<ThrowingStruct>();
         ThrowingStruct value = default;
-        var valueFailure = new InvalidOperationException("struct constructor");
+        var valueFailure = CreateFailure(targetInvocationException);
         try
         {
             valueConstructor(ref value, CreateInfo(typeof(ThrowingStruct)), new StreamingContext(StreamingContextStates.All, valueFailure));
             throw new InvalidOperationException("The struct constructor must throw.");
         }
-        catch (InvalidOperationException exception) when (ReferenceEquals(exception, valueFailure))
+        catch (Exception exception) when (ReferenceEquals(exception, valueFailure))
         {
             Ensure(value.Payload == 29, "Struct mutations before a constructor exception must remain visible.");
+            Ensure(exception.StackTrace!.Contains(nameof(ThrowingStruct), StringComparison.Ordinal), "The ref constructor must remain in the original exception stack.");
+        }
+
+        var boxedConstructor = factory.GetSerializationConstructorDelegate(typeof(ThrowingStruct));
+        object boxed = default(ThrowingStruct);
+        var alias = boxed;
+        var boxedFailure = CreateFailure(targetInvocationException);
+        try
+        {
+            boxedConstructor(boxed, CreateInfo(typeof(ThrowingStruct)), new StreamingContext(StreamingContextStates.All, boxedFailure));
+            throw new InvalidOperationException("The boxed struct constructor must throw.");
+        }
+        catch (Exception exception) when (ReferenceEquals(exception, boxedFailure))
+        {
+            Ensure(ReferenceEquals(alias, boxed) && ((ThrowingStruct)alias).Payload == 29, "Boxed struct mutations before a constructor exception must remain visible on the existing box.");
+            Ensure(exception.StackTrace!.Contains(nameof(ThrowingStruct), StringComparison.Ordinal), "The boxed constructor must remain in the original exception stack.");
         }
     }
 
@@ -151,6 +187,12 @@ internal static class SerializationConstructors
 
     private static SerializationInfo CreateInfo(Type type) => new(type, new FormatterConverter());
 
+    private static Exception CreateFailure(bool targetInvocationException)
+    {
+        var failure = new InvalidOperationException("constructor");
+        return targetInvocationException ? new TargetInvocationException("user exception", failure) : failure;
+    }
+
     private static void Ensure(bool condition, string message)
     {
         if (!condition)
@@ -164,12 +206,16 @@ internal static class SerializationConstructors
         public int Payload;
         public ReferenceValue? Self;
         public object? Context;
+        public SerializationInfo? Info;
+        public StreamingContextStates ContextState;
 
         private ReferenceValue(SerializationInfo info, StreamingContext context)
         {
             Payload = info.GetInt32("Payload");
             Self = (ReferenceValue?)info.GetValue("Self", typeof(ReferenceValue));
             Context = context.Context;
+            Info = info;
+            ContextState = context.State;
         }
     }
 
@@ -177,11 +223,27 @@ internal static class SerializationConstructors
     {
         public int Payload;
         public object? Context;
+        public SerializationInfo? Info;
+        public StreamingContextStates ContextState;
 
         private StructValue(SerializationInfo info, StreamingContext context)
         {
             Payload = info.GetInt32("Payload");
             Context = context.Context;
+            Info = info;
+            ContextState = context.State;
+        }
+    }
+
+    private sealed class PublicReferenceValue
+    {
+        public SerializationInfo Info;
+        public StreamingContext Context;
+
+        public PublicReferenceValue(SerializationInfo info, StreamingContext context)
+        {
+            Info = info;
+            Context = context;
         }
     }
 
@@ -189,10 +251,11 @@ internal static class SerializationConstructors
     {
         public int Payload;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private ThrowingReference(SerializationInfo info, StreamingContext context)
         {
             Payload = 17;
-            throw (InvalidOperationException)context.Context!;
+            throw (Exception)context.Context!;
         }
     }
 
@@ -200,10 +263,11 @@ internal static class SerializationConstructors
     {
         public int Payload;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private ThrowingStruct(SerializationInfo info, StreamingContext context)
         {
             Payload = 29;
-            throw (InvalidOperationException)context.Context!;
+            throw (Exception)context.Context!;
         }
     }
 

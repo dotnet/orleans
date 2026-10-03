@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,8 +34,27 @@ public sealed class SerializationConstructorTests
         Assert.Same(alias, value);
         Assert.Same(value, value.Self);
         Assert.Same(context, value.Context);
+        Assert.Same(info, value.Info);
+        Assert.Equal(StreamingContextStates.All, value.ContextState);
         Assert.Equal(42, value.Payload);
         Assert.Same(constructor, factory.GetSerializationConstructorDelegate(typeof(ReferenceValue)));
+    }
+
+    [Fact]
+    public void PublicReferenceConstructor_PreservesInfoAndContextOnExistingObject()
+    {
+        var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(PublicReferenceValue));
+        var value = (PublicReferenceValue)RuntimeHelpers.GetUninitializedObject(typeof(PublicReferenceValue));
+        var alias = value;
+        var info = CreateInfo(typeof(PublicReferenceValue));
+        var context = new object();
+
+        constructor(value, info, new StreamingContext(StreamingContextStates.All, context));
+
+        Assert.Same(alias, value);
+        Assert.Same(info, value.Info);
+        Assert.Same(context, value.Context.Context);
+        Assert.Equal(StreamingContextStates.All, value.Context.State);
     }
 
     [Fact]
@@ -51,6 +71,8 @@ public sealed class SerializationConstructorTests
 
         Assert.Equal(73, value.Payload);
         Assert.Same(context, value.Context);
+        Assert.Same(info, value.Info);
+        Assert.Equal(StreamingContextStates.All, value.ContextState);
         Assert.Same(constructor, factory.GetSerializationConstructorDelegate<StructValue>());
     }
 
@@ -113,32 +135,57 @@ public sealed class SerializationConstructorTests
         Assert.Same(refConstructor, factory.GetSerializationConstructorDelegate<StructValue>());
     }
 
-    [Fact]
-    public void ReferenceConstructor_PropagatesOriginalExceptionAndPartialMutation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReferenceConstructor_PropagatesOriginalExceptionAndPartialMutation(bool targetInvocationException)
     {
         var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(ThrowingReference));
         var value = (ThrowingReference)RuntimeHelpers.GetUninitializedObject(typeof(ThrowingReference));
-        var failure = new InvalidOperationException("reference constructor");
+        var failure = CreateFailure(targetInvocationException);
 
-        var thrown = Assert.Throws<InvalidOperationException>(
+        var thrown = Assert.Throws(failure.GetType(),
             () => constructor(value, CreateInfo(typeof(ThrowingReference)), new StreamingContext(StreamingContextStates.All, failure)));
 
         Assert.Same(failure, thrown);
+        Assert.Contains(nameof(ThrowingReference), thrown.StackTrace, StringComparison.Ordinal);
         Assert.Equal(17, value.Payload);
     }
 
-    [Fact]
-    public void ValueConstructor_PropagatesOriginalExceptionAndPartialMutation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ValueConstructor_PropagatesOriginalExceptionAndPartialMutation(bool targetInvocationException)
     {
         var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate<ThrowingStruct>();
         ThrowingStruct value = default;
-        var failure = new InvalidOperationException("struct constructor");
+        var failure = CreateFailure(targetInvocationException);
 
-        var thrown = Assert.Throws<InvalidOperationException>(
+        var thrown = Assert.Throws(failure.GetType(),
             () => constructor(ref value, CreateInfo(typeof(ThrowingStruct)), new StreamingContext(StreamingContextStates.All, failure)));
 
         Assert.Same(failure, thrown);
+        Assert.Contains(nameof(ThrowingStruct), thrown.StackTrace, StringComparison.Ordinal);
         Assert.Equal(29, value.Payload);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BoxedValueConstructor_PropagatesOriginalExceptionAndPartialMutation(bool targetInvocationException)
+    {
+        var constructor = new SerializationConstructorFactory().GetSerializationConstructorDelegate(typeof(ThrowingStruct));
+        object value = default(ThrowingStruct);
+        var alias = value;
+        var failure = CreateFailure(targetInvocationException);
+
+        var thrown = Assert.Throws(failure.GetType(),
+            () => constructor(value, CreateInfo(typeof(ThrowingStruct)), new StreamingContext(StreamingContextStates.All, failure)));
+
+        Assert.Same(failure, thrown);
+        Assert.Contains(nameof(ThrowingStruct), thrown.StackTrace, StringComparison.Ordinal);
+        Assert.Same(alias, value);
+        Assert.Equal(29, ((ThrowingStruct)alias).Payload);
     }
 
     [Fact]
@@ -208,17 +255,27 @@ public sealed class SerializationConstructorTests
 
     private static SerializationInfo CreateInfo(Type type) => new(type, new FormatterConverter());
 
+    private static Exception CreateFailure(bool targetInvocationException)
+    {
+        var failure = new InvalidOperationException("constructor");
+        return targetInvocationException ? new TargetInvocationException("user exception", failure) : failure;
+    }
+
     private sealed class ReferenceValue
     {
         public int Payload;
         public ReferenceValue? Self;
         public object? Context;
+        public SerializationInfo? Info;
+        public StreamingContextStates ContextState;
 
         private ReferenceValue(SerializationInfo info, StreamingContext context)
         {
             Payload = info.GetInt32("Payload");
             Self = (ReferenceValue?)info.GetValue("Self", typeof(ReferenceValue));
             Context = context.Context;
+            Info = info;
+            ContextState = context.State;
         }
     }
 
@@ -226,11 +283,27 @@ public sealed class SerializationConstructorTests
     {
         public int Payload;
         public object? Context;
+        public SerializationInfo? Info;
+        public StreamingContextStates ContextState;
 
         private StructValue(SerializationInfo info, StreamingContext context)
         {
             Payload = info.GetInt32("Payload");
             Context = context.Context;
+            Info = info;
+            ContextState = context.State;
+        }
+    }
+
+    private sealed class PublicReferenceValue
+    {
+        public SerializationInfo Info;
+        public StreamingContext Context;
+
+        public PublicReferenceValue(SerializationInfo info, StreamingContext context)
+        {
+            Info = info;
+            Context = context;
         }
     }
 
@@ -238,10 +311,11 @@ public sealed class SerializationConstructorTests
     {
         public int Payload;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private ThrowingReference(SerializationInfo info, StreamingContext context)
         {
             Payload = 17;
-            throw (InvalidOperationException)context.Context!;
+            throw (Exception)context.Context!;
         }
     }
 
@@ -249,10 +323,11 @@ public sealed class SerializationConstructorTests
     {
         public int Payload;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private ThrowingStruct(SerializationInfo info, StreamingContext context)
         {
             Payload = 29;
-            throw (InvalidOperationException)context.Context!;
+            throw (Exception)context.Context!;
         }
     }
 
