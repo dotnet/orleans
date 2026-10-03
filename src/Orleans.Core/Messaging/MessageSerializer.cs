@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Messaging
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
             IRawResponseWriter? rawWriter = null;
-            if (headers.ResponseType is ResponseTypes.None && message.BodyObject is IRawResponseWriter responseWriter)
+            if (headers.ResponseType is ResponseTypes.None && message.BodyObject is Response and IRawResponseWriter responseWriter)
             {
                 rawWriter = responseWriter;
                 headers.ResponseType = ResponseTypes.Success;
