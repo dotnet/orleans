@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!-- Reuse the existing test friend identity, in an isolated publish directory/process only. -->
+    <AssemblyName>Orleans.Runtime.Tests</AssemblyName>
+    <RootNamespace>Orleans.Dissemination.IntegrationHarness</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <HarnessRuntime Condition="'$(HarnessRuntime)' == ''">New</HarnessRuntime>
+    <DefineConstants Condition="'$(HarnessRuntime)' == 'New'">$(DefineConstants);NEW_RUNTIME</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+    <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <AssemblyMetadata Include="HarnessRuntime" Value="$(HarnessRuntime)" />
+    <AssemblyMetadata Include="HarnessSourceRevision" Value="$(SourceRevisionId)" />
+  </ItemGroup>
+</Project>

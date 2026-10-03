@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The controller intentionally references NO Orleans assembly, old or new. -->
+    <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <Compile Include="..\Silo\Observation.cs" Link="Observation.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>
