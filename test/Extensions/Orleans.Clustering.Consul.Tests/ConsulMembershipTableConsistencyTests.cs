@@ -216,20 +216,16 @@ public class ConsulMembershipTableConsistencyTests
 
         requests = store.RequestCount;
         var reads = store.Reads.Count;
-        var row = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
-        Assert.Equal(requests + 3, store.RequestCount);
+        var row = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(requests + 1, store.RequestCount);
         var prefix = root is null ? "orleans/cluster" : $"{root}/orleans/cluster";
         Assert.Equal(new[]
         {
-            (prefix + "/version", false),
-            ($"{prefix}/{entry.SiloAddress.ToParsableString()}", true),
-            (prefix + "/version", false)
+            (prefix + "/", true)
         }, store.Reads.Skip(reads));
         Assert.Equal(all.Version, row.Version);
-        Assert.Equal(all.Members[0].Item2, Assert.Single(row.Members).Item2);
-        var missing = await table.ReadRowAsync(Entry(3).SiloAddress, CancellationToken);
-        Assert.Empty(missing.Members);
-        Assert.Equal(all.Version, missing.Version);
+        Assert.Equal(all.Members[0].Item2, Assert.IsType<Tuple<MembershipEntry, string>>(row.TryGet(entry.SiloAddress)).Item2);
+        Assert.Null(row.TryGet(Entry(3).SiloAddress));
         var gatewayView = await ConsulBasedMembershipTable.ReadAllAsync(
             store.Client, "cluster", root, NullLogger.Instance, null, CancellationToken);
         Assert.Equal(all.Version, gatewayView.Version);
@@ -237,7 +233,7 @@ public class ConsulMembershipTableConsistencyTests
     }
 
     [Fact]
-    public async Task RowReadsStayLocalAndStatusUpdatesNeedNoReads()
+    public async Task SnapshotSelectsRowAndStatusUpdatesNeedNoReads()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
@@ -247,70 +243,58 @@ public class ConsulMembershipTableConsistencyTests
             store.Seed(Entry(i));
         }
 
-        var first = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
-        var row = Assert.Single(first.Members);
+        var first = await table.ReadAllAsync(CancellationToken);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(first.TryGet(entry.SiloAddress));
         Assert.Equal(entry.SiloAddress, row.Item1.SiloAddress);
         entry.Status = SiloStatus.ShuttingDown;
         Assert.True(await table.UpdateRowAsync(entry, row.Item2, first.Version.Next(), CancellationToken));
-        Assert.Equal(3, store.Reads.Count);
-        Assert.All(store.Reads, read => Assert.Equal(
-            read.Recursive ? $"orleans/cluster/{entry.SiloAddress.ToParsableString()}" : "orleans/cluster/version", read.Key));
-        Assert.Equal(2, store.ReturnedKeyCount);
+        Assert.Equal(("orleans/cluster/", true), Assert.Single(store.Reads));
+        Assert.Equal(50, first.Members.Count);
+        Assert.Equal(100, store.ReturnedKeyCount);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RowReadRetriesWhenVersionChangesAroundSnapshot(bool beforeRowRead)
+    [Fact]
+    public async Task SnapshotPreservesRowAndVersionWhenUpdateCommitsBeforeResponse()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
         var otherWriter = store.CreateTable();
         var entry = Entry();
         store.Seed(entry);
-        var first = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var first = await table.ReadAllAsync(CancellationToken);
         var updated = false;
         store.AfterRead = async (_, recursive) =>
         {
-            if (recursive == beforeRowRead)
-            {
-                return;
-            }
-
+            Assert.True(recursive);
             store.AfterRead = null;
             entry.Status = SiloStatus.ShuttingDown;
             Assert.True(await otherWriter.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken));
             updated = true;
         };
 
-        var result = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var result = await table.ReadAllAsync(CancellationToken);
         Assert.True(updated);
-        Assert.Equal(1, result.Version.Version);
-        var row = Assert.Single(result.Members);
-        Assert.Equal(entry.Status, row.Item1.Status);
+        Assert.Equal(first.Version, result.Version);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(entry.SiloAddress));
+        Assert.Equal(SiloStatus.Active, row.Item1.Status);
         Assert.Equal(entry.IAmAliveTime, row.Item1.IAmAliveTime);
-        Assert.NotEqual(Assert.Single(first.Members).Item2, row.Item2);
-        Assert.Equal((await otherWriter.ReadAllAsync(CancellationToken)).Version, result.Version);
+        Assert.Equal(Assert.Single(first.Members).Item2, row.Item2);
+        var current = await otherWriter.ReadAllAsync(CancellationToken);
+        Assert.Equal(1, current.Version.Version);
+        Assert.Equal(entry.Status, Assert.IsType<Tuple<MembershipEntry, string>>(current.TryGet(entry.SiloAddress)).Item1.Status);
+        Assert.NotEqual(row.Item2, current.TryGet(entry.SiloAddress)!.Item2);
     }
 
     [Fact]
-    public async Task RowReadPropagatesVersionValidationFailure()
+    public async Task SnapshotReadPropagatesNativeFailure()
     {
         using var store = new ConsulHandler();
         var table = store.CreateTable();
         store.Seed(Entry());
-        store.AfterRead = (_, recursive) =>
-        {
-            if (recursive)
-            {
-                store.FailureMethod = HttpMethod.Get;
-            }
+        store.FailureMethod = HttpMethod.Get;
 
-            return Task.CompletedTask;
-        };
-
-        await Assert.ThrowsAsync<ConsulRequestException>(() => table.ReadRowAsync(Entry().SiloAddress, CancellationToken));
-        Assert.Equal(3, store.RequestCount);
+        await Assert.ThrowsAsync<ConsulRequestException>(() => table.ReadAllAsync(CancellationToken));
+        Assert.Equal(1, store.RequestCount);
     }
 
     [Fact]
@@ -377,9 +361,9 @@ public class ConsulMembershipTableConsistencyTests
         else
         {
             await otherWriter.UpdateIAmAliveAsync(later, CancellationToken);
-            var afterHeartbeat = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+            var afterHeartbeat = await table.ReadAllAsync(CancellationToken);
             Assert.Equal(first.Version, afterHeartbeat.Version);
-            Assert.Equal(original.Item2, Assert.Single(afterHeartbeat.Members).Item2);
+            Assert.Equal(original.Item2, Assert.IsType<Tuple<MembershipEntry, string>>(afterHeartbeat.TryGet(entry.SiloAddress)).Item2);
         }
 
         if (updateVotes)
@@ -453,7 +437,7 @@ public class ConsulMembershipTableConsistencyTests
         var table = store.CreateTable();
         var entry = Entry();
         store.Seed(entry);
-        var first = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var first = await table.ReadAllAsync(CancellationToken);
         var publications = 0;
         store.AfterRead = async (_, _) =>
         {
@@ -463,16 +447,17 @@ public class ConsulMembershipTableConsistencyTests
 
         var requests = store.RequestCount;
         var reads = store.Reads.Count;
-        var result = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var result = await table.ReadAllAsync(CancellationToken);
         store.AfterRead = null;
-        Assert.Equal(requests + 6, store.RequestCount);
-        Assert.Equal(reads + 3, store.Reads.Count);
-        Assert.Equal(3, publications);
+        Assert.Equal(requests + 2, store.RequestCount);
+        Assert.Equal(reads + 1, store.Reads.Count);
+        Assert.Equal(1, publications);
         Assert.Equal(first.Version, result.Version);
-        var row = Assert.Single(result.Members);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(entry.SiloAddress));
         Assert.Equal(Assert.Single(first.Members).Item2, row.Item2);
-        Assert.Equal(Epoch.AddHours(2), row.Item1.IAmAliveTime);
-        Assert.Equal(Epoch.AddHours(4), Assert.Single((await table.ReadRowAsync(entry.SiloAddress, CancellationToken)).Members).Item1.IAmAliveTime);
+        Assert.Equal(Assert.Single(first.Members).Item1.IAmAliveTime, row.Item1.IAmAliveTime);
+        var current = await table.ReadAllAsync(CancellationToken);
+        Assert.Equal(Epoch.AddHours(2), Assert.IsType<Tuple<MembershipEntry, string>>(current.TryGet(entry.SiloAddress)).Item1.IAmAliveTime);
         Assert.Equal(0, store.ConflictCount);
     }
 
@@ -795,7 +780,6 @@ public class ConsulMembershipTableConsistencyTests
     [Theory]
     [InlineData("initialize")]
     [InlineData("read-all")]
-    [InlineData("read-row")]
     [InlineData("insert")]
     [InlineData("update")]
     [InlineData("heartbeat")]
@@ -812,13 +796,12 @@ public class ConsulMembershipTableConsistencyTests
         var before = store.Snapshot();
         var requests = store.RequestCount;
         entry.IAmAliveTime = Epoch.AddHours(2);
-        store.FailureMethod = operation is "read-all" or "read-row" ? HttpMethod.Get
+        store.FailureMethod = operation is "read-all" ? HttpMethod.Get
             : operation == "delete" ? HttpMethod.Delete : HttpMethod.Put;
         var exception = await Assert.ThrowsAsync<ConsulRequestException>(() => operation switch
         {
             "initialize" => table.InitializeMembershipTableAsync(true, CancellationToken),
             "read-all" => table.ReadAllAsync(CancellationToken),
-            "read-row" => table.ReadRowAsync(entry.SiloAddress, CancellationToken),
             "insert" => table.InsertRowAsync(Entry(2), first.Version.Next(), CancellationToken),
             "update" => table.UpdateRowAsync(entry, Assert.Single(first.Members).Item2, first.Version.Next(), CancellationToken),
             "heartbeat" => table.UpdateIAmAliveAsync(entry, CancellationToken),
@@ -843,7 +826,6 @@ public class ConsulMembershipTableConsistencyTests
         await Assert.ThrowsAsync<OrleansException>(() => table.DeleteMembershipTableEntriesAsync("cluster", CancellationToken));
         store.Set("orleans/cluster/version", Encoding.UTF8.GetBytes("invalid"));
         await Assert.ThrowsAsync<FormatException>(() => table.ReadAllAsync(CancellationToken));
-        await Assert.ThrowsAsync<FormatException>(() => table.ReadRowAsync(Entry().SiloAddress, CancellationToken));
         await Assert.ThrowsAsync<FormatException>(() => table.InsertRowAsync(Entry(), new TableVersion(1, "invalid"), CancellationToken));
     }
 
@@ -854,7 +836,7 @@ public class ConsulMembershipTableConsistencyTests
         var table = store.CreateTable();
         var entry = Entry();
         store.Seed(entry);
-        var first = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var first = await table.ReadAllAsync(CancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         store.BeforeTransaction = () =>
         {
@@ -875,7 +857,7 @@ public class ConsulMembershipTableConsistencyTests
         var table = store.CreateTable();
         var entry = Entry();
         store.Seed(entry);
-        var first = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
+        var first = await table.ReadAllAsync(CancellationToken);
         store.BeforeTransaction = () =>
         {
             store.Seed(Entry());
@@ -889,11 +871,37 @@ public class ConsulMembershipTableConsistencyTests
         Assert.Equal(reads, store.Reads.Count);
         Assert.Equal(1, store.ConflictCount);
         Assert.Single(store.Transactions);
-        var result = await table.ReadRowAsync(entry.SiloAddress, CancellationToken);
-        var row = Assert.Single(result.Members);
+        var result = await table.ReadAllAsync(CancellationToken);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(entry.SiloAddress));
         Assert.Equal(entry.IAmAliveTime, row.Item1.IAmAliveTime);
         Assert.Equal(SiloStatus.Active, row.Item1.Status);
         Assert.Equal(first.Version, result.Version);
+    }
+
+    [Fact]
+    public async Task PointReads_AreUnsupportedWithoutRequests()
+    {
+        using var store = new ConsulHandler();
+        var table = store.CreateTable();
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify both retired entrypoints and cancellation precedence.
+        var legacy = table.ReadRow(Entry().SiloAddress);
+        var current = table.ReadRowAsync(Entry().SiloAddress, CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(Entry().SiloAddress, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Equal(0, store.RequestCount);
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            var obsolete = Assert.Single(typeof(ConsulBasedMembershipTable).GetMethod(name)!.GetCustomAttributes(typeof(ObsoleteAttribute), false));
+            Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(obsolete).Message);
+        }
     }
 
     private static MembershipEntry Entry(int id = 1) => new()

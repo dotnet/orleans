@@ -159,8 +159,13 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     public Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
         => Locked(() => Snapshot(null), cancellationToken);
 
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
-        => Locked(() => Snapshot(key), cancellationToken);
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        backend.PointReads++;
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
+    }
 
     public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         => Locked(() =>
@@ -286,6 +291,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
     public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId);
     public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate);
     public Task<MembershipTableData> ReadAll() => ReadAllAsync();
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key);
     public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion);
     public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion);

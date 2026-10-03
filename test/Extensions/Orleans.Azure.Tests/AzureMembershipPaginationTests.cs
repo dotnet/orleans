@@ -27,10 +27,37 @@ public class AzureMembershipPaginationTests
     private const string TableName = "MembershipPaginationTests";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetiredRowReadsRejectWithoutInitializationOrStorage(bool initialized)
+    {
+        var client = CreateHeartbeatClient();
+        var table = initialized ? CreateTable(CreateManager(null, client)) : new AzureBasedMembershipTable(
+            NullLoggerFactory.Instance, Options.Create(new AzureStorageClusteringOptions()),
+            Options.Create(new ClusterOptions { ClusterId = ClusterId }));
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify the retired compatibility entry points.
+        var legacy = table.ReadRow(null!);
+        var asynchronous = table.ReadRowAsync(null!, TestContext.Current.CancellationToken);
+        var token = new CancellationToken(canceled: true);
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(null!, token));
+#pragma warning restore CS0618
+        Assert.True(legacy.IsFaulted);
+        Assert.True(asynchronous.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => asynchronous)).Message);
+        Assert.Equal(token, canceled.CancellationToken);
+        Assert.Empty(client.ReceivedCalls());
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            Assert.Equal(guidance, table.GetType().GetMethod(name)!.GetCustomAttribute<ObsoleteAttribute>()!.Message);
+        }
+    }
+
+    [Theory]
     [InlineData("Initialize")]
     [InlineData("Delete")]
     [InlineData("Cleanup")]
-    [InlineData("ReadRow")]
     [InlineData("ReadAll")]
     [InlineData("Insert")]
     [InlineData("Update")]
@@ -53,7 +80,6 @@ public class AzureMembershipPaginationTests
             "Initialize" => table.InitializeMembershipTableAsync(true, token),
             "Delete" => table.DeleteMembershipTableEntriesAsync(ClusterId, token),
             "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
-            "ReadRow" => table.ReadRowAsync(silo, token),
             "ReadAll" => table.ReadAllAsync(token),
             "Insert" => table.InsertRowAsync(entry, version, token),
             "Update" => table.UpdateRowAsync(entry, "etag", version, token),
@@ -477,10 +503,8 @@ public class AzureMembershipPaginationTests
         Assert.Equal(1, storage.QueryCount);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task OwnerHeartbeatPreservesVersionConditionForMembershipUpdate(bool readRow)
+    [Fact]
+    public async Task OwnerHeartbeatPreservesVersionConditionForMembershipUpdate()
     {
         var stored = StoredSilo();
         stored.Status = nameof(SiloStatus.Active);
@@ -508,7 +532,7 @@ public class AzureMembershipPaginationTests
         var table = CreateTable(CreateManager(null, client));
         var address = ProposedEntry().SiloAddress;
         var original = await Read();
-        var row = Assert.Single(original.Members);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(original.TryGet(address));
         Assert.Equal("s1", row.Item2);
         var heartbeat = new MembershipEntry
         {
@@ -520,7 +544,7 @@ public class AzureMembershipPaginationTests
         var refreshed = await Read();
 
         Assert.Equal(original.Version, refreshed.Version);
-        Assert.Equal("heartbeat-2", Assert.Single(refreshed.Members).Item2);
+        Assert.Equal("heartbeat-2", refreshed.TryGet(address)!.Item2);
         Assert.Equal(2, queryCount);
         var update = row.Item1;
         update.Status = SiloStatus.Dead;
@@ -541,19 +565,11 @@ public class AzureMembershipPaginationTests
         Assert.Equal(["QueryAsync", "UpdateEntityAsync", "QueryAsync", "SubmitTransactionAsync"],
             client.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
 
-        Task<MembershipTableData> Read() => readRow
-            ? table.ReadRowAsync(address, TestContext.Current.CancellationToken)
-            : table.ReadAllAsync(TestContext.Current.CancellationToken);
+        Task<MembershipTableData> Read() => table.ReadAllAsync(TestContext.Current.CancellationToken);
 
         IEnumerable<Page<SiloInstanceTableEntry>> Pages()
         {
             queryCount++;
-            if (readRow)
-            {
-                yield return Page<SiloInstanceTableEntry>.FromValues([stored, version], null, Substitute.For<Response>());
-                yield break;
-            }
-
             yield return Page<SiloInstanceTableEntry>.FromValues(
                 [BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 7, "before").Entity, stored, version],
                 "next-page", Substitute.For<Response>());
@@ -835,16 +851,13 @@ public class AzureMembershipPaginationTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task NativeSinglePageReadUsesOneQuery(bool readRow, bool present)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NativeSinglePageReadUsesOneQuery(bool present)
     {
         var client = CreateHeartbeatClient();
         client.ReturnsForAll(AsyncPageable<SiloInstanceTableEntry>.FromPages([]));
         var rows = FencedQuery(7, present ? [(StoredSilo(), "s1")] : []).Entries
-            .Where(row => !readRow || row.Entity.RowKey is not (SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN or SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX))
             .Select(row => row.Entity).ToArray();
         _ = client.QueryAsync<SiloInstanceTableEntry>(string.Empty, null, null, TestContext.Current.CancellationToken)
             .ReturnsForAnyArgs(AsyncPageable<SiloInstanceTableEntry>.FromPages(
@@ -852,37 +865,28 @@ public class AzureMembershipPaginationTests
         var table = CreateTable(CreateManager(null, client));
         var address = ProposedEntry().SiloAddress;
 
-        var result = readRow
-            ? await table.ReadRowAsync(address, TestContext.Current.CancellationToken)
-            : await table.ReadAllAsync(TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new TableVersion(7, "version-7"), result.Version);
         if (present)
         {
-            var member = Assert.Single(result.Members);
+            var member = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(address));
             Assert.Equal(address, member.Item1.SiloAddress);
             Assert.Equal("s1", member.Item2);
         }
         else
         {
             Assert.Empty(result.Members);
+            Assert.Null(result.TryGet(address));
         }
 
         var call = Assert.Single(client.ReceivedCalls());
         Assert.Equal(nameof(TableClient.QueryAsync), call.GetMethodInfo().Name);
         Assert.Equal(TestContext.Current.CancellationToken, call.GetArguments()[3]);
-        if (readRow)
-        {
-            var filter = Assert.IsType<string>(call.GetArguments()[0]);
-            var rowKey = SiloInstanceTableEntry.ConstructRowKey(address);
-            Assert.Equal(TableClient.CreateQueryFilter($"(PartitionKey eq {ClusterId}) and ((RowKey eq {rowKey}) or (RowKey eq {SiloInstanceTableEntry.TABLE_VERSION_ROW}))"), filter);
-        }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeReadCancellationBetweenPagesRejectsPartialSnapshot(bool readRow)
+    [Fact]
+    public async Task NativeReadCancellationBetweenPagesRejectsPartialSnapshot()
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var client = CreateHeartbeatClient();
@@ -891,9 +895,7 @@ public class AzureMembershipPaginationTests
             .ReturnsForAnyArgs(AsyncPageable<SiloInstanceTableEntry>.FromPages(Pages()));
         var table = CreateTable(CreateManager(null, client));
 
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => readRow
-            ? table.ReadRowAsync(ProposedEntry().SiloAddress, cancellation.Token)
-            : table.ReadAllAsync(cancellation.Token));
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadAllAsync(cancellation.Token));
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         Assert.Equal(nameof(TableClient.QueryAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
@@ -901,7 +903,7 @@ public class AzureMembershipPaginationTests
         IEnumerable<Page<SiloInstanceTableEntry>> Pages()
         {
             yield return Page<SiloInstanceTableEntry>.FromValues(
-                readRow ? [StoredSilo()] : [BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 7, "before").Entity, StoredSilo()],
+                [BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MIN, 7, "before").Entity, StoredSilo()],
                 "next-page", Substitute.For<Response>());
             cancellation.Cancel();
             cancellation.Token.ThrowIfCancellationRequested();
@@ -909,7 +911,7 @@ public class AzureMembershipPaginationTests
     }
 
     [Fact]
-    public async Task NativeRowReadRequiresCanonicalVersionRow()
+    public async Task NativeReadRequiresCanonicalVersionRow()
     {
         var client = CreateHeartbeatClient();
         client.ReturnsForAll(AsyncPageable<SiloInstanceTableEntry>.FromPages([]));
@@ -918,7 +920,7 @@ public class AzureMembershipPaginationTests
                 [Page<SiloInstanceTableEntry>.FromValues([StoredSilo()], null, Substitute.For<Response>())]));
         var table = CreateTable(CreateManager(null, client));
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => table.ReadRowAsync(ProposedEntry().SiloAddress, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(nameof(TableClient.QueryAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
     }
@@ -953,10 +955,8 @@ public class AzureMembershipPaginationTests
             ]);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeReadPropagatesQueryFailure(bool readRow)
+    [Fact]
+    public async Task NativeReadPropagatesQueryFailure()
     {
         var client = CreateHeartbeatClient();
         client.ReturnsForAll(AsyncPageable<SiloInstanceTableEntry>.FromPages([]));
@@ -965,9 +965,7 @@ public class AzureMembershipPaginationTests
             .ReturnsForAnyArgs(_ => throw failure);
         var table = CreateTable(CreateManager(null, client));
 
-        var exception = await Assert.ThrowsAsync<OrleansException>(() => readRow
-            ? table.ReadRowAsync(ProposedEntry().SiloAddress, TestContext.Current.CancellationToken)
-            : table.ReadAllAsync(TestContext.Current.CancellationToken));
+        var exception = await Assert.ThrowsAsync<OrleansException>(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception.InnerException);
         Assert.Equal(nameof(TableClient.QueryAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);

@@ -28,7 +28,7 @@ public sealed class FaultyMembershipTableTests
     [InlineData("RefuseStatusWrite", "heartbeat-vote", "pre-heartbeat tokens returned false")]
     [InlineData("IgnoreUpdatedVoteTime", "successful-update", "SuspectTimes")]
     [InlineData("PreserveClearedVotes", "successful-update", "SuspectTimes")]
-    [InlineData("CrossClusterPointRead", "isolation", "table integer")]
+    [InlineData("CrossClusterRead", "isolation", "table integer")]
     [InlineData("ResurrectCompactedRow", "missing-row", "unexpectedly succeeded")]
     [InlineData("DeletePrefixScopes", "delete-own", "deletion probe reported deleted populated history")]
     [InlineData("DeleteNoOp", "delete-own", "deletion left populated history")]
@@ -68,7 +68,7 @@ public sealed class FaultyMembershipTableTests
         Assert.Contains("provider=Deliberate-" + faultName, failure.Message);
         Assert.True(control.Injected > 0, "The intended mutant must actually execute, not fail during unrelated setup.");
         if (fault == MembershipFault.RefuseStatusWrite) Assert.Equal(1, control.UpdateCalls);
-        if (fault == MembershipFault.CrossClusterPointRead)
+        if (fault == MembershipFault.CrossClusterRead)
         {
             Assert.Equal(4, control.Backend.CreatedHandles);
             Assert.Equal(control.Backend.CreatedHandles, control.Backend.DisposedHandles);
@@ -140,8 +140,8 @@ public sealed class FaultyMembershipTableTests
         Assert.Contains("HostName", failure.Message);
         Assert.Contains("unexpected-seed-mutation", failure.Message);
         Assert.Equal(5, control.Backend.Inserts);
-        Assert.Equal(6, control.Backend.PointReads);
-        Assert.Equal(2, control.Backend.FullReads);
+        Assert.Equal(0, control.Backend.PointReads);
+        Assert.Equal(8, control.Backend.FullReads);
         Assert.True(control.Injected > 0);
     }
 
@@ -156,17 +156,14 @@ public sealed class FaultyMembershipTableTests
         Assert.True(control.Injected > 0);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task AtomicObservation_OldRowsWithNewVersion_IsRejectedAtReadBarrier(bool pointRead)
+    [Fact]
+    public async Task AtomicObservation_OldRowsWithNewVersion_IsRejectedAtReadBarrier()
     {
-        var control = new MembershipFaultController(pointRead ? MembershipFault.TornReadRow : MembershipFault.TornReadAll);
+        var control = new MembershipFaultController(MembershipFault.TornReadAll);
         var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => control.Fixture().RunAsync((f, ct) =>
         {
             var runner = new MembershipTableTestRunner(f, concurrencyRowCount: 5);
-            return pointRead ? runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct)
-                : runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
+            return runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
         }, TestContext.Current.CancellationToken));
         TestContext.Current.TestOutputHelper!.WriteLine(failure.ToString());
         Assert.Contains("Status", failure.Message);
@@ -176,15 +173,12 @@ public sealed class FaultyMembershipTableTests
     }
 
     [Theory]
-    [InlineData(false, "readers-first")]
-    [InlineData(true, "readers-first")]
-    [InlineData(false, "writer-first")]
-    [InlineData(true, "writer-first")]
-    [InlineData(false, "target-reader-first")]
-    [InlineData(true, "target-reader-first")]
-    public async Task AtomicObservation_ControlledReaderOrder_AlwaysInjectsTornTarget(bool pointRead, string schedule)
+    [InlineData("readers-first")]
+    [InlineData("writer-first")]
+    [InlineData("target-reader-first")]
+    public async Task AtomicObservation_ControlledReaderOrder_AlwaysInjectsTornTarget(string schedule)
     {
-        var control = new MembershipFaultController(pointRead ? MembershipFault.TornReadRow : MembershipFault.TornReadAll);
+        var control = new MembershipFaultController(MembershipFault.TornReadAll);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
         await control.Fixture().RunAsync(async (fixture, ct) =>
@@ -193,10 +187,7 @@ public sealed class FaultyMembershipTableTests
             var before = await MembershipTableTestRunner.Read(fixture.First, ct);
             MembershipTableTestRunner.Equal(before, await MembershipTableTestRunner.Read(fixture.Second, ct));
             var target = MembershipTableTestData.Forward(MembershipTableTestData.CreateEntry(1));
-            var keys = new[] { target.SiloAddress, MembershipTableTestData.CreateEntry(3).SiloAddress, MembershipTableTestData.CreateEntry(6).SiloAddress };
-            Task<MembershipTableData> Read(int index) => pointRead
-                ? fixture.First.ReadRowAsync(keys[index], ct)
-                : fixture.First.ReadAllAsync(ct);
+            Task<MembershipTableData> Read() => fixture.First.ReadAllAsync(ct);
             Task<bool> Write() => fixture.Second.UpdateRowAsync(target, before.Row(target.SiloAddress).Etag, before.Next(), ct);
 
             Task<bool> writer;
@@ -206,18 +197,18 @@ public sealed class FaultyMembershipTableTests
             {
                 writer = Write();
                 earlyReadersPending = !writer.IsCompleted;
-                readers = [Read(0), Read(1), Read(2)];
+                readers = [Read(), Read(), Read()];
             }
             else if (schedule == "target-reader-first")
             {
-                var targetRead = Read(0);
+                var targetRead = Read();
                 earlyReadersPending = !targetRead.IsCompleted;
                 writer = Write();
-                readers = [targetRead, Read(1), Read(2)];
+                readers = [targetRead, Read(), Read()];
             }
             else
             {
-                readers = [Read(0), Read(1), Read(2)];
+                readers = [Read(), Read(), Read()];
                 earlyReadersPending = readers.All(read => !read.IsCompleted);
                 writer = Write();
             }
@@ -234,7 +225,7 @@ public sealed class FaultyMembershipTableTests
                 var sample = ClusteringMembershipSnapshot.Capture(await readers[i]);
                 Assert.Equal(before.Version + 1, sample.Version);
                 Assert.NotEqual(before.TableEtag, sample.TableEtag);
-                var oldRows = pointRead ? before.Select(keys[i]) : before;
+                var oldRows = before;
                 MembershipTableTestRunner.Equal(oldRows with { Version = sample.Version, TableEtag = sample.TableEtag }, sample);
             }
 
@@ -248,17 +239,14 @@ public sealed class FaultyMembershipTableTests
         Assert.Empty(control.Backend.Partitions);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task AtomicCleanup_OldDeadRowWithNewVersion_IsRejectedAtReadBarrier(bool pointRead)
+    [Fact]
+    public async Task AtomicCleanup_OldDeadRowWithNewVersion_IsRejectedAtReadBarrier()
     {
-        var control = new MembershipFaultController(pointRead ? MembershipFault.TornCleanupReadRow : MembershipFault.TornCleanupReadAll);
+        var control = new MembershipFaultController(MembershipFault.TornCleanupReadAll);
         var failure = await Assert.ThrowsAsync<ClusteringConformanceException>(() => control.Fixture().RunAsync((fixture, ct) =>
         {
             var runner = new MembershipTableTestRunner(fixture, concurrencyRowCount: 5);
-            return pointRead ? runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct)
-                : runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
+            return runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct);
         }, TestContext.Current.CancellationToken));
 
         Assert.Contains("atomic cleanup still returned the removed identity", failure.Message);

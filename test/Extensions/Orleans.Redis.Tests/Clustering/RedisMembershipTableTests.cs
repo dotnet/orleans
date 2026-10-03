@@ -228,12 +228,13 @@ namespace Tester.Redis.Clustering
                 SiloName = "owner"
             };
             Assert.True(await table.InsertRowAsync(owner, (await table.ReadAllAsync(token)).Version.Next(), token));
-            var snapshot = await table.ReadRowAsync(owner.SiloAddress, token);
-            var rowEtag = Assert.Single(snapshot.Members).Item2;
+            var snapshot = await table.ReadAllAsync(token);
+            var ownerRow = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(owner.SiloAddress));
+            var rowEtag = ownerRow.Item2;
             var version = snapshot.Version.Next();
             var heartbeat = new MembershipEntry { SiloAddress = owner.SiloAddress, IAmAliveTime = owner.IAmAliveTime.AddTicks(1234567) };
             await table.UpdateIAmAliveAsync(heartbeat, token);
-            var entry = snapshot.Members[0].Item1;
+            var entry = ownerRow.Item1;
             if (insert)
             {
                 entry.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
@@ -253,21 +254,21 @@ namespace Tester.Redis.Clustering
             activeProfile = null;
             Assert.True(result);
             Assert.Equal("EVAL", Assert.Single(profile.FinishProfiling()).Command);
-            var after = await table.ReadRowAsync(entry.SiloAddress, token);
-            var persisted = Assert.Single(after.Members).Item1;
+            var after = await table.ReadAllAsync(token);
+            var persisted = Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(entry.SiloAddress)).Item1;
             Assert.Equal(version.Version, after.Version.Version);
             Assert.Equal(SiloStatus.Dead, persisted.Status);
             Assert.Equal(entry.SuspectTimes, persisted.SuspectTimes);
             if (insert)
             {
-                Assert.Equal(heartbeat.IAmAliveTime, Assert.Single((await table.ReadRowAsync(owner.SiloAddress, token)).Members).Item1.IAmAliveTime);
+                Assert.Equal(heartbeat.IAmAliveTime, Assert.IsType<Tuple<MembershipEntry, string>>(after.TryGet(owner.SiloAddress)).Item1.IAmAliveTime);
             }
 
             entry.Status = SiloStatus.Active;
             Assert.False(await table.UpdateRowAsync(entry, rowEtag, version, token));
-            var unchanged = await table.ReadRowAsync(entry.SiloAddress, token);
+            var unchanged = await table.ReadAllAsync(token);
             Assert.Equal(after.Version, unchanged.Version);
-            Assert.Equal(SiloStatus.Dead, Assert.Single(unchanged.Members).Item1.Status);
+            Assert.Equal(SiloStatus.Dead, Assert.IsType<Tuple<MembershipEntry, string>>(unchanged.TryGet(entry.SiloAddress)).Item1.Status);
         }
 
         [Theory]
@@ -296,8 +297,8 @@ namespace Tester.Redis.Clustering
                 SiloName = "silo"
             };
             Assert.True(await table.InsertRowAsync(entry, (await table.ReadAllAsync(token)).Version.Next(), token));
-            var snapshot = await table.ReadRowAsync(entry.SiloAddress, token);
-            var rowEtag = Assert.Single(snapshot.Members).Item2;
+            var snapshot = await table.ReadAllAsync(token);
+            var rowEtag = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress)).Item2;
             if (insert)
             {
                 entry.SiloAddress = SiloAddress.New(IPAddress.Loopback, 22222, 1);
@@ -332,9 +333,9 @@ namespace Tester.Redis.Clustering
             Assert.True(insert
                 ? await table.InsertRowAsync(entry, snapshot.Version.Next(), token)
                 : await table.UpdateRowAsync(entry, rowEtag, snapshot.Version.Next(), token));
-            var updated = await table.ReadRowAsync(entry.SiloAddress, token);
+            var updated = await table.ReadAllAsync(token);
             Assert.Equal(snapshot.Version.Version + 1, updated.Version.Version);
-            Assert.Equal(SiloStatus.Dead, Assert.Single(updated.Members).Item1.Status);
+            Assert.Equal(SiloStatus.Dead, Assert.IsType<Tuple<MembershipEntry, string>>(updated.TryGet(entry.SiloAddress)).Item1.Status);
         }
 
         [Fact]

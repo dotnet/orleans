@@ -183,7 +183,7 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
+        public async Task MembershipTable_DynamoDB_ReadAll_Insert_TryGet()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }

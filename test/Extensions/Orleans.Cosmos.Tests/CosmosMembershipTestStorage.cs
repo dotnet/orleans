@@ -57,6 +57,10 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
             .ReturnsForAnyArgs(_ => new PageIterator(pending, this));
     }
 
+    public void SetPageFailure(Exception failure)
+        => Container.GetItemQueryIterator<SiloEntity>(new QueryDefinition("SELECT * FROM c"), null, null)
+            .ReturnsForAnyArgs(_ => new FailingPageIterator(failure, this));
+
     public TransactionalBatch SetBatch(params HttpStatusCode[] statuses)
     {
         var response = BatchResponse(statuses);
@@ -190,6 +194,18 @@ internal sealed class CosmosMembershipTestStorage : IDisposable
         public override string ETag => "";
         public override CosmosDiagnostics Diagnostics => null!;
         public override IEnumerator<SiloEntity> GetEnumerator() => ((IEnumerable<SiloEntity>)silos).GetEnumerator();
+    }
+
+    private sealed class FailingPageIterator(Exception failure, CosmosMembershipTestStorage storage) : FeedIterator<SiloEntity>
+    {
+        public override bool HasMoreResults => true;
+
+        public override Task<FeedResponse<SiloEntity>> ReadNextAsync(CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(Token, cancellationToken);
+            storage.PageReadCount++;
+            return Task.FromException<FeedResponse<SiloEntity>>(failure);
+        }
     }
 
     private sealed class PageIterator(Queue<FeedResponse<SiloEntity>> pages, CosmosMembershipTestStorage storage) : FeedIterator<SiloEntity>

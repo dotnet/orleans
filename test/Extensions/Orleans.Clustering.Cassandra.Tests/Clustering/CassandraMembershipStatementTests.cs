@@ -20,6 +20,36 @@ public sealed class CassandraMembershipStatementTests
 {
     private static readonly DateTime Timestamp = new(2026, 9, 17, 12, 0, 0, DateTimeKind.Utc);
 
+    [Fact]
+    public async Task PointReads_AreUnsupportedWithoutStatements()
+    {
+        var backend = new Backend();
+        using var table = await backend.CreateTable();
+        backend.Session.ClearReceivedCalls();
+        var address = Entry(SiloStatus.Active).SiloAddress;
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify both retired entrypoints and cancellation precedence.
+        var legacy = ((IMembershipTable)table).ReadRow(address);
+        var current = table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(address, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Empty(backend.Executed);
+        Assert.Empty(backend.Session.ReceivedCalls());
+        foreach (var name in new[] { "Orleans.IMembershipTable.ReadRow", "ReadRowAsync" })
+        {
+            var method = typeof(CassandraClusteringTable).GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .Single(method => method.Name == name || method.Name.EndsWith("." + name.Split('.')[^1], StringComparison.Ordinal));
+            Assert.Equal(guidance, method.GetCustomAttribute<ObsoleteAttribute>()!.Message);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -320,10 +350,8 @@ public sealed class CassandraMembershipStatementTests
             command => Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SinglePageRead_UsesNativeRowAndStaticVersionInOneRequest(bool pointRead)
+    [Fact]
+    public async Task SinglePageRead_UsesNativeRowAndStaticVersionInOneRequest()
     {
         var backend = new Backend { Version = 9 };
         var entry = Entry(SiloStatus.Active);
@@ -331,13 +359,12 @@ public sealed class CassandraMembershipStatementTests
         using var table = await backend.CreateTable();
         var token = TestContext.Current.CancellationToken;
 
-        var result = pointRead
-            ? await table.ReadRowAsync(entry.SiloAddress, token)
-            : await table.ReadAllAsync(token);
+        var result = await table.ReadAllAsync(token);
 
         Assert.Equal(new TableVersion(9, "9"), result.Version);
-        Assert.Equal(entry.ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
-        Assert.Equal("9", result.Members[0].Item2);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(entry.SiloAddress));
+        Assert.Equal(entry.ToFullString(), row.Item1.ToFullString());
+        Assert.Equal("9", row.Item2);
         var command = Assert.Single(backend.Executed);
         Assert.StartsWith("SELECT version, address", command.Cql);
         Assert.Equal(ConsistencyLevel.Serial, command.Statement.ConsistencyLevel);
@@ -364,70 +391,83 @@ public sealed class CassandraMembershipStatementTests
     }
 
     [Fact]
-    public async Task ReadRow_Absent_FencesAbsenceWithoutAnExtraVersionLookup()
+    public async Task ReadAll_AbsentRow_UsesSnapshotVersionWithoutAnExtraLookup()
     {
         var backend = new Backend { Version = 9 };
+        backend.Entries.Add(Entry(SiloStatus.Active, 2));
         using var table = await backend.CreateTable();
 
-        var result = await table.ReadRowAsync(Entry(SiloStatus.Active).SiloAddress, TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty(result.Members);
+        Assert.Null(result.TryGet(Entry(SiloStatus.Active).SiloAddress));
+        Assert.Equal(backend.Entries[0].ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
         Assert.Equal(new TableVersion(9, "9"), result.Version);
-        Assert.Collection(backend.Executed,
-            command => Assert.StartsWith("SELECT version, address", command.Cql),
-            command => Assert.StartsWith("SELECT version FROM membership", command.Cql),
-            command => Assert.StartsWith("SELECT version, address", command.Cql),
-            command => Assert.StartsWith("SELECT version FROM membership", command.Cql));
+        Assert.StartsWith("SELECT version, address", Assert.Single(backend.Executed).Cql);
     }
 
     [Fact]
-    public async Task ReadRow_InsertedDuringAbsentRead_ReturnsNativeRowVersion()
+    public async Task ReadAll_InsertedAfterSnapshot_PreservesAbsenceAndVersion()
     {
         var backend = new Backend { Version = 9 };
         var entry = Entry(SiloStatus.Active);
         backend.OnExecute = command =>
         {
-            if (command.Cql.StartsWith("SELECT version FROM membership", StringComparison.Ordinal))
+            if (command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal))
             {
                 backend.Version = 10;
                 backend.Entries.Add(entry);
-                return Task.FromResult<RowSet>(new Rows(CreateRow(new() { ["version"] = 9 })));
+                backend.OnExecute = null;
+                return Task.FromResult<RowSet>(new Rows(CreateRow(new() { ["version"] = 9, ["start_time"] = null })));
             }
 
             return null;
         };
         using var table = await backend.CreateTable();
 
-        var result = await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(new TableVersion(10, "10"), result.Version);
-        Assert.Equal(entry.ToFullString(), Assert.Single(result.Members).Item1.ToFullString());
-        Assert.Equal("10", result.Members[0].Item2);
-        Assert.Equal(3, backend.Executed.Count);
+        Assert.Equal(new TableVersion(9, "9"), result.Version);
+        Assert.Null(result.TryGet(entry.SiloAddress));
+        Assert.Single(backend.Executed);
+        var current = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(new TableVersion(10, "10"), current.Version);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(current.TryGet(entry.SiloAddress));
+        Assert.Equal(entry.ToFullString(), row.Item1.ToFullString());
+        Assert.Equal("10", row.Item2);
     }
 
     [Fact]
-    public async Task ReadRow_Absent_RetriesWhenTheClosingVersionChanges()
+    public async Task ReadAll_AbsentRow_RetriesWhenTheClosingVersionChanges()
     {
         var backend = new Backend { Version = 9 };
         var reads = 0;
         backend.OnExecute = command =>
         {
-            if (command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal) && ++reads == 2)
+            if (command.Cql.StartsWith("SELECT version, address", StringComparison.Ordinal))
             {
-                backend.Version = 10;
+                var rows = new Rows(CreateRow(new() { ["version"] = backend.Version, ["start_time"] = null }));
+                if (++reads == 1)
+                {
+                    rows.SetNextPage(() =>
+                    {
+                        backend.Version = 10;
+                        return Task.FromResult<RowSet>(new Rows());
+                    });
+                }
+
+                return Task.FromResult<RowSet>(rows);
             }
 
             return null;
         };
         using var table = await backend.CreateTable();
 
-        var result = await table.ReadRowAsync(Entry(SiloStatus.Active).SiloAddress, TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty(result.Members);
+        Assert.Null(result.TryGet(Entry(SiloStatus.Active).SiloAddress));
         Assert.Equal(new TableVersion(10, "10"), result.Version);
-        Assert.Equal(3, reads);
-        Assert.Equal(6, backend.Executed.Count);
+        Assert.Equal(2, reads);
+        Assert.Equal(3, backend.Executed.Count);
     }
 
     [Fact]

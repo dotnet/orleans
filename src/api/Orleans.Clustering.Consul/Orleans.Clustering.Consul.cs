@@ -118,9 +118,10 @@ namespace Orleans.Runtime.Membership
 
         public System.Threading.Tasks.Task<MembershipTableData> ReadAllAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        [System.Obsolete("Use ReadRowAsync instead.")]
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRow(SiloAddress siloAddress) { throw null; }
 
+        [System.Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public System.Threading.Tasks.Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         [System.Obsolete("Use UpdateIAmAliveAsync instead.")]

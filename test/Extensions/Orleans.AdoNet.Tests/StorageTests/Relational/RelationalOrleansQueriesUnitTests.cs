@@ -1,5 +1,6 @@
 using System.Data;
 using System.Net;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -1459,6 +1460,54 @@ public sealed class RelationalOrleansQueriesUnitTests
         Assert.Contains("UpdateMembershipKey", failure.Message, StringComparison.Ordinal);
         AssertOnlyQueryLoadCall(storage);
         storage.VerifyComplete();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MembershipPointReads_AreUnsupportedWithoutStorage(bool initialized)
+    {
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys);
+        var table = CreateMembershipTable(initialized
+            ? await ClusteringQueries.CreateInstance(storage, TestContext.Current.CancellationToken)
+            : null!);
+        var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify both retired entrypoints and cancellation precedence.
+        var legacy = table.ReadRow(address);
+        var current = table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(address, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            var obsolete = Assert.Single(typeof(AdoNetClusteringTable).GetMethod(name)!.GetCustomAttributes(typeof(ObsoleteAttribute), false));
+            Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(obsolete).Message);
+        }
+
+        if (initialized)
+        {
+            AssertOnlyQueryLoadCall(storage);
+            storage.VerifyComplete();
+        }
+        else
+        {
+            Assert.Empty(storage.Calls);
+        }
+    }
+
+    private static AdoNetClusteringTable CreateMembershipTable(ClusteringQueries queries)
+    {
+        var table = new AdoNetClusteringTable(null!, Options.Create(new ClusterOptions()),
+            Options.Create(new AdoNetClusteringSiloOptions()), NullLogger<AdoNetClusteringTable>.Instance);
+        typeof(AdoNetClusteringTable).GetField("orleansQueries", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(table, queries);
+        return table;
     }
 
     [Theory]

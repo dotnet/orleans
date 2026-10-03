@@ -5,6 +5,7 @@ using Orleans;
 using Orleans.Clustering.TestKit;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 
@@ -197,6 +198,52 @@ public sealed class MembershipTableTestsBaseLifecycleTests
         Assert.Equal(["create-table", "initialize-table", "dispose-table"], events);
     }
 
+    [Fact]
+    public async Task LegacyNamedRowScenario_UsesOnlyFullSnapshotsWithinOwnerLifetime()
+    {
+        var events = new List<string>();
+        var fixture = CreateFixture(events);
+        var token = TestContext.Current.CancellationToken;
+        var table = await fixture.GetTableAsync(token);
+        var data = new MembershipTableData(new TableVersion(0, "initial"));
+        MembershipEntry? committed = null;
+        table.ReadAllAsync(Arg.Any<CancellationToken>()).Returns(_ => data);
+        table.InsertRowAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                if (committed is not null)
+                {
+                    return false;
+                }
+
+                committed = call.ArgAt<MembershipEntry>(0).Copy();
+                var version = call.ArgAt<TableVersion>(1);
+                Assert.Equal(new TableVersion(1, "initial"), version);
+                data = new MembershipTableData(Tuple.Create(committed, "committed-row"), new TableVersion(1, "committed-table"));
+                return true;
+            });
+        table.ClearReceivedCalls();
+        try
+        {
+            await fixture.RunLegacyNamedRowScenarioAsync();
+
+            Assert.Equal(new TableVersion(1, "committed-table"), data.Version);
+            Assert.Equal("committed-row", Assert.Single(data.Members).Item2);
+            var calls = table.ReceivedCalls().ToArray();
+            Assert.Equal(4, calls.Count(call => call.GetMethodInfo().Name == nameof(IMembershipTable.ReadAllAsync)));
+            Assert.Equal(4, calls.Count(call => call.GetMethodInfo().Name == nameof(IMembershipTable.InsertRowAsync)));
+            Assert.All(calls, call => Assert.Contains(call.GetMethodInfo().Name,
+                new[] { nameof(IMembershipTable.ReadAllAsync), nameof(IMembershipTable.InsertRowAsync) }));
+            Assert.Equal(["create-table", "initialize-table"], events);
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+
+        Assert.Equal(["create-table", "initialize-table", "delete-table", "dispose-table"], events);
+    }
+
     private static LegacyFixtureHarness CreateFixture(
         List<string> events,
         Func<CancellationToken, Task>? initializeTable = null,
@@ -243,6 +290,8 @@ public sealed class MembershipTableTestsBaseLifecycleTests
 
         public Task<IGatewayListProvider> GetGatewayAsync(CancellationToken cancellationToken)
             => GetLegacyGatewayListProviderAsync(cancellationToken);
+
+        public Task RunLegacyNamedRowScenarioAsync() => MembershipTable_ReadRow_Insert_Read();
 
         protected override Task<string> GetConnectionString() => Task.FromResult("lifecycle-test");
 

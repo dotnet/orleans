@@ -17,7 +17,7 @@ The membership system provides a **canonical membership view**: a versioned view
 
 `MembershipTableManager` publishes snapshots through `ClusterMembershipService` with monotonically advancing canonical membership views. Directory ownership, gateway discovery, and failure recovery rely on this guarantee.
 
-Per-silo `IAmAliveTime` is tracked independently of the canonical membership view. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAlive*> writes leave the view version unchanged. Snapshot updates retain the maximum observed timestamp for each silo, so local liveness timestamps advance monotonically as table reads and peer snapshots arrive. At the same version, merging retains the accepted versioned fields.
+Per-silo `IAmAliveTime` is tracked independently of the canonical membership view. Periodic <xref:Orleans.IMembershipTable.UpdateIAmAliveAsync*> writes leave the view version unchanged. Snapshot updates retain the maximum observed timestamp for each silo, so local liveness timestamps advance monotonically as table reads and peer snapshots arrive. At the same version, merging retains the accepted versioned fields.
 
 Snapshots can prune previously `Dead` rows at the same version while retaining every non-Dead row. Pruning preserves the versioned fields and maximum `IAmAliveTime` of each retained entry.
 
@@ -101,14 +101,16 @@ These values are protocol parameters, not independent timers: indirect probing, 
 
 ## Membership-table contract <a name="membership-table"></a>
 
-An <xref:Orleans.IMembershipTable> implementation is more than a list of endpoints. It must support:
+An <xref:Orleans.IMembershipTable> implementation coordinates canonical membership changes through:
 
 - insertion of a new silo row;
 - optimistic, conditional update of a silo row;
 - atomic advancement of the table version with a row mutation;
-- reads which return rows and the corresponding version;
+- atomic full-table snapshots containing rows and their corresponding version;
 - periodic `IAmAlive` updates; and
 - durable availability appropriate for cluster coordination.
+
+<xref:Orleans.IMembershipTable.ReadAllAsync*> obtains a coherent snapshot, and <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag within that view. Conditional mutations return their success status. Snapshot refreshes provide the current table state and ETag for subsequent updates.
 
 Table unavailability favors safety over liveness. Existing silos can continue processing calls, but they cannot durably admit a member or declare a failed member dead. A provider must not synthesize successful updates when its backing store is unavailable.
 

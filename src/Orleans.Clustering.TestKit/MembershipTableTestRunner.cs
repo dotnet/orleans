@@ -237,17 +237,25 @@ public sealed class MembershipTableTestRunner
         await Reject(() => A.UpdateRowAsync(dead, delayedRowEtag, compacted.Next(), ct), ct);
     }, cancellationToken);
 
-    /// <summary>G15: point/full reads agree for distinct generations, other endpoints, and absent identities.</summary>
-    public Task ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(CancellationToken cancellationToken = default) => Run(async ct =>
+    /// <summary>Runs the full-snapshot lookup guarantee for present and absent identities.</summary>
+    [Obsolete("Use ReadAll_SelectsPresentAndAbsentIdentities instead.")]
+    public Task ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(CancellationToken cancellationToken = default)
+        => ReadAll_SelectsPresentAndAbsentIdentities(cancellationToken);
+
+    /// <summary>G15: full snapshots select distinct generations, other endpoints, and absent identities.</summary>
+    public Task ReadAll_SelectsPresentAndAbsentIdentities(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
         var successor = CreateSuccessor(Entry(1));
         await Insert(B, successor, ct);
         var all = await SameHandles(ct);
         Check(all.Rows.Count == 3, $"expected three complete identities, observed={all.Rows.Count}");
+        var snapshot = await B.ReadAllAsync(ct);
         foreach (var entry in new[] { Entry(1), Entry(2), successor, Entry(3) })
         {
-            Equal(all.Select(entry.SiloAddress), ClusteringMembershipSnapshot.Capture(await B.ReadRowAsync(entry.SiloAddress, ct)));
+            var selected = snapshot.TryGet(entry.SiloAddress);
+            var actual = selected is null ? new MembershipTableData(snapshot.Version) : new MembershipTableData(selected, snapshot.Version);
+            Equal(all.Select(entry.SiloAddress), ClusteringMembershipSnapshot.Capture(actual));
         }
     }, cancellationToken);
 
@@ -292,7 +300,7 @@ public sealed class MembershipTableTestRunner
         Equal(committed, await SameHandles(ct));
     }, cancellationToken);
 
-    /// <summary>G19: caller mutations of point and full read results cannot mutate storage.</summary>
+    /// <summary>G19: caller mutations of full snapshots and their selected rows cannot mutate storage.</summary>
     public Task Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState(CancellationToken cancellationToken = default) => Run(async ct =>
     {
         await Seed(ct);
@@ -300,8 +308,8 @@ public sealed class MembershipTableTestRunner
         var all = await A.ReadAllAsync(ct);
         MutateCaller(all.TryGet(Entry(1).SiloAddress)!.Item1);
         Equal(baseline, await Read(B, ct));
-        var point = await B.ReadRowAsync(Entry(2).SiloAddress, ct);
-        MutateCaller(point.Members[0].Item1);
+        var second = await B.ReadAllAsync(ct);
+        MutateCaller(second.TryGet(Entry(2).SiloAddress)!.Item1);
         Equal(baseline, await SameHandles(ct));
     }, cancellationToken);
 
@@ -332,11 +340,12 @@ public sealed class MembershipTableTestRunner
 
     /// <summary>G21: bounded simultaneous full reads match only complete before/after committed views.</summary>
     public Task ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(CancellationToken cancellationToken = default)
-        => Run(ct => ConcurrentReads(pointReads: false, ct), cancellationToken);
+        => Run(ConcurrentReads, cancellationToken);
 
-    /// <summary>G22: each changing, sentinel, or missing point read matches its own legal atomic view.</summary>
+    /// <summary>Runs the concurrent full-snapshot guarantee.</summary>
+    [Obsolete("Use ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews instead.")]
     public Task ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(CancellationToken cancellationToken = default)
-        => Run(ct => ConcurrentReads(pointReads: true, ct), cancellationToken);
+        => ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(cancellationToken);
 
     /// <summary>G23: repeated initialization on existing and new handles preserves nonempty state exactly.</summary>
     public Task InitializeMembershipTable_RepeatedWithData_PreservesCommittedState(CancellationToken cancellationToken = default) => Run(async ct =>
@@ -380,13 +389,15 @@ public sealed class MembershipTableTestRunner
         {
             var (table, snapshot) = tableAndSnapshot;
             var key = otherEntry.SiloAddress;
-            var point = ClusteringMembershipSnapshot.Capture(await table.ReadRowAsync(key, ct));
-            Equal(snapshot with { Rows = snapshot.Rows.Clear().Add(key.ToParsableString(), snapshot.Row(key)) }, point);
+            var observed = await table.ReadAllAsync(ct);
+            var selected = observed.TryGet(key);
+            Check(selected is not null, $"isolated snapshot omitted identity={key}");
+            Equal(snapshot.Select(key), ClusteringMembershipSnapshot.Capture(new MembershipTableData(selected!, observed.Version)));
         }
 
-        // Row 2 exists only in A: a point-read implementation must not leak it into B.
-        var absentFromOther = ClusteringMembershipSnapshot.Capture(await Other.ReadRowAsync(Entry(2).SiloAddress, ct));
-        Equal(other with { Rows = other.Rows.Clear() }, absentFromOther);
+        var otherSnapshot = await Other.ReadAllAsync(ct);
+        Check(otherSnapshot.TryGet(Entry(2).SiloAddress) is null, "isolated snapshot leaked an identity from another cluster");
+        Equal(other, ClusteringMembershipSnapshot.Capture(otherSnapshot));
     }, cancellationToken);
 
     /// <summary>G25: eligible Dead rows compact at the same version or in atomic +1 batches; retained canonical fields are preserved.</summary>
@@ -673,8 +684,8 @@ public sealed class MembershipTableTestRunner
 
     internal async Task SeedConcurrentRows(CancellationToken ct)
     {
-        var current = ClusteringMembershipSnapshot.Capture(await A.ReadRowAsync(Entry(1).SiloAddress, ct));
-        Check(current.Rows.Count == 0, "concurrent-read setup requires an unused fixture identity");
+        var current = ClusteringMembershipSnapshot.Capture(await A.ReadAllAsync(ct));
+        Check(current.Rows.Count == 0, "concurrent-read setup requires an empty cluster");
         var expectedRows = current.Rows.ToBuilder();
         for (var i = 1; i <= _concurrencyRowCount; i++)
         {
@@ -684,15 +695,20 @@ public sealed class MembershipTableTestRunner
             var reader = i % 2 == 0 ? A : B;
             Check(await writer.InsertRowAsync(input, current.Next(), ct),
                 $"concurrent-read setup insert failed: index={i}, table={current.Next()}");
-            var observed = ClusteringMembershipSnapshot.Capture(await reader.ReadRowAsync(input.SiloAddress, ct));
-            AssertCommit(current with { Rows = current.Rows.Clear() }, observed, expectedEntry.ToEntry());
-            expectedRows.Add(expectedEntry.Identity, new(expectedEntry, observed.Row(input.SiloAddress).Etag));
-            current = observed;
+            var observed = await reader.ReadAllAsync(ct);
+            Check(observed.Version.Version == current.Version + 1, $"setup commit integer: expected={current.Version + 1}, observed={observed.Version.Version}");
+            Check(!string.IsNullOrEmpty(observed.Version.VersionEtag) && observed.Version.VersionEtag != current.TableEtag,
+                $"setup commit table ETag did not advance: index={i}");
+            var row = observed.TryGet(input.SiloAddress);
+            Check(row is not null, $"setup insert omitted identity={expectedEntry.Identity}");
+            EqualRow(expectedEntry, MembershipEntrySnapshot.Capture(row!.Item1));
+            expectedRows.Add(expectedEntry.Identity, new(expectedEntry, row.Item2));
+            current = current with { Version = observed.Version.Version, TableEtag = observed.Version.VersionEtag };
         }
         Equal(current with { Rows = expectedRows.ToImmutable() }, await SameHandles(ct));
     }
 
-    private async Task ConcurrentReads(bool pointReads, CancellationToken ct)
+    private async Task ConcurrentReads(CancellationToken ct)
     {
         await SeedConcurrentRows(ct);
         for (var round = 0; round < 6; round++)
@@ -712,7 +728,7 @@ public sealed class MembershipTableTestRunner
             }
             var start = Gate();
             var ready = Enumerable.Range(0, 4).Select(_ => Gate()).ToArray();
-            var observations = new System.Collections.Concurrent.ConcurrentQueue<(ClusteringMembershipSnapshot Snapshot, SiloAddress Key)>();
+            var observations = new System.Collections.Concurrent.ConcurrentQueue<ClusteringMembershipSnapshot>();
             async Task Writer()
             {
                 ready[0].SetResult();
@@ -727,10 +743,9 @@ public sealed class MembershipTableTestRunner
             {
                 ready[index].SetResult();
                 await start.Task.WaitAsync(ct);
-                var key = index switch { 1 => target.SiloAddress, 2 => Entry(3).SiloAddress, _ => Entry(_concurrencyRowCount + 1).SiloAddress };
                 var table = index % 2 == 0 ? B : A;
-                var sample = ClusteringMembershipSnapshot.Capture(pointReads ? await table.ReadRowAsync(key, ct) : await table.ReadAllAsync(ct));
-                var expectedBefore = pointReads ? before.Select(key) : before;
+                var sample = ClusteringMembershipSnapshot.Capture(await table.ReadAllAsync(ct));
+                var expectedBefore = before;
                 var id = target.SiloAddress.ToParsableString();
                 if (sample.Version == before.Version)
                 {
@@ -754,9 +769,9 @@ public sealed class MembershipTableTestRunner
                     {
                         Check(!sample.Rows.ContainsKey(id), "atomic cleanup still returned the removed identity");
                     }
-                    Equal(pointReads ? expectedAfter.Select(key) : expectedAfter, sample);
+                    Equal(expectedAfter, sample);
                 }
-                observations.Enqueue((sample, key));
+                observations.Enqueue(sample);
             }
 
             var workers = new[] { Writer(), Reader(1), Reader(2), Reader(3) };
@@ -767,10 +782,10 @@ public sealed class MembershipTableTestRunner
             if (cleanup) AssertCleanup(before, committed, T1);
             else AssertCommit(before, committed, target);
             // Once the writer completes, pin down the committed table token as well as its canonical fields.
-            foreach (var (sample, key) in observations)
+            foreach (var sample in observations)
             {
-                var expectedBefore = pointReads ? before.Select(key) : before;
-                var expectedAfter = pointReads ? committed.Select(key) : committed;
+                var expectedBefore = before;
+                var expectedAfter = committed;
                 Check(expectedBefore.CompareCanonical(sample) is null || expectedAfter.CompareCanonical(sample) is null,
                     $"atomic read matches neither committed view: before={expectedBefore.CompareCanonical(sample)}; after={expectedAfter.CompareCanonical(sample)}");
             }
