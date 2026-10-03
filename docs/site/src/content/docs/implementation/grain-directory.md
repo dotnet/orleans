@@ -55,10 +55,12 @@ Custom directories own their consistency, availability, and cleanup behavior. Th
 
 <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> opts into a view-synchronous directory marked with compiler warning **`ORLEANSEXP003`**:
 
-It is not the default. The experimental status allows its API and protocol to evolve.
+Its experimental status allows the API and protocol to evolve.
 
 <a name="partitioning-strategy"></a>
-The implementation divides the hash ring into configurable ranges, analogous to the virtual-node partitioning described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**, not 30. A partition normally serves requests locally. During a membership view change, old and new owners coordinate range locks, snapshots, and ownership transfer. The design applies the [virtually synchronous methodology for dynamic service replication](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/) and has similarities to [Vertical Paxos and primary-backup replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/).
+The directory uses hash-ring partitioning with a configurable number of virtual nodes per silo, the partitioning scheme described by [Dynamo](https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf). Each virtual node is a directory partition. <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to **1**.
+
+A partition normally serves requests independently. During a membership view change, old and new owners coordinate range gates, snapshots, and ownership transfer using the [Virtual Synchrony approach](https://www.microsoft.com/en-us/research/publication/virtually-synchronous-methodology-for-dynamic-service-replication/). [Vertical Paxos and Primary-Backup Replication](https://www.microsoft.com/en-us/research/publication/vertical-paxos-and-primary-backup-replication/) explains the separation of configuration authority from the work needed to carry state into a new configuration.
 
 <a name="view-change-procedure"></a>
 ```mermaid
@@ -79,6 +81,12 @@ sequenceDiagram
 
 <a name="recovery-process"></a>
 Requests and responses carry view information. A range cannot serve a request under an incompatible ownership view. If an orderly transfer is impossible, the new owner recovers registrations by querying active silos rather than assuming the failed owner's state.
+
+The runtime's cluster-service topology maps a membership snapshot to partition owners. Membership refreshes complete once the requested version is available in the local projection, propagate underlying refresh failures, and cancel pending waits when the projection stops. Each directory partition installs versioned transition gates synchronously when it observes an ownership change. The partition's scheduler serializes local state access, while the gates keep affected requests waiting across asynchronous transfer and recovery steps. Successive transitions wait for overlapping work from earlier views before reading or installing state.
+
+An inbound transition opens its gate after installing state and establishing the directory's fencing conditions. Recovery after an ungraceful failure can also install a timed safety lease which continues to defer new registrations until expiration. An outbound transition drains earlier work and retains a snapshot for a contiguous handoff. An unexpected transition failure keeps the range blocked and reaches the silo's fatal-error handler, allowing cluster membership and the surviving owners to drive recovery. Shutdown cancels outstanding range waits.
+
+For the internal component contracts, transition state machine, registration/recovery race, fencing assumptions, and annotated research references, see [View-synchronous cluster services](view-synchronous-cluster-services.md).
 
 API: <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> and <xref:Orleans.Configuration.GrainDirectoryOptions>. Implementation: [hosting registration](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Hosting/CoreHostingExtensions.cs) and [`DistributedGrainDirectory`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/GrainDirectory/DistributedGrainDirectory.cs).
 
