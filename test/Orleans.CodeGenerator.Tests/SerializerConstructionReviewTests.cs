@@ -16,6 +16,75 @@ namespace Orleans.CodeGenerator.Tests;
 [TestArea("CodeGen")]
 public sealed class SerializerConstructionReviewTests
 {
+    [Fact]
+    public void OrdinaryMetadataRootRetainsExternalConstructorDependencies()
+    {
+        var calls = 0;
+        var dependency = new ExternalDependency();
+        var services = new ServiceCollection().AddSerializer();
+        services.AddSingleton<ExternalDependency>(_ =>
+        {
+            calls++;
+            return dependency;
+        });
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddFieldCodec(typeof(ExternalConstructorCodec));
+            options.AddSerializerService<Leaf>(_ => new Leaf(1));
+        });
+        using var scope = services.BuildServiceProvider();
+        var provider = scope.GetRequiredService<CodecProvider>();
+        var codec = Assert.IsType<ExternalConstructorCodec>(provider.GetCodec<ExternalConstructorValue>());
+        Assert.Same(dependency, codec.Dependency);
+        Assert.Equal(1, calls);
+    }
+
+    public sealed class ExternalConstructorValue;
+    public sealed class ExternalConstructorCodec : IFieldCodec<ExternalConstructorValue>
+    {
+        public ExternalDependency Dependency { get; }
+        public ExternalConstructorCodec(ExternalDependency dependency) => Dependency = dependency;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] ExternalConstructorValue value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> => throw new NotSupportedException();
+        public ExternalConstructorValue ReadValue<TInput>(ref Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+            => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public void NestedProvidersKeepPartiallyConstructedCallerOwnership()
+    {
+        var secondServices = new ServiceCollection().AddSerializer();
+        secondServices.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<ProviderOwnedNode>(_ => new ProviderOwnedNode(2)));
+        using var second = secondServices.BuildServiceProvider();
+        var secondCodecs = second.GetRequiredService<CodecProvider>();
+        var firstServices = new ServiceCollection().AddSerializer();
+        firstServices.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<ProviderOwnedNode>(provider => new ProviderOwnedNode(provider, secondCodecs)));
+        using var first = firstServices.BuildServiceProvider();
+        var firstCodecs = first.GetRequiredService<CodecProvider>();
+        var node = OrleansGeneratedCodeHelper.GetService<ProviderOwnedNode>(null!, firstCodecs);
+        Assert.Equal(1, node.Owner);
+        Assert.Equal(2, node.Other!.Owner);
+        Assert.NotSame(node, node.Other);
+        Assert.Same(node.Other, OrleansGeneratedCodeHelper.GetService<ProviderOwnedNode>(null!, secondCodecs));
+        Assert.Same(node, OrleansGeneratedCodeHelper.GetService<ProviderOwnedNode>(null!, firstCodecs));
+    }
+
+    private sealed class ProviderOwnedNode
+    {
+        public int Owner { get; }
+        public ProviderOwnedNode? Other { get; }
+        public ProviderOwnedNode(int owner) => Owner = owner;
+        public ProviderOwnedNode(ICodecProvider owner, ICodecProvider other)
+        {
+            Owner = 1;
+            Other = OrleansGeneratedCodeHelper.GetService<ProviderOwnedNode>(this, other);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -328,7 +397,7 @@ public sealed class SerializerConstructionReviewTests
         public List<List<int>> Nested { get; set; } = new();
     }
 
-    private sealed class ExternalDependency;
+    public sealed class ExternalDependency;
     private sealed class GeneratedLookupProbe(IFieldCodec<MetadataListModel> codec, IDeepCopier<MetadataListModel> copier,
         IFieldCodec<List<int>> listCodec, IDeepCopier<List<int>> listCopier)
     {

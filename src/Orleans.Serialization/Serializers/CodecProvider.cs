@@ -60,7 +60,7 @@ namespace Orleans.Serialization.Serializers
         private Dictionary<(object Cache, Type Key), Action>? _pendingLegacyCacheCommits;
         private readonly List<Type> _constructingSerializerServices = new();
         private ExceptionDispatchInfo? _constructionFailure;
-        private readonly List<(object Caller, object Dependency)> _constructionDependencies = new();
+        private bool _deferredConstruction;
         private int _initializingThreadId;
         private readonly IServiceProvider _constructionServices;
         private bool _initialized;
@@ -614,7 +614,57 @@ namespace Orleans.Serialization.Serializers
 #endif
         private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
-            try { return ActivateService(type, constructorArguments); }
+            try
+            {
+                if (_manifest.SerializerServiceFactories.Count == 0) return ActivateService(type, constructorArguments);
+                if (OrleansGeneratedCodeHelper.TryGetService(type, this) is { } caller) return caller;
+                lock (_serializerServiceLock)
+                {
+                    _constructionFailure?.Throw();
+                    if (_serializerServices.TryGetValue(type, out var completed)) return completed;
+                }
+                if (TryGetSerializerService(type, out var registered)) return registered;
+                if (!IsConstructionPending)
+                {
+                    var root = OrleansGeneratedCodeHelper.EnterActivation(this);
+                    var success = false;
+                    try
+                    {
+                        var value = ActivateService(type, constructorArguments);
+                        if (Monitor.IsEntered(_serializerServiceLock) && _deferredConstruction)
+                            _pendingSerializerServices!.TryAdd(type, value);
+                        success = true;
+                        return value;
+                    }
+                    catch (Exception exception)
+                    {
+                        RecordConstructionFailure(exception);
+                        throw;
+                    }
+                    finally
+                    {
+                        OrleansGeneratedCodeHelper.ExitServiceResolution();
+                        if (root && Monitor.IsEntered(_serializerServiceLock) && _deferredConstruction)
+                        {
+                            try
+                            {
+                                if (success)
+                                {
+                                    _constructionFailure?.Throw();
+                                    PublishConstruction();
+                                }
+                            }
+                            finally
+                            {
+                                ResetConstruction();
+                                _deferredConstruction = false;
+                                Monitor.Exit(_serializerServiceLock);
+                            }
+                        }
+                    }
+                }
+                return ConstructService(type, () => ActivateService(type, constructorArguments));
+            }
             catch (Exception exception) { RecordConstructionFailure(exception); throw; }
         }
 
@@ -663,6 +713,18 @@ namespace Orleans.Serialization.Serializers
                 return false;
             }
 
+            if (OrleansGeneratedCodeHelper.TryGetService(type, this) is { } caller)
+            {
+                result = caller;
+                return true;
+            }
+
+            result = ConstructService(type, () => factory(this));
+            return true;
+        }
+
+        private object ConstructService(Type type, Func<object> create)
+        {
             if (!_initialized
                 && _initializingThreadId != Environment.CurrentManagedThreadId)
             {
@@ -677,8 +739,8 @@ namespace Orleans.Serialization.Serializers
             lock (_serializerServiceLock)
             {
                 _constructionFailure?.Throw();
-                if (_serializerServices.TryGetValue(type, out result)) return true;
-                if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return true;
+                if (_serializerServices.TryGetValue(type, out var result)) return result;
+                if (_pendingSerializerServices?.TryGetValue(type, out result) == true) return result;
                 if (_constructingSerializerServices.Contains(type))
                 {
                     ThrowResolutionFailure(new InvalidOperationException(
@@ -686,26 +748,25 @@ namespace Orleans.Serialization.Serializers
                 }
                 var isRoot = _pendingSerializerServices is null;
                 _pendingSerializerServices ??= new();
+                var deferred = isRoot && OrleansGeneratedCodeHelper.HasActivation(this);
+                if (deferred)
+                {
+                    Monitor.Enter(_serializerServiceLock);
+                    _deferredConstruction = true;
+                }
+                OrleansGeneratedCodeHelper.EnterServiceResolution(this);
                 _constructingSerializerServices.Add(type);
                 try
                 {
-                    result = factory(this);
+                    result = create();
                     _constructionFailure?.Throw();
                     _pendingSerializerServices.Add(type, result);
-                    if (isRoot)
+                    if (isRoot && !deferred)
                     {
-                        foreach (var entry in _pendingSerializerServices)
-                        {
-                            _serializerServices.Add(entry.Key, entry.Value);
-                        }
-
-                        if (_pendingLegacyCacheCommits is { } commits)
-                        {
-                            foreach (var commit in commits.Values) commit();
-                        }
+                        PublishConstruction();
                     }
 
-                    return true;
+                    return result;
                 }
                 catch (Exception exception)
                 {
@@ -715,16 +776,28 @@ namespace Orleans.Serialization.Serializers
                 finally
                 {
                     _constructingSerializerServices.RemoveAt(_constructingSerializerServices.Count - 1);
-                    if (isRoot)
+                    OrleansGeneratedCodeHelper.ExitServiceResolution();
+                    if (isRoot && !deferred)
                     {
-                        _pendingSerializerServices = null;
-                        _pendingLegacyCacheValues = null;
-                        _pendingLegacyCacheCommits = null;
-                        _constructionFailure = null;
-                        _constructionDependencies.Clear();
+                        ResetConstruction();
                     }
                 }
             }
+        }
+
+        private void PublishConstruction()
+        {
+            foreach (var entry in _pendingSerializerServices!) _serializerServices.Add(entry.Key, entry.Value);
+            if (_pendingLegacyCacheCommits is { } commits)
+                foreach (var commit in commits.Values) commit();
+        }
+
+        private void ResetConstruction()
+        {
+            _pendingSerializerServices = null;
+            _pendingLegacyCacheValues = null;
+            _pendingLegacyCacheCommits = null;
+            _constructionFailure = null;
         }
 
         private bool TryGetCached<TValue>(ConcurrentDictionary<Type, TValue> cache, Type key, [NotNullWhen(true)] out TValue? result) where TValue : class
@@ -757,58 +830,6 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        internal void RecordConstructionDependency(IReadOnlyList<object> callers, object dependency)
-        {
-            lock (_serializerServiceLock)
-            {
-                _constructionFailure?.Throw();
-                if (_pendingSerializerServices is null || callers.Count == 0) return;
-                for (var index = 1; index < callers.Count; index++)
-                {
-                    AddEdge(callers[index - 1], callers[index]);
-                }
-
-                var caller = callers[^1];
-                AddEdge(caller, dependency);
-                var cycle = new List<object>();
-                if (!FindPath(dependency, caller, new List<object>(), cycle)) return;
-                var hasStatic = false;
-                var hasAutomatic = false;
-                foreach (var node in cycle)
-                {
-                    var isStatic = _constructingSerializerServices.Exists(type => type.IsInstanceOfType(node))
-                        || _pendingSerializerServices.Values.Any(value => ReferenceEquals(value, node));
-                    hasStatic |= isStatic;
-                    hasAutomatic |= !isStatic;
-                }
-
-                if (hasStatic && hasAutomatic)
-                {
-                    throw new InvalidOperationException("Cyclic construction combines closed serializer factories and automatic activation. Register closed factories for every serialization service in this cycle.");
-                }
-            }
-
-            void AddEdge(object caller, object dependency)
-            {
-                if (!_constructionDependencies.Any(edge => ReferenceEquals(edge.Caller, caller) && ReferenceEquals(edge.Dependency, dependency)))
-                    _constructionDependencies.Add((caller, dependency));
-            }
-
-            bool FindPath(object source, object target, List<object> visited, List<object> path)
-            {
-                if (visited.Any(node => ReferenceEquals(node, source))) return false;
-                visited.Add(source);
-                path.Add(source);
-                if (ReferenceEquals(source, target)) return true;
-                foreach (var edge in _constructionDependencies)
-                {
-                    if (ReferenceEquals(edge.Caller, source) && FindPath(edge.Dependency, target, visited, path)) return true;
-                }
-                path.RemoveAt(path.Count - 1);
-                return false;
-            }
-        }
-
         internal bool IsConstructionPending
         {
             get { lock (_serializerServiceLock) return _pendingSerializerServices is not null; }
@@ -821,6 +842,55 @@ namespace Orleans.Serialization.Serializers
                 if (_pendingSerializerServices is not null)
                     _constructionFailure ??= ExceptionDispatchInfo.Capture(exception);
             }
+        }
+
+        private object? TryGetConstructedService(Type serviceType)
+        {
+            if (OrleansGeneratedCodeHelper.TryGetService(serviceType, this) is { } caller) return caller;
+            var definition = serviceType.GetGenericTypeDefinition();
+            var fieldType = serviceType.GenericTypeArguments[0];
+            Dictionary<Type, Type> implementations;
+            ConcurrentDictionary<Type, object>? instances = null;
+            if (definition == typeof(IFieldCodec<>))
+            {
+                if (TryGetCached(_typedCodecs, fieldType, out var typed)) return typed;
+                if (TryGetCached(_untypedCodecs, fieldType, out var untyped) && serviceType.IsInstanceOfType(untyped)) return untyped;
+                implementations = _fieldCodecs;
+            }
+            else if (definition == typeof(IDeepCopier<>))
+            {
+                if (TryGetCached(_typedCopiers, fieldType, out var typed)) return typed;
+                if (TryGetCached(_untypedCopiers, fieldType, out var untyped) && serviceType.IsInstanceOfType(untyped)) return untyped;
+                implementations = _copiers;
+            }
+            else if (definition == typeof(IBaseCodec<>))
+            {
+                if (TryGetCached(_typedBaseCodecs, fieldType, out var typed)) return typed;
+                implementations = _baseCodecs;
+            }
+            else if (definition == typeof(IValueSerializer<>))
+            {
+                implementations = _valueSerializers;
+                instances = _instantiatedValueSerializers;
+            }
+            else if (definition == typeof(IBaseCopier<>))
+            {
+                implementations = _baseCopiers;
+                instances = _instantiatedBaseCopiers;
+            }
+            else
+            {
+                implementations = _activators;
+                instances = _instantiatedActivators;
+            }
+
+            var searchType = fieldType.IsConstructedGenericType ? fieldType.GetGenericTypeDefinition() : fieldType;
+            if (!implementations.TryGetValue(searchType, out var implementation)) return null;
+            if (implementation.IsGenericTypeDefinition)
+                implementation = ConstructGenericImplementation(implementation, fieldType.GenericTypeArguments);
+            if (_serializerServices.TryGetValue(implementation, out var completed)) return completed;
+            if (_pendingSerializerServices!.TryGetValue(implementation, out var pending)) return pending;
+            return instances is not null && TryGetCached(instances, implementation, out var existing) ? existing : null;
         }
 
         private sealed class ConstructionServiceProvider(CodecProvider owner) : IServiceProvider, IServiceProviderIsService,
@@ -836,12 +906,17 @@ namespace Orleans.Serialization.Serializers
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
                         if (IsProviderService(serviceType)) return owner;
+                        if (owner._serializerServices.TryGetValue(serviceType, out var completed)) return completed;
+                        if (owner._pendingSerializerServices.TryGetValue(serviceType, out var constructed)) return constructed;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
+                        if (ServiceCollectionExtensions.GetServiceHolderType(serviceType) is { } holderType)
+                        {
+                            if (owner.TryGetConstructedService(serviceType) is { } existing) return existing;
+                            return owner.GetServiceOrCreateInstance(
+                                owner.ConstructGenericImplementation(holderType, serviceType.GenericTypeArguments));
+                        }
                         if (owner.IsRegisteredImplementation(serviceType))
                             return owner.GetServiceOrCreateInstance(serviceType);
-                        if (ServiceCollectionExtensions.GetServiceHolderType(serviceType) is { } holderType)
-                            return ((IServiceHolder<object>)owner.GetServiceOrCreateInstance(
-                                owner.ConstructGenericImplementation(holderType, serviceType.GenericTypeArguments))).Value;
                         var error = new InvalidOperationException($"Dependency injection cannot resolve {serviceType} while a serialization graph is unpublished. Register the dependency through TypeManifestOptions.AddSerializerService using a closed factory which constructs it or returns an explicitly captured instance.");
                         owner.RecordConstructionFailure(error);
                         throw error;

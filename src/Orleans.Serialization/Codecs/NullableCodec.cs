@@ -78,15 +78,15 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <param name="copier">The copier.</param>
         public NullableCopier(IDeepCopier<T> copier)
-            => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(OrleansGeneratedCodeHelper.UnwrapService(this, copier));
+            => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier);
 
         [return: NotNullIfNotNull(nameof(input))]
-        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input, context);
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || OrleansGeneratedCodeHelper.IsShallowCopyable(_copier) ? input : _copier.DeepCopy(input, context);
 
         /// <inheritdoc/>
-        public T? DeepCopy(T? input, CopyContext context) => input is null || _copier is null ? input : _copier.DeepCopy(input.GetValueOrDefault(), context);
+        public T? DeepCopy(T? input, CopyContext context) => input is null || OrleansGeneratedCodeHelper.IsShallowCopyable(_copier) ? input : _copier.DeepCopy(input.GetValueOrDefault(), context);
     }
 }

@@ -56,10 +56,10 @@ namespace Orleans.Serialization.Codecs
         /// Initializes a new instance of the <see cref="ImmutableQueueCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The element copier.</param>
-        public ImmutableQueueCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+        public ImmutableQueueCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier);
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -71,7 +71,7 @@ namespace Orleans.Serialization.Codecs
                 return result!;
 
             System.Diagnostics.Debug.Assert(input is not null);
-            if (input.IsEmpty || _copier is null)
+            if (input.IsEmpty || OrleansGeneratedCodeHelper.IsShallowCopyable(_copier))
                 return input;
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.

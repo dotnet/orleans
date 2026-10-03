@@ -14,6 +14,94 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void MixedCyclesPublishCompletedGraphs()
+    {
+        foreach (var copier in new[] { false, true })
+            foreach (var secondRoot in new[] { false, true })
+            {
+                using var gate = new ConstructionGate { Pause = !secondRoot, PauseSecond = secondRoot };
+                using var services = CreateMixedCycleServices(gate);
+                var provider = services.GetRequiredService<CodecProvider>();
+                var constructing = Task.Run(() => ResolveMixedRoot(provider, copier, secondRoot));
+                Ensure(gate.Paused.Wait(TimeSpan.FromSeconds(10)), "Mixed root reached its dependency-ready construction barrier.");
+                var consuming = Task.Run(() =>
+                {
+                    gate.ConsumerStarted.Set();
+                    if (copier) ((SecondCopier)provider.GetDeepCopier<SecondValue>()).VerifyReady();
+                    else ((SecondCodec)provider.GetCodec<SecondValue>()).VerifyReady();
+                    ExerciseSecond(services, copier);
+                });
+                try
+                {
+                    Ensure(gate.ConsumerStarted.Wait(TimeSpan.FromSeconds(10)), "Concurrent mixed-graph consumer started.");
+                    Ensure(!consuming.Wait(TimeSpan.FromMilliseconds(200)), "Pending mixed graph escaped before its outer constructor completed.");
+                }
+                finally
+                {
+                    gate.Release.Set();
+                }
+                Task.WhenAll(constructing, consuming).WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                Ensure(gate.FirstConstructions == 1 && gate.SecondConstructions == 1,
+                    "Both mixed root orders publish one canonical completed graph.");
+            }
+    }
+
+    public static void FailedMixedCyclesRollBackFromBothRoots()
+    {
+        foreach (var copier in new[] { false, true })
+            foreach (var secondRoot in new[] { false, true })
+            {
+                using var gate = new ConstructionGate { FailFirst = !secondRoot, FailSecond = secondRoot };
+                using var services = CreateMixedCycleServices(gate);
+                var provider = services.GetRequiredService<CodecProvider>();
+                var committed = provider.GetCodec<int>();
+                Expect<InvalidOperationException>(() => ResolveMixedRoot(provider, copier, secondRoot), "injected constructor failure");
+                _ = ResolveMixedRoot(provider, copier, secondRoot);
+                if (copier)
+                {
+                    var first = (FirstCopier)provider.GetDeepCopier<FirstValue>();
+                    var second = (SecondCopier)provider.GetDeepCopier<SecondValue>();
+                    Ensure(ReferenceEquals(first.Second, second) && ReferenceEquals(first, second.First),
+                        "Mixed copier retry replaces both pending references.");
+                }
+                else
+                {
+                    var first = (FirstCodec)provider.GetCodec<FirstValue>();
+                    var second = (SecondCodec)provider.GetCodec<SecondValue>();
+                    Ensure(ReferenceEquals(first.Second, second) && ReferenceEquals(first, second.First),
+                        "Mixed codec retry replaces both pending references.");
+                }
+                Ensure(gate.FirstConstructions == 2 && gate.SecondConstructions == 2,
+                    "A failed outer constructor rebuilds the whole mixed graph.");
+                Ensure(ReferenceEquals(committed, provider.GetCodec<int>()), "Mixed failure retains committed leaves.");
+                ExerciseSecond(services, copier);
+            }
+    }
+
+    private static object ResolveMixedRoot(CodecProvider provider, bool copier, bool secondRoot)
+        => secondRoot
+            ? copier ? provider.GetDeepCopier<SecondValue>() : provider.GetCodec<SecondValue>()
+            : ResolveFirst(provider, copier);
+
+    private static ServiceProvider CreateMixedCycleServices(ConstructionGate gate)
+    {
+        var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+        services.AddSingleton(gate);
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddAllowedType(typeof(SecondValue));
+            options.AddSerializerService<ConstructionGate>(_ => gate);
+            options.AddFieldCodec(typeof(SecondCodec));
+            options.AddCopier(typeof(SecondCopier));
+            options.AddSerializerService<FirstCodec>(provider => new FirstCodec(provider, gate));
+            options.AddSerializerService<FirstCopier>(provider => new FirstCopier(provider, gate));
+            options.AddSerializer<FirstValue>(
+                static provider => OrleansGeneratedCodeHelper.GetService<FirstCodec>(null!, provider),
+                static provider => OrleansGeneratedCodeHelper.GetService<FirstCopier>(null!, provider));
+        });
+        return services.BuildServiceProvider();
+    }
+
     public static void CaughtNestedFailureFaultsTheWholeGraph()
     {
         using var gate = new ConstructionGate { FailFirst = true };
@@ -79,18 +167,37 @@ public static partial class StaticFactoryContracts
         }
     }
 
-    public static void MixedConstructionCyclesFailBeforePublication()
+    public static void MixedConstructionCyclesConstructCanonically()
     {
         foreach (var copier in new[] { false, true })
-        {
-            using var gate = new ConstructionGate();
-            using var services = CreateMixedServices(gate, copier, cyclic: true);
-            var provider = services.GetRequiredService<CodecProvider>();
-            _ = provider.GetCodec<int>();
-            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
-            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
-            Ensure(gate.SecondConstructions == 2, "Rejected mixed cycles leave no stale automatic cache entry.");
-        }
+            foreach (var secondRoot in new[] { false, true })
+            {
+                using var gate = new ConstructionGate();
+                using var services = CreateMixedServices(gate, copier, cyclic: true);
+                var provider = services.GetRequiredService<CodecProvider>();
+                if (secondRoot)
+                {
+                    if (copier) _ = provider.GetDeepCopier<SecondValue>();
+                    else _ = provider.GetCodec<SecondValue>();
+                }
+                if (copier)
+                {
+                    var first = (FirstCopier)provider.GetDeepCopier<FirstValue>();
+                    var second = (SecondCopier)provider.GetDeepCopier<SecondValue>();
+                    Ensure(ReferenceEquals(first.Second, second) && ReferenceEquals(second.First, first),
+                        "Mixed copiers retain the same canonical cycle from either root.");
+                }
+                else
+                {
+                    var first = (FirstCodec)provider.GetCodec<FirstValue>();
+                    var second = (SecondCodec)provider.GetCodec<SecondValue>();
+                    Ensure(ReferenceEquals(first.Second, second) && ReferenceEquals(second.First, first),
+                        "Mixed codecs retain the same canonical cycle from either root.");
+                }
+                Ensure(gate.FirstConstructions == 1 && gate.SecondConstructions == 1,
+                    "Mixed construction reuses one instance per implementation.");
+                ExerciseSecond(services, copier);
+            }
     }
 
     private static ServiceProvider CreateMixedServices(ConstructionGate gate, bool copier, bool cyclic)
@@ -199,6 +306,11 @@ public static partial class StaticFactoryContracts
 
     private sealed class ConstructionContext : SerializerContext
     {
+#if NATIVE_AOT_SMOKE
+        public static IDeepCopier<T> CreateForwardCopier<T>(ICodecProvider provider)
+            => CreateCopierHolder<T>(provider);
+#endif
+
         protected override void ConfigureInner(TypeManifestOptions options)
         {
             options.AddSerializer<int>(static _ => new Int32Codec(), static _ => new ShallowCopier<int>());
@@ -240,7 +352,9 @@ public static partial class StaticFactoryContracts
         public ManualResetEventSlim Release { get; } = new();
         public ManualResetEventSlim ConsumerStarted { get; } = new();
         public bool Pause { get; init; }
+        public bool PauseSecond { get; init; }
         public bool FailFirst { get; init; }
+        public bool FailSecond { get; init; }
         public int FirstConstructions;
         public int SecondConstructions;
 
@@ -252,6 +366,17 @@ public static partial class StaticFactoryContracts
             {
                 Paused.Set();
                 Ensure(Release.Wait(TimeSpan.FromSeconds(10)), "Outer cyclic constructor was released.");
+            }
+        }
+
+        public void ConstructSecond()
+        {
+            var attempt = Interlocked.Increment(ref SecondConstructions);
+            if (FailSecond && attempt == 1) throw new InvalidOperationException("injected constructor failure");
+            if (PauseSecond)
+            {
+                Paused.Set();
+                Ensure(Release.Wait(TimeSpan.FromSeconds(10)), "Outer metadata constructor was released.");
             }
         }
 
@@ -368,6 +493,7 @@ public static partial class StaticFactoryContracts
     {
         private readonly SecondCodec _second;
         private readonly bool _ready;
+        public SecondCodec Second => _second;
 
         public FirstCodec(ICodecProvider provider, ConstructionGate gate)
         {
@@ -396,13 +522,16 @@ public static partial class StaticFactoryContracts
     private sealed class SecondCodec : IFieldCodec<SecondValue>
     {
         public FirstCodec First { get; }
+        private readonly bool _ready;
 
         public SecondCodec(ICodecProvider provider, ConstructionGate gate)
         {
-            Interlocked.Increment(ref gate.SecondConstructions);
             First = OrleansGeneratedCodeHelper.GetService<FirstCodec>(this, provider);
+            gate.ConstructSecond();
+            _ready = true;
         }
 
+        public void VerifyReady() => Ensure(_ready, "Metadata codec constructor completed before use.");
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] SecondValue value)
             where TBufferWriter : IBufferWriter<byte>
         {
@@ -422,6 +551,7 @@ public static partial class StaticFactoryContracts
     {
         private readonly SecondCopier _second;
         private readonly bool _ready;
+        public SecondCopier Second => _second;
 
         public FirstCopier(ICodecProvider provider, ConstructionGate gate)
         {
@@ -443,13 +573,16 @@ public static partial class StaticFactoryContracts
     private sealed class SecondCopier : IDeepCopier<SecondValue>
     {
         public FirstCopier First { get; }
+        private readonly bool _ready;
 
         public SecondCopier(ICodecProvider provider, ConstructionGate gate)
         {
-            Interlocked.Increment(ref gate.SecondConstructions);
             First = OrleansGeneratedCodeHelper.GetService<FirstCopier>(this, provider);
+            gate.ConstructSecond();
+            _ready = true;
         }
 
+        public void VerifyReady() => Ensure(_ready, "Metadata copier constructor completed before use.");
         [return: NotNullIfNotNull(nameof(input))]
         public SecondValue? DeepCopy(SecondValue? input, CopyContext context)
         {
