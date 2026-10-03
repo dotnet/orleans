@@ -18,6 +18,7 @@ namespace Orleans.Serialization.Codecs
     {
         private readonly Type DimensionFieldType = typeof(int[]);
         private readonly Type CodecElementType = typeof(T);
+        private readonly Type _arrayType;
 
         private readonly IFieldCodec<int[]> _intArrayCodec;
         private readonly IFieldCodec<T> _elementCodec;
@@ -25,10 +26,12 @@ namespace Orleans.Serialization.Codecs
         /// <summary>
         /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{T}"/> class.
         /// </summary>
+        /// <param name="arrayType">The concrete array type.</param>
         /// <param name="intArrayCodec">The int array codec.</param>
         /// <param name="elementCodec">The element codec.</param>
-        public MultiDimensionalArrayCodec(IFieldCodec<int[]> intArrayCodec, IFieldCodec<T> elementCodec)
+        public MultiDimensionalArrayCodec(Type arrayType, IFieldCodec<int[]> intArrayCodec, IFieldCodec<T> elementCodec)
         {
+            _arrayType = arrayType;
             _intArrayCodec = OrleansGeneratedCodeHelper.UnwrapService(this, intArrayCodec);
             _elementCodec = OrleansGeneratedCodeHelper.UnwrapService(this, elementCodec);
         }
@@ -122,7 +125,11 @@ namespace Orleans.Serialization.Codecs
 
                             // Multi-dimensional arrays must be indexed using indexing arrays, so create one now.
                             indices = new int[rank];
-                            result = Array.CreateInstance(CodecElementType, lengths);
+#if NET10_0_OR_GREATER
+                            result = Array.CreateInstanceFromArrayType(_arrayType, lengths);
+#else
+                            result = Array.CreateInstance(_arrayType.GetElementType()!, lengths);
+#endif
                             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                             break;
                         }
@@ -239,7 +246,11 @@ namespace Orleans.Serialization.Codecs
                 lowerBounds[i] = originalArray.GetLowerBound(i);
             }
 
+#if NET10_0_OR_GREATER
+            result = Array.CreateInstanceFromArrayType(type, lengths, lowerBounds);
+#else
             result = Array.CreateInstance(elementType!, lengths, lowerBounds);
+#endif
             context.RecordCopy(original, result);
 
             if (rank == 1)

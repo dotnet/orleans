@@ -216,6 +216,50 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     }
 
     [Fact]
+    public void RoundTrip_TypedArraysWithDifferentRanksPreservesShapesAndAliases()
+    {
+        var shared = new MyValue(83);
+        var rankTwo = new MyValue[,] { { shared, shared } };
+        var rankThree = new MyValue[,,] { { { shared, shared } } };
+
+        var restoredTwo = _serializer.Deserialize<MyValue[,]>(_serializer.SerializeToArray(rankTwo))!;
+        var restoredThree = _serializer.Deserialize<MyValue[,,]>(_serializer.SerializeToArray(rankThree))!;
+        var secondTwo = _serializer.Deserialize<MyValue[,]>(_serializer.SerializeToArray(rankTwo))!;
+
+        Assert.Equal(rankTwo.GetType(), restoredTwo.GetType());
+        Assert.Equal(1, restoredTwo.GetLength(0));
+        Assert.Equal(2, restoredTwo.GetLength(1));
+        Assert.Equal(83, restoredTwo[0, 0].Value);
+        Assert.Same(restoredTwo[0, 0], restoredTwo[0, 1]);
+        Assert.NotSame(shared, restoredTwo[0, 0]);
+        Assert.Equal(rankThree.GetType(), restoredThree.GetType());
+        Assert.Equal(1, restoredThree.GetLength(0));
+        Assert.Equal(1, restoredThree.GetLength(1));
+        Assert.Equal(2, restoredThree.GetLength(2));
+        Assert.Equal(83, restoredThree[0, 0, 0].Value);
+        Assert.Same(restoredThree[0, 0, 0], restoredThree[0, 0, 1]);
+        Assert.NotSame(shared, restoredThree[0, 0, 0]);
+        Assert.Equal(rankTwo.GetType(), secondTwo.GetType());
+        Assert.Equal(83, secondTwo[0, 0].Value);
+        Assert.Same(secondTwo[0, 0], secondTwo[0, 1]);
+    }
+
+    [Fact]
+    public void RoundTrip_RecursiveModelWithDifferentArrayRanksPreservesShape()
+    {
+        var root = new MixedRankValue();
+        root.RankTwo = new[,] { { root } };
+        root.RankThree = new[,,] { { { root } } };
+
+        var restored = _serializer.Deserialize<MixedRankValue>(_serializer.SerializeToArray(root))!;
+
+        Assert.Same(restored, restored.RankTwo[0, 0]);
+        Assert.Same(restored, restored.RankThree[0, 0, 0]);
+        Assert.Equal(typeof(MixedRankValue[,]), restored.RankTwo.GetType());
+        Assert.Equal(typeof(MixedRankValue[,,]), restored.RankThree.GetType());
+    }
+
+    [Fact]
     public void Serialize_NonZeroLowerBoundArray_ThrowsNotSupportedException()
     {
         var original = Array.CreateInstance(typeof(int), [2, 2], [1, -1]);
@@ -241,4 +285,14 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     public void Dispose() => _serviceProvider.Dispose();
 
     private Array Copy(Array original) => Assert.IsAssignableFrom<Array>(_deepCopier.Copy((object)original));
+
+    [GenerateSerializer]
+    public sealed class MixedRankValue
+    {
+        [Id(0)]
+        public MixedRankValue[,] RankTwo { get; set; } = new MixedRankValue[0, 0];
+
+        [Id(1)]
+        public MixedRankValue[,,] RankThree { get; set; } = new MixedRankValue[0, 0, 0];
+    }
 }
