@@ -39,6 +39,7 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _legacyCopiers = new();
         private readonly HashSet<Type> _legacyActivators = new();
         private readonly HashSet<Type> _legacyConverters = new();
+        private readonly Dictionary<(Type Implementation, SerializationContract Contract), int> _contractRegistrationOrders = new();
         // Mutable collection access requests legacy discovery, including types added through retained collection references.
         private bool _serializerCollectionAccessed;
         private bool _copierCollectionAccessed;
@@ -277,6 +278,9 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<Type> InterfaceProxyTypes => _interfaceProxies;
 
         internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
+
+        internal int GetContractRegistrationOrder(Type implementation, SerializationContract contract)
+            => _contractRegistrationOrders[(implementation, contract)];
 
         internal bool DiscoverInterfaces(Type type, Type contractType)
             => contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
@@ -554,7 +558,7 @@ namespace Orleans.Serialization.Configuration
                 surrogateDescription: surrogateType, targetDescription: targetType);
         }
 
-        private static void AddContract(
+        private void AddContract(
             HashSet<Type> types,
             Dictionary<Type, List<SerializationContract>> contracts,
             Type type,
@@ -584,6 +588,7 @@ namespace Orleans.Serialization.Configuration
             if (!registrations.Contains(registration))
             {
                 registrations.Add(registration);
+                _contractRegistrationOrders.Add((type, registration), _contractRegistrationOrders.Count);
             }
         }
 

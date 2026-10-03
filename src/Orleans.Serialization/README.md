@@ -104,6 +104,10 @@ Contract lookup selects exact closed targets first, then matching named generic
 targets, then array and bare-parameter patterns. Matching patterns use reverse
 registration order and bind the requested type's element shape and implementation
 parameters before activating the selected codec, copier, or converter.
+Explicit registrations retain their global order across implementations. Repeating
+an identical registration preserves its existing priority, and implementation
+collection membership controls which registrations participate in lookup.
+Raw legacy collection entries retain their collection ordering.
 The selected registration supplies the arguments for implementation closure:
 plain open-target entries use positional arguments, and described entries use
 their matched parameter bindings, including when both belong to one implementation.
