@@ -249,7 +249,7 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     {
         var root = new MixedRankValue();
         root.RankTwo = new[,] { { root } };
-        root.RankThree = new[,,] { { { root } } };
+        root.RankThree = new[, ,] { { { root } } };
 
         var restored = _serializer.Deserialize<MixedRankValue>(_serializer.SerializeToArray(root))!;
 
