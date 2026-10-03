@@ -2374,6 +2374,48 @@ public class DemoClass
     }
 
     [Theory]
+    [InlineData("string")]
+    [InlineData("int")]
+    public async Task RpcClosedGenericModelFactoriesUseDefinitionConstructorContracts(string argument)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace GenericConstruction;
+            [GenerateSerializer]
+            public sealed class Payload<T>
+            {
+                [Id(0)] private T _value;
+                public Payload(T value) => _value = value;
+                public T Value => _value;
+            }
+            """);
+        var definition = compilation.GetTypeByMetadataName("GenericConstruction.Payload`1")!;
+        var parameter = compilation.GetSpecialType(argument == "string" ? SpecialType.System_String : SpecialType.System_Int32);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            definition.Construct(parameter), TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains($"IActivator<global::GenericConstruction.Payload<{argument}>>", graph.ConfigurationStatements);
+        Assert.Contains("provider), provider)", graph.ConfigurationStatements);
+        Assert.DoesNotContain("Payload<T>", graph.ConfigurationStatements);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = $$"""
+            public sealed class GenericConstructionContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RpcReferencedGeneratedActivatorFactoryIsClosed(bool referenceAssembly)
