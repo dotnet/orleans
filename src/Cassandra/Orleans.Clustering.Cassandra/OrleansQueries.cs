@@ -141,7 +141,7 @@ internal sealed class OrleansQueries
 
     public IStatement CheckIfTableExists(string keyspace, ConsistencyLevel consistencyLevel) =>
         new SimpleStatement(
-                $"SELECT * FROM system_schema.tables WHERE keyspace_name = {CassandraIdentifier.QuoteLiteral(CassandraIdentifier.Normalize(keyspace))} AND table_name = 'membership';")
+                $"SELECT * FROM system_schema.tables WHERE keyspace_name = {CassandraIdentifier.QuoteLiteral(keyspace)} AND table_name = 'membership';")
             .SetConsistencyLevel(consistencyLevel);
 
     /// <remarks>

@@ -38,6 +38,21 @@ public sealed class CassandraGrainStorageOptionsTests
 
     [Theory]
     [InlineData(ConsistencyLevel.Any)]
+    [InlineData(ConsistencyLevel.EachQuorum)]
+    public void WriteOnlyConsistencyLevelsAreRejectedForOrdinaryOperations(ConsistencyLevel consistencyLevel)
+    {
+        var options = new CassandraGrainStorageOptions { ConsistencyLevel = consistencyLevel };
+        options.ConfigureClient(static _ => Task.FromResult<ISession>(null!));
+
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => new CassandraGrainStorageOptionsValidator(options, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
+                .ValidateConfiguration());
+
+        Assert.Contains(nameof(CassandraGrainStorageOptions.ConsistencyLevel), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(ConsistencyLevel.Any)]
     [InlineData(ConsistencyLevel.One)]
     [InlineData(ConsistencyLevel.Quorum)]
     [InlineData(ConsistencyLevel.LocalQuorum)]

@@ -125,10 +125,10 @@ public sealed class CassandraGrainStorageOptionsValidator : IConfigurationValida
     /// <inheritdoc />
     public void ValidateConfiguration()
     {
-        if (_options.ConsistencyLevel is ConsistencyLevel.Serial or ConsistencyLevel.LocalSerial)
+        if (_options.ConsistencyLevel is ConsistencyLevel.Any or ConsistencyLevel.EachQuorum or ConsistencyLevel.Serial or ConsistencyLevel.LocalSerial)
         {
             throw new OrleansConfigurationException(
-                $"Invalid {_name} Cassandra grain storage configuration: {nameof(_options.ConsistencyLevel)} must be an ordinary consistency level, not {nameof(ConsistencyLevel.Serial)} or {nameof(ConsistencyLevel.LocalSerial)}.");
+                $"Invalid {_name} Cassandra grain storage configuration: {nameof(_options.ConsistencyLevel)} must be a consistency level supported for both reads and writes, not {nameof(ConsistencyLevel.Any)}, {nameof(ConsistencyLevel.EachQuorum)}, {nameof(ConsistencyLevel.Serial)}, or {nameof(ConsistencyLevel.LocalSerial)}.");
         }
 
         if (_options.SerialConsistencyLevel is not (ConsistencyLevel.Serial or ConsistencyLevel.LocalSerial))

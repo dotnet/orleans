@@ -72,7 +72,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
         byte[]? State);
 
     private string TableName => _options.TableName ?? "grain_state";
-    private string QuotedTableName => CassandraIdentifier.Quote(TableName);
+    private string QuotedTableName => $"{CassandraIdentifier.Quote(_options.Keyspace)}.{CassandraIdentifier.Quote(TableName)}";
     private ISession Session => _session ?? throw new InvalidOperationException("Cassandra grain storage is not initialized.");
 
     public void Participate(ISiloLifecycle lifecycle) =>
