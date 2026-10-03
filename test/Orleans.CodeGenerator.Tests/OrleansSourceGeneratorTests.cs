@@ -2373,6 +2373,143 @@ public class DemoClass
         Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcReferencedGeneratedActivatorFactoryIsClosed(bool referenceAssembly)
+    {
+        var producer = await CreateCompilation("""
+            using Orleans;
+            [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ClosureConsumer")]
+            namespace ReferencedClosure;
+            [GenerateSerializer, Immutable]
+            internal sealed class Payload
+            {
+                [Id(0)] private int _value;
+                [System.NonSerialized] internal readonly object _state = new();
+                [GeneratedActivatorConstructor]
+                public Payload(int value) => _value = value;
+            }
+            """, "ClosureProducer");
+        var generated = RunSourceGenerator(producer);
+        Assert.Empty(generated.Diagnostics);
+        producer = producer.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emitted = producer.Emit(image,
+            options: new Microsoft.CodeAnalysis.Emit.EmitOptions(metadataOnly: referenceAssembly, includePrivateMembers: !referenceAssembly),
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var compilation = (await CreateCompilation("""
+            using Orleans;
+            namespace ClosureProof;
+            [GenerateSerializer, Immutable]
+            internal struct Package
+            {
+                [Id(0)] public ReferencedClosure.Payload Context { get; set; }
+                [Id(1)] public System.Collections.Generic.IList<System.Tuple<ReferencedClosure.Payload[], int>> Nested { get; set; }
+            }
+            """, "ClosureConsumer")).AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+        var type = compilation.GetTypeByMetadataName("ReferencedClosure.Payload");
+        Assert.NotNull(type);
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(services, type, TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains("Activator_Payload", graph.ConfigurationStatements);
+        Assert.Contains("Codec_Payload", graph.ConfigurationStatements);
+        var construction = SerializerFactoryGenerator.CreateRpcConstructionRoot(services, type, TestContext.Current.CancellationToken);
+        Assert.Contains("Activator_Payload", construction.ConfigurationStatements);
+        Assert.Contains("Codec_Payload", construction.ConfigurationStatements);
+        var package = compilation.GetTypeByMetadataName("ClosureProof.Package");
+        Assert.NotNull(package);
+        Assert.True(compilation.IsSymbolAccessibleWithin(package, compilation.Assembly));
+        Assert.NotNull(SerializerFactoryGenerator.CreateRpcModelRoot(services, package, TestContext.Current.CancellationToken));
+        var parent = SerializerFactoryGenerator.CreateRpcConstructionRoot(services,
+            compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.Construct(package), TestContext.Current.CancellationToken);
+        Assert.True(parent.ConfigurationStatements.Contains("Activator_Payload", StringComparison.Ordinal), parent.ConfigurationStatements);
+        Assert.Contains("ArrayCodec<global::ReferencedClosure.Payload>", parent.ConfigurationStatements);
+        Assert.Contains("TupleCodec<global::ReferencedClosure.Payload[], int>", parent.ConfigurationStatements);
+        Assert.Contains("IFieldCodec<global::System.Collections.Generic.IList<", parent.ConfigurationStatements);
+        Assert.Contains("dependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.IFieldCodec<global::System.Tuple<", parent.ConfigurationStatements);
+    }
+
+    [Fact]
+    public async Task RpcImmutableConstructionFactoriesShareCanonicalSurrogateServices()
+    {
+        var compilation = await CreateCompilation("""
+            namespace ClosureProof;
+            public class Root
+            {
+                public System.Collections.Immutable.ImmutableArray<int> Array;
+                public System.Collections.Immutable.ImmutableList<int> List;
+                public System.Collections.Immutable.ImmutableQueue<int> Queue;
+                public System.Collections.Immutable.ImmutableStack<int> Stack;
+                public System.Collections.Immutable.ImmutableHashSet<int> Set;
+                public System.Collections.Immutable.ImmutableSortedSet<int> SortedSet;
+                public System.Collections.Immutable.ImmutableDictionary<string, int> Dictionary;
+                public System.Collections.Immutable.ImmutableSortedDictionary<string, int> SortedDictionary;
+            }
+            """, $"ImmutableClosureProof{Guid.NewGuid():N}");
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var statements = new System.Text.StringBuilder();
+        var assertions = new System.Text.StringBuilder();
+        foreach (var field in compilation.GetTypeByMetadataName("ClosureProof.Root")!.GetMembers().OfType<IFieldSymbol>())
+        {
+            var type = (INamedTypeSymbol)field.Type;
+            var graph = SerializerFactoryGenerator.CreateRpcConstructionRoot(services, type, TestContext.Current.CancellationToken);
+            var codec = services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(type.OriginalDefinition)!.CodecType.Construct([.. type.TypeArguments]);
+            var surrogate = ((INamedTypeSymbol)codec.InstanceConstructors.Single().Parameters.Single().Type).TypeArguments.Single();
+            var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var codecName = codec.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var surrogateName = surrogate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            Assert.Contains($"IValueSerializer<{surrogateName}>", graph.ConfigurationStatements);
+            Assert.Contains($"new {codecName}(", graph.ConfigurationStatements);
+            statements.AppendLine(graph.ConfigurationStatements);
+            assertions.AppendLine($"""
+                if (!ReferenceEquals(provider.GetCodec<{typeName}>(),
+                    Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<{codecName}>(null, provider))) return false;
+                if (!ReferenceEquals(provider.GetValueSerializer<{surrogateName}>(), provider.GetCodec<{surrogateName}>())) return false;
+                _ = provider.GetDeepCopier<{typeName}>();
+                """);
+        }
+        var exercise = $$"""
+            using System;
+            using System.Collections.Immutable;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Serializers;
+            public static class ImmutableClosureProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+                    {
+                        {{statements}}
+                    })).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    {{assertions}}
+                    var serializer = services.GetRequiredService<Serializer>();
+                    var source = ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase).Add("Key", 47);
+                    var result = serializer.Deserialize<ImmutableDictionary<string, int>>(serializer.SerializeToArray(source));
+                    var sorted = ImmutableSortedDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase).Add("Key", 59);
+                    var sortedResult = serializer.Deserialize<ImmutableSortedDictionary<string, int>>(serializer.SerializeToArray(sorted));
+                    return result["KEY"] == 47 && sortedResult["KEY"] == 59
+                        && ReferenceEquals(result.KeyComparer, source.KeyComparer)
+                        && ReferenceEquals(sortedResult.KeyComparer, sorted.KeyComparer);
+                }
+            }
+            """;
+        compilation = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions).Assembly.Location))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emitted = compilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ImmutableClosureProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
     [Fact]
     public async Task RpcResponseFactoriesConstructPartialModelRootsWithinPendingGraphs()
     {
@@ -2496,7 +2633,7 @@ public class DemoClass
         var run = assembly.GetType("RootProof")!.GetMethod("Run")!;
         var rejected = Assert.Throws<System.Reflection.TargetInvocationException>(() => run.Invoke(null, [false]));
         var error = Assert.IsType<InvalidOperationException>(rejected.InnerException);
-        Assert.Contains("IActivator", error.Message);
+        Assert.Contains("Dependency injection cannot resolve", error.Message);
         Assert.Contains("graph is unpublished", error.Message);
         Assert.Equal(true, run.Invoke(null, [true]));
     }

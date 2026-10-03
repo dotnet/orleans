@@ -3435,6 +3435,9 @@ namespace Orleans.Serialization.Configuration
         public void AddDefaultSerializer<T, TCodec, TCopier>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory, System.Type? compatibleCodecType = null, System.Type? compatibleCopierType = null, System.Type[]? codecDependencies = null, System.Type[]? copierDependencies = null)
             where TCodec : class, Codecs.IFieldCodec<T> where TCopier : class, Cloning.IDeepCopier<T> { }
 
+        public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory, System.Type[] dependencies)
+            where TService : class { }
+
         public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
             where TService : class { }
 

@@ -187,13 +187,33 @@ namespace Orleans.Serialization.Configuration
         }
 
         /// <summary>
+        /// Registers a default service factory with its construction dependencies.
+        /// </summary>
+        /// <typeparam name="TService">The closed service type.</typeparam>
+        /// <param name="factory">The default service factory.</param>
+        /// <param name="dependencies">Services required to construct the default graph.</param>
+        /// <remarks>
+        /// The factory participates when its dependencies are available through closed service factories,
+        /// provider-owned services, or instance registrations. Explicit registrations take precedence.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="factory"/> or <paramref name="dependencies"/> is null.</exception>
+        public void AddDefaultSerializerService<TService>(Func<ICodecProvider, TService> factory, Type[] dependencies) where TService : class
+        {
+            if (dependencies is null) throw new ArgumentNullException(nameof(dependencies));
+            dependencies = CopyDefaultDependencies(dependencies);
+            var register = !SerializerServiceFactories.ContainsKey(typeof(TService));
+            AddDefaultSerializerService(factory);
+            if (register) RegisterDefaultContract(typeof(TService), null, null, dependencies);
+        }
+
+        /// <summary>
         /// Registers an inferred service factory with its canonical implementation identity.
         /// </summary>
         /// <typeparam name="TService">The serialization service contract.</typeparam>
         /// <typeparam name="TImplementation">The canonical implementation.</typeparam>
         /// <param name="factory">The service factory.</param>
         /// <param name="compatibleImplementationType">An equivalent metadata implementation.</param>
-        /// <param name="dependencies">The canonical implementation's serialization service dependencies.</param>
+        /// <param name="dependencies">The canonical implementation's construction dependencies.</param>
         public void AddDefaultSerializerService<TService, TImplementation>(
             Func<ICodecProvider, TService> factory,
             Type? compatibleImplementationType = null,
@@ -209,12 +229,13 @@ namespace Orleans.Serialization.Configuration
 
         internal bool IsDefaultSerializerService(Type type) => _defaultSerializerServices.Contains(type);
 
-        private void RegisterDefaultContract(Type service, Type implementation, Type? compatible, Type[]? dependencies)
+        private void RegisterDefaultContract(Type service, Type? implementation, Type? compatible, Type[]? dependencies)
         {
             if (!_defaultSerializerServices.Contains(service) || DefaultSerializerContracts.ContainsKey(service)) return;
             var copiedDependencies = dependencies ?? Type.EmptyTypes;
             DefaultSerializerContracts.Add(service, new(service, implementation, compatible, copiedDependencies));
-            DefaultSerializerContracts.TryAdd(implementation, new(service, implementation, compatible, copiedDependencies));
+            if (implementation is not null)
+                DefaultSerializerContracts.TryAdd(implementation, new(service, implementation, compatible, copiedDependencies));
         }
 
         private static Type[] CopyDefaultDependencies(Type[]? dependencies)
@@ -227,7 +248,7 @@ namespace Orleans.Serialization.Configuration
             return result;
         }
 
-        internal sealed record DefaultSerializerContract(Type Service, Type Implementation, Type? CompatibleImplementation, Type[] Dependencies);
+        internal sealed record DefaultSerializerContract(Type Service, Type? Implementation, Type? CompatibleImplementation, Type[] Dependencies);
 
         private void AddSerializerServiceFactory(Type type, Func<ICodecProvider, object> factory, bool isDefault)
         {
