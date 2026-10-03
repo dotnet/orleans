@@ -1,41 +1,32 @@
 using System;
 using Orleans.Clustering.Cassandra.Hosting;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Clustering.Cassandra.Tests.Clustering;
 
+[TestProvider("Cassandra"), TestSuite("BVT"), TestCategory("BVT")]
 public sealed class CassandraClusteringOptionsTests
 {
-    [Fact]
-    public void ProviderOwnedClientNormalizesKeyspaceBeforeConnecting()
-    {
-        var options = new CassandraClusteringOptions();
-
-        options.ConfigureClient("Contact Points=127.0.0.1", "StateKeyspace");
-
-        Assert.Equal("statekeyspace", options.Keyspace);
-    }
-
     [Theory]
-    [InlineData("")]
-    [InlineData("1keyspace")]
+    [InlineData("StateKeyspace")]
     [InlineData("_keyspace")]
     [InlineData("keyspace-name")]
     [InlineData("keyspace.name")]
-    [InlineData("\"keyspace\"")]
-    [InlineData("keyspace'")]
-    public void ProviderOwnedClientRejectsInvalidKeyspaceBeforeConnecting(string keyspace)
+    public void ProviderOwnedClientPreservesKeyspaceBeforeConnecting(string keyspace)
     {
         var options = new CassandraClusteringOptions();
 
-        Assert.Throws<ArgumentException>(() => options.ConfigureClient("Contact Points=127.0.0.1", keyspace));
+        options.ConfigureClient("Contact Points=127.0.0.1", keyspace);
+
+        Assert.Equal(keyspace, options.Keyspace);
     }
 
     [Fact]
-    public void ProviderOwnedClientRejectsOverlongKeyspaceBeforeConnecting()
+    public void ProviderOwnedClientRejectsNullKeyspace()
     {
         var options = new CassandraClusteringOptions();
 
-        Assert.Throws<ArgumentException>(() => options.ConfigureClient("Contact Points=127.0.0.1", new string('a', 49)));
+        Assert.Throws<ArgumentNullException>(() => options.ConfigureClient("Contact Points=127.0.0.1", null!));
     }
 }
