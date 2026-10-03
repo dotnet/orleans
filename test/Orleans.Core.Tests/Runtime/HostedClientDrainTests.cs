@@ -95,13 +95,12 @@ public class HostedClientDrainTests
             SendingGrain = fixture.Hosted.GrainId,
             TargetGrain = fixture.Sender,
         };
-        var key = (outgoing.SendingGrain, outgoing.Id);
         var succeeded = false;
         try
         {
             var callbacks = ReadCallbacks(fixture.Runtime);
             var shared = new SharedCallbackData(
-                message => callbacks.TryRemove((message.SendingGrain, message.Id), out _),
+                callback => callbacks.TryRemove(callback),
                 NullLogger<CallbackData>.Instance,
                 fixture.Clock,
                 TimeSpan.FromMinutes(1),
@@ -109,7 +108,7 @@ public class HostedClientDrainTests
                 waitForCancellationAcknowledgement: false,
                 cancellationManager: Substitute.For<IGrainCallCancellationManager>());
             callback = new CallbackData(shared, completion, outgoing, fixture.ApplicationRequests);
-            Assert.True(callbacks.TryAdd(key, callback), fixture.DescribeState());
+            callbacks.Register(callback);
             Assert.False(callback.IsCompleted);
             Assert.Equal(0, completion.CompletionCount);
 
@@ -137,12 +136,12 @@ public class HostedClientDrainTests
             await fixture.WaitAsync(
                 completion.Completed.Task,
                 "1702: real callback completed during observer drain",
-                () => $"callbackCount={completion.CompletionCount}; ledgerContainsKey={callbacks.ContainsKey(key)}");
+                () => $"callbackCount={completion.CompletionCount}; ledgerContainsKey={callbacks.ContainsKey(outgoing.Id)}");
             Assert.Equal(731, Assert.IsType<int>(completion.Result));
             Assert.Null(completion.Exception);
             Assert.Equal(1, completion.CompletionCount);
             Assert.True(callback.IsCompleted);
-            Assert.False(callbacks.ContainsKey(key));
+            Assert.False(callbacks.ContainsKey(outgoing.Id));
             Assert.False(invocation.Release.Task.IsCompleted);
             await fixture.WaitAsync(stop, "1701: awaited response releases actual hosted drain");
             Assert.Equal(731, Assert.IsType<int>(invocation.CallbackResult));
@@ -151,7 +150,7 @@ public class HostedClientDrainTests
             // A duplicate response must not complete the original promise a second time.
             fixture.Hosted.ReceiveMessage(response);
             Assert.Equal(1, completion.CompletionCount);
-            Assert.False(callbacks.ContainsKey(key));
+            Assert.False(callbacks.ContainsKey(outgoing.Id));
             fixture.AssertScopeLive();
 
             Assert.Equal(1, completion.CompletionCount);
@@ -336,16 +335,16 @@ public class HostedClientDrainTests
         }
     }
 
-    private static ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> ReadCallbacks(InsideRuntimeClient runtime)
+    private static CallbackRegistry ReadCallbacks(InsideRuntimeClient runtime)
     {
         // The sole reflection seam: read the existing ledger, never replace it or inspect hosted
         // channel/manager/lifecycle/disposal state. This models an outstanding outbound call.
         var field = typeof(InsideRuntimeClient).GetField("callbacks", BindingFlags.Instance | BindingFlags.NonPublic);
-        if (field?.GetValue(runtime) is not ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks)
+        if (field?.GetValue(runtime) is not CallbackRegistry callbacks)
         {
             throw new InvalidOperationException(
                 $"{nameof(ReceiveMessage_CompletesOutstandingResponseDuringDrain)} requires " +
-                "InsideRuntimeClient.callbacks to be ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>.");
+                "InsideRuntimeClient.callbacks to be CallbackRegistry.");
         }
 
         return callbacks;

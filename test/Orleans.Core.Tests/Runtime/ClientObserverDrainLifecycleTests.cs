@@ -46,7 +46,7 @@ public class ClientObserverDrainLifecycleTests
         };
         var callback = new CallbackData(
             new SharedCallbackData(
-                message => callbacks.TryRemove(message.Id, out _),
+                callback => callbacks.TryRemove(callback.Message.Id, out _),
                 NullLogger<CallbackData>.Instance, fixture.TimeProvider, TimeSpan.FromMinutes(1),
                 cancelOnTimeout: false, waitForCancellationAcknowledgement: false, cancellationManager: null),
             source, outbound, new ApplicationRequestInstruments(fixture.Instruments));
@@ -233,9 +233,9 @@ public class ClientObserverDrainLifecycleTests
                 ClientGrainId.Create("remote-client"), IdSpan.Create("outbound-observer")).GrainId
         };
         var shared = new SharedCallbackData(
-            message =>
+            callback =>
             {
-                unregistered.Enqueue((message, callbacks.TryRemove(message.Id, out _)));
+                unregistered.Enqueue((callback.Message, callbacks.TryRemove(callback.Message.Id, out _)));
                 events.Enqueue("callback-unregistered");
             },
             NullLogger<CallbackData>.Instance,

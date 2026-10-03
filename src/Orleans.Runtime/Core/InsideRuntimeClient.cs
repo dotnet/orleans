@@ -25,13 +25,13 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, IRuntimeClientTestAccessor, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private readonly CallbackRegistry callbacks;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
+            this.callbacks = new CallbackRegistry();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                this.UnregisterCallback,
                 callbackDataLogger,
                 timeProvider,
                 this.messagingOptions.ResponseTimeout,
@@ -97,7 +97,7 @@ namespace Orleans.Runtime
                 cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                this.UnregisterCallback,
                 callbackDataLogger,
                 timeProvider,
                 this.messagingOptions.SystemResponseTimeout,
@@ -197,7 +197,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                callbacks.Register(callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -209,8 +209,8 @@ namespace Orleans.Runtime
                 }
             }
 
-            // Completing callbacks during shutdown can resume application code which issues follow-up
-            // calls. Reject those calls so that they cannot outlive the shutdown callback sweep.
+            // Shutdown sets _isStopping before sweeping callbacks. Recheck it after registration so that
+            // a callback published after its stripe was swept completes and removes itself here.
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
@@ -238,9 +238,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
+        private void UnregisterCallback(CallbackData callback)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            callbacks.TryRemove(callback);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -470,13 +470,8 @@ namespace Orleans.Runtime
 
         private void ProcessResponseCallback(Message message)
         {
-            if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
-            {
-                // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
-            }
-            else
+            // The callback completes inline, while continuations are scheduled as work items.
+            if (!callbacks.TryCompleteResponse(message))
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
             }
@@ -485,7 +480,7 @@ namespace Orleans.Runtime
         private void ProcessStatusResponse(Message message)
         {
             var status = (StatusResponse)message.BodyObject!;
-            callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+            callbacks.TryGetResponseCallback(message, out var callback);
             var request = callback?.Message;
             if (request is not null)
             {
@@ -568,7 +563,7 @@ namespace Orleans.Runtime
 
         private void BreakOutstandingMessages()
         {
-            foreach (var (_, callback) in callbacks)
+            callbacks.ForEach(this, static (callback, self) =>
             {
                 try
                 {
@@ -576,9 +571,9 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    LogWarningWhileProcessingCallbackExpiry(this.logger, exception);
+                    LogWarningWhileProcessingCallbackExpiry(self.logger, exception);
                 }
-            }
+            });
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
@@ -602,13 +597,13 @@ namespace Orleans.Runtime
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            callbacks.ForEach(deadSilo, static (callback, deadSilo) =>
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
-            }
+            });
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -617,8 +612,8 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 
-        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        int IRuntimeClientTestAccessor.GetRunningRequestCount(GrainInterfaceType grainInterfaceType)
+            => this.callbacks.GetRunningRequestCountForTest(grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {
@@ -627,18 +622,18 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentTimestamp = TimeProvider.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    callbacks.ForEach(currentTimestamp, static (callback, currentTimestamp) =>
                     {
                         if (callback.IsCompleted)
                         {
-                            continue;
+                            return;
                         }
 
                         if (callback.IsExpired(currentTimestamp))
                         {
                             callback.OnTimeout();
                         }
-                    }
+                    });
                 }
                 catch (Exception ex)
                 {
