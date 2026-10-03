@@ -2,11 +2,12 @@ using System;
 using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Connections.Transport;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class ClientOutboundConnection : Connection
@@ -19,15 +20,14 @@ namespace Orleans.Runtime.Messaging
 
         public ClientOutboundConnection(
             SiloAddress remoteSiloAddress,
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
+            MessageTransport transport,
             ClientMessageCenter messageCenter,
             ConnectionManager connectionManager,
-            ConnectionOptions connectionOptions,
             ConnectionCommon connectionShared,
+            ConnectionOptions connectionOptions,
             ConnectionPreambleHelper connectionPreambleHelper,
             ClusterOptions clusterOptions)
-            : base(connection, middleware, connectionShared)
+            : base(transport, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
@@ -41,26 +41,25 @@ namespace Orleans.Runtime.Messaging
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.ClientToGateway;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override TimeSpan CloseConnectionTimeout => this.connectionOptions.CloseConnectionTimeout;
 
-        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        protected override ClientMessageCenter MessageCenter => this.messageCenter;
 
-        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) =>
+            MessagingMetrics.OnMessageReceive(message, totalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
 
-        protected override void OnReceivedMessage(Message message)
+        internal protected override void RecordMessageSend(Message message, int totalBytes, int headerBytes) =>
+            MessagingMetrics.OnMessageSend(message, totalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+
+        internal protected override void OnReceivedMessage(Message message)
         {
+            message.SendingSilo ??= RemoteSiloAddress;
             this.messageCenter.DispatchLocalMessage(message);
         }
 
-        protected override async Task RunInternal()
+        protected override async Task RunAsyncCore()
         {
-            Exception? error = default;
+            Exception error = default;
             try
             {
                 this.messageCenter.OnGatewayConnectionOpen();
@@ -88,7 +87,7 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{myClusterId}""");
                 }
 
-                await base.RunInternal();
+                await base.RunAsyncCore();
             }
             catch (Exception exception) when ((error = exception) is null)
             {
@@ -119,7 +118,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex = null)
+        protected override void RetryMessage(Message msg, Exception ex = null)
         {
             if (msg == null) return;
 
@@ -140,9 +139,13 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the rejection message is transferred to the local message dispatcher.")]
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingInstrumentation.OnRejectedMessage(msg);
+            MessagingMetrics.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
@@ -152,7 +155,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstrumentation.OnFailedSentMessage(msg);
+            MessagingMetrics.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogDebugClientIsRejectingMessage(this.Log, msg, reason);
@@ -162,14 +165,10 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 LogInformationClientIsDroppingMessage(this.Log, msg, reason);
-                MessagingInstrumentation.OnDroppedSentMessage(msg);
+                MessagingMetrics.OnDroppedSentMessage(msg);
             }
-        }
 
-        protected override void OnSendMessageFailure(Message message, string error)
-        {
-            message.TargetSilo = null;
-            this.messageCenter.SendMessage(message);
+            msg.Dispose();
         }
 
         [LoggerMessage(
@@ -177,7 +176,7 @@ namespace Orleans.Runtime.Messaging
             SkipEnabledCheck = true,
             Message = "Established connection to {Silo} with protocol version {ProtocolVersion}"
         )]
-        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress? silo, string protocolVersion);
+        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress silo, string protocolVersion);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

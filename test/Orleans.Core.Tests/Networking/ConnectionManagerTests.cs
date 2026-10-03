@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,11 +13,13 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Networking.Shared;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
+using Orleans.TestingHost.InMemoryTransport;
 using TestExtensions;
 using Xunit;
 
@@ -100,7 +101,7 @@ public class ConnectionManagerTests
             await Assert.ThrowsAsync<OperationCanceledException>(() => rig.Manager.GetConnection(rejectedAddress).AsTask());
 
             var (connection, context) = rig.CreateSiloConnection();
-            await using var peer = new DefaultConnectionContext { Transport = context.PeerTransport };
+            var peer = context.PeerTransport;
             attempt.Completion.SetResult(connection);
             await rig.PreambleHelper.Write(peer, new ConnectionPreamble
             {
@@ -247,23 +248,23 @@ public class ConnectionManagerTests
     }
 
     [Fact]
-    public async Task Run_ClosesQueuedConnectionBeforeInvokingMiddleware()
+    public async Task RunAsync_ClosesQueuedConnectionBeforeStarting()
     {
         await using var rig = new TestRig();
         var connection = rig.CreateConnection();
 
         await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
-        await connection.Run().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
 
         Assert.False(connection.Started.Task.IsCompleted);
         Assert.False(connection.IsValid);
         Assert.True(connection.Initialized.IsFaulted);
-        Assert.Equal(1, connection.TransportContext.AbortCount);
+        Assert.Equal(1, connection.TransportContext.CloseCount);
         Assert.Equal(1, connection.TransportContext.DisposeCount);
     }
 
     [Fact]
-    public async Task InitializationTimeout_AbortsWrappedTransportBeforeMiddlewareDisposal()
+    public async Task InitializationTimeout_ClosesWrappedTransportBeforeDisposal()
     {
         var middleware = new WrappedTransportMiddleware();
         await using var rig = new TestRig(transportMiddleware: middleware, openConnectionTimeout: TimeSpan.FromSeconds(5));
@@ -272,49 +273,46 @@ public class ConnectionManagerTests
         var connection = rig.CreateConnection(blockInitialization: true);
         attempt.Completion.SetResult(connection);
         await connection.Started.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
-        await connection.TransportContext.Aborted.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.TransportContext.Closing.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
         await middleware.Unwinding.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
 
         Assert.True(attempt.CancellationToken.IsCancellationRequested);
         Assert.False(rig.ShutdownSource.Token.IsCancellationRequested);
         Assert.False(acquisition.IsCompleted);
         Assert.False(connection.TransportContext.Disposing.Task.IsCompleted);
-        Assert.NotSame(connection.TransportContext.OriginalTransport, connection.TransportContext.Transport);
+        Assert.NotSame(connection.TransportContext, connection.MessageTransport);
 
         middleware.ReleaseCleanup.TrySetResult();
         var error = await Assert.ThrowsAsync<ConnectionFailedException>(() => acquisition.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
 
         Assert.Contains("timed out after", error.Message);
         Assert.Null(error.InnerException);
-        Assert.Same(connection.TransportContext.OriginalTransport, connection.TransportContext.DisposedTransport);
-        Assert.Equal(1, connection.TransportContext.AbortCount);
+        Assert.Equal(1, connection.TransportContext.CloseCount);
         Assert.Equal(1, connection.TransportContext.DisposeCount);
         Assert.Equal(0, rig.Manager.ConnectionCount);
     }
 
     [Fact]
-    public async Task Run_AbortsTransportAfterSynchronousMiddlewareFailure()
+    public async Task RunAsync_ClosesTransportAfterSynchronousInitializationFailure()
     {
         await using var rig = new TestRig();
-        var failure = new InvalidOperationException("Synchronous middleware failure");
-        var connection = rig.CreateConnection(middleware: _ => throw failure);
+        var failure = new InvalidOperationException("Synchronous initialization failure");
+        var connection = rig.CreateConnection(initialize: _ => throw failure);
 
-        await connection.Run().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => connection.Initialized);
 
         Assert.Same(failure, error);
         Assert.False(connection.Started.Task.IsCompleted);
-        Assert.Equal(1, connection.TransportContext.AbortCount);
+        Assert.Equal(1, connection.TransportContext.CloseCount);
         Assert.Equal(1, connection.TransportContext.DisposeCount);
     }
 
     private sealed class TestRig : IAsyncDisposable
     {
         private readonly ServiceProvider _services;
-        private readonly ConcurrentBag<(Connection Connection, TestConnectionContext Context)> _connections = [];
-        private readonly SharedMemoryPool _memoryPool = new();
+        private readonly ConcurrentBag<(Connection Connection, TestMessageTransport Context)> _connections = [];
         private readonly ConnectionCommon _shared;
-        private readonly ConnectionDelegate _middleware;
         private readonly ConnectionOptions _options;
         private readonly WrappedTransportMiddleware? _transportMiddleware;
 
@@ -330,41 +328,44 @@ public class ConnectionManagerTests
             services.AddSerializer(builder => builder.AddAssembly(typeof(Connection).Assembly));
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<MessagingInstruments>();
+            services.AddSingleton<NetworkingInstruments>();
             services.AddSingleton<MessagingProcessingInstruments>();
-            services.AddSingleton(_memoryPool);
             services.AddSingleton<MessagingOptions>(new ClientMessagingOptions());
             services.AddTransient<MessageSerializer>();
             services.AddSingleton<ConnectionPreambleHelper>();
+            services.AddSingleton(sp => new MessagingTrace(
+                NullLoggerFactory.Instance,
+                sp.GetRequiredService<MessagingInstruments>(),
+                sp.GetRequiredService<MessagingProcessingInstruments>()));
+            services.AddSingleton(new ConnectionTrace(NullLoggerFactory.Instance));
+            services.AddSingleton(sp => new MessageFactory(
+                sp.GetRequiredService<DeepCopier>(),
+                NullLogger<MessageFactory>.Instance,
+                sp.GetRequiredService<MessagingTrace>()));
+            services.AddSingleton<MessageHandlerShared>(sp => new(
+                sp.GetRequiredService<MessagingTrace>(),
+                sp.GetRequiredService<ConnectionTrace>(),
+                () => sp.GetRequiredService<MessageSerializer>(),
+                sp.GetRequiredService<MessageFactory>(),
+                Substitute.For<IMessageCenter>(),
+                sp.GetRequiredService<MessagingInstruments>()));
             _services = services.BuildServiceProvider();
             var instruments = _services.GetRequiredService<MessagingInstruments>();
             _shared = new ConnectionCommon(
                 _services,
-                null!,
-                new MessagingTrace(NullLoggerFactory.Instance, instruments, _services.GetRequiredService<MessagingProcessingInstruments>()),
-                _services.GetRequiredService<OrleansInstruments>(),
+                _services.GetRequiredService<MessageFactory>(),
+                _services.GetRequiredService<MessagingTrace>(),
+                _services.GetRequiredService<ConnectionTrace>(),
                 instruments,
-                NullLogger<Connection>.Instance,
+                _services.GetRequiredService<NetworkingInstruments>(),
                 new NoOpMessageStatisticsSink());
-            var builder = new ConnectionBuilder(_services);
-            builder.Use(next => context =>
-            {
-                context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                return next(context);
-            });
-            if (transportMiddleware is not null)
-            {
-                builder.Use(next => context => transportMiddleware.Invoke(context, next));
-            }
-
-            Connection.ConfigureBuilder(builder);
-            _middleware = builder.Build();
             _options = new ConnectionOptions
             {
                 OpenConnectionTimeout = openConnectionTimeout ?? System.Threading.Timeout.InfiniteTimeSpan,
                 ConnectionRetryDelay = TimeSpan.FromMinutes(1)
             };
             var options = Options.Create(_options);
-            Factory = new TestConnectionFactory(_services, options);
+            Factory = new TestConnectionFactory();
             Manager = new ConnectionManager(options, Factory, logger ?? NullLogger<ConnectionManager>.Instance);
             ShutdownSource = (CancellationTokenSource)typeof(ConnectionManager)
                 .GetField("shutdownCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Manager)!;
@@ -380,21 +381,22 @@ public class ConnectionManagerTests
             bool blockInitialization = false,
             bool blockCleanup = false,
             bool blockDisposal = false,
-            ConnectionDelegate? middleware = null)
+            Func<MessageTransport, Task>? initialize = null)
         {
-            var context = new TestConnectionContext(blockDisposal);
-            var connection = new TestConnection(context, middleware ?? _middleware, _shared, Manager, Address, blockInitialization, blockCleanup);
+            var context = new TestMessageTransport(blockDisposal);
+            var transport = _transportMiddleware?.Wrap(context) ?? (MessageTransport)context;
+            var connection = new TestConnection(context, transport, _shared, Manager, Address, PreambleHelper, blockInitialization, blockCleanup, initialize);
             _connections.Add((connection, context));
             return connection;
         }
 
-        public (SiloConnection Connection, TestConnectionContext Context) CreateSiloConnection()
+        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection()
         {
-            var context = new TestConnectionContext(blockDisposal: false);
+            var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
             local.SiloAddress.Returns(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12344), 1));
             local.ClusterId.Returns("test-cluster");
-            var connection = new SiloConnection(Address, context, _middleware, null!, local, Manager, _options, _shared, null!, PreambleHelper);
+            var connection = new SiloConnection(Address, context, null!, local, Manager, _options, _shared, null!, PreambleHelper);
             _connections.Add((connection, context));
             return (connection, context);
         }
@@ -416,12 +418,10 @@ public class ConnectionManagerTests
             Factory.FailPendingAttempts();
             await Manager.Close(CancellationToken.None).WaitAsync(TestTimeout);
             await _services.DisposeAsync();
-            _memoryPool.Pool.Dispose();
         }
     }
 
-    private sealed class TestConnectionFactory(IServiceProvider services, IOptions<ConnectionOptions> options)
-        : ConnectionFactory(null!, services, options)
+    private sealed class TestConnectionFactory() : ConnectionFactory(null!, [])
     {
         private readonly Channel<Attempt> _attempts = Channel.CreateUnbounded<Attempt>();
         private readonly ConcurrentBag<Attempt> _allAttempts = [];
@@ -448,7 +448,8 @@ public class ConnectionManagerTests
             }
         }
 
-        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context) => throw new NotSupportedException();
+        protected override Connection CreateConnection(SiloAddress address, MessageTransport transport) => throw new NotSupportedException();
+        protected override EndPoint GetEndPoint(SiloAddress address) => address.Endpoint;
     }
 
     private sealed class Attempt(CancellationToken cancellationToken)
@@ -462,46 +463,58 @@ public class ConnectionManagerTests
         private readonly ConnectionManager _manager;
         private readonly SiloAddress _address;
         private readonly bool _blockInitialization;
+        private readonly ConnectionPreambleHelper _preambleHelper;
+        private readonly Func<MessageTransport, Task>? _initialize;
 
         public TestConnection(
-            TestConnectionContext context,
-            ConnectionDelegate middleware,
+            TestMessageTransport context,
+            MessageTransport transport,
             ConnectionCommon shared,
             ConnectionManager manager,
             SiloAddress address,
+            ConnectionPreambleHelper preambleHelper,
             bool blockInitialization,
-            bool blockCleanup) : base(context, middleware, shared)
+            bool blockCleanup,
+            Func<MessageTransport, Task>? initialize) : base(transport, shared)
         {
             TransportContext = context;
             _manager = manager;
             _address = address;
             _blockInitialization = blockInitialization;
+            _preambleHelper = preambleHelper;
+            _initialize = initialize;
             if (!blockCleanup)
             {
                 ReleaseCleanup.SetResult();
             }
         }
 
-        public TestConnectionContext TransportContext { get; }
+        public TestMessageTransport TransportContext { get; }
+        public MessageTransport MessageTransport => Context;
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource CleanupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TestTimeout;
         protected override IMessageCenter MessageCenter => null!;
 
-        protected override async Task RunInternal()
+        protected override async Task RunAsyncCore()
         {
-            Started.SetResult();
             try
             {
+                if (_initialize is not null)
+                {
+                    await _initialize(Context);
+                }
+
+                Started.SetResult();
                 if (_blockInitialization)
                 {
-                    var read = await Context.Transport.Input.ReadAsync();
-                    Context.Transport.Input.AdvanceTo(read.Buffer.Start);
+                    await _preambleHelper.Read(Context);
                     throw new ConnectionAbortedException("Initialization read terminated");
                 }
 
-                await base.RunInternal();
+                await base.RunAsyncCore();
             }
             finally
             {
@@ -513,26 +526,30 @@ public class ConnectionManagerTests
 
         protected override bool PrepareMessageForSend(Message message) => true;
         protected override void RetryMessage(Message message, Exception? exception = null) { }
-        protected override void OnReceivedMessage(Message message) { }
-        protected override void RecordMessageReceive(Message message, int numTotalBytes, int headerBytes) { }
-        protected override void RecordMessageSend(Message message, int numTotalBytes, int headerBytes) { }
-        protected override void OnSendMessageFailure(Message message, string error) { }
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int numTotalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int numTotalBytes, int headerBytes) { }
     }
 
-    private sealed class TestConnectionContext : DefaultConnectionContext
+    private sealed class TestMessageTransport : MessageTransport
     {
-        private readonly Pipe _incoming = new();
-        private readonly Pipe _outgoing = new();
+        private readonly InMemoryMessageTransport _transport;
         private int _disposeCount;
-        private int _abortCount;
+        private int _closeCount;
 
-        public TestConnectionContext(bool blockDisposal) : base(Guid.NewGuid().ToString())
+        public TestMessageTransport(bool blockDisposal)
         {
-            Transport = new DuplexPipe(_incoming.Reader, _outgoing.Writer);
-            OriginalTransport = Transport;
-            PeerTransport = new DuplexPipe(_outgoing.Reader, _incoming.Writer);
-            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 12344);
-            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 12345);
+            var incoming = new Pipe();
+            var outgoing = new Pipe();
+            _transport = new InMemoryMessageTransport(new DuplexPipe(incoming.Reader, outgoing.Writer), NullLogger.Instance);
+            PeerTransport = new InMemoryMessageTransport(new DuplexPipe(outgoing.Reader, incoming.Writer), NullLogger.Instance);
+            _transport.Start();
+            PeerTransport.Start();
+            Features.Set<IConnectionEndPointFeature>(new ConnectionEndPointFeature
+            {
+                LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 12344),
+                RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 12345)
+            });
             if (!blockDisposal)
             {
                 ReleaseDisposal.SetResult();
@@ -540,29 +557,31 @@ public class ConnectionManagerTests
         }
 
         public int DisposeCount => Volatile.Read(ref _disposeCount);
-        public int AbortCount => Volatile.Read(ref _abortCount);
-        public IDuplexPipe OriginalTransport { get; }
-        public IDuplexPipe PeerTransport { get; }
-        public IDuplexPipe? DisposedTransport { get; private set; }
-        public TaskCompletionSource Aborted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int CloseCount => Volatile.Read(ref _closeCount);
+        public InMemoryMessageTransport PeerTransport { get; }
+        public override CancellationToken Closed => _transport.Closed;
+        public override IFeatureCollection Features => _transport.Features;
+        public TaskCompletionSource Closing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Disposing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseDisposal { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public override void Abort(ConnectionAbortedException abortReason)
+        public override bool EnqueueRead(ReadRequest request) => _transport.EnqueueRead(request);
+        public override bool EnqueueWrite(WriteRequest request) => _transport.EnqueueWrite(request);
+
+        public override async ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
         {
-            Interlocked.Increment(ref _abortCount);
-            base.Abort(abortReason);
-            Aborted.TrySetResult();
+            Interlocked.Increment(ref _closeCount);
+            Closing.TrySetResult();
+            await _transport.CloseAsync(closeException, cancellationToken);
         }
 
         public override async ValueTask DisposeAsync()
         {
             Interlocked.Increment(ref _disposeCount);
-            DisposedTransport = Transport;
             Disposing.TrySetResult();
             await ReleaseDisposal.Task;
-            await _incoming.Writer.CompleteAsync();
-            await _outgoing.Reader.CompleteAsync();
+            await _transport.DisposeAsync();
+            await PeerTransport.DisposeAsync();
             await base.DisposeAsync();
         }
 
@@ -578,35 +597,23 @@ public class ConnectionManagerTests
         public TaskCompletionSource Unwinding { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task Invoke(ConnectionContext context, ConnectionDelegate next)
-        {
-            var original = context.Transport;
-            var wrapped = new StreamTransport(original);
-            context.Transport = wrapped;
-            try
-            {
-                await next(context);
-            }
-            finally
-            {
-                Unwinding.TrySetResult();
-                await ReleaseCleanup.Task;
-                try
-                {
-                    await wrapped.Input.CompleteAsync();
-                    await wrapped.Output.CompleteAsync();
-                }
-                finally
-                {
-                    context.Transport = original;
-                }
-            }
-        }
+        public MessageTransport Wrap(MessageTransport transport) => new WrappedTransport(transport, this);
 
-        private sealed class StreamTransport(IDuplexPipe underlying) : IDuplexPipe
+        private sealed class WrappedTransport(MessageTransport inner, WrappedTransportMiddleware middleware) : MessageTransport
         {
-            public PipeReader Input { get; } = PipeReader.Create(underlying.Input.AsStream(leaveOpen: true), new StreamPipeReaderOptions(leaveOpen: true));
-            public PipeWriter Output { get; } = PipeWriter.Create(underlying.Output.AsStream(leaveOpen: true), new StreamPipeWriterOptions(leaveOpen: true));
+            public override CancellationToken Closed => inner.Closed;
+            public override IFeatureCollection Features => inner.Features;
+            public override bool EnqueueRead(ReadRequest request) => inner.EnqueueRead(request);
+            public override bool EnqueueWrite(WriteRequest request) => inner.EnqueueWrite(request);
+
+            public override async ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
+            {
+                await inner.CloseAsync(closeException, cancellationToken);
+                middleware.Unwinding.TrySetResult();
+                await middleware.ReleaseCleanup.Task;
+            }
+
+            public override ValueTask DisposeAsync() => inner.DisposeAsync();
         }
     }
 
