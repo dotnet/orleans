@@ -3408,6 +3408,10 @@ public class DemoClass
         Assert.Contains("options.AddRawResponseReader<int>", response);
         Assert.Contains("IResponseInvokable.InvokeAndCopy", proxy);
         Assert.Contains("factory.RentCopied(value, contexts)", proxy);
+        Assert.Contains("var original = await Invoke();", proxy);
+        Assert.Contains("return copy = responseCopier.Copy(original);", proxy);
+        Assert.Contains("if (!global::System.Object.ReferenceEquals(original, copy))", proxy);
+        Assert.Contains("original.Dispose();", proxy);
         Assert.DoesNotContain("MakeGenericType", response);
         var holders = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
             .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
