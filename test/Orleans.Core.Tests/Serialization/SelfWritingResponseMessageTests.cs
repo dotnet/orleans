@@ -73,6 +73,26 @@ public sealed class SelfWritingResponseMessageTests
     }
 
     [Fact]
+    public void Write_RequestImplementingRawWriter_PreservesOrdinaryRequestFrame()
+    {
+        using var environment = new SerializationEnvironment();
+        var body = new RequestWithRawWriter { Value = 47 };
+        var message = CreateMessage(Response.Completed);
+        message.BodyObject = body;
+        message.Direction = Message.Directions.Request;
+
+        var frame = WriteFrame(environment.Serializer, message);
+        var received = ReadFrame(environment.Serializer, frame);
+
+        Assert.Equal(0, body.WriteCount);
+        Assert.Equal(Message.ResponseTypes.None, message.Result);
+        Assert.Equal(Message.Directions.Request, received.Direction);
+        Assert.Equal(Message.ResponseTypes.None, received.Result);
+        Assert.Equal(47, Assert.IsType<RequestWithRawWriter>(received.BodyObject).Value);
+        AssertHeaders(message, received);
+    }
+
+    [Fact]
     public void Read_RegisteredReader_IsCachedBeforeLegacyResponseCodecLookup()
     {
         // Arrange: any legacy Response<int> codec resolution is a failing sentinel.
@@ -394,6 +414,22 @@ public sealed class SelfWritingResponseMessageTests
     {
         public int ReaderFactoryCalls;
         public int LegacyCodecLookups;
+    }
+
+    [GenerateSerializer]
+    public sealed class RequestWithRawWriter : IRawResponseWriter
+    {
+        [Id(0)]
+        public int Value { get; set; }
+
+        [NonSerialized]
+        public int WriteCount;
+
+        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
+        {
+            WriteCount++;
+            throw new InvalidOperationException("A request body uses its ordinary field codec.");
+        }
     }
 
     private sealed class CountingRawReader<TResult, TCodec>(TCodec codec) : IRawResponseReader
