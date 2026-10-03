@@ -1,14 +1,70 @@
-using System.Text;
+using System.Collections.Immutable;
+using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Orleans.CodeGenerator.Hashing;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
 
 internal static class RpcResponseHolderGenerator
 {
-    internal static string GetName(ITypeSymbol resultType)
-        => $"RpcResponse_{HexConverter.ToString(XxHash32.Hash(Encoding.UTF8.GetBytes(resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))))}";
+    internal static ImmutableArray<(string TypeName, string HolderName)> GetNames(
+        Compilation compilation,
+        ImmutableArray<ProxyInterfaceModel> proxies,
+        SourceGeneratorOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (proxies.IsDefaultOrEmpty)
+        {
+            return [];
+        }
+
+        var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
+        var resolver = new TypeSymbolResolver(compilation);
+        var resultTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        foreach (var proxy in proxies)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!resolver.TryResolveProxyInterface(proxy, cancellationToken, out var interfaceType))
+            {
+                continue;
+            }
+
+            foreach (var method in interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
+                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>())))
+            {
+                if (method.MethodKind == MethodKind.Ordinary
+                    && method.ReturnType is INamedTypeSymbol { TypeArguments.Length: 1 } returnType
+                    && (SymbolEqualityComparer.Default.Equals(returnType.OriginalDefinition, services.LibraryTypes.Task_1)
+                        || SymbolEqualityComparer.Default.Equals(returnType.OriginalDefinition, services.LibraryTypes.ValueTask_1)))
+                {
+                    resultTypes.Add(returnType.TypeArguments[0].WithNullableAnnotation(NullableAnnotation.None));
+                }
+            }
+        }
+
+        return GetNames(resultTypes.Where(type => TryDescribe(services, type, out _, out _))
+            .Select(static type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+    }
+
+    internal static ImmutableArray<(string TypeName, string HolderName)> GetNames(IEnumerable<string> resultTypeNames)
+    {
+        var names = ImmutableArray.CreateBuilder<(string TypeName, string HolderName)>();
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var typeName in resultTypeNames.Distinct(StringComparer.Ordinal).OrderBy(static name => name, StringComparer.Ordinal))
+        {
+            var baseName = $"RpcResponse_{GeneratedSourceOutput.CreateStableHash(typeName)}";
+            var name = baseName;
+            for (var index = 1; !usedNames.Add(name); index++)
+            {
+                name = $"{baseName}_{index.ToString(CultureInfo.InvariantCulture)}";
+            }
+
+            names.Add((typeName, name));
+        }
+
+        return names.ToImmutable();
+    }
 
     internal static string GetNamespace(Compilation compilation)
         => $"{GeneratedCodeUtilities.CodeGeneratorName}.{Identifier.SanitizeIdentifierName(compilation.AssemblyName ?? "Assembly").EscapeIdentifier()}";
@@ -46,10 +102,9 @@ internal static class RpcResponseHolderGenerator
         return false;
     }
 
-    internal static string Generate(IGeneratorServices services, ITypeSymbol resultType, string codec, string copier)
+    internal static string Generate(IGeneratorServices services, ITypeSymbol resultType, string name, string codec, string copier)
     {
         var type = resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var name = GetName(resultType);
         var factory = name + "Factory";
         var shallow = services.LibraryTypes.IsShallowCopyable(resultType);
         var staticCodec = services.LibraryTypes.StaticCodecs.FindByUnderlyingType(resultType)?.CodecType;
