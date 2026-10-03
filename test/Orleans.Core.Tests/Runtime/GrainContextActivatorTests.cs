@@ -3,14 +3,18 @@ using System.Diagnostics.CodeAnalysis;
 using NSubstitute;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
 
 namespace UnitTests.Runtime;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class GrainContextActivatorTests
 {
-    [Fact, TestCategory("BVT")]
+    [Fact]
     public void CreateInstance_ConfiguresContextBeforeStartingActivation()
     {
         var events = new List<string>();
@@ -24,6 +28,32 @@ public class GrainContextActivatorTests
 
         Assert.Same(context, activator.CreateInstance(address));
         Assert.Equal(["configure", "activate"], events);
+    }
+
+    [Fact]
+    public void UndecodedRequest_InterleavesForReentrantGrain()
+    {
+        var component = new GrainCanInterleave();
+        component.MayInterleavePredicates.Add(ReentrantPredicate.Instance);
+        var message = new Message { BodyObject = new UndecodedRequestBody([], "alias") };
+
+        Assert.True(component.MayInterleave(new object(), message));
+    }
+
+    [Fact]
+    public void UndecodedRequest_SkipsBodyDependentInterleavePredicate()
+    {
+        var invoked = false;
+        var component = new GrainCanInterleave();
+        component.MayInterleavePredicates.Add(new MayInterleaveStaticPredicate(_ =>
+        {
+            invoked = true;
+            return true;
+        }));
+        var message = new Message { BodyObject = new UndecodedRequestBody([], "alias") };
+
+        Assert.False(component.MayInterleave(new object(), message));
+        Assert.False(invoked);
     }
 
     private sealed class TestGrainContextActivatorProvider(IGrainContextActivator activator) : IGrainContextActivatorProvider
