@@ -134,10 +134,51 @@ namespace Orleans.Providers.Streams.Common
         {
             if (msgs == null) throw new ArgumentNullException(nameof(msgs));
 
-            LogDebugAddToCache(msgs.Count);
-            foreach (var message in msgs)
+            var count = msgs.Count;
+            if (count == 0)
             {
-                Add(message, message.SequenceToken);
+                LogDebugAddToCache(0);
+                return;
+            }
+
+            if (count > (long)maxCacheSize - Size) throw new CacheFullException();
+
+            // Admission is all-or-nothing: the receiver can retry this same list after a
+            // failure. Snapshot provider inputs and allocate storage before changing the
+            // linked list or bucket counts. Do not invoke provider getters during commit.
+            var items = new LinkedListNode<SimpleQueueCacheItem>[count];
+            var newBuckets = new List<CacheBucket>();
+            var bucket = cacheCursorHistogram.Count > 0 ? cacheCursorHistogram[^1] : null;
+            var itemsInBucket = bucket?.NumCurrentItems ?? 0;
+            for (var i = 0; i < count; i++)
+            {
+                var message = msgs[i] ?? throw new ArgumentException("A cache batch cannot be null.", nameof(msgs));
+                var token = message.SequenceToken ?? throw new ArgumentException("A cache batch must have a sequence token.", nameof(msgs));
+                if (bucket is null || itemsInBucket == CACHE_HISTOGRAM_MAX_BUCKET_SIZE)
+                {
+                    bucket = new CacheBucket();
+                    newBuckets.Add(bucket);
+                    itemsInBucket = 0;
+                }
+
+                items[i] = new LinkedListNode<SimpleQueueCacheItem>(new SimpleQueueCacheItem
+                {
+                    Batch = message,
+                    SequenceToken = token,
+                    CacheBucket = bucket,
+                });
+                itemsInBucket++;
+            }
+
+            cacheCursorHistogram.EnsureCapacity(cacheCursorHistogram.Count + newBuckets.Count);
+            // Keep observer failures explicit, but before the admission commit boundary.
+            LogDebugAddToCache(count);
+
+            cacheCursorHistogram.AddRange(newBuckets);
+            foreach (var item in items)
+            {
+                cachedMessages.AddFirst(item);
+                item.Value.CacheBucket.UpdateNumItems(1);
             }
         }
 
@@ -208,6 +249,16 @@ namespace Orleans.Providers.Streams.Common
                 }
 
                 var latestCursor = result.Cursor!;
+                if (latestCursor.GetType() == typeof(SimpleQueueCacheCursor))
+                {
+                    // Exclude the observed partition tail without selecting or acknowledging it.
+                    // When empty, the waiting cursor instead includes the first future record.
+                    var nativeCursor = (SimpleQueueCacheCursor)latestCursor;
+                    nativeCursor.StartAfter(cachedMessages.First);
+                    UnsetCursor(nativeCursor, null);
+                    return result;
+                }
+
                 var retainCursor = false;
                 try
                 {
@@ -246,14 +297,15 @@ namespace Orleans.Providers.Streams.Common
 
         private void InitializeCursorAtEarliestAvailable(SimpleQueueCacheCursor cursor)
         {
-            for (var node = cachedMessages.Last; node is not null; node = node.Previous)
+            // Include other streams in the scan so they contribute to the same safe prefix.
+            var node = cursor.WaitingAfter is { List: var list } anchor && list == cachedMessages
+                ? anchor.Previous
+                : cachedMessages.Last;
+            if (node is not null)
             {
-                if (cursor.IsInStream(node.Value.Batch))
-                {
-                    cursor.WaitingForEarliestAvailable = false;
-                    SetCursor(cursor, node);
-                    return;
-                }
+                cursor.WaitingForEarliestAvailable = false;
+                SetCursor(cursor, node);
+                return;
             }
 
             UnsetCursor(cursor, null);
@@ -267,6 +319,11 @@ namespace Orleans.Providers.Streams.Common
             // Nothing in cache, unset token, and wait for more data.
             if (cachedMessages.Count == 0)
             {
+                if (sequenceToken is null)
+                {
+                    cursor.WaitingForEarliestAvailable = true;
+                }
+
                 UnsetCursor(cursor, sequenceToken);
                 return null;
             }
@@ -275,8 +332,10 @@ namespace Orleans.Providers.Streams.Common
             sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken!; // cachedMessages.Count > 0 here (checked above), so First/Value/SequenceToken are guaranteed non-null.
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
-            if (EventSequenceTokenCompatibility.Compare(sequenceToken, cachedMessages.First!.Value.SequenceToken) > 0) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.
+            if (EventSequenceTokenCompatibility.Compare(sequenceToken, cachedMessages.First!.Value.SequenceToken) > 0
+                && cachedMessages.First.Value.Batch is not IQueueCacheBatchContainerFilter)
             {
+                cursor.RecordScanned(cachedMessages.First.Value.SequenceToken);
                 UnsetCursor(cursor, sequenceToken);
                 return null;
             }
@@ -299,20 +358,28 @@ namespace Orleans.Providers.Streams.Common
                 if (node.Next == null) // node is the last message
                     break;
 
-                // if sequenceId is between the two, take the higher
-                if (EventSequenceTokenCompatibility.Compare(node.Next.Value.SequenceToken, sequenceToken) < 0)
+                // A provider filter can slice an inclusive token inside a multi-event batch.
+                // Otherwise preserve the legacy behavior of taking the higher token.
+                if (EventSequenceTokenCompatibility.Compare(node.Next.Value.SequenceToken, sequenceToken) < 0
+                    && node.Next.Value.Batch is not IQueueCacheBatchContainerFilter)
                     break;
 
                 node = node.Next;
             }
 
             // return cursor from start.
+            cursor.InclusiveStartToken ??= sequenceToken;
             SetCursor(cursor, node!); // Guaranteed non-null: node starts as First (non-null since Count > 0) and is only ever reassigned to node.Next after a non-null check.
             return null;
         }
 
         internal void RefreshCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
+            if (cursor.CacheMiss is { } observedMiss)
+            {
+                throw observedMiss.ToException();
+            }
+
             LogDebugRefreshCursor(cursor, sequenceToken);
 
             // set if unset
@@ -327,6 +394,7 @@ namespace Orleans.Providers.Streams.Common
                 var token = cursor.SequenceToken ?? sequenceToken;
                 if (InitializeCursor(cursor, token) is { } cacheMiss)
                 {
+                    cursor.CacheMiss = cacheMiss;
                     throw cacheMiss.ToException();
                 }
             }
@@ -365,6 +433,8 @@ namespace Orleans.Providers.Streams.Common
             // If we are at the end of the cache unset cursor and move offset one forward
             if (cursor.Element == cachedMessages.First)
             {
+                cursor.WaitingAfter = cursor.Element;
+                cursor.WaitingForEarliestAvailable = true;
                 UnsetCursor(cursor, null);
             }
             else // Advance to next:
@@ -402,41 +472,6 @@ namespace Orleans.Providers.Streams.Common
                 cursor.Element!.Value.CacheBucket.UpdateNumCursors(-1); // cursor.IsSet is true, so Element is non-null.
             }
             cursor.UnSet(token);
-        }
-
-        private void Add(IBatchContainer batch, StreamSequenceToken sequenceToken)
-        {
-            if (batch == null) throw new ArgumentNullException(nameof(batch));
-            // this should never happen, but just in case
-            if (Size >= maxCacheSize) throw new CacheFullException();
-
-            CacheBucket cacheBucket;
-            if (cacheCursorHistogram.Count == 0)
-            {
-                cacheBucket = new CacheBucket();
-                cacheCursorHistogram.Add(cacheBucket);
-            }
-            else
-            {
-                cacheBucket = cacheCursorHistogram[cacheCursorHistogram.Count - 1]; // last one
-            }
-
-            if (cacheBucket.NumCurrentItems == CACHE_HISTOGRAM_MAX_BUCKET_SIZE) // last bucket is full, open a new one
-            {
-                cacheBucket = new CacheBucket();
-                cacheCursorHistogram.Add(cacheBucket);
-            }
-
-            // Add message to linked list
-            var item = new SimpleQueueCacheItem
-            {
-                Batch = batch,
-                SequenceToken = sequenceToken,
-                CacheBucket = cacheBucket
-            };
-
-            cachedMessages.AddFirst(new LinkedListNode<SimpleQueueCacheItem>(item));
-            cacheBucket.UpdateNumItems(1);
         }
 
         [LoggerMessage(

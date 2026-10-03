@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Azure.Messaging.EventHubs;
 using Newtonsoft.Json;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -14,7 +15,7 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    public class EventHubBatchContainer : IBatchContainer
+    public class EventHubBatchContainer : IBatchContainer, IQueueCacheBatchContainerFilter
     {
         [JsonProperty]
         [Id(0)]
@@ -27,6 +28,9 @@ namespace Orleans.Streaming.EventHubs
         [JsonProperty]
         [Id(1)]
         private readonly EventHubSequenceToken token = null!;
+
+        [Id(2)]
+        private readonly int firstEventIndex;
 
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
@@ -71,6 +75,39 @@ namespace Orleans.Streaming.EventHubs
             this.Serializer = serializer;
         }
 
+        private EventHubBatchContainer(EventHubBatchContainer source, int firstEventIndex)
+        {
+            eventHubMessage = source.eventHubMessage;
+            Serializer = source.Serializer;
+            payload = source.payload;
+            this.firstEventIndex = firstEventIndex;
+            token = new EventHubSequenceTokenV2(source.token.EventHubOffset, source.token.SequenceNumber, firstEventIndex);
+        }
+
+        IBatchContainer? IQueueCacheBatchContainerFilter.FilterFrom(StreamSequenceToken inclusiveStartToken)
+        {
+            var comparison = EventSequenceTokenCompatibility.Compare(token, inclusiveStartToken);
+            if (inclusiveStartToken.SequenceNumber != token.SequenceNumber)
+            {
+                return comparison > 0 ? this : null;
+            }
+
+            var start = Math.Max(firstEventIndex, inclusiveStartToken.EventIndex);
+            return start < GetPayload().Events.Count ? new EventHubBatchContainer(this, start) : null;
+        }
+
+        IBatchContainer? IQueueCacheBatchContainerFilter.FilterAfter(StreamSequenceToken exclusiveStartToken)
+        {
+            var comparison = EventSequenceTokenCompatibility.Compare(token, exclusiveStartToken);
+            if (exclusiveStartToken.SequenceNumber != token.SequenceNumber)
+            {
+                return comparison > 0 ? this : null;
+            }
+
+            var start = Math.Max(firstEventIndex, checked(exclusiveStartToken.EventIndex + 1));
+            return start < GetPayload().Events.Count ? new EventHubBatchContainer(this, start) : null;
+        }
+
         /// <summary>
         /// Gets events of a specific type from the batch.
         /// </summary>
@@ -78,7 +115,9 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return GetPayload().Events.Cast<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)));
+            return GetPayload().Events.Cast<T>()
+                .Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, new EventHubSequenceTokenV2(token.EventHubOffset, token.SequenceNumber, i)))
+                .Skip(firstEventIndex);
         }
 
         /// <summary>
