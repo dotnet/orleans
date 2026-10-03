@@ -171,8 +171,12 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var writer = WriteUpdates();
-            var readAll = ReadSnapshots(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
-            var readRow = ReadSnapshots(() => table.ReadRowAsync(address, TestContext.Current.CancellationToken));
+            var readAll = ReadSnapshots(
+                nameof(FirestoreMembershipTable.ReadAllAsync),
+                () => table.ReadAllAsync(TestContext.Current.CancellationToken));
+            var readRow = ReadSnapshots(
+                nameof(FirestoreMembershipTable.ReadRowAsync),
+                () => table.ReadRowAsync(address, TestContext.Current.CancellationToken));
             start.SetResult();
 
             await Task.WhenAll(writer, readAll, readRow).WaitAsync(
@@ -199,7 +203,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             }
 
-            async Task ReadSnapshots(Func<Task<MembershipTableData>> read)
+            async Task ReadSnapshots(string operation, Func<Task<MembershipTableData>> read)
             {
                 await start.Task.WaitAsync(TestContext.Current.CancellationToken);
                 var previousVersion = -1;
@@ -208,11 +212,15 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     var snapshot = await ReadWithRetries(
                         read,
                         TestContext.Current.CancellationToken);
-                    Assert.True(snapshot.Version.Version >= previousVersion);
+                    Assert.True(
+                        snapshot.Version.Version >= previousVersion,
+                        $"{operation} read {i} returned version {snapshot.Version.Version} after version {previousVersion}.");
                     var row = Assert.Single(
                         snapshot.Members,
                         member => member.Item1.SiloAddress.Equals(address));
-                    Assert.Equal(snapshot.Version.Version, row.Item1.ProxyPort);
+                    Assert.True(
+                        snapshot.Version.Version == row.Item1.ProxyPort,
+                        $"{operation} read {i} returned table version {snapshot.Version.Version} with row version {row.Item1.ProxyPort}.");
                     previousVersion = snapshot.Version.Version;
                 }
             }
