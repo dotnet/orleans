@@ -75,7 +75,7 @@ Handle registration and teardown's ownership snapshot share one lifecycle lock.
 Admitted factory calls, provider initialization, terminal deletion, native probes,
 and late-owner disposal remain
 owned until their actual tasks finish. Caller cancellation ends that caller's
-wait; the factory and tokenless-compatible initialization keep their original
+wait; the factory and provider initialization keep their original
 owners alive. An acquisition which finishes after disposal or history retirement
 disposes its returned owner before reporting the lifetime error. Teardown waits
 for these admitted operations before deleting scopes or disposing shared owners.
@@ -94,8 +94,7 @@ scopes are retired; teardown disposes their owners directly. A deletion request
 which fails after invocation also retires its handles, since it may have
 committed. Subsequent histories use a new fixture with fresh owners.
 Ordinary membership operations receive their scenario cancellation token. The
-fixture's ownership tracking covers its lifecycle callbacks, rather than hidden
-work behind a provider's canceled compatibility adapter. Handle disposers release
+fixture tracks its lifecycle callbacks through completion. Handle disposers release
 their declared resources according to the real SDK close, abort, or drain
 contract; any resulting infrastructure failures remain observable.
 Use non-secret provider labels: diagnostics include labels, cluster IDs, opaque
@@ -103,7 +102,7 @@ tokens, identities, and mismatched persisted fields.
 
 ## Independently discoverable direct guarantees
 
-Expose each active runner method below as a separate fact/test in your framework. All return
+Expose each runner method below as a separate fact/test in your framework. All return
 `Task` and take `CancellationToken cancellationToken = default`. Every provider
 runs the same behavioral assertions.
 
@@ -136,11 +135,7 @@ runs the same behavioral assertions.
 | G26 | `DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster` |
 | G27 | `DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster` |
 
-The previous G15 method `ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities`
-is an obsolete alias for the full-snapshot lookup case. G22
-`ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews` is an obsolete alias for G21.
-Existing callers keep those entry points; normal discovery exposes each supported
-scenario once, for 26 direct cases plus generated conformance.
+The suite exposes 26 direct cases plus generated conformance.
 
 The generated fact is conventionally named
 `MembershipTable_ModelBased_GeneratedConformance`; it calls
@@ -150,10 +145,8 @@ asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
 The public runner executes the complete generated suite. Repository hosted
 system-target tests distribute the same seed-17 manifest across four xUnit cases
 (240, 240, 240, and 239 histories), preserving every history and operation count.
-The internal `ReadPresentRow` and `ReadAbsentRow` operation identities now select
-entries from `ReadAllAsync` snapshots using `TryGet`. Their generated histories,
-multiplicities, and 18-kind manifest remain stable while their storage reads use
-the supported full-snapshot operation.
+The generated model includes 18 operation kinds. Present and absent entry
+observations select entries from `ReadAllAsync` snapshots using `TryGet`.
 
 ## Comparison and protocol rules
 
@@ -270,9 +263,8 @@ against all independently expected canonical entries.
 
 For N rows this is N bool-returning inserts, N+3 full reads, and
 N(N+1)/2 + 2N returned membership rows. At N=4096, setup returns 8,398,848 rows;
-at N=1001 it returns 503,503 rows. This quadratic test-only setup cost keeps
-the suite on the existing public membership operations. Provider-specific
-instrumentation measures native requests, paging, and retry costs.
+at N=1001 it returns 503,503 rows. Provider-specific instrumentation measures
+native requests, paging, and retry costs.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach stale table snapshots after cross-row and same-row commits,
