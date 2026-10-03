@@ -23,38 +23,55 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     {
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
+        internal static void EnterServiceResolution(ICodecProvider provider) => ResolutionState.Value!.Enter(null!, provider);
+        internal static void ExitServiceResolution() => ResolutionState.Value!.Exit();
+        internal static bool EnterActivation(ICodecProvider provider)
+        {
+            var state = ResolutionState.Value!;
+            var root = !state.HasActivation(provider);
+            state.Enter(null!, provider, activation: true);
+            return root;
+        }
+        internal static bool HasActivation(ICodecProvider provider) => ResolutionState.Value!.HasActivation(provider);
+
         private sealed class RecursiveServiceResolutionState
         {
             private int _depth;
 
-            public List<object> Callers { get; } = new List<object>();
-            private readonly List<(object Caller, ICodecProvider? Provider)> _active = new();
+            public List<(object Caller, ICodecProvider? Provider)> Callers { get; } = new();
+            private readonly List<(ICodecProvider? Provider, int CallerStart, bool Activation)> _active = new();
             public ICodecProvider? Provider => _active.Count > 0 ? _active[^1].Provider : null;
 
-            public void Enter(object caller, ICodecProvider? provider = null)
+            public bool HasActivation(ICodecProvider provider)
+                => _active.Any(frame => frame.Activation && ReferenceEquals(frame.Provider, provider));
+
+            public void Enter(object caller, ICodecProvider? provider = null, bool activation = false)
             {
                 ++_depth;
-                _active.Add((caller, provider ?? Provider));
+                var owner = provider ?? Provider;
+                var callerOwner = Provider ?? owner;
+                var callerStart = ReferenceEquals(owner, Provider) ? -1 : Callers.Count;
+                _active.Add((owner, callerStart, activation));
                 if (caller is not null)
                 {
-                    Callers.Add(caller);
+                    Callers.Add((caller, callerOwner));
                 }
             }
 
             public void Exit()
             {
+                var callerStart = _active[^1].CallerStart;
                 _active.RemoveAt(_active.Count - 1);
+                if (callerStart >= 0)
+                {
+                    Callers.RemoveRange(callerStart, Callers.Count - callerStart);
+                }
                 if (--_depth <= 0)
                 {
                     Callers.Clear();
                 }
             }
 
-            public void ValidateCycle(object service, ICodecProvider? provider = null)
-            {
-                if ((provider ?? Provider) is not CodecProvider codecProvider) return;
-                codecProvider.RecordConstructionDependency(_active.Where(entry => entry.Caller is not null).Select(entry => entry.Caller).ToArray(), service);
-            }
         }
 
         /// <summary>
@@ -84,9 +101,8 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s && !(c is IServiceHolder<TService>))
+                    if (ReferenceEquals(c.Provider, codecProvider) && c.Caller is TService s && !(c.Caller is IServiceHolder<TService>))
                     {
-                        state.ValidateCycle(c, codecProvider);
                         return s;
                     }
                 }
@@ -96,7 +112,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 {
                     if (provider.TryGetSerializerService(typeof(TService), out var registered))
                     {
-                        state.ValidateCycle(registered, provider);
                         return (TService)registered;
                     }
 
@@ -108,7 +123,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     val = wrapping.Value;
                 }
 
-                if (val is { } resolved) state.ValidateCycle(resolved, codecProvider);
                 return val;
             }
             catch (Exception exception)
@@ -139,15 +153,13 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s and not IServiceHolder<TService>)
+                    if (ReferenceEquals(c.Provider, state.Provider) && c.Caller is TService s and not IServiceHolder<TService>)
                     {
-                        state.ValidateCycle(c);
                         return s;
                     }
                 }
 
                 var result = Unwrap(service);
-                if (result is { } resolved) state.ValidateCycle(resolved);
                 return result;
             }
             catch (Exception exception)
@@ -176,11 +188,10 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             var state = ResolutionState.Value!;
             foreach (var c in state.Callers)
             {
-                var type = c?.GetType();
-                if (serviceType == type)
+                if (ReferenceEquals(c.Provider, codecProvider) && c.Caller is not IServiceHolder<object>
+                    && serviceType.IsInstanceOfType(c.Caller))
                 {
-                    state.ValidateCycle(c!, codecProvider);
-                    return c;
+                    return c.Caller;
                 }
             }
 
@@ -191,6 +202,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// Returns the provided copier if it's not shallow-copyable.
         /// </summary>
         public static IDeepCopier<T>? GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
+
+        internal static bool IsShallowCopyable([NotNullWhen(false)] IDeepCopier? copier)
+            => copier is null || copier is IOptionalDeepCopier optional && optional.IsShallowCopyable();
 
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.

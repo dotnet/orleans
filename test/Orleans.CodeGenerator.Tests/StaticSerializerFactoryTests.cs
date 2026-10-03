@@ -11,7 +11,19 @@ public sealed class StaticSerializerFactoryTests
     public void FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry() => StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
 
     [Fact]
+    public void MixedNullableTupleCyclesDeferOptionalQueries() => StaticFactoryContracts.MixedNullableTupleCyclesDeferOptionalQueries();
+
+    [Fact]
+    public void GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots() => StaticFactoryContracts.GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots();
+
+    [Fact]
     public void GeneratedMetadataCollectionsComposeWithClosedFactories() => StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
+
+    [Fact]
+    public void MixedCyclesPublishCompletedGraphs() => StaticFactoryContracts.MixedCyclesPublishCompletedGraphs();
+
+    [Fact]
+    public void FailedMixedCyclesRollBackFromBothRoots() => StaticFactoryContracts.FailedMixedCyclesRollBackFromBothRoots();
 
     [Fact]
     public void CyclicConstructionPublishesCompletedGraphs() => StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
@@ -29,7 +41,7 @@ public sealed class StaticSerializerFactoryTests
     public void AutomaticCacheEntriesRollBackWithFactoryFailures() => StaticFactoryContracts.AutomaticCacheEntriesRollBackWithFactoryFailures();
 
     [Fact]
-    public void MixedConstructionCyclesFailBeforePublication() => StaticFactoryContracts.MixedConstructionCyclesFailBeforePublication();
+    public void MixedConstructionCyclesConstructCanonically() => StaticFactoryContracts.MixedConstructionCyclesConstructCanonically();
 
     [Fact]
     public void DiSingletonsCannotRetainPendingServices() => StaticFactoryContracts.DiSingletonsCannotRetainPendingServices();

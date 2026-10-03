@@ -87,6 +87,166 @@ public static partial class StaticFactoryContracts
         public FactoryCycleRoot Root { get; } = root;
     }
 
+    public static void MixedNullableTupleCyclesDeferOptionalQueries()
+    {
+        foreach (var tupleRoot in new[] { false, true })
+        {
+            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+#if NATIVE_AOT_SMOKE
+            // Both value-type forward edges are statically closed before the ordinary metadata constructors allocate their callers.
+            var nullableHolderConstructions = 0;
+            var valueHolderConstructions = 0;
+            services.AddSingleton<Orleans.Serialization.Cloning.IDeepCopier<OptionalCycleValue?>>(serviceProvider =>
+            {
+                var codecs = serviceProvider.GetRequiredService<CodecProvider>();
+                Ensure(!codecs.IsConstructionPending, "The closed nullable forward holder is supplied before a factory joins the ordinary metadata graph.");
+                nullableHolderConstructions++;
+                return ConstructionContext.CreateForwardCopier<OptionalCycleValue?>(codecs);
+            });
+            services.AddSingleton<Orleans.Serialization.Cloning.IDeepCopier<OptionalCycleValue>>(serviceProvider =>
+            {
+                var codecs = serviceProvider.GetRequiredService<CodecProvider>();
+                Ensure(!codecs.IsConstructionPending, "The closed value forward holder is supplied before a factory joins the ordinary metadata graph.");
+                valueHolderConstructions++;
+                return ConstructionContext.CreateForwardCopier<OptionalCycleValue>(codecs);
+            });
+#endif
+            services.Configure<TypeManifestOptions>(options =>
+            {
+                options.AddCopier(typeof(NullableCopier<>));
+                options.AddCopier(typeof(TupleCopier<>));
+                options.AddCopier(typeof(OptionalCycleCopier));
+                options.AddSerializerService<OptionalCycleCopier>(provider => new OptionalCycleCopier(provider));
+                options.AddSerializerService<Orleans.Serialization.Cloning.IDeepCopier<OptionalCycleValue>>(
+                    static provider => OrleansGeneratedCodeHelper.GetService<OptionalCycleCopier>(null!, provider));
+            });
+            using var scope = services.BuildServiceProvider();
+            var provider = scope.GetRequiredService<CodecProvider>();
+            if (tupleRoot) _ = provider.GetDeepCopier<Tuple<OptionalCycleValue?>>();
+            else _ = provider.GetDeepCopier<OptionalCycleValue>();
+#if NATIVE_AOT_SMOKE
+            Ensure(nullableHolderConstructions == (tupleRoot ? 1 : 0) && valueHolderConstructions == (tupleRoot ? 1 : 0),
+                "Pending nullable dependencies reuse the actual constructed copier instead of entering DI.");
+#endif
+            var copier = OrleansGeneratedCodeHelper.GetService<OptionalCycleCopier>(null!, provider);
+            Ensure(ReferenceEquals(copier.Nullable, provider.GetDeepCopier<OptionalCycleValue?>())
+                && ReferenceEquals(copier.Tuple, provider.GetDeepCopier<Tuple<OptionalCycleValue?>>()),
+                "Optional mixed cycles retain canonical dependencies from both roots.");
+            var links = new OptionalCycleValue?[1];
+            var original = new OptionalCycleValue { Values = new() { 13, 17 }, Links = links };
+            links[0] = original;
+            using var context = scope.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>().GetContext();
+            var result = copier.Tuple.DeepCopy(Tuple.Create<OptionalCycleValue?>(original), context)!;
+            var copy = result.Item1!.Value;
+            Ensure(!ReferenceEquals(original.Values, copy.Values) && !ReferenceEquals(links, copy.Links),
+                "Optional cycles copy mutable members after all constructors complete.");
+            Ensure(ReferenceEquals(copy.Values, copy.Links[0]!.Value.Values)
+                && ReferenceEquals(copy.Links, copy.Links[0]!.Value.Links), "Optional cycles preserve shared values and self-references.");
+            copy.Values[0] = 23;
+            Ensure(original.Values[0] == 13 && copy.Links[0]!.Value.Values[0] == 23,
+                "Optional cyclic copies isolate original values.");
+        }
+    }
+
+    public struct OptionalCycleValue
+    {
+        public List<int> Values;
+        public OptionalCycleValue?[] Links;
+    }
+
+    private sealed class OptionalCycleCopier : Orleans.Serialization.Cloning.IDeepCopier<OptionalCycleValue>,
+        Orleans.Serialization.Cloning.IOptionalDeepCopier
+    {
+        private readonly bool _ready;
+        public NullableCopier<OptionalCycleValue> Nullable { get; }
+        public TupleCopier<OptionalCycleValue?> Tuple { get; }
+        public OptionalCycleCopier(ICodecProvider provider)
+        {
+            Nullable = OrleansGeneratedCodeHelper.GetService<NullableCopier<OptionalCycleValue>>(this, provider);
+            Tuple = OrleansGeneratedCodeHelper.GetService<TupleCopier<OptionalCycleValue?>>(this, provider);
+            _ready = true;
+        }
+        public bool IsShallowCopyable()
+        {
+            Ensure(_ready, "No consuming constructor queries an incomplete optional copier.");
+            return false;
+        }
+        public OptionalCycleValue DeepCopy(OptionalCycleValue input, Orleans.Serialization.Cloning.CopyContext context)
+        {
+            Ensure(_ready, "Optional copier operations begin after construction.");
+            if (!context.TryGetCopy<List<int>>(input.Values, out var values))
+            {
+                values = new List<int>(input.Values);
+                context.RecordCopy(input.Values, values);
+            }
+            if (!context.TryGetCopy<OptionalCycleValue?[]>(input.Links, out var links))
+            {
+                links = new OptionalCycleValue?[input.Links.Length];
+                context.RecordCopy(input.Links, links);
+                for (var index = 0; index < links.Length; index++)
+                    links[index] = Nullable.DeepCopy(input.Links[index], context);
+            }
+            return new OptionalCycleValue { Values = values!, Links = links! };
+        }
+    }
+
+    public static void GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots()
+    {
+        foreach (var collectionRoot in new[] { false, true })
+        {
+            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            services.Configure<TypeManifestOptions>(options =>
+            {
+                options.AddSerializer(typeof(ListCodec<>));
+                options.AddCopier(typeof(ListCopier<>));
+                options.AddAllowedType(typeof(GeneratedMixedValue));
+                options.AddSerializerService<global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Codec_GeneratedMixedValue>(
+                    provider => new global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Codec_GeneratedMixedValue(provider));
+                options.AddSerializerService<global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Copier_GeneratedMixedValue>(
+                    provider => new global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Copier_GeneratedMixedValue(provider));
+                options.AddSerializer<GeneratedMixedValue>(
+                    static provider => OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Codec_GeneratedMixedValue>(null!, provider),
+                    static provider => OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.ContextSmoke.StaticFactoryContracts.Copier_GeneratedMixedValue>(null!, provider));
+            });
+            using var scope = services.BuildServiceProvider();
+            var provider = scope.GetRequiredService<CodecProvider>();
+            if (collectionRoot)
+            {
+                _ = provider.GetCodec<List<GeneratedMixedValue>>();
+                _ = provider.GetDeepCopier<List<GeneratedMixedValue>>();
+            }
+            else
+            {
+                _ = provider.GetCodec<GeneratedMixedValue>();
+                _ = provider.GetDeepCopier<GeneratedMixedValue>();
+            }
+            var original = new GeneratedMixedValue { Value = 42 };
+            original.Children = new() { original, original };
+            original.Alias = original.Children;
+            var serializer = scope.GetRequiredService<Serializer>();
+            var restored = serializer.Deserialize<GeneratedMixedValue>(serializer.SerializeToArray(original))!;
+            var copied = scope.GetRequiredService<DeepCopier>().Copy(original)!;
+            foreach (var value in new[] { restored, copied })
+            {
+                Ensure(value.Value == 42 && value.Children.Count == 2, "Generated mixed cycles retain values.");
+                Ensure(ReferenceEquals(value, value.Children[0]) && ReferenceEquals(value, value.Children[1])
+                    && ReferenceEquals(value.Children, value.Alias), "Generated mixed cycles retain self-reference and collection aliases.");
+                Ensure(!ReferenceEquals(original, value) && !ReferenceEquals(original.Children, value.Children),
+                    "Generated mixed cycles isolate copied and deserialized values.");
+            }
+            copied.Value = 17;
+            Ensure(original.Value == 42 && copied.Children[0].Value == 17, "Copied mixed cycles retain isolated canonical identities.");
+        }
+    }
+
+    [GenerateSerializer]
+    public sealed class GeneratedMixedValue
+    {
+        [Id(0)] public int Value { get; set; }
+        [Id(1)] public List<GeneratedMixedValue> Children { get; set; } = new();
+        [Id(2)] public List<GeneratedMixedValue> Alias { get; set; } = new();
+    }
+
     public static void GeneratedMetadataCollectionsComposeWithClosedFactories()
     {
         var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
