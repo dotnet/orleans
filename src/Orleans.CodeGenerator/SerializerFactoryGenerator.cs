@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
@@ -46,17 +47,42 @@ internal static class SerializerFactoryGenerator
         bool includeResponse)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!constructionTypes.Add(type) || type.IsGenericType || type.IsAbstract || type.TypeKind == TypeKind.Interface
+        var originalBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
+        type = originalBinding.GetSpeculativeTypeInfo(0, type.ToTypeSyntax(), SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol
+            ?? throw new InvalidOperationException($"Unable to bind serialization construction type {type}.");
+        if (!constructionTypes.Add(type) || ContainsTypeParameter(type) || type.ContainingType is { IsGenericType: true }
+            || type.IsAbstract || type.TypeKind == TypeKind.Interface
             || !type.HasAttribute(services.LibraryTypes.GenerateSerializerAttribute))
         {
             return null;
         }
 
         var registration = new Registration(type);
+        var inspectionCompilation = services.Compilation;
+        var inspectionType = type;
+        var inspectionLibrary = services.LibraryTypes;
+        if (!SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
+        {
+            inspectionCompilation = services.Compilation.WithOptions(services.Compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All));
+            var binding = inspectionCompilation.GetSemanticModel(inspectionCompilation.SyntaxTrees.First());
+            inspectionType = binding.GetSpeculativeTypeInfo(0, type.ToTypeSyntax(), SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol
+                ?? throw new InvalidOperationException($"Unable to bind referenced serialization type {type}.");
+            inspectionLibrary = LibraryTypes.FromCompilation(inspectionCompilation, services.Options);
+        }
         ISerializableTypeDescription? constructionModel;
         try
         {
-            constructionModel = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type, inspectReferenceMetadata: true);
+            if (SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
+            {
+                constructionModel = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type);
+            }
+            else
+            {
+                // Reference assemblies preserve constructor contracts, but can omit serialized private fields.
+                var fields = new FieldIdAssignmentHelper(inspectionType, [], GenerateFieldIds.None, inspectionLibrary);
+                constructionModel = new SerializableTypeDescription(inspectionCompilation, inspectionType, false,
+                    SerializableSourceOutputGenerator.GetDataMembers(fields), inspectionLibrary);
+            }
         }
         catch (OrleansGeneratorDiagnosticAnalysisException)
         {
@@ -68,21 +94,36 @@ internal static class SerializerFactoryGenerator
         }
 
         var requiresActivator = false;
+        INamedTypeSymbol? referencedActivator = null;
+        var codecDependencies = new List<string>();
+        var copierDependencies = new List<string>();
         if (SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
         {
-            var model = SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type);
-            if (model is null) return null;
+            var model = constructionModel;
             DescribeGeneratedModel(registration, type, model);
-            ConstructGeneratedModel(registration, services);
+            var codecDeclaration = new SerializerGenerator(services).Generate(model);
+            var copierDeclaration = new CopierGenerator(services).GenerateCopier(model, new());
+            registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
+            registration.CopierConstruction = copierDeclaration is null
+                ? $"new {registration.Copier}()"
+                : ConstructGenerated(registration.Copier, copierDeclaration);
             requiresActivator = model.UseActivator;
+            codecDependencies.AddRange(ConstructorDependencies(codecDeclaration));
+            if (copierDeclaration is not null)
+                copierDependencies.AddRange(ConstructorDependencies(copierDeclaration));
         }
         else
         {
             var generatedNamespace = SerializerGenerator.GetGeneratedNamespaceName(type);
-            var codecType = services.Compilation.GetTypeByMetadataName($"{generatedNamespace}.{SerializerGenerator.GetSimpleClassName(type.Name)}");
-            if (codecType is null) return null;
+            var codecType = ResolveModelImplementation(SerializerGenerator.GetSimpleClassName(type.Name));
+            if (codecType is null)
+            {
+                return null;
+            }
+
             registration.Codec = Name(codecType);
             registration.CodecConstruction = ConstructReferenced(registration.Codec, codecType);
+            codecDependencies.AddRange(ConstructorDependencies(codecType));
             requiresActivator = HasActivatorDependency(codecType);
             if (services.LibraryTypes.IsShallowCopyable(type))
             {
@@ -91,17 +132,32 @@ internal static class SerializerFactoryGenerator
             }
             else
             {
-                var copierType = services.Compilation.GetTypeByMetadataName($"{generatedNamespace}.{CopierGenerator.GetSimpleClassName(type.Name)}");
-                if (copierType is null) return null;
+                var copierType = ResolveModelImplementation(CopierGenerator.GetSimpleClassName(type.Name));
+                if (copierType is null)
+                {
+                    return null;
+                }
+
                 registration.Copier = Name(copierType);
                 registration.CopierConstruction = ConstructReferenced(registration.Copier, copierType);
+                copierDependencies.AddRange(ConstructorDependencies(copierType));
                 requiresActivator |= HasActivatorDependency(copierType);
             }
+
+            INamedTypeSymbol? ResolveModelImplementation(string name)
+            {
+                var arity = type.TypeArguments.Length;
+                var definition = inspectionCompilation.GetTypeByMetadataName($"{generatedNamespace}.{name}{(arity > 0 ? $"`{arity}" : "")}");
+                return definition is null || arity == 0 ? definition : definition.Construct([.. type.TypeArguments]);
+            }
+            if (requiresActivator)
+                referencedActivator = ResolveModelImplementation(ActivatorGenerator.GetSimpleClassName(constructionModel));
         }
 
         if (requiresActivator
-            && (type.HasAttribute(services.LibraryTypes.UseActivatorAttribute) && !constructionModel.HasActivatorConstructor
-                || constructionModel.HasActivatorConstructor && !SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly)))
+            && (type.HasAttribute(services.LibraryTypes.UseActivatorAttribute) && !constructionModel.HasActivatorConstructor && referencedActivator is null
+                || constructionModel.HasActivatorConstructor && !SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly)
+                    && (referencedActivator is null || !inspectionCompilation.IsSymbolAccessibleWithin(referencedActivator, inspectionCompilation.Assembly))))
         {
             return null;
         }
@@ -110,22 +166,40 @@ internal static class SerializerFactoryGenerator
         var codec = $"global::Orleans.Serialization.Invocation.PooledResponseCodec<{Name(type)}, {registration.Codec}>";
         var copier = $"global::Orleans.Serialization.Invocation.PooledResponseCopier<{Name(type)}, {registration.Copier}>";
         var result = new StringBuilder();
+        foreach (var member in constructionModel.Members)
+        {
+            var memberName = Name(member.Type);
+            if (member.IsSerializable)
+                codecDependencies.Add($"global::Orleans.Serialization.Codecs.IFieldCodec<{memberName}>");
+            if (member.IsCopyable && !services.LibraryTypes.IsShallowCopyable(type))
+                copierDependencies.Add($"global::Orleans.Serialization.Cloning.IDeepCopier<{memberName}>");
+        }
         foreach (var memberType in constructionModel.Members
             .Where(static member => member.IsSerializable || member.IsCopyable)
             .Select(static member => member.Type)
             .Distinct<ITypeSymbol>(SymbolEqualityComparer.Default))
         {
-            AppendConstructionDependency(services, memberType, cancellationToken, constructionTypes, result);
+            var originalType = originalBinding.GetSpeculativeTypeInfo(0, memberType.ToTypeSyntax(), SpeculativeBindingOption.BindAsTypeOrNamespace).Type
+                ?? throw new InvalidOperationException($"Unable to bind serialization construction dependency {memberType}.");
+            AppendConstructionDependency(services, originalType, cancellationToken, constructionTypes, result);
         }
 
-        if (requiresActivator && constructionModel.HasActivatorConstructor
+        if (referencedActivator is not null)
+        {
+            result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<")
+                .Append(Name(type)).Append(">, ").Append(Name(referencedActivator)).Append(">(static provider => ")
+                .Append(ConstructReferenced(Name(referencedActivator), referencedActivator))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(referencedActivator))).AppendLine(");");
+        }
+        else if (requiresActivator && constructionModel.HasActivatorConstructor
             && SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
         {
             var activatorName = $"global::{constructionModel.GeneratedNamespace}.{ActivatorGenerator.GetSimpleClassName(constructionModel)}";
             var activator = new ActivatorGenerator(services).GenerateActivator(constructionModel);
             result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<")
                 .Append(Name(type)).Append(">, ").Append(activatorName).Append(">(static provider => ")
-                .Append(ConstructGenerated(activatorName, activator)).AppendLine(");");
+                .Append(ConstructGenerated(activatorName, activator))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(activator))).AppendLine(");");
         }
         else if (requiresActivator && !type.HasAttribute(services.LibraryTypes.UseActivatorAttribute)
             && !constructionModel.HasActivatorConstructor)
@@ -143,10 +217,19 @@ internal static class SerializerFactoryGenerator
             .Append(registration.CopierConstruction).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.IFieldCodec<")
             .Append(Name(type)).Append(">, ").Append(registration.Codec).Append(">(static provider => ")
-            .Append(Resolve(registration.Codec)).AppendLine(");");
+            .Append(Resolve(registration.Codec))
+            .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IDeepCopier<")
             .Append(Name(type)).Append(">, ").Append(registration.Copier).Append(">(static provider => ")
-            .Append(Resolve(registration.Copier)).AppendLine(");");
+            .Append(Resolve(registration.Copier))
+            .Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies)).AppendLine(");");
+        if (type.IsValueType && type.TypeKind != TypeKind.Enum)
+        {
+            result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<")
+                .Append(Name(type)).Append(">, ").Append(registration.Codec).Append(">(static provider => ")
+                .Append(Resolve(registration.Codec))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
+        }
         if (!includeResponse)
         {
             return new Graph(new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default) { [type] = registration }, result.ToString());
@@ -166,8 +249,8 @@ internal static class SerializerFactoryGenerator
         bool HasActivatorDependency(INamedTypeSymbol implementation)
             => implementation.InstanceConstructors.SelectMany(static constructor => constructor.Parameters)
                 .Any(parameter => parameter.Type is INamedTypeSymbol dependency
-                    && SymbolEqualityComparer.Default.Equals(dependency.OriginalDefinition, services.LibraryTypes.IActivator_1)
-                    && SymbolEqualityComparer.Default.Equals(dependency.TypeArguments[0], type));
+                    && SymbolEqualityComparer.Default.Equals(dependency.OriginalDefinition, inspectionLibrary.IActivator_1)
+                    && SymbolEqualityComparer.Default.Equals(dependency.TypeArguments[0], inspectionType));
 
     }
 
@@ -197,6 +280,7 @@ internal static class SerializerFactoryGenerator
             && CreateRpcModelRoot(services, modelType, cancellationToken, constructionTypes, includeResponse: false) is { } modelGraph)
         {
             result.AppendLine(modelGraph.ConfigurationStatements);
+            return;
         }
         else
         {
@@ -217,18 +301,33 @@ internal static class SerializerFactoryGenerator
             return;
         }
 
-        if (dependency is INamedTypeSymbol collection
-            && services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(collection.OriginalDefinition) is { } collectionCodec
-            && services.LibraryTypes.WellKnownCopiers.FindByUnderlyingType(collection.OriginalDefinition) is { } collectionCopier
-            && collectionCodec.CodecType.IsGenericType && collectionCopier.CopierType.IsGenericType)
+        if (dependency is IArrayTypeSymbol { IsSZArray: true } arrayType)
         {
-            var codec = collectionCodec.CodecType.Construct([.. collection.TypeArguments]);
-            var copier = collectionCopier.CopierType.Construct([.. collection.TypeArguments]);
+            AppendConstructionDependency(services, arrayType.ElementType, cancellationToken, constructionTypes, result);
+            var codec = services.LibraryTypes.ArrayCodec.Construct(arrayType.ElementType);
+            var copier = services.LibraryTypes.ArrayCopier.Construct(arrayType.ElementType);
+            result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
+                .Append(ConstructReferenced(Name(codec), codec)).AppendLine(");");
+            result.Append("options.AddDefaultSerializerService<").Append(Name(copier)).Append(">(static provider => ")
+                .Append(ConstructReferenced(Name(copier), copier)).AppendLine(");");
+            result.Append("options.AddDefaultSerializer<").Append(Name(arrayType)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
+                .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
+                .Append(", codecDependencies: ").Append(DefaultDependencyServices([arrayType.ElementType], codec: true))
+                .Append(", copierDependencies: ").Append(DefaultDependencyServices([arrayType.ElementType], codec: false)).AppendLine(");");
+            return;
+        }
+
+        if (dependency is INamedTypeSymbol collection
+            && TryGetConstructionCollectionServices(services, collection, out var collectionCodec, out var collectionCopier))
+        {
+            var codec = collectionCodec;
+            var copier = collectionCopier;
             foreach (var argument in collection.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, constructionTypes, result);
             foreach (var parameter in codec.InstanceConstructors.SelectMany(static constructor => constructor.Parameters))
             {
                 if (parameter.Type is INamedTypeSymbol contract
-                    && SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.FieldCodec_1))
+                    && (SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.FieldCodec_1)
+                        || SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.ValueSerializer)))
                     AppendConstructionDependency(services, contract.TypeArguments[0], cancellationToken, constructionTypes, result);
             }
             result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
@@ -237,17 +336,25 @@ internal static class SerializerFactoryGenerator
                 .Append(ConstructReferenced(Name(copier), copier)).AppendLine(");");
             result.Append("options.AddDefaultSerializer<").Append(Name(collection)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
                 .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
-                .Append(", codecDependencies: ").Append(DefaultDependencyServices(collection.TypeArguments, codec: true))
-                .Append(", copierDependencies: ").Append(DefaultDependencyServices(collection.TypeArguments, codec: false)).AppendLine(");");
+                .Append(", codecDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec, preferCompleteConstructor: true)))
+                .Append(", copierDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
             return;
         }
 
         var name = Name(dependency);
+        IEnumerable<ITypeSymbol> bridgeDependencies = dependency switch
+        {
+            INamedTypeSymbol bridge => bridge.TypeArguments.AsEnumerable(),
+            IArrayTypeSymbol bridge => [bridge.ElementType],
+            _ => []
+        };
         // Metadata bridges add service contracts, while type dispatch stays with ordinary metadata.
         result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.IFieldCodec<")
-            .Append(name).Append(">>(static provider => provider.GetCodec<").Append(name).AppendLine(">());");
+            .Append(name).Append(">>(static provider => provider.GetCodec<").Append(name)
+            .Append(">(), dependencies: ").Append(DefaultDependencyServices(bridgeDependencies, codec: true)).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IDeepCopier<")
-            .Append(name).Append(">>(static provider => provider.GetDeepCopier<").Append(name).AppendLine(">());");
+            .Append(name).Append(">>(static provider => provider.GetDeepCopier<").Append(name)
+            .Append(">(), dependencies: ").Append(DefaultDependencyServices(bridgeDependencies, codec: false)).AppendLine(");");
         if (dependency is INamedTypeSymbol named)
         {
             foreach (var argument in named.TypeArguments) AppendConstructionDependency(services, argument, cancellationToken, constructionTypes, result);
@@ -449,8 +556,24 @@ internal static class SerializerFactoryGenerator
     }
 
     private static string DefaultDependencyServices(IEnumerable<ITypeSymbol> dependencies, bool codec)
-        => "new global::System.Type[] { " + string.Join(", ", dependencies.Select(dependency =>
-            $"typeof(global::Orleans.Serialization.{(codec ? "Codecs.IFieldCodec" : "Cloning.IDeepCopier")}<{Name(dependency)}>)")) + " }";
+        => DefaultServiceDependencies(dependencies.Select(dependency =>
+            $"global::Orleans.Serialization.{(codec ? "Codecs.IFieldCodec" : "Cloning.IDeepCopier")}<{Name(dependency)}>"));
+
+    private static string DefaultServiceDependencies(IEnumerable<string> dependencies)
+        => "new global::System.Type[] { " + string.Join(", ", dependencies
+            .Where(static type => type != "global::Orleans.Serialization.Serializers.ICodecProvider")
+            .Distinct(StringComparer.Ordinal).Select(static type => $"typeof({type})")) + " }";
+
+    private static IEnumerable<string> ConstructorDependencies(INamedTypeSymbol implementation, bool preferCompleteConstructor = false)
+        => GetReferencedConstructor(implementation, preferCompleteConstructor).Parameters.Select(static parameter => Name(parameter.Type));
+
+    private static IEnumerable<string> ConstructorDependencies(ClassDeclarationSyntax declaration)
+        => (declaration.Members.OfType<ConstructorDeclarationSyntax>().SingleOrDefault()?.ParameterList.Parameters
+                .Select(static parameter => parameter.Type!.ToString()) ?? [])
+            .Concat(declaration.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
+                .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name)
+                    .TypeArgumentList.Arguments.Single().ToString()));
 
     private static string? Describe(Registration registration, IGeneratorServices services, Compilation implementationCompilation, CancellationToken cancellationToken)
     {
@@ -704,14 +827,56 @@ internal static class SerializerFactoryGenerator
         codec = null;
         copier = null;
         var arity = type.TypeArguments.Length;
-        if (arity == 0 || !SymbolEqualityComparer.Default.Equals(type.OriginalDefinition,
-            services.Compilation.GetTypeByMetadataName($"System.Tuple`{arity}")))
+        if (arity == 0)
         {
             return false;
         }
 
-        codec = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.TupleCodec`{arity}")!.Construct([.. type.TypeArguments]);
-        copier = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.TupleCopier`{arity}")!.Construct([.. type.TypeArguments]);
+        var family = SymbolEqualityComparer.Default.Equals(type.OriginalDefinition,
+            services.Compilation.GetTypeByMetadataName($"System.Tuple`{arity}")) ? "Tuple"
+            : SymbolEqualityComparer.Default.Equals(type.OriginalDefinition,
+                services.Compilation.GetTypeByMetadataName($"System.ValueTuple`{arity}")) ? "ValueTuple" : null;
+        if (family is null) return false;
+        codec = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.{family}Codec`{arity}")!.Construct([.. type.TypeArguments]);
+        copier = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.{family}Copier`{arity}")!.Construct([.. type.TypeArguments]);
+        return true;
+    }
+
+    private static bool TryGetConstructionCollectionServices(IGeneratorServices services, INamedTypeSymbol type,
+        [NotNullWhen(true)] out INamedTypeSymbol? codec, [NotNullWhen(true)] out INamedTypeSymbol? copier)
+    {
+        codec = null;
+        copier = null;
+        var codecDefinition = services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(type.OriginalDefinition)?.CodecType;
+        var copierDefinition = services.LibraryTypes.WellKnownCopiers.FindByUnderlyingType(type.OriginalDefinition)?.CopierType;
+        if (codecDefinition is null || copierDefinition is null)
+        {
+            var name = type.OriginalDefinition.ToDisplayString() switch
+            {
+                "System.Collections.Generic.SortedDictionary<TKey, TValue>" => "SortedDictionary",
+                "System.Collections.Generic.SortedList<TKey, TValue>" => "SortedList",
+                "System.Collections.Generic.SortedSet<T>" => "SortedSet",
+                "System.Collections.Generic.Queue<T>" => "Queue",
+                "System.Collections.Generic.Stack<T>" => "Stack",
+                "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>" => "ConcurrentDictionary",
+                "System.Collections.Concurrent.ConcurrentQueue<T>" => "ConcurrentQueue",
+                "System.Collections.ObjectModel.Collection<T>" => "Collection",
+                "System.Collections.ObjectModel.ReadOnlyCollection<T>" => "ReadOnlyCollection",
+                "System.Collections.ObjectModel.ReadOnlyDictionary<TKey, TValue>" => "ReadOnlyDictionary",
+                "System.Collections.Frozen.FrozenDictionary<TKey, TValue>" => "FrozenDictionary",
+                "System.Collections.Frozen.FrozenSet<T>" => "FrozenSet",
+                "System.ArraySegment<T>" => "ArraySegment",
+                "System.Memory<T>" => "Memory",
+                "System.ReadOnlyMemory<T>" => "ReadOnlyMemory",
+                _ => null
+            };
+            if (name is null) return false;
+            codecDefinition = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.{name}Codec`{type.Arity}");
+            copierDefinition = services.Compilation.GetTypeByMetadataName($"Orleans.Serialization.Codecs.{name}Copier`{type.Arity}");
+        }
+        if (codecDefinition is not { IsGenericType: true } || copierDefinition is not { IsGenericType: true }) return false;
+        codec = codecDefinition.Construct([.. type.TypeArguments]);
+        copier = copierDefinition.Construct([.. type.TypeArguments]);
         return true;
     }
 
@@ -727,15 +892,20 @@ internal static class SerializerFactoryGenerator
 
     private static string ConstructReferenced(string name, INamedTypeSymbol implementation, bool preferCompleteConstructor = false)
     {
-        var constructors = implementation.InstanceConstructors.Where(static constructor => constructor.DeclaredAccessibility == Accessibility.Public);
-        var constructor = preferCompleteConstructor
-            ? constructors.OrderByDescending(static constructor => constructor.Parameters.Length).First()
-            : constructors.Single();
+        var constructor = GetReferencedConstructor(implementation, preferCompleteConstructor);
         var arguments = constructor.Parameters.Select(parameter =>
             parameter.Type.ToDisplayString() == "Orleans.Serialization.Serializers.ICodecProvider"
                 ? "provider"
                 : Resolve(Name(parameter.Type)));
         return $"new {name}({string.Join(", ", arguments)})";
+    }
+
+    private static IMethodSymbol GetReferencedConstructor(INamedTypeSymbol implementation, bool preferCompleteConstructor)
+    {
+        var constructors = implementation.InstanceConstructors.Where(static constructor => constructor.DeclaredAccessibility == Accessibility.Public);
+        return preferCompleteConstructor
+            ? constructors.OrderByDescending(static constructor => constructor.Parameters.Length).First()
+            : constructors.Single();
     }
 
     private static string ConstructGenerated(string name, ClassDeclarationSyntax declaration)

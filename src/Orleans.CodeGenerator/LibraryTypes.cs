@@ -133,7 +133,16 @@ internal sealed class LibraryTypes
                 new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCodec`2")),
                 new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCodec`1")),
                 new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCodec`1")),
+                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCodec`2")),
                 new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableArray`1"), Type("Orleans.Serialization.Codecs.ImmutableArrayCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableList`1"), Type("Orleans.Serialization.Codecs.ImmutableListCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableQueue`1"), Type("Orleans.Serialization.Codecs.ImmutableQueueCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableStack`1"), Type("Orleans.Serialization.Codecs.ImmutableStackCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableHashSet`1"), Type("Orleans.Serialization.Codecs.ImmutableHashSetCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableSortedSet`1"), Type("Orleans.Serialization.Codecs.ImmutableSortedSetCodec`1")),
+                new(Type("System.Collections.Immutable.ImmutableDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableDictionaryCodec`2")),
+                new(Type("System.Collections.Immutable.ImmutableSortedDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableSortedDictionaryCodec`2")),
         ];
         StaticCopiers =
         [
@@ -148,7 +157,16 @@ internal sealed class LibraryTypes
                 new(Type("System.Collections.Generic.Dictionary`2"), Type("Orleans.Serialization.Codecs.DictionaryCopier`2")),
                 new(Type("System.Collections.Generic.List`1"), Type("Orleans.Serialization.Codecs.ListCopier`1")),
                 new(Type("System.Collections.Generic.HashSet`1"), Type("Orleans.Serialization.Codecs.HashSetCopier`1")),
+                new(Type("System.Collections.Generic.KeyValuePair`2"), Type("Orleans.Serialization.Codecs.KeyValuePairCopier`2")),
                 new(compilation.GetSpecialType(SpecialType.System_Nullable_T), Type("Orleans.Serialization.Codecs.NullableCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableArray`1"), Type("Orleans.Serialization.Codecs.ImmutableArrayCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableList`1"), Type("Orleans.Serialization.Codecs.ImmutableListCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableQueue`1"), Type("Orleans.Serialization.Codecs.ImmutableQueueCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableStack`1"), Type("Orleans.Serialization.Codecs.ImmutableStackCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableHashSet`1"), Type("Orleans.Serialization.Codecs.ImmutableHashSetCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableSortedSet`1"), Type("Orleans.Serialization.Codecs.ImmutableSortedSetCopier`1")),
+                new(Type("System.Collections.Immutable.ImmutableDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableDictionaryCopier`2")),
+                new(Type("System.Collections.Immutable.ImmutableSortedDictionary`2"), Type("Orleans.Serialization.Codecs.ImmutableSortedDictionaryCopier`2")),
         ];
         Exception = Type("System.Exception");
         ImmutableAttribute = Type(CodeGeneratorOptions.ImmutableAttribute);

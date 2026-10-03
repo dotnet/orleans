@@ -678,20 +678,35 @@ namespace Orleans.Serialization.Serializers
             => !_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
                 || IsDefaultContractEligible(contract, []);
 
+        private bool IsProviderService(Type serviceType)
+            => serviceType != typeof(object)
+                && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
+                && serviceType.IsInstanceOfType(this);
+
         private bool IsDefaultContractEligible(TypeManifestOptions.DefaultSerializerContract contract, HashSet<Type> visited)
         {
             if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
             var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
             var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
-            if (role is not null
+            if (role is not null && contract.Implementation is { } implementation
                 && TrySelectImplementation(role, target, target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target, out var selected)
-                && !MatchesDefaultImplementation(selected, contract.Implementation, contract.CompatibleImplementation, target))
+                && !MatchesDefaultImplementation(selected, implementation, contract.CompatibleImplementation, target))
                 return false;
             foreach (var dependency in contract.Dependencies)
             {
-                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required)
-                    && !IsDefaultContractEligible(required, visited))
+                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required))
+                {
+                    if (!IsDefaultContractEligible(required, visited)) return false;
+                }
+                else if (!_manifest.SerializerServiceFactories.ContainsKey(dependency)
+                    && !IsProviderService(dependency)
+                    && dependency != typeof(IServiceProvider)
+                    && dependency != typeof(IServiceProviderIsService)
+                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider)
+                    && _serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == dependency)?.ImplementationInstance is null)
+                {
                     return false;
+                }
             }
             return true;
         }
@@ -985,7 +1000,7 @@ namespace Orleans.Serialization.Serializers
                     {
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
-                        if (IsProviderService(serviceType)) return owner;
+                        if (owner.IsProviderService(serviceType)) return owner;
                         if (owner._serializerServices.TryGetValue(serviceType, out var completed)) return completed;
                         if (scope.TryGetService(serviceType, out var constructed, requireInstance: false)) return constructed;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
@@ -1063,7 +1078,7 @@ namespace Orleans.Serialization.Serializers
                     scope?.ThrowIfFaulted();
                     if (scope is { IsPending: true })
                     {
-                        return IsProviderService(serviceType)
+                        return owner.IsProviderService(serviceType)
                             || serviceType == typeof(IServiceProvider)
                             || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
@@ -1076,10 +1091,6 @@ namespace Orleans.Serialization.Serializers
                 return owner._serviceProvider.GetRequiredService<IServiceProviderIsService>().IsService(serviceType);
             }
 
-            private bool IsProviderService(Type serviceType)
-                => serviceType != typeof(object)
-                    && (serviceType == typeof(CodecProvider) || serviceType.IsInterface)
-                    && serviceType.IsInstanceOfType(owner);
         }
 
         [DoesNotReturn]
