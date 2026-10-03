@@ -220,6 +220,20 @@ namespace Orleans.Runtime.GrainDirectory
         }
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(GrainAddress address) => cache.Remove(address);
+
+        internal bool TryGetCacheEntry(GrainId grainId, SiloAddress siloAddress, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+        {
+            if (cache is IGrainDirectoryCacheEntrySource entrySource
+                && entrySource.TryGetEntry(grainId, out entry)
+                && entry.Address.SiloAddress?.Equals(siloAddress) == true)
+            {
+                return true;
+            }
+
+            entry = null;
+            return false;
+        }
+
         public bool TryLookupInCache(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
         {
             var grainType = grainId.Type;
