@@ -206,6 +206,18 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         internal static bool IsShallowCopyable([NotNullWhen(false)] IDeepCopier? copier)
             => copier is null || copier is IOptionalDeepCopier optional && optional.IsShallowCopyable();
 
+        internal static bool IsShallowCopyable<TCopier>(ref int cache, TCopier copier, Func<TCopier, bool> calculate)
+        {
+            var result = Volatile.Read(ref cache);
+            if (result == 0)
+            {
+                result = calculate(copier) ? 1 : 2;
+                Volatile.Write(ref cache, result);
+            }
+
+            return result == 1;
+        }
+
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
         /// </summary>                

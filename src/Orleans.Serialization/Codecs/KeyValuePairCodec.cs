@@ -92,6 +92,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class KeyValuePairCopier<TKey, TValue> : IDeepCopier<KeyValuePair<TKey, TValue>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly IDeepCopier<TKey>? _keyCopier;
         private readonly IDeepCopier<TValue>? _valueCopier;
 
@@ -107,7 +108,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._valueCopier));
 
         [return: NotNullIfNotNull(nameof(input))]
         object? IDeepCopier.DeepCopy(object? input, CopyContext context) => IsShallowCopyable() ? input : DeepCopy((KeyValuePair<TKey, TValue>)input!, context);
@@ -115,6 +117,8 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public KeyValuePair<TKey, TValue> DeepCopy(KeyValuePair<TKey, TValue> input, CopyContext context)
         {
+            if (IsShallowCopyable()) return input;
+
             return new(OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier) ? input.Key : _keyCopier.DeepCopy(input.Key, context)!,
                 OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier) ? input.Value : _valueCopier.DeepCopy(input.Value, context)!);
         }
