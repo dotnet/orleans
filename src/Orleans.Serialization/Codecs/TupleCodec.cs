@@ -90,6 +90,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T> : IDeepCopier<Tuple<T>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T>);
         private readonly IDeepCopier<T>? _copier;
 
@@ -100,7 +101,8 @@ namespace Orleans.Serialization.Codecs
         public TupleCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -122,7 +124,7 @@ namespace Orleans.Serialization.Codecs
             // Mitigate that by returning a shallow-copy in such a case.
             context.RecordCopy(input, input);
 
-            var result = Tuple.Create(OrleansGeneratedCodeHelper.IsShallowCopyable(_copier) ? input.Item1 : _copier.DeepCopy(input.Item1, context)!);
+            var result = Tuple.Create(_copier!.DeepCopy(input.Item1, context)!);
             context.RecordCopy(input, result);
             return result;
         }
@@ -222,6 +224,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2> : IDeepCopier<Tuple<T1, T2>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -238,7 +241,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -376,6 +380,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3> : IDeepCopier<Tuple<T1, T2, T3>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -398,7 +403,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -549,6 +555,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -575,7 +582,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -742,6 +750,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -772,7 +781,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -952,6 +962,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -986,7 +997,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -1180,6 +1192,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -1218,7 +1231,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier7);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier7));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -1424,6 +1438,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier where T8 : notnull
     {
+        private int _shallowCopyable;
         private readonly Type _fieldType = typeof(Tuple<T1, T2, T3, T4, T5, T6, T7, T8>);
         private readonly IDeepCopier<T1>? _copier1;
         private readonly IDeepCopier<T2>? _copier2;
@@ -1466,7 +1481,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier7) && OrleansGeneratedCodeHelper.IsShallowCopyable(_copier8);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier1) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier2) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier3) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier4) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier5) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier6) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier7) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier8));
 
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]

@@ -66,6 +66,7 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class FrozenDictionaryCopier<TKey, TValue> : IDeepCopier<FrozenDictionary<TKey, TValue>>, IOptionalDeepCopier, IDerivedTypeCopier where TKey : notnull
     {
+        private int _shallowCopyable;
         private readonly IDeepCopier<TKey>? _keyCopier;
         private readonly IDeepCopier<TValue>? _valueCopier;
 
@@ -81,7 +82,8 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier);
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(self._valueCopier));
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -93,7 +95,7 @@ namespace Orleans.Serialization.Codecs
                 return result!;
 
             System.Diagnostics.Debug.Assert(input is not null);
-            if (input.Count == 0 || OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier) && OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier))
+            if (input.Count == 0 || IsShallowCopyable())
                 return input;
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
