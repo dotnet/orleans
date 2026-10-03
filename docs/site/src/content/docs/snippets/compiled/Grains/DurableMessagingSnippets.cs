@@ -56,10 +56,15 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
         IPreparedOutboxBatch? reply = null;
         if (context.Envelope.ReplyTo is { } recipient)
         {
-            var envelope = context.CreateEnvelope()
+            var replyBuilder = context.CreateEnvelope()
                 .To(recipient, "notifications/received")
-                .WithBody(message)
-                .Build();
+                .WithBody(message);
+            if (context.Envelope.CorrelationKey is { } correlationKey)
+            {
+                replyBuilder.WithCorrelationKey(correlationKey);
+            }
+
+            var envelope = replyBuilder.Build();
             reply = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
         }
 
