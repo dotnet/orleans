@@ -244,8 +244,8 @@ public sealed class RpcResponseTests : IDisposable
     [InlineData("ImplementationType", false, true)]
     [InlineData("ImplementationFactory", false, false)]
     [InlineData("ImplementationFactory", false, true)]
-    [InlineData("Instance", true, false)]
-    [InlineData("Instance", true, true)]
+    [InlineData("Instance", false, false)]
+    [InlineData("Instance", false, true)]
     [InlineData("SerializerFactory", true, false)]
     [InlineData("SerializerFactory", true, true)]
     public void DefaultFactoryConstructorDependenciesRespectPublicationBoundary(string registration, bool eligible, bool bridgeFirst)

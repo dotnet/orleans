@@ -702,8 +702,7 @@ namespace Orleans.Serialization.Serializers
                     && !IsProviderService(dependency)
                     && dependency != typeof(IServiceProvider)
                     && dependency != typeof(IServiceProviderIsService)
-                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider)
-                    && _serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == dependency)?.ImplementationInstance is null)
+                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider))
                 {
                     return false;
                 }
