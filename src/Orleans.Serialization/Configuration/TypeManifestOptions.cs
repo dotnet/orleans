@@ -130,12 +130,12 @@ namespace Orleans.Serialization.Configuration
             if (registerCodec)
             {
                 RegisterDefaultContract(typeof(IFieldCodec<T>), typeof(TCodec), compatibleCodecType, codecDependencies);
-                DefaultCodecFactoryContracts.Add(typeof(T), DefaultSerializerContracts[typeof(IFieldCodec<T>)]);
+                DefaultCodecFactoryContracts.TryAdd(typeof(T), DefaultSerializerContracts[typeof(IFieldCodec<T>)]);
             }
             if (registerCopier)
             {
                 RegisterDefaultContract(typeof(IDeepCopier<T>), typeof(TCopier), compatibleCopierType, copierDependencies);
-                DefaultCopierFactoryContracts.Add(typeof(T), DefaultSerializerContracts[typeof(IDeepCopier<T>)]);
+                DefaultCopierFactoryContracts.TryAdd(typeof(T), DefaultSerializerContracts[typeof(IDeepCopier<T>)]);
             }
         }
 
@@ -152,6 +152,10 @@ namespace Orleans.Serialization.Configuration
                 Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider));
             AddSerializerServiceFactory(typeof(IFieldCodec<T>), codecFactory, isDefault);
             AddSerializerServiceFactory(typeof(IDeepCopier<T>), copierFactory, isDefault);
+            if (DefaultSerializerContracts.TryGetValue(typeof(IFieldCodec<T>), out var codecContract))
+                DefaultCodecFactoryContracts.TryAdd(typeof(T), codecContract);
+            if (DefaultSerializerContracts.TryGetValue(typeof(IDeepCopier<T>), out var copierContract))
+                DefaultCopierFactoryContracts.TryAdd(typeof(T), copierContract);
             ContextTypes.Add(typeof(T));
         }
 
