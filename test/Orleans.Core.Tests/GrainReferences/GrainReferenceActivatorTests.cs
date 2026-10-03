@@ -5,9 +5,11 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using TestExtensions;
 using Xunit;
+using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<Orleans.Runtime.GrainReferenceFactory>;
 
 namespace UnitTests.GrainReferences;
 
@@ -90,5 +92,181 @@ public class GrainReferenceActivatorTests
         Assert.Equal(
             GrainId.Create(ReferenceConstructionFixture.GrainType, IdSpan.Create("private-constructor")),
             reference.GrainId);
+    }
+
+    [Fact]
+    public void CreateReference_StaticallyClosedGenericFactoriesPreserveIdentityAndSharedState()
+    {
+        using var fixture = new ReferenceConstructionFixture();
+        var first = fixture.CreateReference<int>("int-key");
+        var second = fixture.CreateReference<int>("second-key");
+        var text = fixture.CreateReference<string>("text-key");
+
+        Assert.IsAssignableFrom<IGenericConstructionGrain<int>>(first);
+        Assert.IsAssignableFrom<IGenericConstructionGrain<string>>(text);
+        Assert.NotEqual(first.GetType(), text.GetType());
+        Assert.Equal(fixture.Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<int>)), first.InterfaceType);
+        Assert.Equal(fixture.Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<string>)), text.InterfaceType);
+        Assert.Equal(IdSpan.Create("int-key"), first.GrainId.Key);
+        Assert.Equal(IdSpan.Create("text-key"), text.GrainId.Key);
+        Assert.Same(first.Shared, second.Shared);
+        Assert.NotSame(first.Shared, text.Shared);
+        var factories = fixture.ManifestOptions.GetOrCreate<ReferenceFactories>().Factories;
+        Assert.NotNull(factories[typeof(IGenericConstructionGrain<int>)].Factory);
+        Assert.NotNull(factories[typeof(IGenericConstructionGrain<string>)].Factory);
+    }
+
+    [Fact]
+    public void CreateReference_RuntimeSelectedGenericPreservesJitCompatibility()
+    {
+        using var fixture = new ReferenceConstructionFixture();
+
+        var reference = fixture.CreateReference<Guid>("generic-key");
+
+        Assert.IsAssignableFrom<IGenericConstructionGrain<Guid>>(reference);
+        Assert.Equal(IdSpan.Create("generic-key"), reference.GrainId.Key);
+        Assert.Equal(fixture.Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<Guid>)), reference.InterfaceType);
+    }
+
+    [Fact]
+    public void CreateReference_LegacyGeneratedManifestPreservesCompatibility()
+    {
+        using var fixture = new ReferenceConstructionFixture(legacy: true);
+
+        var reference = fixture.CreateReference("legacy-key");
+
+        Assert.IsAssignableFrom<IConstructionGrain>(reference);
+        Assert.Equal(IdSpan.Create("legacy-key"), reference.GrainId.Key);
+        Assert.Equal(17, reference.InterfaceVersion);
+    }
+
+    [Fact]
+    public void CreateReference_RegisteredFactoryUsesDeclaredInterfaceAndPropagatesConstructorExceptions()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(ThrowingConstructorProxy), factory: static (shared, key) => new ThrowingConstructorProxy(shared, key));
+
+        var exception = Assert.Throws<ConstructionException>(() => fixture.CreateReference("key"));
+
+        Assert.Equal("proxy-constructor", exception.Message);
+    }
+
+    [Fact]
+    public void CreateReference_RegisteredFactorySupportsPrivateConstructor()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(NonPublicConstructorProxy), factory: NonPublicConstructorProxy.Create);
+
+        var reference = Assert.IsType<NonPublicConstructorProxy>(fixture.CreateReference("private-key"));
+
+        Assert.Equal(IdSpan.Create("private-key"), reference.GrainId.Key);
+    }
+
+    [Fact]
+    public void CreateReference_LegacyCustomProxyOverridesGeneratedFactory()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(InspectableConstructionProxy), includeGeneratedFactories: true);
+        var generated = fixture.ManifestOptions.GetOrCreate<ReferenceFactories>().Factories[typeof(IConstructionGrain)];
+        Assert.NotNull(generated.Factory);
+        Assert.NotEqual(typeof(InspectableConstructionProxy), generated.ProxyType);
+
+        var reference = Assert.IsType<InspectableConstructionProxy>(fixture.CreateReference("override-key"));
+
+        Assert.Equal(IdSpan.Create("override-key"), reference.GrainId.Key);
+        Assert.Equal(17, reference.InterfaceVersion);
+    }
+
+    [Fact]
+    public void CreateReference_RegisteredCustomFactoryOverridesGeneratedFactory()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(ThrowingConstructorProxy),
+            factory: static (shared, key) => new ThrowingConstructorProxy(shared, key),
+            includeGeneratedFactories: true);
+
+        var exception = Assert.Throws<ConstructionException>(() => fixture.CreateReference("override-key"));
+
+        Assert.Equal("proxy-constructor", exception.Message);
+    }
+
+    [Fact]
+    public void CreateReference_RegisteredFactoryUsesExplicitInterfaceForMultipleInterfaceProxy()
+    {
+        using var fixture = new ReferenceConstructionFixture(
+            proxyType: typeof(MultipleInterfaceConstructionProxy),
+            factory: static (shared, key) => new MultipleInterfaceConstructionProxy(shared, key));
+
+        var reference = Assert.IsType<MultipleInterfaceConstructionProxy>(fixture.CreateReference("multiple-key"));
+
+        Assert.IsAssignableFrom<IOtherConstructionGrain>(reference);
+        Assert.Equal(ReferenceConstructionFixture.InterfaceType, reference.InterfaceType);
+        Assert.Equal(17, reference.InterfaceVersion);
+        Assert.Equal(IdSpan.Create("multiple-key"), reference.GrainId.Key);
+    }
+
+    [Fact]
+    public void ManifestExtensionsPreserveTypedConfigurationPerManifest()
+    {
+        var first = new TypeManifestOptions();
+        var second = new TypeManifestOptions();
+        var factories = first.GetOrCreate<ReferenceFactories>();
+        factories.Add(typeof(IConstructionGrain), typeof(InspectableConstructionProxy),
+            static (shared, key) => new InspectableConstructionProxy(shared, key));
+
+        Assert.Same(factories, first.GetOrCreate<ReferenceFactories>());
+        Assert.NotSame(factories, second.GetOrCreate<ReferenceFactories>());
+        Assert.Empty(second.GetOrCreate<ReferenceFactories>().Factories);
+        Assert.Single(first.GetOrCreate<ReferenceFactories>().Factories);
+    }
+
+    [Fact]
+    public void InterfaceProxyFactoriesSupportIndependentDelegateSignatures()
+    {
+        var manifest = new TypeManifestOptions();
+        var factories = manifest.GetOrCreate<InterfaceProxyFactoryOptions<Func<string, int, int>>>();
+        factories.Add(typeof(IFormattable), typeof(int), static (prefix, value) => value);
+        factories.Add(typeof(IFormattable), typeof(int), static (prefix, value) => int.Parse(prefix) + value);
+        var other = manifest.GetOrCreate<InterfaceProxyFactoryOptions<Func<int, string>>>();
+        other.Add(typeof(IComparable), typeof(string), static value => value.ToString());
+
+        var registration = Assert.Single(factories.Factories);
+        Assert.Equal(typeof(IFormattable), registration.Key);
+        Assert.Equal(typeof(int), registration.Value.ProxyType);
+        Assert.Equal(42, Assert.IsType<Func<string, int, int>>(registration.Value.Factory)("40", 2));
+        Assert.Equal("42", Assert.IsType<Func<int, string>>(other.Factories[typeof(IComparable)].Factory)(42));
+        Assert.Single(factories.ProxyTypes);
+        Assert.Single(other.Factories);
+        Assert.Equal(typeof(Serializer).Assembly, typeof(InterfaceProxyFactoryOptions<>).Assembly);
+    }
+
+    [Theory]
+    [InlineData(true, "interfaceType")]
+    [InlineData(true, "proxyType")]
+    [InlineData(true, "factory")]
+    [InlineData(false, "interfaceType")]
+    [InlineData(false, "proxyType")]
+    public void InterfaceProxyFactoriesRejectNullArgumentsWithoutChangingRegistrations(bool registerFactory, string parameter)
+    {
+        var factories = new InterfaceProxyFactoryOptions<Func<string>>();
+        var interfaceType = parameter == "interfaceType" ? null! : typeof(IComparable);
+        var proxyType = parameter == "proxyType" ? null! : typeof(string);
+        Func<string> factory = parameter == "factory" ? null! : static () => string.Empty;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+        {
+            if (registerFactory)
+            {
+                factories.Add(interfaceType, proxyType, factory);
+            }
+            else
+            {
+                factories.Add(interfaceType, proxyType);
+            }
+        });
+
+        Assert.Equal(parameter, exception.ParamName);
+        Assert.Empty(factories.Factories);
+        Assert.Empty(factories.ProxyTypes);
     }
 }

@@ -67,6 +67,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IResponseTimeoutGrain(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IResponseTimeoutGrain.LongRunningMethod(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8();
@@ -159,6 +160,8 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
+            proxyFactories.Add(typeof(global::TestProject.IResponseTimeoutGrain), typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain), OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain.Create);
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");

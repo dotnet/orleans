@@ -70,6 +70,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IHelloGrain(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IHelloGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F();
@@ -259,6 +260,8 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
+            proxyFactories.Add(typeof(global::TestProject.IHelloGrain), typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain), OrleansCodeGen.TestProject.Proxy_IHelloGrain.Create);
             config.AddInterface(typeof(global::TestProject.IHelloGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));

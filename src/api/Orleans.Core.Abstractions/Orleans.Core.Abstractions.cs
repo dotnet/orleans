@@ -2266,6 +2266,7 @@ namespace Orleans.Runtime
     }
 
     [Alias("GrainRef")]
+    [GenerateProxyFactory(typeof(GrainReferenceFactory))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.ValueTask<>), typeof(Request<>))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.ValueTask), typeof(Request))]
     [DefaultInvokableBaseType(typeof(System.Threading.Tasks.Task<>), typeof(TaskRequest<>))]
@@ -2318,6 +2319,7 @@ namespace Orleans.Runtime
         public sealed override string ToString() { throw null; }
     }
 
+    public delegate GrainReference GrainReferenceFactory(GrainReferenceShared shared, IdSpan key);
     [GenerateSerializer]
     public sealed partial class GrainReferenceNotBoundException : OrleansException
     {

@@ -12,7 +12,7 @@ Orleans serialization serves two related pipelines:
 - value serialization, deep copying, and activation for message and storage payloads;
 - RPC code generation for grain references, request objects, dispatch, and responses.
 
-Most application code uses generated components. Reflection-based discovery is deliberately not the default architecture: generated manifests make the participating types explicit and keep runtime dispatch compatible with [trimming](https://learn.microsoft.com/dotnet/core/deploying/trimming/prepare-libraries-for-trimming) and ahead-of-time compilation.
+Most application code uses generated components. Generated manifests make the participating types explicit and keep runtime dispatch compatible with [trimming](https://learn.microsoft.com/dotnet/core/deploying/trimming/prepare-libraries-for-trimming) and ahead-of-time compilation.
 
 ## Incremental generator pipeline
 
@@ -72,7 +72,17 @@ Boxed value-type delegates initialize the existing box. Statically closed value-
 
 ## RPC generation
 
-Grain-reference construction resolves the generated proxy from the registered type manifest and invokes its `(GrainReferenceShared, IdSpan)` constructor. The activator caches the constructor delegate and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. JIT runtimes use an emitted constructor delegate; NativeAOT uses a cached reflection constructor invoker. Generated `AddInterfaceProxy` registrations preserve the public proxy constructor during trimming.
+Generated manifests register each concrete grain interface with a typed factory which directly constructs its proxy using `(GrainReferenceShared, IdSpan)`. The runtime resolves the factory using the declared interface identity. The activator caches that factory and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. Direct construction preserves proxy constructors through normal static call reachability and propagates constructor exceptions directly.
+
+Proxy bases declare their construction delegate using <xref:Orleans.GenerateProxyFactoryAttribute>. <xref:Orleans.Runtime.GrainReference> declares <xref:Orleans.Runtime.GrainReferenceFactory>, which constructs a grain reference from shared runtime state and a grain key. Other RPC proxy bases can select their own delegate signatures. The generator emits a static `Create` method matching the declared delegate and forwards its parameters to the proxy constructor. C# compilation checks that constructor call for both non-generic and open generic proxies.
+
+Derived proxy bases inherit the factory declaration. A declaration on a nearer base overrides the inherited signature. Factory declarations use closed delegate types with a by-value proxy result; attribute arguments follow C#'s rules for concrete type references. The generator validates the delegate and its result conversion at build time, and preserves parameter passing modes such as `ref`. Proxy hierarchies supply accessible constructors matching their declared contract.
+
+The serialization manifest stores factories in <xref:Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions`1>, parameterized by the construction delegate type. This keeps factory registration independent of grain runtime types and supports proxy hierarchies with different construction signatures. Custom proxies can register a direct typed factory in the manifest's <xref:Orleans.Serialization.Configuration.TypeManifestOptions.GetOrCreate*> configuration.
+
+The generator automatically registers factories for non-generic grain interfaces and open proxy mappings for generic interfaces. A statically closed factory registration selects direct construction for that concrete interface before the runtime resolves open generic families. NativeAOT deployments supply a concrete factory for each generic interface they construct; generated proxy names remain assembly-local implementation details.
+
+JIT applications also support generic arguments selected at runtime through explicitly registered open generic proxy mappings. Those mappings use reflective generic closure and a cached constructor invoker. Older generated manifests and custom proxies registered by type retain the same constructor-invoker compatibility path.
 
 For each grain interface method, generated code captures arguments in an invokable object. The generated proxy submits that object through its proxy base. On the target, generated dispatch metadata invokes the concrete implementation and encodes the response.
 

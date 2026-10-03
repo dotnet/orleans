@@ -17,6 +17,7 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
         INamedTypeSymbol interfaceType)
     {
         ValidateBaseClass(generationContext.LibraryTypes, proxyBaseType);
+        FactorySignature = GetFactorySignature(generationContext.LibraryTypes, proxyBaseType, interfaceType);
 
         var prop = interfaceType.GetAllMembers<IPropertySymbol>().FirstOrDefault();
         if (prop is { })
@@ -112,6 +113,47 @@ internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
     public string GeneratedNamespace { get; }
     public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
     public INamedTypeSymbol ProxyBaseType { get; }
+    public IMethodSymbol? FactorySignature { get; }
+
+    private static IMethodSymbol? GetFactorySignature(LibraryTypes libraryTypes, INamedTypeSymbol proxyBaseType, INamedTypeSymbol interfaceType)
+    {
+        var attribute = libraryTypes.GenerateProxyFactoryAttribute is { } attributeType
+            ? proxyBaseType.GetAttribute(attributeType, inherited: true)
+            : null;
+        if (attribute is null)
+        {
+            return null;
+        }
+
+        var location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation() ?? proxyBaseType.Locations.First();
+        if (attribute.ConstructorArguments.Length != 1
+            || attribute.ConstructorArguments[0].Value is not INamedTypeSymbol { IsUnboundGenericType: false } factoryType
+            || factoryType.DelegateInvokeMethod is not { ReturnsVoid: false, ReturnsByRef: false, ReturnsByRefReadonly: false } signature)
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(
+                IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(
+                    proxyBaseType, location, "GenerateProxyFactory requires a closed delegate with a non-void, by-value return type."));
+        }
+
+        var baseConversion = libraryTypes.Compilation.ClassifyCommonConversion(proxyBaseType, signature.ReturnType);
+        var interfaceConversion = libraryTypes.Compilation.ClassifyCommonConversion(interfaceType, signature.ReturnType);
+        if (!(baseConversion.IsIdentity || baseConversion.IsImplicit && baseConversion.IsReference)
+            && !(interfaceConversion.IsIdentity || interfaceConversion.IsImplicit && interfaceConversion.IsReference))
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(
+                IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(
+                    proxyBaseType, location, "GenerateProxyFactory's return type must accept the generated proxy base or interface through an identity or implicit reference conversion."));
+        }
+
+        if (signature.Parameters.Any(static parameter => parameter.RefKind is not (RefKind.None or RefKind.Ref or RefKind.Out or RefKind.In)))
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(
+                IncorrectProxyBaseClassSpecificationDiagnostic.CreateDiagnostic(
+                    proxyBaseType, location, "GenerateProxyFactory supports by-value, ref, in, and out parameters."));
+        }
+
+        return signature;
+    }
 
     private static void ValidateBaseClass(LibraryTypes l, INamedTypeSymbol baseClass)
     {

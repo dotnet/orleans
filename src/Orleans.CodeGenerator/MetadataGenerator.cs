@@ -79,6 +79,25 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
             AddRegistration(body, addProxyMethod, GetGeneratedProxyTypeSyntax(type));
         }
 
+        var factoryGroups = orderedProxyInterfaces
+            .Where(static proxy => !proxy.ProxyBase.FactoryType.IsEmpty)
+            .GroupBy(static proxy => proxy.ProxyBase.FactoryType)
+            .ToArray();
+        for (var index = 0; index < factoryGroups.Length; index++)
+        {
+            var group = factoryGroups[index];
+            var name = index == 0 ? "proxyFactories" : $"proxyFactories{index}";
+            body.Add(ParseStatement(
+                $"var {name} = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<{group.Key.SyntaxString}>>();"));
+            foreach (var proxy in group)
+            {
+                var interfaceType = GetOpenTypeSyntax(proxy.InterfaceType);
+                var proxyType = GetGeneratedProxyTypeSyntax(proxy);
+                var factory = GetProxyGenericArity(proxy) == 0 ? $", {proxyType}.Create" : string.Empty;
+                body.Add(ParseStatement($"{name}.Add(typeof({interfaceType}), typeof({proxyType}){factory});"));
+            }
+        }
+
         var addInterfaceMethod = configParam.Member("AddInterface");
         foreach (var type in orderedProxyInterfaces.Select(static proxy => proxy.InterfaceType).Distinct())
         {
@@ -585,9 +604,12 @@ internal class MetadataGenerator(MetadataAggregateModel metadataModel, string as
 
     private static TypeSyntax GetGeneratedProxyTypeSyntax(ProxyInterfaceModel proxy)
     {
-        var genericArity = Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
+        var genericArity = GetProxyGenericArity(proxy);
         return CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), genericArity);
     }
+
+    private static int GetProxyGenericArity(ProxyInterfaceModel proxy)
+        => Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
 
     private static int CountGenericArguments(TypeRef typeRef)
     {

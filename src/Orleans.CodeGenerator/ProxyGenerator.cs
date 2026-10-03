@@ -32,6 +32,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
         var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
 
         var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        var factories = GenerateFactory(generatedClassName, interfaceDescription);
 
         var classDeclaration = ClassDeclaration(generatedClassName)
             .AddBaseListTypes(
@@ -41,6 +42,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(fieldDeclarations)
             .AddMembers(ctors)
+            .AddMembers(factories)
             .AddMembers(proxyMethods);
 
         var typeParameters = interfaceDescription.TypeParameters;
@@ -57,6 +59,40 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     public static string GetSimpleClassName(string name)
         => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
+
+    private MemberDeclarationSyntax[] GenerateFactory(string className, ProxyInterfaceDescription interfaceDescription)
+    {
+        if (interfaceDescription.FactorySignature is not { } signature)
+        {
+            return [];
+        }
+
+        var proxyType = interfaceDescription.TypeParameters.Count == 0
+            ? (TypeSyntax)IdentifierName(className)
+            : GenericName(Identifier(className), TypeArgumentList(SeparatedList<TypeSyntax>(
+                interfaceDescription.TypeParameters.Select(static parameter => parameter.Name.ToIdentifierName()))));
+        return
+        [
+            MethodDeclaration(signature.ReturnType.ToTypeSyntax(), "Create")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddParameterListParameters(
+                    [.. signature.Parameters.Select((parameter, index) => GetParameterSyntax(index, parameter, typeParameterSubstitutions: null))])
+                .WithExpressionBody(ArrowExpressionClause(
+                    ObjectCreationExpression(proxyType).WithArgumentList(ArgumentList(SeparatedList(
+                        signature.Parameters.Select((parameter, index) =>
+                        {
+                            var argument = Argument(IdentifierName($"arg{index}"));
+                            return parameter.RefKind switch
+                            {
+                                RefKind.Ref => argument.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
+                                RefKind.Out => argument.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword)),
+                                RefKind.In => argument.WithRefOrOutKeyword(Token(SyntaxKind.InKeyword)),
+                                _ => argument,
+                            };
+                        }))))))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+        ];
+    }
 
     private List<GeneratedFieldDescription> GetFieldDescriptions(
         ProxyInterfaceDescription interfaceDescription)

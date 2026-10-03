@@ -65,6 +65,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IGrainA(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainA.MethodA(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98();
@@ -128,6 +129,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IGrainB(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IGrainB.MethodB(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
@@ -299,6 +301,9 @@ namespace OrleansCodeGen.TestProject
             config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
+            proxyFactories.Add(typeof(global::TestProject.IGrainA), typeof(OrleansCodeGen.TestProject.Proxy_IGrainA), OrleansCodeGen.TestProject.Proxy_IGrainA.Create);
+            proxyFactories.Add(typeof(global::TestProject.IGrainB), typeof(OrleansCodeGen.TestProject.Proxy_IGrainB), OrleansCodeGen.TestProject.Proxy_IGrainB.Create);
             config.AddInterface(typeof(global::TestProject.IGrainA));
             config.AddInterface(typeof(global::TestProject.IGrainB));
             config.AddInterfaceImplementation(typeof(global::TestProject.RealGrain));

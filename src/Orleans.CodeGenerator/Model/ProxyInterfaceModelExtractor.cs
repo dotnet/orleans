@@ -90,11 +90,17 @@ internal static class ProxyInterfaceModelExtractor
 
         var proxyBaseType = proxyBaseTypeSymbol.OriginalDefinition;
         var generatedClassNameComponent = isExtension ? $"{proxyBaseType.Name}_Ext" : proxyBaseType.Name;
+        var factoryType = libraryTypes.GenerateProxyFactoryAttribute is { } factoryAttributeType
+            && proxyBaseType.GetAttribute(factoryAttributeType, inherited: true) is { ConstructorArguments.Length: 1 } factoryAttribute
+            && factoryAttribute.ConstructorArguments[0].Value is INamedTypeSymbol factoryDelegate
+            ? new TypeRef(factoryDelegate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            : TypeRef.Empty;
         var proxyBase = new ProxyBaseModel(
             new TypeRef(proxyBaseType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
             isExtension,
             generatedClassNameComponent,
-            TypeMetadataIdentity.Create(proxyBaseType));
+            TypeMetadataIdentity.Create(proxyBaseType),
+            factoryType);
 
         var name = GetProxyInterfaceName(typeSymbol, libraryTypes);
         var typeParameters = ExtractInterfaceTypeParameters(typeSymbol);
