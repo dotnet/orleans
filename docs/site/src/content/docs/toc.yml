@@ -124,6 +124,8 @@ items:
         href: host/configuration-guide/serialization-immutability.md
       - name: Configure serialization
         href: host/configuration-guide/serialization-configuration.md
+      - name: Compile-time serializer contexts
+        href: host/configuration-guide/serializer-contexts.md
       - name: Customize serialization
         href: host/configuration-guide/serialization-customization.md
       - name: Code generation overview

@@ -9,6 +9,10 @@
     <OrleansBuildTimeCodeGen Condition="'$(NativeAotSmokeScenario)' != 'DependencyInjection'">true</OrleansBuildTimeCodeGen>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DefineConstants>$(DefineConstants);NATIVE_AOT_SMOKE</DefineConstants>
+    <EnableTrimAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableAotAnalyzer>
+    <ILLinkTreatWarningsAsErrors Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</ILLinkTreatWarningsAsErrors>
+    <TrimmerSingleWarn Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">false</TrimmerSingleWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,7 +25,11 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj"
                       Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection' or '$(NativeAotSmokeScenario)' == 'Silo' or '$(NativeAotSmokeScenario)' == 'GrainActivation'" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)docs\site\src\content\docs\host\configuration-guide\snippets\serializer-contexts\SerializerContexts.csproj"
+                      Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
     <Compile Include="NativeAotEnvironment.cs" />
+    <Compile Include="Factories.Contracts.cs" Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
+    <Compile Include="Factories.Review.cs" Condition="'$(NativeAotSmokeScenario)' == 'Contexts'" />
     <Compile Include="..\Orleans.DependencyInjection.TrimmedSmoke\Program.cs"
              Link="DependencyInjection.cs"
              Condition="'$(NativeAotSmokeScenario)' == 'DependencyInjection'" />

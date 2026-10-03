@@ -62,16 +62,18 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableHashSetCopier<T> : IDeepCopier<ImmutableHashSet<T>>, IOptionalDeepCopier
     {
+        private int _shallowCopyable;
         private readonly IDeepCopier<T>? _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableHashSetCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The element copier.</param>
-        public ImmutableHashSetCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+        public ImmutableHashSetCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier));
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -83,7 +85,7 @@ namespace Orleans.Serialization.Codecs
                 return result!;
 
             System.Diagnostics.Debug.Assert(input is not null);
-            if (input.IsEmpty || _copier is null)
+            if (input.IsEmpty || IsShallowCopyable())
                 return input;
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.

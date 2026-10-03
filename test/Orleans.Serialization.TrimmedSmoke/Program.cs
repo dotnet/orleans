@@ -38,12 +38,108 @@ internal static class Program
             .BuildServiceProvider();
 
         var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
+        ValidateArrayFallbacks(serviceProvider);
+        ValidateRecursiveArrayRoots();
         ValidateGeneratedSerializer(serviceProvider);
         ValidateManualRegistrations(codecProvider);
         ValidateSerializableCallbacks(serviceProvider);
         ValidateGeneratedHelper(codecProvider);
         ValidateConfigurationAnalyzer(serviceProvider, codecProvider);
         ValidateGeneratedProxy(serviceProvider, codecProvider);
+    }
+
+    private static void ValidateRecursiveArrayRoots()
+    {
+        foreach (var rankThreeRoot in new[] { false, true })
+        {
+            using var provider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = provider.GetRequiredService<Serializer>();
+            var model = new RecursiveArrayPayload { Value = 42 };
+            model.RankTwo = new[,] { { model, model } };
+            model.RankThree = new[, ,] { { { model, model } } };
+            model.RankTwoAlias = model.RankTwo;
+            model.RankThreeAlias = model.RankThree;
+            Array original;
+            Array restored;
+            if (rankThreeRoot)
+            {
+                var root = new[, ,] { { { model, model } } };
+                original = root;
+                restored = serializer.Deserialize<RecursiveArrayPayload[,,]>(serializer.SerializeToArray(root))!;
+            }
+            else
+            {
+                var root = new[,] { { model, model } };
+                original = root;
+                restored = serializer.Deserialize<RecursiveArrayPayload[,]>(serializer.SerializeToArray(root))!;
+            }
+            var copied = provider.GetRequiredService<DeepCopier>().Copy(original)!;
+            var first = new int[original.Rank];
+            var last = new int[original.Rank];
+            last[^1] = 1;
+            foreach (var result in new[] { restored, copied })
+            {
+                var value = (RecursiveArrayPayload)result.GetValue(first)!;
+                Ensure(result.GetType() == original.GetType() && !ReferenceEquals(original, result),
+                    "Recursive array roots retain their concrete shape and independent storage.");
+                Ensure(value.Value == 42 && ReferenceEquals(value, result.GetValue(last))
+                    && ReferenceEquals(value, value.RankTwo[0, 0]) && ReferenceEquals(value, value.RankThree[0, 0, 0]),
+                    "Recursive array roots preserve repeated elements and cross-rank cycles.");
+                Ensure(ReferenceEquals(value.RankTwo, value.RankTwoAlias)
+                    && ReferenceEquals(value.RankThree, value.RankThreeAlias),
+                    "Recursive array roots preserve array aliases.");
+                Ensure(!ReferenceEquals(model, value) && !ReferenceEquals(model.RankTwo, value.RankTwo)
+                    && !ReferenceEquals(model.RankThree, value.RankThree), "Recursive array roots isolate original members.");
+            }
+        }
+    }
+
+    private static void ValidateArrayFallbacks(IServiceProvider serviceProvider)
+    {
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var copier = serviceProvider.GetRequiredService<DeepCopier>();
+        foreach (var bounds in new[] { new[] { 0, 0 }, new[] { -2, 3 }, new[] { 4 } })
+        {
+            var original = Array.CreateInstance(typeof(string), Enumerable.Repeat(2, bounds.Length).ToArray(), bounds);
+            original.SetValue("first", bounds);
+            var last = bounds.Select(static bound => bound + 1).ToArray();
+            original.SetValue("last", last);
+            var copied = copier.Copy(original) ?? throw new InvalidOperationException("Array copying returned null.");
+            var results = new List<Array> { copied };
+            if (bounds.All(static bound => bound == 0))
+            {
+                results.Add(serializer.Deserialize<Array>(serializer.SerializeToArray<Array>(original))
+                    ?? throw new InvalidOperationException("Array deserialization returned null."));
+            }
+            else
+            {
+                try
+                {
+                    _ = serializer.SerializeToArray<Array>(original);
+                    throw new InvalidOperationException("Array serialization must diagnose non-zero lower bounds.");
+                }
+                catch (NotSupportedException exception)
+                {
+                    Ensure(exception.Message.Contains("non-zero lower bounds", StringComparison.Ordinal),
+                        "Array serialization retains its lower-bound diagnostic.");
+                }
+            }
+            foreach (var result in results)
+            {
+                Ensure(result.GetType() == original.GetType(), "Array fallback preserves the concrete array type.");
+                Ensure(result.Rank == original.Rank, "Array fallback preserves array rank.");
+                for (var dimension = 0; dimension < bounds.Length; dimension++)
+                {
+                    Ensure(result.GetLowerBound(dimension) == bounds[dimension], "Array fallback preserves lower bounds.");
+                    Ensure(result.GetLength(dimension) == 2, "Array fallback preserves dimension lengths.");
+                }
+                Ensure(Equals(result.GetValue(bounds), "first") && Equals(result.GetValue(last), "last"),
+                    "Array fallback preserves values.");
+                Ensure(!ReferenceEquals(original, result), "Array serialization and copying create independent arrays.");
+                result.SetValue("changed", bounds);
+                Ensure(Equals(original.GetValue(bounds), "first"), "Array copy isolation preserves the original values.");
+            }
+        }
     }
 
     private static void ValidateManualRegistrations(CodecProvider codecProvider)
@@ -201,6 +297,16 @@ public sealed class GeneratedPayload<T>
     }
 
     public T Value => _value;
+}
+
+[GenerateSerializer]
+public sealed class RecursiveArrayPayload
+{
+    [Id(0)] public RecursiveArrayPayload[,] RankTwo { get; set; } = new RecursiveArrayPayload[0, 0];
+    [Id(1)] public RecursiveArrayPayload[,,] RankThree { get; set; } = new RecursiveArrayPayload[0, 0, 0];
+    [Id(2)] public RecursiveArrayPayload[,] RankTwoAlias { get; set; } = new RecursiveArrayPayload[0, 0];
+    [Id(3)] public RecursiveArrayPayload[,,] RankThreeAlias { get; set; } = new RecursiveArrayPayload[0, 0, 0];
+    [Id(4)] public int Value { get; set; }
 }
 
 internal sealed class PublicConstructorService

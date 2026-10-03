@@ -262,9 +262,9 @@ namespace OrleansCodeGen.TestProject
             config.AddInterface(typeof(global::TestProject.IHelloGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.HelloGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IHelloGrain));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IHelloGrain));
             n3.Add("5336307F", typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
         }
     }

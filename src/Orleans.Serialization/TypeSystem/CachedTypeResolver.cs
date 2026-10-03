@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
@@ -13,6 +14,26 @@ namespace Orleans.Serialization.TypeSystem
         private readonly ConcurrentDictionary<string, Type> _typeCache = new();
         private readonly ConcurrentDictionary<string, Assembly> _assemblyCache = new();
         private static readonly ConcurrentDictionary<Assembly, string> _assemblyNameCache = new();
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CachedTypeResolver"/> class.
+        /// </summary>
+        public CachedTypeResolver()
+        {
+        }
+
+        internal CachedTypeResolver(IEnumerable<Type> knownTypes)
+        {
+            foreach (var type in knownTypes)
+            {
+                var name = RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false);
+                AddTypeToCache(name, type);
+                var unqualified = RuntimeTypeNameParser.Parse(name) is AssemblyQualifiedTypeSpec qualified
+                    ? qualified.Type.Format()
+                    : name;
+                _typeCache.TryAdd(unqualified, type);
+            }
+        }
 
         /// <summary>
         /// Gets the cached assembly name.
@@ -90,6 +111,10 @@ namespace Orleans.Serialization.TypeSystem
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026",
+            Justification = "Known closed registrations are resolved from the cache first. Reflection lookup resolves only metadata preserved by the application; missing metadata produces an unsuccessful resolution rather than assuming a type is available.")]
+        [UnconditionalSuppressMessage("Trimming", "IL2057",
+            Justification = "Runtime wire type names cannot be statically enumerated. Registered closed types are cached before lookup, and additional names resolve only when their reflection metadata is preserved.")]
         private bool TryPerformUncachedTypeResolution(string fullName, [NotNullWhen(true)] out Type? type, Assembly[] assemblies)
         {
             if (null == assemblies)
@@ -157,9 +182,13 @@ namespace Orleans.Serialization.TypeSystem
                 return result;
             }
 
-            static Type? ResolveType(Assembly? asm, string name, bool ignoreCase)
+            [UnconditionalSuppressMessage("Trimming", "IL2026",
+                Justification = "The resolver callback looks up existing preserved metadata; registered closed types use the cache and unavailable types remain unresolved.")]
+            [UnconditionalSuppressMessage("Trimming", "IL2057",
+                Justification = "Runtime names resolve only when their reflection metadata is preserved. This callback is the metadata lookup boundary, not a mechanism for preserving arbitrary named types.")]
+            static Type? ResolveType(Assembly? asm, string name, bool _)
             {
-                return asm?.GetType(name, throwOnError: false, ignoreCase: ignoreCase) ?? Type.GetType(name, throwOnError: false, ignoreCase: ignoreCase);
+                return asm?.GetType(name, throwOnError: false, ignoreCase: false) ?? Type.GetType(name, throwOnError: false, ignoreCase: false);
             }
         }
     }
