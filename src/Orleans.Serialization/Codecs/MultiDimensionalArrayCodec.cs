@@ -13,25 +13,24 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for multi-dimensional arrays.
     /// </summary>
+    /// <typeparam name="TArray">The concrete array type.</typeparam>
     /// <typeparam name="T">The array element type.</typeparam>
-    internal sealed class MultiDimensionalArrayCodec<T> : IGeneralizedCodec
+    internal sealed class MultiDimensionalArrayCodec<TArray, T> : IGeneralizedCodec
     {
         private readonly Type DimensionFieldType = typeof(int[]);
         private readonly Type CodecElementType = typeof(T);
-        private readonly Type _arrayType;
+        private readonly Type _arrayType = typeof(TArray);
 
         private readonly IFieldCodec<int[]> _intArrayCodec;
         private readonly IFieldCodec<T> _elementCodec;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{T}"/> class.
+        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{TArray, T}"/> class.
         /// </summary>
-        /// <param name="arrayType">The concrete array type.</param>
         /// <param name="intArrayCodec">The int array codec.</param>
         /// <param name="elementCodec">The element codec.</param>
-        public MultiDimensionalArrayCodec(Type arrayType, IFieldCodec<int[]> intArrayCodec, IFieldCodec<T> elementCodec)
+        public MultiDimensionalArrayCodec(IFieldCodec<int[]> intArrayCodec, IFieldCodec<T> elementCodec)
         {
-            _arrayType = arrayType;
             _intArrayCodec = OrleansGeneratedCodeHelper.UnwrapService(this, intArrayCodec);
             _elementCodec = OrleansGeneratedCodeHelper.UnwrapService(this, elementCodec);
         }
@@ -95,7 +94,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference(ref reader, _arrayType);
             }
 
             field.EnsureWireTypeTagDelimited();

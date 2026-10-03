@@ -602,7 +602,7 @@ namespace Orleans.Serialization.Serializers
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ConcreteTypeSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCodec<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCodec<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(SurrogateCodec<,,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueTypeSurrogateCodec<,,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCopier<>))]
@@ -616,6 +616,16 @@ namespace Orleans.Serialization.Serializers
         {
             try { return ActivateService(type, constructorArguments); }
             catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+        }
+
+        private bool IsRegisteredImplementation(Type type)
+        {
+            var definition = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
+            return _manifest.SerializerTypes.Contains(type) || _manifest.SerializerTypes.Contains(definition)
+                || _manifest.FieldCodecTypes.Contains(type) || _manifest.FieldCodecTypes.Contains(definition)
+                || _manifest.CopierTypes.Contains(type) || _manifest.CopierTypes.Contains(definition)
+                || _manifest.ActivatorTypes.Contains(type) || _manifest.ActivatorTypes.Contains(definition)
+                || _manifest.ConverterTypes.Contains(type) || _manifest.ConverterTypes.Contains(definition);
         }
 
 #if NET5_0_OR_GREATER
@@ -822,6 +832,11 @@ namespace Orleans.Serialization.Serializers
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
                         if (IsProviderService(serviceType)) return owner;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
+                        if (owner.IsRegisteredImplementation(serviceType))
+                            return owner.GetServiceOrCreateInstance(serviceType);
+                        if (ServiceCollectionExtensions.GetServiceHolderType(serviceType) is { } holderType)
+                            return ((IServiceHolder<object>)owner.GetServiceOrCreateInstance(
+                                owner.ConstructGenericImplementation(holderType, serviceType.GenericTypeArguments))).Value;
                         var error = new InvalidOperationException($"Dependency injection cannot resolve {serviceType} while a serialization graph is unpublished. Register the dependency through TypeManifestOptions.AddSerializerService using a closed factory which constructs it or returns an explicitly captured instance.");
                         owner.RecordConstructionFailure(error);
                         throw error;
@@ -889,7 +904,9 @@ namespace Orleans.Serialization.Serializers
                             || serviceType == typeof(IServiceProvider)
                             || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
-                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType);
+                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
+                            || owner.IsRegisteredImplementation(serviceType)
+                            || ServiceCollectionExtensions.GetServiceHolderType(serviceType) is not null;
                     }
                 }
 
@@ -943,12 +960,9 @@ namespace Orleans.Serialization.Serializers
             else if (fieldType.IsArray)
             {
                 // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
-                var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
-                codecType = ConstructGenericImplementation(arrayCodecType, fieldType.GetElementType()!);
-                if (!fieldType.IsSZArray)
-                {
-                    constructorArguments = new[] { fieldType };
-                }
+                codecType = fieldType.IsSZArray
+                    ? ConstructGenericImplementation(typeof(ArrayCodec<>), fieldType.GetElementType()!)
+                    : ConstructGenericImplementation(typeof(MultiDimensionalArrayCodec<,>), fieldType, fieldType.GetElementType()!);
             }
             else if (searchType.BaseType is object
                 && CreateCodecInstance(

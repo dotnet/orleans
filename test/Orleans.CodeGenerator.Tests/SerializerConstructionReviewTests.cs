@@ -4,6 +4,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
@@ -15,6 +16,111 @@ namespace Orleans.CodeGenerator.Tests;
 [TestArea("CodeGen")]
 public sealed class SerializerConstructionReviewTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GeneratedMetadataModelComposesWithClosedFactoriesAndRollsBackCaughtExternalFailure(bool failFirst)
+    {
+        var services = new ServiceCollection().AddSerializer();
+        var externalCalls = 0;
+        var listFactoryCalls = 0;
+        var intConstructions = 0;
+        var attempts = 0;
+        GeneratedLookupProbe? failedProbe = null;
+        InvalidOperationException? caught = null;
+        services.AddSingleton<ExternalDependency>(_ =>
+        {
+            externalCalls++;
+            return new ExternalDependency();
+        });
+        services.AddSingleton<ListCodec<int>>(provider =>
+        {
+            listFactoryCalls++;
+            return new ListCodec<int>(provider.GetRequiredService<IFieldCodec<int>>());
+        });
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializer<int>(_ =>
+            {
+                intConstructions++;
+                return new Int32Codec();
+            }, static _ => new ShallowCopier<int>());
+            options.AddSerializerService<GeneratedLookupProbe>(provider =>
+            {
+                var probe = new GeneratedLookupProbe(provider.GetCodec<MetadataListModel>(), provider.GetDeepCopier<MetadataListModel>(),
+                    provider.GetCodec<List<int>>(), provider.GetDeepCopier<List<int>>());
+                if (++attempts == 1 && failFirst)
+                {
+                    failedProbe = probe;
+                    try
+                    {
+                        _ = provider.Services.GetRequiredService<ExternalDependency>();
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        caught = exception;
+                    }
+                }
+                return probe;
+            });
+        });
+        using var provider = services.BuildServiceProvider();
+        var codecs = provider.GetRequiredService<CodecProvider>();
+        var committed = codecs.GetCodec<int>();
+        if (failFirst)
+        {
+            var failure = Assert.Throws<InvalidOperationException>(
+                () => OrleansGeneratedCodeHelper.GetService<GeneratedLookupProbe>(null!, codecs));
+            Assert.Same(caught, failure);
+            Assert.Contains("AddSerializerService", failure.Message, StringComparison.Ordinal);
+        }
+        var root = OrleansGeneratedCodeHelper.GetService<GeneratedLookupProbe>(null!, codecs);
+        Assert.Equal(failFirst ? 2 : 1, attempts);
+        Assert.Equal(1, intConstructions);
+        Assert.Equal(0, listFactoryCalls);
+        Assert.Equal(0, externalCalls);
+        Assert.Same(committed, codecs.GetCodec<int>());
+        Assert.Same(root.Codec, codecs.GetCodec<MetadataListModel>());
+        Assert.Same(root.Copier, codecs.GetDeepCopier<MetadataListModel>());
+        Assert.Same(root.ListCodec, codecs.GetCodec<List<int>>());
+        Assert.Same(root.ListCopier, codecs.GetDeepCopier<List<int>>());
+        Assert.Same(root, OrleansGeneratedCodeHelper.GetService<GeneratedLookupProbe>(null!, codecs));
+        Assert.Contains("OrleansCodeGen", root.Codec.GetType().Namespace!, StringComparison.Ordinal);
+        if (failFirst)
+        {
+            Assert.NotNull(failedProbe);
+            Assert.NotSame(failedProbe.Codec, root.Codec);
+            Assert.NotSame(failedProbe.Copier, root.Copier);
+            Assert.NotSame(failedProbe.ListCodec, root.ListCodec);
+            Assert.NotSame(failedProbe.ListCopier, root.ListCopier);
+        }
+        var original = new MetadataListModel { Values = new() { 13, 17 } };
+        original.Alias = original.Values;
+        original.Next = original;
+        original.Nested = new() { original.Values, original.Values };
+        var serializer = provider.GetRequiredService<Serializer>();
+        var restored = serializer.Deserialize<MetadataListModel>(serializer.SerializeToArray(original))!;
+        var copied = provider.GetRequiredService<DeepCopier>().Copy(original)!;
+        foreach (var result in new[] { restored, copied })
+        {
+            Assert.Equal(new[] { 13, 17 }, result.Values);
+            Assert.Same(result.Values, result.Alias);
+            Assert.Equal(2, result.Nested.Count);
+            Assert.Same(result.Values, result.Nested[0]);
+            Assert.Same(result.Values, result.Nested[1]);
+            Assert.Same(result, result.Next);
+            Assert.NotSame(original, result);
+            Assert.NotSame(original.Values, result.Values);
+        }
+        copied.Values[0] = 23;
+        Assert.Equal(13, original.Values[0]);
+        Assert.Equal(23, copied.Alias[0]);
+        _ = codecs.Services.GetRequiredService<ListCodec<int>>();
+        _ = codecs.Services.GetRequiredService<ExternalDependency>();
+        Assert.Equal(1, listFactoryCalls);
+        Assert.Equal(1, externalCalls);
+    }
+
     [Fact]
     public void DictionaryActivationWithoutAvailabilityPreservesCustomComparer()
     {
@@ -207,6 +313,29 @@ public sealed class SerializerConstructionReviewTests
     {
         public object? GetService(Type serviceType) =>
             serviceType == typeof(IServiceProviderIsService) ? null : provider.GetService(serviceType);
+    }
+
+    [GenerateSerializer]
+    public sealed class MetadataListModel
+    {
+        [Id(0)]
+        public List<int> Values { get; set; } = new();
+        [Id(1)]
+        public List<int> Alias { get; set; } = new();
+        [Id(2)]
+        public MetadataListModel? Next { get; set; }
+        [Id(3)]
+        public List<List<int>> Nested { get; set; } = new();
+    }
+
+    private sealed class ExternalDependency;
+    private sealed class GeneratedLookupProbe(IFieldCodec<MetadataListModel> codec, IDeepCopier<MetadataListModel> copier,
+        IFieldCodec<List<int>> listCodec, IDeepCopier<List<int>> listCopier)
+    {
+        public IFieldCodec<MetadataListModel> Codec { get; } = codec;
+        public IDeepCopier<MetadataListModel> Copier { get; } = copier;
+        public IFieldCodec<List<int>> ListCodec { get; } = listCodec;
+        public IDeepCopier<List<int>> ListCopier { get; } = listCopier;
     }
 
     public interface IKeyedDependency<T>;

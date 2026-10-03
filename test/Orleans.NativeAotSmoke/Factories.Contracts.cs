@@ -87,9 +87,9 @@ public static partial class StaticFactoryContracts
             using var services = CreateMixedServices(gate, copier, cyclic: true);
             var provider = services.GetRequiredService<CodecProvider>();
             _ = provider.GetCodec<int>();
-            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "AddSerializerService");
-            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "AddSerializerService");
-            Ensure(gate.SecondConstructions == 0, "External service lookup is rejected before entering automatic cyclic construction.");
+            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
+            Expect<InvalidOperationException>(() => ResolveFirst(provider, copier), "closed factories for every");
+            Ensure(gate.SecondConstructions == 2, "Rejected mixed cycles leave no stale automatic cache entry.");
         }
     }
 

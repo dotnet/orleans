@@ -39,12 +39,59 @@ internal static class Program
 
         var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
         ValidateArrayFallbacks(serviceProvider);
+        ValidateRecursiveArrayRoots();
         ValidateGeneratedSerializer(serviceProvider);
         ValidateManualRegistrations(codecProvider);
         ValidateSerializableCallbacks(serviceProvider);
         ValidateGeneratedHelper(codecProvider);
         ValidateConfigurationAnalyzer(serviceProvider, codecProvider);
         ValidateGeneratedProxy(serviceProvider, codecProvider);
+    }
+
+    private static void ValidateRecursiveArrayRoots()
+    {
+        foreach (var rankThreeRoot in new[] { false, true })
+        {
+            using var provider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = provider.GetRequiredService<Serializer>();
+            var model = new RecursiveArrayPayload { Value = 42 };
+            model.RankTwo = new[,] { { model, model } };
+            model.RankThree = new[, ,] { { { model, model } } };
+            model.RankTwoAlias = model.RankTwo;
+            model.RankThreeAlias = model.RankThree;
+            Array original;
+            Array restored;
+            if (rankThreeRoot)
+            {
+                var root = new[, ,] { { { model, model } } };
+                original = root;
+                restored = serializer.Deserialize<RecursiveArrayPayload[,,]>(serializer.SerializeToArray(root))!;
+            }
+            else
+            {
+                var root = new[,] { { model, model } };
+                original = root;
+                restored = serializer.Deserialize<RecursiveArrayPayload[,]>(serializer.SerializeToArray(root))!;
+            }
+            var copied = provider.GetRequiredService<DeepCopier>().Copy(original)!;
+            var first = new int[original.Rank];
+            var last = new int[original.Rank];
+            last[^1] = 1;
+            foreach (var result in new[] { restored, copied })
+            {
+                var value = (RecursiveArrayPayload)result.GetValue(first)!;
+                Ensure(result.GetType() == original.GetType() && !ReferenceEquals(original, result),
+                    "Recursive array roots retain their concrete shape and independent storage.");
+                Ensure(value.Value == 42 && ReferenceEquals(value, result.GetValue(last))
+                    && ReferenceEquals(value, value.RankTwo[0, 0]) && ReferenceEquals(value, value.RankThree[0, 0, 0]),
+                    "Recursive array roots preserve repeated elements and cross-rank cycles.");
+                Ensure(ReferenceEquals(value.RankTwo, value.RankTwoAlias)
+                    && ReferenceEquals(value.RankThree, value.RankThreeAlias),
+                    "Recursive array roots preserve array aliases.");
+                Ensure(!ReferenceEquals(model, value) && !ReferenceEquals(model.RankTwo, value.RankTwo)
+                    && !ReferenceEquals(model.RankThree, value.RankThree), "Recursive array roots isolate original members.");
+            }
+        }
     }
 
     private static void ValidateArrayFallbacks(IServiceProvider serviceProvider)
@@ -250,6 +297,16 @@ public sealed class GeneratedPayload<T>
     }
 
     public T Value => _value;
+}
+
+[GenerateSerializer]
+public sealed class RecursiveArrayPayload
+{
+    [Id(0)] public RecursiveArrayPayload[,] RankTwo { get; set; } = new RecursiveArrayPayload[0, 0];
+    [Id(1)] public RecursiveArrayPayload[,,] RankThree { get; set; } = new RecursiveArrayPayload[0, 0, 0];
+    [Id(2)] public RecursiveArrayPayload[,] RankTwoAlias { get; set; } = new RecursiveArrayPayload[0, 0];
+    [Id(3)] public RecursiveArrayPayload[,,] RankThreeAlias { get; set; } = new RecursiveArrayPayload[0, 0, 0];
+    [Id(4)] public int Value { get; set; }
 }
 
 internal sealed class PublicConstructorService
