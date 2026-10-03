@@ -21,11 +21,14 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionCommon _shared;
         private readonly TaskCompletionSource _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _startedClosing = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _runCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly string _id;
         private readonly MessageTransport _transport;
         private readonly SendWorker _sendWorker;
         private Task? _processIncomingTask;
         private Task? _closeTask;
+        private int _runState;
+        private bool _openedSocket;
         private long _lastMessageReceivedTimestamp;
 
         protected Connection(
@@ -80,10 +83,16 @@ namespace Orleans.Runtime.Messaging
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
         public async Task RunAsync()
         {
+            var run = Interlocked.CompareExchange(ref _runState, 1, 0) == 0;
             Exception? error = default;
             try
             {
-                await RunAsyncCore();
+                if (run)
+                {
+                    NetworkingMetrics.OnOpenedSocket(ConnectionDirection);
+                    _openedSocket = true;
+                    await RunAsyncCore();
+                }
             }
             catch (Exception exception)
             {
@@ -91,6 +100,11 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                if (run)
+                {
+                    _runCompleted.TrySetResult();
+                }
+
                 await CloseAsync(error);
             }
         }
@@ -141,6 +155,11 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+            if (Interlocked.CompareExchange(ref _runState, 2, 0) == 0)
+            {
+                _runCompleted.TrySetResult();
+            }
+
             if (!_initializationTcs.Task.IsCompleted)
             {
                 _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed."));
@@ -157,7 +176,6 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            NetworkingMetrics.OnClosedSocket(ConnectionDirection);
             var sendWorkerTask = _sendWorker.StopAsync();
 
             try
@@ -169,6 +187,8 @@ namespace Orleans.Runtime.Messaging
             {
                 LogWarningExceptionTerminatingConnection(Log, closeException, this);
             }
+
+            await _runCompleted.Task.ConfigureAwait(false);
 
             if (_processIncomingTask is { IsCompleted: false } incoming)
             {
@@ -183,6 +203,11 @@ namespace Orleans.Runtime.Messaging
             }
 
             await sendWorkerTask.ConfigureAwait(false);
+
+            if (_openedSocket)
+            {
+                NetworkingMetrics.OnClosedSocket(ConnectionDirection);
+            }
 
             try
             {
