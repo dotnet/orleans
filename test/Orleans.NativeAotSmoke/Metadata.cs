@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization;
@@ -19,7 +21,8 @@ internal static class Metadata
 {
     private static void Main()
     {
-        var registrations = new ServiceCollection().AddSerializer();
+        var registrations = new ServiceCollection().AddSerializer()
+            .AddSingleton<MetadataKnownArrayConverter<string>>();
         var integerCodec = new Int32Codec();
         var stringCodec = new StringCodec();
         AddClosedSerializer(registrations, integerCodec);
@@ -39,6 +42,7 @@ internal static class Metadata
         ValidateMatchingImplementationCandidates();
         ValidatePatternContractSelection(services);
         ValidateMixedRegistrationClosure();
+        ValidateArrayMetadataAvailability(services);
     }
 
     internal static class PrivateContractContainer
@@ -171,6 +175,84 @@ internal static class Metadata
         Console.WriteLine("MixedRegistrationClosure passed.");
     }
 
+    private static void ValidateArrayMetadataAvailability(IServiceProvider serializerServices)
+    {
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!
+            .CreateDelegate<Func<SerializationType, Type[], Type>>();
+        var rooted = new MetadataRootedArrayValue[1].GetType();
+        if (resolve(SerializationType.Create(typeof(MetadataRootedArrayValue[])), []).TypeHandle.Value != rooted.TypeHandle.Value)
+        {
+            throw new InvalidOperationException("Typed array code and concrete descriptors must supply the same native array representation.");
+        }
+        foreach (var (descriptor, knownArray) in new[]
+        {
+            (SerializationType.Create(typeof(byte[])), typeof(byte[])),
+            (SerializationType.Create(typeof(MetadataMixedTarget<byte>[])), typeof(MetadataMixedTarget<byte>[])),
+            (SerializationType.Create(typeof(int[,])), typeof(int[,]))
+        })
+        {
+            if (resolve(descriptor, []).TypeHandle.Value != knownArray.TypeHandle.Value)
+            {
+                throw new InvalidOperationException("Source-known array descriptors must retain their concrete native type.");
+            }
+        }
+
+        var parameter = typeof(MetadataArrayCodec<>).GetGenericArguments()[0];
+        foreach (var (description, parameters) in new[]
+        {
+            (SerializationType.Array(SerializationType.Parameter(0)), new[] { parameter }),
+            (SerializationType.Array(SerializationType.Parameter(0)), new[] { typeof(MetadataRootedArrayValue) }),
+            (SerializationType.Array(SerializationType.Create(typeof(MetadataUnrootedArrayValue))), Type.EmptyTypes)
+        })
+        {
+            try
+            {
+                _ = resolve(description, parameters);
+                throw new InvalidOperationException("Executable resolution must require a source-known closed array descriptor.");
+            }
+            catch (NotSupportedException exception)
+            {
+                if (!exception.Message.Contains("SerializationType.Create(typeof(ClosedArray))", StringComparison.Ordinal))
+                {
+                    throw;
+                }
+            }
+        }
+
+        using var services = new ServiceCollection()
+            .AddSingleton<MetadataKnownArrayConverter<string>>()
+            .BuildServiceProvider();
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(MetadataKnownArrayConverter<string>), typeof(MetadataMixedTarget<string>),
+            typeof(MetadataKnownArraySurrogate<string, int[]>));
+        foreach (var provider in new[]
+        {
+            new CodecProvider(services, Options.Create(options)),
+            serializerServices.GetRequiredService<CodecProvider>()
+        })
+        {
+            var selectConverter = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .CreateDelegate<SurrogateSelection>(provider);
+            if (!selectConverter(typeof(MetadataMixedTarget<string>), typeof(MetadataMixedTarget<>), out var codec, out var arguments)
+                || codec != typeof(SurrogateCodec<MetadataMixedTarget<string>, MetadataKnownArraySurrogate<string, int[]>, MetadataKnownArrayConverter<string>>)
+                || arguments is not [MetadataKnownArrayConverter<string>])
+            {
+                throw new InvalidOperationException("The closed or generated array surrogate registration did not select its source-known types.");
+            }
+        }
+
+        var closeImplementation = typeof(CodecProvider).GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Func<Type, Type, Type, Type?>>(serializerServices.GetRequiredService<CodecProvider>());
+        if (closeImplementation(typeof(ImmutableArrayCodec<>), typeof(ImmutableArray<int>), typeof(IFieldCodec<>)) != typeof(ImmutableArrayCodec<int>))
+        {
+            throw new InvalidOperationException("The source-known immutable-array implementation did not retain ordinary generic closure.");
+        }
+
+        Console.WriteLine("ArrayMetadataAvailability passed.");
+    }
+
+    private delegate bool SurrogateSelection(Type target, Type searchType, out Type? codec, out object[]? arguments);
+
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
         services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
@@ -286,4 +368,14 @@ internal sealed class MetadataMixedActivator<T> : IActivator<MetadataMixedTarget
 {
     MetadataMixedTarget<T> IActivator<MetadataMixedTarget<T>>.Create() => new();
     MetadataMixedTarget<MetadataMixedTarget<T>> IActivator<MetadataMixedTarget<MetadataMixedTarget<T>>>.Create() => new();
+}
+internal readonly record struct MetadataRootedArrayValue(long Value);
+internal readonly record struct MetadataUnrootedArrayValue(long Value);
+internal struct MetadataKnownArraySurrogate<T, TArray>;
+
+[RegisterConverter]
+internal sealed class MetadataKnownArrayConverter<T> : IConverter<MetadataMixedTarget<T>, MetadataKnownArraySurrogate<T, int[]>>
+{
+    public MetadataMixedTarget<T> ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int[]> surrogate) => new();
+    public MetadataKnownArraySurrogate<T, int[]> ConvertToSurrogate(in MetadataMixedTarget<T> value) => default;
 }

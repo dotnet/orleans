@@ -487,6 +487,11 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The converter implementation type.</param>
         /// <param name="targetType">The converted type or its generic definition.</param>
         /// <param name="surrogateType">The surrogate description, binding parameters to the converter implementation.</param>
+        /// <remarks>
+        /// Array nodes used in an executable surrogate description must be source-known closed types
+        /// supplied through <see cref="SerializationType.Create"/>. Use the concrete surrogate type
+        /// overload to register a closed converter and its surrogate directly.
+        /// </remarks>
         public void AddConverter(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
@@ -513,6 +518,10 @@ namespace Orleans.Serialization.Configuration
         /// <param name="contractType">The generic definition of the field codec, base codec, value serializer, copier, activator, or converter interface.</param>
         /// <param name="targetType">The target type description.</param>
         /// <param name="surrogateType">The surrogate description for a converter contract.</param>
+        /// <remarks>
+        /// Target descriptions support structural array matching. Executable surrogate descriptions
+        /// require source-known closed array types supplied through <see cref="SerializationType.Create"/>.
+        /// </remarks>
         public void AddSerializationContract(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
