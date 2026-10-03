@@ -150,9 +150,6 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
-        internal static IReadOnlyList<ServiceDescriptor> GetServiceDescriptors(IServiceProvider services)
-            => services.GetService<ConfigurationContext>()?.Builder.Services.ToArray() ?? Array.Empty<ServiceDescriptor>();
-
         private class SerializerBuilder : ISerializerBuilder
         {
             public SerializerBuilder(IServiceCollection services) => Services = services;

@@ -63,7 +63,6 @@ namespace Orleans.Serialization.Serializers
         private readonly List<(object Caller, object Dependency)> _constructionDependencies = new();
         private int _initializingThreadId;
         private readonly IServiceProvider _constructionServices;
-        private readonly IReadOnlyList<ServiceDescriptor> _serviceDescriptors;
         private bool _initialized;
 
         /// <summary>
@@ -74,7 +73,6 @@ namespace Orleans.Serialization.Serializers
         public CodecProvider(IServiceProvider serviceProvider, IOptions<TypeManifestOptions> codecConfiguration)
         {
             _serviceProvider = serviceProvider;
-            _serviceDescriptors = ServiceCollectionExtensions.GetServiceDescriptors(serviceProvider);
             _constructionServices = new ConstructionServiceProvider(this);
             _manifest = codecConfiguration.Value;
             ConsumeMetadata(codecConfiguration);
@@ -604,9 +602,11 @@ namespace Orleans.Serialization.Serializers
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ConcreteTypeSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCodec<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCodec<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(SurrogateCodec<,,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueTypeSurrogateCodec<,,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCopier<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(MultiDimensionalArrayCopier<>))]
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2067",
@@ -632,10 +632,13 @@ namespace Orleans.Serialization.Serializers
 
             if (TryGetSerializerService(type, out var registered)) return registered;
 
-            result = Services.GetService(type);
-            if (result != null)
+            if (!IsConstructionPending)
             {
-                return result;
+                result = Services.GetService(type);
+                if (result != null)
+                {
+                    return result;
+                }
             }
 
             result = ActivatorUtilities.CreateInstance(Services, type, constructorArguments ?? Array.Empty<object>());
@@ -818,13 +821,8 @@ namespace Orleans.Serialization.Serializers
                         if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceProviderIsService)
                             || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider) return this;
                         if (IsProviderService(serviceType)) return owner;
-                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == serviceType)
-                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => !descriptor.IsKeyedService && serviceType.IsConstructedGenericType
-                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
-                        if (descriptor?.ImplementationInstance is { } instance) return instance;
                         if (owner.TryGetSerializerService(serviceType, out var registered)) return registered;
-                        if (descriptor is null) return null;
-                        var error = new InvalidOperationException($"Dependency injection cannot resolve {serviceType} while a serialization graph is unpublished. Register a closed service factory or provide an instance registration.");
+                        var error = new InvalidOperationException($"Dependency injection cannot resolve {serviceType} while a serialization graph is unpublished. Register the dependency through TypeManifestOptions.AddSerializerService using a closed factory which constructs it or returns an explicitly captured instance.");
                         owner.RecordConstructionFailure(error);
                         throw error;
                     }
@@ -853,19 +851,7 @@ namespace Orleans.Serialization.Serializers
                     owner._constructionFailure?.Throw();
                     if (owner._pendingSerializerServices is not null)
                     {
-                        var descriptor = owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
-                            && Equals(descriptor.ServiceKey, serviceKey) && descriptor.ServiceType == serviceType)
-                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
-                                && Equals(descriptor.ServiceKey, serviceKey) && serviceType.IsConstructedGenericType
-                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition())
-                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
-                                && Equals(descriptor.ServiceKey, KeyedService.AnyKey) && descriptor.ServiceType == serviceType)
-                            ?? owner._serviceDescriptors.LastOrDefault(descriptor => descriptor.IsKeyedService
-                                && Equals(descriptor.ServiceKey, KeyedService.AnyKey) && serviceType.IsConstructedGenericType
-                                && descriptor.ServiceType == serviceType.GetGenericTypeDefinition());
-                        if (descriptor?.KeyedImplementationInstance is { } instance) return instance;
-                        if (descriptor is null && !required) return null;
-                        var error = new InvalidOperationException($"Dependency injection cannot resolve keyed service {serviceType} while a serialization graph is unpublished. Provide an explicit keyed instance registration.");
+                        var error = new InvalidOperationException($"Dependency injection cannot resolve keyed service {serviceType} while a serialization graph is unpublished. Supply the keyed dependency through an explicit closed factory registered with TypeManifestOptions.AddSerializerService.");
                         owner.ThrowResolutionFailure(error);
                     }
                 }
@@ -885,10 +871,7 @@ namespace Orleans.Serialization.Serializers
                     owner._constructionFailure?.Throw();
                     if (owner._pendingSerializerServices is not null)
                     {
-                        return owner._serviceDescriptors.Any(descriptor => descriptor.IsKeyedService
-                            && (Equals(descriptor.ServiceKey, serviceKey) || Equals(descriptor.ServiceKey, KeyedService.AnyKey))
-                            && (descriptor.ServiceType == serviceType
-                                || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition()));
+                        return false;
                     }
                 }
 
@@ -896,14 +879,22 @@ namespace Orleans.Serialization.Serializers
             }
 
             public bool IsService(Type serviceType)
-                => IsProviderService(serviceType)
-                    || serviceType == typeof(IServiceProvider)
-                    || serviceType == typeof(IServiceProviderIsService)
-                    || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
-                    || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType)
-                    || owner._serviceDescriptors.Any(descriptor => !descriptor.IsKeyedService
-                        && (descriptor.ServiceType == serviceType
-                            || serviceType.IsConstructedGenericType && descriptor.ServiceType == serviceType.GetGenericTypeDefinition()));
+            {
+                lock (owner._serializerServiceLock)
+                {
+                    owner._constructionFailure?.Throw();
+                    if (owner._pendingSerializerServices is not null)
+                    {
+                        return IsProviderService(serviceType)
+                            || serviceType == typeof(IServiceProvider)
+                            || serviceType == typeof(IServiceProviderIsService)
+                            || serviceType == typeof(IServiceProviderIsKeyedService) && owner._serviceProvider is IKeyedServiceProvider
+                            || owner._manifest.SerializerServiceFactories.ContainsKey(serviceType);
+                    }
+                }
+
+                return owner._serviceProvider.GetRequiredService<IServiceProviderIsService>().IsService(serviceType);
+            }
 
             private bool IsProviderService(Type serviceType)
                 => serviceType != typeof(object)
@@ -1277,7 +1268,7 @@ namespace Orleans.Serialization.Serializers
         [UnconditionalSuppressMessage("Trimming", "IL2055",
             Justification = "Registered implementation definitions preserve constructors and interfaces through annotated manifest APIs. Closed factories or typed generated dependencies preserve native instantiations; arbitrary unrooted shapes require an explicit registration.")]
 #endif
-        private static Type ConstructGenericImplementation(Type implementation, params Type[] arguments)
+        private Type ConstructGenericImplementation(Type implementation, params Type[] arguments)
         {
             try
             {
@@ -1285,9 +1276,16 @@ namespace Orleans.Serialization.Serializers
             }
             catch (NotSupportedException exception) when (!RuntimeFeature.IsDynamicCodeSupported)
             {
-                throw new NotSupportedException(
+                var failure = new NotSupportedException(
                     $"The runtime cannot materialize serialization implementation {implementation} for [{string.Join(", ", arguments.Select(static type => type.ToString()))}]. Register its closed codec/copier and dependencies using a serializer context or closed factories.",
                     exception);
+                RecordConstructionFailure(failure);
+                throw failure;
+            }
+            catch (Exception exception)
+            {
+                RecordConstructionFailure(exception);
+                throw;
             }
         }
 

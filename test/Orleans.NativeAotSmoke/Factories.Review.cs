@@ -69,13 +69,15 @@ public static partial class StaticFactoryContracts
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddSerializerService<KeyedConstructionLeaf>(_ => new KeyedConstructionLeaf(++leaves));
+            options.AddSerializerService<IKeyedDependency<int>>(_ => instance);
             options.AddSerializerService<KeyedConstructionRoot>(provider =>
             {
                 var leaf = OrleansGeneratedCodeHelper.GetService<KeyedConstructionLeaf>(null!, provider);
+                var dependency = facade.GetRequiredKeyedService<IKeyedDependency<int>>(null);
                 if (++attempts == 1)
                 {
-                    Ensure(((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "factory"),
-                        "Captured availability remains observable without entering keyed singleton construction.");
+                    Ensure(!((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "factory"),
+                        "External keyed dependencies require an explicit closed factory during construction.");
                     try
                     {
                         _ = facade.GetRequiredKeyedService<IKeyedDependency<int>>("factory");
@@ -85,13 +87,9 @@ public static partial class StaticFactoryContracts
                         caught = error;
                     }
                 }
-                Ensure(((IServiceProviderIsKeyedService)facade).IsKeyedService(typeof(IKeyedDependency<int>), "instance"),
-                    "The explicit keyed instance is available during pending construction.");
-                Ensure(ReferenceEquals(instance, facade.GetRequiredKeyedService<IKeyedDependency<int>>(null)),
-                    "A captured null-key lookup retains safe unkeyed-instance resolution during construction.");
-                Ensure(facade.GetKeyedService<IKeyedDependency<int>>("missing") is null,
-                    "Optional absent keyed services remain absent without container entry during construction.");
-                return new KeyedConstructionRoot(leaf, facade.GetRequiredKeyedService<IKeyedDependency<int>>("instance"));
+                Ensure(ReferenceEquals(instance, dependency),
+                    "A captured null-key lookup resolves the explicit closed service during construction.");
+                return new KeyedConstructionRoot(leaf, dependency);
             });
         });
         using var scope = services.BuildServiceProvider();
@@ -110,7 +108,7 @@ public static partial class StaticFactoryContracts
         Ensure(failed is not null && ReferenceEquals(failed, caught), "A caught keyed DI rejection faults the root with the original exception.");
         Ensure(keyedConstructions == 0 && leaves == 1, "The captured facade rejects keyed singleton construction before entering DI.");
         var rebuilt = OrleansGeneratedCodeHelper.GetService<KeyedConstructionRoot>(null!, codecs);
-        Ensure(ReferenceEquals(instance, rebuilt.Dependency), "Explicit keyed instances remain safe during construction.");
+        Ensure(ReferenceEquals(instance, rebuilt.Dependency), "Explicit closed factories retain captured instances during construction.");
         Ensure(leaves == 2 && rebuilt.Leaf.Generation == 2
             && ReferenceEquals(rebuilt.Leaf, OrleansGeneratedCodeHelper.GetService<KeyedConstructionLeaf>(null!, codecs)),
             "Retry rebuilds and commits the canonical leaf after keyed rejection.");
@@ -130,7 +128,7 @@ public static partial class StaticFactoryContracts
         public IKeyedDependency<int> Dependency { get; } = dependency;
     }
 
-    public static void KeyedDescriptorsDoNotShadowUnkeyedInstances()
+    public static void ClosedDependenciesRemainIndependentOfKeyedDiRegistrations()
     {
         var unkeyed = new KeyedDependency<int>();
         var keyed = new KeyedDependency<int>();
@@ -139,15 +137,17 @@ public static partial class StaticFactoryContracts
         services.AddKeyedSingleton<IKeyedDependency<int>>("keyed", keyed);
         services.AddKeyedSingleton(typeof(IKeyedDependency<>), "open-keyed", typeof(KeyedDependency<>));
         services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<IKeyedDependency<int>>(_ => unkeyed);
             options.AddSerializerService<KeyedLookupResult>(provider =>
             {
                 var dependency = provider.Services.GetRequiredService<IKeyedDependency<int>>();
                 var availability = (IServiceProviderIsService)provider.Services.GetRequiredService(typeof(IServiceProviderIsService));
-                Ensure(availability.IsService(typeof(IKeyedDependency<int>)), "Unkeyed instance is available during graph construction.");
-                Ensure(!availability.IsService(typeof(IKeyedDependency<string>)), "Keyed open generic is absent from unkeyed availability.");
-                Ensure(provider.Services.GetService(typeof(IKeyedDependency<string>)) is null, "Keyed open generic is absent from unkeyed resolution.");
+                Ensure(availability.IsService(typeof(IKeyedDependency<int>)), "The explicit closed service is available during graph construction.");
+                Ensure(!availability.IsService(typeof(IKeyedDependency<string>)), "External keyed registrations require explicit closed construction.");
                 return new KeyedLookupResult(dependency);
-            }));
+            });
+        });
         using var scope = services.BuildServiceProvider();
         var codecs = scope.GetRequiredService<CodecProvider>();
         var result = OrleansGeneratedCodeHelper.GetService<KeyedLookupResult>(null!, codecs);
@@ -375,7 +375,7 @@ public static partial class StaticFactoryContracts
             using var scope = services.BuildServiceProvider();
             var codecs = scope.GetRequiredService<CodecProvider>();
             Expect<Exception>(() => OrleansGeneratedCodeHelper.GetService<AutomaticCatcher>(null!, codecs),
-                missing ? "Could not find" : "automatic constructor failure");
+                missing ? "Could not find" : "AddSerializerService");
             var leaf = OrleansGeneratedCodeHelper.GetService<DiLeaf>(null!, codecs);
             Ensure(leaf is not null && gate.FirstConstructions == 2, "Caught automatic/missing failure discards the pending leaf.");
         }

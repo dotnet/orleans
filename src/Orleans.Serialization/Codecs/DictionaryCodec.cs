@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -44,6 +45,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="keyCodec">The key codec.</param>
         /// <param name="valueCodec">The value codec.</param>
         /// <param name="comparerCodec">The comparer codec.</param>
+        [ActivatorUtilitiesConstructor]
         public DictionaryCodec(
             IFieldCodec<TKey> keyCodec,
             IFieldCodec<TValue> valueCodec,

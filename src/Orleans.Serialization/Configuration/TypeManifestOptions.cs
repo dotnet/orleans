@@ -79,6 +79,9 @@ namespace Orleans.Serialization.Configuration
         /// The codec provider constructs and caches one instance per service type. Recursive generated
         /// constructors retain references to in-progress dependencies through the generated-code helper.
         /// The first registration for a service type is used.
+        /// During graph construction, dependencies resolve through provider-owned services and these closed
+        /// factories. Supply external dependencies through explicit constructor arguments or factories which
+        /// return captured instances. Ordinary dependency injection resumes after the graph is published.
         /// </remarks>
         public void AddSerializerService<TService>(Func<ICodecProvider, TService> factory) where TService : class
         {
