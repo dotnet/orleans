@@ -70,7 +70,7 @@ internal static class SerializationContractModelExtractor
                 return new(null, index, 0, default);
             }
 
-            if (type is IArrayTypeSymbol array)
+            if (type is IArrayTypeSymbol array && ContainsTypeParameter(array))
             {
                 return new(null, -1, array.Rank, ImmutableArray.Create(CreateDescription(array.ElementType, parameters, compilation)));
             }

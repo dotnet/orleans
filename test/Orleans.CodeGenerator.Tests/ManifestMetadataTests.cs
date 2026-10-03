@@ -199,6 +199,39 @@ public class ManifestMetadataTests
     }
 
     [Fact]
+    public async Task ConcreteArrayNodesEmitSourceKnownTypesInsideGenericContracts()
+    {
+        const string source = """
+            using Orleans;
+            public class Target<T, TArray> { }
+            public struct Surrogate<T, TArray> { }
+            public class Box<T> { }
+            [RegisterConverter]
+            public class Converter<T> : IConverter<Target<T, byte[]>, Surrogate<T, Box<byte>[]>>
+            {
+                public Target<T, byte[]> ConvertFromSurrogate(in Surrogate<T, Box<byte>[]> value) => new();
+                public Surrogate<T, Box<byte>[]> ConvertToSurrogate(in Target<T, byte[]> value) => default;
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var symbol = compilation.GetTypeByMetadataName("Converter`1");
+        Assert.NotNull(symbol);
+        var contract = Assert.Single(ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Converter, compilation).Contracts);
+        Assert.Equal(0, contract.TargetDescription!.Value.Arguments[1].ArrayRank);
+        Assert.Equal("byte[]", contract.TargetDescription.Value.Arguments[1].Type!.Value.Type.SyntaxString);
+        Assert.Equal(0, contract.SurrogateDescription!.Value.Arguments[1].ArrayRank);
+        Assert.Equal("global::Box<byte>[]", contract.SurrogateDescription.Value.Arguments[1].Type!.Value.Type.SyntaxString);
+        var result = RunGenerator(compilation, out var updated);
+
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var metadata = GetMetadata(result).ToString();
+        Assert.Contains("SerializationType.Create(typeof(byte[]))", metadata);
+        Assert.Contains("SerializationType.Create(typeof(global::Box<byte>[]))", metadata);
+        Assert.DoesNotContain("SerializationType.Array", metadata);
+    }
+
+    [Fact]
     public async Task CustomInvokableBaseRegistersTheGeneratedInvokableAsItsTarget()
     {
         const string source = """

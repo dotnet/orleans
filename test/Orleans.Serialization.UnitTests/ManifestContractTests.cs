@@ -168,7 +168,7 @@ public class ManifestContractTests
     }
 
     [Fact]
-    public void GenericConverterSurrogateDescriptionPreservesNestedArraysAndParameterOrder()
+    public void ExecutableParameterizedArraySurrogatesRequireClosedRegistration()
     {
         var options = new TypeManifestOptions();
         options.AddConverter(typeof(GenericConverter<,>), typeof(GenericTarget<,>),
@@ -178,12 +178,9 @@ public class ManifestContractTests
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
         object?[] arguments = [typeof(GenericTarget<string, int>), typeof(GenericTarget<,>), null, null];
-        var result = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments);
-
-        Assert.Equal(true, result);
-        var codecType = Assert.IsAssignableFrom<Type>(arguments[2]);
-        Assert.Equal(typeof(GenericSurrogate<(int, string)[]>), codecType.GetGenericArguments()[1]);
-        Assert.IsType<GenericConverter<string, int>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Contains("SerializationType.Create(typeof(ClosedArray))", Assert.IsType<NotSupportedException>(exception.InnerException).Message);
     }
 
     [Fact]
@@ -281,9 +278,9 @@ public class ManifestContractTests
         options.AddSerializationContract(typeof(PatternConverter<>), typeof(IConverter<,>),
             SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
             SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)));
-        options.AddSerializationContract(typeof(PatternConverter<>), typeof(IConverter<,>),
-            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(string))),
-            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Array(SerializationType.Parameter(0))));
+        options.AddSerializationContract(typeof(PatternConverter<Guid>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Create(typeof(Guid)), SerializationType.Create(typeof(string))),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Create(typeof(Guid[]))));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
         foreach (var (target, surrogate) in new[]
@@ -317,6 +314,37 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void ClosedConverterRegistrationOverridesAnUnresolvedArraySurrogateRecipe()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(GenericConverter<,>), typeof(GenericTarget<,>),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Array(SerializationType.Parameter(0))));
+        options.AddConverter(typeof(GenericConverter<string, int>), typeof(GenericTarget<string, int>),
+            typeof(GenericSurrogate<(int, string)[]>));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        object?[] arguments = [typeof(GenericTarget<string, int>), typeof(GenericTarget<,>), null, null];
+
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(typeof(GenericSurrogate<(int, string)[]>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        Assert.IsType<GenericConverter<string, int>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+    }
+
+    [Fact]
+    public void LegacyClosedConverterDiscoveryPreservesItsArraySurrogate()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(GenericConverter<string, int>));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        object?[] arguments = [typeof(GenericTarget<string, int>), typeof(GenericTarget<,>), null, null];
+
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(typeof(GenericSurrogate<(int, string)[]>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        Assert.IsType<GenericConverter<string, int>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+    }
+
+    [Fact]
     public void SerializationDescriptionsValidateAndCopyTheirArguments()
     {
         var first = SerializationType.Parameter(0);
@@ -330,18 +358,42 @@ public class ManifestContractTests
         Assert.Throws<ArgumentNullException>(() => SerializationType.Array(null!));
         Assert.Throws<ArgumentException>(() => SerializationType.Create(typeof(int), first));
         Assert.Throws<ArgumentException>(() => SerializationType.Create(typeof(GenericSurrogate<>), first, first));
+        var parameter = typeof(GenericSurrogate<>).GetGenericArguments()[0];
+        Assert.Equal("type", Assert.Throws<ArgumentException>(() => SerializationType.Create(parameter.MakeArrayType())).ParamName);
     }
 
     [Fact]
-    public void MaterializationBoundariesConstructRegisteredGenericAndArrayMetadata()
+    public void ExecutableTypeResolutionUsesSourceKnownClosedArrays()
     {
         var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
         Assert.Equal(typeof(GenericSurrogate<string>), generic.Invoke(null, [typeof(GenericSurrogate<>), new[] { typeof(string) }]));
-        var array = typeof(CodecProvider).GetMethod("ConstructArrayMetadata", BindingFlags.Static | BindingFlags.NonPublic)!;
-        Assert.Equal(typeof(string[]), array.Invoke(null, [typeof(string), 1]));
-        Assert.Equal(typeof(string[,]), array.Invoke(null, [typeof(string), 2]));
-        var parameter = typeof(GenericSurrogate<>).GetGenericArguments()[0];
-        Assert.Equal(parameter.MakeArrayType(), array.Invoke(null, [parameter, 1]));
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!;
+        foreach (var type in new[] { typeof(string[]), typeof(string[,]), typeof(FixedArgument<byte>[]) })
+        {
+            Assert.Equal(type, resolve.Invoke(null, [SerializationType.Create(type), Type.EmptyTypes]));
+        }
+        Assert.Equal(typeof(GenericTarget<string, int[]>), resolve.Invoke(null,
+            [SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int[]))),
+                new[] { typeof(string) }]));
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    public void ExecutableArrayPatternsRejectWithClosedRegistrationGuidance(int rank, bool openParameter)
+    {
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var parameter = openParameter ? typeof(GenericSurrogate<>).GetGenericArguments()[0] : typeof(string);
+        var description = SerializationType.Array(SerializationType.Parameter(0), rank);
+
+        var exception = Assert.Throws<TargetInvocationException>(() => resolve.Invoke(null, [description, new[] { parameter }]));
+        var failure = Assert.IsType<NotSupportedException>(exception.InnerException);
+        Assert.Contains("SerializationType.Create(typeof(ClosedArray))", failure.Message);
+        Assert.Contains("explicit closed converter registration", failure.Message);
+        exception = Assert.Throws<TargetInvocationException>(() =>
+            resolve.Invoke(null, [SerializationType.Array(SerializationType.Create(typeof(string)), rank), Type.EmptyTypes]));
+        Assert.Equal(failure.Message, Assert.IsType<NotSupportedException>(exception.InnerException).Message);
     }
 
     [Fact]
@@ -350,9 +402,7 @@ public class ManifestContractTests
         var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
         var exception = Assert.Throws<TargetInvocationException>(() => generic.Invoke(null, [typeof(GenericSurrogate<>), Type.EmptyTypes]));
         Assert.IsType<ArgumentException>(exception.InnerException);
-        var array = typeof(CodecProvider).GetMethod("ConstructArrayMetadata", BindingFlags.Static | BindingFlags.NonPublic)!;
-        exception = Assert.Throws<TargetInvocationException>(() => array.Invoke(null, [typeof(string), 0]));
-        Assert.IsType<IndexOutOfRangeException>(exception.InnerException);
+        Assert.Throws<ArgumentOutOfRangeException>(() => SerializationType.Array(SerializationType.Create(typeof(string)), 0));
     }
 
     [Fact]
