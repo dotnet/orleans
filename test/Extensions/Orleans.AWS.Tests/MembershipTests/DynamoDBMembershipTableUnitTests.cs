@@ -57,8 +57,6 @@ namespace AWSUtils.Tests.MembershipTests
         [InlineData("ReadAll")]
         [InlineData("Insert")]
         [InlineData("Update")]
-        [InlineData("InsertWithResult")]
-        [InlineData("UpdateWithResult")]
         [InlineData("Heartbeat")]
         public async Task CanceledOperationsDoNotAccessStorage(string operation)
         {
@@ -81,8 +79,6 @@ namespace AWSUtils.Tests.MembershipTests
                 "ReadAll" => table.ReadAllAsync(token),
                 "Insert" => table.InsertRowAsync(entry, version, token),
                 "Update" => table.UpdateRowAsync(entry, "etag", version, token),
-                "InsertWithResult" => table.InsertRowWithResultAsync(entry, version, token),
-                "UpdateWithResult" => table.UpdateRowWithResultAsync(entry, "etag", version, token),
                 "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
             });
@@ -856,142 +852,6 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task MembershipWriteReceiptsChainDistinctNativeTokensWithoutReads(bool update)
-        {
-            var tableEtag = "7";
-            var rowEtag = update ? "3" : null;
-            var versionNumber = 41;
-            var writtenRows = new List<Dictionary<string, AttributeValue>>();
-            using var client = new RequestClient
-            {
-                Write = request =>
-                {
-                    Assert.Equal(2, request.TransactItems.Count);
-                    var row = Assert.IsType<Put>(request.TransactItems[0].Put);
-                    var version = Assert.IsType<Update>(request.TransactItems[1].Update);
-                    writtenRows.Add(row.Item);
-                    Assert.Equal(tableEtag, version.ExpressionAttributeValues[":currentETag"].N);
-                    if (rowEtag is not null)
-                    {
-                        Assert.Equal(rowEtag, row.ExpressionAttributeValues[":currentETag"].N);
-                    }
-                    else
-                    {
-                        Assert.Equal("attribute_not_exists(DeploymentId) AND attribute_not_exists(SiloIdentity)", row.ConditionExpression);
-                    }
-
-                    Assert.Equal((versionNumber + 1).ToString(CultureInfo.InvariantCulture), version.ExpressionAttributeValues[":MembershipVersion"].N);
-                    versionNumber++;
-                    tableEtag = version.ExpressionAttributeValues[":ETag"].N;
-                    rowEtag = row.Item[SiloInstanceRecord.ETAG_PROPERTY_NAME].N;
-                    return new TransactWriteItemsResponse();
-                }
-            };
-            var table = CreateTable(client);
-            var token = TestContext.Current.CancellationToken;
-            var entry = new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                HostName = "host",
-                SiloName = "silo-1",
-                ProxyPort = 30000,
-                Status = SiloStatus.Active,
-                StartTime = DateTime.UnixEpoch,
-                IAmAliveTime = DateTime.UnixEpoch.AddHours(1),
-                SuspectTimes = []
-            };
-            var result = update
-                ? await table.UpdateRowWithResultAsync(entry, "3", new TableVersion(42, "7"), token)
-                : await table.InsertRowWithResultAsync(entry, new TableVersion(42, "7"), token);
-
-            Assert.True(result.Succeeded);
-            var first = Assert.IsType<MembershipTableWriteReceipt>(result.Receipt);
-            Assert.Equal(new TableVersion(42, "8"), first.Version);
-            Assert.Equal(update ? "4" : "0", first.RowETag);
-            Assert.Equal(tableEtag, first.Version.VersionEtag);
-            Assert.Equal(rowEtag, first.RowETag);
-            entry.Status = SiloStatus.ShuttingDown;
-            entry.AddSuspector(SiloAddress.New(IPAddress.Loopback, 11112, 1), DateTime.UnixEpoch.AddHours(2));
-            var chained = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
-            Assert.True(chained.Succeeded);
-            var second = Assert.IsType<MembershipTableWriteReceipt>(chained.Receipt);
-            Assert.Equal(new TableVersion(43, "9"), second.Version);
-            Assert.Equal(update ? "5" : "1", second.RowETag);
-            Assert.Equal(tableEtag, second.Version.VersionEtag);
-            Assert.Equal(rowEtag, second.RowETag);
-            Assert.Equal(new TableVersion(42, "8"), first.Version);
-            Assert.Equal(update ? "4" : "0", first.RowETag);
-            Assert.False(writtenRows[0].ContainsKey(SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME));
-            Assert.False(writtenRows[0].ContainsKey(SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME));
-            Assert.Equal("127.0.0.1:11112@1", writtenRows[1][SiloInstanceRecord.SUSPECTING_SILOS_PROPERTY_NAME].S);
-            Assert.Equal("1970-01-01 02:00:00.000 GMT", writtenRows[1][SiloInstanceRecord.SUSPECTING_TIMES_PROPERTY_NAME].S);
-            Assert.Equal(((int)SiloStatus.Active).ToString(CultureInfo.InvariantCulture), writtenRows[0][SiloInstanceRecord.STATUS_PROPERTY_NAME].N);
-            Assert.Equal(((int)SiloStatus.ShuttingDown).ToString(CultureInfo.InvariantCulture), writtenRows[1][SiloInstanceRecord.STATUS_PROPERTY_NAME].N);
-            foreach (var field in new[] { SiloInstanceRecord.HOSTNAME_PROPERTY_NAME, SiloInstanceRecord.SILO_NAME_PROPERTY_NAME, SiloInstanceRecord.START_TIME_PROPERTY_NAME, SiloInstanceRecord.PROXY_PORT_PROPERTY_NAME })
-            {
-                Assert.Equal(writtenRows[0][field].S, writtenRows[1][field].S);
-                Assert.Equal(writtenRows[0][field].N, writtenRows[1][field].N);
-            }
-            Assert.Equal(2, client.WriteCount);
-            Assert.Equal(0, client.ReadCount);
-        }
-
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task MembershipWriteReceiptsRejectInvalidTokensWithoutStorageAccess(bool update)
-        {
-            using var client = new RequestClient();
-            var table = CreateTable(client);
-            var entry = new MembershipEntry { SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1) };
-            var token = TestContext.Current.CancellationToken;
-
-            var result = update
-                ? await table.UpdateRowWithResultAsync(entry, "3", new TableVersion(8, "invalid"), token)
-                : await table.InsertRowWithResultAsync(entry, new TableVersion(8, "invalid"), token);
-
-            Assert.False(result.Succeeded);
-            Assert.Null(result.Receipt);
-            if (update)
-            {
-                var invalidRow = await table.UpdateRowWithResultAsync(entry, "invalid", new TableVersion(8, "7"), token);
-                Assert.False(invalidRow.Succeeded);
-                Assert.Null(invalidRow.Receipt);
-            }
-
-            Assert.Equal(0, client.ReadCount);
-            Assert.Equal(0, client.WriteCount);
-        }
-
-        [Theory]
-        [InlineData(false, "resource")]
-        [InlineData(true, "resource")]
-        [InlineData(false, "authorization")]
-        [InlineData(true, "authorization")]
-        [InlineData(false, "network")]
-        [InlineData(true, "network")]
-        [InlineData(false, "cancellation")]
-        [InlineData(true, "cancellation")]
-        public async Task MembershipWriteReceiptsPropagateNativeFailuresWithoutReads(bool update, string kind)
-        {
-            var token = TestContext.Current.CancellationToken;
-            var failure = kind == "cancellation" ? new OperationCanceledException(token) : CreateStorageFailure(kind);
-            using var client = new RequestClient { Write = _ => throw failure };
-            var table = CreateTable(client);
-            var entry = new MembershipEntry { SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1) };
-
-            var operation = update
-                ? table.UpdateRowWithResultAsync(entry, "3", new TableVersion(8, "7"), token)
-                : table.InsertRowWithResultAsync(entry, new TableVersion(8, "7"), token);
-
-            Assert.Same(failure, await Assert.ThrowsAnyAsync<Exception>(() => operation));
-            Assert.Equal(1, client.WriteCount);
-            Assert.Equal(0, client.ReadCount);
-        }
-
-        [Theory]
         [InlineData("missing-row")]
         [InlineData("stale-row")]
         [InlineData("stale-table")]
@@ -1145,21 +1005,6 @@ namespace AWSUtils.Tests.MembershipTests
                 Assert.False(await pending);
             }
             Assert.Equal(1, client.WriteCount);
-
-            var receiptPending = update
-                ? table.UpdateRowWithResultAsync(entry, "3", new TableVersion(8, "7"), TestContext.Current.CancellationToken)
-                : table.InsertRowWithResultAsync(entry, new TableVersion(8, "7"), TestContext.Current.CancellationToken);
-            if (reason is "ValidationError" or "MissingReasons")
-            {
-                Assert.Same(failure, await Assert.ThrowsAsync<TransactionCanceledException>(() => receiptPending));
-            }
-            else
-            {
-                var result = await receiptPending;
-                Assert.False(result.Succeeded);
-                Assert.Null(result.Receipt);
-            }
-            Assert.Equal(2, client.WriteCount);
         }
 
         [Theory]

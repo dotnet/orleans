@@ -98,12 +98,9 @@ public sealed class AdoNetMembershipUpgradeTests
         heartbeatAtCutoff.IAmAliveTime = cutoff;
         var oldSuspect = Entry(7, SiloStatus.Dead);
         var entries = new[] { active, dead, suspected, joining, startingAtCutoff, heartbeatAtCutoff, oldSuspect };
-        var next = new TableVersion(900, "0");
         for (var version = 0; version < entries.Length; version++)
         {
-            var result = await current.InsertRowWithResultAsync(entries[version], next, cancellationToken);
-            var receipt = AssertReceipt(result, version + 1);
-            next = new TableVersion(900 + version, receipt.Version.VersionEtag);
+            Assert.True(await current.InsertRowAsync(entries[version], new TableVersion(version + 1, version.ToString(CultureInfo.InvariantCulture)), cancellationToken));
         }
 
         suspected.SuspectTimes = [Tuple.Create(active.SiloAddress, cutoff)];
@@ -111,8 +108,7 @@ public sealed class AdoNetMembershipUpgradeTests
         foreach (var entry in new[] { suspected, oldSuspect })
         {
             var row = await current.ReadAllAsync(cancellationToken);
-            AssertReceipt(await current.UpdateRowWithResultAsync(entry, Assert.IsType<Tuple<MembershipEntry, string>>(row.TryGet(entry.SiloAddress)).Item2, row.Version.Next(), cancellationToken),
-                row.Version.Version + 1);
+            Assert.True(await current.UpdateRowAsync(entry, Assert.IsType<Tuple<MembershipEntry, string>>(row.TryGet(entry.SiloAddress)).Item2, row.Version.Next(), cancellationToken));
         }
 
         // A populated original installation supports package upgrades without any catalog edits.
@@ -142,15 +138,11 @@ public sealed class AdoNetMembershipUpgradeTests
         active.Status = SiloStatus.ShuttingDown;
         active.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddMinutes(4))];
         active.IAmAliveTime = StartTime.AddMinutes(5);
-        var updateReceipt = AssertReceipt(await current.UpdateRowWithResultAsync(
-            active, originalRowToken, new TableVersion(900, captured.Version.VersionEtag), cancellationToken), 10);
+        Assert.True(await current.UpdateRowAsync(active, originalRowToken, captured.Version.Next(), cancellationToken));
         // Original SQL can overwrite a newer heartbeat; only enhanced full-row writes retain MAX.
         active.IAmAliveTime = StartTime.AddMinutes(enhanced ? 10 : 5);
         var afterUpdate = await ReadSnapshotAsync(storage, cancellationToken);
         AssertStored(afterUpdate, 10, entries);
-        Assert.Equal(afterUpdate.Version, updateReceipt.Version.Version);
-        Assert.Equal(afterUpdate.Etag, updateReceipt.Version.VersionEtag);
-        Assert.Equal(afterUpdate.Etag, updateReceipt.RowETag);
         active.IAmAliveTime = StartTime.AddMinutes(3);
         await current.UpdateIAmAliveAsync(active, cancellationToken);
         var afterBlindHeartbeat = await ReadSnapshotAsync(storage, cancellationToken);
@@ -170,14 +162,14 @@ public sealed class AdoNetMembershipUpgradeTests
             var changed = Entry(1, SiloStatus.Dead);
             changed.IAmAliveTime = StartTime.AddDays(1);
             changed.SuspectTimes = [Tuple.Create(joining.SiloAddress, StartTime.AddDays(1))];
-            await AssertRejectedAsync(() => current.InsertRowWithResultAsync(absent, captured.Version.Next(), cancellationToken));
-            await AssertRejectedAsync(() => current.UpdateRowWithResultAsync(changed, originalRowToken, captured.Version.Next(), cancellationToken));
-            await AssertRejectedAsync(() => current.InsertRowWithResultAsync(changed, stable.NextVersion, cancellationToken));
-            await AssertRejectedAsync(() => current.UpdateRowWithResultAsync(changed, originalRowToken, stable.NextVersion, cancellationToken));
-            await AssertRejectedAsync(() => current.UpdateRowWithResultAsync(absent, stable.Etag, stable.NextVersion, cancellationToken));
+            await AssertRejectedAsync(() => current.InsertRowAsync(absent, captured.Version.Next(), cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(changed, originalRowToken, captured.Version.Next(), cancellationToken));
+            await AssertRejectedAsync(() => current.InsertRowAsync(changed, stable.NextVersion, cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(changed, originalRowToken, stable.NextVersion, cancellationToken));
+            await AssertRejectedAsync(() => current.UpdateRowAsync(absent, stable.Etag, stable.NextVersion, cancellationToken));
 
             absent.HostName = null!;
-            var error = await Assert.ThrowsAnyAsync<DbException>(() => current.InsertRowWithResultAsync(absent, stable.NextVersion, cancellationToken));
+            var error = await Assert.ThrowsAnyAsync<DbException>(() => current.InsertRowAsync(absent, stable.NextVersion, cancellationToken));
             Assert.True(engine switch
             {
                 "SQLServer" => error is Microsoft.Data.SqlClient.SqlException { Number: 515 },
@@ -188,7 +180,7 @@ public sealed class AdoNetMembershipUpgradeTests
             AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
             using var canceled = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             canceled.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => current.InsertRowWithResultAsync(Entry(20, SiloStatus.Joining), stable.NextVersion, canceled.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => current.InsertRowAsync(Entry(20, SiloStatus.Joining), stable.NextVersion, canceled.Token));
             AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
         }
 
@@ -247,33 +239,20 @@ public sealed class AdoNetMembershipUpgradeTests
         {
             // Frozen original SQL can commit a version-only update on a missing row. Do not conceal it.
             var beforeMissing = await ReadSnapshotAsync(storage, cancellationToken);
-            var missing = await current.UpdateRowWithResultAsync(
+            var missing = await current.UpdateRowAsync(
                 Entry(20, SiloStatus.Dead), beforeMissing.Etag, beforeMissing.NextVersion, cancellationToken);
-            Assert.False(missing.Succeeded);
-            Assert.Null(missing.Receipt);
+            Assert.False(missing);
             var afterMissing = await ReadSnapshotAsync(storage, cancellationToken);
             Assert.Equal(beforeMissing.Version + 1, afterMissing.Version);
             Assert.Equal(beforeMissing.Members, afterMissing.Members);
         }
 
         Assert.Equal(queries.OrderBy(pair => pair.Key), (await ReadQueriesAsync(storage, cancellationToken)).OrderBy(pair => pair.Key));
-        async Task AssertRejectedAsync(Func<Task<MembershipTableWriteResult>> write)
+        async Task AssertRejectedAsync(Func<Task<bool>> write)
         {
-            var result = await write();
-            Assert.False(result.Succeeded);
-            Assert.Null(result.Receipt);
+            Assert.False(await write());
             AssertUnchanged(stable, await ReadSnapshotAsync(storage, cancellationToken));
         }
-    }
-
-    private static MembershipTableWriteReceipt AssertReceipt(MembershipTableWriteResult result, int version)
-    {
-        Assert.True(result.Succeeded);
-        var receipt = Assert.IsType<MembershipTableWriteReceipt>(result.Receipt);
-        var etag = version.ToString(CultureInfo.InvariantCulture);
-        Assert.Equal(new TableVersion(version, etag), receipt.Version);
-        Assert.Equal(etag, receipt.RowETag);
-        return receipt;
     }
 
     private static MembershipEntry Entry(int id, SiloStatus status) => new()

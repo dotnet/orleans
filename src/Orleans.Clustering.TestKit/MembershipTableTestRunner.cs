@@ -692,16 +692,18 @@ public sealed class MembershipTableTestRunner
             var input = Entry(i);
             var expectedEntry = MembershipEntrySnapshot.Capture(input);
             var writer = i % 2 == 0 ? B : A;
-            var result = await writer.InsertRowWithResultAsync(input, current.Next(), ct);
-            Check(result.Succeeded,
+            var reader = i % 2 == 0 ? A : B;
+            Check(await writer.InsertRowAsync(input, current.Next(), ct),
                 $"concurrent-read setup insert failed: index={i}, table={current.Next()}");
-            var receipt = result.Receipt ?? throw new InvalidOperationException(
-                $"Concurrent-read setup requires mutation receipts: provider={_fixture.ProviderName}; index={i}. The write succeeded without a receipt.");
-            Check(receipt.Version.Version == current.Version + 1, $"setup commit integer: expected={current.Version + 1}, observed={receipt.Version.Version}");
-            Check(!string.IsNullOrEmpty(receipt.Version.VersionEtag) && receipt.Version.VersionEtag != current.TableEtag,
+            var observed = await reader.ReadAllAsync(ct);
+            Check(observed.Version.Version == current.Version + 1, $"setup commit integer: expected={current.Version + 1}, observed={observed.Version.Version}");
+            Check(!string.IsNullOrEmpty(observed.Version.VersionEtag) && observed.Version.VersionEtag != current.TableEtag,
                 $"setup commit table ETag did not advance: index={i}");
-            expectedRows.Add(expectedEntry.Identity, new(expectedEntry, receipt.RowETag));
-            current = current with { Version = receipt.Version.Version, TableEtag = receipt.Version.VersionEtag };
+            var row = observed.TryGet(input.SiloAddress);
+            Check(row is not null, $"setup insert omitted identity={expectedEntry.Identity}");
+            EqualRow(expectedEntry, MembershipEntrySnapshot.Capture(row!.Item1));
+            expectedRows.Add(expectedEntry.Identity, new(expectedEntry, row.Item2));
+            current = current with { Version = observed.Version.Version, TableEtag = observed.Version.VersionEtag };
         }
         Equal(current with { Rows = expectedRows.ToImmutable() }, await SameHandles(ct));
     }

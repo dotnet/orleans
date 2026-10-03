@@ -236,10 +236,6 @@ namespace Orleans.Clustering.DynamoDB
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
-
-        /// <inheritdoc />
-        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -250,7 +246,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningInsertFailedInvalidETag(entry, tableVersion.VersionEtag);
-                    return new(false);
+                    return false;
                 }
 
                 versionEntry.ETag++;
@@ -289,10 +285,7 @@ namespace Orleans.Clustering.DynamoDB
                     LogWarningInsertFailedDueToContention(entry);
                 }
 
-                return result
-                    ? new(true, new(new TableVersion(versionEntry.MembershipVersion, versionEntry.ETag.ToString(CultureInfo.InvariantCulture)),
-                        tableEntry.ETag.ToString(CultureInfo.InvariantCulture)))
-                    : new(false);
+                return result;
             }
             catch (Exception exc)
             {
@@ -305,10 +298,6 @@ namespace Orleans.Clustering.DynamoDB
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
-
-        /// <inheritdoc />
-        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -318,7 +307,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!int.TryParse(etag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var currentEtag))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, etag);
-                    return new(false);
+                    return false;
                 }
 
                 siloEntry.ETag = currentEtag + 1;
@@ -326,7 +315,7 @@ namespace Orleans.Clustering.DynamoDB
                 if (!TryCreateTableVersionRecord(tableVersion.Version, tableVersion.VersionEtag, out var versionEntry))
                 {
                     LogWarningUpdateFailedInvalidETag(entry, tableVersion.VersionEtag);
-                    return new(false);
+                    return false;
                 }
 
                 versionEntry.ETag++;
@@ -365,10 +354,7 @@ namespace Orleans.Clustering.DynamoDB
                     LogWarningUpdateFailedDueToContention(canceledException, entry, etag);
                 }
 
-                return result
-                    ? new(true, new(new TableVersion(versionEntry.MembershipVersion, versionEntry.ETag.ToString(CultureInfo.InvariantCulture)),
-                        siloEntry.ETag.ToString(CultureInfo.InvariantCulture)))
-                    : new(false);
+                return result;
             }
             catch (Exception exc)
             {

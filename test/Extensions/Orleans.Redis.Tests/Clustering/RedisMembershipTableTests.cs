@@ -124,40 +124,6 @@ namespace Tester.Redis.Clustering
         }
 
         [Fact]
-        public async Task NativeReceipts_ChainWithoutInterveningReads()
-        {
-            var token = TestContext.Current.CancellationToken;
-            var table = await GetLegacyMembershipTableAsync(token);
-            var initial = await table.ReadAllAsync(token);
-            var entry = new MembershipEntry
-            {
-                SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
-                HostName = "host",
-                SiloName = "silo",
-                Status = SiloStatus.Joining,
-                StartTime = DateTime.UnixEpoch,
-                IAmAliveTime = DateTime.UnixEpoch,
-                SuspectTimes = []
-            };
-            var inserted = await table.InsertRowWithResultAsync(entry, initial.Version.Next(), token);
-            Assert.True(inserted.Succeeded);
-            var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
-            Assert.Equal(initial.Version.Version + 1, first.Version.Version);
-            entry.Status = SiloStatus.Active;
-            var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
-            Assert.True(updated.Succeeded);
-            var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
-            Assert.Equal(first.Version.Version + 1, second.Version.Version);
-            Assert.Equal(second.Version.VersionEtag, second.RowETag);
-            Assert.NotEqual(first.RowETag, second.RowETag);
-            var snapshot = await table.ReadAllAsync(token);
-            var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress));
-            Assert.Equal(second.Version, snapshot.Version);
-            Assert.Equal(second.RowETag, row.Item2);
-            Assert.Equal(SiloStatus.Active, row.Item1.Status);
-        }
-
-        [Fact]
         public async Task UpdateRowInParallel()
         {
             await MembershipTable_UpdateRowInParallel();

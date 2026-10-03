@@ -212,8 +212,6 @@ namespace UnitTests.MembershipTests
         [InlineData(nameof(IMembershipTable.ReadAllAsync))]
         [InlineData(nameof(IMembershipTable.InsertRowAsync))]
         [InlineData(nameof(IMembershipTable.UpdateRowAsync))]
-        [InlineData(nameof(IMembershipTable.InsertRowWithResultAsync))]
-        [InlineData(nameof(IMembershipTable.UpdateRowWithResultAsync))]
         [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync))]
         public async Task MembershipOperations_PreCanceledToken_DoesNotCreateClient(string operation)
         {
@@ -232,8 +230,6 @@ namespace UnitTests.MembershipTests
                 nameof(IMembershipTable.ReadAllAsync) => () => sut.ReadAllAsync(cancellationToken),
                 nameof(IMembershipTable.InsertRowAsync) => () => sut.InsertRowAsync(CreateMembershipEntry(), CreateTableVersion(), cancellationToken),
                 nameof(IMembershipTable.UpdateRowAsync) => () => sut.UpdateRowAsync(CreateMembershipEntry(), "17", CreateTableVersion(), cancellationToken),
-                nameof(IMembershipTable.InsertRowWithResultAsync) => () => sut.InsertRowWithResultAsync(CreateMembershipEntry(), CreateTableVersion(), cancellationToken),
-                nameof(IMembershipTable.UpdateRowWithResultAsync) => () => sut.UpdateRowWithResultAsync(CreateMembershipEntry(), "17", CreateTableVersion(), cancellationToken),
                 nameof(IMembershipTable.UpdateIAmAliveAsync) => () => sut.UpdateIAmAliveAsync(CreateMembershipEntry(), cancellationToken),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation)),
             };
@@ -781,121 +777,6 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal(path, failure.getPath());
             Assert.Equal(1, fake.Calls.Count(call => call == "sync /"));
-        }
-
-        [Fact]
-        public async Task MutationReceipts_UseNativeStatsAndChainWithoutReads()
-        {
-            var fake = new ZooKeeperNativeFake();
-            fake.Nodes["/"] = new([], 17);
-            var entry = CreateTimedEntry();
-
-            var inserted = await ZooKeeperBasedMembershipTable.InsertRowWithResultCoreAsync(
-                fake.Operations, entry, new TableVersion(999, "17"), TestContext.Current.CancellationToken);
-
-            Assert.True(inserted.Succeeded);
-            var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
-            Assert.Equal(new TableVersion(18, "18"), first.Version);
-            Assert.Equal("0", first.RowETag);
-            Assert.Equal(1, fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)].ChildrenVersion);
-            Assert.Equal("multi", Assert.Single(fake.Calls));
-
-            entry.IAmAliveTime = entry.IAmAliveTime.AddDays(1);
-            await Heartbeat(fake, entry);
-            entry.Status = SiloStatus.Dead;
-            var updated = await ZooKeeperBasedMembershipTable.UpdateRowWithResultCoreAsync(
-                fake.Operations, entry, first.RowETag, new TableVersion(777, first.Version.VersionEtag),
-                TestContext.Current.CancellationToken);
-
-            Assert.True(updated.Succeeded);
-            var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
-            Assert.Equal(new TableVersion(19, "19"), second.Version);
-            Assert.Equal("1", second.RowETag);
-            Assert.Equal(["multi", "write " + ZooKeeperNativeFake.HeartbeatPath(entry.SiloAddress), "multi"], fake.Calls);
-            Assert.Collection(fake.Transactions,
-                insert => AssertSet(insert[0], "/", 17),
-                update =>
-                {
-                    AssertSet(update[0], "/", 18);
-                    AssertSet(update[1], ZooKeeperNativeFake.RowPath(entry.SiloAddress), 0);
-                });
-            var snapshot = await Read(fake);
-            Assert.Equal(second.Version, snapshot.Version);
-            var row = snapshot.TryGet(entry.SiloAddress)!;
-            Assert.Equal(second.RowETag, row.Item2);
-            Assert.Equal(entry.Status, row.Item1.Status);
-            Assert.Equal(entry.IAmAliveTime, row.Item1.IAmAliveTime);
-        }
-
-        [Theory]
-        [InlineData("duplicate")]
-        [InlineData("insert-version")]
-        [InlineData("update-row")]
-        [InlineData("update-version")]
-        [InlineData("missing-row")]
-        public async Task MutationReceipt_ConditionalFailure_HasNoReceipt(string condition)
-        {
-            var (fake, entry) = await CreateNativeTable();
-            var original = fake.Nodes.ToArray();
-            var result = condition switch
-            {
-                "duplicate" => await ZooKeeperBasedMembershipTable.InsertRowWithResultCoreAsync(
-                    fake.Operations, entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-                "insert-version" => await ZooKeeperBasedMembershipTable.InsertRowWithResultCoreAsync(
-                    fake.Operations, CreateTimedEntry(12346), new TableVersion(1, "0"), TestContext.Current.CancellationToken),
-                "update-row" => await ZooKeeperBasedMembershipTable.UpdateRowWithResultCoreAsync(
-                    fake.Operations, entry, "7", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-                "update-version" => await ZooKeeperBasedMembershipTable.UpdateRowWithResultCoreAsync(
-                    fake.Operations, entry, "0", new TableVersion(1, "0"), TestContext.Current.CancellationToken),
-                "missing-row" => await ZooKeeperBasedMembershipTable.UpdateRowWithResultCoreAsync(
-                    fake.Operations, CreateTimedEntry(12346), "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-                _ => throw new ArgumentOutOfRangeException(nameof(condition))
-            };
-
-            Assert.False(result.Succeeded);
-            Assert.Null(result.Receipt);
-            Assert.Equal(original, fake.Nodes.ToArray());
-            Assert.Equal(condition == "missing-row" ? ["multi", "read /"] : ["multi"], fake.Calls);
-            Assert.Single(fake.Transactions);
-        }
-
-        [Fact]
-        public async Task MutationReceipt_WaitsForNativeCompletionAndRetainsOwnCommitStats()
-        {
-            var fake = new ZooKeeperNativeFake();
-            var entry = CreateTimedEntry();
-            var native = fake.Operations;
-            var committed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var delayed = new ZooKeeperBasedMembershipTable.NativeOperations(
-                native.GetData, native.GetChildren, native.Sync,
-                async operations =>
-                {
-                    var results = await native.Multi(operations);
-                    committed.SetResult();
-                    await complete.Task;
-                    return results;
-                }, native.SetData);
-            var operation = ZooKeeperBasedMembershipTable.InsertRowWithResultCoreAsync(
-                delayed, entry, new TableVersion(900, "0"), TestContext.Current.CancellationToken);
-            try
-            {
-                await committed.Task.WaitAsync(TestContext.Current.CancellationToken);
-                Assert.False(operation.IsCompleted);
-                Assert.True(await Insert(fake, CreateTimedEntry(12346), 1));
-                Assert.Equal(2, fake.Nodes["/"].Version);
-            }
-            finally
-            {
-                complete.SetResult();
-            }
-
-            var result = await operation;
-            Assert.True(result.Succeeded);
-            var receipt = Assert.IsType<MembershipTableWriteReceipt>(result.Receipt);
-            Assert.Equal(new TableVersion(1, "1"), receipt.Version);
-            Assert.Equal("0", receipt.RowETag);
-            Assert.Equal(["multi", "multi"], fake.Calls);
         }
 
         [Fact]
@@ -1584,8 +1465,6 @@ namespace UnitTests.MembershipTests
         [InlineData("point")]
         [InlineData("insert")]
         [InlineData("update")]
-        [InlineData("insert-result")]
-        [InlineData("update-result")]
         [InlineData("cleanup")]
         public async Task MembershipOperations_MissingClusterHistory_PropagatesNoNode(string operation)
         {
@@ -1597,7 +1476,7 @@ namespace UnitTests.MembershipTests
 
             Assert.Equal("/", failure.getPath());
             Assert.Empty(fake.Nodes);
-            if (operation is "insert" or "insert-result")
+            if (operation == "insert")
             {
                 Assert.Equal("multi", Assert.Single(fake.Calls));
             }
@@ -1610,12 +1489,6 @@ namespace UnitTests.MembershipTests
         [InlineData("update", "auth", true)]
         [InlineData("update", "connection", true)]
         [InlineData("update", "session", true)]
-        [InlineData("insert-result", "session", true)]
-        [InlineData("insert-result", "auth", true)]
-        [InlineData("insert-result", "connection", true)]
-        [InlineData("update-result", "auth", true)]
-        [InlineData("update-result", "connection", true)]
-        [InlineData("update-result", "session", true)]
         [InlineData("cleanup", "session", false)]
         [InlineData("cleanup", "auth", true)]
         [InlineData("cleanup", "connection", true)]
@@ -1702,7 +1575,6 @@ namespace UnitTests.MembershipTests
 
         [Theory]
         [InlineData("update")]
-        [InlineData("update-result")]
         [InlineData("cleanup")]
         public async Task MembershipOperations_ClusterRemovedDuringWrite_PropagatesNoNode(string operation)
         {
@@ -1756,8 +1628,6 @@ namespace UnitTests.MembershipTests
         [InlineData("point")]
         [InlineData("insert")]
         [InlineData("update")]
-        [InlineData("insert-result")]
-        [InlineData("update-result")]
         [InlineData("heartbeat")]
         [InlineData("cleanup")]
         public async Task NativeOperations_PreCanceledToken_IssuesNoRequests(string operation)
@@ -1881,8 +1751,6 @@ namespace UnitTests.MembershipTests
                 "point" => ZooKeeperBasedMembershipTable.ReadCoreAsync(fake.Operations, entry.SiloAddress, cancellationToken),
                 "insert" => ZooKeeperBasedMembershipTable.InsertRowCoreAsync(fake.Operations, entry, new TableVersion(2, "1"), cancellationToken),
                 "update" => ZooKeeperBasedMembershipTable.UpdateRowCoreAsync(fake.Operations, entry, "0", new TableVersion(2, "1"), cancellationToken),
-                "insert-result" => ZooKeeperBasedMembershipTable.InsertRowWithResultCoreAsync(fake.Operations, entry, new TableVersion(2, "1"), cancellationToken),
-                "update-result" => ZooKeeperBasedMembershipTable.UpdateRowWithResultCoreAsync(fake.Operations, entry, "0", new TableVersion(2, "1"), cancellationToken),
                 "heartbeat" => ZooKeeperBasedMembershipTable.UpdateIAmAliveCoreAsync(entry, fake.SetData, cancellationToken),
                 "cleanup" => ZooKeeperBasedMembershipTable.CleanupCoreAsync(fake.Operations, DateTime.UnixEpoch.AddDays(3), cancellationToken),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))

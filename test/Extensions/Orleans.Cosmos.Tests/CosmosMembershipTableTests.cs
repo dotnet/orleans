@@ -256,12 +256,6 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         await MembershipTable_InsertRow();
     }
 
-    [Theory, TestCategory("Functional")]
-    [InlineData(false)]
-    [InlineData(true)]
-    public Task MembershipTable_Cosmos_NativeNoContentReceiptProvenance(bool inspectInsertSnapshot)
-        => MembershipTable_NativeReceiptProvenance(inspectInsertSnapshot);
-
     [Fact, TestCategory("Functional")]
     public async Task MembershipTable_Cosmos_ReadAll_Insert_TryGet()
     {

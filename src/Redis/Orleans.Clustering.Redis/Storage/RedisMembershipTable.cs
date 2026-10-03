@@ -198,13 +198,11 @@ namespace Orleans.Clustering.Redis
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
+        {
+            return await UpsertRowInternal(entry, tableVersion, allowInsertOnly: true, cancellationToken);
+        }
 
-        /// <inheritdoc />
-        public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => UpsertRowInternal(entry, tableVersion, allowInsertOnly: true, cancellationToken);
-
-        private async Task<MembershipTableWriteResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
+        private async Task<bool> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool allowInsertOnly, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             // Server-side token validation avoids WATCH conflicts caused by heartbeat writes to the same hash.
@@ -220,15 +218,12 @@ namespace Orleans.Clustering.Redis
                 redis.call('HSET', KEYS[1], 'Version', ARGV[3], ARGV[1], ARGV[4])
                 return 1
                 """;
-            var committedVersion = SerializeVersion(tableVersion);
             var result = await AwaitAsync(_db.ScriptEvaluateAsync(
                 script,
                 [_clusterKey],
-                [entry.SiloAddress.ToString(), tableVersion.VersionEtag, committedVersion, Serialize(entry), allowInsertOnly ? 0 : 1],
+                [entry.SiloAddress.ToString(), tableVersion.VersionEtag, SerializeVersion(tableVersion), Serialize(entry), allowInsertOnly ? 0 : 1],
                 CommandFlags.NoScriptCache), cancellationToken);
-            return (int)result == 1
-                ? new(true, new(new TableVersion(tableVersion.Version, committedVersion), committedVersion))
-                : new(false);
+            return (int)result == 1;
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -305,16 +300,11 @@ namespace Orleans.Clustering.Redis
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
-
-        /// <inheritdoc />
-        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             // Reads use the table version as the row etag, so both must describe the same view.
             return string.Equals(etag, tableVersion.VersionEtag, StringComparison.Ordinal)
-                ? await UpsertRowInternal(entry, tableVersion, allowInsertOnly: false, cancellationToken)
-                : new(false);
+                && await UpsertRowInternal(entry, tableVersion, allowInsertOnly: false, cancellationToken);
         }
 
         [Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]

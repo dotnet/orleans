@@ -108,12 +108,6 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
     [Fact]
     public Task InsertRow() => MembershipTable_InsertRow();
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public Task NativeWriteResultReceiptProvenance(bool inspectInsertSnapshot)
-        => MembershipTable_NativeReceiptProvenance(inspectInsertSnapshot);
-
     [Fact]
     public Task ReadAll_Insert_TryGet() => MembershipTable_ReadRow_Insert_Read();
 

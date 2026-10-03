@@ -244,101 +244,6 @@ public sealed class MembershipTableTestsBaseLifecycleTests
         Assert.Equal(["create-table", "initialize-table", "delete-table", "dispose-table"], events);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeReceiptScenario_UsesReceiptTokensAndPreservesOwnerLifetime(bool inspectInsertSnapshot)
-    {
-        var events = new List<string>();
-        var fixture = CreateFixture(events);
-        var token = TestContext.Current.CancellationToken;
-        var table = await fixture.GetTableAsync(token);
-        var initialVersion = new TableVersion(0, "native-table-0");
-        var insertReceipt = new MembershipTableWriteReceipt(new TableVersion(1, "native-table-1"), "native-row-1");
-        var updateReceipt = new MembershipTableWriteReceipt(new TableVersion(2, "native-table-2"), "native-row-2");
-        MembershipEntry? insertedEntry = null;
-        MembershipEntry? updatedEntry = null;
-        var reads = 0;
-        var updates = 0;
-        table.ReadAllAsync(Arg.Any<CancellationToken>()).Returns(_ =>
-        {
-            if (++reads == 1)
-            {
-                return new MembershipTableData(initialVersion);
-            }
-
-            if (updatedEntry is { } updated)
-            {
-                return new MembershipTableData(Tuple.Create(updated.Copy(), updateReceipt.RowETag), updateReceipt.Version);
-            }
-
-            var inserted = Assert.IsType<MembershipEntry>(insertedEntry);
-            return new MembershipTableData(Tuple.Create(inserted.Copy(), insertReceipt.RowETag), insertReceipt.Version);
-        });
-        table.InsertRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                Assert.Equal(initialVersion.Next(), call.ArgAt<TableVersion>(1));
-                insertedEntry = call.ArgAt<MembershipEntry>(0).Copy();
-                Assert.Equal("receipt-host", insertedEntry.HostName);
-                Assert.Equal("receipt-silo", insertedEntry.SiloName);
-                Assert.Equal(SiloStatus.Joining, insertedEntry.Status);
-                Assert.Equal(new DateTime(2024, 1, 2, 3, 4, 5, DateTimeKind.Utc), insertedEntry.StartTime);
-                Assert.Equal(insertedEntry.StartTime.AddMinutes(1), insertedEntry.IAmAliveTime);
-                Assert.Empty(insertedEntry.SuspectTimes!);
-                return new MembershipTableWriteResult(true, insertReceipt);
-            });
-        table.UpdateRowWithResultAsync(Arg.Any<MembershipEntry>(), Arg.Any<string>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                Assert.Equal(insertReceipt.RowETag, call.ArgAt<string>(1));
-                Assert.Equal(insertReceipt.Version.Next(), call.ArgAt<TableVersion>(2));
-                var input = call.ArgAt<MembershipEntry>(0);
-                if (++updates == 1)
-                {
-                    Assert.Equal(SiloStatus.Active, input.Status);
-                    updatedEntry = input.Copy();
-                    return new MembershipTableWriteResult(true, updateReceipt);
-                }
-
-                Assert.Equal(SiloStatus.ShuttingDown, input.Status);
-                return default(MembershipTableWriteResult);
-            });
-        table.ClearReceivedCalls();
-        try
-        {
-            await fixture.RunNativeReceiptScenarioAsync(inspectInsertSnapshot);
-
-            var expectedCalls = new List<string> { nameof(IMembershipTable.ReadAllAsync), nameof(IMembershipTable.InsertRowWithResultAsync) };
-            if (inspectInsertSnapshot)
-            {
-                expectedCalls.Add(nameof(IMembershipTable.ReadAllAsync));
-            }
-
-            expectedCalls.AddRange([
-                nameof(IMembershipTable.UpdateRowWithResultAsync), nameof(IMembershipTable.ReadAllAsync),
-                nameof(IMembershipTable.UpdateRowWithResultAsync), nameof(IMembershipTable.ReadAllAsync)]);
-            var calls = table.ReceivedCalls().ToArray();
-            Assert.Equal(expectedCalls, calls.Select(call => call.GetMethodInfo().Name));
-            Assert.All(calls, call => Assert.Equal(token, Assert.IsType<CancellationToken>(call.GetArguments()[^1])));
-            Assert.Equal(inspectInsertSnapshot ? 4 : 3, reads);
-            Assert.Equal(2, updates);
-            var stored = Assert.IsType<MembershipEntry>(updatedEntry);
-            var expected = Assert.IsType<MembershipEntry>(insertedEntry).Copy();
-            expected.Status = SiloStatus.Active;
-            Assert.Equal(expected.ToFullString(), stored.ToFullString());
-            Assert.Equal(new TableVersion(1, "native-table-1"), insertReceipt.Version);
-            Assert.Equal("native-row-1", insertReceipt.RowETag);
-            Assert.Equal(["create-table", "initialize-table"], events);
-        }
-        finally
-        {
-            await fixture.DisposeAsync();
-        }
-
-        Assert.Equal(["create-table", "initialize-table", "delete-table", "dispose-table"], events);
-    }
-
     private static LegacyFixtureHarness CreateFixture(
         List<string> events,
         Func<CancellationToken, Task>? initializeTable = null,
@@ -387,9 +292,6 @@ public sealed class MembershipTableTestsBaseLifecycleTests
             => GetLegacyGatewayListProviderAsync(cancellationToken);
 
         public Task RunLegacyNamedRowScenarioAsync() => MembershipTable_ReadRow_Insert_Read();
-
-        public Task RunNativeReceiptScenarioAsync(bool inspectInsertSnapshot)
-            => MembershipTable_NativeReceiptProvenance(inspectInsertSnapshot);
 
         protected override Task<string> GetConnectionString() => Task.FromResult("lifecycle-test");
 

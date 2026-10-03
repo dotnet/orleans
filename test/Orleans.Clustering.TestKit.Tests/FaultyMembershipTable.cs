@@ -11,7 +11,7 @@ internal enum MembershipFault
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatStorageFailure,
     CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll,
     DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation,
-    IgnoreHeartbeatWrite, MissingReceipt
+    IgnoreHeartbeatWrite
 }
 
 internal sealed class MembershipFaultController(MembershipFault fault)
@@ -152,9 +152,6 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     }
 
     public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-        => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
-
-    public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
         if (Fault == MembershipFault.IgnoreTableToken)
         {
@@ -163,7 +160,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             {
                 var current = inner.ReadAllAsync(cancellationToken).GetAwaiter().GetResult().Version.Next();
                 if (current.VersionEtag != tableVersion.VersionEtag) control.Injected++;
-                return inner.InsertRowWithResultAsync(entry, current, cancellationToken).GetAwaiter().GetResult();
+                return inner.InsertRowAsync(entry, current, cancellationToken).GetAwaiter().GetResult();
             }
         }
         if (Fault == MembershipFault.VersionJump)
@@ -171,8 +168,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             tableVersion = new(tableVersion.Version + 1, tableVersion.VersionEtag);
             control.Injected++;
         }
-        var result = await inner.InsertRowWithResultAsync(entry, tableVersion, cancellationToken);
-        var success = result.Succeeded;
+        var success = await inner.InsertRowAsync(entry, tableVersion, cancellationToken);
         if (success && Fault == MembershipFault.InsertChangesExistingRow)
             Mutate(p =>
             {
@@ -184,7 +180,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             });
         if (success && Fault == MembershipFault.AliasInsert)
             Mutate(p => { p.Rows[entry.SiloAddress] = Tuple.Create(entry, p.Rows[entry.SiloAddress].Item2); control.Injected++; });
-        return Fault == MembershipFault.MissingReceipt ? new(result.Succeeded) : result;
+        return success;
     }
 
     public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
@@ -327,12 +323,12 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
         }
         if (Fault == MembershipFault.TornReadAll)
         {
-            // Two final setup reads and two round-boundary reads precede the writer barrier.
+            // The last insert verification, two final setup reads, and two round-boundary reads precede the writer barrier.
             var current = await inner.ReadAllAsync(ct);
             var fullReads = current.Version.Version == 5
                 ? Interlocked.Increment(ref control.ReadsAtFiveRows)
                 : Volatile.Read(ref control.ReadsAtFiveRows);
-            if (fullReads > 4)
+            if (fullReads > 5)
                 await control.WriterArmed.Task.WaitAsync(ct);
             if (Volatile.Read(ref control.TornArmed) != 0)
             {

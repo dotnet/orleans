@@ -189,8 +189,6 @@ namespace Orleans
         System.Threading.Tasks.Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion);
         [Alias("FEF3AC5A")]
         System.Threading.Tasks.Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
-        [Alias("InsertRowWithResult")]
-        System.Threading.Tasks.Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
         [System.Obsolete("Use ReadAllAsync instead.")]
         System.Threading.Tasks.Task<MembershipTableData> ReadAll();
         [Alias("00BCE16F")]
@@ -208,8 +206,6 @@ namespace Orleans
         System.Threading.Tasks.Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion);
         [Alias("E06D3DBC")]
         System.Threading.Tasks.Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
-        [Alias("UpdateRowWithResult")]
-        System.Threading.Tasks.Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget, Runtime.IAddressable
@@ -350,34 +346,6 @@ namespace Orleans
         public System.Tuple<MembershipEntry, string>? TryGet(Runtime.SiloAddress silo) { throw null; }
 
         public MembershipTableData WithoutDuplicateDeads() { throw null; }
-    }
-
-    [GenerateSerializer]
-    [Immutable]
-    public sealed partial class MembershipTableWriteReceipt
-    {
-        public MembershipTableWriteReceipt(TableVersion version, string rowETag) { }
-
-        [Id(1)]
-        public string RowETag { get { throw null; } }
-
-        [Id(0)]
-        public TableVersion Version { get { throw null; } }
-    }
-
-    [GenerateSerializer]
-    [Immutable]
-    public readonly partial struct MembershipTableWriteResult
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public MembershipTableWriteResult(bool succeeded, MembershipTableWriteReceipt? receipt = null) { }
-
-        [Id(1)]
-        public MembershipTableWriteReceipt? Receipt { get { throw null; } }
-
-        [Id(0)]
-        public bool Succeeded { get { throw null; } }
     }
 
     public static partial class NamedOptionExtensions
@@ -2261,24 +2229,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IMembershipTable_GrainReference_543FB541 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMembershipTable_GrainReference_543FB541>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_IMembershipTable_GrainReference_543FB541(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMembershipTable_GrainReference_543FB541 instance) { }
-
-        public Invokable_IMembershipTable_GrainReference_543FB541 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMembershipTable_GrainReference_543FB541 instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMembershipTable_GrainReference_543FB541 value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IMembershipTable_GrainReference_60723C98 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMembershipTable_GrainReference_60723C98>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IMembershipTable_GrainReference_60723C98(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2445,24 +2395,6 @@ namespace OrleansCodeGen.Orleans
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMembershipTable_GrainReference_E06D3DBC value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IMembershipTable_GrainReference_F29AA4D9 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMembershipTable_GrainReference_F29AA4D9>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_IMembershipTable_GrainReference_F29AA4D9(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMembershipTable_GrainReference_F29AA4D9 instance) { }
-
-        public Invokable_IMembershipTable_GrainReference_F29AA4D9 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMembershipTable_GrainReference_F29AA4D9 instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMembershipTable_GrainReference_F29AA4D9 value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -2699,42 +2631,6 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_MembershipTableWriteReceipt : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.MembershipTableWriteReceipt>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_MembershipTableWriteReceipt(global::Orleans.Serialization.Activators.IActivator<global::Orleans.MembershipTableWriteReceipt> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.MembershipTableWriteReceipt instance) { }
-
-        public global::Orleans.MembershipTableWriteReceipt ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.MembershipTableWriteReceipt instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.MembershipTableWriteReceipt value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_MembershipTableWriteResult : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.MembershipTableWriteResult>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.MembershipTableWriteResult>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_MembershipTableWriteResult(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.MembershipTableWriteResult instance) { }
-
-        public global::Orleans.MembershipTableWriteResult ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.MembershipTableWriteResult instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.MembershipTableWriteResult value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_TableVersion : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.TableVersion>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_TableVersion(global::Orleans.Serialization.Activators.IActivator<global::Orleans.TableVersion> _activator) { }
@@ -2784,16 +2680,6 @@ namespace OrleansCodeGen.Orleans
         public Copier_Invokable_IMembershipTable_GrainReference_47733EA8(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IMembershipTable_GrainReference_47733EA8 DeepCopy(Invokable_IMembershipTable_GrainReference_47733EA8 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IMembershipTable_GrainReference_543FB541 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMembershipTable_GrainReference_543FB541>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_Invokable_IMembershipTable_GrainReference_543FB541(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public Invokable_IMembershipTable_GrainReference_543FB541 DeepCopy(Invokable_IMembershipTable_GrainReference_543FB541 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -2882,16 +2768,6 @@ namespace OrleansCodeGen.Orleans
         public Copier_Invokable_IMembershipTable_GrainReference_E06D3DBC(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IMembershipTable_GrainReference_E06D3DBC DeepCopy(Invokable_IMembershipTable_GrainReference_E06D3DBC original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IMembershipTable_GrainReference_F29AA4D9 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMembershipTable_GrainReference_F29AA4D9>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_Invokable_IMembershipTable_GrainReference_F29AA4D9(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public Invokable_IMembershipTable_GrainReference_F29AA4D9 DeepCopy(Invokable_IMembershipTable_GrainReference_F29AA4D9 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -3115,47 +2991,6 @@ namespace OrleansCodeGen.Orleans
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-
-        public override bool TryCancel() { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "UpdateRowWithResult" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_543FB541 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableWriteResult>
-    {
-        public global::Orleans.MembershipEntry arg0;
-        public string arg1;
-        public global::Orleans.TableVersion arg2;
-        public System.Threading.CancellationToken arg3;
-        public override bool IsCancellable { get { throw null; } }
-
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableWriteResult> InvokeInner() { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3515,46 +3350,6 @@ namespace OrleansCodeGen.Orleans
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "InsertRowWithResult" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_F29AA4D9 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableWriteResult>
-    {
-        public global::Orleans.MembershipEntry arg0;
-        public global::Orleans.TableVersion arg1;
-        public System.Threading.CancellationToken arg2;
-        public override bool IsCancellable { get { throw null; } }
-
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableWriteResult> InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-
-        public override bool TryCancel() { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

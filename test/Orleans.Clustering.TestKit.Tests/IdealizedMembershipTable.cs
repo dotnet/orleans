@@ -167,39 +167,31 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
         return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
-    public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-        => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
-
-    public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         => Locked(() =>
         {
             backend.Inserts++;
             var partition = Partition;
-            if (partition.Etag != tableVersion.VersionEtag || partition.Rows.ContainsKey(entry.SiloAddress)) return default(MembershipTableWriteResult);
+            if (partition.Etag != tableVersion.VersionEtag || partition.Rows.ContainsKey(entry.SiloAddress)) return false;
             if (entry.SuspectTimes is { Count: > 0 }) backend.InsertsWithSuspectVotes++;
             var stored = Clone(entry);
             if (backend.SeparateHeartbeatStorage) stored.IAmAliveTime = stored.StartTime;
             partition.Rows.Add(entry.SiloAddress, Tuple.Create(stored, backend.Token()));
             partition.Version = tableVersion.Version;
             partition.Etag = backend.Token();
-            return new MembershipTableWriteResult(true, new(
-                new TableVersion(partition.Version, partition.Etag),
-                backend.TableVersionRowEtags ? partition.Etag : partition.Rows[entry.SiloAddress].Item2));
+            return true;
         }, cancellationToken);
 
-    public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
-        => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
-
-    public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
+    public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         => Locked(() =>
         {
             backend.VersionedUpdates++;
             var partition = Partition;
-            if (partition.Etag != tableVersion.VersionEtag || !partition.Rows.TryGetValue(entry.SiloAddress, out var row)) return default(MembershipTableWriteResult);
+            if (partition.Etag != tableVersion.VersionEtag || !partition.Rows.TryGetValue(entry.SiloAddress, out var row)) return false;
             if (!backend.PhysicalRowEtags)
             {
                 backend.RowConditionChecks++;
-                if ((backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return default(MembershipTableWriteResult);
+                if ((backend.TableVersionRowEtags ? partition.Etag : row.Item2) != etag) return false;
             }
             var stored = Clone(entry);
             if (backend.SeparateHeartbeatStorage
@@ -208,9 +200,7 @@ internal sealed class IdealizedMembershipTable(IdealizedMembershipBackend backen
             partition.Rows[stored.SiloAddress] = Tuple.Create(stored, backend.Token());
             partition.Version = tableVersion.Version;
             partition.Etag = backend.Token();
-            return new MembershipTableWriteResult(true, new(
-                new TableVersion(partition.Version, partition.Etag),
-                backend.TableVersionRowEtags ? partition.Etag : partition.Rows[entry.SiloAddress].Item2));
+            return true;
         }, cancellationToken);
 
     public Task UpdateIAmAliveAsync(MembershipEntry entry, CancellationToken cancellationToken = default)

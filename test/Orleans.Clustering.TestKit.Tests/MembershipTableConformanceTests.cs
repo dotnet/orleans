@@ -78,7 +78,7 @@ public sealed class MembershipTableConformanceTests
     [InlineData(4096, false, false)]
     [InlineData(4096, true, false)]
     [InlineData(4096, false, true)]
-    public async Task ConcurrentReadSetup_UsesCommitReceiptsAndIndependentFinalView(int rows, bool tableVersionRowEtags, bool physicalRowEtags)
+    public async Task ConcurrentReadSetup_UsesFullSnapshotsAndIndependentFinalView(int rows, bool tableVersionRowEtags, bool physicalRowEtags)
     {
         var backend = new IdealizedMembershipBackend { TableVersionRowEtags = tableVersionRowEtags, PhysicalRowEtags = physicalRowEtags };
         await backend.Fixture().RunAsync(async (fixture, ct) =>
@@ -86,8 +86,8 @@ public sealed class MembershipTableConformanceTests
             await new MembershipTableTestRunner(fixture, concurrencyRowCount: rows).SeedConcurrentRows(ct);
             Assert.Equal(rows, backend.Inserts);
             Assert.Equal(0, backend.PointReads);
-            Assert.Equal(3, backend.FullReads);
-            Assert.Equal(2 * rows, backend.RowsObserved);
+            Assert.Equal(rows + 3, backend.FullReads);
+            Assert.Equal(rows * (rows + 1) / 2 + 2 * rows, backend.RowsObserved);
             var partition = backend.Partitions[fixture.ClusterId];
             Assert.Equal(rows, partition.Version);
             Assert.Equal(rows, partition.Rows.Count);

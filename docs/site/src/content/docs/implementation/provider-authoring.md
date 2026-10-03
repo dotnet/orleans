@@ -83,21 +83,13 @@ Membership table RPCs retain their existing operation aliases and application-ar
 
 When a lifecycle callback must execute its cancellation or cleanup logic, schedule it with <xref:System.Threading.Tasks.Task.Run*> and pass the cancellation token to the operation inside the callback. The callback then owns how cancellation completes its work.
 
-## Membership snapshots and mutation results
+## Membership snapshots
 
 Use <xref:Orleans.IMembershipTable.ReadAllAsync*> to obtain the membership rows and their corresponding table version in one atomic snapshot. <xref:Orleans.MembershipTableData.TryGet*> selects a silo's entry and row ETag from that snapshot.
 
 Both legacy row-read signatures are obsolete. Built-in providers report <xref:System.NotSupportedException>; cancellation-aware calls observe pre-cancellation first. Custom providers using the default row-read adapter retain their legacy dispatch and cancellation behavior.
 
-<xref:Orleans.IMembershipTable.InsertRowWithResultAsync*> and <xref:Orleans.IMembershipTable.UpdateRowWithResultAsync*> return a <xref:Orleans.MembershipTableWriteResult>. Its success status records the conditional write's outcome. When the provider supplies a <xref:Orleans.MembershipTableWriteReceipt>, the receipt contains the table version and written row's ETag from that specific commit. Providers obtain this metadata from their native write result or the values which the conditional mutation committed.
-
-The default implementations call the corresponding bool-returning operation once and return its outcome with an absent receipt. A caller which needs current state can explicitly refresh with a full snapshot. That snapshot describes the read's observation; the receipt describes the originating write.
-
-During isolated setup, callers can maintain expected membership locally and use <xref:Orleans.TableVersion.Next*> on each returned receipt's version to supply the next write's table condition. Full snapshots at the end validate the stored canonical fields. Concurrent canonical writes can make a returned table token stale, so a later conditional failure requires a fresh view before selecting another mutation.
-
-Row ETags follow each provider's metadata policy and can change during heartbeat-only activity. Canonical updates require an existing row and a matching table ETag; additional row conditions remain heartbeat-neutral. A receipt supplies exact commit metadata rather than a promise that every row ETag remains stable.
-
-The receipt-returning RPCs have their own operation identities and require a receiver which implements them. Existing bool-returning calls retain their wire contracts during mixed-version deployments.
+Conditional writes use <xref:Orleans.TableVersion.Next*> from the observed snapshot and return their success status. Refresh the snapshot to obtain the current table ETag before selecting another mutation. Row ETags follow each provider's metadata policy and can change during heartbeat-only activity. Canonical updates require an existing row and a matching table ETag; additional row conditions remain heartbeat-neutral.
 
 ## Testing a provider
 

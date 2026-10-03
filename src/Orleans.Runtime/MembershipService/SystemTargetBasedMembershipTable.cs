@@ -161,16 +161,10 @@ namespace Orleans.Runtime.MembershipService
 
         public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.InsertRowAsync(entry, tableVersion, cancellationToken);
 
-        public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            this.grain.InsertRowWithResultAsync(entry, tableVersion, cancellationToken);
-
         [Obsolete("Use UpdateRowAsync instead.")]
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) => this.grain.UpdateRowAsync(entry, etag, tableVersion, cancellationToken);
-
-        public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            this.grain.UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken);
 
         [Obsolete("Use UpdateIAmAliveAsync instead.")]
         public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry, CancellationToken.None);
@@ -287,41 +281,29 @@ namespace Orleans.Runtime.MembershipService
         [Obsolete("Use InsertRowAsync instead.")]
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
-        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            Task.FromResult(InsertRowCore(entry, tableVersion, cancellationToken).Succeeded);
-
-        public Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            Task.FromResult(InsertRowCore(entry, tableVersion, cancellationToken));
-
-        private MembershipTableWriteResult InsertRowCore(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken)
+        public Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugInsertRow(logger, entry, tableVersion);
-            var result = table.InsertWithResult(entry, tableVersion);
-            if (!result.Succeeded)
+            bool result = table.Insert(entry, tableVersion);
+            if (result == false)
                 LogInformationInsertRowFailed(logger, entry, tableVersion, table.ReadAll());
 
-            return result;
+            return Task.FromResult(result);
         }
 
         [Obsolete("Use UpdateRowAsync instead.")]
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
-        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            Task.FromResult(UpdateRowCore(entry, etag, tableVersion, cancellationToken).Succeeded);
-
-        public Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default) =>
-            Task.FromResult(UpdateRowCore(entry, etag, tableVersion, cancellationToken));
-
-        private MembershipTableWriteResult UpdateRowCore(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken)
+        public Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             LogDebugUpdateRow(logger, entry, etag, tableVersion);
-            var result = table.UpdateWithResult(entry, etag, tableVersion);
-            if (!result.Succeeded)
+            bool result = table.Update(entry, etag, tableVersion);
+            if (result == false)
                 LogInformationUpdateRowFailed(logger, entry, etag, tableVersion, table.ReadAll());
 
-            return result;
+            return Task.FromResult(result);
         }
 
         [Obsolete("Use UpdateIAmAliveAsync instead.")]

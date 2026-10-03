@@ -61,8 +61,6 @@ public class AzureMembershipPaginationTests
     [InlineData("ReadAll")]
     [InlineData("Insert")]
     [InlineData("Update")]
-    [InlineData("InsertWithResult")]
-    [InlineData("UpdateWithResult")]
     [InlineData("Heartbeat")]
     public async Task CanceledOperationsDoNotAccessStorage(string operation)
     {
@@ -85,8 +83,6 @@ public class AzureMembershipPaginationTests
             "ReadAll" => table.ReadAllAsync(token),
             "Insert" => table.InsertRowAsync(entry, version, token),
             "Update" => table.UpdateRowAsync(entry, "etag", version, token),
-            "InsertWithResult" => table.InsertRowWithResultAsync(entry, version, token),
-            "UpdateWithResult" => table.UpdateRowWithResultAsync(entry, "etag", version, token),
             "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -585,11 +581,9 @@ public class AzureMembershipPaginationTests
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public async Task MembershipWriteUsesAtomicCanonicalVersionCondition(bool insert, bool rich)
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MembershipWriteUsesAtomicCanonicalVersionCondition(bool insert)
     {
         var client = CreateHeartbeatClient();
         TableTransactionAction[]? transaction = null;
@@ -605,23 +599,11 @@ public class AzureMembershipPaginationTests
         var proposedTime = entry.IAmAliveTime;
         var version = new TableVersion(7, "v7").Next();
 
-        if (rich)
-        {
-            var result = insert
-                ? await table.InsertRowWithResultAsync(entry, version, TestContext.Current.CancellationToken)
-                : await table.UpdateRowWithResultAsync(entry, "s1", version, TestContext.Current.CancellationToken);
-            Assert.True(result.Succeeded);
-            Assert.NotNull(result.Receipt);
-            Assert.Equal(new TableVersion(8, "W/\"written-version\""), result.Receipt.Version);
-            Assert.Equal("W/\"written-row\"", result.Receipt.RowETag);
-        }
-        else
-        {
-            Assert.True(insert
-                ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
-                : await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken));
-        }
+        var result = insert
+            ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
+            : await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken);
 
+        Assert.True(result);
         Assert.NotNull(transaction);
         Assert.Equal(4, transaction.Length);
         Assert.Equal(insert ? TableTransactionActionType.Add : TableTransactionActionType.UpdateReplace, transaction[0].ActionType);
@@ -647,76 +629,6 @@ public class AzureMembershipPaginationTests
         Assert.Equal(nameof(TableClient.SubmitTransactionAsync), Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
     }
 
-    [Fact]
-    public async Task ReceiptChainsWithoutReadbackAndRetainsOwnCommitMetadata()
-    {
-        var client = CreateHeartbeatClient();
-        var writes = new List<TableTransactionAction[]>();
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                var transaction = call.Arg<IEnumerable<TableTransactionAction>>().ToArray();
-                writes.Add(transaction);
-                Assert.Equal(writes.Count == 1 ? "v7" : "W/\"version-8\"", transaction[1].ETag.ToString());
-                return SuccessfulTransaction($"W/\"row-{writes.Count + 7}\"", $"W/\"version-{writes.Count + 7}\"");
-            });
-        _ = client.UpdateEntityAsync(Arg.Any<SiloInstanceTableEntry>(), Arg.Any<ETag>(), TableUpdateMode.Merge, Arg.Any<CancellationToken>())
-            .Returns(Substitute.ForPartsOf<Response>());
-        var table = CreateTable(CreateManager(null, client));
-        var entry = ProposedEntry();
-        entry.SuspectTimes = [];
-        var inserted = await table.InsertRowWithResultAsync(entry, new TableVersion(8, "v7"), TestContext.Current.CancellationToken);
-        Assert.True(inserted.Succeeded);
-        var receipt = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
-        await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
-        entry.Status = SiloStatus.Dead;
-        entry.AddSuspector(entry.SiloAddress, entry.IAmAliveTime);
-        var updated = await table.UpdateRowWithResultAsync(entry, receipt.RowETag, receipt.Version.Next(), TestContext.Current.CancellationToken);
-
-        Assert.True(updated.Succeeded);
-        Assert.Equal(new TableVersion(9, "W/\"version-9\""), updated.Receipt!.Version);
-        Assert.Equal("W/\"row-9\"", updated.Receipt.RowETag);
-        Assert.Equal(new TableVersion(8, "W/\"version-8\""), receipt.Version);
-        Assert.Equal("W/\"row-8\"", receipt.RowETag);
-        Assert.Equal(ETag.All, writes[1][0].ETag);
-        Assert.Equal(string.Empty, Assert.IsType<SiloInstanceTableEntry>(writes[0][0].Entity).SuspectingSilos);
-        Assert.Equal(entry.SiloAddress.ToParsableString(), Assert.IsType<SiloInstanceTableEntry>(writes[1][0].Entity).SuspectingSilos);
-        var initialRow = Assert.IsType<SiloInstanceTableEntry>(writes[0][0].Entity);
-        var updatedRow = Assert.IsType<SiloInstanceTableEntry>(writes[1][0].Entity);
-        Assert.Equal(nameof(SiloStatus.Active), initialRow.Status);
-        Assert.Equal(nameof(SiloStatus.Dead), updatedRow.Status);
-        Assert.Equal(initialRow.HostName, updatedRow.HostName);
-        Assert.Equal(initialRow.SiloName, updatedRow.SiloName);
-        Assert.Equal(initialRow.StartTime, updatedRow.StartTime);
-        Assert.Equal(initialRow.ProxyPort, updatedRow.ProxyPort);
-        Assert.Equal(["SubmitTransactionAsync", "UpdateEntityAsync", "SubmitTransactionAsync"],
-            client.ReceivedCalls().Select(call => call.GetMethodInfo().Name));
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ReceiptWritePreservesNativeCancellation(bool update)
-    {
-        var client = CreateHeartbeatClient();
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        _ = client.SubmitTransactionAsync(Arg.Any<IEnumerable<TableTransactionAction>>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                Assert.Equal(cancellation.Token, call.Arg<CancellationToken>());
-                cancellation.Cancel();
-                return Task.FromCanceled<Response<IReadOnlyList<Response>>>(cancellation.Token);
-            });
-        var table = CreateTable(CreateManager(null, client));
-
-        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => update
-            ? table.UpdateRowWithResultAsync(ProposedEntry(), "ignored", new TableVersion(8, "v7"), cancellation.Token)
-            : table.InsertRowWithResultAsync(ProposedEntry(), new TableVersion(8, "v7"), cancellation.Token));
-
-        Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal("SubmitTransactionAsync", Assert.Single(client.ReceivedCalls()).GetMethodInfo().Name);
-    }
-
     [Theory]
     [InlineData(true, 409, "EntityAlreadyExists")]
     [InlineData(true, 412, "UpdateConditionNotSatisfied")]
@@ -732,11 +644,10 @@ public class AzureMembershipPaginationTests
         var version = new TableVersion(7, "v7").Next();
 
         var result = insert
-            ? await table.InsertRowWithResultAsync(entry, version, TestContext.Current.CancellationToken)
-            : await table.UpdateRowWithResultAsync(entry, "s1", version, TestContext.Current.CancellationToken);
+            ? await table.InsertRowAsync(entry, version, TestContext.Current.CancellationToken)
+            : await table.UpdateRowAsync(entry, "s1", version, TestContext.Current.CancellationToken);
 
-        Assert.False(result.Succeeded);
-        Assert.Null(result.Receipt);
+        Assert.False(result);
         var call = Assert.Single(client.ReceivedCalls());
         Assert.Equal(nameof(TableClient.SubmitTransactionAsync), call.GetMethodInfo().Name);
         var transaction = Assert.IsAssignableFrom<IEnumerable<TableTransactionAction>>(call.GetArguments()[0]).ToArray();
@@ -808,8 +719,6 @@ public class AzureMembershipPaginationTests
     [Theory]
     [InlineData("Insert")]
     [InlineData("Update")]
-    [InlineData("InsertWithResult")]
-    [InlineData("UpdateWithResult")]
     [InlineData("Heartbeat")]
     public async Task WriteTableNotFoundIsNotContention(string operation)
     {
@@ -826,8 +735,6 @@ public class AzureMembershipPaginationTests
         {
             "Insert" => table.InsertRowAsync(entry, new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
             "Update" => table.UpdateRowAsync(entry, "s1", new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
-            "InsertWithResult" => table.InsertRowWithResultAsync(entry, new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
-            "UpdateWithResult" => table.UpdateRowWithResultAsync(entry, "s1", new TableVersion(8, "v7"), TestContext.Current.CancellationToken),
             "Heartbeat" => table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
@@ -1132,32 +1039,10 @@ public class AzureMembershipPaginationTests
         return row;
     }
 
-    private static Response<IReadOnlyList<Response>> SuccessfulTransaction(string rowETag = "W/\"written-row\"", string versionETag = "W/\"written-version\"")
+    private static Response<IReadOnlyList<Response>> SuccessfulTransaction()
         => Response.FromValue<IReadOnlyList<Response>>(
-            [new ETagResponse(rowETag), new ETagResponse(versionETag), new ETagResponse("W/\"boundary-start\""), new ETagResponse("W/\"boundary-end\"")],
+            [Substitute.ForPartsOf<Response>(), Substitute.ForPartsOf<Response>(), Substitute.ForPartsOf<Response>(), Substitute.ForPartsOf<Response>()],
             Substitute.For<Response>());
-
-    private sealed class ETagResponse(string etag) : Response
-    {
-        public override int Status => 204;
-        public override string ReasonPhrase => "No Content";
-        public override System.IO.Stream? ContentStream { get; set; }
-        public override string ClientRequestId { get; set; } = string.Empty;
-        public override void Dispose() { }
-        protected override bool ContainsHeader(string name) => string.Equals(name, "ETag", StringComparison.OrdinalIgnoreCase);
-        protected override IEnumerable<Azure.Core.HttpHeader> EnumerateHeaders() => [new("ETag", etag)];
-        protected override bool TryGetHeader(string name, out string value)
-        {
-            value = ContainsHeader(name) ? etag : string.Empty;
-            return ContainsHeader(name);
-        }
-
-        protected override bool TryGetHeaderValues(string name, out IEnumerable<string> values)
-        {
-            values = ContainsHeader(name) ? [etag] : [];
-            return ContainsHeader(name);
-        }
-    }
 
     private static MembershipTableQueryResult FencedQuery(
         int version,

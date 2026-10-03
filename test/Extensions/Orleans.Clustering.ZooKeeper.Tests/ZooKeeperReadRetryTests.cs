@@ -664,15 +664,11 @@ public sealed class ZooKeeperReadRetryTests
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, true)]
-    public async Task ConditionalWrite_CommitOrCloseLoss_PropagatesWithoutReplay(bool update, bool closeFailure, bool rich)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ConditionalWrite_CommitOrCloseLoss_PropagatesWithoutReplay(bool update, bool closeFailure)
     {
         var harness = await Harness.CreateAsync(1);
         var entry = update ? harness.Entries[0] : Harness.Entry(1);
@@ -683,13 +679,9 @@ public sealed class ZooKeeperReadRetryTests
         else
             harness.AfterMulti = () => Task.FromException(failure);
 
-        var actual = await Record.ExceptionAsync(() => (rich, update) switch
-        {
-            (true, true) => harness.Table.UpdateRowWithResultAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            (true, false) => harness.Table.InsertRowWithResultAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            (false, true) => harness.Table.UpdateRowAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            _ => harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken)
-        });
+        var actual = await Record.ExceptionAsync(() => update
+            ? harness.Table.UpdateRowAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken)
+            : harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken));
 
         Assert.Same(failure, actual);
         Assert.Same(failure, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
@@ -723,11 +715,9 @@ public sealed class ZooKeeperReadRetryTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public async Task ConditionalWrite_CallbackAndCloseFailures_PreserveBothExceptions(bool update, bool rich)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConditionalWrite_CallbackAndCloseFailures_PreserveBothExceptions(bool update)
     {
         var harness = await Harness.CreateAsync(1);
         var entry = update ? harness.Entries[0] : Harness.Entry(1);
@@ -737,13 +727,9 @@ public sealed class ZooKeeperReadRetryTests
         harness.AfterMulti = () => Task.FromException(primary);
         harness.Close = () => Task.FromException(secondary);
 
-        var actual = await Assert.ThrowsAsync<AggregateException>(() => (rich, update) switch
-        {
-            (true, true) => harness.Table.UpdateRowWithResultAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            (true, false) => harness.Table.InsertRowWithResultAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            (false, true) => harness.Table.UpdateRowAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken),
-            _ => harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken)
-        });
+        var actual = await Assert.ThrowsAsync<AggregateException>(() => update
+            ? harness.Table.UpdateRowAsync(entry, "0", new TableVersion(2, "1"), TestContext.Current.CancellationToken)
+            : harness.Table.InsertRowAsync(entry, new TableVersion(2, "1"), TestContext.Current.CancellationToken));
 
         Assert.Equal(new Exception[] { primary, secondary }, actual.InnerExceptions);
         Assert.Same(actual, await Record.ExceptionAsync(() => Assert.Single(harness.Sessions).Completion));
@@ -766,124 +752,6 @@ public sealed class ZooKeeperReadRetryTests
 
         Assert.Same(native.Multi, wrapped.Multi);
         Assert.Same(native.SetData, wrapped.SetData);
-    }
-
-    [Fact]
-    public async Task ReceiptWrites_ChainNativeTokensUsingOneOwnerPerWrite()
-    {
-        var harness = await Harness.CreateAsync(0);
-        var entry = Harness.Entry(0);
-        var token = TestContext.Current.CancellationToken;
-
-        var inserted = await harness.Table.InsertRowWithResultAsync(entry, new TableVersion(900, "0"), token);
-        Assert.True(inserted.Succeeded);
-        var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
-        Assert.Equal(new TableVersion(1, "1"), first.Version);
-        Assert.Equal("0", first.RowETag);
-        entry.Status = SiloStatus.Dead;
-        var updated = await harness.Table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
-        Assert.True(updated.Succeeded);
-        var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
-        Assert.Equal(new TableVersion(2, "2"), second.Version);
-        Assert.Equal("1", second.RowETag);
-        Assert.Equal(new[] { "Multi", "Multi" }, harness.Calls);
-        Assert.Equal(new[] { false, false }, harness.ReadOnly);
-        Assert.Equal(2, harness.CloseCount);
-        Assert.All(harness.Sessions, session => Assert.True(session.Completion.IsCompletedSuccessfully));
-        Assert.Equal(2, harness.Fake.Nodes["/"].Version);
-        Assert.Equal(1, harness.Fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)].Version);
-        Assert.Equal(ZooKeeperBasedMembershipTable.Serialize(entry), harness.Fake.Nodes[ZooKeeperNativeFake.RowPath(entry.SiloAddress)].Data);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ReceiptWrite_WaitsForCloseAndRetainsOwnCommitAfterInterveningWrite(bool update)
-    {
-        var harness = await Harness.CreateAsync(1);
-        var entry = update ? harness.Entries[0] : Harness.Entry(1);
-        entry.Status = SiloStatus.Dead;
-        var closeStarted = Gate();
-        var close = Gate();
-        harness.Close = () =>
-        {
-            closeStarted.SetResult();
-            return close.Task;
-        };
-        var token = TestContext.Current.CancellationToken;
-        var result = update
-            ? harness.Table.UpdateRowWithResultAsync(entry, "0", new TableVersion(900, "1"), token)
-            : harness.Table.InsertRowWithResultAsync(entry, new TableVersion(900, "1"), token);
-        var owner = Assert.Single(harness.Sessions);
-        try
-        {
-            await closeStarted.Task.WaitAsync(token);
-            Assert.False(result.IsCompleted);
-            Assert.False(owner.Completion.IsCompleted);
-            Assert.True(await ZooKeeperBasedMembershipTable.InsertRowCoreAsync(
-                harness.Fake.Operations, Harness.Entry(2), new TableVersion(3, "2"), token));
-            Assert.Equal(3, harness.Fake.Nodes["/"].Version);
-        }
-        finally
-        {
-            close.TrySetResult();
-        }
-
-        var committed = await result;
-        Assert.True(committed.Succeeded);
-        var receipt = Assert.IsType<MembershipTableWriteReceipt>(committed.Receipt);
-        Assert.Equal(new TableVersion(2, "2"), receipt.Version);
-        Assert.Equal(update ? "1" : "0", receipt.RowETag);
-        Assert.Equal("Multi", Assert.Single(harness.Calls));
-        Assert.Equal(2, harness.Fake.Transactions.Count);
-        Assert.True(owner.Completion.IsCompletedSuccessfully);
-        harness.AssertOneOwner(readOnly: false);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ReceiptWrite_CanceledCaller_OwnerJoinsAdmittedMultiAndClose(bool update)
-    {
-        var harness = await Harness.CreateAsync(1);
-        var entry = update ? harness.Entries[0] : Harness.Entry(1);
-        var releaseResponse = Gate();
-        var closeStarted = Gate();
-        var releaseClose = Gate();
-        harness.AfterMulti = () => releaseResponse.Task;
-        harness.Close = () =>
-        {
-            closeStarted.SetResult();
-            return releaseClose.Task;
-        };
-        using var cancellation = new CancellationTokenSource();
-        var result = update
-            ? harness.Table.UpdateRowWithResultAsync(entry, "0", new TableVersion(2, "1"), cancellation.Token)
-            : harness.Table.InsertRowWithResultAsync(entry, new TableVersion(2, "1"), cancellation.Token);
-        var owner = Assert.Single(harness.Sessions);
-        try
-        {
-            Assert.False(result.IsCompleted);
-            cancellation.Cancel();
-            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => result);
-            Assert.Equal(cancellation.Token, failure.CancellationToken);
-            Assert.False(owner.Completion.IsCompleted);
-            Assert.Equal(0, harness.CloseCount);
-            releaseResponse.SetResult();
-            await closeStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
-            Assert.False(owner.Completion.IsCompleted);
-        }
-        finally
-        {
-            releaseResponse.TrySetResult();
-            releaseClose.TrySetResult();
-            await owner.Completion;
-        }
-
-        Assert.Equal("Multi", Assert.Single(harness.Calls));
-        Assert.Single(harness.Fake.Transactions);
-        Assert.Equal(2, harness.Fake.Nodes["/"].Version);
-        harness.AssertOneOwner(readOnly: false);
     }
 
     [Theory]
@@ -1110,9 +978,8 @@ public sealed class ZooKeeperReadRetryTests
                 async ops =>
                 {
                     Calls.Enqueue("Multi");
-                    var results = await native.Multi(ops);
+                    await native.Multi(ops);
                     await AfterMulti();
-                    return results;
                 },
                 native.SetData);
             var session = new ZooKeeperSession(

@@ -24,8 +24,6 @@ internal sealed class ScriptedRelationalStorage(
 
     public Action? BeforeSelector { get; set; }
 
-    public Func<Task>? BeforeReadCompletion { get; set; }
-
     public ScriptedRelationalStorage ExpectRead(string query, params DataTable[] resultSets)
     {
         _expectedCalls.Enqueue(new(ExpectedCallKind.Read, query, resultSets, 0, null));
@@ -95,11 +93,6 @@ internal sealed class ScriptedRelationalStorage(
             resultSet++;
         }
         while (reader.NextResult());
-
-        if (BeforeReadCompletion is { } beforeCompletion)
-        {
-            await beforeCompletion();
-        }
 
         _ = command;
         return results;

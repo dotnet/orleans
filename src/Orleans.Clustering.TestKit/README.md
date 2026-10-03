@@ -262,20 +262,17 @@ range 3–10000) bounds the multi-row workload without changing any assertion.
 An adapter must select a safe count which crosses its backend's actual paging
 or streaming boundary. Retain provider-specific pagination tests which force
 those boundaries explicitly.
-Setup uses one initial empty full snapshot, then one actual
-`InsertRowWithResultAsync` call per row, chaining each successful receipt's table
-version into the next insert. Two final full views are checked against independently
-constructed canonical entries. A missing receipt produces an explicit setup-prerequisite
-error after the successful write; it triggers neither a repeated write nor a hidden read.
-Each insertion verifies an exact +1 receipt and a fresh table token. The final
-views verify canonical row fields against the independent expected entries.
-For N rows this is N actual richer inserts, three full reads, and 2N returned
-membership rows, plus constant-size metadata on each insert response. No
-intermediate point read, native metadata hook, or bulk-population adapter is used.
-Providers supplying only the compatibility bool result remain valid implementations
-of that older contract; this large setup explicitly requires commit receipts.
-These are provider API and returned-row counts. Provider-specific instrumentation
-measures native requests, paging, and retry costs.
+Setup uses one initial empty full snapshot, then one `InsertRowAsync` call and
+one `ReadAllAsync` verification per row. Each verification obtains the current
+table ETag for the next insert and checks the inserted row's canonical fields
+against the independently constructed input. Two final full views are compared
+against all independently expected canonical entries.
+
+For N rows this is N bool-returning inserts, N+3 full reads, and
+N(N+1)/2 + 2N returned membership rows. At N=4096, setup returns 8,398,848 rows;
+at N=1001 it returns 503,503 rows. This quadratic test-only setup cost keeps
+the suite on the existing public membership operations. Provider-specific
+instrumentation measures native requests, paging, and retry costs.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach stale table snapshots after cross-row and same-row commits,

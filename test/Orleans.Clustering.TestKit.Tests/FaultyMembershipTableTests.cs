@@ -141,22 +141,8 @@ public sealed class FaultyMembershipTableTests
         Assert.Contains("unexpected-seed-mutation", failure.Message);
         Assert.Equal(5, control.Backend.Inserts);
         Assert.Equal(0, control.Backend.PointReads);
-        Assert.Equal(3, control.Backend.FullReads);
+        Assert.Equal(8, control.Backend.FullReads);
         Assert.True(control.Injected > 0);
-    }
-
-    [Fact]
-    public async Task ConcurrentReadSetup_MissingReceiptReportsPrerequisiteWithoutReadbackOrRetry()
-    {
-        var control = new MembershipFaultController(MembershipFault.MissingReceipt);
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => control.Fixture().RunAsync(
-            (fixture, ct) => new MembershipTableTestRunner(fixture, concurrencyRowCount: 5).SeedConcurrentRows(ct),
-            TestContext.Current.CancellationToken));
-        Assert.Contains("requires mutation receipts", failure.Message);
-        Assert.Contains("write succeeded without a receipt", failure.Message);
-        Assert.Equal(1, control.Backend.Inserts);
-        Assert.Equal(1, control.Backend.FullReads);
-        Assert.Equal(0, control.Backend.PointReads);
     }
 
     [Fact]

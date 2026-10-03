@@ -113,10 +113,6 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion, CancellationToken.None);
 
         public async Task<bool> InsertRowAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await InsertRowWithResultAsync(entry, tableVersion, cancellationToken)).Succeeded;
-
-        /// <inheritdoc/>
-        public async Task<MembershipTableWriteResult> InsertRowWithResultAsync(MembershipEntry entry, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -125,14 +121,12 @@ namespace Orleans.Runtime.MembershipService
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                var result = await tableManager.InsertSiloEntryConditionally(
+                bool result = await tableManager.InsertSiloEntryConditionally(
                     tableEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
 
-                if (result is null)
+                if (result == false)
                     LogWarningTableContention(entry, tableVersion);
-                return result is { } etags
-                    ? new(true, new(new TableVersion(tableVersion.Version, etags.VersionETag), etags.RowETag))
-                    : new(false);
+                return result;
             }
             catch (Exception exc)
             {
@@ -148,10 +142,6 @@ namespace Orleans.Runtime.MembershipService
         public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion, CancellationToken.None);
 
         public async Task<bool> UpdateRowAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
-            => (await UpdateRowWithResultAsync(entry, etag, tableVersion, cancellationToken)).Succeeded;
-
-        /// <inheritdoc/>
-        public async Task<MembershipTableWriteResult> UpdateRowWithResultAsync(MembershipEntry entry, string etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -160,12 +150,10 @@ namespace Orleans.Runtime.MembershipService
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
-                var result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
-                if (result is null)
+                bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, versionEntry, tableVersion.VersionEtag, cancellationToken);
+                if (result == false)
                     LogWarningTableContentionEtag(entry, etag, tableVersion);
-                return result is { } etags
-                    ? new(true, new(new TableVersion(tableVersion.Version, etags.VersionETag), etags.RowETag))
-                    : new(false);
+                return result;
             }
             catch (Exception exc)
             {

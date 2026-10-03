@@ -166,35 +166,6 @@ public sealed partial class CassandraClusteringTableTests : MembershipTableFullC
         Assert.Equal(0, data.Version.Version);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NativeReceipts_ChainWithoutInterveningReads(bool ttl)
-    {
-        var token = TestContext.Current.CancellationToken;
-        var (table, _) = await CreateNewMembershipTableAsync(token, cassandraTtl: ttl);
-        var initial = await table.ReadAllAsync(token);
-        var entry = CreateMembershipEntryForTest();
-        entry.Status = SiloStatus.Joining;
-        entry.SuspectTimes = [];
-        var inserted = await table.InsertRowWithResultAsync(entry, initial.Version.Next(), token);
-        Assert.True(inserted.Succeeded);
-        var first = Assert.IsType<MembershipTableWriteReceipt>(inserted.Receipt);
-        Assert.Equal(initial.Version.Version + 1, first.Version.Version);
-        entry.Status = SiloStatus.Active;
-        var updated = await table.UpdateRowWithResultAsync(entry, first.RowETag, first.Version.Next(), token);
-        Assert.True(updated.Succeeded);
-        var second = Assert.IsType<MembershipTableWriteReceipt>(updated.Receipt);
-        Assert.Equal(first.Version.Version + 1, second.Version.Version);
-        Assert.Equal(second.Version.VersionEtag, second.RowETag);
-        Assert.NotEqual(first.RowETag, second.RowETag);
-        var snapshot = await table.ReadAllAsync(token);
-        var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress));
-        Assert.Equal(second.Version, snapshot.Version);
-        Assert.Equal(second.RowETag, row.Item2);
-        Assert.Equal(SiloStatus.Active, row.Item1.Status);
-    }
-
     [Fact]
     public async Task MembershipTable_InsertRow()
     {

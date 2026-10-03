@@ -19,8 +19,6 @@ public sealed class InProcessMembershipTableCancellationTests
     [InlineData(nameof(IMembershipTable.ReadAllAsync))]
     [InlineData(nameof(IMembershipTable.InsertRowAsync))]
     [InlineData(nameof(IMembershipTable.UpdateRowAsync))]
-    [InlineData(nameof(IMembershipTable.InsertRowWithResultAsync))]
-    [InlineData(nameof(IMembershipTable.UpdateRowWithResultAsync))]
     [InlineData(nameof(IMembershipTable.UpdateIAmAliveAsync))]
     public async Task PreCanceledOperation_PreservesTable(string operation)
     {
@@ -77,8 +75,6 @@ public sealed class InProcessMembershipTableCancellationTests
             nameof(IMembershipTable.ReadAllAsync) => table.ReadAllAsync(cancellationToken),
             nameof(IMembershipTable.InsertRowAsync) => table.InsertRowAsync(entry, version, cancellationToken),
             nameof(IMembershipTable.UpdateRowAsync) => table.UpdateRowAsync(entry, etag, version, cancellationToken),
-            nameof(IMembershipTable.InsertRowWithResultAsync) => table.InsertRowWithResultAsync(entry, version, cancellationToken),
-            nameof(IMembershipTable.UpdateRowWithResultAsync) => table.UpdateRowWithResultAsync(entry, etag, version, cancellationToken),
             nameof(IMembershipTable.UpdateIAmAliveAsync) => table.UpdateIAmAliveAsync(entry, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(operation)),
         };

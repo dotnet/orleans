@@ -439,16 +439,17 @@ namespace Orleans.AzureUtils
         /// <param name="tableVersionEntry">Version row to update</param>
         /// <param name="tableVersionEtag">Version row eTag</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        internal async Task<(string RowETag, string VersionETag)?> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag, CancellationToken cancellationToken = default)
+        internal async Task<bool> InsertSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string tableVersionEtag, CancellationToken cancellationToken = default)
         {
             try
             {
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
-                return await storage.CreateAndUpdateTableEntriesAsync(
+                await storage.CreateAndUpdateTableEntriesAsync(
                     siloEntry,
                     (tableVersionEntry, tableVersionEtag),
                     (boundaryEntries.Min, boundaryEntries.Max),
                     cancellationToken);
+                return true;
             }
             catch (Exception exc)
             {
@@ -456,7 +457,7 @@ namespace Orleans.AzureUtils
 
                 LogTraceInsertSiloEntryConditionallyFailed(httpStatusCode, restStatus);
                 if (httpStatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed
-                    || exc is RequestFailedException requestFailed && IsRowNotFound(requestFailed)) return null;
+                    || exc is RequestFailedException requestFailed && IsRowNotFound(requestFailed)) return false;
 
                 throw;
             }
@@ -470,16 +471,17 @@ namespace Orleans.AzureUtils
         /// <param name="versionEtag">ETag value for the version row</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns></returns>
-        internal async Task<(string RowETag, string VersionETag)?> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, CancellationToken cancellationToken = default)
+        internal async Task<bool> UpdateSiloEntryConditionally(SiloInstanceTableEntry siloEntry, SiloInstanceTableEntry tableVersionEntry, string versionEtag, CancellationToken cancellationToken = default)
         {
             try
             {
                 var boundaryEntries = CreateBoundaryVersionEntries(tableVersionEntry);
-                return await storage.UpdateTableEntriesAsync(
+                await storage.UpdateTableEntriesAsync(
                     (siloEntry, AzureTableUtils.ANY_ETAG),
                     (tableVersionEntry, versionEtag),
                     (boundaryEntries.Min, boundaryEntries.Max),
                     cancellationToken);
+                return true;
             }
             catch (Exception exc)
             {
@@ -487,7 +489,7 @@ namespace Orleans.AzureUtils
 
                 LogTraceUpdateSiloEntryConditionallyFailed(httpStatusCode, restStatus);
                 if (httpStatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed
-                    || exc is RequestFailedException requestFailed && IsRowNotFound(requestFailed)) return null;
+                    || exc is RequestFailedException requestFailed && IsRowNotFound(requestFailed)) return false;
 
                 throw;
             }
