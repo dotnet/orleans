@@ -353,6 +353,8 @@ namespace Orleans.Serialization
     {
         public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, System.Reflection.Assembly assembly) { throw null; }
 
+        public static ISerializerBuilder AddSerializerContext(this ISerializerBuilder builder, SerializerContext context) { throw null; }
+
         public static ISerializerBuilder Configure(this ISerializerBuilder builder, Microsoft.Extensions.Options.IConfigureOptions<Configuration.TypeManifestOptions> configure) { throw null; }
 
         public static ISerializerBuilder Configure(this ISerializerBuilder builder, System.Action<Configuration.TypeManifestOptions> configure) { throw null; }
@@ -372,6 +374,13 @@ namespace Orleans.Serialization
 
             public System.Collections.Generic.Dictionary<System.Type, System.Collections.Generic.HashSet<System.Reflection.MethodInfo>> Methods { get { throw null; } }
         }
+    }
+
+    public abstract partial class SerializerContext : Configuration.TypeManifestProviderBase
+    {
+        protected static Codecs.IFieldCodec<T> CreateCodecHolder<T>(Serializers.ICodecProvider provider) { throw null; }
+
+        protected static Cloning.IDeepCopier<T> CreateCopierHolder<T>(Serializers.ICodecProvider provider) { throw null; }
     }
 
     [GenerateSerializer]
@@ -458,6 +467,8 @@ namespace Orleans.Serialization
     public static partial class ServiceCollectionExtensions
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializer(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<ISerializerBuilder>? configure = null) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSerializerContext(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, SerializerContext context) { throw null; }
     }
 
     [GenerateSerializer]
@@ -1765,6 +1776,8 @@ namespace Orleans.Serialization.Codecs
     public sealed partial class DictionaryCodec<TKey, TValue> : IFieldCodec<System.Collections.Generic.Dictionary<TKey, TValue>>, IFieldCodec
     {
         public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec, IFieldCodec<System.Collections.Generic.IEqualityComparer<TKey>> comparerCodec) { }
+
+        public DictionaryCodec(IFieldCodec<TKey> keyCodec, IFieldCodec<TValue> valueCodec) { }
 
         public System.Collections.Generic.Dictionary<TKey, TValue> ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
 
@@ -3352,6 +3365,17 @@ namespace Orleans.Serialization.Configuration
         public static void Register(IProviderMetadataProvider provider) { }
     }
 
+    public sealed partial class SerializationType
+    {
+        internal SerializationType() { }
+
+        public static SerializationType Array(SerializationType element, int rank = 1) { throw null; }
+
+        public static SerializationType Create(System.Type type, params SerializationType[] arguments) { throw null; }
+
+        public static SerializationType Parameter(int index) { throw null; }
+    }
+
     public sealed partial class TypeManifestOptions
     {
         public System.Collections.Generic.HashSet<System.Type> Activators { get { throw null; } }
@@ -3384,15 +3408,43 @@ namespace Orleans.Serialization.Configuration
 
         public System.Collections.Generic.Dictionary<uint, System.Type> WellKnownTypeIds { get { throw null; } }
 
+        public void AddActivator(System.Type type, System.Type targetType) { }
+
         public void AddActivator(System.Type type) { }
 
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }
 
+        public void AddBaseCodec(System.Type type, System.Type targetType) { }
+
+        public void AddBaseCopier(System.Type type, System.Type targetType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, SerializationType surrogateType) { }
+
+        public void AddConverter(System.Type type, System.Type targetType, System.Type surrogateType) { }
+
         public void AddConverter(System.Type type) { }
 
+        public void AddCopier(System.Type type, System.Type targetType) { }
+
         public void AddCopier(System.Type type) { }
+
+        public void AddDefaultSerializer<T>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory) { }
+
+        public void AddDefaultSerializer<T, TCodec, TCopier>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory, System.Type? compatibleCodecType = null, System.Type? compatibleCopierType = null, System.Type[]? codecDependencies = null, System.Type[]? copierDependencies = null)
+            where TCodec : class, Codecs.IFieldCodec<T> where TCopier : class, Cloning.IDeepCopier<T> { }
+
+        public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory, System.Type[] dependencies)
+            where TService : class { }
+
+        public void AddDefaultSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
+            where TService : class { }
+
+        public void AddDefaultSerializerService<TService, TImplementation>(System.Func<Serializers.ICodecProvider, TService> factory, System.Type? compatibleImplementationType = null, System.Type[]? dependencies = null)
+            where TService : class where TImplementation : class, TService { }
+
+        public void AddFieldCodec(System.Type type, System.Type targetType) { }
 
         public void AddFieldCodec(System.Type type) { }
 
@@ -3402,7 +3454,20 @@ namespace Orleans.Serialization.Configuration
 
         public void AddInterfaceProxy(System.Type type) { }
 
+        public void AddRawResponseReader<TResult>(System.Func<Serializers.ICodecProvider, Invocation.IRawResponseReader> factory) { }
+
+        public void AddSerializationContract(System.Type type, System.Type contractType, SerializationType targetType, SerializationType? surrogateType = null) { }
+
+        public void AddSerializer(System.Type type, System.Type targetType) { }
+
         public void AddSerializer(System.Type type) { }
+
+        public void AddSerializer<T>(System.Func<Serializers.ICodecProvider, Codecs.IFieldCodec<T>> codecFactory, System.Func<Serializers.ICodecProvider, Cloning.IDeepCopier<T>> copierFactory) { }
+
+        public void AddSerializerService<TService>(System.Func<Serializers.ICodecProvider, TService> factory)
+            where TService : class { }
+
+        public void AddValueSerializer(System.Type type, System.Type targetType) { }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
@@ -3430,6 +3495,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
+
+        public static Activators.IActivator<T> CreateDefaultReferenceTypeActivator<T>()
+            where T : class { throw null; }
+
+        public static Activators.IActivator<T> CreateDefaultValueTypeActivator<T>()
+            where T : struct { throw null; }
 
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
@@ -3541,16 +3612,59 @@ namespace Orleans.Serialization.Invocation
             where T : class, IInvokable, new() { }
     }
 
+    public partial interface IRawResponseReader
+    {
+        bool IsSupported { get; }
+
+        Response ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field);
+    }
+
+    public partial interface IRawResponseWriter
+    {
+        void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte>;
+    }
+
     public partial interface IResponseCompletionSource
     {
         void Complete();
         void Complete(Response value);
     }
 
+    public partial interface IResponseInvokable
+    {
+        System.Threading.Tasks.ValueTask<Response> InvokeAndCopy(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier);
+    }
+
     public partial interface ITargetHolder
     {
         object? GetComponent(System.Type componentType);
         object? GetTarget();
+    }
+
+    public partial class PooledResponseCodec<TResult, TResultCodec> : ResponseCodec, Codecs.IFieldCodec<Response<TResult>>, Codecs.IFieldCodec where TResultCodec : class, Codecs.IFieldCodec<TResult>
+    {
+        public PooledResponseCodec(TResultCodec codec) { }
+
+        public PooledResponseCodec(System.Func<object, TResultCodec> codecFactory) { }
+
+        public override object ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { throw null; }
+
+        public Response<TResult> ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Response<TResult> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public override void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, object value) { }
+    }
+
+    public partial class PooledResponseCopier<TResult, TResultCopier> : Cloning.IDeepCopier<Response<TResult>>, Cloning.IDeepCopier where TResultCopier : class, Cloning.IDeepCopier<TResult>
+    {
+        public PooledResponseCopier(TResultCopier copier) { }
+
+        public PooledResponseCopier(System.Func<object, TResultCopier> copierFactory) { }
+
+        public Response<TResult>? DeepCopy(Response<TResult>? input, Cloning.CopyContext context) { throw null; }
     }
 
     [SerializerTransparent]
@@ -3651,7 +3765,13 @@ namespace Orleans.Serialization.Invocation
     {
         public static Response<T> Get<T>() { throw null; }
 
+        public static TResponse GetGenerated<TResponse>()
+            where TResponse : Response, new() { throw null; }
+
         public static void Return<T>(Response<T> obj) { }
+
+        public static void ReturnGenerated<TResponse>(TResponse response)
+            where TResponse : Response, new() { }
     }
 
     [UseActivator]
@@ -3733,6 +3853,8 @@ namespace Orleans.Serialization.Serializers
         public Cloning.IDeepCopier? TryGetDeepCopier(System.Type fieldType) { throw null; }
 
         public Cloning.IDeepCopier<T>? TryGetDeepCopier<T>() { throw null; }
+
+        public bool TryGetRawResponseReader(System.Type resultType, out Invocation.IRawResponseReader? reader) { throw null; }
     }
 
     public sealed partial class ConcreteTypeSerializer<TField, TBaseCodec> : Codecs.IFieldCodec<TField>, Codecs.IFieldCodec where TField : class where TBaseCodec : IBaseCodec<TField>
@@ -4038,6 +4160,10 @@ namespace Orleans.Serialization.TypeSystem
         public CompoundTypeAliasTree Add(System.Type key) { throw null; }
 
         public static CompoundTypeAliasTree Create() { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(string key) { throw null; }
+
+        public CompoundTypeAliasTree GetOrAdd(System.Type key) { throw null; }
     }
 
     public partial class ConstructedGenericTypeSpec : TypeSpec

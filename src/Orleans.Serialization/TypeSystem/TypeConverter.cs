@@ -150,13 +150,19 @@ public class TypeConverter
 
     private void ConsumeMetadata(TypeManifestOptions metadata)
     {
-        AddFromMetadata(metadata.SerializerTypes, typeof(IBaseCodec<>));
-        AddFromMetadata(metadata.SerializerTypes, typeof(IValueSerializer<>));
-        AddFromMetadata(metadata.SerializerTypes, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.FieldCodecTypes, typeof(IFieldCodec<>));
-        AddFromMetadata(metadata.ActivatorTypes, typeof(IActivator<>));
-        AddFromMetadata(metadata.CopierTypes, typeof(IDeepCopier<>));
-        AddFromMetadata(metadata.ConverterTypes, typeof(IConverter<,>));
+        foreach (var type in metadata.CodecFactories.Keys)
+        {
+            AddAllowedType(type);
+        }
+
+        AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IBaseCodec<>));
+        AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IValueSerializer<>));
+        AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.FieldCodecTypes, metadata.SerializerContracts, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.ActivatorTypes, metadata.ActivatorContracts, typeof(IActivator<>));
+        AddFromMetadata(metadata.CopierTypes, metadata.CopierContracts, typeof(IDeepCopier<>));
+        AddFromMetadata(metadata.CopierTypes, metadata.CopierContracts, typeof(IBaseCopier<>));
+        AddFromMetadata(metadata.ConverterTypes, metadata.ConverterContracts, typeof(IConverter<,>));
         foreach (var type in metadata.InterfaceProxyTypes)
         {
             AddAllowedType(type switch
@@ -170,14 +176,54 @@ public class TypeConverter
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2075",
-            Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions implementation registration methods, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
+            Justification = "Legacy implementation-only registrations preserve implemented interfaces through annotated TypeManifestOptions methods. Explicit contract registrations are consumed directly. The HashSet<Type> boundary cannot retain the legacy annotations.")]
 #endif
-        void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
+        void AddFromMetadata(
+            HashSet<Type> metadataCollection,
+            Dictionary<Type, List<SerializationContract>> contracts,
+            Type genericType)
         {
             Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
             foreach (var type in metadataCollection)
             {
+                if (contracts.TryGetValue(type, out var registrations))
+                {
+                    foreach (var registration in registrations)
+                    {
+                        if (registration.ContractType == genericType)
+                        {
+                            if (registration.TargetDescription is { } targetDescription)
+                            {
+                                foreach (var referenced in targetDescription.GetReferencedTypes())
+                                {
+                                    InspectGenericArgument(referenced);
+                                }
+                            }
+                            else
+                            {
+                                InspectGenericArgument(registration.TargetType!);
+                            }
+                            if (registration.SurrogateType is { } surrogateType)
+                            {
+                                InspectGenericArgument(surrogateType);
+                            }
+                            if (registration.SurrogateDescription is { } description)
+                            {
+                                foreach (var referencedType in description.GetReferencedTypes())
+                                {
+                                    InspectGenericArgument(referencedType);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!metadata.DiscoverInterfaces(type, genericType))
+                    {
+                        continue;
+                    }
+                }
+
                 var interfaces = type.GetInterfaces();
                 foreach (var @interface in interfaces)
                 {
@@ -211,7 +257,13 @@ public class TypeConverter
                 genericArgument = genericArgument.GetGenericTypeDefinition();
             }
 
-            if (genericArgument.IsGenericParameter || genericArgument.IsArray)
+            if (genericArgument.IsArray)
+            {
+                FormatAndAddAllowedType(genericArgument);
+                return;
+            }
+
+            if (genericArgument.IsGenericParameter)
             {
                 return;
             }
@@ -223,7 +275,7 @@ public class TypeConverter
         [UnconditionalSuppressMessage(
             "Trimming",
             "IL2070",
-            Justification = "Generated manifests register proxy metadata through TypeManifestOptions.AddInterfaceProxy, which preserves implemented interfaces. The intermediate Type values cannot retain that annotation.")]
+            Justification = "Explicit contract APIs and SerializationType.Create preserve target interface metadata, and AddInterfaceProxy preserves proxy interfaces. The manifest collections and intermediate Type values cannot retain these annotations.")]
 #endif
         void AddAllowedType(Type type)
         {

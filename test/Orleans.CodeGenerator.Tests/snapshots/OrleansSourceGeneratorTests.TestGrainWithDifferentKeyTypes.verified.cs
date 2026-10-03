@@ -1,4 +1,5 @@
-﻿#pragma warning disable
+﻿[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.RpcResponseFactories))]
+#pragma warning disable
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -12,10 +13,10 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IMyGrainWithGuidKey), "8F0FEC0E")]
-    public sealed class Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E : global::Orleans.Runtime.TaskRequest<global::System.Guid>
+    public sealed class Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E : global::Orleans.Runtime.TaskRequest<global::System.Guid>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         global::TestProject.IMyGrainWithGuidKey _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidKey), "GetGuidValue", null, null);
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IMyGrainWithGuidKey).GetMethod("GetGuidValue", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, global::System.Type.EmptyTypes, null);
         public override string GetMethodName() => "GetGuidValue";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithGuidKey";
         public override string GetActivityName() => "IMyGrainWithGuidKey/GetGuidValue";
@@ -29,6 +30,21 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Guid> InvokeInner() => _target.GetGuidValue();
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_5C3A711CFactory.Resolve(provider);
+                if (!factory.IsSupported)
+                    return responseCopier.Copy(await Invoke());
+                global::System.Guid value = await InvokeInner();
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -47,10 +63,10 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IMyGrainWithStringKey), "43570316")]
-    public sealed class Invokable_IMyGrainWithStringKey_GrainReference_43570316 : global::Orleans.Runtime.TaskRequest<string>
+    public sealed class Invokable_IMyGrainWithStringKey_GrainReference_43570316 : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         global::TestProject.IMyGrainWithStringKey _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithStringKey), "GetStringKey", null, null);
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IMyGrainWithStringKey).GetMethod("GetStringKey", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, global::System.Type.EmptyTypes, null);
         public override string GetMethodName() => "GetStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithStringKey";
         public override string GetActivityName() => "IMyGrainWithStringKey/GetStringKey";
@@ -64,6 +80,21 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.GetStringKey();
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory.Resolve(provider);
+                if (!factory.IsSupported)
+                    return responseCopier.Copy(await Invoke());
+                string value = await InvokeInner();
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -82,10 +113,10 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IMyGrainWithGuidCompoundKey), "A9FEF7AF")]
-    public sealed class Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF : global::Orleans.Runtime.TaskRequest<global::System.Tuple<global::System.Guid, string>>
+    public sealed class Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF : global::Orleans.Runtime.TaskRequest<global::System.Tuple<global::System.Guid, string>>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         global::TestProject.IMyGrainWithGuidCompoundKey _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidCompoundKey), "GetGuidAndStringKey", null, null);
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IMyGrainWithGuidCompoundKey).GetMethod("GetGuidAndStringKey", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, global::System.Type.EmptyTypes, null);
         public override string GetMethodName() => "GetGuidAndStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithGuidCompoundKey";
         public override string GetActivityName() => "IMyGrainWithGuidCompoundKey/GetGuidAndStringKey";
@@ -99,6 +130,21 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> InvokeInner() => _target.GetGuidAndStringKey();
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_6A3EE8F4Factory.Resolve(provider);
+                if (!factory.IsSupported)
+                    return responseCopier.Copy(await Invoke());
+                global::System.Tuple<global::System.Guid, string> value = await InvokeInner();
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -117,10 +163,10 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IMyGrainWithIntegerCompoundKey), "9814021A")]
-    public sealed class Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A : global::Orleans.Runtime.TaskRequest<global::System.Tuple<long, string>>
+    public sealed class Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A : global::Orleans.Runtime.TaskRequest<global::System.Tuple<long, string>>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         global::TestProject.IMyGrainWithIntegerCompoundKey _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey), "GetIntegerAndStringKey", null, null);
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IMyGrainWithIntegerCompoundKey).GetMethod("GetIntegerAndStringKey", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, global::System.Type.EmptyTypes, null);
         public override string GetMethodName() => "GetIntegerAndStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithIntegerCompoundKey";
         public override string GetActivityName() => "IMyGrainWithIntegerCompoundKey/GetIntegerAndStringKey";
@@ -134,6 +180,21 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> InvokeInner() => _target.GetIntegerAndStringKey();
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_AFB713E4Factory.Resolve(provider);
+                if (!factory.IsSupported)
+                    return responseCopier.Copy(await Invoke());
+                global::System.Tuple<long, string> value = await InvokeInner();
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -763,6 +824,675 @@ namespace OrleansCodeGen.TestProject
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class RpcResponseFactories : global::Orleans.Serialization.SerializerContext
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions options)
+        {
+            options.AddDefaultSerializerService<RpcResponse_5C3A711CFactory>(static provider => new RpcResponse_5C3A711CFactory(provider));
+            options.AddDefaultSerializer<RpcResponse_5C3A711C>(static provider => RpcResponse_5C3A711CFactory.Resolve(provider), static provider => RpcResponse_5C3A711CFactory.Resolve(provider));
+            options.AddRawResponseReader<global::System.Guid>(static provider => RpcResponse_5C3A711CFactory.Resolve(provider));
+            options.AddDefaultSerializerService<RpcResponse_6A3EE8F4Factory>(static provider => new RpcResponse_6A3EE8F4Factory(provider));
+            options.AddDefaultSerializer<RpcResponse_6A3EE8F4>(static provider => RpcResponse_6A3EE8F4Factory.Resolve(provider), static provider => RpcResponse_6A3EE8F4Factory.Resolve(provider));
+            options.AddRawResponseReader<global::System.Tuple<global::System.Guid, string>>(static provider => RpcResponse_6A3EE8F4Factory.Resolve(provider));
+            options.AddDefaultSerializerService<RpcResponse_AFB713E4Factory>(static provider => new RpcResponse_AFB713E4Factory(provider));
+            options.AddDefaultSerializer<RpcResponse_AFB713E4>(static provider => RpcResponse_AFB713E4Factory.Resolve(provider), static provider => RpcResponse_AFB713E4Factory.Resolve(provider));
+            options.AddRawResponseReader<global::System.Tuple<long, string>>(static provider => RpcResponse_AFB713E4Factory.Resolve(provider));
+            options.AddDefaultSerializerService<RpcResponse_9146C7E3Factory>(static provider => new RpcResponse_9146C7E3Factory(provider));
+            options.AddDefaultSerializer<RpcResponse_9146C7E3>(static provider => RpcResponse_9146C7E3Factory.Resolve(provider), static provider => RpcResponse_9146C7E3Factory.Resolve(provider));
+            options.AddRawResponseReader<string>(static provider => RpcResponse_9146C7E3Factory.Resolve(provider));
+#if NET5_0_OR_GREATER
+            if (global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
+                return;
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Guid, global::Orleans.Serialization.Codecs.GuidCodec>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Guid, global::Orleans.Serialization.Codecs.GuidCodec>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.GuidCodec>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Guid, global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Guid, global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>(null !, provider)));
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Guid, global::Orleans.Serialization.Codecs.GuidCodec>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Guid, global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.Response<global::System.Guid>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>(null !, provider)));
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCodec<long, string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCodec<long, string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCodec<long, string>>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCopier<long, string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCopier<long, string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCopier<long, string>>(null !, provider)));
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCodec<long, string>>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCopier<long, string>>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider)));
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<string>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.Response<string>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.GuidCodec>(static provider => new global::Orleans.Serialization.Codecs.GuidCodec());
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>());
+            options.AddDefaultSerializer<global::System.Guid>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.GuidCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>(null !, provider));
+            options.AddAllowedType(typeof(global::System.Guid));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>(static provider => new global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.GuidCodec>(null !, provider), global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>(static provider => new global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>>(null !, provider), global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider)));
+            options.AddDefaultSerializer<global::System.Tuple<global::System.Guid, string>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>>(null !, provider));
+            options.AddAllowedType(typeof(global::System.Tuple<global::System.Guid, string>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.TupleCodec<long, string>>(static provider => new global::Orleans.Serialization.Codecs.TupleCodec<long, string>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.Int64Codec>(null !, provider), global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.TupleCopier<long, string>>(static provider => new global::Orleans.Serialization.Codecs.TupleCopier<long, string>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<long>>(null !, provider), global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider)));
+            options.AddDefaultSerializer<global::System.Tuple<long, string>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCodec<long, string>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.TupleCopier<long, string>>(null !, provider));
+            options.AddAllowedType(typeof(global::System.Tuple<long, string>));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.Int64Codec>(static provider => new global::Orleans.Serialization.Codecs.Int64Codec());
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<long>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<long>());
+            options.AddDefaultSerializer<long>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.Int64Codec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<long>>(null !, provider));
+            options.AddAllowedType(typeof(long));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.StringCodec>(static provider => new global::Orleans.Serialization.Codecs.StringCodec());
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<string>());
+            options.AddDefaultSerializer<string>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider));
+            options.AddAllowedType(typeof(string));
+            options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());
+            options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null !, provider));
+            options.AddDefaultSerializerService<CompletedResponseActivator>(static provider => new CompletedResponseActivator());
+            options.AddDefaultSerializerService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(static provider => new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>());
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));
+#endif
+        }
+
+        private sealed class CompletedResponseActivator : global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Invocation.CompletedResponse>
+        {
+            public CompletedResponseActivator()
+            {
+            }
+
+            public global::Orleans.Serialization.Invocation.CompletedResponse Create() => global::Orleans.Serialization.Invocation.CompletedResponse.Instance;
+        }
+
+        private sealed class ResponseFieldCodec : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCodec()
+            {
+            }
+        }
+
+        private sealed class ResponseFieldCopier : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCopier()
+            {
+            }
+
+            [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+            public global::Orleans.Serialization.Invocation.Response DeepCopy(global::Orleans.Serialization.Invocation.Response input, global::Orleans.Serialization.Cloning.CopyContext context)
+            {
+                if (context is null)
+                    throw new global::System.ArgumentNullException(nameof(context));
+                if (input is global::Orleans.Serialization.Invocation.CompletedResponse or global::Orleans.Serialization.Invocation.ExceptionResponse)
+                    return input;
+                return (global::Orleans.Serialization.Invocation.Response)global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context);
+            }
+        }
+    }
+
+    internal sealed class RpcResponse_5C3A711C : global::Orleans.Serialization.Invocation.Response, global::Orleans.Serialization.Invocation.IRawResponseWriter
+    {
+        internal global::System.Guid Value;
+        private RpcResponse_5C3A711CFactory _factory;
+        public RpcResponse_5C3A711C()
+        {
+        }
+
+        internal static RpcResponse_5C3A711C Rent(global::System.Guid value, RpcResponse_5C3A711CFactory factory)
+        {
+            var result = global::Orleans.Serialization.Invocation.ResponsePool.GetGenerated<RpcResponse_5C3A711C>();
+            result.Value = value;
+            result._factory = factory;
+            return result;
+        }
+
+        public override object Result { get => Value; set => Value = (global::System.Guid)value; }
+        public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
+
+        public override global::System.Type GetSimpleResultType() => typeof(global::System.Guid);
+        public override T GetResult<T>()
+        {
+            if (typeof(T) == typeof(global::System.Guid))
+                return global::System.Runtime.CompilerServices.Unsafe.As<global::System.Guid, T>(ref Value);
+            return (T)(object)Value;
+        }
+
+        public void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (_factory is null)
+                throw new global::System.ObjectDisposedException(GetType().Name);
+            writer.WriteStartObject(0, null, typeof(global::System.Guid));
+            global::Orleans.Serialization.Codecs.GuidCodec.WriteField(ref writer, 0, Value);
+            writer.WriteEndObject();
+        }
+
+        public override void Dispose()
+        {
+            if (_factory is null)
+                return;
+            Value = default;
+            _factory = null;
+            global::Orleans.Serialization.Invocation.ResponsePool.ReturnGenerated(this);
+        }
+    }
+
+    internal sealed class RpcResponse_5C3A711CFactory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_5C3A711C>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_5C3A711C>, global::Orleans.Serialization.Invocation.IRawResponseReader
+    {
+        private readonly global::Orleans.Serialization.Codecs.GuidCodec _codec;
+        private readonly global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid> _copier;
+        public bool IsSupported { get; }
+
+        internal static RpcResponse_5C3A711CFactory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            provider.GetCodec<global::System.Guid>();
+            provider.GetDeepCopier<global::System.Guid>();
+            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
+            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
+            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_5C3A711CFactory>(null, provider);
+        }
+
+        public RpcResponse_5C3A711CFactory(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            _codec = provider.GetCodec<global::System.Guid>() as global::Orleans.Serialization.Codecs.GuidCodec;
+            _copier = provider.GetDeepCopier<global::System.Guid>() as global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>;
+            var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
+            var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
+            IsSupported = _codec is not null && _copier is not null && (responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Guid, global::Orleans.Serialization.Codecs.GuidCodec> || responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Guid, global::Orleans.Serialization.Codecs.IFieldCodec<global::System.Guid>>) && (responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Guid, global::Orleans.Serialization.Cloning.ShallowCopier<global::System.Guid>> || responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Guid, global::Orleans.Serialization.Cloning.IDeepCopier<global::System.Guid>>);
+        }
+
+        internal global::Orleans.Serialization.Invocation.Response RentCopied(global::System.Guid value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            return RpcResponse_5C3A711C.Rent(value, this);
+        }
+
+        [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+        public RpcResponse_5C3A711C DeepCopy(RpcResponse_5C3A711C input, global::Orleans.Serialization.Cloning.CopyContext context) => input is null ? null : RpcResponse_5C3A711C.Rent(input.Value, this);
+        internal void WriteResult<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::System.Guid value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null, typeof(global::System.Guid));
+            global::Orleans.Serialization.Codecs.GuidCodec.WriteField(ref writer, 0, value);
+            writer.WriteEndObject();
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_5C3A711C)value).Value);
+        public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        private RpcResponse_5C3A711C ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = RpcResponse_5C3A711C.Rent(default, this);
+            try
+            {
+                reader.ReadFieldHeader(ref field);
+                if (!field.IsEndBaseOrEndObject)
+                {
+                    result.Value = global::Orleans.Serialization.Codecs.GuidCodec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    reader.ConsumeEndBaseOrEndObject(ref field);
+                }
+
+                return result;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, RpcResponse_5C3A711C value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(global::Orleans.Serialization.Invocation.Response<global::System.Guid>));
+            global::Orleans.Serialization.Codecs.GuidCodec.WriteField(ref writer, 0, value.Value);
+            writer.WriteEndObject();
+        }
+
+        public RpcResponse_5C3A711C ReadValue<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            if (field.IsReference)
+                return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<RpcResponse_5C3A711C, TInput>(ref reader, field);
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
+            return ReadResult(ref reader, ref field);
+        }
+    }
+
+    internal sealed class RpcResponse_6A3EE8F4 : global::Orleans.Serialization.Invocation.Response, global::Orleans.Serialization.Invocation.IRawResponseWriter
+    {
+        internal global::System.Tuple<global::System.Guid, string> Value;
+        private RpcResponse_6A3EE8F4Factory _factory;
+        public RpcResponse_6A3EE8F4()
+        {
+        }
+
+        internal static RpcResponse_6A3EE8F4 Rent(global::System.Tuple<global::System.Guid, string> value, RpcResponse_6A3EE8F4Factory factory)
+        {
+            var result = global::Orleans.Serialization.Invocation.ResponsePool.GetGenerated<RpcResponse_6A3EE8F4>();
+            result.Value = value;
+            result._factory = factory;
+            return result;
+        }
+
+        public override object Result { get => Value; set => Value = (global::System.Tuple<global::System.Guid, string>)value; }
+        public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
+
+        public override global::System.Type GetSimpleResultType() => typeof(global::System.Tuple<global::System.Guid, string>);
+        public override T GetResult<T>()
+        {
+            if (typeof(T) == typeof(global::System.Tuple<global::System.Guid, string>))
+                return global::System.Runtime.CompilerServices.Unsafe.As<global::System.Tuple<global::System.Guid, string>, T>(ref Value);
+            return (T)(object)Value;
+        }
+
+        public void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (_factory is null)
+                throw new global::System.ObjectDisposedException(GetType().Name);
+            _factory.WriteResult(ref writer, Value);
+        }
+
+        public override void Dispose()
+        {
+            if (_factory is null)
+                return;
+            Value = default;
+            _factory = null;
+            global::Orleans.Serialization.Invocation.ResponsePool.ReturnGenerated(this);
+        }
+    }
+
+    internal sealed class RpcResponse_6A3EE8F4Factory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_6A3EE8F4>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_6A3EE8F4>, global::Orleans.Serialization.Invocation.IRawResponseReader
+    {
+        private readonly global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string> _codec;
+        private readonly global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string> _copier;
+        public bool IsSupported { get; }
+
+        internal static RpcResponse_6A3EE8F4Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            provider.GetCodec<global::System.Tuple<global::System.Guid, string>>();
+            provider.GetDeepCopier<global::System.Tuple<global::System.Guid, string>>();
+            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
+            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
+            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_6A3EE8F4Factory>(null, provider);
+        }
+
+        public RpcResponse_6A3EE8F4Factory(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            _codec = provider.GetCodec<global::System.Tuple<global::System.Guid, string>>() as global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>;
+            _copier = provider.GetDeepCopier<global::System.Tuple<global::System.Guid, string>>() as global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>;
+            var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
+            var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
+            IsSupported = _codec is not null && _copier is not null && (responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCodec<global::System.Guid, string>> || responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.IFieldCodec<global::System.Tuple<global::System.Guid, string>>>) && (responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Codecs.TupleCopier<global::System.Guid, string>> || responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<global::System.Guid, string>, global::Orleans.Serialization.Cloning.IDeepCopier<global::System.Tuple<global::System.Guid, string>>>);
+        }
+
+        internal global::Orleans.Serialization.Invocation.Response RentCopied(global::System.Tuple<global::System.Guid, string> value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            return RpcResponse_6A3EE8F4.Rent(value, this);
+        }
+
+        [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+        public RpcResponse_6A3EE8F4 DeepCopy(RpcResponse_6A3EE8F4 input, global::Orleans.Serialization.Cloning.CopyContext context) => input is null ? null : RpcResponse_6A3EE8F4.Rent(input.Value, this);
+        internal void WriteResult<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::System.Tuple<global::System.Guid, string> value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null, typeof(global::System.Tuple<global::System.Guid, string>));
+            if (value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::System.Tuple<global::System.Guid, string>), value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_6A3EE8F4)value).Value);
+        public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        private RpcResponse_6A3EE8F4 ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = RpcResponse_6A3EE8F4.Rent(default, this);
+            try
+            {
+                reader.ReadFieldHeader(ref field);
+                if (!field.IsEndBaseOrEndObject)
+                {
+                    result.Value = _codec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    reader.ConsumeEndBaseOrEndObject(ref field);
+                }
+
+                return result;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, RpcResponse_6A3EE8F4 value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>));
+            if (value.Value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::System.Tuple<global::System.Guid, string>), value.Value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public RpcResponse_6A3EE8F4 ReadValue<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            if (field.IsReference)
+                return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<RpcResponse_6A3EE8F4, TInput>(ref reader, field);
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
+            return ReadResult(ref reader, ref field);
+        }
+    }
+
+    internal sealed class RpcResponse_AFB713E4 : global::Orleans.Serialization.Invocation.Response, global::Orleans.Serialization.Invocation.IRawResponseWriter
+    {
+        internal global::System.Tuple<long, string> Value;
+        private RpcResponse_AFB713E4Factory _factory;
+        public RpcResponse_AFB713E4()
+        {
+        }
+
+        internal static RpcResponse_AFB713E4 Rent(global::System.Tuple<long, string> value, RpcResponse_AFB713E4Factory factory)
+        {
+            var result = global::Orleans.Serialization.Invocation.ResponsePool.GetGenerated<RpcResponse_AFB713E4>();
+            result.Value = value;
+            result._factory = factory;
+            return result;
+        }
+
+        public override object Result { get => Value; set => Value = (global::System.Tuple<long, string>)value; }
+        public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
+
+        public override global::System.Type GetSimpleResultType() => typeof(global::System.Tuple<long, string>);
+        public override T GetResult<T>()
+        {
+            if (typeof(T) == typeof(global::System.Tuple<long, string>))
+                return global::System.Runtime.CompilerServices.Unsafe.As<global::System.Tuple<long, string>, T>(ref Value);
+            return (T)(object)Value;
+        }
+
+        public void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (_factory is null)
+                throw new global::System.ObjectDisposedException(GetType().Name);
+            _factory.WriteResult(ref writer, Value);
+        }
+
+        public override void Dispose()
+        {
+            if (_factory is null)
+                return;
+            Value = default;
+            _factory = null;
+            global::Orleans.Serialization.Invocation.ResponsePool.ReturnGenerated(this);
+        }
+    }
+
+    internal sealed class RpcResponse_AFB713E4Factory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_AFB713E4>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_AFB713E4>, global::Orleans.Serialization.Invocation.IRawResponseReader
+    {
+        private readonly global::Orleans.Serialization.Codecs.TupleCodec<long, string> _codec;
+        private readonly global::Orleans.Serialization.Codecs.TupleCopier<long, string> _copier;
+        public bool IsSupported { get; }
+
+        internal static RpcResponse_AFB713E4Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            provider.GetCodec<global::System.Tuple<long, string>>();
+            provider.GetDeepCopier<global::System.Tuple<long, string>>();
+            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
+            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
+            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_AFB713E4Factory>(null, provider);
+        }
+
+        public RpcResponse_AFB713E4Factory(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            _codec = provider.GetCodec<global::System.Tuple<long, string>>() as global::Orleans.Serialization.Codecs.TupleCodec<long, string>;
+            _copier = provider.GetDeepCopier<global::System.Tuple<long, string>>() as global::Orleans.Serialization.Codecs.TupleCopier<long, string>;
+            var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
+            var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
+            IsSupported = _codec is not null && _copier is not null && (responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCodec<long, string>> || responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.IFieldCodec<global::System.Tuple<long, string>>>) && (responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<long, string>, global::Orleans.Serialization.Codecs.TupleCopier<long, string>> || responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<global::System.Tuple<long, string>, global::Orleans.Serialization.Cloning.IDeepCopier<global::System.Tuple<long, string>>>);
+        }
+
+        internal global::Orleans.Serialization.Invocation.Response RentCopied(global::System.Tuple<long, string> value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            return RpcResponse_AFB713E4.Rent(value, this);
+        }
+
+        [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+        public RpcResponse_AFB713E4 DeepCopy(RpcResponse_AFB713E4 input, global::Orleans.Serialization.Cloning.CopyContext context) => input is null ? null : RpcResponse_AFB713E4.Rent(input.Value, this);
+        internal void WriteResult<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::System.Tuple<long, string> value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null, typeof(global::System.Tuple<long, string>));
+            if (value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::System.Tuple<long, string>), value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_AFB713E4)value).Value);
+        public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        private RpcResponse_AFB713E4 ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = RpcResponse_AFB713E4.Rent(default, this);
+            try
+            {
+                reader.ReadFieldHeader(ref field);
+                if (!field.IsEndBaseOrEndObject)
+                {
+                    result.Value = _codec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    reader.ConsumeEndBaseOrEndObject(ref field);
+                }
+
+                return result;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, RpcResponse_AFB713E4 value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>));
+            if (value.Value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::System.Tuple<long, string>), value.Value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public RpcResponse_AFB713E4 ReadValue<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            if (field.IsReference)
+                return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<RpcResponse_AFB713E4, TInput>(ref reader, field);
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
+            return ReadResult(ref reader, ref field);
+        }
+    }
+
+    internal sealed class RpcResponse_9146C7E3 : global::Orleans.Serialization.Invocation.Response, global::Orleans.Serialization.Invocation.IRawResponseWriter
+    {
+        internal string Value;
+        private RpcResponse_9146C7E3Factory _factory;
+        public RpcResponse_9146C7E3()
+        {
+        }
+
+        internal static RpcResponse_9146C7E3 Rent(string value, RpcResponse_9146C7E3Factory factory)
+        {
+            var result = global::Orleans.Serialization.Invocation.ResponsePool.GetGenerated<RpcResponse_9146C7E3>();
+            result.Value = value;
+            result._factory = factory;
+            return result;
+        }
+
+        public override object Result { get => Value; set => Value = (string)value; }
+        public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
+
+        public override global::System.Type GetSimpleResultType() => typeof(string);
+        public override T GetResult<T>()
+        {
+            if (typeof(T) == typeof(string))
+                return global::System.Runtime.CompilerServices.Unsafe.As<string, T>(ref Value);
+            return (T)(object)Value;
+        }
+
+        public void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (_factory is null)
+                throw new global::System.ObjectDisposedException(GetType().Name);
+            writer.WriteStartObject(0, null, typeof(string));
+            if (Value is not null)
+            {
+                global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0, Value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public override void Dispose()
+        {
+            if (_factory is null)
+                return;
+            Value = default;
+            _factory = null;
+            global::Orleans.Serialization.Invocation.ResponsePool.ReturnGenerated(this);
+        }
+    }
+
+    internal sealed class RpcResponse_9146C7E3Factory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_9146C7E3>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_9146C7E3>, global::Orleans.Serialization.Invocation.IRawResponseReader
+    {
+        private readonly global::Orleans.Serialization.Codecs.StringCodec _codec;
+        private readonly global::Orleans.Serialization.Cloning.ShallowCopier<string> _copier;
+        public bool IsSupported { get; }
+
+        internal static RpcResponse_9146C7E3Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            provider.GetCodec<string>();
+            provider.GetDeepCopier<string>();
+            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<string>>();
+            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<string>>();
+            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_9146C7E3Factory>(null, provider);
+        }
+
+        public RpcResponse_9146C7E3Factory(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            _codec = provider.GetCodec<string>() as global::Orleans.Serialization.Codecs.StringCodec;
+            _copier = provider.GetDeepCopier<string>() as global::Orleans.Serialization.Cloning.ShallowCopier<string>;
+            var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<string>>();
+            var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<string>>();
+            IsSupported = _codec is not null && _copier is not null && (responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec> || responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.IFieldCodec<string>>) && (responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>> || responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.IDeepCopier<string>>);
+        }
+
+        internal global::Orleans.Serialization.Invocation.Response RentCopied(string value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            return RpcResponse_9146C7E3.Rent(value, this);
+        }
+
+        [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+        public RpcResponse_9146C7E3 DeepCopy(RpcResponse_9146C7E3 input, global::Orleans.Serialization.Cloning.CopyContext context) => input is null ? null : RpcResponse_9146C7E3.Rent(input.Value, this);
+        internal void WriteResult<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, string value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null, typeof(string));
+            if (value is not null)
+            {
+                global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0, value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_9146C7E3)value).Value);
+        public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        private RpcResponse_9146C7E3 ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = RpcResponse_9146C7E3.Rent(default, this);
+            try
+            {
+                reader.ReadFieldHeader(ref field);
+                if (!field.IsEndBaseOrEndObject)
+                {
+                    result.Value = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    reader.ConsumeEndBaseOrEndObject(ref field);
+                }
+
+                return result;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, RpcResponse_9146C7E3 value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(global::Orleans.Serialization.Invocation.Response<string>));
+            if (value.Value is not null)
+            {
+                global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0, value.Value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public RpcResponse_9146C7E3 ReadValue<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            if (field.IsReference)
+                return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<RpcResponse_9146C7E3, TInput>(ref reader, field);
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
+            return ReadResult(ref reader, ref field);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
@@ -799,15 +1529,15 @@ namespace OrleansCodeGen.TestProject
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithStringKey));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidCompoundKey));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_GrainWithIntegerCompoundKey));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IMyGrainWithGuidKey));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithGuidKey));
             n3.Add("8F0FEC0E", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
-            var n5 = n2.Add(typeof(global::TestProject.IMyGrainWithStringKey));
+            var n5 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithStringKey));
             n5.Add("43570316", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316));
-            var n7 = n2.Add(typeof(global::TestProject.IMyGrainWithGuidCompoundKey));
+            var n7 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithGuidCompoundKey));
             n7.Add("A9FEF7AF", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
-            var n9 = n2.Add(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
+            var n9 = n2.GetOrAdd(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey));
             n9.Add("9814021A", typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
         }
     }

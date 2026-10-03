@@ -144,4 +144,10 @@
   <data name="InvalidInvokableBaseTypeMappingTitle" xml:space="preserve">
     <value>Invalid invokable base type mapping</value>
   </data>
+  <data name="UnsupportedRpcResponseFactoryTitle" xml:space="preserve">
+    <value>RPC response requires a closed serializer factory</value>
+  </data>
+  <data name="UnsupportedRpcResponseFactoryMessageFormat" xml:space="preserve">
+    <value>RPC method '{0}' requires response result '{1}': {2}; register the closed Response&lt;TResult&gt; types in a serializer context for this contract</value>
+  </data>
 </root>

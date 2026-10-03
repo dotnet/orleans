@@ -77,6 +77,62 @@ strategy on JIT-enabled runtimes.
 NativeAOT applications also need statically available codecs, copiers, and
 activators for their closed payload types.
 
+## Generated manifest metadata
+
+The source generator registers each serialization contract with its implementation
+and target type. Field codecs, base codecs, value serializers, deep and base copiers,
+activators, and converters have explicit entries, including both the value and surrogate
+types for converters. The registration APIs preserve implementation constructors and
+target interface metadata. `TypeConverter` and `CodecProvider` consume these entries
+directly during `AddSerializer` service initialization.
+
+Types marked with `[GenerateSerializer]` and implementations marked with
+`[RegisterSerializer]`, `[RegisterCopier]`, `[RegisterActivator]`, or
+`[RegisterConverter]` receive these registrations automatically. Manual registrations
+can use the target-taking `TypeManifestOptions.Add*` overloads. Existing single-type
+registrations retain their interface-discovery behavior.
+
+Parameterized array contracts and generic converter surrogates use
+`SerializationType` descriptions. These record concrete types, generic parameter
+indices, and array shapes so the runtime can bind the selected implementation's
+generic arguments directly. Generated registrations preserve nested argument shapes
+and parameter ordering. For a described generic target, the runtime matches the
+requested closed type against that shape and binds implementation parameters,
+preserving fixed arguments and reordered parameters.
+
+Contract lookup selects exact closed targets first, then matching named generic
+targets, then array and bare-parameter patterns. Matching patterns use reverse
+registration order and bind the requested type's element shape and implementation
+parameters before activating the selected codec, copier, or converter.
+Explicit registrations retain their global order across implementations. Repeating
+an identical registration preserves its existing priority, and implementation
+collection membership controls which registrations participate in lookup.
+Raw legacy collection entries retain their collection ordering.
+The selected registration supplies the arguments for implementation closure:
+plain open-target entries use positional arguments, and described entries use
+their matched parameter bindings, including when both belong to one implementation.
+
+`SerializationType.Array` describes a structural target-matching pattern, including
+generic element parameters. Executable array types use source-known closed
+descriptors such as `SerializationType.Create(typeof(MyValue[]))`. The generator
+emits these concrete descriptors for fully known array shapes, including arrays
+nested in partly generic contracts. Target-taking registrations can likewise supply
+closed codec, copier, and converter types and concrete surrogate types.
+Concrete array descriptors also register their element and generic-argument type
+names with `TypeConverter`.
+
+Resolving an array matching pattern as an executable type reports
+`NotSupportedException` with closed-registration guidance on both JIT and NativeAOT
+runtimes. Register each closed converter/surrogate combination used by an executable
+surrogate description containing parameterized arrays. This gives both runtimes the
+same registration contract and supplies the native array representations through
+typed code and source-known type references.
+
+NativeAOT applications also provide statically compiled closed codec and serializer
+instances for the generic combinations they use. The `Metadata` scenario in
+`test/Orleans.NativeAotSmoke` exercises the default manifest and primitive, reference
+tuple, and value tuple serialization with closed built-in codec instances.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

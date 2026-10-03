@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -20,6 +21,28 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Creates the default activator for a statically specified reference type.
+        /// </summary>
+        /// <typeparam name="T">The reference type to activate.</typeparam>
+        /// <returns>The default reference-type activator.</returns>
+        public static IActivator<T> CreateDefaultReferenceTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        T>() where T : class => new DefaultReferenceTypeActivator<T>();
+
+        /// <summary>
+        /// Creates the default activator for a statically specified value type.
+        /// </summary>
+        /// <typeparam name="T">The value type to activate.</typeparam>
+        /// <returns>The default value-type activator.</returns>
+        public static IActivator<T> CreateDefaultValueTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        T>() where T : struct => new DefaultValueTypeActivator<T>();
+
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
         private sealed class RecursiveServiceResolutionState
@@ -27,10 +50,13 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             private int _depth;
 
             public List<object> Callers { get; } = new List<object>();
+            private readonly List<(object Caller, ICodecProvider? Provider)> _active = new();
+            public ICodecProvider? Provider => _active.Count > 0 ? _active[^1].Provider : null;
 
-            public void Enter(object caller)
+            public void Enter(object caller, ICodecProvider? provider = null)
             {
                 ++_depth;
+                _active.Add((caller, provider ?? Provider));
                 if (caller is not null)
                 {
                     Callers.Add(caller);
@@ -39,10 +65,17 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             public void Exit()
             {
+                _active.RemoveAt(_active.Count - 1);
                 if (--_depth <= 0)
                 {
                     Callers.Clear();
                 }
+            }
+
+            public void ValidateCycle(object service, ICodecProvider? provider = null)
+            {
+                if ((provider ?? Provider) is not CodecProvider codecProvider) return;
+                codecProvider.RecordConstructionDependency(_active.Where(entry => entry.Caller is not null).Select(entry => entry.Caller).ToArray(), service);
             }
         }
 
@@ -68,24 +101,42 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             try
             {
-                state.Enter(caller);
+                state.Enter(caller, codecProvider);
 
 
                 foreach (var c in state.Callers)
                 {
                     if (c is TService s && !(c is IServiceHolder<TService>))
                     {
+                        state.ValidateCycle(c, codecProvider);
                         return s;
                     }
                 }
 
-                var val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                TService val;
+                if (codecProvider is CodecProvider provider)
+                {
+                    if (provider.TryGetSerializerService(typeof(TService), out var registered))
+                    {
+                        state.ValidateCycle(registered, provider);
+                        return (TService)registered;
+                    }
+
+                }
+
+                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
                 }
 
+                if (val is { } resolved) state.ValidateCycle(resolved, codecProvider);
                 return val;
+            }
+            catch (Exception exception)
+            {
+                if (codecProvider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
             }
             finally
             {
@@ -112,11 +163,19 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 {
                     if (c is TService s and not IServiceHolder<TService>)
                     {
+                        state.ValidateCycle(c);
                         return s;
                     }
                 }
 
-                return Unwrap(service);
+                var result = Unwrap(service);
+                if (result is { } resolved) state.ValidateCycle(resolved);
+                return result;
+            }
+            catch (Exception exception)
+            {
+                if (state.Provider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
             }
             finally
             {
@@ -134,7 +193,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
         }
 
-        internal static object? TryGetService(Type serviceType)
+        internal static object? TryGetService(Type serviceType, ICodecProvider codecProvider)
         {
             var state = ResolutionState.Value!;
             foreach (var c in state.Callers)
@@ -142,6 +201,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 var type = c?.GetType();
                 if (serviceType == type)
                 {
+                    state.ValidateCycle(c!, codecProvider);
                     return c;
                 }
             }

@@ -2898,7 +2898,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_00BCE16F : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_00BCE16F : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public override void Dispose() { }
 
@@ -2916,6 +2916,8 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
@@ -2923,7 +2925,7 @@ namespace OrleansCodeGen.Orleans
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "00BCE16F" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_4115A4B4 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_4115A4B4 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
@@ -2950,6 +2952,8 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
@@ -2961,7 +2965,7 @@ namespace OrleansCodeGen.Orleans
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "E06D3DBC" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_47733EA8 : global::Orleans.Runtime.TaskRequest<bool>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_47733EA8 : global::Orleans.Runtime.TaskRequest<bool>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.MembershipEntry arg0;
         public string arg1;
@@ -2991,6 +2995,8 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
@@ -3002,7 +3008,7 @@ namespace OrleansCodeGen.Orleans
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "FEF3AC5A" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_60723C98 : global::Orleans.Runtime.TaskRequest<bool>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_60723C98 : global::Orleans.Runtime.TaskRequest<bool>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.MembershipEntry arg0;
         public global::Orleans.TableVersion arg1;
@@ -3030,6 +3036,8 @@ namespace OrleansCodeGen.Orleans
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3073,7 +3081,7 @@ namespace OrleansCodeGen.Orleans
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IMembershipTable), "D851FB33" })]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_92AB4F4C : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_92AB4F4C : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.Runtime.SiloAddress arg0;
         public System.Threading.CancellationToken arg1;
@@ -3100,6 +3108,8 @@ namespace OrleansCodeGen.Orleans
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3290,7 +3300,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_D851FB33 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_D851FB33 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipTableData>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.Runtime.SiloAddress arg0;
         public override void Dispose() { }
@@ -3313,6 +3323,8 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
@@ -3321,7 +3333,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_E06D3DBC : global::Orleans.Runtime.TaskRequest<bool>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_E06D3DBC : global::Orleans.Runtime.TaskRequest<bool>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.MembershipEntry arg0;
         public string arg1;
@@ -3345,6 +3357,8 @@ namespace OrleansCodeGen.Orleans
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3424,7 +3438,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Invokable_IMembershipTable_GrainReference_FEF3AC5A : global::Orleans.Runtime.TaskRequest<bool>
+    public sealed partial class Invokable_IMembershipTable_GrainReference_FEF3AC5A : global::Orleans.Runtime.TaskRequest<bool>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.MembershipEntry arg0;
         public global::Orleans.TableVersion arg1;
@@ -3447,6 +3461,8 @@ namespace OrleansCodeGen.Orleans
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -4079,7 +4095,7 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Placement.Rebalancing.IActivationRebalancer), "D7EB6469" })]
-    public sealed partial class Invokable_IActivationRebalancer_GrainReference_D7EB6469 : global::Orleans.Runtime.Request<global::Orleans.Placement.Rebalancing.RebalancingReport>
+    public sealed partial class Invokable_IActivationRebalancer_GrainReference_D7EB6469 : global::Orleans.Runtime.Request<global::Orleans.Placement.Rebalancing.RebalancingReport>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public bool arg0;
         public override void Dispose() { }
@@ -4101,6 +4117,8 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.ValueTask<global::Orleans.Placement.Rebalancing.RebalancingReport> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -5793,7 +5811,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "AEDE93F6" })]
-    public sealed partial class Invokable_IManagementGrain_GrainReference_4C2438F7 : global::Orleans.Runtime.TaskRequest<int>
+    public sealed partial class Invokable_IManagementGrain_GrainReference_4C2438F7 : global::Orleans.Runtime.TaskRequest<int>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.Runtime.GrainReference arg0;
         public System.Threading.CancellationToken arg1;
@@ -5820,6 +5838,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6148,7 +6168,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetGrainActivationCount" })]
-    public sealed partial class Invokable_IManagementGrain_GrainReference_AEDE93F6 : global::Orleans.Runtime.TaskRequest<int>
+    public sealed partial class Invokable_IManagementGrain_GrainReference_AEDE93F6 : global::Orleans.Runtime.TaskRequest<int>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public global::Orleans.Runtime.GrainReference arg0;
         public override void Dispose() { }
@@ -6171,6 +6191,8 @@ namespace OrleansCodeGen.Orleans.Runtime
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
@@ -6180,7 +6202,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "D7365B43" })]
-    public sealed partial class Invokable_IManagementGrain_GrainReference_B15A0F47 : global::Orleans.Runtime.TaskRequest<int>
+    public sealed partial class Invokable_IManagementGrain_GrainReference_B15A0F47 : global::Orleans.Runtime.TaskRequest<int>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
@@ -6206,6 +6228,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6322,7 +6346,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetTotalActivationCount" })]
-    public sealed partial class Invokable_IManagementGrain_GrainReference_D7365B43 : global::Orleans.Runtime.TaskRequest<int>
+    public sealed partial class Invokable_IManagementGrain_GrainReference_D7365B43 : global::Orleans.Runtime.TaskRequest<int>, global::Orleans.Serialization.Invocation.IResponseInvokable
     {
         public override void Dispose() { }
 
@@ -6339,6 +6363,8 @@ namespace OrleansCodeGen.Orleans.Runtime
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
