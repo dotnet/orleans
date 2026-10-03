@@ -141,6 +141,27 @@ public sealed class CassandraGrainStorageTests
     }
 
     [Fact]
+    public async Task ConfiguredKeyspaceQualifiesEveryTableStatement()
+    {
+        var fake = new FakeCassandra();
+        var options = CreateOptions(fake.Session);
+        options.Keyspace = "configured_keyspace";
+        options.CreateTableIfNotExists = true;
+        var storage = CreateProvider(options, fake);
+        var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+        storage.Participate(lifecycle);
+
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
+        using (storage)
+        {
+            Assert.Equal(7, fake.CqlStatements.Count);
+            Assert.All(
+                fake.CqlStatements,
+                statement => Assert.Contains("\"configured_keyspace\".\"grain_state\"", statement, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public async Task PhysicalClearRemovesEtagAndRetainedClearIsIdempotent()
     {
         var fake = new FakeCassandra();
@@ -698,8 +719,10 @@ public sealed class CassandraGrainStorageTests
             {
                 if (FailPrepare) throw new InvalidOperationException("prepare failed");
                 PrepareInvocationCount++;
+                var cql = callInfo.Arg<string>();
+                CqlStatements.Enqueue(cql);
                 var statement = Substitute.For<PreparedStatement>();
-                _statements[statement] = GetKind(callInfo.Arg<string>());
+                _statements[statement] = GetKind(cql);
                 statement.Bind(Arg.Any<object[]>()).Returns(call => new TestBoundStatement(
                     statement,
                     call.Arg<object[]>()));
@@ -725,6 +748,7 @@ public sealed class CassandraGrainStorageTests
         public TaskCompletionSource PrepareCompleted { get; private set; } = Completed();
         public int ExecutionCount { get; private set; }
         public int PrepareInvocationCount { get; private set; }
+        public ConcurrentQueue<string> CqlStatements { get; } = [];
         public ConcurrentQueue<(string Kind, ConsistencyLevel? ConsistencyLevel, ConsistencyLevel SerialConsistencyLevel)> ExecutedStatements { get; } = [];
 
         public void BlockExecution()
@@ -762,6 +786,12 @@ public sealed class CassandraGrainStorageTests
             try
             {
                 await _executionGate.Task;
+                if (statement is SimpleStatement simple)
+                {
+                    CqlStatements.Enqueue(simple.QueryString);
+                    return default;
+                }
+
                 if (statement is not TestBoundStatement bound || !_statements.TryGetValue(bound.PreparedStatement, out var kind))
                 {
                     return default;
