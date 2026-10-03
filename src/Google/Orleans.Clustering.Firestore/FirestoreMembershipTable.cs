@@ -129,21 +129,23 @@ internal partial class FirestoreMembershipTable : IMembershipTable
         try
         {
             var collection = this._storage.GetCollection();
-            // One BatchGet stream is a strongly consistent snapshot; the SDK restores request order.
-            var snapshots = await FirestoreDataManager.ExecuteWithCancellation(
-                collection.Database.GetAllSnapshotsAsync(
+            var data = await this._storage.ExecuteTransaction(async transaction =>
+            {
+                // The transaction binds the version and row to one snapshot across the streamed batch response.
+                var snapshots = await transaction.GetAllSnapshotsAsync(
                     [collection.Document(this._partitionId), collection.Document(key.ToParsableString())],
-                    cancellationToken),
-                cancellationToken);
-            var versionSnapshot = snapshots[0];
-            var siloSnapshot = snapshots[1];
-            if (!versionSnapshot.Exists)
-                throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
+                    transaction.CancellationToken);
+                var versionSnapshot = snapshots[0];
+                var siloSnapshot = snapshots[1];
+                if (!versionSnapshot.Exists)
+                    throw new KeyNotFoundException($"Could not find cluster version entry for {this._partitionId}");
 
-            var silos = siloSnapshot.Exists
-                ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
-                : Array.Empty<SiloInstanceEntity>();
-            var table = Convert((silos, versionSnapshot.ConvertTo<ClusterVersionEntity>()));
+                var silos = siloSnapshot.Exists
+                    ? new[] { siloSnapshot.ConvertTo<SiloInstanceEntity>() }
+                    : Array.Empty<SiloInstanceEntity>();
+                return (silos, versionSnapshot.ConvertTo<ClusterVersionEntity>());
+            }, cancellationToken);
+            var table = Convert(data);
 
             LogReadEntry(key, table);
 
