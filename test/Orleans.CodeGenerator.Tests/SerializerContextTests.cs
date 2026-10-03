@@ -17,6 +17,7 @@ public sealed class SerializerContextTests
     [Fact] public void CanonicalValueSerializerUsesGeneratedCodec() => ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
     [Fact] public void GenericArraysRoundTripAndCopy() => ContextContracts.GenericArraysRoundTripAndCopy();
     [Fact] public void GenericArrayCyclesPreserveIdentity() => ContextContracts.GenericArrayCyclesPreserveIdentity();
+    [Fact] public void CollectionDependenciesHonorSelectedCustomRegistrations() => ContextContracts.CollectionDependenciesHonorSelectedCustomRegistrations();
     [Fact] public void NullableRootCyclesPreserveCopyIdentity() => ContextContracts.NullableRootCyclesPreserveCopyIdentity();
     [Fact] public void NullableRootFailureRollsBackAndRetriesCanonically() => ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
 #if NET10_0_OR_GREATER

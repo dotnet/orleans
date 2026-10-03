@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 #if NET10_0_OR_GREATER
 using Documentation.SerializerContexts;
 #endif
@@ -176,6 +177,67 @@ public static partial class ContextContracts
         Ensure(!ReferenceEquals(original, copy) && !ReferenceEquals(original.Children.Values, copy.Children.Values)
             && ReferenceEquals(copy, copy.Children.Values[0]) && ReferenceEquals(copy, copy.Children.Values[1])
             && ReferenceEquals(copy.Children.Values, copy.Children.Other), "Generic-array cycles preserve copy identity and isolation.");
+    }
+
+    public static void CollectionDependenciesHonorSelectedCustomRegistrations()
+    {
+        foreach (var customFirst in new[] { true, false })
+        {
+            var codec = new DictionaryCodec<string, int>(new StringCodec(), new Int32Codec(), new ComparerCodecAdapter());
+            var copier = new DictionaryCopier<string, int>(new ShallowCopier<string>(), new ShallowCopier<int>());
+            var registrations = new ServiceCollection();
+            void RegisterCustom()
+                => registrations.Configure<TypeManifestOptions>(options =>
+                {
+                    options.AddSerializer<Dictionary<string, int>>(_ => codec, _ => copier);
+                    options.AddAllowedType(typeof(WellKnownStringComparerCodec));
+                    options.WellKnownTypeAliases.TryAdd("StringComparer", typeof(WellKnownStringComparerCodec));
+                });
+            if (customFirst) RegisterCustom();
+            registrations.AddSerializerContext(new DuplicateContext());
+            if (!customFirst) RegisterCustom();
+            using var services = registrations.BuildServiceProvider();
+            var provider = services.GetRequiredService<CodecProvider>();
+            var serializer = services.GetRequiredService<Serializer>();
+            var input = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["FIRST"] = 7 };
+            var nested = new List<Dictionary<string, int>> { input, input };
+            if (!customFirst)
+            {
+                Ensure(!ReferenceEquals(codec, provider.GetCodec<Dictionary<string, int>>()),
+                    "Context-first registration remains selected for root dictionaries.");
+                Expect<NotSupportedException>(() => serializer.SerializeToArray(input), "comparer");
+                Expect<NotSupportedException>(() => serializer.SerializeToArray(nested), "comparer");
+                continue;
+            }
+            Ensure(ReferenceEquals(codec, provider.GetCodec<Dictionary<string, int>>())
+                && ReferenceEquals(copier, provider.GetDeepCopier<Dictionary<string, int>>()),
+                "Custom-first codec and copier instances remain selected canonically.");
+            var rootResult = RoundTrip(services, input);
+            var nestedResult = RoundTrip(services, nested);
+            Ensure(rootResult["first"] == 7 && nestedResult[0]["first"] == 7
+                && ReferenceEquals(nestedResult[0], nestedResult[1]),
+                "Root and nested serialization preserve the selected comparer and shared identity.");
+            var rootCopy = services.GetRequiredService<DeepCopier>().Copy(input);
+            var nestedCopy = services.GetRequiredService<DeepCopier>().Copy(nested);
+            rootCopy["first"] = 11;
+            nestedCopy[0]["first"] = 13;
+            Ensure(input["first"] == 7 && rootCopy["FIRST"] == 11 && nestedCopy[1]["FIRST"] == 13
+                && ReferenceEquals(nestedCopy[0], nestedCopy[1]) && !ReferenceEquals(input, nestedCopy[0]),
+                "Root and nested copying preserve the selected comparer, isolation, and shared identity.");
+        }
+    }
+
+    private sealed class ComparerCodecAdapter : IFieldCodec<IEqualityComparer<string>>
+    {
+        private readonly WellKnownStringComparerCodec _codec = new();
+        public IEqualityComparer<string>? ReadValue<TInput>(
+            ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+            => (IEqualityComparer<string>?)_codec.ReadValue(ref reader, field);
+        public void WriteField<TBufferWriter>(
+            ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [AllowNull] Type expectedType, [AllowNull] IEqualityComparer<string> value)
+            where TBufferWriter : IBufferWriter<byte>
+            => _codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
     }
 
     public static void NullableRootCyclesPreserveCopyIdentity()

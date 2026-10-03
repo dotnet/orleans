@@ -50,6 +50,8 @@ Reflection-based activation uses constructors preserved by generated manifests, 
 
 The generated dictionary registration serializes dictionaries using `EqualityComparer<TKey>.Default`. A custom comparer in a value or serialized payload produces `NotSupportedException`. Applications with custom comparer requirements can register a comparer-aware closed codec through <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddSerializer*>.
 
+Register that codec and copier before the context so they become the selected implementations. Collection factories bind their element dependencies to the selected per-type registrations, preserving the same comparer behavior for a root dictionary and for dictionaries inside a list. Context-first registration retains the context's default-comparer implementation for both paths.
+
 For a NativeAOT executable, enable native publication:
 
 :::code language="xml" source="snippets/serializer-contexts/NativeContextPublish.props" id="serializer_context_native_publish":::

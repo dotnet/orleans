@@ -103,10 +103,10 @@ internal static class SerializerFactoryGenerator
                     var cyclic = Reaches(target, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                     codecArguments.Add(cyclic
                         ? $"CreateCodecHolder<{Name(dependency)}>(provider)"
-                        : Resolve(target.Codec));
+                        : $"provider.GetCodec<{Name(dependency)}>()");
                     copierArguments.Add(cyclic
                         ? $"CreateCopierHolder<{Name(dependency)}>(provider)"
-                        : Resolve(target.Copier));
+                        : $"provider.GetDeepCopier<{Name(dependency)}>()");
                 }
 
                 registration.CodecConstruction = $"new {registration.Codec}({string.Join(", ", codecArguments)})";
@@ -134,13 +134,13 @@ internal static class SerializerFactoryGenerator
                 var cyclic = Reaches(element, registration.Type, registrations, new(SymbolEqualityComparer.Default));
                 if (arrayRegistration.Codec != canonicalCodec && auxiliaryServices.Add(canonicalCodec))
                 {
-                    var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : Resolve(element.Codec);
+                    var codecDependency = cyclic ? $"CreateCodecHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetCodec<{Name(array.ElementType)}>()";
                     result.Append("options.AddSerializerService<").Append(canonicalCodec).Append(">(static provider => new ")
                         .Append(canonicalCodec).Append('(').Append(codecDependency).AppendLine("));");
                 }
                 if (arrayRegistration.Copier != canonicalCopier && auxiliaryServices.Add(canonicalCopier))
                 {
-                    var copierDependency = cyclic ? $"CreateCopierHolder<{Name(array.ElementType)}>(provider)" : Resolve(element.Copier);
+                    var copierDependency = cyclic ? $"CreateCopierHolder<{Name(array.ElementType)}>(provider)" : $"provider.GetDeepCopier<{Name(array.ElementType)}>()";
                     result.Append("options.AddSerializerService<").Append(canonicalCopier).Append(">(static provider => new ")
                         .Append(canonicalCopier).Append('(').Append(copierDependency).AppendLine("));");
                 }

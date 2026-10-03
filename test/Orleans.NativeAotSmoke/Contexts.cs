@@ -7,6 +7,7 @@ ContextContracts.GeneratedModelsTraverseDependencies();
 ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
 ContextContracts.GenericArraysRoundTripAndCopy();
 ContextContracts.GenericArrayCyclesPreserveIdentity();
+ContextContracts.CollectionDependenciesHonorSelectedCustomRegistrations();
 ContextContracts.NullableRootCyclesPreserveCopyIdentity();
 ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
 ContextContracts.ReferencedGeneratedModelsTraverseDependencies();
