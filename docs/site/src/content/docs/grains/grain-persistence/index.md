@@ -1,7 +1,7 @@
 ---
 title: Grain persistence
 description: Persist Orleans grain state using IPersistentState and storage providers.
-ms.date: 08/17/2026
+ms.date: 09/05/2026
 ms.topic: overview
 ---
 
@@ -9,7 +9,7 @@ ms.topic: overview
 
 Orleans grain persistence stores application state independently of a grain activation. When an activation starts, Orleans reads its configured state records before calling <xref:Orleans.Grain.OnActivateAsync*>. The grain explicitly writes changes when the operation's durability point is reached.
 
-Persistence is intentionally a record-oriented abstraction, not an object-relational mapper. A grain can use multiple named state records, use different providers for different records, or access a database directly when it needs queries or data models that don't fit grain storage.
+Grain persistence provides record-oriented storage by grain identity. A grain can use multiple named state records and different providers for different records. Query-oriented data models can use a database directly. See [Model collections of grains](../../how-to/model-grain-collections.md) for registry, partitioned-index, and external query-store patterns.
 
 ## Choose a provider
 
