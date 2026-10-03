@@ -1,5 +1,6 @@
 using Orleans.Serialization.ContextSmoke;
 
+StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
 StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
 StaticFactoryContracts.FailedCyclicConstructionRollsBack();
 StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();

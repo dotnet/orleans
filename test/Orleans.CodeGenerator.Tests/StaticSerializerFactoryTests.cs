@@ -8,6 +8,9 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class StaticSerializerFactoryTests
 {
     [Fact]
+    public void FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry() => StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
+
+    [Fact]
     public void GeneratedMetadataCollectionsComposeWithClosedFactories() => StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
 
     [Fact]

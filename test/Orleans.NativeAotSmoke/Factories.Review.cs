@@ -13,6 +13,80 @@ namespace Orleans.Serialization.ContextSmoke;
 
 public static partial class StaticFactoryContracts
 {
+    public static void FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry()
+    {
+        foreach (var mutual in new[] { false, true })
+        {
+            var leaves = 0;
+            var attempts = 0;
+            FactoryCycleLeaf? failedLeaf = null;
+            InvalidOperationException? caught = null;
+            var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
+            services.Configure<TypeManifestOptions>(options =>
+            {
+                options.AddSerializerService<FactoryCycleLeaf>(_ => new FactoryCycleLeaf(++leaves));
+                options.AddSerializerService<FactoryCycleDependency>(provider =>
+                    new FactoryCycleDependency(OrleansGeneratedCodeHelper.GetService<FactoryCycleRoot>(null!, provider)));
+                options.AddSerializerService<FactoryCycleRoot>(provider =>
+                {
+                    var leaf = OrleansGeneratedCodeHelper.GetService<FactoryCycleLeaf>(null!, provider);
+                    if (++attempts == 1)
+                    {
+                        failedLeaf = leaf;
+                        try
+                        {
+                            if (mutual) _ = OrleansGeneratedCodeHelper.GetService<FactoryCycleDependency>(null!, provider);
+                            else _ = OrleansGeneratedCodeHelper.GetService<FactoryCycleRoot>(null!, provider);
+                        }
+                        catch (InvalidOperationException exception)
+                        {
+                            caught = exception;
+                        }
+                    }
+                    return new FactoryCycleRoot(leaf);
+                });
+            });
+            using var scope = services.BuildServiceProvider();
+            var codecs = scope.GetRequiredService<CodecProvider>();
+            var committed = codecs.GetCodec<int>();
+            InvalidOperationException? failure = null;
+            try
+            {
+                _ = OrleansGeneratedCodeHelper.GetService<FactoryCycleRoot>(null!, codecs);
+            }
+            catch (InvalidOperationException exception)
+            {
+                failure = exception;
+            }
+            Ensure(failure is not null && ReferenceEquals(failure, caught)
+                && failure.Message.Contains("in-progress instance", StringComparison.Ordinal),
+                "Factory cycles fault the graph with the original registration diagnostic even when caught.");
+            var root = OrleansGeneratedCodeHelper.GetService<FactoryCycleRoot>(null!, codecs);
+            Ensure(attempts == 2 && leaves == 2 && root.Leaf.Generation == 2
+                && !ReferenceEquals(failedLeaf, root.Leaf), "Retry rebuilds every unpublished factory dependency.");
+            Ensure(ReferenceEquals(root, OrleansGeneratedCodeHelper.GetService<FactoryCycleRoot>(null!, codecs))
+                && ReferenceEquals(root.Leaf, OrleansGeneratedCodeHelper.GetService<FactoryCycleLeaf>(null!, codecs))
+                && ReferenceEquals(committed, codecs.GetCodec<int>()), "Retry commits canonical services and preserves completed leaves.");
+            Ensure(ReferenceEquals(root, OrleansGeneratedCodeHelper.GetService<FactoryCycleDependency>(null!, codecs).Root),
+                "The formerly cyclic factory resolves the completed root after retry.");
+        }
+    }
+
+    private sealed class FactoryCycleLeaf(int generation)
+    {
+        public int Generation { get; } = generation;
+    }
+
+    private sealed class FactoryCycleRoot(FactoryCycleLeaf leaf)
+    {
+        public FactoryCycleLeaf Leaf { get; } = leaf;
+    }
+
+    private sealed class FactoryCycleDependency(FactoryCycleRoot root)
+    {
+        public FactoryCycleRoot Root { get; } = root;
+    }
+
     public static void GeneratedMetadataCollectionsComposeWithClosedFactories()
     {
         var services = new ServiceCollection().AddSerializerContext(new ConstructionContext());
