@@ -367,6 +367,7 @@ namespace Orleans
                         return;
                     }
 
+                    Response? response = null;
                     try
                     {
                         request.SetTarget(this);
@@ -376,36 +377,37 @@ namespace Orleans
                         }
 
                         var filters = _manager.GrainCallFilters;
-                        Response response;
+                        bool isCopied;
                         if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
                         {
-                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping,
+                            using var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping,
                                 _manager._responseCopier, _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
                                 _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
                             await invoker.Invoke();
-                            response = invoker.Response!;
+                            (response, isCopied) = invoker.TakeResponse();
                         }
                         else
                         {
-                            if (request is IResponseInvokable direct)
-                                response = await direct.InvokeAndCopy(
-                                    _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
-                                    _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(), _manager._responseCopier);
-                            else
-                            {
-                                response = await request.Invoke();
-                                response = _manager._responseCopier.Copy(response)!;
-                            }
+                            response = await ResponseCopyBoundary.InvokeAndCopy(request,
+                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
+                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(), _manager._responseCopier);
+                            isCopied = request is not IResponseInvokable || response.Exception is null;
                         }
 
                         if (message.Direction != Message.Directions.OneWay)
                         {
-                            this.SendResponseAsync(message, response);
+                            var outgoing = response;
+                            response = null;
+                            this.SendResponseAsync(message, outgoing, isCopied);
                         }
                     }
                     catch (Exception exc)
                     {
                         this.ReportException(message, exc);
+                    }
+                    finally
+                    {
+                        response?.Dispose();
                     }
                 }
                 catch (Exception outerException)
@@ -458,31 +460,39 @@ namespace Orleans
             private void SendCanceledResponse(Message message) =>
                 _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
 
-            private void SendResponseAsync(Message message, Response resultObject)
+            private void SendResponseAsync(Message message, Response resultObject, bool isCopied)
             {
-                if (message.IsExpired)
-                {
-                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
-                    return;
-                }
-
-                Response deepCopy;
+                Response? response = resultObject;
                 try
                 {
-                    // we're expected to notify the caller if the deep copy failed.
-                    // The copier preserves the null state of its input.
-                    deepCopy = _manager.deepCopier.Copy(resultObject)!;
-                }
-                catch (Exception exc2)
-                {
-                    _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    LogErrorSendingResponse(_manager.logger, exc2);
-                    return;
-                }
+                    if (message.IsExpired)
+                    {
+                        _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
+                        return;
+                    }
 
-                // the deep-copy succeeded.
-                _manager.runtimeClient.SendResponse(message, deepCopy);
-                return;
+                    if (!isCopied)
+                    {
+                        try
+                        {
+                            response = null;
+                            response = ResponseCopyBoundary.CopyAndDispose(resultObject, _manager.deepCopier);
+                        }
+                        catch (Exception exc2)
+                        {
+                            _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
+                            LogErrorSendingResponse(_manager.logger, exc2);
+                            return;
+                        }
+                    }
+
+                    _manager.runtimeClient.SendResponse(message, response);
+                    response = null;
+                }
+                finally
+                {
+                    response?.Dispose();
+                }
             }
 
             private void ReportException(Message message, Exception exception)
