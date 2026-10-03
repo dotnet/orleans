@@ -14,6 +14,19 @@ Orleans can protect client-to-silo and silo-to-silo connections with Transport L
 
 The TLS APIs are included in the Orleans server and client packages.
 
+## Migrate TLS configuration
+
+TLS configuration and certificate loading now reside in the Orleans Core and Runtime packages. Applications migrating from `Microsoft.Orleans.Connections.Security` update their references as follows:
+
+| Previous API | Current API |
+|---|---|
+| `Orleans.Hosting.OrleansConnectionSecurityHostingExtensions` client overloads | <xref:Orleans.Hosting.ClientTlsHostingExtensions> |
+| `Orleans.Hosting.OrleansConnectionSecurityHostingExtensions` silo overloads | <xref:Orleans.Hosting.SiloTlsHostingExtensions> |
+| `Orleans.Connections.Security.CertificateLoader` | <xref:Orleans.Connections.Transport.Security.CertificateLoader> |
+| `Orleans.Connections.Security` TLS options and features | `Orleans.Connections.Transport.Security` |
+
+The `builder.UseTls(...)` call syntax is preserved. Explicit static calls use the client or silo hosting type listed above. This package and assembly consolidation is a binary API change: rebuild applications and libraries against the message transport APIs and deploy those rebuilt binaries together.
+
 ## Choose an authentication model
 
 | Model | Inbound silo policy | Outbound local-certificate policy | Typical boundary |

@@ -27,6 +27,7 @@ using Orleans.Serialization.Session;
 using Xunit;
 using SslApplicationProtocol = System.Net.Security.SslApplicationProtocol;
 using SslClientAuthenticationOptions = System.Net.Security.SslClientAuthenticationOptions;
+using SslStream = System.Net.Security.SslStream;
 
 namespace Orleans.Core.Tests.Networking;
 

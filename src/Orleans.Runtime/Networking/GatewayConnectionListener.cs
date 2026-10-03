@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
@@ -20,8 +19,7 @@ namespace Orleans.Runtime.Messaging
         MessageCenter messageCenter,
         ConnectionManager connectionManager,
         ConnectionCommon connectionShared,
-        ConnectionPreambleHelper connectionPreambleHelper,
-        ILogger<GatewayConnectionListener> logger) : ConnectionListener(
+        ConnectionPreambleHelper connectionPreambleHelper) : ConnectionListener(
               listeners.Where(static listener => listener.ListenerName.Equals(DefaultListenerName, StringComparison.Ordinal)),
               listenerMiddleware,
               connectionOptions,
@@ -33,7 +31,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter _messageCenter = messageCenter;
         private readonly ConnectionCommon _connectionShared = connectionShared;
         private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
-        private readonly ILogger<GatewayConnectionListener> _logger = logger;
         private readonly OverloadDetector _overloadDetector = overloadDetector;
         private readonly Gateway _gateway = messageCenter.Gateway;
 

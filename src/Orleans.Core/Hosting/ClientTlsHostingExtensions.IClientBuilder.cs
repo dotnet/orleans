@@ -9,7 +9,7 @@ using Orleans.Runtime;
 namespace Orleans.Hosting
 {
     /// <summary>
-    /// Provides extension methods for configuring TLS on Orleans clients and silos.
+    /// Provides extension methods for configuring TLS on Orleans clients.
     /// </summary>
     public static partial class ClientTlsHostingExtensions
     {
