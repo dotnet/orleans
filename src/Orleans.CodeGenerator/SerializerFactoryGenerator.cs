@@ -212,9 +212,11 @@ internal static class SerializerFactoryGenerator
         }
 
         result.Append("options.AddDefaultSerializerService<").Append(registration.Codec).Append(">(static provider => ")
-            .Append(registration.CodecConstruction).AppendLine(");");
+            .Append(registration.CodecConstruction)
+            .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<").Append(registration.Copier).Append(">(static provider => ")
-            .Append(registration.CopierConstruction).AppendLine(");");
+            .Append(registration.CopierConstruction)
+            .Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies)).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.IFieldCodec<")
             .Append(Name(type)).Append(">, ").Append(registration.Codec).Append(">(static provider => ")
             .Append(Resolve(registration.Codec))
@@ -236,9 +238,11 @@ internal static class SerializerFactoryGenerator
         }
 
         result.Append("options.AddDefaultSerializerService<").Append(codec).Append(">(static provider => new ")
-            .Append(codec).Append("(caller => ").Append(Resolve(registration.Codec, "caller")).AppendLine("));");
+            .Append(codec).Append("(caller => ").Append(Resolve(registration.Codec, "caller"))
+            .Append("), dependencies: ").Append(DefaultDependencyServices([type], codec: true)).AppendLine(");");
         result.Append("options.AddDefaultSerializerService<").Append(copier).Append(">(static provider => new ")
-            .Append(copier).Append("(caller => ").Append(Resolve(registration.Copier, "caller")).AppendLine("));");
+            .Append(copier).Append("(caller => ").Append(Resolve(registration.Copier, "caller"))
+            .Append("), dependencies: ").Append(DefaultDependencyServices([type], codec: false)).AppendLine(");");
         result.Append("options.AddDefaultSerializer<").Append(Name(responseType)).Append(", ").Append(codec).Append(", ").Append(copier).Append(">(static provider => ")
             .Append(Resolve(codec)).Append(", static provider => ").Append(Resolve(copier))
             .Append(", codecDependencies: ").Append(DefaultDependencyServices([type], codec: true))
@@ -291,9 +295,11 @@ internal static class SerializerFactoryGenerator
         {
             foreach (var element in tupleType.TypeArguments) AppendConstructionDependency(services, element, cancellationToken, constructionTypes, result);
             result.Append("options.AddDefaultSerializerService<").Append(Name(tupleCodec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(tupleCodec), tupleCodec)).AppendLine(");");
+                .Append(ConstructReferenced(Name(tupleCodec), tupleCodec))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCodec))).AppendLine(");");
             result.Append("options.AddDefaultSerializerService<").Append(Name(tupleCopier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(tupleCopier), tupleCopier)).AppendLine(");");
+                .Append(ConstructReferenced(Name(tupleCopier), tupleCopier))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCopier))).AppendLine(");");
             result.Append("options.AddDefaultSerializer<").Append(Name(tupleType)).Append(", ").Append(Name(tupleCodec)).Append(", ").Append(Name(tupleCopier)).Append(">(static provider => ")
                 .Append(Resolve(Name(tupleCodec))).Append(", static provider => ").Append(Resolve(Name(tupleCopier)))
                 .Append(", codecDependencies: ").Append(DefaultDependencyServices(tupleType.TypeArguments, codec: true))
@@ -307,9 +313,11 @@ internal static class SerializerFactoryGenerator
             var codec = services.LibraryTypes.ArrayCodec.Construct(arrayType.ElementType);
             var copier = services.LibraryTypes.ArrayCopier.Construct(arrayType.ElementType);
             result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(codec), codec)).AppendLine(");");
+                .Append(ConstructReferenced(Name(codec), codec))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec))).AppendLine(");");
             result.Append("options.AddDefaultSerializerService<").Append(Name(copier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(copier), copier)).AppendLine(");");
+                .Append(ConstructReferenced(Name(copier), copier))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
             result.Append("options.AddDefaultSerializer<").Append(Name(arrayType)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
                 .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
                 .Append(", codecDependencies: ").Append(DefaultDependencyServices([arrayType.ElementType], codec: true))
@@ -331,9 +339,11 @@ internal static class SerializerFactoryGenerator
                     AppendConstructionDependency(services, contract.TypeArguments[0], cancellationToken, constructionTypes, result);
             }
             result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(codec), codec, preferCompleteConstructor: true)).AppendLine(");");
+                .Append(ConstructReferenced(Name(codec), codec, preferCompleteConstructor: true))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec, preferCompleteConstructor: true))).AppendLine(");");
             result.Append("options.AddDefaultSerializerService<").Append(Name(copier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(copier), copier)).AppendLine(");");
+                .Append(ConstructReferenced(Name(copier), copier))
+                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
             result.Append("options.AddDefaultSerializer<").Append(Name(collection)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
                 .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
                 .Append(", codecDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec, preferCompleteConstructor: true)))
@@ -481,9 +491,15 @@ internal static class SerializerFactoryGenerator
             }
 
             result.Append("options.").Append(addService).Append('<').Append(registration.Codec).Append(">(static provider => ")
-                .Append(registration.CodecConstruction).AppendLine(");");
+                .Append(registration.CodecConstruction);
+            if (useDefaultFactories && registration.Dependencies.Count > 0)
+                result.Append(", dependencies: ").Append(DefaultDependencyServices(registration.Dependencies, codec: true));
+            result.AppendLine(");");
             result.Append("options.").Append(addService).Append('<').Append(registration.Copier).Append(">(static provider => ")
-                .Append(registration.CopierConstruction).AppendLine(");");
+                .Append(registration.CopierConstruction);
+            if (useDefaultFactories && registration.Dependencies.Count > 0)
+                result.Append(", dependencies: ").Append(DefaultDependencyServices(registration.Dependencies, codec: false));
+            result.AppendLine(");");
             result.Append("options.").Append(addSerializer).Append('<').Append(typeName);
             if (useDefaultFactories)
                 result.Append(", ").Append(registration.Codec).Append(", ").Append(registration.Copier);
