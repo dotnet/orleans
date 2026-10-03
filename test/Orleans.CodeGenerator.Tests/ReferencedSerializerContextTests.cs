@@ -13,6 +13,68 @@ namespace Orleans.CodeGenerator.Tests;
 [TestArea("CodeGen")]
 public sealed class ReferencedSerializerContextTests
 {
+    [Fact]
+    public async Task ReferencedNet8DynamicImplementationsRoundTripAndCopy()
+    {
+        var producer = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializer]
+            public sealed class DynamicPayload<T>
+            {
+                [Orleans.Id(0)] public readonly T Value;
+                public DynamicPayload() { }
+                public DynamicPayload(T value) { Value = value; }
+            }
+            """, $"DynamicProducer{Guid.NewGuid():N}");
+        var (producerOutput, producerResult) = Generate(producer, "v8.0", hotReload: false);
+        Assert.Empty(producerResult.Diagnostics);
+        AssertNoCompilationErrors(producerOutput);
+        Assert.Contains("Utilities.FieldAccessor", string.Join("\n",
+            producerResult.Results.SelectMany(static result => result.GeneratedSources)
+                .Select(static source => source.SourceText.ToString())), StringComparison.Ordinal);
+        var consumer = await TestCompilationHelper.CreateCompilation("""
+            [Orleans.GenerateSerializerContext(typeof(DynamicPayload<System.Collections.Generic.List<int>>))]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            public static class DynamicProducerProof
+            {
+                public static bool Run()
+                {
+                    using var services = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(
+                        Orleans.Serialization.ServiceCollectionExtensions.AddSerializerContext(
+                            new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
+                    var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
+                    var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
+                    var original = new DynamicPayload<System.Collections.Generic.List<int>>(new() { 13, 17 });
+                    var restored = serializer.Deserialize<DynamicPayload<System.Collections.Generic.List<int>>>(serializer.SerializeToArray(original));
+                    var copy = copier.Copy(original);
+                    copy.Value[0] = 23;
+                    return restored.Value[0] == 13 && restored.Value[1] == 17
+                        && original.Value[0] == 13 && copy.Value[0] == 23 && copy.Value[1] == 17
+                        && !object.ReferenceEquals(original, restored)
+                        && !object.ReferenceEquals(original, copy)
+                        && !object.ReferenceEquals(original.Value, copy.Value);
+                }
+            }
+            """, $"DynamicConsumer{Guid.NewGuid():N}", EmitReference(producerOutput));
+        consumer = consumer.AddReferences(
+            MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceProvider).Assembly.Location));
+        var (consumerOutput, consumerResult) = Generate(consumer, "v10.0", hotReload: false);
+        Assert.Empty(consumerResult.Diagnostics);
+        AssertNoCompilationErrors(consumerOutput);
+        var executable = producerOutput.AddSyntaxTrees(consumerOutput.SyntaxTrees)
+            .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceProvider).Assembly.Location));
+        foreach (var tree in executable.SyntaxTrees)
+        {
+            var root = (CompilationUnitSyntax)tree.GetRoot(TestContext.Current.CancellationToken);
+            executable = executable.ReplaceSyntaxTree(tree,
+                tree.WithRootAndOptions(root.WithAttributeLists(default), tree.Options));
+        }
+        using var image = new MemoryStream();
+        var emitted = executable.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("DynamicProducerProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
     [Theory]
     [InlineData("v8.0", MetadataImportOptions.Public)]
     [InlineData("v8.0", MetadataImportOptions.All)]
@@ -119,12 +181,12 @@ public sealed class ReferencedSerializerContextTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ReferencedGenericReadonlyFieldRejectsNet8Producer(bool referenceAssembly)
+    public async Task ReferencedGenericReadonlyFieldAcceptsNet8Producer(bool referenceAssembly)
     {
         var reference = await CompileProducer("[Id(0)] public readonly T Value;", generic: true,
             frameworkVersion: "v8.0", hotReload: false, referenceAssembly,
             dynamicCodec: true, dynamicCopier: true);
-        await AssertRejected(reference, "Codec_Payload");
+        await AssertAccepted(reference);
     }
 
     [Theory]
@@ -134,14 +196,14 @@ public sealed class ReferencedSerializerContextTests
     [InlineData("v10.0", true, true, true)]
     [InlineData("v10.0", true, false, false)]
     [InlineData("v10.0", true, false, true)]
-    public async Task ReferencedPrivateFieldRejectsDynamicProducer(
+    public async Task ReferencedPrivateFieldAcceptsDynamicProducer(
         string frameworkVersion, bool hotReload, bool generic, bool referenceAssembly)
     {
         var memberType = generic ? "T" : "int";
         var reference = await CompileProducer(
             $"[Id(0)] private {memberType} _value; public {memberType} Value => _value;",
             generic, frameworkVersion, hotReload, referenceAssembly, dynamicCodec: true, dynamicCopier: true);
-        await AssertRejected(reference, "Codec_Payload", generic);
+        await AssertAccepted(reference, generic);
     }
 
     [Theory]
@@ -149,23 +211,23 @@ public sealed class ReferencedSerializerContextTests
     [InlineData(true, true)]
     [InlineData(false, false)]
     [InlineData(false, true)]
-    public async Task ReferencedHotReloadReadonlyFieldRejectsDynamicProducer(bool generic, bool referenceAssembly)
+    public async Task ReferencedHotReloadReadonlyFieldAcceptsDynamicProducer(bool generic, bool referenceAssembly)
     {
         var reference = await CompileProducer($"[Id(0)] public readonly {(generic ? "T" : "int")} Value;",
             generic, frameworkVersion: "v10.0", hotReload: true, referenceAssembly,
             dynamicCodec: true, dynamicCopier: true);
-        await AssertRejected(reference, "Codec_Payload", generic);
+        await AssertAccepted(reference, generic);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ReferencedCopierOnlyDynamicAccessorsAreRejected(bool referenceAssembly)
+    public async Task ReferencedCopierOnlyDynamicAccessorsAreAccepted(bool referenceAssembly)
     {
         var reference = await CompileProducer("[Id(0)] public readonly T Value;",
             generic: true, frameworkVersion: "v8.0", hotReload: false, referenceAssembly,
             dynamicCodec: false, dynamicCopier: true, codecFrameworkVersion: "v10.0");
-        await AssertRejected(reference, "Copier_Payload");
+        await AssertAccepted(reference);
     }
 
     [Theory]
@@ -195,39 +257,35 @@ public sealed class ReferencedSerializerContextTests
     [InlineData("Codec_Payload", true)]
     [InlineData("Copier_Payload", false)]
     [InlineData("Copier_Payload", true)]
-    public async Task ReferencedImplementationsWithoutAccessorContractAreRejected(
+    public async Task ReferencedImplementationsWithoutAccessorMarkersAreAccepted(
         string implementation, bool referenceAssembly)
     {
         var reference = await CompileProducer("[Id(0)] public T Value;", generic: true,
-            frameworkVersion: "v10.0", hotReload: false, referenceAssembly, removeContractFrom: implementation);
-        await AssertRejected(reference, implementation, reason: "rebuild the referenced assembly");
+            frameworkVersion: "v10.0", hotReload: false, referenceAssembly);
+        var compilation = await AssertAccepted(reference);
+        var symbol = compilation.GetTypeByMetadataName($"OrleansCodeGen.Producer.{implementation}`1");
+        Assert.NotNull(symbol);
+        Assert.DoesNotContain(symbol.GetAttributes(),
+            static attribute => attribute.AttributeClass?.ToDisplayString() == "System.ComponentModel.DescriptionAttribute");
     }
 
-    private static async Task AssertRejected(
-        MetadataReference[] reference, string implementation, bool generic = true,
-        string reason = "statically generated field accessor")
+    private static async Task<Compilation> AssertAccepted(MetadataReference[] reference, bool generic = true)
     {
         var (compilation, result) = await GenerateConsumer(reference, generic, frameworkVersion: "v10.0", hotReload: false);
-        var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal("ORLEANS0115", diagnostic.Id);
-        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        var message = diagnostic.GetMessage();
-        Assert.True(message.Contains(implementation, StringComparison.Ordinal), message);
-        Assert.True(message.Contains(reason, StringComparison.Ordinal), message);
-        Assert.DoesNotContain(result.Results.SelectMany(static result => result.GeneratedSources),
-            static source => source.HintName.Contains(".context.", StringComparison.Ordinal));
-        Assert.All(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
-            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error), static diagnostic =>
-            {
-                Assert.Equal("CS0534", diagnostic.Id);
-                Assert.Contains("DemoContext", diagnostic.GetMessage(), StringComparison.Ordinal);
-                Assert.Contains("ConfigureInner", diagnostic.GetMessage(), StringComparison.Ordinal);
-            });
+        Assert.Empty(result.Diagnostics);
+        AssertNoCompilationErrors(compilation);
+        var context = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        var typeArguments = generic ? "<int>" : "";
+        Assert.Contains($"new global::OrleansCodeGen.Producer.Codec_Payload{typeArguments}", context, StringComparison.Ordinal);
+        Assert.Contains($"new global::OrleansCodeGen.Producer.Copier_Payload{typeArguments}", context, StringComparison.Ordinal);
+        EmitReference(compilation);
+        return compilation;
     }
 
     private static async Task<MetadataReference[]> CompileProducer(
         string member, bool generic, string frameworkVersion, bool hotReload, bool referenceAssembly,
-        string? removeContractFrom = null, bool dynamicCodec = false, bool dynamicCopier = false,
+        bool dynamicCodec = false, bool dynamicCopier = false,
         string? codecFrameworkVersion = null)
     {
         var sourceCompilation = await TestCompilationHelper.CreateCompilation($$"""
@@ -244,7 +302,7 @@ public sealed class ReferencedSerializerContextTests
         AssertNoCompilationErrors(compilation);
         if (codecFrameworkVersion is not null)
         {
-            // Compile independently generated implementations so copier validation is not masked by codec rejection.
+            // Exercise independently generated codec and copier accessor strategies.
             var (codecCompilation, codecResult) = Generate(sourceCompilation, codecFrameworkVersion, hotReload);
             Assert.Empty(codecResult.Diagnostics);
             AssertNoCompilationErrors(codecCompilation);
@@ -259,34 +317,15 @@ public sealed class ReferencedSerializerContextTests
                 tree.GetRoot(TestContext.Current.CancellationToken).ReplaceNode(declaration, replacement), tree.Options));
         }
 
-        AssertProducerContract(compilation, "Codec_Payload", generic, dynamicCodec);
-        AssertProducerContract(compilation, "Copier_Payload", generic, dynamicCopier);
-
-        if (removeContractFrom is not null)
-        {
-            foreach (var tree in compilation.SyntaxTrees)
-            {
-                var root = tree.GetRoot(TestContext.Current.CancellationToken);
-                var attributes = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
-                    .Where(type => type.Identifier.ValueText == removeContractFrom)
-                    .SelectMany(static type => type.AttributeLists)
-                    .Where(static list => list.ToString().Contains("OrleansCodeGen.FieldAccessors.v1:", StringComparison.Ordinal))
-                    .ToArray();
-                if (attributes.Length > 0)
-                {
-                    var replacement = tree.WithRootAndOptions(root.RemoveNodes(attributes, SyntaxRemoveOptions.KeepNoTrivia)!, tree.Options);
-                    compilation = compilation.ReplaceSyntaxTree(tree, replacement);
-                }
-            }
-        }
+        AssertProducerAccessorShape(compilation, "Codec_Payload", generic, dynamicCodec);
+        AssertProducerAccessorShape(compilation, "Copier_Payload", generic, dynamicCopier);
 
         if (!referenceAssembly)
         {
             return [EmitReference(compilation)];
         }
 
-        // Keep model metadata complete: model reconstruction deliberately rejects reference-only models.
-        // Only the generated implementations need reference-only images to exercise accessor contract retention.
+        // Keep complete model metadata alongside reference-only generated implementations.
         var contracts = sourceCompilation.WithAssemblyName("ReferencedContextContracts");
         var contractsReference = EmitReference(contracts);
         var implementations = CSharpCompilation.Create("ReferencedContextProducer",
@@ -305,7 +344,7 @@ public sealed class ReferencedSerializerContextTests
         return MetadataReference.CreateFromImage(image.ToArray());
     }
 
-    private static void AssertProducerContract(
+    private static void AssertProducerAccessorShape(
         Compilation compilation, string name, bool generic, bool dynamicAccessors)
     {
         var implementation = compilation.GetTypeByMetadataName($"OrleansCodeGen.Producer.{name}{(generic ? "`1" : "")}");
@@ -315,10 +354,8 @@ public sealed class ReferencedSerializerContextTests
         Assert.Equal(dynamicAccessors, declaration.ToString().Contains("Utilities.FieldAccessor", StringComparison.Ordinal));
         Assert.Equal(dynamicAccessors, implementation.GetMembers().OfType<IFieldSymbol>()
             .Any(static field => field.IsStatic && field.Type.TypeKind == TypeKind.Delegate));
-        var contract = Assert.Single(implementation.GetAttributes(),
+        Assert.DoesNotContain(implementation.GetAttributes(),
             static attribute => attribute.AttributeClass?.ToDisplayString() == "System.ComponentModel.DescriptionAttribute");
-        Assert.Equal($"OrleansCodeGen.FieldAccessors.v1:{(dynamicAccessors ? "Dynamic" : "Static")}",
-            Assert.Single(contract.ConstructorArguments).Value);
     }
 
     private static async Task<(Compilation Compilation, GeneratorDriverRunResult Result)> GenerateConsumer(

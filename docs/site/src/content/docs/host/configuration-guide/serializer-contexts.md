@@ -6,7 +6,7 @@ ms.topic: how-to
 
 # Compile-time serializer contexts
 
-A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of types with statically constructed Orleans codecs and deep copiers. Use a context when publishing a serialization component with NativeAOT, so the native compiler can compile each required generic implementation.
+A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of types with statically constructed Orleans codecs and deep copiers. Use a context when publishing a serialization component with NativeAOT on .NET 10 and later, so the native compiler can compile each required generic implementation.
 
 ## Declare the type graph
 
@@ -14,13 +14,13 @@ Apply <xref:Orleans.GenerateSerializerContextAttribute> to a top-level, non-gene
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 
-Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies can provide generated model codecs and copiers; the context constructs their closed implementations and validates the producer's generated accessor contract. Compile those implementations with direct member access or static accessors for each serialized member. For traversal of referenced models, provide the implementation assembly to the compiler, for example by setting `ProduceReferenceAssembly=false` on the model project. This preserves the member information consumed by the existing Orleans model generator.
+Models use the existing <xref:Orleans.GenerateSerializerAttribute> and stable <xref:Orleans.IdAttribute> member identifiers. Referenced assemblies provide generated codecs and copiers whose actual constructor and service-member metadata determine the closed dependency graph. NativeAOT implementations use direct member access or static accessors for each serialized member; JIT applications also support generated dynamic accessors. For traversal of referenced models, provide complete implementation metadata to the compiler, for example by setting `ProduceReferenceAssembly=false` on the model project. This preserves the member information consumed by the existing Orleans model generator.
 
 Referenced dependency discovery follows the producer's emitted codec and copier service contracts, including private implementation fields and generated service properties. The producer's selected members and field identifiers therefore determine serialization and copying even when the consumer uses different field-ID settings. Provide complete implementation metadata for models using assembly-level implicit member selection.
 
 Metadata discovery also follows generic arguments, array elements, implemented interfaces, and declaring types. It preserves accessible alias metadata independently of codec registration. This traversal has separate limits of 1,024 closed metadata types and 128 nested dependencies; expanding generic-interface shapes produce `ORLEANS0115` with guidance to declare finite type metadata. Already visited types terminate finite metadata cycles.
 
-The supported graph includes primitive leaf codecs with parameterless construction, generated enums, `List<T>`, `Dictionary<TKey, TValue>`, nullable value types, and single-dimensional zero-based arrays. Generated models use default construction, an `object` base for classes, and members supported by direct access or statically generated accessors. The context generator uses the existing model generator's accessor guarantees. Model hooks, custom activation, and additional collection families require their corresponding implementation support before being included in a context. The generator reports `ORLEANS0115` for a dependency requiring dynamic field access, another unsupported dependency, or a graph exceeding 1,024 closed types.
+The supported graph includes primitive leaf codecs with parameterless construction, generated enums, `List<T>`, `Dictionary<TKey, TValue>`, nullable value types, and single-dimensional zero-based arrays. Generated models use default construction and an `object` base for classes. NativeAOT uses the existing model generator's direct-access and static-accessor support. Model hooks, custom activation, and additional collection families require their corresponding implementation support before being included in a context. The generator reports `ORLEANS0115` for an unsupported dependency or a graph exceeding 1,024 closed types. Native publication diagnoses referenced implementations which require unavailable runtime code generation.
 
 ## Register and use the context
 
