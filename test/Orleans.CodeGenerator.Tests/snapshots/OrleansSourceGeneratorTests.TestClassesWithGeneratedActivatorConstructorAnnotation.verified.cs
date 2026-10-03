@@ -123,9 +123,11 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithGeneratedActivatorConstructor));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ClassWithGeneratedActivatorConstructor), typeof(global::TestProject.ClassWithGeneratedActivatorConstructor));
         }
     }
 }

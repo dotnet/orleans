@@ -68,8 +68,8 @@ internal static class ModelExtractor
         ImmutableArray<ProxyInterfaceModel> entries)
         => MetadataAggregateModelBuilder.NormalizeProxyInterfaceModels(entries);
 
-    public static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind)
-        => ReferenceAssemblyModelExtractor.ExtractRegisteredCodec(symbol, kind);
+    public static RegisteredCodecModel ExtractRegisteredCodec(INamedTypeSymbol symbol, RegisteredCodecKind kind, Compilation compilation)
+        => ReferenceAssemblyModelExtractor.ExtractRegisteredCodec(symbol, kind, compilation);
 
     internal static SerializableTypeModel? TryExtractSerializableTypeModel(
         INamedTypeSymbol typeSymbol,

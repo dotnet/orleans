@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -41,6 +42,10 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, Type> _fieldCodecs = new();
         private readonly Dictionary<Type, Type> _copiers = new();
         private readonly Dictionary<Type, Type> _converters = new();
+        private readonly Dictionary<Type, List<(Type Implementation, SerializationContract Contract)>> _converterContracts = new();
+        private readonly List<(Type Implementation, SerializationContract Contract)> _patternConverterContracts = new();
+        // A null target groups array and bare-parameter patterns for shape matching.
+        private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationType? Target, int? Order)>> _implementationCandidates = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -95,27 +100,80 @@ namespace Orleans.Serialization.Serializers
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
-            AddFromMetadata(_baseCodecs, metadata.SerializerTypes, typeof(IBaseCodec<>));
-            AddFromMetadata(_valueSerializers, metadata.SerializerTypes, typeof(IValueSerializer<>));
-            AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, typeof(IFieldCodec<>));
-            AddFromMetadata(_fieldCodecs, metadata.FieldCodecTypes, typeof(IFieldCodec<>));
-            AddFromMetadata(_activators, metadata.ActivatorTypes, typeof(IActivator<>));
-            AddFromMetadata(_copiers, metadata.CopierTypes, typeof(IDeepCopier<>));
-            AddFromMetadata(_converters, metadata.ConverterTypes, typeof(IConverter<,>));
-            AddFromMetadata(_baseCopiers, metadata.CopierTypes, typeof(IBaseCopier<>));
+            AddFromMetadata(_baseCodecs, metadata.SerializerTypes, metadata.SerializerContracts, typeof(IBaseCodec<>));
+            AddFromMetadata(_valueSerializers, metadata.SerializerTypes, metadata.SerializerContracts, typeof(IValueSerializer<>));
+            AddFromMetadata(_fieldCodecs, metadata.SerializerTypes, metadata.SerializerContracts, typeof(IFieldCodec<>));
+            AddFromMetadata(_fieldCodecs, metadata.FieldCodecTypes, metadata.SerializerContracts, typeof(IFieldCodec<>));
+            AddFromMetadata(_activators, metadata.ActivatorTypes, metadata.ActivatorContracts, typeof(IActivator<>));
+            AddFromMetadata(_copiers, metadata.CopierTypes, metadata.CopierContracts, typeof(IDeepCopier<>));
+            AddFromMetadata(_converters, metadata.ConverterTypes, metadata.ConverterContracts, typeof(IConverter<,>));
+            AddFromMetadata(_baseCopiers, metadata.CopierTypes, metadata.CopierContracts, typeof(IBaseCopier<>));
 
 #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage(
                 "Trimming",
                 "IL2075",
-                Justification = "Generated manifests and trim-safe manual configuration register implementation types through TypeManifestOptions.AddSerializer, AddFieldCodec, AddCopier, AddConverter, and AddActivator, which preserve implemented interfaces. The HashSet<Type> boundary cannot retain those annotations.")]
+                Justification = "Legacy implementation-only registrations preserve implemented interfaces through annotated TypeManifestOptions methods. Explicit contract registrations are consumed directly. The HashSet<Type> boundary cannot retain the legacy annotations.")]
 #endif
-            static void AddFromMetadata(Dictionary<Type, Type> resultCollection, HashSet<Type> metadataCollection, Type genericType)
+            void AddFromMetadata(
+                Dictionary<Type, Type> resultCollection,
+                HashSet<Type> metadataCollection,
+                Dictionary<Type, List<SerializationContract>> contracts,
+                Type genericType)
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
                 foreach (var type in metadataCollection)
                 {
+                    if (contracts.TryGetValue(type, out var registrations))
+                    {
+                        foreach (var registration in registrations)
+                        {
+                            if (registration.ContractType != genericType)
+                            {
+                                continue;
+                            }
+
+                            var target = registration.TargetDescription is { } description
+                                ? description.Type is null
+                                    ? null
+                                    : description.Type is { IsGenericTypeDefinition: true } definition
+                                        ? definition
+                                        : ResolveSerializationType(description, type.GetGenericArguments())
+                                : registration.TargetType!;
+                            if (target != typeof(object))
+                            {
+                                if (target is not null)
+                                {
+                                    resultCollection[target] = type;
+                                }
+
+                                var candidateKey = (genericType, target);
+                                if (!_implementationCandidates.TryGetValue(candidateKey, out var candidates))
+                                {
+                                    _implementationCandidates[candidateKey] = candidates = new();
+                                }
+
+                                candidates.Add((type, registration.TargetDescription, metadata.GetContractRegistrationOrder(type, registration)));
+                                if (genericType == typeof(IConverter<,>))
+                                {
+                                    var converterRegistrations = _patternConverterContracts;
+                                    if (target is not null && !_converterContracts.TryGetValue(target, out converterRegistrations))
+                                    {
+                                        _converterContracts[target] = converterRegistrations = new();
+                                    }
+
+                                    converterRegistrations.Add((type, registration));
+                                }
+                            }
+                        }
+
+                        if (!metadata.DiscoverInterfaces(type, genericType))
+                        {
+                            continue;
+                        }
+                    }
+
                     var interfaces = type.GetInterfaces();
                     foreach (var @interface in interfaces)
                     {
@@ -135,12 +193,91 @@ namespace Orleans.Serialization.Serializers
                             continue;
                         }
 
-                        if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
+                        if (registrations is not null && registrations.Exists(registration =>
+                            registration.ContractType == genericType
+                            && (registration.TargetDescription is { } description
+                                ? BindTypeArguments(description, genericArgument, new Type?[type.GetGenericArguments().Length])
+                                : registration.TargetType == genericArgument
+                                    || genericArgument.IsConstructedGenericType && registration.TargetType == genericArgument.GetGenericTypeDefinition())))
                         {
-                            genericArgument = genericArgument.GetGenericTypeDefinition();
+                            continue;
                         }
 
-                        resultCollection[genericArgument] = type;
+                        var legacyDescription = genericArgument.ContainsGenericParameters
+                            ? SerializationType.FromType(genericArgument, type.GetGenericArguments())
+                            : null;
+                        var target = legacyDescription is { } shape
+                            ? shape.Type
+                            : genericArgument;
+                        if (target is not null)
+                        {
+                            resultCollection[target] = type;
+                        }
+                        var legacyKey = (genericType, target);
+                        if (!_implementationCandidates.TryGetValue(legacyKey, out var legacyCandidates))
+                        {
+                            _implementationCandidates[legacyKey] = legacyCandidates = new();
+                        }
+
+                        legacyCandidates.Add((type, legacyDescription, null));
+                    }
+                }
+
+                foreach (var (key, candidates) in _implementationCandidates)
+                {
+                    if (key.Contract != genericType)
+                    {
+                        continue;
+                    }
+
+                    OrderExplicitCandidates(candidates);
+                    if (key.Target is { } target)
+                    {
+                        resultCollection[target] = candidates[^1].Implementation;
+                    }
+                }
+
+                if (genericType == typeof(IConverter<,>))
+                {
+                    foreach (var registrations in _converterContracts.Values)
+                    {
+                        registrations.Sort(CompareConverterOrder);
+                    }
+                    _patternConverterContracts.Sort(CompareConverterOrder);
+                }
+
+                int CompareConverterOrder(
+                    (Type Implementation, SerializationContract Contract) left,
+                    (Type Implementation, SerializationContract Contract) right)
+                    => metadata.GetContractRegistrationOrder(left.Implementation, left.Contract)
+                        .CompareTo(metadata.GetContractRegistrationOrder(right.Implementation, right.Contract));
+            }
+
+            static void OrderExplicitCandidates(List<(Type Implementation, SerializationType? Target, int? Order)> candidates)
+            {
+                if (candidates.Count < 2)
+                {
+                    return;
+                }
+
+                var explicitCandidates = new List<(Type Implementation, SerializationType? Target, int Order)>();
+                foreach (var candidate in candidates)
+                {
+                    if (candidate.Order is { } order)
+                    {
+                        explicitCandidates.Add((candidate.Implementation, candidate.Target, order));
+                    }
+                }
+                explicitCandidates.Sort(static (left, right) => left.Order.CompareTo(right.Order));
+
+                // Retain raw legacy collection positions while ordering explicit contracts globally.
+                var next = 0;
+                for (var i = 0; i < candidates.Count; i++)
+                {
+                    if (candidates[i].Order is not null)
+                    {
+                        var candidate = explicitCandidates[next++];
+                        candidates[i] = (candidate.Implementation, candidate.Target, candidate.Order);
                     }
                 }
             }
@@ -381,11 +518,15 @@ namespace Orleans.Serialization.Serializers
             ThrowIfUnsupportedType(concreteType);
 
             object[]? constructorArguments = null;
-            if (_valueSerializers.TryGetValue(searchType, out var serializerType))
+            if (TrySelectImplementation(typeof(IValueSerializer<>), concreteType, searchType, out var serializerType))
             {
                 if (serializerType.IsGenericTypeDefinition)
                 {
-                    serializerType = serializerType.MakeGenericType(concreteType.GetGenericArguments());
+                    serializerType = CloseImplementation(serializerType, concreteType, typeof(IValueSerializer<>));
+                    if (serializerType is null)
+                    {
+                        return null;
+                    }
                 }
             }
             else if (TryGetSurrogateCodec(concreteType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IValueSerializer).IsAssignableFrom(surrogateCodecType))
@@ -412,12 +553,16 @@ namespace Orleans.Serialization.Serializers
             ThrowIfUnsupportedType(concreteType);
 
             object[]? constructorArguments = null;
-            if (_baseCopiers.TryGetValue(searchType, out var copierType))
+            if (TrySelectImplementation(typeof(IBaseCopier<>), concreteType, searchType, out var copierType))
             {
                 // Use the detected copier type.
                 if (copierType.IsGenericTypeDefinition)
                 {
-                    copierType = copierType.MakeGenericType(concreteType.GetGenericArguments());
+                    copierType = CloseImplementation(copierType, concreteType, typeof(IBaseCopier<>));
+                    if (copierType is null)
+                    {
+                        return null;
+                    }
                 }
             }
             else if (TryGetSurrogateCodec(concreteType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IBaseCopier).IsAssignableFrom(surrogateCodecType))
@@ -437,13 +582,13 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
-        private object GetActivatorInner(Type concreteType, Type searchType)
+        private object? GetActivatorInner(Type concreteType, Type searchType)
         {
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(concreteType);
 
-            if (!_activators.TryGetValue(searchType, out var activatorType))
+            if (!TrySelectImplementation(typeof(IActivator<>), concreteType, searchType, out var activatorType))
             {
                 if (searchType.IsValueType)
                 {
@@ -456,7 +601,11 @@ namespace Orleans.Serialization.Serializers
             }
             else if (activatorType.IsGenericTypeDefinition)
             {
-                activatorType = activatorType.MakeGenericType(concreteType.GetGenericArguments());
+                activatorType = CloseImplementation(activatorType, concreteType, typeof(IActivator<>));
+                if (activatorType is null)
+                {
+                    return null;
+                }
             }
 
             if (!_instantiatedActivators.TryGetValue(activatorType, out var result))
@@ -525,29 +674,41 @@ namespace Orleans.Serialization.Serializers
                 return _objectCodec;
 
             object[]? constructorArguments = null;
-            if (_fieldCodecs.TryGetValue(searchType, out var codecType))
+            if (TrySelectImplementation(typeof(IFieldCodec<>), fieldType, searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
                 {
-                    codecType = codecType.MakeGenericType(fieldType.GetGenericArguments());
+                    codecType = CloseImplementation(codecType, fieldType, typeof(IFieldCodec<>));
+                    if (codecType is null)
+                    {
+                        return null;
+                    }
                 }
             }
-            else if (_baseCodecs.TryGetValue(searchType, out var baseCodecType))
+            else if (TrySelectImplementation(typeof(IBaseCodec<>), fieldType, searchType, out var baseCodecType))
             {
                 if (baseCodecType.IsGenericTypeDefinition)
                 {
-                    baseCodecType = baseCodecType.MakeGenericType(fieldType.GetGenericArguments());
+                    baseCodecType = CloseImplementation(baseCodecType, fieldType, typeof(IBaseCodec<>));
+                    if (baseCodecType is null)
+                    {
+                        return null;
+                    }
                 }
 
                 // If there is a base type serializer for this type, create a codec which will then accept that base type serializer.
                 codecType = typeof(ConcreteTypeSerializer<,>).MakeGenericType(fieldType, baseCodecType);
                 constructorArguments = new[] { GetServiceOrCreateInstance(baseCodecType) };
             }
-            else if (_valueSerializers.TryGetValue(searchType, out var valueSerializerType))
+            else if (TrySelectImplementation(typeof(IValueSerializer<>), fieldType, searchType, out var valueSerializerType))
             {
                 if (valueSerializerType.IsGenericTypeDefinition)
                 {
-                    valueSerializerType = valueSerializerType.MakeGenericType(fieldType.GetGenericArguments());
+                    valueSerializerType = CloseImplementation(valueSerializerType, fieldType, typeof(IValueSerializer<>));
+                    if (valueSerializerType is null)
+                    {
+                        return null;
+                    }
                 }
 
                 // If there is a value serializer for this type, create a codec which will then accept that value serializer.
@@ -585,22 +746,49 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("Trimming", "IL2075",
+            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). Materialization erases the registration annotation; explicit contracts use their stored surrogate descriptions instead.")]
+#endif
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
-            if (_converters.TryGetValue(searchType, out var converterType))
+            if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterDefinition))
             {
+                var converterType = converterDefinition;
                 if (converterType.IsGenericTypeDefinition)
                 {
-                    converterType = converterType.MakeGenericType(fieldType.GetGenericArguments());
-                }
-
-                var converterInterfaceArgs = Array.Empty<Type>();
-                foreach (var @interface in converterType.GetInterfaces())
-                {
-                    if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
-                        && @interface.GenericTypeArguments[0] == fieldType)
+                    var closed = CloseImplementation(converterType, fieldType, typeof(IConverter<,>));
+                    if (closed is null)
                     {
-                        converterInterfaceArgs = @interface.GetGenericArguments();
+                        surrogateCodecType = null;
+                        constructorArguments = null;
+                        return false;
+                    }
+                    converterType = closed;
+                }
+                var converterInterfaceArgs = Array.Empty<Type>();
+                if (TryGetConverterContract(searchType, converterDefinition, fieldType, out var registration))
+                {
+                    var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
+                    var surrogate = registration.SurrogateDescription is { } description
+                        ? ResolveSerializationType(description, arguments)
+                        : registration.SurrogateType!;
+                    if (surrogate.IsGenericTypeDefinition)
+                    {
+                        surrogate = ConstructGenericImplementation(surrogate, arguments);
+                    }
+
+                    converterInterfaceArgs = [fieldType, surrogate];
+                }
+                else
+                {
+                    foreach (var @interface in converterType.GetInterfaces())
+                    {
+                        if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
+                            && @interface.GenericTypeArguments[0] == fieldType)
+                        {
+                            converterInterfaceArgs = @interface.GetGenericArguments();
+                        }
                     }
                 }
 
@@ -628,14 +816,238 @@ namespace Orleans.Serialization.Serializers
             return false;
         }
 
+        private bool TrySelectImplementation(
+            Type contractType,
+            Type targetType,
+            Type searchType,
+            [NotNullWhen(true)] out Type? implementation)
+            => TrySelectImplementation(contractType, targetType, searchType, out implementation, out _);
+
+        private bool TrySelectImplementation(
+            Type contractType,
+            Type targetType,
+            Type searchType,
+            [NotNullWhen(true)] out Type? implementation,
+            out Type?[]? boundArguments)
+        {
+            if (targetType != searchType && TrySelect(targetType, out implementation, out boundArguments))
+            {
+                return true;
+            }
+
+            return TrySelect(searchType, out implementation, out boundArguments) || TrySelect(null, out implementation, out boundArguments);
+
+            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result, out Type?[]? arguments)
+            {
+                if (_implementationCandidates.TryGetValue((contractType, key), out var candidates))
+                {
+                    for (var i = candidates.Count - 1; i >= 0; i--)
+                    {
+                        var candidate = candidates[i];
+                        Type?[]? bindings = null;
+                        if (candidate.Target is { } description)
+                        {
+                            bindings = new Type?[candidate.Implementation.GetGenericArguments().Length];
+                            if (!BindTypeArguments(description, targetType, bindings))
+                            {
+                                continue;
+                            }
+                        }
+
+                        result = candidate.Implementation;
+                        arguments = bindings;
+                        return true;
+                    }
+                }
+
+                result = null;
+                arguments = null;
+                return false;
+            }
+        }
+
+        private Type? CloseImplementation(Type implementation, Type targetType, Type contractType)
+        {
+            var searchType = targetType.IsConstructedGenericType ? targetType.GetGenericTypeDefinition() : targetType;
+            if (!TrySelectImplementation(contractType, targetType, searchType, out var selected, out var arguments)
+                || selected != implementation)
+            {
+                return null;
+            }
+
+            if (arguments is null)
+            {
+                return ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
+            }
+
+            var resolved = new Type[arguments.Length];
+            for (var i = 0; i < resolved.Length; i++)
+            {
+                resolved[i] = arguments[i] ?? throw new InvalidOperationException(
+                    $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
+            }
+
+            return ConstructGenericImplementation(implementation, resolved);
+        }
+
+        private bool TryGetConverterContract(Type searchType, Type implementation, Type target, out SerializationContract contract)
+        {
+            if (target != searchType && TryFind(target, out contract))
+            {
+                return true;
+            }
+
+            return TryFind(searchType, out contract) || TryMatch(_patternConverterContracts, out contract);
+
+            bool TryFind(Type key, out SerializationContract result)
+            {
+                if (_converterContracts.TryGetValue(key, out var registrations) && TryMatch(registrations, out result))
+                {
+                    return true;
+                }
+
+                result = default;
+                return false;
+            }
+
+            bool TryMatch(List<(Type Implementation, SerializationContract Contract)> registrations, out SerializationContract result)
+            {
+                for (var i = registrations.Count - 1; i >= 0; i--)
+                {
+                    var candidate = registrations[i];
+                    if (candidate.Implementation != implementation)
+                    {
+                        continue;
+                    }
+
+                    if (candidate.Contract.TargetDescription is { } description
+                        && !BindTypeArguments(description, target, new Type?[implementation.GetGenericArguments().Length]))
+                    {
+                        continue;
+                    }
+
+                    result = candidate.Contract;
+                    return true;
+                }
+
+                result = default;
+                return false;
+            }
+        }
+
+        private static bool BindTypeArguments(SerializationType description, Type target, Type?[] arguments)
+        {
+            if (description.ParameterIndex >= 0)
+            {
+                var index = description.ParameterIndex;
+                if (index >= arguments.Length)
+                {
+                    throw new InvalidOperationException($"Serialization contract parameter {index} exceeds implementation arity {arguments.Length}.");
+                }
+
+                if (arguments[index] is { } existing)
+                {
+                    return existing == target;
+                }
+
+                arguments[index] = target;
+                return true;
+            }
+
+            if (description.ArrayRank > 0)
+            {
+                return target.IsArray && target.GetArrayRank() == description.ArrayRank
+                    && (description.ArrayRank != 1 || target.IsSZArray)
+                    && BindTypeArguments(description.Arguments[0], target.GetElementType()!, arguments);
+            }
+
+            if (description.Arguments.Length == 0)
+            {
+                return description.Type == target;
+            }
+
+            if (!target.IsConstructedGenericType || target.GetGenericTypeDefinition() != description.Type)
+            {
+                return false;
+            }
+
+            var parameters = target.GetGenericArguments();
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                if (!BindTypeArguments(description.Arguments[i], parameters[i], arguments))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static Type ResolveSerializationType(SerializationType description, Type[] parameters)
+        {
+            if (description.ParameterIndex >= 0)
+            {
+                if (description.ParameterIndex >= parameters.Length)
+                {
+                    throw new InvalidOperationException($"Surrogate generic parameter {description.ParameterIndex} exceeds the converter's arity {parameters.Length}.");
+                }
+
+                return parameters[description.ParameterIndex];
+            }
+
+            if (description.ArrayRank > 0)
+            {
+                throw new NotSupportedException(
+                    "Supply a source-known closed array type using SerializationType.Create(typeof(ClosedArray)) or an explicit closed converter registration when resolving executable serialization metadata. Array descriptions are structural matching patterns.");
+            }
+
+            var type = description.Type!;
+            if (description.Arguments.Length == 0)
+            {
+                return type.IsGenericTypeDefinition ? ConstructGenericImplementation(type, parameters) : type;
+            }
+
+            var arguments = new Type[description.Arguments.Length];
+            for (var i = 0; i < arguments.Length; i++)
+            {
+                arguments[i] = ResolveSerializationType(description.Arguments[i], parameters);
+            }
+
+            return ConstructGenericImplementation(type, arguments);
+        }
+
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("AOT", "IL3050",
+            Justification = "Generated closed factories take priority. Metadata-based resolution can materialize a registered implementation whose closed native code is already rooted; unsupported native instantiations fail with registration guidance.")]
+        [UnconditionalSuppressMessage("Trimming", "IL2055",
+            Justification = "Registered definitions preserve constructors through manifest APIs and interface metadata through SerializationType.Create. Closed factories or typed generated dependencies preserve native instantiations; arbitrary unrooted shapes require an explicit registration.")]
+#endif
+        private static Type ConstructGenericImplementation(Type implementation, params Type[] arguments)
+        {
+            try
+            {
+                return implementation.MakeGenericType(arguments);
+            }
+            catch (NotSupportedException exception) when (!RuntimeFeature.IsDynamicCodeSupported)
+            {
+                throw new NotSupportedException(
+                    $"The runtime cannot materialize serialization implementation {implementation} for [{string.Join<Type>(", ", arguments)}]. Register its closed codec/copier and dependencies using a serializer context or closed factories.",
+                    exception);
+            }
+        }
+
         private IBaseCodec? CreateBaseCodecInstance(Type fieldType, Type searchType)
         {
             object[]? constructorArguments = null;
-            if (_baseCodecs.TryGetValue(searchType, out var codecType))
+            if (TrySelectImplementation(typeof(IBaseCodec<>), fieldType, searchType, out var codecType))
             {
                 if (codecType.IsGenericTypeDefinition)
                 {
-                    codecType = codecType.MakeGenericType(fieldType.GetGenericArguments());
+                    codecType = CloseImplementation(codecType, fieldType, typeof(IBaseCodec<>));
+                    if (codecType is null)
+                    {
+                        return null;
+                    }
                 }
             }
             else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments) && typeof(IBaseCodec).IsAssignableFrom(surrogateCodecType))
@@ -652,11 +1064,15 @@ namespace Orleans.Serialization.Serializers
                 return _objectCopier;
 
             object[]? constructorArguments = null;
-            if (_copiers.TryGetValue(searchType, out var copierType))
+            if (TrySelectImplementation(typeof(IDeepCopier<>), fieldType, searchType, out var copierType))
             {
                 if (copierType.IsGenericTypeDefinition)
                 {
-                    copierType = copierType.MakeGenericType(fieldType.GetGenericArguments());
+                    copierType = CloseImplementation(copierType, fieldType, typeof(IDeepCopier<>));
+                    if (copierType is null)
+                    {
+                        return null;
+                    }
                 }
             }
             else if (ShallowCopyableTypes.Contains(fieldType))
