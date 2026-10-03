@@ -158,11 +158,11 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
                 }
 
                 _read = await PrepareAsync(session, $"SELECT etag, record_exists, state FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
-                _insert = await PrepareAsync(session, $"INSERT INTO {QuotedTableName} (service_id, grain_id, state_name, grain_type, etag, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, true, ?, ?) IF NOT EXISTS", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
-                _update = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET grain_type = ?, etag = ?, record_exists = true, state = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
+                _insert = await PrepareAsync(session, $"INSERT INTO {QuotedTableName} (service_id, grain_id, state_name, grain_type, etag, record_exists, state, updated_at) VALUES (?, ?, ?, ?, ?, true, ?, ?) IF NOT EXISTS", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
+                _update = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET grain_type = ?, etag = ?, record_exists = true, state = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
                 _clearWithEtag = await PrepareAsync(session, $"UPDATE {QuotedTableName} SET record_exists = false, state = null, etag = ?, updated_at = ? WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
                 _deleteWithoutEtag = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF record_exists = false", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
-                _delete = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation, true).ConfigureAwait(false);
+                _delete = await PrepareAsync(session, $"DELETE FROM {QuotedTableName} WHERE service_id = ? AND grain_id = ? AND state_name = ? IF etag = ?", cancellationToken, onPrepareCancellation).ConfigureAwait(false);
 
                 bool publishSession;
                 lock (_operationLock)
@@ -208,8 +208,7 @@ internal sealed class CassandraGrainStorage : IGrainStorage, ILifecycleParticipa
         ISession session,
         string cql,
         CancellationToken cancellationToken,
-        Action<Task<PreparedStatement>>? onCancellation = null,
-        bool lwt = false)
+        Action<Task<PreparedStatement>>? onCancellation = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var operation = TrackInitializationTask(session.PrepareAsync(cql));
