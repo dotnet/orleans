@@ -47,7 +47,6 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, List<(Type Implementation, SerializationContract Contract)>> _converterContracts = new();
         private readonly List<(Type Implementation, SerializationContract Contract)> _patternConverterContracts = new();
         // A null target groups array and bare-parameter patterns for shape matching.
-        private readonly Dictionary<(Type Contract, Type? Target, Type Implementation), List<SerializationType>> _targetDescriptions = new();
         private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationType? Target)>> _implementationCandidates = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
@@ -203,16 +202,6 @@ namespace Orleans.Serialization.Serializers
                                 }
 
                                 candidates.Add((type, registration.TargetDescription));
-                                if (registration.TargetDescription is { } targetDescription)
-                                {
-                                    var key = (genericType, target, type);
-                                    if (!_targetDescriptions.TryGetValue(key, out var descriptions))
-                                    {
-                                        _targetDescriptions[key] = descriptions = new();
-                                    }
-
-                                    descriptions.Add(targetDescription);
-                                }
                                 if (genericType == typeof(IConverter<,>))
                                 {
                                     var converterRegistrations = _patternConverterContracts;
@@ -1203,33 +1192,47 @@ namespace Orleans.Serialization.Serializers
             Type targetType,
             Type searchType,
             [NotNullWhen(true)] out Type? implementation)
+            => TrySelectImplementation(contractType, targetType, searchType, out implementation, out _);
+
+        private bool TrySelectImplementation(
+            Type contractType,
+            Type targetType,
+            Type searchType,
+            [NotNullWhen(true)] out Type? implementation,
+            out Type?[]? boundArguments)
         {
-            if (targetType != searchType && TrySelect(targetType, out implementation))
+            if (targetType != searchType && TrySelect(targetType, out implementation, out boundArguments))
             {
                 return true;
             }
 
-            return TrySelect(searchType, out implementation) || TrySelect(null, out implementation);
+            return TrySelect(searchType, out implementation, out boundArguments) || TrySelect(null, out implementation, out boundArguments);
 
-            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result)
+            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result, out Type?[]? arguments)
             {
                 if (_implementationCandidates.TryGetValue((contractType, key), out var candidates))
                 {
                     for (var i = candidates.Count - 1; i >= 0; i--)
                     {
                         var candidate = candidates[i];
-                        if (candidate.Target is { } description
-                            && !BindTypeArguments(description, targetType, new Type?[candidate.Implementation.GetGenericArguments().Length]))
+                        Type?[]? bindings = null;
+                        if (candidate.Target is { } description)
                         {
-                            continue;
+                            bindings = new Type?[candidate.Implementation.GetGenericArguments().Length];
+                            if (!BindTypeArguments(description, targetType, bindings))
+                            {
+                                continue;
+                            }
                         }
 
                         result = candidate.Implementation;
+                        arguments = bindings;
                         return true;
                     }
                 }
 
                 result = null;
+                arguments = null;
                 return false;
             }
         }
@@ -1237,46 +1240,25 @@ namespace Orleans.Serialization.Serializers
         private Type? CloseImplementation(Type implementation, Type targetType, Type contractType)
         {
             var searchType = targetType.IsConstructedGenericType ? targetType.GetGenericTypeDefinition() : targetType;
-            var hasNamed = _targetDescriptions.TryGetValue((contractType, targetType, implementation), out var descriptions)
-                || _targetDescriptions.TryGetValue((contractType, searchType, implementation), out descriptions);
-            if (hasNamed && TryClose(descriptions!, out var closed))
+            if (!TrySelectImplementation(contractType, targetType, searchType, out var selected, out var arguments)
+                || selected != implementation)
             {
-                return closed;
+                return null;
             }
 
-            var hasPatterns = _targetDescriptions.TryGetValue((contractType, null, implementation), out descriptions);
-            if (hasPatterns && TryClose(descriptions!, out closed))
+            if (arguments is null)
             {
-                return closed;
+                return ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
             }
 
-            return hasNamed || hasPatterns ? null : ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
-
-            bool TryClose(List<SerializationType> candidates, [NotNullWhen(true)] out Type? result)
+            var resolved = new Type[arguments.Length];
+            for (var i = 0; i < resolved.Length; i++)
             {
-                var count = implementation.GetGenericArguments().Length;
-                for (var candidate = candidates.Count - 1; candidate >= 0; candidate--)
-                {
-                    var arguments = new Type?[count];
-                    if (!BindTypeArguments(candidates[candidate], targetType, arguments))
-                    {
-                        continue;
-                    }
-
-                    var resolved = new Type[arguments.Length];
-                    for (var i = 0; i < resolved.Length; i++)
-                    {
-                        resolved[i] = arguments[i] ?? throw new InvalidOperationException(
-                            $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
-                    }
-
-                    result = ConstructGenericImplementation(implementation, resolved);
-                    return true;
-                }
-
-                result = null;
-                return false;
+                resolved[i] = arguments[i] ?? throw new InvalidOperationException(
+                    $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
             }
+
+            return ConstructGenericImplementation(implementation, resolved);
         }
 
         private bool TryGetConverterContract(Type searchType, Type implementation, Type target, out SerializationContract contract)
