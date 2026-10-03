@@ -345,6 +345,20 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void ConcreteArrayDescriptorsAuthorizeTheirElementTypeNames()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(GenericConverter<string, int>), typeof(GenericTarget<string, int>),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Create(typeof((int, string)[]))));
+        var converter = new TypeConverter(Array.Empty<ITypeConverter>(), Array.Empty<ITypeNameFilter>(), [new RejectUnregisteredTypes()],
+            Options.Create(options), new CachedTypeResolver());
+        var surrogate = typeof(GenericSurrogate<(int, string)[]>);
+
+        Assert.Equal(surrogate, converter.Parse(converter.Format(surrogate)));
+        Assert.Throws<InvalidOperationException>(() => converter.Format(typeof(SecondTarget)));
+    }
+
+    [Fact]
     public void SerializationDescriptionsValidateAndCopyTheirArguments()
     {
         var first = SerializationType.Parameter(0);
@@ -583,6 +597,10 @@ public class ManifestContractTests
     private struct ValueTarget;
     private struct Surrogate;
     private sealed class ReplacementCodec;
+    private sealed class RejectUnregisteredTypes : ITypeFilter
+    {
+        public bool? IsTypeAllowed(Type type) => false;
+    }
     private sealed class MixedImplementation : IFieldCodec<FirstTarget>, IBaseCodec<SecondTarget>
     {
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] FirstTarget value)

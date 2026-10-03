@@ -248,10 +248,33 @@ internal static class Metadata
             throw new InvalidOperationException("The source-known immutable-array implementation did not retain ordinary generic closure.");
         }
 
+        var typeOptions = new TypeManifestOptions();
+        typeOptions.AddConverter(typeof(MetadataValueArrayConverter), typeof(MetadataMixedTarget<string>),
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>),
+                SerializationType.Create(typeof(string)), SerializationType.Create(typeof(MetadataRootedArrayValue[]))));
+        var converter = new TypeConverter([], [], [new RejectUnregisteredTypes()], Options.Create(typeOptions), new CachedTypeResolver());
+        var arraySurrogate = typeof(MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]>);
+        if (converter.Parse(converter.Format(arraySurrogate)) != arraySurrogate)
+        {
+            throw new InvalidOperationException("The concrete array descriptor did not authorize its element type names.");
+        }
+        try
+        {
+            _ = converter.Format(typeof(MetadataUnrootedArrayValue));
+            throw new InvalidOperationException("Concrete array authorization must remain scoped to its registered type names.");
+        }
+        catch (InvalidOperationException exception) when (exception.Message.Contains("not allowed", StringComparison.Ordinal))
+        {
+        }
+
         Console.WriteLine("ArrayMetadataAvailability passed.");
     }
 
     private delegate bool SurrogateSelection(Type target, Type searchType, out Type? codec, out object[]? arguments);
+    private sealed class RejectUnregisteredTypes : ITypeFilter
+    {
+        public bool? IsTypeAllowed(Type type) => false;
+    }
 
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
@@ -378,4 +401,9 @@ internal sealed class MetadataKnownArrayConverter<T> : IConverter<MetadataMixedT
 {
     public MetadataMixedTarget<T> ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int[]> surrogate) => new();
     public MetadataKnownArraySurrogate<T, int[]> ConvertToSurrogate(in MetadataMixedTarget<T> value) => default;
+}
+internal sealed class MetadataValueArrayConverter : IConverter<MetadataMixedTarget<string>, MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]>>
+{
+    public MetadataMixedTarget<string> ConvertFromSurrogate(in MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]> surrogate) => new();
+    public MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]> ConvertToSurrogate(in MetadataMixedTarget<string> value) => default;
 }
