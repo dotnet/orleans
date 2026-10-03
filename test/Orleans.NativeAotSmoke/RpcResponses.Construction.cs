@@ -13,6 +13,12 @@ internal static class RpcConstructionContracts
 {
     public static void DefaultGraphsRespectConstructorDependencies()
     {
+        Check(false);
+        Check(true);
+    }
+
+    private static void Check(bool bridgeFirst)
+    {
         var calls = 0;
         var collection = new ServiceCollection().AddSingleton<RpcConstructorDependency>();
         collection.AddSerializerContext(new global::OrleansCodeGen.OrleansNativeAotSmoke.RpcResponseFactories());
@@ -20,6 +26,7 @@ internal static class RpcConstructionContracts
         {
             options.AddFieldCodec(typeof(global::OrleansCodeGen.Orleans.NativeAotSmoke.Codec_RpcActivatedValue), typeof(RpcActivatedValue));
             options.AddActivator(typeof(global::OrleansCodeGen.Orleans.NativeAotSmoke.Activator_RpcActivatedValue), typeof(RpcActivatedValue));
+            if (bridgeFirst) RegisterBridge(options);
             options.AddDefaultSerializerService<IActivator<RpcActivatedValue>, global::OrleansCodeGen.Orleans.NativeAotSmoke.Activator_RpcActivatedValue>(
                 provider => new global::OrleansCodeGen.Orleans.NativeAotSmoke.Activator_RpcActivatedValue(
                     OrleansGeneratedCodeHelper.GetService<RpcConstructorDependency>(null!, provider)),
@@ -28,16 +35,19 @@ internal static class RpcConstructionContracts
             {
                 calls++;
                 return new(OrleansGeneratedCodeHelper.GetService<IActivator<RpcActivatedValue>>(null!, provider));
-            });
+            }, [typeof(IActivator<RpcActivatedValue>)]);
             options.AddDefaultSerializerService<IFieldCodec<RpcActivatedValue>, global::OrleansCodeGen.Orleans.NativeAotSmoke.Codec_RpcActivatedValue>(
                 provider => OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.NativeAotSmoke.Codec_RpcActivatedValue>(null!, provider),
                 dependencies: [typeof(IActivator<RpcActivatedValue>)]);
+            if (!bridgeFirst) RegisterBridge(options);
             options.AddAllowedType(typeof(RpcActivatedValue));
         });
         using var services = collection.BuildServiceProvider();
         var provider = services.GetRequiredService<CodecProvider>();
         var codec = provider.GetCodec<RpcActivatedValue>();
+        var concrete = OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.NativeAotSmoke.Codec_RpcActivatedValue>(null!, provider);
         if (calls != 0 || codec is not global::OrleansCodeGen.Orleans.NativeAotSmoke.Codec_RpcActivatedValue
+            || concrete is null
             || !ReferenceEquals(codec, provider.GetCodec<RpcActivatedValue>()))
             throw new InvalidOperationException("The inferred graph must decline arbitrary DI before canonical generated codec activation.");
         var serializer = services.GetRequiredService<Serializer>();
@@ -46,6 +56,10 @@ internal static class RpcConstructionContracts
         if (result is null || result.Value != 59 || result.ConstructionValue != 47 || calls != 0)
             throw new InvalidOperationException("The rooted generated codec and activator must construct through ordinary native metadata dispatch.");
     }
+
+    private static void RegisterBridge(TypeManifestOptions options)
+        => options.AddDefaultSerializerService<IFieldCodec<RpcActivatedValue>>(
+            provider => provider.GetCodec<RpcActivatedValue>(), [typeof(IActivator<RpcActivatedValue>)]);
 }
 
 public sealed class RpcConstructorDependency
