@@ -43,6 +43,7 @@ internal static class Metadata
         ValidatePatternContractSelection(services);
         ValidateMixedRegistrationClosure();
         ValidateArrayMetadataAvailability(services);
+        ValidateInterleavedRegistrationOrder();
     }
 
     internal static class PrivateContractContainer
@@ -276,6 +277,46 @@ internal static class Metadata
         public bool? IsTypeAllowed(Type type) => false;
     }
 
+    private static void ValidateInterleavedRegistrationOrder()
+    {
+        var options = new TypeManifestOptions();
+        var firstTarget = SerializationType.Create(typeof(BindingPair<,>), SerializationType.Create(typeof(Guid)), SerializationType.Create(typeof(int)));
+        var target = SerializationType.Create(typeof(BindingPair<,>), SerializationType.Create(typeof(string)), SerializationType.Create(typeof(int)));
+        foreach (var role in new[] { typeof(IFieldCodec<>), typeof(IDeepCopier<>) })
+        {
+            options.AddSerializationContract(typeof(MetadataOrderedCodecCopier), role, firstTarget);
+            options.AddSerializationContract(typeof(MetadataAlternativeOrderedCodecCopier), role, target);
+            options.AddSerializationContract(typeof(MetadataOrderedCodecCopier), role, target);
+        }
+        options.AddSerializationContract(typeof(MetadataOrderedConverter), typeof(IConverter<,>), firstTarget,
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<Guid, int>)));
+        options.AddSerializationContract(typeof(MetadataAlternativeOrderedConverter), typeof(IConverter<,>), target,
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<int, int>)));
+        options.AddSerializationContract(typeof(MetadataOrderedConverter), typeof(IConverter<,>), target,
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<string, int>)));
+        using var services = new ServiceCollection()
+            .AddSingleton<MetadataOrderedCodecCopier>()
+            .AddSingleton<MetadataAlternativeOrderedCodecCopier>()
+            .AddSingleton<MetadataOrderedConverter>()
+            .AddSingleton<MetadataAlternativeOrderedConverter>()
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetCodec<BindingPair<string, int>>().GetType() != typeof(MetadataOrderedCodecCopier)
+            || provider.GetDeepCopier<BindingPair<string, int>>().GetType() != typeof(MetadataOrderedCodecCopier))
+        {
+            throw new InvalidOperationException("Interleaved A/B/A codec and copier registrations did not select the last matching contract.");
+        }
+        var selectConverter = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<SurrogateSelection>(provider);
+        if (!selectConverter(typeof(BindingPair<string, int>), typeof(BindingPair<,>), out var codec, out var arguments)
+            || codec != typeof(SurrogateCodec<BindingPair<string, int>, MetadataKnownArraySurrogate<string, int>, MetadataOrderedConverter>)
+            || arguments is not [MetadataOrderedConverter])
+        {
+            throw new InvalidOperationException("Interleaved A/B/A converter registrations did not retain the selected surrogate contract.");
+        }
+        Console.WriteLine("InterleavedRegistrationOrder passed.");
+    }
+
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
         services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
@@ -406,4 +447,41 @@ internal sealed class MetadataValueArrayConverter : IConverter<MetadataMixedTarg
 {
     public MetadataMixedTarget<string> ConvertFromSurrogate(in MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]> surrogate) => new();
     public MetadataKnownArraySurrogate<string, MetadataRootedArrayValue[]> ConvertToSurrogate(in MetadataMixedTarget<string> value) => default;
+}
+internal sealed class MetadataOrderedCodecCopier : IFieldCodec<BindingPair<Guid, int>>, IFieldCodec<BindingPair<string, int>>,
+    IDeepCopier<BindingPair<Guid, int>>, IDeepCopier<BindingPair<string, int>>
+{
+    void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, object? value) => throw new NotSupportedException();
+    object? IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    object? IDeepCopier.DeepCopy(object? input, CopyContext context) => throw new NotSupportedException();
+    void IFieldCodec<BindingPair<Guid, int>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] BindingPair<Guid, int> value) => throw new NotSupportedException();
+    void IFieldCodec<BindingPair<string, int>>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] BindingPair<string, int> value) => throw new NotSupportedException();
+    BindingPair<Guid, int> IFieldCodec<BindingPair<Guid, int>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    BindingPair<string, int> IFieldCodec<BindingPair<string, int>>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    [return: NotNullIfNotNull(nameof(input))]
+    public BindingPair<Guid, int>? DeepCopy(BindingPair<Guid, int>? input, CopyContext context) => input is null ? null : new();
+    [return: NotNullIfNotNull(nameof(input))]
+    public BindingPair<string, int>? DeepCopy(BindingPair<string, int>? input, CopyContext context) => input is null ? null : new();
+}
+internal sealed class MetadataAlternativeOrderedCodecCopier : IFieldCodec<BindingPair<string, int>>, IDeepCopier<BindingPair<string, int>>
+{
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] BindingPair<string, int> value)
+        where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+    public BindingPair<string, int> ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    [return: NotNullIfNotNull(nameof(input))]
+    public BindingPair<string, int>? DeepCopy(BindingPair<string, int>? input, CopyContext context) => input is null ? null : new();
+}
+internal sealed class MetadataOrderedConverter :
+    IConverter<BindingPair<Guid, int>, MetadataKnownArraySurrogate<Guid, int>>,
+    IConverter<BindingPair<string, int>, MetadataKnownArraySurrogate<string, int>>
+{
+    public BindingPair<Guid, int> ConvertFromSurrogate(in MetadataKnownArraySurrogate<Guid, int> surrogate) => new();
+    public BindingPair<string, int> ConvertFromSurrogate(in MetadataKnownArraySurrogate<string, int> surrogate) => new();
+    public MetadataKnownArraySurrogate<Guid, int> ConvertToSurrogate(in BindingPair<Guid, int> value) => default;
+    public MetadataKnownArraySurrogate<string, int> ConvertToSurrogate(in BindingPair<string, int> value) => default;
+}
+internal sealed class MetadataAlternativeOrderedConverter : IConverter<BindingPair<string, int>, MetadataKnownArraySurrogate<int, int>>
+{
+    public BindingPair<string, int> ConvertFromSurrogate(in MetadataKnownArraySurrogate<int, int> surrogate) => new();
+    public MetadataKnownArraySurrogate<int, int> ConvertToSurrogate(in BindingPair<string, int> value) => default;
 }
