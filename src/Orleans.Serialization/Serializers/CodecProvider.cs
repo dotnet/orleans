@@ -45,8 +45,10 @@ namespace Orleans.Serialization.Serializers
         private readonly Dictionary<Type, Type> _copiers = new();
         private readonly Dictionary<Type, Type> _converters = new();
         private readonly Dictionary<Type, List<(Type Implementation, SerializationContract Contract)>> _converterContracts = new();
-        private readonly Dictionary<(Type Contract, Type Target, Type Implementation), List<SerializationType>> _targetDescriptions = new();
-        private readonly Dictionary<(Type Contract, Type Target), List<(Type Implementation, SerializationType? Target)>> _implementationCandidates = new();
+        private readonly List<(Type Implementation, SerializationContract Contract)> _patternConverterContracts = new();
+        // A null target groups array and bare-parameter patterns for shape matching.
+        private readonly Dictionary<(Type Contract, Type? Target, Type Implementation), List<SerializationType>> _targetDescriptions = new();
+        private readonly Dictionary<(Type Contract, Type? Target), List<(Type Implementation, SerializationType? Target)>> _implementationCandidates = new();
         private readonly Dictionary<Type, Type> _baseCopiers = new();
         private readonly Dictionary<Type, Type> _activators = new();
         private readonly List<IGeneralizedCodec> _generalizedCodecs = new();
@@ -181,13 +183,19 @@ namespace Orleans.Serialization.Serializers
                             }
 
                             var target = registration.TargetDescription is { } description
-                                ? description.Type is { IsGenericTypeDefinition: true } definition
-                                    ? definition
-                                    : ResolveSerializationType(description, type.GetGenericArguments())
+                                ? description.Type is null
+                                    ? null
+                                    : description.Type is { IsGenericTypeDefinition: true } definition
+                                        ? definition
+                                        : ResolveSerializationType(description, type.GetGenericArguments())
                                 : registration.TargetType!;
                             if (target != typeof(object))
                             {
-                                resultCollection[target] = type;
+                                if (target is not null)
+                                {
+                                    resultCollection[target] = type;
+                                }
+
                                 var candidateKey = (genericType, target);
                                 if (!_implementationCandidates.TryGetValue(candidateKey, out var candidates))
                                 {
@@ -207,7 +215,8 @@ namespace Orleans.Serialization.Serializers
                                 }
                                 if (genericType == typeof(IConverter<,>))
                                 {
-                                    if (!_converterContracts.TryGetValue(target, out var converterRegistrations))
+                                    var converterRegistrations = _patternConverterContracts;
+                                    if (target is not null && !_converterContracts.TryGetValue(target, out converterRegistrations))
                                     {
                                         _converterContracts[target] = converterRegistrations = new();
                                     }
@@ -250,10 +259,12 @@ namespace Orleans.Serialization.Serializers
                         if (registrations is not null && registrations.Exists(registration =>
                             registration.ContractType == genericType
                             && (registration.TargetDescription is { } description
-                                ? description.Type is { IsGenericTypeDefinition: true } definition
-                                    ? definition
-                                    : ResolveSerializationType(description, type.GetGenericArguments())
-                                : registration.TargetType) == genericArgument))
+                                ? description.Type is null
+                                    ? BindTypeArguments(description, genericArgument, new Type?[type.GetGenericArguments().Length])
+                                    : (description.Type is { IsGenericTypeDefinition: true } definition
+                                        ? definition
+                                        : ResolveSerializationType(description, type.GetGenericArguments())) == genericArgument
+                                : registration.TargetType == genericArgument)))
                         {
                             continue;
                         }
@@ -1198,9 +1209,9 @@ namespace Orleans.Serialization.Serializers
                 return true;
             }
 
-            return TrySelect(searchType, out implementation);
+            return TrySelect(searchType, out implementation) || TrySelect(null, out implementation);
 
-            bool TrySelect(Type key, [NotNullWhen(true)] out Type? result)
+            bool TrySelect(Type? key, [NotNullWhen(true)] out Type? result)
             {
                 if (_implementationCandidates.TryGetValue((contractType, key), out var candidates))
                 {
@@ -1226,32 +1237,46 @@ namespace Orleans.Serialization.Serializers
         private Type? CloseImplementation(Type implementation, Type targetType, Type contractType)
         {
             var searchType = targetType.IsConstructedGenericType ? targetType.GetGenericTypeDefinition() : targetType;
-            if (!_targetDescriptions.TryGetValue((contractType, targetType, implementation), out var descriptions)
-                && !_targetDescriptions.TryGetValue((contractType, searchType, implementation), out descriptions))
+            var hasNamed = _targetDescriptions.TryGetValue((contractType, targetType, implementation), out var descriptions)
+                || _targetDescriptions.TryGetValue((contractType, searchType, implementation), out descriptions);
+            if (hasNamed && TryClose(descriptions!, out var closed))
             {
-                return ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
+                return closed;
             }
 
-            var count = implementation.GetGenericArguments().Length;
-            for (var candidate = descriptions.Count - 1; candidate >= 0; candidate--)
+            var hasPatterns = _targetDescriptions.TryGetValue((contractType, null, implementation), out descriptions);
+            if (hasPatterns && TryClose(descriptions!, out closed))
             {
-                var arguments = new Type?[count];
-                if (!BindTypeArguments(descriptions[candidate], targetType, arguments))
-                {
-                    continue;
-                }
-
-                var resolved = new Type[arguments.Length];
-                for (var i = 0; i < resolved.Length; i++)
-                {
-                    resolved[i] = arguments[i] ?? throw new InvalidOperationException(
-                        $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
-                }
-
-                return ConstructGenericImplementation(implementation, resolved);
+                return closed;
             }
 
-            return null;
+            return hasNamed || hasPatterns ? null : ConstructGenericImplementation(implementation, targetType.GetGenericArguments());
+
+            bool TryClose(List<SerializationType> candidates, [NotNullWhen(true)] out Type? result)
+            {
+                var count = implementation.GetGenericArguments().Length;
+                for (var candidate = candidates.Count - 1; candidate >= 0; candidate--)
+                {
+                    var arguments = new Type?[count];
+                    if (!BindTypeArguments(candidates[candidate], targetType, arguments))
+                    {
+                        continue;
+                    }
+
+                    var resolved = new Type[arguments.Length];
+                    for (var i = 0; i < resolved.Length; i++)
+                    {
+                        resolved[i] = arguments[i] ?? throw new InvalidOperationException(
+                            $"Serialization contract for {implementation} does not bind generic parameter {i} from target {targetType}.");
+                    }
+
+                    result = ConstructGenericImplementation(implementation, resolved);
+                    return true;
+                }
+
+                result = null;
+                return false;
+            }
         }
 
         private bool TryGetConverterContract(Type searchType, Type implementation, Type target, out SerializationContract contract)
@@ -1261,29 +1286,37 @@ namespace Orleans.Serialization.Serializers
                 return true;
             }
 
-            return TryFind(searchType, out contract);
+            return TryFind(searchType, out contract) || TryMatch(_patternConverterContracts, out contract);
 
             bool TryFind(Type key, out SerializationContract result)
             {
-                if (_converterContracts.TryGetValue(key, out var registrations))
+                if (_converterContracts.TryGetValue(key, out var registrations) && TryMatch(registrations, out result))
                 {
-                    for (var i = registrations.Count - 1; i >= 0; i--)
+                    return true;
+                }
+
+                result = default;
+                return false;
+            }
+
+            bool TryMatch(List<(Type Implementation, SerializationContract Contract)> registrations, out SerializationContract result)
+            {
+                for (var i = registrations.Count - 1; i >= 0; i--)
+                {
+                    var candidate = registrations[i];
+                    if (candidate.Implementation != implementation)
                     {
-                        var candidate = registrations[i];
-                        if (candidate.Implementation != implementation)
-                        {
-                            continue;
-                        }
-
-                        if (candidate.Contract.TargetDescription is { } description
-                            && !BindTypeArguments(description, target, new Type?[implementation.GetGenericArguments().Length]))
-                        {
-                            continue;
-                        }
-
-                        result = candidate.Contract;
-                        return true;
+                        continue;
                     }
+
+                    if (candidate.Contract.TargetDescription is { } description
+                        && !BindTypeArguments(description, target, new Type?[implementation.GetGenericArguments().Length]))
+                    {
+                        continue;
+                    }
+
+                    result = candidate.Contract;
+                    return true;
                 }
 
                 result = default;

@@ -333,13 +333,135 @@ public class ManifestContractTests
         options.AddSerializationContract(implementation, typeof(IFieldCodec<>), SerializationType.Array(SerializationType.Parameter(0)));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        var target = typeof(ArrayCodec<>).GetGenericArguments()[0].MakeArrayType();
-
-        AssertMapping(provider, "_fieldCodecs", target, implementation);
         _ = CreateConverter(options);
         Assert.Equal(0, implementation.InterfaceInspections);
         Assert.Equal("contractType", Assert.Throws<ArgumentException>(() =>
             options.AddSerializationContract(typeof(Int32Codec), typeof(IDisposable), SerializationType.Create(typeof(int)))).ParamName);
+    }
+
+    [Fact]
+    public void ParameterizedArrayContractsResolveTheirCodecAndCopier()
+    {
+        var options = new TypeManifestOptions();
+        var target = SerializationType.Array(SerializationType.Parameter(0));
+        options.AddSerializationContract(typeof(PatternArrayCodec<>), typeof(IFieldCodec<>), target);
+        options.AddSerializationContract(typeof(PatternArrayCopier<>), typeof(IDeepCopier<>), target);
+        using var services = new ServiceCollection()
+            .AddSingleton<IFieldCodec<int>>(new Int32Codec())
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<PatternArrayCodec<int>>(provider.GetCodec<int[]>());
+        var copier = Assert.IsType<PatternArrayCopier<int>>(provider.GetDeepCopier<int[]>());
+        var input = new[] { 1, 2, 3 };
+        var result = copier.DeepCopy(input, null!);
+        Assert.Equal(input, result);
+        Assert.NotSame(input, result);
+    }
+
+    [Fact]
+    public void ArrayPatternsMatchRankAndNestedElementShape()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(PatternArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0)));
+        options.AddSerializationContract(typeof(PatternMatrixCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0), 2));
+        options.AddSerializationContract(typeof(PatternNestedArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Create(typeof(GenericTarget<,>),
+                SerializationType.Parameter(0), SerializationType.Create(typeof(int)))));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<PatternArrayCopier<int>>(provider.GetDeepCopier<int[]>());
+        Assert.IsType<PatternMatrixCopier<int>>(provider.GetDeepCopier<int[,]>());
+        Assert.IsType<PatternArrayCopier<int[]>>(provider.GetDeepCopier<int[][]>());
+        Assert.IsType<PatternNestedArrayCopier<string>>(provider.GetDeepCopier<GenericTarget<string, int>[]>());
+        var nonVector = typeof(int).MakeArrayType(1);
+        object?[] arguments = [typeof(IDeepCopier<>), nonVector, nonVector, null];
+        Assert.Equal(false, typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Null(arguments[3]);
+    }
+
+    [Fact]
+    public void NamedContractsTakePriorityOverBareParameterPatterns()
+    {
+        var options = new TypeManifestOptions();
+        options.AddCopier(typeof(ShallowCopier<int>), typeof(int));
+        options.AddCopier(typeof(ShallowCopier<GenericTarget<string, int>>), typeof(GenericTarget<string, int>));
+        options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<ShallowCopier<int>>(provider.GetDeepCopier<int>());
+        Assert.IsType<ShallowCopier<GenericTarget<string, int>>>(provider.GetDeepCopier<GenericTarget<string, int>>());
+        Assert.IsType<ParameterCopier<FirstTarget>>(provider.GetDeepCopier<FirstTarget>());
+        Assert.IsType<ParameterCopier<GenericTarget<Guid, string>>>(provider.GetDeepCopier<GenericTarget<Guid, string>>());
+    }
+
+    [Fact]
+    public void ExactArrayContractsTakePriorityOverLaterPatterns()
+    {
+        var options = new TypeManifestOptions();
+        options.AddCopier(typeof(ShallowCopier<int[]>), typeof(int[]));
+        options.AddSerializationContract(typeof(PatternArrayCopier<>), typeof(IDeepCopier<>),
+            SerializationType.Array(SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<ShallowCopier<int[]>>(provider.GetDeepCopier<int[]>());
+        Assert.IsType<PatternArrayCopier<string>>(provider.GetDeepCopier<string[]>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnnamedConverterContractsSelectTheirStoredSurrogate(bool arrayTarget)
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(arrayTarget ? typeof(PatternArrayConverter<>) : typeof(ParameterConverter<>), typeof(IConverter<,>),
+            arrayTarget ? SerializationType.Array(SerializationType.Parameter(0)) : SerializationType.Parameter(0),
+            SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var target = arrayTarget ? typeof(FirstTarget[]) : typeof(FirstTarget);
+        object?[] arguments = [target, target, null, null];
+        var result = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments);
+
+        Assert.Equal(true, result);
+        Assert.Equal(typeof(GenericSurrogate<FirstTarget>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        Assert.IsType(arrayTarget ? typeof(PatternArrayConverter<FirstTarget>) : typeof(ParameterConverter<FirstTarget>),
+            Assert.Single(Assert.IsType<object[]>(arguments[3])));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnnamedPatternsUseReverseRegistrationOrder(bool arrayLast)
+    {
+        var options = new TypeManifestOptions();
+        var array = SerializationType.Array(SerializationType.Parameter(0));
+        var parameter = SerializationType.Parameter(0);
+        options.AddSerializationContract(arrayLast ? typeof(ParameterCopier<>) : typeof(PatternArrayCopier<>), typeof(IDeepCopier<>),
+            arrayLast ? parameter : array);
+        options.AddSerializationContract(arrayLast ? typeof(PatternArrayCopier<>) : typeof(ParameterCopier<>), typeof(IDeepCopier<>),
+            arrayLast ? array : parameter);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var copier = provider.GetDeepCopier<int[]>();
+
+        Assert.IsType(arrayLast ? typeof(PatternArrayCopier<int>) : typeof(ParameterCopier<int[]>), copier);
+        var input = new[] { 5, 7 };
+        var result = copier.DeepCopy(input, null!);
+        Assert.Equal(input, result);
+        if (arrayLast)
+        {
+            Assert.NotSame(input, result);
+        }
+        else
+        {
+            Assert.Same(input, result);
+        }
     }
 
     [Fact]
@@ -430,5 +552,36 @@ public class ManifestContractTests
     {
         public GenericTarget<TFirst, TSecond> ConvertFromSurrogate(in GenericSurrogate<(TSecond, TFirst)[]> surrogate) => new();
         public GenericSurrogate<(TSecond, TFirst)[]> ConvertToSurrogate(in GenericTarget<TFirst, TSecond> value) => default;
+    }
+    public sealed class PatternArrayCodec<T>(IFieldCodec<T> elementCodec) : IFieldCodec<T[]>
+    {
+        private readonly ArrayCodec<T> _codec = new(elementCodec);
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] T[] value)
+            where TBufferWriter : IBufferWriter<byte>
+            => _codec.WriteField(ref writer, id, expected, value);
+        [return: MaybeNull]
+        public T[] ReadValue<TInput>(ref Reader<TInput> reader, Field field) => _codec.ReadValue(ref reader, field);
+    }
+    public sealed class PatternArrayCopier<T> : IDeepCopier<T[]>
+    {
+        [return: NotNullIfNotNull(nameof(input))]
+        public T[]? DeepCopy(T[]? input, CopyContext context) => input is null ? null : (T[])input.Clone();
+    }
+    public sealed class PatternMatrixCopier<T> : IDeepCopier<T[,]>
+    {
+        [return: NotNullIfNotNull(nameof(input))]
+        public T[,]? DeepCopy(T[,]? input, CopyContext context) => input is null ? null : (T[,])input.Clone();
+    }
+    public sealed class ParameterCopier<T> : ShallowCopier<T>;
+    public sealed class PatternNestedArrayCopier<T> : ShallowCopier<GenericTarget<T, int>[]>;
+    public sealed class ParameterConverter<T> : IConverter<T, GenericSurrogate<T>>
+    {
+        public T ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => throw new NotSupportedException();
+        public GenericSurrogate<T> ConvertToSurrogate(in T value) => default;
+    }
+    public sealed class PatternArrayConverter<T> : IConverter<T[], GenericSurrogate<T>>
+    {
+        public T[] ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => [];
+        public GenericSurrogate<T> ConvertToSurrogate(in T[] value) => default;
     }
 }
