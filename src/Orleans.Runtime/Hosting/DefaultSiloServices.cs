@@ -371,7 +371,7 @@ namespace Orleans.Hosting
             services.AddOptions<GrainCollectionOptions>()
                 .Configure<IOptions<GrainTypeOptions>>((options, grainTypeOptions) =>
                 {
-                    foreach (var grainClass in grainTypeOptions.Value.Classes)
+                    foreach (var grainClass in grainTypeOptions.Value.GrainClasses)
                     {
                         var attr = grainClass.GetCustomAttribute<CollectionAgeLimitAttribute>();
                         if (attr != null)

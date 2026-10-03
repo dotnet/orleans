@@ -27,7 +27,7 @@ Implementation notes:
 
 -- These settings improves throughput of the database by reducing locking by better separating readers from writers.
 -- SQL Server 2012 and newer can refer to itself as CURRENT. Older ones need a workaround.
-CREATE TABLE OrleansQuery
+CREATE TABLE IF NOT EXISTS OrleansQuery
 (
     QueryKey  TEXT PRIMARY KEY,
     QueryText TEXT NOT NULL

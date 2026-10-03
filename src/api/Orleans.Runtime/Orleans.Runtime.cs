@@ -524,6 +524,7 @@ namespace Orleans.Metadata
 {
     public partial class GrainClassMap
     {
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("The dictionary's grain types must have public constructors preserved separately, for example by GrainTypeOptions.AddClass or TypeManifestOptions.AddInterfaceImplementation.")]
         public GrainClassMap(Serialization.TypeSystem.TypeConverter typeConverter, System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, System.Type> classes) { }
 
         public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type? grainClass) { throw null; }

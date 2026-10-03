@@ -5,7 +5,6 @@ using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -102,12 +101,13 @@ public class HotReloadCodegenTests
     }
 
     [Fact]
-    public async Task ReleaseBuildsKeepEagerInitialization()
+    public async Task ReleaseBuildsUseStaticFieldAccessorsAndEagerCodecs()
     {
         var generated = await Generate(GreetingV2, OptimizationLevel.Release);
         var codec = GetClass(generated, "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("private static readonly global::System.Action<global::TestProject.Greeting, string> setField_0 = ", codec);
+        Assert.Contains("private extern static ref string accessField_0(global::TestProject.Greeting instance);", codec);
+        Assert.DoesNotContain("Utilities.FieldAccessor", codec);
         Assert.Contains("private readonly global::Orleans.Serialization.Codecs.ListCodec<int> _codec_List_Int32_", codec);
         Assert.Contains("private readonly global::System.Type _type_List_Int32_", codec);
         Assert.Contains("= typeof(global::System.Collections.Generic.List<int>);", codec);
@@ -189,9 +189,9 @@ public class HotReloadCodegenTests
     {
         var codec = GetClass(await Generate(GreetingV2, OptimizationLevel.Release), "Codec_Greeting").NormalizeWhitespace().ToFullString();
 
-        Assert.Contains("setField_0 = ", codec);
-        Assert.Contains("setField_3 = ", codec);
-        Assert.Contains("setField_4 = ", codec);
+        Assert.Contains("accessField_0(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_3(global::TestProject.Greeting instance)", codec);
+        Assert.Contains("accessField_4(global::TestProject.Greeting instance)", codec);
         Assert.DoesNotContain("setField0", codec);
         Assert.DoesNotContain("setField1", codec);
     }
@@ -398,7 +398,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: globalOptions is null ? null : new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics, TestContext.Current.CancellationToken);
         Assert.Empty(diagnostics);
@@ -420,7 +420,7 @@ public class HotReloadCodegenTests
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
-            optionsProvider: new TestAnalyzerConfigOptionsProvider(globalOptions),
+            optionsProvider: TestCompilationHelper.CreateOptionsProvider(globalOptions),
             driverOptions: new GeneratorDriverOptions(default));
         driver.RunGeneratorsAndUpdateCompilation(
             compilation,
@@ -503,20 +503,5 @@ public class HotReloadCodegenTests
                 process.Kill(entireProcessTree: true);
             }
         }
-    }
-
-    private sealed class TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> globalOptions) : AnalyzerConfigOptionsProvider
-    {
-        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
-        private readonly AnalyzerConfigOptions _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-
-        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
-    }
-
-    private sealed class TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string value) => options.TryGetValue(key, out value!);
     }
 }

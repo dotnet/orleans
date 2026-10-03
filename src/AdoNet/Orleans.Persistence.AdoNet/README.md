@@ -92,7 +92,11 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [MySQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
-- [SQLite Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
+- [SQLite Main Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Shared/Sqlite-Main.sql)
+- [SQLite Persistence Script](https://github.com/dotnet/orleans/blob/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
+
+The SQLite scripts are idempotent: reapplying them refreshes the persistence
+queries while preserving grain state.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

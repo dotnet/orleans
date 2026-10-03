@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
@@ -11,10 +12,30 @@ namespace Orleans.Configuration
     /// </summary>
     public class GrainTypeOptions
     {
+        private readonly HashSet<Type> _classes = new();
+
         /// <summary>
         /// Gets a collection of metadata about grain classes.
         /// </summary>
-        public HashSet<Type> Classes { get; } = new();
+        /// <remarks>
+        /// Use <see cref="AddClass(Type)"/> to register grain classes with public constructors preserved for activation.
+        /// </remarks>
+        public HashSet<Type> Classes
+        {
+            [RequiresUnreferencedCode("Direct collection access requires grain public constructors to be preserved separately. Use AddClass(Type) when registering grain classes.")]
+            get => _classes;
+        }
+
+        /// <summary>
+        /// Adds a grain class and preserves its public constructors and implemented interfaces for activation.
+        /// </summary>
+        /// <param name="grainClass">The grain implementation class.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="grainClass"/> is <see langword="null"/>.</exception>
+        public void AddClass(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type grainClass)
+            => _classes.Add(grainClass ?? throw new ArgumentNullException(nameof(grainClass)));
+
+        internal HashSet<Type> GrainClasses => _classes;
 
         /// <summary>
         /// Gets a collection of metadata about grain interfaces.
@@ -50,7 +71,7 @@ namespace Orleans.Configuration
             {
                 if (IsImplementationType(type))
                 {
-                    options.Classes.Add(type switch
+                    options.GrainClasses.Add(type switch
                     {
                         { IsGenericType: true, IsConstructedGenericType: false } => type.GetGenericTypeDefinition(),
                         _ => type
@@ -105,7 +126,7 @@ namespace Orleans.Configuration
             var isSilo = _serviceProvider.GetService(typeof(ILocalSiloDetails)) != null;
             if (isSilo)
             {
-                if (_options.Value.Classes is not { Count: > 0 })
+                if (_options.Value.GrainClasses is not { Count: > 0 })
                 {
                     throw new OrleansConfigurationException($"No grain classes have been configured. Either add some grain classes and reference the Orleans.Sdk package, or remove {nameof(GrainTypeOptionsValidator)} from the services collection.");
                 }

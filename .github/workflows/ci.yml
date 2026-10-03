@@ -21,7 +21,9 @@ env:
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
   COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260907@sha256:2db1f9e74c506bcf6fc347aa937aea1c00fa756061296a5a9efba530ce86ec02
-  CONSUL_IMAGE: public.ecr.aws/hashicorp/consul:1.19
+  # Consul 1.22+ accepts the ':' and '@' characters in Orleans silo-address keys.
+  CONSUL_IMAGE: mirror.gcr.io/hashicorp/consul:1.22.7@sha256:a230dcea0bb107bd7958a912d1429fb7f9d399637de7ffb814b34412b9e8c543
+  CONSUL_FALLBACK_IMAGE: docker.io/hashicorp/consul:1.22.7@sha256:a230dcea0bb107bd7958a912d1429fb7f9d399637de7ffb814b34412b9e8c543
   DYNAMODB_IMAGE: amazon/dynamodb-local:latest
   ELASTICMQ_IMAGE: softwaremill/elasticmq-native:latest
   # Keep in sync with SeaweedFSTestContainer
@@ -494,7 +496,14 @@ jobs:
         set -euo pipefail
 
         bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
-        bash .github/scripts/docker-pull-with-retry.sh "$CONSUL_IMAGE"
+        consul_image="$CONSUL_IMAGE"
+        if ! bash .github/scripts/docker-pull-with-retry.sh "$consul_image"; then
+          echo "Pulling Consul from Docker Hub after the mirror failed."
+          consul_image="$CONSUL_FALLBACK_IMAGE"
+          bash .github/scripts/docker-pull-with-retry.sh "$consul_image"
+        fi
+
+        echo "CONSUL_IMAGE=$consul_image" >> "$GITHUB_ENV"
     - name: Test
       uses: ./.github/actions/run-tests
       with:
