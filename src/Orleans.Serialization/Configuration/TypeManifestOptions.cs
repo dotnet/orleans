@@ -198,8 +198,8 @@ namespace Orleans.Serialization.Configuration
         /// <param name="factory">The default service factory.</param>
         /// <param name="dependencies">Services required to construct the default graph.</param>
         /// <remarks>
-        /// The factory participates when its dependencies are available through closed service factories,
-        /// provider-owned services, or instance registrations. Explicit registrations take precedence.
+        /// The factory participates when its dependencies are supplied by closed service factories
+        /// and provider-owned services. Explicit registrations take precedence.
         /// </remarks>
         /// <exception cref="ArgumentNullException"><paramref name="factory"/> or <paramref name="dependencies"/> is null.</exception>
         public void AddDefaultSerializerService<TService>(Func<ICodecProvider, TService> factory, Type[] dependencies) where TService : class
