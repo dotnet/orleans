@@ -418,13 +418,14 @@ public class DynamoDBGrainStorageKeyFormatTests : IAsyncLifetime
         var grainId = NewGrainId();
         var storage = await CreateStorage(o => { o.UseClusterServiceId = true; o.MigrateLegacyKeys = true; });
         await WriteAsync(storage, grainId, "a");
-        await WriteAsync(storage, grainId, "b");
 
+        // written once, the current item is at ETag 0, which an ETag that is not a number must not stand for
         var state = await ReadAsync(storage, grainId);
         state.ETag = "not a number";
+        state.State!.A = "overwritten";
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => storage.WriteStateAsync(GrainType, grainId, state));
-        Assert.Equal("b", (await ReadAsync(storage, grainId)).State!.A);
+        Assert.Equal("a", (await ReadAsync(storage, grainId)).State!.A);
     }
 
     [Fact, TestCategory("Functional")]

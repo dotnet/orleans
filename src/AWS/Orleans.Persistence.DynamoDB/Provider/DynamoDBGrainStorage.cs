@@ -572,8 +572,13 @@ namespace Orleans.Storage
         /// </summary>
         private async Task WriteAndRetireLegacyAsync<T>(IGrainState<T> grainState, GrainStateRecord record, string legacyPartitionKey, bool clear)
         {
-            // as in WriteStateInternal: an ETag that is not a number fails the condition, as an inconsistent state
-            int.TryParse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var currentETag);
+            // no item has an ETag that is not a number, so it cannot be the current state; taken as 0, it would pass the
+            // condition on an item written once
+            if (!int.TryParse(grainState.ETag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var currentETag))
+            {
+                throw new InconsistentStateException($"Inconsistent grain state: the ETag '{grainState.ETag}' is not one this provider writes");
+            }
+
             var newETag = currentETag + 1;
             var values = new Dictionary<string, AttributeValue>
             {
