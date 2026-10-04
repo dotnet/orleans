@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Reflection;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -481,6 +482,107 @@ namespace UnitTests.MembershipTests
 
             client.ClearPendingRequests();
             Assert.Equal(0, gateway.TrackedRequestClientCount);
+        }
+
+        [Theory, TestCategory("Liveness")]
+        [InlineData("active")]
+        [InlineData("rejected")]
+        [InlineData("replaced")]
+        [InlineData("completed")]
+        [InlineData("disconnected")]
+        [InlineData("reconnected")]
+        [InlineData("cleared")]
+        public async Task GatewayTransportRetryChecksAttemptOwnership(string ownership)
+        {
+            var services = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = services.GetRequiredService<MessageCenter>().Gateway!;
+            var manager = services.GetRequiredService<ConnectionManager>();
+            var transport = Assert.IsType<SiloConnection>(
+                await manager.GetConnection(HostedCluster.SecondarySilos[0].SiloAddress));
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var targetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 0), 1);
+            var destination = new RecordingConnection();
+            var request = new Message
+            {
+                Id = new CorrelationId(-2),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = targetSilo,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+            var connection = Assert.IsType<GatewayInboundConnection>(client.Connection);
+            manager.OnConnected(targetSilo, destination);
+            try
+            {
+                client.SendRequest(request, destination);
+                Assert.Same(request, Assert.Single(destination.Messages));
+                var attempt = request.GatewayRequestAttempt;
+                Assert.True(attempt > 0);
+
+                switch (ownership)
+                {
+                    case "rejected":
+                        gateway.SiloStatusChangeNotification(targetSilo, SiloStatus.Dead);
+                        break;
+                    case "replaced":
+                        client.SendRequest(new Message
+                        {
+                            Id = request.Id,
+                            Direction = request.Direction,
+                            SendingSilo = request.SendingSilo,
+                            SendingGrain = request.SendingGrain,
+                            TargetSilo = request.TargetSilo,
+                            TargetGrain = request.TargetGrain,
+                        }, destination);
+                        break;
+                    case "completed":
+                        var response = services.GetRequiredService<MessageFactory>().CreateResponseMessage(request);
+                        response.Result = Message.ResponseTypes.Success;
+                        response.BodyObject = Response.Completed;
+                        client.SendResponse(response);
+                        break;
+                    case "disconnected":
+                    case "reconnected":
+                        client.RecordDisconnection();
+                        if (ownership == "reconnected")
+                        {
+                            client.RecordConnection(connection);
+                        }
+                        break;
+                    case "cleared":
+                        client.ClearPendingRequests();
+                        break;
+                }
+
+                destination.Messages.Clear();
+                typeof(SiloConnection).GetMethod("RetryMessage", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(transport, [request, null]);
+
+                Assert.Equal(1, request.RetryCount);
+                if (ownership is "active" or "disconnected" or "reconnected")
+                {
+                    Assert.Same(request, Assert.Single(destination.Messages));
+                    Assert.Equal(ownership == "active" ? attempt : -attempt, request.GatewayRequestAttempt);
+                }
+                else
+                {
+                    Assert.Empty(destination.Messages);
+                }
+
+                Assert.Equal(ownership is "active" or "replaced" ? 1 : 0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                if (client.Connection is null)
+                {
+                    client.RecordConnection(connection);
+                }
+
+                client.ClearPendingRequests();
+                manager.OnConnectionTerminated(targetSilo, destination, exception: null);
+            }
         }
 
         [Fact, TestCategory("Liveness")]

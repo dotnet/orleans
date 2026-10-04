@@ -27,6 +27,10 @@ namespace Orleans.Runtime
         [NonSerialized]
         private SiloAddress[]? _gatewayResponseRoutingHistory;
 
+        // Transport retries on the ingress silo retain the original per-client owner.
+        [field: NonSerialized]
+        internal Action<Message, Connection?, Exception?>? GatewayRequestRetry { get; set; }
+
         public CoarseStopwatch _timeToExpiry;
 
         internal object? _bodyObject;

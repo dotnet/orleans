@@ -375,6 +375,7 @@ namespace UnitTests.Serialization
                 [Message.GatewayResponseRoutingHistoryKey] = Array.Empty<SiloAddress>(),
             };
             message.GatewayRequestAttempt = gatewayRequestAttempt;
+            message.GatewayRequestRetry = static (_, _, _) => throw new InvalidOperationException("Local callback must not be serialized.");
             message.GatewayForwardingSource = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
             message.GatewayResponseRoutingHistory =
             [
@@ -385,6 +386,7 @@ namespace UnitTests.Serialization
             var deserializedMessage = RoundTripMessage(message);
 
             Assert.Equal(gatewayRequestAttempt, deserializedMessage.GatewayRequestAttempt);
+            Assert.Null(deserializedMessage.GatewayRequestRetry);
             Assert.Equal(message.GatewayForwardingSource, deserializedMessage.GatewayForwardingSource);
             Assert.Equal(message.GatewayResponseRoutingHistory, deserializedMessage.GatewayResponseRoutingHistory);
             Assert.Equal(42, deserializedMessage.RequestContextData!["application"]);

@@ -88,7 +88,7 @@ Rejections carry more information than a timeout because the runtime has made an
 
 ### Gateway-forwarded requests and silo failure
 
-For external client requests sent to a remote silo, the ingress gateway tracks the destination and request attempt in its per-client state. Registration and the transport enqueue are serialized with membership-driven removal. When membership declares the tracked destination dead, the gateway removes the request and returns a transient rejection backed by <xref:Orleans.Runtime.SiloUnavailableException>, completing the client call promptly.
+For external client requests sent to a remote silo, the ingress gateway tracks the destination and request attempt in its per-client state. Registration and the transport enqueue are serialized with membership-driven removal. Transport retries retain that per-client owner and recheck the attempt and destination under the same lock, preserving the original retention deadline. When membership declares the tracked destination dead, the gateway removes the request and returns a transient rejection backed by <xref:Orleans.Runtime.SiloUnavailableException>, completing the client call promptly. Removing ownership suppresses subsequent transport retries of that attempt.
 
 Forwarding updates advance destination ownership as the request moves between silos. Responses pass through the live ingress gateway to complete tracking. If that gateway becomes unavailable to the client, response routing selects a current gateway and bounds routing repair by the configured forwarding limit. When replacement-gateway lookup fails or selects a dead silo, a gateway which still retains the client's state queues the original response for reconnect.
 
