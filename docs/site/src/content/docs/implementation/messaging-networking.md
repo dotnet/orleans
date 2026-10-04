@@ -17,6 +17,8 @@ Connection establishment has a bounded `OpenConnectionTimeout`. A failed attempt
 
 Source: [`ConnectionManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/ConnectionManager.cs), [`Connection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/Connection.cs), and [`SiloConnection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Networking/SiloConnection.cs).
 
+The TCP transport enables keep-alive on outbound and accepted sockets. By default, the operating system sends the first probe after 90 seconds of idle time, then probes every 30 seconds and allows 10 unanswered probes before terminating the connection. Accepted sockets use the current options for their named listener, so each silo or gateway listener applies its configured keep-alive policy to new connections.
+
 ## Message path and framing
 
 When `MessageCenter.SendMessage` has a target silo, it reuses an existing connection or obtains one from `ConnectionManager`. A local target uses receive processing directly. A known-dead target causes a transient rejection for request and one-way messages, and expired messages are dropped before consuming transport work.

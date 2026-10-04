@@ -17,6 +17,10 @@ internal sealed class TcpMessageTransportOptions
     internal bool NoDelay { get; set; } = true;
     internal bool FastPath { get; set; } = true;
     internal bool DualMode { get; set; } = true;
+    internal bool KeepAlive { get; set; } = true;
+    internal int KeepAliveTimeSeconds { get; set; } = 90;
+    internal int KeepAliveIntervalSeconds { get; set; } = 30;
+    internal int KeepAliveRetryCount { get; set; } = 10;
 }
 
 /// <summary>
@@ -55,6 +59,7 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
         {
             socket.LingerState = options.LingerOption;
             socket.NoDelay = options.NoDelay;
+            socket.ConfigureKeepAlive(options);
 
             if (ip.AddressFamily == AddressFamily.InterNetworkV6)
             {

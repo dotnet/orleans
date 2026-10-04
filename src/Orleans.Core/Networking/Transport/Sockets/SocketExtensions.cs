@@ -10,6 +10,17 @@ internal static class SocketExtensions
     private const int SIO_LOOPBACK_FAST_PATH = -1744830448;
     private static readonly byte[] Enabled = BitConverter.GetBytes(1);
 
+    internal static void ConfigureKeepAlive(this Socket socket, TcpMessageTransportOptions options)
+    {
+        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, options.KeepAlive);
+        if (options.KeepAlive)
+        {
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, options.KeepAliveTimeSeconds);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, options.KeepAliveIntervalSeconds);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, options.KeepAliveRetryCount);
+        }
+    }
+
     /// <summary>
     /// Enables TCP Loopback Fast Path on a socket.
     /// See https://blogs.technet.microsoft.com/wincat/2012/12/05/fast-tcp-loopback-performance-and-low-latency-with-windows-server-2012-tcp-loopback-fast-path/
