@@ -4,12 +4,16 @@
 #nullable enable
 
 using System;
+using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Connections.Transport.Sockets;
 
 internal static partial class SocketsLog
 {
+    [LoggerMessage(21, LogLevel.Warning, "TCP keep-alive option {Option} is unsupported on this platform; retaining the supported socket settings.", EventName = "UnsupportedKeepAliveOption")]
+    internal static partial void UnsupportedKeepAliveOption(ILogger logger, Exception exception, SocketOptionName option);
+
     // Reserved: Event ID 3, EventName = ConnectionRead
 
     [LoggerMessage(6, LogLevel.Debug, @"Connection ""{Connection}"" received FIN.", EventName = "ConnectionReadFin", SkipEnabledCheck = true)]

@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -20,6 +23,78 @@ namespace Orleans.Core.Tests.Networking;
 public class TcpMessageTransportKeepAliveTests
 {
     private const string ListenerName = "silo";
+
+    [Theory]
+    [InlineData(SocketOptionName.KeepAlive, SocketError.ProtocolOption, false)]
+    [InlineData(SocketOptionName.TcpKeepAliveTime, SocketError.ProtocolOption, false)]
+    [InlineData(SocketOptionName.TcpKeepAliveInterval, SocketError.OperationNotSupported, false)]
+    [InlineData(SocketOptionName.TcpKeepAliveRetryCount, SocketError.ProtocolNotSupported, false)]
+    [InlineData(SocketOptionName.TcpKeepAliveRetryCount, SocketError.SocketNotSupported, false)]
+    [InlineData(SocketOptionName.TcpKeepAliveTime, SocketError.Success, true)]
+    public void ConfigureKeepAlive_UnsupportedOption_LogsAndRetainsSupportedSettings(
+        SocketOptionName unsupportedOption, SocketError socketError, bool platformException)
+    {
+        Exception failure = platformException
+            ? new PlatformNotSupportedException()
+            : new SocketException((int)socketError);
+        var logger = Substitute.For<ILogger>();
+        logger.IsEnabled(LogLevel.Warning).Returns(true);
+        var attempted = new List<(SocketOptionLevel, SocketOptionName, int)>();
+        var applied = new List<SocketOptionName>();
+
+        SocketExtensions.ConfigureKeepAlive(new TcpMessageTransportOptions(), logger, (level, option, value) =>
+        {
+            attempted.Add((level, option, value));
+            if (option == unsupportedOption)
+            {
+                throw failure;
+            }
+
+            applied.Add(option);
+        });
+
+        var expected = unsupportedOption == SocketOptionName.KeepAlive
+            ? new[] { (SocketOptionLevel.Socket, SocketOptionName.KeepAlive, 1) }
+            : new[]
+            {
+                (SocketOptionLevel.Socket, SocketOptionName.KeepAlive, 1),
+                (SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 90),
+                (SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 30),
+                (SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 10)
+            };
+        Assert.Equal(expected, attempted);
+        Assert.Equal(expected.Select(entry => entry.Item2).Where(option => option != unsupportedOption), applied);
+        var log = Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log));
+        Assert.Equal(LogLevel.Warning, log.GetArguments()[0]);
+        Assert.Equal("UnsupportedKeepAliveOption", Assert.IsType<EventId>(log.GetArguments()[1]).Name);
+        Assert.Contains(unsupportedOption.ToString(), log.GetArguments()[2]!.ToString());
+        Assert.Same(failure, log.GetArguments()[3]);
+    }
+
+    [Theory]
+    [InlineData(SocketError.InvalidArgument)]
+    [InlineData(SocketError.AccessDenied)]
+    [InlineData(SocketError.NotSocket)]
+    public void ConfigureKeepAlive_OtherSocketErrors_Propagate(SocketError socketError)
+    {
+        var failure = new SocketException((int)socketError);
+        var logger = Substitute.For<ILogger>();
+        var attempted = new List<SocketOptionName>();
+
+        var thrown = Assert.Throws<SocketException>(() =>
+            SocketExtensions.ConfigureKeepAlive(new TcpMessageTransportOptions(), logger, (_, option, _) =>
+            {
+                attempted.Add(option);
+                if (option == SocketOptionName.TcpKeepAliveTime)
+                {
+                    throw failure;
+                }
+            }));
+
+        Assert.Same(failure, thrown);
+        Assert.Equal([SocketOptionName.KeepAlive, SocketOptionName.TcpKeepAliveTime], attempted);
+        Assert.DoesNotContain(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log));
+    }
 
     [Theory]
     [InlineData(false, true, 90, 30, 10)]

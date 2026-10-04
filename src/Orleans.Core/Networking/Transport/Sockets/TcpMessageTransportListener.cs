@@ -58,7 +58,7 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
         {
             listenSocket.LingerState = options.LingerOption;
             listenSocket.NoDelay = options.NoDelay;
-            listenSocket.ConfigureKeepAlive(options);
+            listenSocket.ConfigureKeepAlive(options, Logger);
 
             listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
@@ -86,7 +86,7 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
     {
         var options = _tcpOptions.Get(ListenerName);
         socket.NoDelay = options.NoDelay;
-        socket.ConfigureKeepAlive(options);
+        socket.ConfigureKeepAlive(options, Logger);
     }
 
     public override ValueTask BindAsync(CancellationToken cancellationToken = default)

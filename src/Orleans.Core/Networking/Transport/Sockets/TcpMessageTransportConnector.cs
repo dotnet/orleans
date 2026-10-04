@@ -59,7 +59,7 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
         {
             socket.LingerState = options.LingerOption;
             socket.NoDelay = options.NoDelay;
-            socket.ConfigureKeepAlive(options);
+            socket.ConfigureKeepAlive(options, _logger);
 
             if (ip.AddressFamily == AddressFamily.InterNetworkV6)
             {

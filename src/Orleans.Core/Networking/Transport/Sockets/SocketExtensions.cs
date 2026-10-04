@@ -2,6 +2,7 @@
 using System;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -10,14 +11,42 @@ internal static class SocketExtensions
     private const int SIO_LOOPBACK_FAST_PATH = -1744830448;
     private static readonly byte[] Enabled = BitConverter.GetBytes(1);
 
-    internal static void ConfigureKeepAlive(this Socket socket, TcpMessageTransportOptions options)
+    internal static void ConfigureKeepAlive(this Socket socket, TcpMessageTransportOptions options, ILogger logger) =>
+        ConfigureKeepAlive(options, logger, socket.SetSocketOption);
+
+    internal static void ConfigureKeepAlive(
+        TcpMessageTransportOptions options,
+        ILogger logger,
+        Action<SocketOptionLevel, SocketOptionName, int> setSocketOption)
     {
-        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, options.KeepAlive);
-        if (options.KeepAlive)
+        if (!TrySet(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, options.KeepAlive ? 1 : 0) || !options.KeepAlive)
         {
-            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, options.KeepAliveTimeSeconds);
-            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, options.KeepAliveIntervalSeconds);
-            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, options.KeepAliveRetryCount);
+            return;
+        }
+
+        TrySet(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, options.KeepAliveTimeSeconds);
+        TrySet(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, options.KeepAliveIntervalSeconds);
+        TrySet(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, options.KeepAliveRetryCount);
+
+        bool TrySet(SocketOptionLevel level, SocketOptionName option, int value)
+        {
+            try
+            {
+                setSocketOption(level, option, value);
+                return true;
+            }
+            catch (SocketException exception) when (exception.SocketErrorCode is
+                SocketError.ProtocolOption or SocketError.OperationNotSupported or
+                SocketError.ProtocolNotSupported or SocketError.SocketNotSupported)
+            {
+                SocketsLog.UnsupportedKeepAliveOption(logger, exception, option);
+                return false;
+            }
+            catch (PlatformNotSupportedException exception)
+            {
+                SocketsLog.UnsupportedKeepAliveOption(logger, exception, option);
+                return false;
+            }
         }
     }
 
