@@ -485,6 +485,7 @@ namespace Orleans.Runtime
 
         private void ProcessStatusResponse(Message message)
         {
+            using var statusMessage = message;
             var status = (StatusResponse)message.BodyObject!;
             callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
             var request = callback?.Message;

@@ -29,6 +29,8 @@ A connector middleware receives the next <xref:Orleans.Connections.Transport.Mes
 
 Delegate <xref:Orleans.Connections.Transport.MessageTransportConnector.Features>, `IsValid`, and disposal unless the middleware deliberately changes those guarantees.
 
+Orleans owns the connector decorators returned by middleware. During host disposal, the connection factory closes connection-establishment admission, awaits admitted attempts, and disposes the decorated connector chain. Each decorator disposes its own resources and delegates disposal to its inner connector. The service provider owns the registered transport connector and disposes it separately.
+
 ## Decorate inbound listeners
 
 A listener middleware receives the next <xref:Orleans.Connections.Transport.MessageTransportListener> and returns the listener Orleans should bind and accept from:

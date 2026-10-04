@@ -348,6 +348,7 @@ namespace Orleans
 
             if (response.Result is Message.ResponseTypes.Status)
             {
+                using var statusMessage = response;
                 var status = (StatusResponse)response.BodyObject!;
                 callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
