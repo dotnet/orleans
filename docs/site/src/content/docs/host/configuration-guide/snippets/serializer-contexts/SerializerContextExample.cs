@@ -5,8 +5,8 @@ using Orleans.Serialization;
 namespace Documentation.SerializerContexts;
 
 #region serializer_context_declaration
-[GenerateSerializerContext(typeof(List<Dictionary<string, int>>))]
-[GenerateSerializerContext(typeof(DocumentationPayload<int>))]
+[GenerateSerializerContext<List<Dictionary<string, int>>>]
+[GenerateSerializerContext<DocumentationPayload<int>>]
 public partial class ApplicationSerializerContext : SerializerContext;
 
 [GenerateSerializer]

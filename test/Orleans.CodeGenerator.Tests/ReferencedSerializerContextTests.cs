@@ -32,7 +32,7 @@ public sealed class ReferencedSerializerContextTests
             producerResult.Results.SelectMany(static result => result.GeneratedSources)
                 .Select(static source => source.SourceText.ToString())), StringComparison.Ordinal);
         var consumer = await TestCompilationHelper.CreateCompilation("""
-            [Orleans.GenerateSerializerContext(typeof(DynamicPayload<System.Collections.Generic.List<int>>))]
+            [Orleans.GenerateSerializerContext<DynamicPayload<System.Collections.Generic.List<int>>>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             public static class DynamicProducerProof
             {
@@ -118,7 +118,7 @@ public sealed class ReferencedSerializerContextTests
         AssertNoCompilationErrors(producerOutput);
         var reference = EmitReference(producerOutput);
         var consumer = await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.GenerateSerializerContext(typeof({{closedType}}))]
+            [Orleans.GenerateSerializerContext<{{closedType}}>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """, $"ImplicitConsumer{Guid.NewGuid():N}", reference);
         consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));
@@ -361,7 +361,7 @@ public sealed class ReferencedSerializerContextTests
     private static async Task<(Compilation Compilation, GeneratorDriverRunResult Result)> GenerateConsumer(
         MetadataReference[] reference, bool generic, string frameworkVersion, bool hotReload)
         => Generate(await TestCompilationHelper.CreateCompilation($$"""
-            [Orleans.GenerateSerializerContext(typeof(Producer.Payload{{(generic ? "<int>" : "")}}))]
+            [Orleans.GenerateSerializerContext<Producer.Payload{{(generic ? "<int>" : "")}}>]
             public partial class DemoContext : Orleans.Serialization.SerializerContext { }
             """, "ReferencedContextConsumer", reference), frameworkVersion, hotReload);
 

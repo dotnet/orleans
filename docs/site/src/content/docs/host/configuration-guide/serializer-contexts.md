@@ -10,7 +10,7 @@ A <xref:Orleans.Serialization.SerializerContext> registers a closed graph of typ
 
 ## Declare the type graph
 
-Apply <xref:Orleans.GenerateSerializerContextAttribute> to a top-level, non-generic partial class derived from `SerializerContext`. Each attribute declares one closed root type. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
+Apply <xref:Orleans.GenerateSerializerContextAttribute`1> to a top-level, non-generic partial class derived from `SerializerContext`. The attribute's type argument declares one closed root type, using C# 11 or later. The compiler enforces closed attribute type arguments. The generator follows serialized model members and collection elements, registering every supported dependency. A root such as `List<Dictionary<string, int>>` includes the list, dictionary, string, and integer implementations.
 
 :::code language="csharp" source="snippets/serializer-contexts/SerializerContextExample.cs" id="serializer_context_declaration":::
 

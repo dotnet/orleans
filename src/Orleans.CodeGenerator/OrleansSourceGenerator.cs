@@ -28,6 +28,7 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     internal const string ReferencedSerializerOutputsTrackingName = "Orleans.ReferencedSerializerOutputs";
     internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
     internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
+    internal const string SerializerContextOutputsTrackingName = "Orleans.SerializerContextOutputs";
 
     /// <inheritdoc/>
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -42,13 +43,15 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 
         var serializerContextOutputs = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "Orleans.GenerateSerializerContextAttribute",
+                "Orleans.GenerateSerializerContextAttribute`1",
                 predicate: static (node, _) => node is ClassDeclarationSyntax,
                 transform: static (ctx, _) => ctx)
             .Combine(generatorOptions)
             .SelectMany(static (input, ct) => SerializerContextGenerator.Generate(input.Left, input.Right, ct))
             .Collect()
-            .Select(static (outputs, _) => outputs.Distinct().ToImmutableArray());
+            .Select(static (outputs, _) => outputs.Distinct().ToImmutableArray())
+            .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
+            .WithTrackingName(SerializerContextOutputsTrackingName);
         context.RegisterSourceOutput(serializerContextOutputs.SelectMany(static (outputs, _) => outputs), static (productionContext, output) =>
         {
             GeneratedSourceOutput.EmitSourceOutputResult(productionContext, output);

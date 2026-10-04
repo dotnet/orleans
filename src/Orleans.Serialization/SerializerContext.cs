@@ -11,7 +11,7 @@ namespace Orleans.Serialization;
 /// <remarks>
 /// Derive a class from this type and override <c>ConfigureInner</c> to register closed codec, copier,
 /// and service factories.
-/// Apply <see cref="GenerateSerializerContextAttribute"/> to a partial derived class to generate
+/// Apply <see cref="GenerateSerializerContextAttribute{T}"/> to a partial derived class to generate
 /// these registrations from its declared roots and their serialization dependencies.
 /// Register its instance using <see cref="SerializerBuilderExtensions.AddSerializerContext"/>.
 /// Multiple contexts contribute to the same serializer configuration.

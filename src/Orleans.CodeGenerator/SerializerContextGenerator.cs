@@ -35,21 +35,17 @@ internal static class SerializerContextGenerator
             return [SourceOutputResult.FromDiagnostic(Diagnostic.Create(InvalidContext, location, symbol.Name))];
         }
 
+        var compilation = context.SemanticModel.Compilation;
+        var attributeDefinition = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerContextAttribute`1");
         var roots = new List<ITypeSymbol>();
         foreach (var attribute in symbol.GetAttributes().Where(attribute =>
-            attribute.AttributeClass?.ToDisplayString() == "Orleans.GenerateSerializerContextAttribute"))
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, attributeDefinition)))
         {
-            if (attribute.ConstructorArguments.FirstOrDefault().Value is ITypeSymbol type)
-            {
-                roots.Add(type);
-            }
-            else
-            {
-                return Error(symbol, location, "<null>", "specify a closed root type");
-            }
+            var type = attribute.AttributeClass!.TypeArguments[0];
+            if (HasInvalidTypeArgument(type)) return [];
+            roots.Add(type);
         }
 
-        var compilation = context.SemanticModel.Compilation;
         var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
         if (!SerializerFactoryGenerator.TryCreate(services, roots, cancellationToken, out var graph, out var failure))
         {
@@ -72,4 +68,12 @@ internal static class SerializerContextGenerator
 
     private static ImmutableArray<SourceOutputResult> Error(INamedTypeSymbol context, Location? location, string type, string reason)
         => [SourceOutputResult.FromDiagnostic(Diagnostic.Create(UnsupportedType, location, context.Name, type, reason))];
+
+    private static bool HasInvalidTypeArgument(ITypeSymbol type)
+        => type.TypeKind is TypeKind.Error or TypeKind.TypeParameter
+            || type is IArrayTypeSymbol array && HasInvalidTypeArgument(array.ElementType)
+            || type is INamedTypeSymbol named
+                && (named.IsUnboundGenericType
+                    || named.TypeArguments.Any(HasInvalidTypeArgument)
+                    || named.ContainingType is { } containing && HasInvalidTypeArgument(containing));
 }
