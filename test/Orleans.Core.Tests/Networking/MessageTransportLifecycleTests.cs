@@ -24,6 +24,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Session;
+using TestExtensions;
 using Xunit;
 using SslApplicationProtocol = System.Net.Security.SslApplicationProtocol;
 using SslClientAuthenticationOptions = System.Net.Security.SslClientAuthenticationOptions;
@@ -31,6 +32,10 @@ using SslStream = System.Net.Security.SslStream;
 
 namespace Orleans.Core.Tests.Networking;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+[TestCategory("BVT")]
 public class MessageTransportLifecycleTests
 {
     [Fact]
@@ -247,6 +252,41 @@ public class MessageTransportLifecycleTests
         Assert.Null(message._bodyObject);
         Assert.Equal(0, readRequest.BodyLength);
         Assert.Equal(0, readRequest.Body.Length);
+    }
+
+    [Theory]
+    [InlineData((int)Message.Directions.Request, (int)Message.ResponseTypes.None)]
+    [InlineData((int)Message.Directions.Response, (int)Message.ResponseTypes.Success)]
+    public void Message_FormattingFailure_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
+    {
+        var direction = (Message.Directions)directionValue;
+        var responseType = (Message.ResponseTypes)responseTypeValue;
+        using var serviceProvider = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(serviceProvider);
+        using var bodyWriter = new ArcBufferWriter();
+        bodyWriter.Write([0xff]);
+        var readRequest = new MessageReadRequest(shared);
+        readRequest._originalResponseType = responseType;
+        readRequest.Body = bodyWriter.ConsumeSlice(1);
+        typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(readRequest, 1);
+        using var message = new Message { Direction = direction, Result = responseType };
+        message.SetMessageReadRequest(readRequest);
+
+        Assert.Contains("Unable to deserialize message body:", message.ToString());
+        Assert.Contains("Unable to deserialize message body:", message.ToString());
+        Assert.Same(readRequest, message._bodyObject);
+        Assert.Equal(responseType, message.Result);
+        Assert.Equal([0xff], readRequest.Body.ToArray());
+
+        using var serializer = new MessageSerializer(serviceProvider.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions());
+        using var output = new ArcBufferWriter();
+        var lengths = serializer.Write(output, message);
+        Assert.Equal(1, lengths.BodyLength);
+
+        if (direction == Message.Directions.Request)
+        {
+            Assert.ThrowsAny<Exception>(() => _ = message.BodyObject);
+        }
     }
 
     [Fact]
@@ -533,6 +573,35 @@ public class MessageTransportLifecycleTests
         listener.Stop();
     }
 
+    [Fact]
+    public async Task SocketMessageTransport_ReadFin_InterruptsBlockedWrite()
+    {
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(10));
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        var accept = listener.AcceptAsync(cancellation.Token).AsTask();
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { SendBufferSize = 1024 };
+        await client.ConnectAsync(listener.LocalEndPoint!, cancellation.Token);
+        using var peer = await accept;
+        peer.ReceiveBufferSize = 1024;
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance);
+        using var request = new BufferedWriteRequest(new byte[2 * 1024 * 1024]);
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
+        transport.Start();
+
+        Assert.True(transport.EnqueueWrite(request));
+        Assert.Equal(1, await peer.ReceiveAsync(new byte[1], SocketFlags.None, cancellation.Token));
+        Assert.False(request.Completion.IsCompleted);
+        Assert.True(transport.EnqueueRead(new PendingReadRequest()));
+        peer.Shutdown(SocketShutdown.Send);
+
+        await closed.Task.WaitAsync(cancellation.Token);
+        Assert.NotNull(await Record.ExceptionAsync(() => request.Completion));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -802,6 +871,13 @@ public class MessageTransportLifecycleTests
         public override void SetResult() => _completion.TrySetResult();
         public override void SetException(Exception error) => _completion.TrySetException(error);
         public void Dispose() => _buffer.Dispose();
+    }
+
+    private sealed class PendingReadRequest : ReadRequest
+    {
+        public override bool OnRead(ArcBufferReader buffer) => false;
+        public override void OnError(Exception error) { }
+        public override void OnCanceled() { }
     }
 
     private sealed class BufferedWriteRequest : WriteRequest, IDisposable

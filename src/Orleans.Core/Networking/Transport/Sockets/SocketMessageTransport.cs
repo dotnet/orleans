@@ -441,6 +441,7 @@ exit:
         finally
         {
             _shutdownReason ??= error;
+            Shutdown();
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
@@ -753,6 +754,7 @@ RefreshRequestQueue:
         finally
         {
             _shutdownReason ??= error;
+            Shutdown();
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
             _readSignal.Signal();
 

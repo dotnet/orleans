@@ -49,6 +49,7 @@ namespace Orleans.Runtime
         {
             if (_bodyObject is MessageReadRequest readRequest)
             {
+                var responseType = Result;
                 _bodyObject = null;
                 MessageSerializer? messageSerializer = null;
                 try
@@ -58,6 +59,8 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
+                    _bodyObject = readRequest;
+                    Result = responseType;
                     return $"Unable to deserialize message body: {exception.Message}";
                 }
                 finally
@@ -67,7 +70,10 @@ namespace Orleans.Runtime
                         readRequest.Shared.Return(messageSerializer);
                     }
 
-                    readRequest.Reset();
+                    if (!ReferenceEquals(_bodyObject, readRequest))
+                    {
+                        readRequest.Reset();
+                    }
                 }
             }
 

@@ -372,9 +372,9 @@ gracefulTermination:
                 {
                     request.SetResult();
                 }
-            }
 
-            processingRequests.Clear();
+                processingRequests.Clear();
+            }
         }
         catch (Exception ex)
         {

@@ -79,6 +79,29 @@ public class InMemoryTransportTests
     }
 
     [Fact]
+    public async Task CompletedPeerFailsActiveAndQueuedWrites()
+    {
+        var input = new Pipe();
+        var output = new Pipe();
+        await output.Reader.CompleteAsync();
+        await using var transport = new InMemoryMessageTransport(
+            new TestDuplexPipe(input.Reader, output.Writer),
+            NullLogger.Instance);
+        using var active = new TestWriteRequest([1]);
+        using var queued = new TestWriteRequest([2]);
+        Assert.True(transport.EnqueueWrite(active));
+        Assert.True(transport.EnqueueWrite(queued));
+        transport.Start();
+
+        await Assert.ThrowsAsync<ConnectionClosedException>(
+            () => active.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ConnectionClosedException>(
+            () => queued.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Equal(1, active.CompletionCount);
+        Assert.Equal(1, queued.CompletionCount);
+    }
+
+    [Fact]
     public async Task ListenerWithoutEndpoint_IsDisabledAndNotRegistered()
     {
         var hub = new InMemoryTransportConnectionHub();
@@ -119,6 +142,36 @@ public class InMemoryTransportTests
 
         public override void OnError(Exception error) => _completion.TrySetException(error);
         public override void OnCanceled() => _completion.TrySetCanceled();
+    }
+
+    private sealed class TestWriteRequest : WriteRequest, IDisposable
+    {
+        private readonly ArcBufferWriter _buffer = new();
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _completionCount;
+
+        public TestWriteRequest(ReadOnlySpan<byte> bytes)
+        {
+            _buffer.Write(bytes);
+            Buffers = _buffer.Reader;
+        }
+
+        public Task Completion => _completion.Task;
+        public int CompletionCount => Volatile.Read(ref _completionCount);
+
+        public override void SetResult()
+        {
+            Interlocked.Increment(ref _completionCount);
+            _completion.SetResult();
+        }
+
+        public override void SetException(Exception error)
+        {
+            Interlocked.Increment(ref _completionCount);
+            _completion.SetException(error);
+        }
+
+        public void Dispose() => _buffer.Dispose();
     }
 
 }

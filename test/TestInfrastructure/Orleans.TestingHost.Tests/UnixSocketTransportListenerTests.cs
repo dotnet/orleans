@@ -11,7 +11,7 @@ namespace Orleans.TestingHost.Tests;
 public class UnixSocketTransportListenerTests
 {
     [Fact]
-    public async Task DisposeRemovesSocketFile()
+    public async Task DisposeRemovesSocketFileAndIsIdempotent()
     {
         if (!Socket.OSSupportsUnixDomainSockets)
         {
@@ -35,6 +35,8 @@ public class UnixSocketTransportListenerTests
             await listener.DisposeAsync();
         }
 
+        await listener.DisposeAsync();
+        await listener.UnbindAsync(TestContext.Current.CancellationToken);
         Assert.False(File.Exists(path));
     }
 

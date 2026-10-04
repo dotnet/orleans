@@ -25,6 +25,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
     private readonly CancellationTokenSource _closingCts = new();
     private Socket? _listenSocket;
     private string? _boundPath;
+    private int _disposeStarted;
     private readonly IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> _listenerOptions;
 
     internal UnixDomainSocketMessageTransportListener(
@@ -146,12 +147,21 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
     {
-        DisposeCore();
+        if (Volatile.Read(ref _disposeStarted) == 0)
+        {
+            DisposeCore();
+        }
+
         return default;
     }
 
     public override async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
         DisposeCore();
         GC.SuppressFinalize(this);
         try
