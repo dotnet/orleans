@@ -23,35 +23,36 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     {
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
-        internal static void EnterServiceResolution(ICodecProvider provider) => ResolutionState.Value!.Enter(null!, provider);
+        internal static void EnterServiceResolution(ICodecProvider provider, CodecProvider.ConstructionScope scope)
+            => ResolutionState.Value!.Enter(null!, provider, scope);
         internal static void ExitServiceResolution() => ResolutionState.Value!.Exit();
-        internal static bool EnterActivation(ICodecProvider provider)
-        {
-            var state = ResolutionState.Value!;
-            var root = !state.HasActivation(provider);
-            state.Enter(null!, provider, activation: true);
-            return root;
-        }
-        internal static bool HasActivation(ICodecProvider provider) => ResolutionState.Value!.HasActivation(provider);
+        internal static CodecProvider.ConstructionScope? GetConstructionScope(ICodecProvider provider)
+            => ResolutionState.Value!.GetConstructionScope(provider);
 
         private sealed class RecursiveServiceResolutionState
         {
             private int _depth;
 
             public List<(object Caller, ICodecProvider? Provider)> Callers { get; } = new();
-            private readonly List<(ICodecProvider? Provider, int CallerStart, bool Activation)> _active = new();
+            private readonly List<(ICodecProvider? Provider, int CallerStart, CodecProvider.ConstructionScope? Scope)> _active = new();
             public ICodecProvider? Provider => _active.Count > 0 ? _active[^1].Provider : null;
 
-            public bool HasActivation(ICodecProvider provider)
-                => _active.Any(frame => frame.Activation && ReferenceEquals(frame.Provider, provider));
+            public CodecProvider.ConstructionScope? GetConstructionScope(ICodecProvider provider)
+            {
+                foreach (var frame in _active)
+                {
+                    if (frame.Scope is not null && ReferenceEquals(frame.Provider, provider)) return frame.Scope;
+                }
+                return null;
+            }
 
-            public void Enter(object caller, ICodecProvider? provider = null, bool activation = false)
+            public void Enter(object caller, ICodecProvider? provider = null, CodecProvider.ConstructionScope? scope = null)
             {
                 ++_depth;
                 var owner = provider ?? Provider;
                 var callerOwner = Provider ?? owner;
                 var callerStart = ReferenceEquals(owner, Provider) ? -1 : Callers.Count;
-                _active.Add((owner, callerStart, activation));
+                _active.Add((owner, callerStart, scope));
                 if (caller is not null)
                 {
                     Callers.Add((caller, callerOwner));

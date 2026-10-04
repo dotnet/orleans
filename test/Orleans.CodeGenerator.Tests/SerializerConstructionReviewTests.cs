@@ -17,6 +17,109 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class SerializerConstructionReviewTests
 {
     [Fact]
+    public void InitializationCallbacksResolveClosedServicesUnderTheExistingInitializationLock()
+    {
+        var constructions = 0;
+        var callbacks = 0;
+        Leaf? initializedLeaf = null;
+        var services = new ServiceCollection().AddSerializer();
+        services.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<Leaf>(_ => new Leaf(++constructions)));
+        services.AddSingleton<IGeneralizedCodec>(serviceProvider =>
+        {
+            callbacks++;
+            initializedLeaf = OrleansGeneratedCodeHelper.GetService<Leaf>(
+                null!, serviceProvider.GetRequiredService<CodecProvider>());
+            return new InitializationCodec();
+        });
+        using var serviceProvider = services.BuildServiceProvider();
+        var codecs = serviceProvider.GetRequiredService<CodecProvider>();
+        var leaf = OrleansGeneratedCodeHelper.GetService<Leaf>(null!, codecs);
+        Assert.Same(initializedLeaf, leaf);
+        Assert.Equal(1, constructions);
+        Assert.Equal(1, callbacks);
+        Assert.Same(leaf, OrleansGeneratedCodeHelper.GetService<Leaf>(null!, codecs));
+    }
+
+    [Fact]
+    public void PendingImplementationCachesRollBackTogetherAndPublishCanonicalServicesOnRetry()
+    {
+        var attempts = 0;
+        IActivator<ReferenceModel<string>>? failedActivator = null;
+        IValueSerializer<ValueModel<string>>? failedSerializer = null;
+        IBaseCopier<ReferenceModel<string>>? failedCopier = null;
+        InvalidOperationException? caught = null;
+        var services = new ServiceCollection().AddSerializer();
+        services.AddSingleton<ExternalDependency>();
+        services.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddActivator(typeof(ConstrainedActivator<>));
+            options.AddSerializer(typeof(ConstrainedValueSerializer<>));
+            options.AddCopier(typeof(ConstrainedBaseCopier<>));
+            options.AddSerializerService<ConstrainedActivator<string>>(_ => new ConstrainedActivator<string>());
+            options.AddSerializerService<ConstrainedValueSerializer<string>>(_ => new ConstrainedValueSerializer<string>());
+            options.AddSerializerService<ConstrainedBaseCopier<string>>(_ => new ConstrainedBaseCopier<string>());
+            options.AddSerializerService<ImplementationServices>(provider =>
+            {
+                var result = new ImplementationServices(provider.GetActivator<ReferenceModel<string>>(),
+                    provider.GetValueSerializer<ValueModel<string>>(), provider.GetBaseCopier<ReferenceModel<string>>());
+                if (++attempts == 1)
+                {
+                    failedActivator = result.Activator;
+                    failedSerializer = result.Serializer;
+                    failedCopier = result.Copier;
+                    try
+                    {
+                        _ = provider.Services.GetRequiredService<ExternalDependency>();
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        caught = exception;
+                    }
+                }
+                return result;
+            });
+        });
+        using var serviceProvider = services.BuildServiceProvider();
+        var codecs = serviceProvider.GetRequiredService<CodecProvider>();
+        var failure = Assert.Throws<InvalidOperationException>(
+            () => OrleansGeneratedCodeHelper.GetService<ImplementationServices>(null!, codecs));
+        Assert.Same(caught, failure);
+        var result = OrleansGeneratedCodeHelper.GetService<ImplementationServices>(null!, codecs);
+        Assert.Equal(2, attempts);
+        Assert.NotSame(failedActivator, result.Activator);
+        Assert.NotSame(failedSerializer, result.Serializer);
+        Assert.NotSame(failedCopier, result.Copier);
+        Assert.Same(result.Activator, codecs.GetActivator<ReferenceModel<string>>());
+        Assert.Same(result.Serializer, codecs.GetValueSerializer<ValueModel<string>>());
+        Assert.Same(result.Copier, codecs.GetBaseCopier<ReferenceModel<string>>());
+        Assert.Same(result.Activator, OrleansGeneratedCodeHelper.GetService<ConstrainedActivator<string>>(null!, codecs));
+        Assert.Same(result.Serializer, OrleansGeneratedCodeHelper.GetService<ConstrainedValueSerializer<string>>(null!, codecs));
+        Assert.Same(result.Copier, OrleansGeneratedCodeHelper.GetService<ConstrainedBaseCopier<string>>(null!, codecs));
+        Assert.Same(result, OrleansGeneratedCodeHelper.GetService<ImplementationServices>(null!, codecs));
+        Assert.NotNull(codecs.Services.GetRequiredService<ExternalDependency>());
+    }
+
+    private sealed class ImplementationServices(IActivator<ReferenceModel<string>> activator,
+        IValueSerializer<ValueModel<string>> serializer, IBaseCopier<ReferenceModel<string>> copier)
+    {
+        public IActivator<ReferenceModel<string>> Activator { get; } = activator;
+        public IValueSerializer<ValueModel<string>> Serializer { get; } = serializer;
+        public IBaseCopier<ReferenceModel<string>> Copier { get; } = copier;
+    }
+
+    private sealed class InitializationCodec : IGeneralizedCodec
+    {
+        public bool IsSupportedType(Type type) => false;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] object value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> => throw new NotSupportedException();
+        public object ReadValue<TInput>(ref Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+            => throw new NotSupportedException();
+    }
+
+    [Fact]
     public void OrdinaryMetadataRootRetainsExternalConstructorDependencies()
     {
         var calls = 0;
