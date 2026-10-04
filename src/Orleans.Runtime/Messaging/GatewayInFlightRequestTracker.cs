@@ -113,6 +113,13 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
+        internal bool CanRetry(Message request) =>
+            _requests?.TryGetValue(request.Id, out var trackedRequest) is true
+            && request.GatewayRequestAttempt == trackedRequest.Attempt
+            && request.ForwardCount == trackedRequest.ForwardCount
+            && trackedRequest.TargetSilo.Equals(request.TargetSilo)
+            && timeProvider.GetElapsedTime(trackedRequest.StartTimestamp) < trackedRequest.RetentionPeriod;
+
         internal bool TryRemoveExpiredAttempt(Message request)
         {
             if (request.GatewayRequestAttempt <= 0

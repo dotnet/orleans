@@ -300,11 +300,12 @@ namespace Orleans.Runtime.Messaging
             ClientState client,
             Message message,
             Connection? destination,
-            Exception? exception)
+            Exception? exception,
+            bool isRetry = false)
         {
             if (destination is not null)
             {
-                client.SendRequest(message, destination);
+                client.SendRequest(message, destination, isRetry);
                 return;
             }
 
@@ -485,6 +486,7 @@ namespace Orleans.Runtime.Messaging
             private readonly Task _messageLoop;
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly GatewayInFlightRequestTracker _pendingRequests;
+            private readonly Action<Message, Connection?, Exception?> _retrySendMessage;
             private readonly object _requestLock = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
@@ -504,6 +506,8 @@ namespace Orleans.Runtime.Messaging
 
                 _gateway = gateway;
                 Id = id;
+                _retrySendMessage = (message, destination, exception) =>
+                    _gateway.SendMessage(this, message, destination, exception, isRetry: true);
                 _pendingRequests = new(
                     gateway.timeProvider,
                     gateway.messagingOptions.ResponseTimeout,
@@ -665,8 +669,10 @@ namespace Orleans.Runtime.Messaging
 
             public void SendRequest(
                 Message message,
-                Connection destination)
+                Connection destination,
+                bool isRetry = false)
             {
+                message.GatewayRequestRetry = _retrySendMessage;
                 Message? requestToReject = null;
                 var requestTrackingStopped = false;
                 var sendUntracked = false;
@@ -679,7 +685,7 @@ namespace Orleans.Runtime.Messaging
                             releaseTrackedRequest: true);
                         requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
                     }
-                    else if (!_pendingRequests.Track(message))
+                    else if (!(isRetry ? _pendingRequests.CanRetry(message) : _pendingRequests.Track(message)))
                     {
                         sendUntracked = _pendingRequests.TryPrepareForUntrackedDelivery(
                             message,
@@ -718,6 +724,15 @@ namespace Orleans.Runtime.Messaging
                 if (sendUntracked)
                 {
                     destination.Send(message);
+                }
+                else if (isRetry && requestToReject is null)
+                {
+                    LogDebugGatewayRequestRetrySuppressed(
+                        _gateway.logger,
+                        message.Id,
+                        message.GatewayRequestAttempt,
+                        message.TargetSilo,
+                        message.ForwardCount);
                 }
 
                 if (requestToReject is not null)
@@ -999,6 +1014,13 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Suppressing transport retry for request {MessageId}, attempt {Attempt}, destination {TargetSilo}, forwarding generation {ForwardCount}: the attempt no longer owns the destination."
+        )]
+        private static partial void LogDebugGatewayRequestRetrySuppressed(
+            ILogger logger, CorrelationId messageId, long attempt, SiloAddress? targetSilo, int forwardCount);
+
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Error performing gateway maintenance"

@@ -419,6 +419,43 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void TransportRetryPreservesOriginalRetentionDeadline()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(30));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        var attempt = request.GatewayRequestAttempt;
+
+        timeProvider.Advance(TimeSpan.FromSeconds(29));
+        Assert.True(tracker.CanRetry(request));
+        Assert.Equal(attempt, request.GatewayRequestAttempt);
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        Assert.False(tracker.CanRetry(request));
+        Assert.True(tracker.TryRemoveExpiredAttempt(request));
+        Assert.False(tracker.HasEntries);
+    }
+
+    [Fact]
+    public void TransportRetryRequiresCurrentForwardingDestination()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        Assert.Equal(
+            GatewayInFlightRequestTracker.ForwardingUpdateResult.Applied,
+            tracker.TryUpdateDestination(
+                request.Id, Silo1, Silo2, 1, request.GatewayRequestAttempt, out _, out _));
+
+        Assert.False(tracker.CanRetry(request));
+        request.ForwardCount = 1;
+        Assert.False(tracker.CanRetry(request));
+        request.TargetSilo = Silo2;
+        Assert.True(tracker.CanRetry(request));
+        Assert.Equal(1, tracker.Count);
+    }
+
+    [Fact]
     public void RemovedAttemptCannotRecreateTrackingOnDelayedForward()
     {
         var tracker = CreateTracker();
