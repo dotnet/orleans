@@ -22,7 +22,8 @@ internal static class Metadata
     private static void Main()
     {
         var registrations = new ServiceCollection().AddSerializer()
-            .AddSingleton<MetadataKnownArrayConverter<string>>();
+            .AddSingleton<MetadataKnownArrayConverter<string>>()
+            .AddSingleton<MetadataStructConstrainedCopier<MetadataConstraintValue>>();
         var integerCodec = new Int32Codec();
         var stringCodec = new StringCodec();
         AddClosedSerializer(registrations, integerCodec);
@@ -45,6 +46,7 @@ internal static class Metadata
         ValidateArrayMetadataAvailability(services);
         ValidateInterleavedRegistrationOrder();
         ValidateEquivalentDescriptorsAndLegacyShapes();
+        ValidateGenericConstraints(services);
     }
 
     internal static class PrivateContractContainer
@@ -378,6 +380,77 @@ internal static class Metadata
         Console.WriteLine("EquivalentDescriptorsAndLegacyShapes passed.");
     }
 
+    private static void ValidateGenericConstraints(IServiceProvider serializerServices)
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(MetadataConstraintFallbackCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(typeof(MetadataStructConstrainedCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        using var services = new ServiceCollection()
+            .AddSingleton<MetadataConstraintFallbackCopier<string>>()
+            .AddSingleton<MetadataConstraintFallbackCopier<int?>>()
+            .AddSingleton<MetadataConstraintFallbackCopier<MetadataPrivateConstructorTarget>>()
+            .AddSingleton<MetadataStructConstrainedCopier<int>>()
+            .AddSingleton<MetadataConstructorConstrainedCopier<MetadataPublicConstructorTarget>>()
+            .AddSingleton<MetadataDependentCopier<MetadataConstraintBase, MetadataConstraintDerived>>()
+            .AddSingleton<MetadataPairFallbackCopier<MetadataConstraintBase, MetadataConstraintDerived>>()
+            .AddSingleton<MetadataStructPatternConverter<MetadataKnownArraySurrogate<string, int>>>()
+            .BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetDeepCopier<string>().GetType() != typeof(MetadataConstraintFallbackCopier<string>)
+            || provider.GetDeepCopier<int?>().GetType() != typeof(MetadataConstraintFallbackCopier<int?>)
+            || provider.GetDeepCopier<int>().GetType() != typeof(MetadataStructConstrainedCopier<int>))
+        {
+            throw new InvalidOperationException("Generic struct constraints did not select the latest applicable copier.");
+        }
+        options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(MetadataConstraintFallbackCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(typeof(MetadataConstructorConstrainedCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetDeepCopier<MetadataPrivateConstructorTarget>().GetType() != typeof(MetadataConstraintFallbackCopier<MetadataPrivateConstructorTarget>)
+            || provider.GetDeepCopier<MetadataPublicConstructorTarget>().GetType() != typeof(MetadataConstructorConstrainedCopier<MetadataPublicConstructorTarget>))
+        {
+            throw new InvalidOperationException("Generic constructor constraints did not preserve the applicable candidate.");
+        }
+        options = new TypeManifestOptions();
+        options.AddCopier(typeof(MetadataPairFallbackCopier<,>), typeof(BindingPair<,>));
+        options.AddSerializationContract(typeof(MetadataDependentCopier<,>), typeof(IDeepCopier<>),
+            SerializationType.Create(typeof(BindingPair<,>), SerializationType.Parameter(1), SerializationType.Parameter(0)));
+        provider = new CodecProvider(services, Options.Create(options));
+        if (provider.GetDeepCopier<BindingPair<MetadataConstraintDerived, MetadataConstraintBase>>().GetType()
+                != typeof(MetadataDependentCopier<MetadataConstraintBase, MetadataConstraintDerived>)
+            || provider.GetDeepCopier<BindingPair<MetadataConstraintBase, MetadataConstraintDerived>>().GetType()
+                != typeof(MetadataPairFallbackCopier<MetadataConstraintBase, MetadataConstraintDerived>))
+        {
+            throw new InvalidOperationException("Dependent generic constraints did not use the bound implementation parameter order.");
+        }
+        options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(MetadataStructPatternConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(MetadataMixedTarget<>), SerializationType.Parameter(0)),
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))));
+        options.AddSerializationContract(typeof(MetadataStructPatternConverter<>), typeof(IConverter<,>),
+            SerializationType.Create(typeof(MetadataMixedTarget<>),
+                SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int)))),
+            SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>),
+                SerializationType.Create(typeof(MetadataKnownArraySurrogate<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
+                SerializationType.Create(typeof(int))));
+        provider = new CodecProvider(services, Options.Create(options));
+        var select = typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<SurrogateSelection>(provider);
+        if (!select(typeof(MetadataMixedTarget<MetadataKnownArraySurrogate<string, int>>), typeof(MetadataMixedTarget<>), out var codec, out var arguments)
+            || codec != typeof(SurrogateCodec<MetadataMixedTarget<MetadataKnownArraySurrogate<string, int>>,
+                MetadataKnownArraySurrogate<MetadataKnownArraySurrogate<string, int>, int>, MetadataStructPatternConverter<MetadataKnownArraySurrogate<string, int>>>)
+            || arguments is not [MetadataStructPatternConverter<MetadataKnownArraySurrogate<string, int>>])
+        {
+            throw new InvalidOperationException("The converter surrogate did not belong to the constraint-validated winning registration.");
+        }
+        if (serializerServices.GetRequiredService<CodecProvider>().GetDeepCopier<MetadataConstraintValue>().GetType()
+            != typeof(MetadataStructConstrainedCopier<MetadataConstraintValue>))
+        {
+            throw new InvalidOperationException("The generated constrained copier registration did not resolve through ordinary AddSerializer.");
+        }
+        Console.WriteLine("GenericConstraintSelection passed.");
+    }
+
     private static void AddClosedSerializer<T>(IServiceCollection services, IFieldCodec<T> codec)
     {
         services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
@@ -571,4 +644,28 @@ internal sealed class MetadataLegacyShapeConverter<T> :
     BindingPair<T, string> IConverter<BindingPair<T, string>, MetadataKnownArraySurrogate<T, int>>.ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int> surrogate) => new();
     public MetadataKnownArraySurrogate<T, int> ConvertToSurrogate(in BindingPair<T, int> value) => default;
     public MetadataKnownArraySurrogate<T, int> ConvertToSurrogate(in BindingPair<T, string> value) => default;
+}
+internal sealed class MetadataConstraintFallbackCopier<T> : ShallowCopier<T>;
+
+[RegisterCopier]
+internal sealed class MetadataStructConstrainedCopier<T> : ShallowCopier<T> where T : struct;
+internal sealed class MetadataConstructorConstrainedCopier<T> : ShallowCopier<T> where T : new();
+internal sealed class MetadataPublicConstructorTarget;
+internal sealed class MetadataPrivateConstructorTarget
+{
+    private MetadataPrivateConstructorTarget() { }
+}
+internal class MetadataConstraintBase;
+internal sealed class MetadataConstraintDerived : MetadataConstraintBase;
+internal readonly record struct MetadataConstraintValue(int Value);
+internal sealed class MetadataPairFallbackCopier<TFirst, TSecond> : ShallowCopier<BindingPair<TFirst, TSecond>>;
+internal sealed class MetadataDependentCopier<TBase, TDerived> : ShallowCopier<BindingPair<TDerived, TBase>> where TDerived : TBase;
+internal sealed class MetadataStructPatternConverter<T> :
+    IConverter<MetadataMixedTarget<T>, MetadataKnownArraySurrogate<T, int>>,
+    IConverter<MetadataMixedTarget<MetadataKnownArraySurrogate<T, int>>, MetadataKnownArraySurrogate<MetadataKnownArraySurrogate<T, int>, int>> where T : struct
+{
+    public MetadataMixedTarget<T> ConvertFromSurrogate(in MetadataKnownArraySurrogate<T, int> surrogate) => new();
+    public MetadataMixedTarget<MetadataKnownArraySurrogate<T, int>> ConvertFromSurrogate(in MetadataKnownArraySurrogate<MetadataKnownArraySurrogate<T, int>, int> surrogate) => new();
+    public MetadataKnownArraySurrogate<T, int> ConvertToSurrogate(in MetadataMixedTarget<T> value) => default;
+    public MetadataKnownArraySurrogate<MetadataKnownArraySurrogate<T, int>, int> ConvertToSurrogate(in MetadataMixedTarget<MetadataKnownArraySurrogate<T, int>> value) => default;
 }

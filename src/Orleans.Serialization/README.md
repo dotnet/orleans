@@ -111,6 +111,11 @@ collection membership controls which registrations participate in lookup.
 Raw legacy collection entries retain their collection ordering.
 Legacy discovery retains complete target shapes and binds their fixed, reordered,
 and array arguments through the same matcher as explicit registrations.
+Candidate selection validates the bound implementation's generic arguments using
+the runtime's generic closure rules. A constraint mismatch advances to the next
+matching registration; the latest applicable registration supplies both the
+implementation and its converter surrogate. Missing native code or metadata remains
+an explicit resolution failure requiring a statically available closed registration.
 The selected registration supplies the arguments for implementation closure:
 plain open-target entries use positional arguments, and described entries use
 their matched parameter bindings, including when both belong to one implementation.
