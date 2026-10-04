@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
 using System.Reflection;
@@ -15,10 +16,13 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
+using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.TestingHost.InMemoryTransport;
 using TestExtensions;
 using Xunit;
@@ -32,6 +36,72 @@ namespace Orleans.Core.Tests.Networking;
 public class ConnectionManagerTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
+
+    [Theory]
+    [InlineData((int)Message.Directions.Request)]
+    [InlineData((int)Message.Directions.Response)]
+    [InlineData((int)Message.Directions.OneWay)]
+    public async Task SiloConnection_Shutdown_InvalidatesRequestsAndReleasesBufferedBodies(int direction)
+    {
+        await using var rig = new TestRig();
+        var responses = new List<Message>();
+        var sender = rig.CreateConnection();
+        sender.SendObserver = responses.Add;
+        rig.Manager.OnConnected(rig.Address, sender);
+        var (connection, _) = rig.CreateSiloConnection(blockApplicationMessages: true);
+        using var body = new ArcBufferWriter();
+        body.Write([1, 2, 3]);
+        var readRequest = rig.CreateReadRequest();
+        readRequest.Body = body.ConsumeSlice(body.Length);
+        using var message = new Message
+        {
+            Direction = (Message.Directions)direction,
+            Id = new CorrelationId(1),
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = GrainId.Create("test", "target"),
+            SendingSilo = rig.Address,
+            TargetSilo = connection.LocalSiloAddress
+        };
+        message.SetMessageReadRequest(readRequest);
+
+        try
+        {
+            connection.OnReceivedMessage(message);
+
+            Assert.Null(message._bodyObject);
+            Assert.Equal(0, readRequest.Body.Length);
+            if (message.Direction is Message.Directions.Request)
+            {
+                var response = Assert.Single(responses);
+                Assert.Equal(Message.Directions.Response, response.Direction);
+                Assert.Equal(Message.ResponseTypes.Rejection, response.Result);
+                Assert.Equal(message.Id, response.Id);
+                Assert.Equal(message.SendingGrain, response.TargetGrain);
+                Assert.Equal(rig.Address, response.TargetSilo);
+                var rejection = Assert.IsType<RejectionResponse>(response.BodyObject);
+                Assert.Equal(Message.RejectionTypes.Transient, rejection.RejectionType);
+                Assert.Contains("Silo stopping", rejection.RejectionInfo);
+                var invalidation = Assert.Single(response.CacheInvalidationHeader!);
+                Assert.Equal(message.TargetGrain, invalidation.GrainId);
+                Assert.Equal(connection.LocalSiloAddress, invalidation.InvalidSiloAddress);
+                Assert.Null(invalidation.ValidGrainAddress);
+                rig.GrainDirectory.Received(1).InvalidateCacheEntry(
+                    Arg.Is<GrainAddress>(address => address.GrainId == message.TargetGrain
+                        && address.SiloAddress == connection.LocalSiloAddress));
+            }
+            else
+            {
+                Assert.Empty(responses);
+            }
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
 
     [Fact]
     public async Task Close_WaitsForAdmittedUnpublishedEstablishment()
@@ -312,6 +382,7 @@ public class ConnectionManagerTests
     {
         private readonly ServiceProvider _services;
         private readonly ConcurrentBag<(Connection Connection, TestMessageTransport Context)> _connections = [];
+        private readonly List<MessageCenter> _messageCenters = [];
         private readonly ConnectionCommon _shared;
         private readonly ConnectionOptions _options;
         private readonly WrappedTransportMiddleware? _transportMiddleware;
@@ -373,6 +444,7 @@ public class ConnectionManagerTests
 
         public SiloAddress Address { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 1);
         public ConnectionManager Manager { get; }
+        public ILocalGrainDirectory GrainDirectory { get; } = Substitute.For<ILocalGrainDirectory>();
         public TestConnectionFactory Factory { get; }
         public CancellationTokenSource ShutdownSource { get; }
         public ConnectionPreambleHelper PreambleHelper => _services.GetRequiredService<ConnectionPreambleHelper>();
@@ -390,13 +462,49 @@ public class ConnectionManagerTests
             return connection;
         }
 
-        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection()
+        public MessageReadRequest CreateReadRequest() => _shared.MessageHandlerShared.GetReceiveMessageHandler();
+
+        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(bool blockApplicationMessages = false)
         {
             var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
             local.SiloAddress.Returns(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12344), 1));
             local.ClusterId.Returns("test-cluster");
-            var connection = new SiloConnection(Address, context, null!, local, Manager, _options, _shared, null!, PreambleHelper);
+            MessageCenter? messageCenter = null;
+            if (blockApplicationMessages)
+            {
+                var directoryResolver = new GrainDirectoryResolver(
+                    _services,
+                    new GrainPropertiesResolver(Substitute.For<IClusterManifestProvider>()),
+                    []);
+                var locatorResolver = new GrainLocatorResolver(
+                    _services,
+                    directoryResolver,
+                    null!,
+                    new DhtGrainLocator(GrainDirectory, null!));
+                messageCenter = new MessageCenter(
+                    local,
+                    _shared.MessageFactory,
+                    null!,
+                    null!,
+                    NullLogger<MessageCenter>.Instance,
+                    Substitute.For<ISiloStatusOracle>(),
+                    Manager,
+                    new RuntimeMessagingTrace(
+                        NullLoggerFactory.Instance,
+                        _services.GetRequiredService<MessagingInstruments>(),
+                        _services.GetRequiredService<MessagingProcessingInstruments>()),
+                    _services.GetRequiredService<MessagingInstruments>(),
+                    _services.GetRequiredService<MessagingProcessingInstruments>(),
+                    Options.Create(new SiloMessagingOptions()),
+                    null!,
+                    new GrainLocator(locatorResolver, null!),
+                    new NoOpMessageStatisticsSink());
+                messageCenter.BlockApplicationMessages();
+                _messageCenters.Add(messageCenter);
+            }
+
+            var connection = new SiloConnection(Address, context, messageCenter!, local, Manager, _options, _shared, null!, PreambleHelper);
             _connections.Add((connection, context));
             return (connection, context);
         }
@@ -417,6 +525,11 @@ public class ConnectionManagerTests
 
             Factory.FailPendingAttempts();
             await Manager.Close(CancellationToken.None).WaitAsync(TestTimeout);
+            foreach (var messageCenter in _messageCenters)
+            {
+                await messageCenter.DisposeAsync();
+            }
+
             await _services.DisposeAsync();
         }
     }
@@ -494,6 +607,7 @@ public class ConnectionManagerTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource CleanupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Action<Message>? SendObserver { get; set; }
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TestTimeout;
         protected override IMessageCenter MessageCenter => null!;
@@ -525,6 +639,18 @@ public class ConnectionManagerTests
         }
 
         protected override bool PrepareMessageForSend(Message message) => true;
+        public override void Send(Message message)
+        {
+            if (SendObserver is { } observer)
+            {
+                observer(message);
+            }
+            else
+            {
+                base.Send(message);
+            }
+        }
+
         protected override void RetryMessage(Message message, Exception? exception = null) { }
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int numTotalBytes, int headerBytes) { }

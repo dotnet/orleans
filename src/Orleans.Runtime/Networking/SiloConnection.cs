@@ -90,11 +90,10 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            // If we've stopped application message processing, then filter those out now
+            // Reject application requests with targeted cache invalidation during shutdown.
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage)
             {
-                // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
@@ -102,10 +101,12 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                MessagingMetrics.OnRejectedMessage(msg);
-                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
-                this.Send(rejection);
-                msg.Dispose();
+                messageCenter.ProcessRequestToInvalidActivation(
+                    msg,
+                    new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo },
+                    forwardingAddress: null,
+                    failedOperation: "Silo stopping",
+                    rejectMessages: true);
                 return;
             }
 
