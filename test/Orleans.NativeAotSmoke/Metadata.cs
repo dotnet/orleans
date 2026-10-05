@@ -203,8 +203,8 @@ internal static class Metadata
 
     private static void ValidateArrayMetadataAvailability(IServiceProvider serializerServices)
     {
-        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!
-            .CreateDelegate<Func<SerializationType, Type[], Type>>();
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .CreateDelegate<Func<SerializationType, Type[], Type>>(serializerServices.GetRequiredService<CodecProvider>());
         var rooted = new MetadataRootedArrayValue[1].GetType();
         if (resolve(SerializationType.Create(typeof(MetadataRootedArrayValue[])), []).TypeHandle.Value != rooted.TypeHandle.Value)
         {
