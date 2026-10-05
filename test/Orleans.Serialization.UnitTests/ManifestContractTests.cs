@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -570,6 +571,90 @@ public class ManifestContractTests
     }
 
     [Theory]
+    [InlineData("Legacy")]
+    [InlineData("Closed")]
+    [InlineData("Pattern")]
+    public void ArrayConvertersParticipateInPublicSerializationAndCopying(string registration)
+    {
+        var converter = new ArrayConverter<int>();
+        using var services = new ServiceCollection()
+            .AddSingleton(converter)
+            .AddSerializer(builder => builder.Configure(options =>
+            {
+                switch (registration)
+                {
+                    case "Legacy":
+                        options.AddConverter(typeof(ArrayConverter<>));
+                        break;
+                    case "Closed":
+                        options.AddConverter(typeof(ArrayConverter<int>), typeof(int[]), typeof(ArraySurrogate<int>));
+                        break;
+                    case "Pattern":
+                        options.AddSerializationContract(typeof(ArrayConverter<>), typeof(IConverter<,>),
+                            SerializationType.Array(SerializationType.Parameter(0)),
+                            SerializationType.Create(typeof(ArraySurrogate<>), SerializationType.Parameter(0)));
+                        break;
+                }
+            }))
+            .BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Assert.IsType<SurrogateCodec<int[], ArraySurrogate<int>, ArrayConverter<int>>>(provider.GetCodec<int[]>());
+        Assert.IsType<SurrogateCodec<int[], ArraySurrogate<int>, ArrayConverter<int>>>(provider.GetDeepCopier<int[]>());
+        var serializer = services.GetRequiredService<Serializer<int[]>>();
+        var input = new[] { 7, 11, 19 };
+
+        Assert.Equal(input, serializer.Deserialize(serializer.SerializeToArray(input)));
+        var copy = services.GetRequiredService<DeepCopier<int[]>>().Copy(input);
+        Assert.Equal(input, copy);
+        Assert.NotSame(input, copy);
+        Assert.Equal(2, converter.ToSurrogateCalls);
+        Assert.Equal(2, converter.FromSurrogateCalls);
+        Assert.Null(serializer.Deserialize(serializer.SerializeToArray(null!)));
+        Assert.Null(services.GetRequiredService<DeepCopier<int[]>>().Copy(null!));
+        Assert.Equal(2, converter.ToSurrogateCalls);
+        Assert.Equal(2, converter.FromSurrogateCalls);
+    }
+
+    [Theory]
+    [InlineData("ClosedBuiltin")]
+    [InlineData("ClosedCustom")]
+    [InlineData("PatternCustom")]
+    public void DirectArrayCodecsAndCopiersRetainPriorityOverConverters(string registration)
+    {
+        var converter = new ArrayConverter<int>();
+        using var services = new ServiceCollection()
+            .AddSingleton(converter)
+            .AddSerializer(builder => builder.Configure(options =>
+            {
+                options.AddConverter(typeof(ArrayConverter<int>), typeof(int[]), typeof(ArraySurrogate<int>));
+                if (registration == "PatternCustom")
+                {
+                    var target = SerializationType.Array(SerializationType.Parameter(0));
+                    options.AddSerializationContract(typeof(PatternArrayCodec<>), typeof(IFieldCodec<>), target);
+                    options.AddSerializationContract(typeof(PatternArrayCopier<>), typeof(IDeepCopier<>), target);
+                }
+                else
+                {
+                    options.AddSerializer(registration == "ClosedBuiltin" ? typeof(ArrayCodec<int>) : typeof(PatternArrayCodec<int>), typeof(int[]));
+                    options.AddCopier(registration == "ClosedBuiltin" ? typeof(ArrayCopier<int>) : typeof(PatternArrayCopier<int>), typeof(int[]));
+                }
+            }))
+            .BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Assert.IsType(registration == "ClosedBuiltin" ? typeof(ArrayCodec<int>) : typeof(PatternArrayCodec<int>), provider.GetCodec<int[]>());
+        Assert.IsType(registration == "ClosedBuiltin" ? typeof(ArrayCopier<int>) : typeof(PatternArrayCopier<int>), provider.GetDeepCopier<int[]>());
+        var serializer = services.GetRequiredService<Serializer<int[]>>();
+        var input = new[] { 37, 41 };
+
+        Assert.Equal(input, serializer.Deserialize(serializer.SerializeToArray(input)));
+        var copy = services.GetRequiredService<DeepCopier<int[]>>().Copy(input);
+        Assert.Equal(input, copy);
+        Assert.NotSame(input, copy);
+        Assert.Equal(0, converter.ToSurrogateCalls);
+        Assert.Equal(0, converter.FromSurrogateCalls);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void UnnamedPatternsUseReverseRegistrationOrder(bool arrayLast)
@@ -774,6 +859,99 @@ public class ManifestContractTests
 
         Assert.IsType(legacyLast ? typeof(LegacyOrderedConverter<string, int>) : typeof(InterleavedConverter<int>),
             ResolveInterleaved(provider, "Converter", false, legacyLast ? typeof(GenericSurrogate<string>) : typeof(GenericSurrogate<int>)));
+    }
+
+    [Theory]
+    [InlineData("Codec", false, false)]
+    [InlineData("Codec", false, true)]
+    [InlineData("Codec", true, false)]
+    [InlineData("Codec", true, true)]
+    [InlineData("Copier", false, false)]
+    [InlineData("Copier", false, true)]
+    [InlineData("Copier", true, false)]
+    [InlineData("Copier", true, true)]
+    [InlineData("Converter", false, false)]
+    [InlineData("Converter", false, true)]
+    [InlineData("Converter", true, false)]
+    [InlineData("Converter", true, true)]
+    public void NonMatchingExplicitContractsPreserveTheirImplementationsLegacyPriority(string role, bool arrayTarget, bool legacyLast)
+    {
+        var options = new TypeManifestOptions();
+        var first = role == "Converter" ? typeof(InterleavedConverter<>) : typeof(InterleavedCodecCopier<>);
+        var second = role == "Converter" ? typeof(AlternativeInterleavedConverter<,>) : typeof(AlternativeInterleavedCodecCopier<,>);
+        var contract = role == "Codec" ? typeof(IFieldCodec<>) : role == "Copier" ? typeof(IDeepCopier<>) : typeof(IConverter<,>);
+        var types = role == "Codec" ? options.Serializers : role == "Copier" ? options.Copiers : options.Converters;
+        if (!legacyLast)
+        {
+            types.Add(first);
+        }
+        var matching = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1));
+        options.AddSerializationContract(second, contract, arrayTarget ? SerializationType.Array(matching) : matching,
+            role == "Converter" ? SerializationType.Create(typeof(GenericSurrogate<>),
+                SerializationType.Create(typeof(ValueTuple<,>), SerializationType.Parameter(0), SerializationType.Parameter(1))) : null);
+        if (legacyLast)
+        {
+            types.Add(first);
+        }
+        var other = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Create(typeof(string)), SerializationType.Parameter(0));
+        options.AddSerializationContract(first, contract, arrayTarget ? SerializationType.Array(other) : other,
+            role == "Converter" ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var target = arrayTarget ? typeof(GenericTarget<Guid, int>[]) : typeof(GenericTarget<Guid, int>);
+        var expected = role == "Converter"
+            ? legacyLast ? typeof(InterleavedConverter<Guid>) : typeof(AlternativeInterleavedConverter<Guid, int>)
+            : legacyLast ? typeof(InterleavedCodecCopier<Guid>) : typeof(AlternativeInterleavedCodecCopier<Guid, int>);
+
+        Assert.Equal(expected, SelectImplementation(provider, contract, target));
+        if (role == "Converter")
+        {
+            object?[] arguments = [target, arrayTarget ? target : typeof(GenericTarget<,>), null, null];
+            Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+            Assert.Equal(legacyLast ? typeof(GenericSurrogate<Guid>) : typeof(GenericSurrogate<(Guid, int)>),
+                Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+            Assert.IsType(expected, Assert.Single(Assert.IsType<object[]>(arguments[3])));
+        }
+        else if (role == "Codec")
+        {
+            Assert.IsType(expected, provider.GetCodec(target));
+        }
+        else
+        {
+            Assert.IsType(expected, provider.GetDeepCopier(target));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MiddleLegacyEntriesRetainTheirPositionAmongInterleavedExplicitContracts(bool converter)
+    {
+        var options = new TypeManifestOptions();
+        var types = converter ? options.Converters : options.Copiers;
+        var contract = converter ? typeof(IConverter<,>) : typeof(IDeepCopier<>);
+        var first = converter ? typeof(InterleavedConverter<>) : typeof(InterleavedCodecCopier<>);
+        var second = converter ? typeof(AlternativeInterleavedConverter<,>) : typeof(AlternativeInterleavedCodecCopier<,>);
+        options.AddSerializationContract(first, contract,
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int))),
+            converter ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null);
+        types.Add(converter ? typeof(LegacyOrderedConverter<,>) : typeof(LegacyOrderedCopier<,>));
+        options.AddSerializationContract(second, contract,
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1)),
+            converter ? SerializationType.Create(typeof(GenericSurrogate<>),
+                SerializationType.Create(typeof(ValueTuple<,>), SerializationType.Parameter(0), SerializationType.Parameter(1))) : null);
+        options.AddSerializationContract(first, contract,
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Create(typeof(string)), SerializationType.Parameter(0)),
+            converter ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType(converter ? typeof(InterleavedConverter<int>) : typeof(InterleavedCodecCopier<int>),
+            ResolveInterleaved(provider, converter ? "Converter" : "Copier", false, typeof(GenericSurrogate<int>)));
+        types.Remove(first);
+        provider = new CodecProvider(services, Options.Create(options));
+        Assert.IsType(converter ? typeof(AlternativeInterleavedConverter<string, int>) : typeof(AlternativeInterleavedCodecCopier<string, int>),
+            ResolveInterleaved(provider, converter ? "Converter" : "Copier", false, typeof(GenericSurrogate<(string, int)>)));
     }
 
     [Fact]
@@ -1236,6 +1414,27 @@ public class ManifestContractTests
     {
         public T[] ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => [];
         public GenericSurrogate<T> ConvertToSurrogate(in T[] value) => default;
+    }
+    [GenerateSerializer]
+    public struct ArraySurrogate<T>
+    {
+        [Id(0)]
+        public List<T> Values { get; set; }
+    }
+    public sealed class ArrayConverter<T> : IConverter<T[], ArraySurrogate<T>>
+    {
+        public int ToSurrogateCalls { get; private set; }
+        public int FromSurrogateCalls { get; private set; }
+        public T[] ConvertFromSurrogate(in ArraySurrogate<T> surrogate)
+        {
+            FromSurrogateCalls++;
+            return surrogate.Values.ToArray();
+        }
+        public ArraySurrogate<T> ConvertToSurrogate(in T[] value)
+        {
+            ToSurrogateCalls++;
+            return new() { Values = [.. value] };
+        }
     }
     public sealed class InterleavedCodecCopier<T> :
         IFieldCodec<GenericTarget<T, int>>, IFieldCodec<GenericTarget<string, T>>,

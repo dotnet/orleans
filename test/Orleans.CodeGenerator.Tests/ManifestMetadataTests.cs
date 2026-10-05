@@ -198,6 +198,105 @@ public class ManifestMetadataTests
         Assert.DoesNotContain("config.AddSerializer(typeof(global::Codec<>))", metadata);
     }
 
+    [Theory]
+    [InlineData("dynamic", "object")]
+    [InlineData("List<dynamic>", "global::System.Collections.Generic.List<object>")]
+    [InlineData("Dictionary<string, List<dynamic[]>>", "global::System.Collections.Generic.Dictionary<string, global::System.Collections.Generic.List<object[]>>")]
+    [InlineData("(dynamic, List<dynamic>)", "(object, global::System.Collections.Generic.List<object>)")]
+    [InlineData("global::DynamicTargets.Escaped.@dynamic", "global::DynamicTargets.Escaped.dynamic")]
+    public async Task DynamicContractTargetsEmitObjectTypeSyntax(string target, string expected)
+    {
+        var source = $$"""
+            using System;
+            using System.Buffers;
+            using System.Collections.Generic;
+            using Orleans;
+            using Orleans.Serialization.Buffers;
+            using Orleans.Serialization.Codecs;
+            using Orleans.Serialization.WireProtocol;
+            namespace DynamicTargets;
+            public class Escaped
+            {
+                public class @dynamic { }
+            }
+            public abstract class CodecBase<T> : IFieldCodec<T>
+            {
+                public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, Type expected, T value)
+                    where TBufferWriter : IBufferWriter<byte> { }
+                public T ReadValue<TInput>(ref Reader<TInput> reader, Field field) => default;
+            }
+            [RegisterSerializer]
+            public class Codec : CodecBase<{{target}}> { }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var symbol = compilation.GetTypeByMetadataName("DynamicTargets.Codec");
+        Assert.NotNull(symbol);
+        var contract = Assert.Single(ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Serializer, compilation).Contracts);
+        Assert.Equal(expected, contract.Target.Type.SyntaxString);
+        var result = RunGenerator(compilation, out var updated);
+
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Contains($"config.AddSerializer(typeof(global::DynamicTargets.Codec), typeof({expected}))", GetMetadata(result).ToString());
+    }
+
+    [Fact]
+    public async Task DynamicContractsEmitObjectRuntimeTypeNames()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using Orleans;
+            using Orleans.Serialization.Cloning;
+            public class Container
+            {
+                internal class Hidden<T> { }
+                [RegisterCopier]
+                internal class Copier : ShallowCopier<Hidden<List<dynamic[]>>> { }
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var symbol = compilation.GetTypeByMetadataName("Container+Copier");
+        Assert.NotNull(symbol);
+        var contract = Assert.Single(ModelExtractor.ExtractRegisteredCodec(symbol, RegisteredCodecKind.Copier, compilation).Contracts);
+        var result = RunGenerator(compilation, out var updated);
+
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Equal("Container+Hidden`1[[System.Collections.Generic.List`1[[System.Object[], System.Private.CoreLib]], System.Private.CoreLib]], TestProject",
+            contract.Target.RuntimeTypeName);
+        Assert.Contains("typeof(global::Container.Hidden<global::System.Collections.Generic.List<object[]>>)", GetMetadata(result).ToString());
+    }
+
+    [Fact]
+    public async Task DescribedDynamicTargetsAndSurrogatesEmitObjectNodes()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using Orleans;
+            public class Target<T, TItem> { }
+            public struct Surrogate<T, TItem> { }
+            public abstract class ConverterBase<TValue, TSurrogate> : IConverter<TValue, TSurrogate> where TSurrogate : struct
+            {
+                public abstract TValue ConvertFromSurrogate(in TSurrogate value);
+                public abstract TSurrogate ConvertToSurrogate(in TValue value);
+            }
+            [RegisterConverter]
+            public class Converter<T> : ConverterBase<Target<T, List<dynamic[]>>, Surrogate<T, List<dynamic>>>
+            {
+                public override Target<T, List<dynamic[]>> ConvertFromSurrogate(in Surrogate<T, List<dynamic>> value) => new();
+                public override Surrogate<T, List<dynamic>> ConvertToSurrogate(in Target<T, List<dynamic[]>> value) => default;
+            }
+            """;
+        var compilation = await TestCompilationHelper.CreateCompilation(source);
+        var result = RunGenerator(compilation, out var updated);
+
+        Assert.Empty(updated.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var metadata = GetMetadata(result).ToString();
+        Assert.Contains("SerializationType.Create(typeof(global::System.Collections.Generic.List<object[]>))", metadata);
+        Assert.Contains("SerializationType.Create(typeof(global::System.Collections.Generic.List<object>))", metadata);
+    }
+
     [Fact]
     public async Task ConcreteArrayNodesEmitSourceKnownTypesInsideGenericContracts()
     {

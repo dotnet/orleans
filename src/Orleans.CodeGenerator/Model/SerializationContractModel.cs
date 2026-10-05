@@ -90,6 +90,11 @@ internal static class SerializationContractModelExtractor
 
     private static ContractTargetModel CreateTarget(ITypeSymbol target, Compilation compilation)
     {
+        if (target is IDynamicTypeSymbol)
+        {
+            target = compilation.GetSpecialType(SpecialType.System_Object);
+        }
+
         if (target is ITypeParameterSymbol || target is IArrayTypeSymbol && ContainsTypeParameter(target))
         {
             return new(TypeRef.Empty, string.Empty, false);
@@ -106,14 +111,15 @@ internal static class SerializationContractModelExtractor
         }
 
         var open = target is INamedTypeSymbol generic && generic.GetAllTypeArguments().Any(ContainsTypeParameter);
-        var syntax = target.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var syntax = string.Concat(target.ToDisplayParts(SymbolDisplayFormat.FullyQualifiedFormat)
+            .Select(static part => part.Kind == SymbolDisplayPartKind.Keyword && part.ToString() == "dynamic" ? "object" : part.ToString()));
         if (open)
         {
             syntax = target is INamedTypeSymbol { IsTupleType: true } tupleDefinition
                 ? "global::System.ValueTuple<" + new string(',', tupleDefinition.Arity - 1) + ">"
                 : target.ToOpenTypeSyntax().ToString();
         }
-        return new ContractTargetModel(new TypeRef(syntax), FormatTypeName(target),
+        return new ContractTargetModel(new TypeRef(syntax), FormatTypeName(target, compilation),
             compilation.IsSymbolAccessibleWithin(target, compilation.Assembly));
     }
 
@@ -125,11 +131,16 @@ internal static class SerializationContractModelExtractor
         _ => false
     };
 
-    private static string FormatTypeName(ITypeSymbol type)
+    private static string FormatTypeName(ITypeSymbol type, Compilation compilation)
     {
+        if (type is IDynamicTypeSymbol)
+        {
+            type = compilation.GetSpecialType(SpecialType.System_Object);
+        }
+
         if (type is IArrayTypeSymbol array)
         {
-            var element = FormatTypeName(array.ElementType);
+            var element = FormatTypeName(array.ElementType, compilation);
             var separator = element.LastIndexOf(", ", StringComparison.Ordinal);
             var suffix = array.Rank == 1 ? "[]" : "[" + new string(',', array.Rank - 1) + "]";
             return element.Insert(separator, suffix);
@@ -143,7 +154,7 @@ internal static class SerializationContractModelExtractor
         var identity = TypeMetadataIdentity.Create(named);
         var arguments = named.GetAllTypeArguments().ToArray();
         var genericArguments = arguments.Length > 0 && !arguments.Any(ContainsTypeParameter)
-            ? "[" + string.Join(",", arguments.Select(static argument => "[" + FormatTypeName(argument) + "]")) + "]"
+            ? "[" + string.Join(",", arguments.Select(argument => "[" + FormatTypeName(argument, compilation) + "]")) + "]"
             : string.Empty;
         return identity.MetadataName + genericArguments + ", " + identity.AssemblyName;
     }

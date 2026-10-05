@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,14 @@ internal static class Metadata
     {
         var registrations = new ServiceCollection().AddSerializer()
             .AddSingleton<MetadataKnownArrayConverter<string>>()
-            .AddSingleton<MetadataStructConstrainedCopier<MetadataConstraintValue>>();
+            .AddSingleton<MetadataStructConstrainedCopier<MetadataConstraintValue>>()
+            .AddSingleton<MetadataArrayConverter>()
+            .AddSingleton<SurrogateCodec<int[], MetadataArraySurrogate, MetadataArrayConverter>>(static services =>
+            {
+                var provider = services.GetRequiredService<CodecProvider>();
+                return new(provider.GetValueSerializer<MetadataArraySurrogate>(), provider.GetDeepCopier<MetadataArraySurrogate>(),
+                    services.GetRequiredService<MetadataArrayConverter>());
+            });
         var integerCodec = new Int32Codec();
         var stringCodec = new StringCodec();
         AddClosedSerializer(registrations, integerCodec);
@@ -47,6 +55,7 @@ internal static class Metadata
         ValidateInterleavedRegistrationOrder();
         ValidateEquivalentDescriptorsAndLegacyShapes();
         ValidateGenericConstraints(services);
+        ValidateArrayConverterPublicPaths(services);
     }
 
     internal static class PrivateContractContainer
@@ -459,6 +468,32 @@ internal static class Metadata
         services.AddSingleton<Serializer<T>>(serviceProvider => new(codec, serviceProvider.GetRequiredService<SerializerSessionPool>()));
     }
 
+    private static void ValidateArrayConverterPublicPaths(IServiceProvider services)
+    {
+        var provider = services.GetRequiredService<CodecProvider>();
+        var codec = provider.GetCodec<int[]>();
+        var copier = provider.GetDeepCopier<int[]>();
+        if (codec.GetType() != typeof(SurrogateCodec<int[], MetadataArraySurrogate, MetadataArrayConverter>)
+            || copier.GetType() != typeof(SurrogateCodec<int[], MetadataArraySurrogate, MetadataArrayConverter>))
+        {
+            throw new InvalidOperationException("The registered array converter did not precede the intrinsic array implementations.");
+        }
+
+        var serializer = new Serializer<int[]>(codec, services.GetRequiredService<SerializerSessionPool>());
+        var input = new[] { 13, 29, 47 };
+        var result = serializer.Deserialize(serializer.SerializeToArray(input));
+        using var context = services.GetRequiredService<CopyContextPool>().GetContext();
+        var copy = copier.DeepCopy(input, context);
+        var converter = services.GetRequiredService<MetadataArrayConverter>();
+        if (!input.SequenceEqual(result) || !input.SequenceEqual(copy) || ReferenceEquals(input, copy)
+            || converter.ToSurrogateCalls != 2 || converter.FromSurrogateCalls != 2)
+        {
+            throw new InvalidOperationException("Public array serialization and copying did not use the registered converter.");
+        }
+
+        Console.WriteLine("ArrayConverterPublicPaths passed.");
+    }
+
     private static void MetadataInitialization(IServiceProvider services)
     {
         _ = services.GetRequiredService<TypeConverter>();
@@ -563,6 +598,33 @@ internal sealed class MetadataArrayCodec<T>(IFieldCodec<T> elementCodec) : IFiel
 }
 
 internal sealed class MetadataArrayCopier<T> : ShallowCopier<T[]>;
+[GenerateSerializer]
+internal struct MetadataArraySurrogate
+{
+    [Id(0)]
+    public string Values { get; set; }
+}
+
+[RegisterConverter]
+internal sealed class MetadataArrayConverter : IConverter<int[], MetadataArraySurrogate>
+{
+    public int ToSurrogateCalls { get; private set; }
+    public int FromSurrogateCalls { get; private set; }
+
+    public int[] ConvertFromSurrogate(in MetadataArraySurrogate surrogate)
+    {
+        FromSurrogateCalls++;
+        return surrogate.Values.Length == 0 ? []
+            : surrogate.Values.Split(',').Select(static value => int.Parse(value, CultureInfo.InvariantCulture)).ToArray();
+    }
+
+    public MetadataArraySurrogate ConvertToSurrogate(in int[] value)
+    {
+        ToSurrogateCalls++;
+        return new() { Values = string.Join(",", value.Select(static item => item.ToString(CultureInfo.InvariantCulture))) };
+    }
+}
+
 internal sealed class MetadataParameterCopier<T> : ShallowCopier<T>;
 internal sealed class MetadataMixedTarget<T>;
 internal sealed class MetadataMixedActivator<T> : IActivator<MetadataMixedTarget<T>>, IActivator<MetadataMixedTarget<MetadataMixedTarget<T>>>

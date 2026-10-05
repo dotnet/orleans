@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,6 +92,7 @@ namespace Orleans.Serialization.Serializers
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
+            var candidates = new List<(Type? Target, Type Implementation, SerializationContract Contract, int LegacyOrder)>();
             AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IBaseCodec<>));
             AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IValueSerializer<>));
             AddFromMetadata(metadata.SerializerTypes, metadata.SerializerContracts, typeof(IFieldCodec<>));
@@ -100,16 +102,24 @@ namespace Orleans.Serialization.Serializers
             AddFromMetadata(metadata.ConverterTypes, metadata.ConverterContracts, typeof(IConverter<,>));
             AddFromMetadata(metadata.CopierTypes, metadata.CopierContracts, typeof(IBaseCopier<>));
 
-            foreach (var candidates in _implementationCandidates.Values)
+            foreach (var candidate in candidates
+                .OrderBy(static candidate => candidate.Contract.RegistrationOrder ?? candidate.LegacyOrder)
+                .ThenBy(static candidate => candidate.Contract.RegistrationOrder.HasValue))
             {
-                OrderExplicitCandidates(candidates);
+                var key = (candidate.Contract.ContractType, candidate.Target);
+                if (!_implementationCandidates.TryGetValue(key, out var registrations))
+                {
+                    _implementationCandidates[key] = registrations = new();
+                }
+
+                registrations.Add((candidate.Implementation, candidate.Contract));
             }
 
 #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage(
                 "Trimming",
-                "IL2075",
-                Justification = "Legacy implementation-only registrations preserve implemented interfaces through annotated TypeManifestOptions methods. Explicit contract registrations are consumed directly. The HashSet<Type> boundary cannot retain the legacy annotations.")]
+                "IL2065",
+                Justification = "Legacy implementation-only registrations preserve implemented interfaces through annotated TypeManifestOptions methods. Explicit contract registrations are consumed directly. The manifest collections and materialized Type arrays cannot retain the legacy annotations.")]
 #endif
             void AddFromMetadata(
                 HashSet<Type> metadataCollection,
@@ -118,8 +128,31 @@ namespace Orleans.Serialization.Serializers
             {
                 Debug.Assert(genericType.GetGenericArguments().Length >= 1);
 
-                foreach (var type in metadataCollection)
+                var types = metadataCollection.ToArray();
+                var legacyOrders = new int[types.Length];
+                var nextOrder = int.MaxValue;
+                // Anchor legacy entries before subsequent collection members' explicit registrations.
+                for (var i = types.Length - 1; i >= 0; i--)
                 {
+                    legacyOrders[i] = nextOrder;
+                    if (contracts.TryGetValue(types[i], out var registrations))
+                    {
+                        foreach (var registration in registrations)
+                        {
+                            nextOrder = Math.Min(nextOrder, registration.RegistrationOrder!.Value);
+                        }
+                    }
+                }
+
+                for (var i = 0; i < types.Length; i++)
+                {
+                    var type = types[i];
+                    // Open built-in array implementations are intrinsic fallbacks, after registered converters.
+                    if (type == typeof(ArrayCodec<>) || type == typeof(ArrayCopier<>))
+                    {
+                        continue;
+                    }
+
                     if (contracts.TryGetValue(type, out var registrations))
                     {
                         foreach (var registration in registrations)
@@ -138,7 +171,7 @@ namespace Orleans.Serialization.Serializers
                                 : registration.TargetType!;
                             if (target != typeof(object))
                             {
-                                AddCandidate(target, type, registration);
+                                candidates.Add((target, type, registration, legacyOrders[i]));
                             }
                         }
 
@@ -183,46 +216,8 @@ namespace Orleans.Serialization.Serializers
                         var target = legacyDescription is { } shape
                             ? shape.Type
                             : genericArgument;
-                        AddCandidate(target, type, new SerializationContract(genericType, target, null, TargetDescription: legacyDescription));
-                    }
-                }
-            }
-
-            void AddCandidate(Type? target, Type implementation, SerializationContract contract)
-            {
-                var key = (contract.ContractType, target);
-                if (!_implementationCandidates.TryGetValue(key, out var candidates))
-                {
-                    _implementationCandidates[key] = candidates = new();
-                }
-
-                candidates.Add((implementation, contract));
-            }
-
-            static void OrderExplicitCandidates(List<(Type Implementation, SerializationContract Contract)> candidates)
-            {
-                if (candidates.Count < 2)
-                {
-                    return;
-                }
-
-                var explicitCandidates = new List<(Type Implementation, SerializationContract Contract)>();
-                foreach (var candidate in candidates)
-                {
-                    if (candidate.Contract.RegistrationOrder is not null)
-                    {
-                        explicitCandidates.Add(candidate);
-                    }
-                }
-                explicitCandidates.Sort(static (left, right) => Nullable.Compare(left.Contract.RegistrationOrder, right.Contract.RegistrationOrder));
-
-                // Retain raw legacy collection positions while ordering explicit contracts globally.
-                var next = 0;
-                for (var i = 0; i < candidates.Count; i++)
-                {
-                    if (candidates[i].Contract.RegistrationOrder is not null)
-                    {
-                        candidates[i] = explicitCandidates[next++];
+                        candidates.Add((target, type,
+                            new SerializationContract(genericType, target, null, TargetDescription: legacyDescription), legacyOrders[i]));
                     }
                 }
             }
@@ -609,20 +604,19 @@ namespace Orleans.Serialization.Serializers
                 codecType = typeof(ValueSerializer<,>).MakeGenericType(fieldType, valueSerializerType);
                 constructorArguments = new[] { GetServiceOrCreateInstance(valueSerializerType) };
             }
-            else if (fieldType.IsArray)
-            {
-                // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
-                var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
-                codecType = arrayCodecType.MakeGenericType(fieldType.GetElementType()!);
-            }
             else if (fieldType.IsEnum)
             {
                 return CreateCodecInstance(fieldType, fieldType.GetEnumUnderlyingType());
             }
             else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
             {
-                // Use the converter
                 codecType = surrogateCodecType;
+            }
+            else if (fieldType.IsArray)
+            {
+                // Depending on the type of the array, select the base array codec or the multi-dimensional codec.
+                var arrayCodecType = fieldType.IsSZArray ? typeof(ArrayCodec<>) : typeof(MultiDimensionalArrayCodec<>);
+                codecType = arrayCodecType.MakeGenericType(fieldType.GetElementType()!);
             }
             else if (searchType.BaseType is object
                 && CreateCodecInstance(
@@ -900,15 +894,15 @@ namespace Orleans.Serialization.Serializers
             {
                 return ShallowCopier.Instance;
             }
+            else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
+            {
+                copierType = surrogateCodecType;
+            }
             else if (fieldType.IsArray)
             {
                 // Depending on the type of the array, select the base array copier or the multi-dimensional copier.
                 var arrayCopierType = fieldType.IsSZArray ? typeof(ArrayCopier<>) : typeof(MultiDimensionalArrayCopier<>);
                 copierType = arrayCopierType.MakeGenericType(fieldType.GetElementType()!);
-            }
-            else if (TryGetSurrogateCodec(fieldType, searchType, out var surrogateCodecType, out constructorArguments))
-            {
-                copierType = surrogateCodecType;
             }
             else if (searchType.BaseType is { } baseType
                 && CreateCopierInstance(

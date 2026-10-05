@@ -522,6 +522,8 @@ namespace Orleans.Serialization.Configuration
         /// <remarks>
         /// Target descriptions support structural array matching. Executable surrogate descriptions
         /// require source-known closed array types supplied through <see cref="SerializationType.Create"/>.
+        /// Registered converters handle matching array targets before the intrinsic array codec and
+        /// copier fallbacks. Directly registered codecs and copiers retain priority over converters.
         /// </remarks>
         public void AddSerializationContract(
 #if NET5_0_OR_GREATER
