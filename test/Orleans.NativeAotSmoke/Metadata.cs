@@ -245,9 +245,11 @@ internal static class Metadata
             }
         }
 
-        var closeImplementation = typeof(CodecProvider).GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .CreateDelegate<Func<Type, Type, Type, Type?>>(serializerServices.GetRequiredService<CodecProvider>());
-        if (closeImplementation(typeof(ImmutableArrayCodec<>), typeof(ImmutableArray<int>), typeof(IFieldCodec<>)) != typeof(ImmutableArrayCodec<int>))
+        var selectImplementation = typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType()])!
+            .CreateDelegate<ImplementationSelection>(serializerServices.GetRequiredService<CodecProvider>());
+        if (!selectImplementation(typeof(IFieldCodec<>), typeof(ImmutableArray<int>), typeof(ImmutableArray<>), out var implementation)
+            || implementation != typeof(ImmutableArrayCodec<int>))
         {
             throw new InvalidOperationException("The source-known immutable-array implementation did not retain ordinary generic closure.");
         }
@@ -275,6 +277,7 @@ internal static class Metadata
     }
 
     private delegate bool SurrogateSelection(Type target, Type searchType, out Type? codec, out object[]? arguments);
+    private delegate bool ImplementationSelection(Type contract, Type target, Type searchType, out Type? implementation);
     private sealed class RejectUnregisteredTypes : ITypeFilter
     {
         public bool? IsTypeAllowed(Type type) => false;

@@ -36,12 +36,9 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _interfaceProxies = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
         private readonly Dictionary<Type, InterfaceDiscoveryKinds> _interfaceDiscoveryRequests = new();
-        private readonly Dictionary<(Type Implementation, SerializationContract Contract), int> _contractRegistrationOrders = new();
+        private int _nextContractRegistrationOrder;
         // Mutable collection access requests legacy discovery, including types added through retained collection references.
-        private bool _serializerCollectionAccessed;
-        private bool _copierCollectionAccessed;
-        private bool _activatorCollectionAccessed;
-        private bool _converterCollectionAccessed;
+        private InterfaceDiscoveryKinds _accessedCollections;
         internal Dictionary<Type, List<SerializationContract>> SerializerContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> CopierContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ActivatorContracts { get; } = new();
@@ -68,7 +65,7 @@ namespace Orleans.Serialization.Configuration
 #endif
             get
             {
-                _activatorCollectionAccessed = true;
+                _accessedCollections |= InterfaceDiscoveryKinds.Activator;
                 return _activators;
             }
         }
@@ -85,7 +82,7 @@ namespace Orleans.Serialization.Configuration
 #endif
             get
             {
-                _serializerCollectionAccessed = true;
+                _accessedCollections |= InterfaceDiscoveryKinds.Serializer;
                 return _fieldCodecs;
             }
         }
@@ -102,7 +99,7 @@ namespace Orleans.Serialization.Configuration
 #endif
             get
             {
-                _serializerCollectionAccessed = true;
+                _accessedCollections |= InterfaceDiscoveryKinds.Serializer;
                 return _serializers;
             }
         }
@@ -119,7 +116,7 @@ namespace Orleans.Serialization.Configuration
 #endif
             get
             {
-                _copierCollectionAccessed = true;
+                _accessedCollections |= InterfaceDiscoveryKinds.Copier;
                 return _copiers;
             }
         }
@@ -136,7 +133,7 @@ namespace Orleans.Serialization.Configuration
 #endif
             get
             {
-                _converterCollectionAccessed = true;
+                _accessedCollections |= InterfaceDiscoveryKinds.Converter;
                 return _converters;
             }
         }
@@ -276,20 +273,18 @@ namespace Orleans.Serialization.Configuration
 
         internal HashSet<Type> InterfaceImplementationTypes => _interfaceImplementations;
 
-        internal int GetContractRegistrationOrder(Type implementation, SerializationContract contract)
-            => _contractRegistrationOrders[(implementation, contract)];
-
         internal bool DiscoverInterfaces(Type type, Type contractType)
         {
-            var (kind, collectionAccessed) = contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
-                ? (InterfaceDiscoveryKinds.Serializer, _serializerCollectionAccessed)
+            var kind = contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
+                ? InterfaceDiscoveryKinds.Serializer
                 : contractType == typeof(IDeepCopier<>) || contractType == typeof(IBaseCopier<>)
-                    ? (InterfaceDiscoveryKinds.Copier, _copierCollectionAccessed)
+                    ? InterfaceDiscoveryKinds.Copier
                     : contractType == typeof(IActivator<>)
-                        ? (InterfaceDiscoveryKinds.Activator, _activatorCollectionAccessed)
-                        : (InterfaceDiscoveryKinds.Converter, _converterCollectionAccessed);
+                        ? InterfaceDiscoveryKinds.Activator
+                        : InterfaceDiscoveryKinds.Converter;
 
-            return collectionAccessed || _interfaceDiscoveryRequests.TryGetValue(type, out var requests) && (requests & kind) != 0;
+            _interfaceDiscoveryRequests.TryGetValue(type, out var requests);
+            return ((_accessedCollections | requests) & kind) != 0;
         }
 
         /// <summary>
@@ -589,8 +584,7 @@ namespace Orleans.Serialization.Configuration
             var registration = new SerializationContract(contractType, targetType, surrogateType, surrogateDescription, targetDescription);
             if (!registrations.Exists(existing => existing.IsEquivalentTo(registration)))
             {
-                registrations.Add(registration);
-                _contractRegistrationOrders.Add((type, registration), _contractRegistrationOrders.Count);
+                registrations.Add(registration with { RegistrationOrder = _nextContractRegistrationOrder++ });
             }
         }
 

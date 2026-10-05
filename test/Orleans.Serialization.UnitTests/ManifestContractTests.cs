@@ -38,14 +38,14 @@ public class ManifestContractTests
         var provider = new CodecProvider(services, Options.Create(options));
         var converter = CreateConverter(options);
 
-        AssertMapping(provider, "_fieldCodecs", typeof(FirstTarget), implementation);
-        AssertMapping(provider, "_fieldCodecs", typeof(SecondTarget), implementation);
-        AssertMapping(provider, "_baseCodecs", typeof(FirstTarget), implementation);
-        AssertMapping(provider, "_valueSerializers", typeof(ValueTarget), implementation);
-        AssertMapping(provider, "_copiers", typeof(FirstTarget), implementation);
-        AssertMapping(provider, "_baseCopiers", typeof(FirstTarget), implementation);
-        AssertMapping(provider, "_activators", typeof(FirstTarget), implementation);
-        AssertMapping(provider, "_converters", typeof(FirstTarget), implementation);
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IFieldCodec<>), typeof(FirstTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IFieldCodec<>), typeof(SecondTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IBaseCodec<>), typeof(FirstTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IValueSerializer<>), typeof(ValueTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IDeepCopier<>), typeof(FirstTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IBaseCopier<>), typeof(FirstTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IActivator<>), typeof(FirstTarget)));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IConverter<,>), typeof(FirstTarget)));
         Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
         Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
         Assert.Equal(typeof(Surrogate), converter.Parse(converter.Format(typeof(Surrogate))));
@@ -76,12 +76,12 @@ public class ManifestContractTests
         options.AddCopier(typeof(ShallowCopier<int>));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_fieldCodecs", typeof(int), typeof(ReplacementCodec));
-        AssertMapping(provider, "_copiers", typeof(int), typeof(ShallowCopier<int>));
+        Assert.Equal(typeof(ReplacementCodec), SelectImplementation(provider, typeof(IFieldCodec<>), typeof(int)));
+        Assert.IsType<ShallowCopier<int>>(provider.GetDeepCopier<int>());
 
         options.SerializerTypes.Remove(typeof(ReplacementCodec));
         provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_fieldCodecs", typeof(int), typeof(Int32Codec));
+        Assert.IsType<Int32Codec>(provider.GetCodec<int>());
     }
 
     [Theory]
@@ -102,8 +102,8 @@ public class ManifestContractTests
         options.AddBaseCodec(typeof(MixedImplementation), typeof(SecondTarget));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_fieldCodecs", typeof(FirstTarget), typeof(MixedImplementation));
-        AssertMapping(provider, "_baseCodecs", typeof(SecondTarget), typeof(MixedImplementation));
+        Assert.IsType<MixedImplementation>(provider.GetCodec<FirstTarget>());
+        Assert.IsType<MixedImplementation>(provider.GetBaseCodec<SecondTarget>());
         var converter = CreateConverter(options);
         Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
         Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
@@ -117,8 +117,8 @@ public class ManifestContractTests
         options.AddSerializer(typeof(MixedImplementation), typeof(SecondTarget));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_fieldCodecs", typeof(FirstTarget), typeof(MixedImplementation));
-        AssertMapping(provider, "_fieldCodecs", typeof(SecondTarget), typeof(MixedImplementation));
+        Assert.Equal(typeof(MixedImplementation), SelectImplementation(provider, typeof(IFieldCodec<>), typeof(FirstTarget)));
+        Assert.Equal(typeof(MixedImplementation), SelectImplementation(provider, typeof(IFieldCodec<>), typeof(SecondTarget)));
         var converter = CreateConverter(options);
         Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
         Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
@@ -166,7 +166,7 @@ public class ManifestContractTests
     }
 
     [Fact]
-    public void ExplicitOpenGenericEntriesMapDefinitionsAndAuthorizeTargets()
+    public void ExplicitOpenGenericEntriesSelectClosedImplementationsAndAuthorizeTargets()
     {
         var options = new TypeManifestOptions();
         options.AddSerializer(typeof(ValueTupleCodec<,>), typeof(ValueTuple<,>));
@@ -174,8 +174,8 @@ public class ManifestContractTests
         options.AddActivator(typeof(DefaultValueTypeActivator<>), typeof(ValueTarget));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_fieldCodecs", typeof(ValueTuple<,>), typeof(ValueTupleCodec<,>));
-        AssertMapping(provider, "_copiers", typeof(ValueTuple<,>), typeof(ValueTupleCopier<,>));
+        Assert.Equal(typeof(ValueTupleCodec<int, string>), SelectImplementation(provider, typeof(IFieldCodec<>), typeof(ValueTuple<int, string>)));
+        Assert.Equal(typeof(ValueTupleCopier<int, string>), SelectImplementation(provider, typeof(IDeepCopier<>), typeof(ValueTuple<int, string>)));
         var converter = CreateConverter(options);
         Assert.Equal(typeof(ValueTuple<,>), converter.Parse(converter.Format(typeof(ValueTuple<,>))));
     }
@@ -235,8 +235,7 @@ public class ManifestContractTests
         var provider = new CodecProvider(services, Options.Create(options));
 
         Assert.IsType<PatternCodec<string>>(provider.GetBaseCodec<PatternOuter<string>.Nested<FixedArgument<int>>>());
-        Assert.Null(provider.GetType().GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider,
-            [typeof(PatternCodec<>), typeof(PatternOuter<string>.Nested<FixedArgument<Guid>>), typeof(IBaseCodec<>)]));
+        Assert.Throws<KeyNotFoundException>(() => provider.GetBaseCodec<PatternOuter<string>.Nested<FixedArgument<Guid>>>());
     }
 
     [Fact]
@@ -306,7 +305,7 @@ public class ManifestContractTests
         options.AddBaseCopier(implementation, typeof(FirstTarget));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        AssertMapping(provider, "_baseCopiers", typeof(FirstTarget), implementation);
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IBaseCopier<>), typeof(FirstTarget)));
         var converter = CreateConverter(options);
         Assert.Equal(typeof(FirstTarget), converter.Parse(converter.Format(typeof(FirstTarget))));
         Assert.Equal(0, implementation.InterfaceInspections);
@@ -704,8 +703,7 @@ public class ManifestContractTests
         Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, string>[]>());
         Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetBaseCodec<GenericTarget<Guid, FixedArgument<int>>>());
         Assert.IsType<LegacyMultiShapeCodec<Guid>>(provider.GetValueSerializer<GenericSurrogate<Guid>>());
-        Assert.Null(provider.GetType().GetMethod("CloseImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider,
-            [typeof(LegacyMultiShapeCodec<>), typeof(GenericTarget<Guid, decimal>), typeof(IBaseCodec<>)]));
+        Assert.Throws<KeyNotFoundException>(() => provider.GetBaseCodec<GenericTarget<Guid, decimal>>());
         options.AddSerializationContract(typeof(ReplacementStringShapeCodec<>), typeof(IBaseCodec<>),
             SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(string))));
         provider = new CodecProvider(services, Options.Create(options));
@@ -1014,22 +1012,45 @@ public class ManifestContractTests
     }
 
     [Fact]
-    public void CanonicalSelectorRetainsImplementationDefinitionIdentity()
+    public void CanonicalSelectorReturnsTheConstraintValidatedClosedImplementation()
     {
         var options = new TypeManifestOptions();
         options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
         options.AddSerializationContract(typeof(StructConstrainedCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
         using var services = new ServiceCollection().BuildServiceProvider();
         var provider = new CodecProvider(services, Options.Create(options));
-        var select = typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic,
-            [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType()])!;
-        object?[] arguments = [typeof(IDeepCopier<>), typeof(string), typeof(string), null];
+        Assert.Equal(typeof(ParameterCopier<string>), SelectImplementation(provider, typeof(IDeepCopier<>), typeof(string)));
+        Assert.Equal(typeof(StructConstrainedCopier<int>), SelectImplementation(provider, typeof(IDeepCopier<>), typeof(int)));
+    }
 
-        Assert.Equal(true, select.Invoke(provider, arguments));
-        Assert.Same(typeof(ParameterCopier<>), arguments[3]);
-        arguments = [typeof(IDeepCopier<>), typeof(int), typeof(int), null];
-        Assert.Equal(true, select.Invoke(provider, arguments));
-        Assert.Same(typeof(StructConstrainedCopier<>), arguments[3]);
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WinningImplementationIsClosedOnceDuringResolution(bool converter)
+    {
+        var implementation = new CountingGenericImplementation(converter ? typeof(ParameterConverter<>) : typeof(ParameterCopier<>));
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(implementation, converter ? typeof(IConverter<,>) : typeof(IDeepCopier<>),
+            SerializationType.Parameter(0),
+            converter ? SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0)) : null);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        if (converter)
+        {
+            object?[] arguments = [typeof(FirstTarget), typeof(FirstTarget), null, null];
+            Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+            Assert.Equal(typeof(SurrogateCodec<FirstTarget, GenericSurrogate<FirstTarget>, ParameterConverter<FirstTarget>>), arguments[2]);
+            Assert.IsType<ParameterConverter<FirstTarget>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+        }
+        else
+        {
+            var copier = Assert.IsType<ParameterCopier<FirstTarget>>(provider.GetDeepCopier<FirstTarget>());
+            var input = new FirstTarget();
+            Assert.Same(input, copier.DeepCopy(input, null!));
+        }
+
+        Assert.Equal(1, implementation.ClosureAttempts);
     }
 
     [Fact]
@@ -1048,10 +1069,13 @@ public class ManifestContractTests
         => new(Array.Empty<ITypeConverter>(), Array.Empty<ITypeNameFilter>(), Array.Empty<ITypeFilter>(),
             Options.Create(options), new CachedTypeResolver());
 
-    private static void AssertMapping(CodecProvider provider, string fieldName, Type target, Type expected)
+    private static Type SelectImplementation(CodecProvider provider, Type contract, Type target)
     {
-        var mappings = (Dictionary<Type, Type>)typeof(CodecProvider).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(provider)!;
-        Assert.Equal(expected, mappings[target]);
+        var searchType = target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target;
+        object?[] arguments = [contract, target, searchType, null];
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic,
+            [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType()])!.Invoke(provider, arguments));
+        return Assert.IsAssignableFrom<Type>(arguments[3]);
     }
 
     private sealed class UninspectableImplementation(Type type) : TypeDelegator(type)
@@ -1073,6 +1097,18 @@ public class ManifestContractTests
         {
             ClosureAttempts++;
             throw failure;
+        }
+    }
+
+    private sealed class CountingGenericImplementation(Type type) : TypeDelegator(type)
+    {
+        public int ClosureAttempts { get; private set; }
+        public override bool IsGenericTypeDefinition => true;
+        public override Type[] GetGenericArguments() => typeImpl!.GetGenericArguments();
+        public override Type MakeGenericType(params Type[] arguments)
+        {
+            ClosureAttempts++;
+            return typeImpl!.MakeGenericType(arguments);
         }
     }
 
