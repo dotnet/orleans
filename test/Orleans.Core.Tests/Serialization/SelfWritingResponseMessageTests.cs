@@ -1,10 +1,8 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Networking.Shared;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
@@ -136,22 +134,10 @@ public sealed class SelfWritingResponseMessageTests
         var holder = new Int32Response(42);
         var message = CreateMessage(holder);
         message.Result = responseType;
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-
-        try
-        {
-            // Act
-            Assert.Throws<CodecNotFoundException>(() => environment.Serializer.Write(pipe.Writer, message));
-
-            // Assert
-            Assert.Equal(0, holder.WriteCount);
-            Assert.Equal(responseType, message.Result);
-        }
-        finally
-        {
-            pipe.Writer.Complete();
-            pipe.Reader.Complete();
-        }
+        using var buffer = new ArcBufferWriter();
+        Assert.Throws<CodecNotFoundException>(() => environment.Serializer.Write(buffer, message));
+        Assert.Equal(0, holder.WriteCount);
+        Assert.Equal(responseType, message.Result);
     }
 
     [Fact]
@@ -161,23 +147,16 @@ public sealed class SelfWritingResponseMessageTests
         using var environment = new SerializationEnvironment(
             messagingOptions: new SiloMessagingOptions { MaxMessageBodySize = 32 });
         var oversized = new StringResponse(new string('x', 128));
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-
-        try
+        using (var buffer = new ArcBufferWriter())
         {
             // Act
             var exception = Assert.Throws<InvalidMessageFrameException>(
-                () => environment.Serializer.Write(pipe.Writer, CreateMessage(oversized)));
+                () => environment.Serializer.Write(buffer, CreateMessage(oversized)));
 
             // Assert
             Assert.Contains("Invalid body size:", exception.Message);
             Assert.Contains(nameof(MessagingOptions.MaxMessageBodySize), exception.Message);
             Assert.Equal(1, oversized.WriteCount);
-        }
-        finally
-        {
-            pipe.Writer.Complete();
-            pipe.Reader.Complete();
         }
 
         AssertSuccessfulReuse(environment);
@@ -189,22 +168,15 @@ public sealed class SelfWritingResponseMessageTests
         // Arrange
         using var environment = new SerializationEnvironment();
         var holder = new ThrowingResponse();
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-
-        try
+        using (var buffer = new ArcBufferWriter())
         {
             // Act
             var exception = Assert.Throws<InvalidOperationException>(
-                () => environment.Serializer.Write(pipe.Writer, CreateMessage(holder)));
+                () => environment.Serializer.Write(buffer, CreateMessage(holder)));
 
             // Assert
             Assert.Same(holder.Failure, exception);
             Assert.Equal(1, holder.WriteCount);
-        }
-        finally
-        {
-            pipe.Writer.Complete();
-            pipe.Reader.Complete();
         }
 
         AssertSuccessfulReuse(environment);
@@ -293,34 +265,31 @@ public sealed class SelfWritingResponseMessageTests
         };
     }
 
-    private static (byte[] Bytes, int HeaderLength, int BodyLength) WriteFrame(MessageSerializer serializer, Message message)
+    internal static (byte[] Bytes, int HeaderLength, int BodyLength) WriteFrame(MessageSerializer serializer, Message message)
     {
-        var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-        try
-        {
-            var (headerLength, bodyLength) = serializer.Write(pipe.Writer, message);
-            pipe.Writer.FlushAsync().GetAwaiter().GetResult();
-            Assert.True(pipe.Reader.TryRead(out var result));
-            var bytes = result.Buffer.ToArray();
-            pipe.Reader.AdvanceTo(result.Buffer.End);
-            return (bytes, headerLength, bodyLength);
-        }
-        finally
-        {
-            pipe.Writer.Complete();
-            pipe.Reader.Complete();
-        }
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(new byte[Message.LENGTH_HEADER_SIZE]);
+        var (headerLength, bodyLength) = serializer.Write(buffer, message);
+        Span<byte> lengths = stackalloc byte[Message.LENGTH_HEADER_SIZE];
+        BinaryPrimitives.WriteInt32LittleEndian(lengths, headerLength);
+        BinaryPrimitives.WriteInt32LittleEndian(lengths[sizeof(int)..], bodyLength);
+        buffer.WriteAt(0, lengths);
+        using var frame = buffer.ConsumeSlice(buffer.Length);
+        return (frame.ToArray(), headerLength, bodyLength);
     }
 
-    private static Message ReadFrame(MessageSerializer serializer, (byte[] Bytes, int HeaderLength, int BodyLength) frame)
+    internal static Message ReadFrame(MessageSerializer serializer, (byte[] Bytes, int HeaderLength, int BodyLength) frame)
     {
-        var input = new ReadOnlySequence<byte>(frame.Bytes);
-        var (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref input, out var message);
-        Assert.Equal(0, requiredBytes);
-        Assert.Equal(frame.HeaderLength, headerLength);
-        Assert.Equal(frame.BodyLength, bodyLength);
-        Assert.True(input.IsEmpty);
-        return Assert.IsType<Message>(message);
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(frame.Bytes.AsSpan(Message.LENGTH_HEADER_SIZE));
+        using var shared = new MessageHandlerShared(null!, null!, () => serializer, null!, null!, null!);
+        using var request = shared.GetReceiveMessageHandler();
+        request.Headers = buffer.ConsumeSlice(frame.HeaderLength);
+        request.Body = buffer.ConsumeSlice(frame.BodyLength);
+        serializer.ReadHeaders(request, out var message);
+        serializer.ReadBodyObject(message, request);
+        Assert.Equal(0, buffer.Length);
+        return message;
     }
 
     private static void AssertFrame(
@@ -379,8 +348,6 @@ public sealed class SelfWritingResponseMessageTests
 
     private sealed class SerializationEnvironment : IDisposable
     {
-        private readonly SharedMemoryPool _memoryPool = new();
-
         public SerializationEnvironment(Action<TypeManifestOptions>? configure = null, MessagingOptions? messagingOptions = null)
         {
             var services = new ServiceCollection();
@@ -395,7 +362,7 @@ public sealed class SelfWritingResponseMessageTests
             Services = services.BuildServiceProvider();
             CodecProvider = Services.GetRequiredService<CodecProvider>();
             Serializer = new MessageSerializer(
-                Services.GetRequiredService<SerializerSessionPool>(), _memoryPool, messagingOptions ?? new SiloMessagingOptions());
+                Services.GetRequiredService<SerializerSessionPool>(), messagingOptions ?? new SiloMessagingOptions());
         }
 
         public ServiceProvider Services { get; }
@@ -406,7 +373,6 @@ public sealed class SelfWritingResponseMessageTests
         {
             Serializer.Dispose();
             Services.Dispose();
-            _memoryPool.Pool.Dispose();
         }
     }
 

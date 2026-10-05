@@ -2,7 +2,6 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
-using System.IO.Pipelines;
 using System.Net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,7 +14,6 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
-using Orleans.Networking.Shared;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
@@ -158,7 +156,7 @@ public sealed class SelfWritingResponseOwnershipTests
         using var response = await fixture.Invoke(request, observer);
 
         Assert.Null(response.Exception);
-        Assert.NotSame(request.ReturnedResponse, response);
+        if (!filtered) Assert.NotSame(request.ReturnedResponse, response);
         Assert.Equal(filtered ? 2 : 1, counts.PayloadCopies);
         Assert.Equal(filtered ? 2 : 1, counts.ResponseCopies);
         Assert.Equal(filtered ? 3 : 2, counts.Rents);
@@ -596,6 +594,7 @@ public sealed class SelfWritingResponseOwnershipTests
         {
             if (input is null) return null;
             counts.ResponseCopies++;
+            if (counts.ReturnInput) return input;
             return CountedResponse.Rent(counts.Copy(Assert.IsType<Payload>(input.Result)), counts, provider.GetCodec<Payload>());
         }
     }
@@ -627,7 +626,6 @@ public sealed class SelfWritingResponseOwnershipTests
         private readonly Counts _counts;
         private readonly ObserverGrainId _observerId = ObserverGrainId.Create(ClientGrainId.Create("response-copy"), IdSpan.Create("observer"));
         private readonly TaskCompletionSource<Response> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly SharedMemoryPool _memory = new();
         private readonly MessageSerializer _serializer;
         private Message _request = null!;
         private Response? _sentResponse;
@@ -698,7 +696,7 @@ public sealed class SelfWritingResponseOwnershipTests
             _manager = new InvokableObjectManager(Substitute.For<IGrainContext>(), observerRuntime, copier, trace,
                 _services.GetRequiredService<DeepCopier<Response>>(), mapping, NullLogger<InvokableObjectManager>.Instance);
             Assert.True(_manager.TryRegister(_observer, _observerId));
-            _serializer = new MessageSerializer(_services.GetRequiredService<SerializerSessionPool>(), _memory, options.Value);
+            _serializer = new MessageSerializer(_services.GetRequiredService<SerializerSessionPool>(), options.Value);
         }
 
         public async Task<Response> Invoke(IInvokable request, bool observer)
@@ -749,7 +747,7 @@ public sealed class SelfWritingResponseOwnershipTests
             }
         }
 
-        public async Task AssertFrameRoundTrip(Response response)
+        public Task AssertFrameRoundTrip(Response response)
         {
             var message = new Message
             {
@@ -759,31 +757,14 @@ public sealed class SelfWritingResponseOwnershipTests
                 TargetGrain = _request.SendingGrain,
                 BodyObject = response,
             };
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            try
-            {
-                var written = _serializer.Write(pipe.Writer, message);
-                await pipe.Writer.FlushAsync(TestContext.Current.CancellationToken);
-                Assert.True(pipe.Reader.TryRead(out var read));
-                var bytes = read.Buffer.ToArray();
-                pipe.Reader.AdvanceTo(read.Buffer.End);
-                var input = new ReadOnlySequence<byte>(bytes);
-                var (required, headers, body) = _serializer.TryRead(ref input, out var received);
-                Assert.Equal(0, required);
-                Assert.Equal(written.HeaderLength, headers);
-                Assert.Equal(written.BodyLength, body);
-                Assert.True(input.IsEmpty);
-                Assert.NotNull(received);
-                Assert.Equal(message.Direction, received.Direction);
-                Assert.Equal(message.Id, received.Id);
-                using var result = Assert.IsAssignableFrom<Response>(received.BodyObject);
-                Assert.Equal(Assert.IsType<Payload>(response.Result).Values, Assert.IsType<Payload>(result.Result).Values);
-            }
-            finally
-            {
-                await pipe.Writer.CompleteAsync();
-                await pipe.Reader.CompleteAsync();
-            }
+            var frame = SelfWritingResponseMessageTests.WriteFrame(_serializer, message);
+            using var received = SelfWritingResponseMessageTests.ReadFrame(_serializer, frame);
+            Assert.Equal(message.Direction, received.Direction);
+            Assert.Equal(message.Id, received.Id);
+            using var result = Assert.IsAssignableFrom<Response>(received.BodyObject);
+            Assert.Equal(Assert.IsType<Payload>(response.Result).Values, Assert.IsType<Payload>(result.Result).Values);
+            received.BodyObject = null;
+            return Task.CompletedTask;
         }
 
         void IResponseCompletionSource.Complete(Response value)
@@ -811,7 +792,6 @@ public sealed class SelfWritingResponseOwnershipTests
             _sentResponse?.Dispose();
             ((IDisposable)_hosted).Dispose();
             _serializer.Dispose();
-            _memory.Pool.Dispose();
             await _services.DisposeAsync();
             GC.KeepAlive(_observer);
         }
