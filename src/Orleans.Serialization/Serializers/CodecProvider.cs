@@ -689,7 +689,8 @@ namespace Orleans.Serialization.Serializers
             var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
             var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
             if (role is not null && contract.Implementation is { } implementation
-                && TrySelectImplementation(role, target, target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target, out var selected)
+                && TrySelectImplementation(role, target, target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target,
+                    out var selected, out _, materializeImplementation: false)
                 && !MatchesDefaultImplementation(selected, implementation, contract.CompatibleImplementation, target))
                 return false;
             foreach (var dependency in contract.Dependencies)
@@ -713,15 +714,20 @@ namespace Orleans.Serialization.Serializers
         private static bool MatchesDefaultImplementation(Type selected, Type expected, Type? compatible, Type target)
         {
             if (selected == expected || selected == compatible) return true;
-            if (!selected.IsGenericTypeDefinition) return false;
-            if (expected.IsConstructedGenericType && selected == expected.GetGenericTypeDefinition()) return true;
-            if (compatible is { IsConstructedGenericType: true } && selected == compatible.GetGenericTypeDefinition()) return true;
-            if (target.IsConstructedGenericType && target.GetGenericTypeDefinition() == typeof(Invocation.Response<>)
-                && expected.IsConstructedGenericType && expected.GenericTypeArguments[0] == target.GenericTypeArguments[0])
+            if (!selected.IsGenericType) return false;
+            if (selected.IsGenericTypeDefinition)
             {
+                if (expected.IsConstructedGenericType && selected == expected.GetGenericTypeDefinition()) return true;
+                if (compatible is { IsConstructedGenericType: true } && selected == compatible.GetGenericTypeDefinition()) return true;
+            }
+            if (target.IsConstructedGenericType && target.GetGenericTypeDefinition() == typeof(Invocation.Response<>)
+                && expected.IsConstructedGenericType && expected.GenericTypeArguments[0] == target.GenericTypeArguments[0]
+                && (!selected.IsConstructedGenericType || selected.GenericTypeArguments[0] == target.GenericTypeArguments[0]))
+            {
+                var selectedDefinition = selected.GetGenericTypeDefinition();
                 var definition = expected.GetGenericTypeDefinition();
-                return selected == typeof(Invocation.PooledResponseCodec<>) && definition == typeof(Invocation.PooledResponseCodec<,>)
-                    || selected == typeof(Invocation.PooledResponseCopier<>) && definition == typeof(Invocation.PooledResponseCopier<,>);
+                return selectedDefinition == typeof(Invocation.PooledResponseCodec<>) && definition == typeof(Invocation.PooledResponseCodec<,>)
+                    || selectedDefinition == typeof(Invocation.PooledResponseCopier<>) && definition == typeof(Invocation.PooledResponseCopier<,>);
             }
             return false;
         }
@@ -1217,7 +1223,8 @@ namespace Orleans.Serialization.Serializers
             Type targetType,
             Type searchType,
             [NotNullWhen(true)] out Type? implementation,
-            out SerializationContract registration)
+            out SerializationContract registration,
+            bool materializeImplementation = true)
         {
             if (targetType != searchType && TrySelect(targetType, out implementation, out registration))
             {
@@ -1244,7 +1251,7 @@ namespace Orleans.Serialization.Serializers
                         }
 
                         var closed = candidate.Implementation;
-                        if (closed.IsGenericTypeDefinition)
+                        if (closed.IsGenericTypeDefinition && materializeImplementation)
                         {
                             var arguments = bindings is null ? targetType.GetGenericArguments() : new Type[bindings.Length];
                             if (bindings is not null)

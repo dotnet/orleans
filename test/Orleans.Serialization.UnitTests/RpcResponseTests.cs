@@ -189,6 +189,50 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Fact]
+    public void GeneratedResponseFactoriesPreserveCanonicalClosedImplementations()
+    {
+        var provider = _services.GetRequiredService<CodecProvider>();
+        Assert.IsType<PooledResponseCodec<int, Int32Codec>>(provider.GetCodec<Response<int>>());
+        Assert.IsType<PooledResponseCopier<int, ShallowCopier<int>>>(provider.GetDeepCopier<Response<int>>());
+    }
+
+    [Fact]
+    public void InferredResponseFactoriesInspectDefinitionsWithoutMaterializingLegacyImplementations()
+    {
+        var codecDefinition = new DefinitionOnlyType(typeof(PooledResponseCodec<>));
+        var copierDefinition = new DefinitionOnlyType(typeof(PooledResponseCopier<>));
+        var options = new TypeManifestOptions();
+        options.AddSerializer(codecDefinition, typeof(Response<>));
+        options.AddCopier(copierDefinition, typeof(Response<>));
+        options.AddDefaultSerializer<Response<int>, PooledResponseCodec<int, Int32Codec>, PooledResponseCopier<int, ShallowCopier<int>>>(
+            static _ => new PooledResponseCodec<int, Int32Codec>(new Int32Codec()),
+            static _ => new PooledResponseCopier<int, ShallowCopier<int>>(new ShallowCopier<int>()));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Microsoft.Extensions.Options.Options.Create(options));
+
+        Assert.IsType<PooledResponseCodec<int, Int32Codec>>(provider.GetCodec<Response<int>>());
+        Assert.IsType<PooledResponseCopier<int, ShallowCopier<int>>>(provider.GetDeepCopier<Response<int>>());
+        Assert.Equal(0, codecDefinition.MaterializationCalls);
+        Assert.Equal(0, copierDefinition.MaterializationCalls);
+    }
+
+    private sealed class DefinitionOnlyType(Type definition) : System.Reflection.TypeDelegator(definition)
+    {
+        public int MaterializationCalls { get; private set; }
+        public override bool IsGenericType => typeImpl.IsGenericType;
+        public override bool IsGenericTypeDefinition => typeImpl.IsGenericTypeDefinition;
+        public override bool IsConstructedGenericType => typeImpl.IsConstructedGenericType;
+        public override Type GetGenericTypeDefinition() => typeImpl.GetGenericTypeDefinition();
+        public override Type[] GetGenericArguments() => typeImpl.GetGenericArguments();
+
+        public override Type MakeGenericType(params Type[] typeArguments)
+        {
+            MaterializationCalls++;
+            throw new InvalidOperationException("The inferred factory supplies its closed executable implementation.");
+        }
+    }
+
+    [Fact]
     public void AutomaticResponseFactoriesPreserveCustomJitPayloadCopier()
     {
         using var services = new ServiceCollection()
