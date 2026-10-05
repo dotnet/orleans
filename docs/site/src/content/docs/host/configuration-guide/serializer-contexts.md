@@ -30,7 +30,7 @@ The supported graph includes primitive leaf codecs with parameterless constructi
 
 The context's closed serializer registrations seed the type names used during deserialization in the common type resolver's cache. <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*> authorizes formatted names, while additional names resolve through reflection when the application preserves their metadata. Type-name filters and component validation apply to both forms of resolution. Codecs and copiers preserve Orleans field identifiers, reference tracking, and deep-copy isolation. Object cycles and shared references retain their identity within the restored or copied graph.
 
-Generated struct value serializers and field codecs share one canonical codec instance. Closed generic models include the concrete array services requested by their generated implementations, while direct byte-array serialization and copying retain the optimized byte-array implementations.
+Generated struct value serializers and field codecs share one canonical codec instance. Supported non-sealed models register their generated base-codec and base-copier contracts as aliases to the same concrete instances used for field serialization and deep copying. Closed generic models include the concrete array services requested by their generated implementations, while direct byte-array serialization and copying retain the optimized byte-array implementations.
 
 ## Dependency construction and concurrency
 

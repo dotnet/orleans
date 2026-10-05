@@ -2,6 +2,7 @@ using Orleans.Serialization.ContextSmoke;
 
 
 ContextContracts.NestedCollectionsRoundTripAndCopy();
+ContextContracts.NonSealedModelBaseServicesAliasCanonicalInstances();
 ContextContracts.GeneratedFactoriesComposeWithMetadataAndReflection();
 ContextContracts.GeneratedModelsTraverseDependencies();
 ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();

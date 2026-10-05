@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator;
 using Orleans.Serialization.ContextSmoke;
 using Xunit;
@@ -12,6 +13,7 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class SerializerContextTests(ITestOutputHelper output)
 {
     [Fact] public void NestedCollectionsRoundTripAndCopy() => ContextContracts.NestedCollectionsRoundTripAndCopy();
+    [Fact] public void NonSealedModelBaseServicesAliasCanonicalInstances() => ContextContracts.NonSealedModelBaseServicesAliasCanonicalInstances();
     [Fact] public void GeneratedFactoriesComposeWithMetadataAndReflection() => ContextContracts.GeneratedFactoriesComposeWithMetadataAndReflection();
     [Fact] public void GeneratedModelsTraverseDependencies() => ContextContracts.GeneratedModelsTraverseDependencies();
     [Fact] public void CanonicalValueSerializerUsesGeneratedCodec() => ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
@@ -243,6 +245,41 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
         Assert.DoesNotContain("CreateCodecHolder", context, StringComparison.Ordinal);
         Assert.DoesNotContain("MakeGenericType", context, StringComparison.Ordinal);
         Assert.DoesNotContain("#pragma warning disable", context, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("class", "", true, true)]
+    [InlineData("class", "[Orleans.Immutable]", true, true)]
+    [InlineData("sealed class", "", false, false)]
+    [InlineData("sealed class", "[Orleans.Immutable]", false, false)]
+    public void BaseAliasesFollowGeneratedModelContracts(string declaration, string attributes, bool baseCodec, bool baseCopier)
+    {
+        var (compilation, result) = Generate($$"""
+            [Orleans.GenerateSerializer]
+            {{attributes}}
+            public {{declaration}} Payload
+            {
+                [Orleans.Id(0)] public System.Collections.Generic.List<int> Values { get; set; } = new();
+            }
+            [Orleans.GenerateSerializerContext<Payload>]
+            public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+            """);
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var source = Assert.Single(result.Results.SelectMany(static result => result.GeneratedSources),
+            static source => source.HintName.Contains(".context.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Equal(baseCodec, source.Contains("AddSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<global::Payload>>", StringComparison.Ordinal));
+        Assert.Equal(baseCopier, source.Contains("AddSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<global::Payload>>", StringComparison.Ordinal));
+        var registrations = SyntaxFactory.ParseCompilationUnit(source)
+            .DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax
+            { Name: GenericNameSyntax { Identifier.ValueText: "AddSerializer" } }).ToArray();
+        var canonical = Assert.Single(registrations, static registration => registration.Expression.ToString().Contains("<global::Payload>", StringComparison.Ordinal));
+        var codecFactory = canonical.ArgumentList.Arguments[0].Expression.ToString();
+        var copierFactory = canonical.ArgumentList.Arguments[1].Expression.ToString();
+        if (baseCodec) Assert.Contains($"IBaseCodec<global::Payload>>({codecFactory})", source, StringComparison.Ordinal);
+        if (baseCopier) Assert.Contains($"IBaseCopier<global::Payload>>({copierFactory})", source, StringComparison.Ordinal);
     }
 
     [Theory]

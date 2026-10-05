@@ -18,7 +18,7 @@ public sealed class ReferencedSerializerContextTests
     {
         var producer = await TestCompilationHelper.CreateCompilation("""
             [Orleans.GenerateSerializer]
-            public sealed class DynamicPayload<T>
+            public class DynamicPayload<T>
             {
                 [Orleans.Id(0)] public readonly T Value;
                 public DynamicPayload() { }
@@ -43,6 +43,11 @@ public sealed class ReferencedSerializerContextTests
                             new Microsoft.Extensions.DependencyInjection.ServiceCollection(), new DemoContext()));
                     var serializer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializer>(services);
                     var copier = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.DeepCopier>(services);
+                    var provider = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Orleans.Serialization.Serializers.CodecProvider>(services);
+                    if (!object.ReferenceEquals(provider.GetCodec<DynamicPayload<System.Collections.Generic.List<int>>>(),
+                            provider.GetBaseCodec<DynamicPayload<System.Collections.Generic.List<int>>>())
+                        || !object.ReferenceEquals(provider.GetDeepCopier<DynamicPayload<System.Collections.Generic.List<int>>>(),
+                            provider.GetBaseCopier<DynamicPayload<System.Collections.Generic.List<int>>>())) return false;
                     var original = new DynamicPayload<System.Collections.Generic.List<int>>(new() { 13, 17 });
                     var restored = serializer.Deserialize<DynamicPayload<System.Collections.Generic.List<int>>>(serializer.SerializeToArray(original));
                     var copy = copier.Copy(original);

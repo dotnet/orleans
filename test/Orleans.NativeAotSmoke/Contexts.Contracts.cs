@@ -21,6 +21,47 @@ public static partial class ContextContracts
         .AddSerializerContext(new AliasRegistrationContext())
         .BuildServiceProvider();
 
+    public static void NonSealedModelBaseServicesAliasCanonicalInstances()
+    {
+        foreach (var baseFirst in new[] { false, true })
+        {
+            using var services = new ServiceCollection().AddSerializerContext(new BaseServiceContext()).BuildServiceProvider();
+            var provider = services.GetRequiredService<CodecProvider>();
+            if (baseFirst)
+            {
+                _ = provider.GetBaseCodec<BaseServiceModel>();
+                _ = provider.GetBaseCopier<BaseServiceModel>();
+            }
+            var codec = provider.GetCodec<BaseServiceModel>();
+            var copier = provider.GetDeepCopier<BaseServiceModel>();
+            var baseCodec = provider.GetBaseCodec<BaseServiceModel>();
+            var baseCopier = provider.GetBaseCopier<BaseServiceModel>();
+            Ensure(ReferenceEquals(codec, baseCodec) && ReferenceEquals(copier, baseCopier),
+                "Generated non-sealed base contracts alias the canonical field codec and deep copier in either resolution order.");
+            var original = new BaseServiceModel { Value = 42, Values = new() { 13, 17 } };
+            original.Alias = original.Values;
+            var restored = RoundTrip(services, original);
+            var copied = services.GetRequiredService<DeepCopier>().Copy(original);
+            foreach (var result in new[] { restored, copied })
+            {
+                Ensure(result.Value == 42 && result.Values.SequenceEqual(original.Values)
+                    && ReferenceEquals(result.Values, result.Alias),
+                    "Non-sealed context models retain wire values and mutable-member aliases.");
+                Ensure(!ReferenceEquals(original, result) && !ReferenceEquals(original.Values, result.Values),
+                    "Non-sealed context model round trips and copies isolate mutable values.");
+            }
+            copied.Values[0] = 23;
+            Ensure(original.Values[0] == 13 && copied.Alias[0] == 23,
+                "Non-sealed copied values retain isolation and aliases.");
+            using var context = services.GetRequiredService<CopyContextPool>().GetContext();
+            var target = new BaseServiceModel();
+            baseCopier.DeepCopy(original, target, context);
+            Ensure(target.Value == 42 && target.Values.SequenceEqual(original.Values)
+                && ReferenceEquals(target.Values, target.Alias) && !ReferenceEquals(original.Values, target.Values),
+                "The generated base copier populates an existing instance with independent aliased members.");
+        }
+    }
+
     public static void NestedCollectionsRoundTripAndCopy()
     {
         using var services = CreateServices();
@@ -599,6 +640,17 @@ internal partial class AliasRegistrationContext : SerializerContext;
 
 [GenerateSerializerContext<RecursiveValue?>]
 internal partial class NullableCycleContext : SerializerContext;
+
+[GenerateSerializerContext<BaseServiceModel>]
+internal partial class BaseServiceContext : SerializerContext;
+
+[GenerateSerializer]
+public class BaseServiceModel
+{
+    [Id(0)] public int Value { get; set; }
+    [Id(1)] public List<int> Values { get; set; } = new();
+    [Id(2)] public List<int> Alias { get; set; } = new();
+}
 
 [GenerateSerializer]
 public struct RecursiveValue

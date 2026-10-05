@@ -74,10 +74,17 @@ internal static class SerializerFactoryGenerator
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
             var typeName = Name(registration.Type);
+            var hasBaseCodec = false;
+            var hasBaseCopier = false;
             if (registration.Model is { } model)
             {
                 if (registration.ReferencedCodec is { } referencedCodec)
                 {
+                    var implementationLibrary = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
+                    hasBaseCodec = referencedCodec.AllInterfaces.Any(contract =>
+                        SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCodec_1));
+                    hasBaseCopier = registration.ReferencedCopier?.AllInterfaces.Any(contract =>
+                        SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, implementationLibrary.BaseCopier_1)) == true;
                     registration.CodecConstruction = ConstructReferenced(registration.Codec, referencedCodec);
                     registration.CopierConstruction = registration.ReferencedCopier is { } referencedCopier
                         ? ConstructReferenced(registration.Copier, referencedCopier)
@@ -87,6 +94,10 @@ internal static class SerializerFactoryGenerator
                 {
                     var codecDeclaration = serializerGenerator.Generate(model);
                     var copierDeclaration = copierGenerator.GenerateCopier(model, new());
+                    hasBaseCodec = codecDeclaration.BaseList!.Types.Any(contract =>
+                        contract.Type.ToString() == services.LibraryTypes.BaseCodec_1.ToTypeSyntax(model.TypeSyntax).ToString());
+                    hasBaseCopier = copierDeclaration?.BaseList?.Types.Any(contract =>
+                        contract.Type.ToString() == services.LibraryTypes.BaseCopier_1.ToTypeSyntax(model.TypeSyntax).ToString()) == true;
                     registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
                     registration.CopierConstruction = copierDeclaration is null
                         ? $"new {registration.Copier}()"
@@ -123,6 +134,16 @@ internal static class SerializerFactoryGenerator
             {
                 result.Append("options.AddSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<")
                     .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+            }
+            if (hasBaseCodec)
+            {
+                result.Append("options.AddSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<")
+                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+            }
+            if (hasBaseCopier)
+            {
+                result.Append("options.AddSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<")
+                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Copier)).AppendLine(");");
             }
 
             foreach (var array in registration.CanonicalArrays)
