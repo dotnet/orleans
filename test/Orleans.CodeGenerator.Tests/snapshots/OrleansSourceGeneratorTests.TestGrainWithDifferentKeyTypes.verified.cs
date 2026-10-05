@@ -38,6 +38,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithGuidKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Guid> global::TestProject.IMyGrainWithGuidKey.GetGuidValue()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
@@ -73,6 +74,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithStringKey(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::TestProject.IMyGrainWithStringKey.GetStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316();
@@ -108,6 +110,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithGuidCompoundKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> global::TestProject.IMyGrainWithGuidCompoundKey.GetGuidAndStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
@@ -143,6 +146,7 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrainWithIntegerCompoundKey(arg0, arg1);
         global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> global::TestProject.IMyGrainWithIntegerCompoundKey.GetIntegerAndStringKey()
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A();
@@ -787,6 +791,11 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithIntegerCompoundKey));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
+            proxyFactories.Add(typeof(global::TestProject.IMyGrainWithGuidKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidKey.Create);
+            proxyFactories.Add(typeof(global::TestProject.IMyGrainWithStringKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithStringKey.Create);
+            proxyFactories.Add(typeof(global::TestProject.IMyGrainWithGuidCompoundKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithGuidCompoundKey.Create);
+            proxyFactories.Add(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey), typeof(OrleansCodeGen.TestProject.Proxy_IMyGrainWithIntegerCompoundKey), OrleansCodeGen.TestProject.Proxy_IMyGrainWithIntegerCompoundKey.Create);
             config.AddInterface(typeof(global::TestProject.IMyGrainWithGuidKey));
             config.AddInterface(typeof(global::TestProject.IMyGrainWithStringKey));
             config.AddInterface(typeof(global::TestProject.IMyGrainWithGuidCompoundKey));

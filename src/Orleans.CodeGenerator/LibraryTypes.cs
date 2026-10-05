@@ -32,6 +32,7 @@ internal sealed class LibraryTypes
         MethodInfo = Type("System.Reflection.MethodInfo");
         Func_2 = Type("System.Func`2");
         GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute");
+        GenerateProxyFactoryAttribute = TypeOrDefault("Orleans.GenerateProxyFactoryAttribute");
         GenerateSerializerAttribute = Type("Orleans.GenerateSerializerAttribute");
         SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute");
         IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1");
@@ -217,6 +218,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol Func_2 { get; private set; }
     public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
     public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
+    public INamedTypeSymbol? GenerateProxyFactoryAttribute { get; }
     public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
     public INamedTypeSymbol IActivator_1 { get; private set; }
     public INamedTypeSymbol IBufferWriter { get; private set; }

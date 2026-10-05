@@ -65,6 +65,7 @@ namespace OrleansCodeGen
         {
         }
 
+        public static global::Orleans.Runtime.GrainReference Create(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) => new Proxy_IMyGrain(arg0, arg1);
         global::System.Threading.Tasks.Task<string> global::IMyGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404();
@@ -163,6 +164,8 @@ namespace OrleansCodeGen.TestProject
             config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddCopier(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.Proxy_IMyGrain));
+            var proxyFactories = config.GetOrCreate<global::Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<global::Orleans.Runtime.GrainReferenceFactory>>();
+            proxyFactories.Add(typeof(global::IMyGrain), typeof(OrleansCodeGen.Proxy_IMyGrain), OrleansCodeGen.Proxy_IMyGrain.Create);
             config.AddInterface(typeof(global::IMyGrain));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));

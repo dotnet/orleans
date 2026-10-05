@@ -83,6 +83,14 @@ namespace Orleans
         public System.Type ProxyBase { get { throw null; } }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, Inherited = true)]
+    public sealed partial class GenerateProxyFactoryAttribute : System.Attribute
+    {
+        public GenerateProxyFactoryAttribute(System.Type delegateType) { }
+
+        public System.Type DelegateType { get { throw null; } }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Enum)]
     public sealed partial class GenerateSerializerAttribute : System.Attribute
     {

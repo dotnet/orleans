@@ -14,6 +14,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
+using ReferenceFactories = Orleans.Serialization.Configuration.InterfaceProxyFactoryOptions<Orleans.Runtime.GrainReferenceFactory>;
 
 namespace UnitTests.GrainReferences;
 
@@ -24,7 +25,10 @@ internal sealed class ReferenceConstructionFixture : IDisposable
 
     public ReferenceConstructionFixture(
         bool unordered = false,
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type? proxyType = null)
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.Interfaces)] Type? proxyType = null,
+        GrainReferenceFactory? factory = null,
+        bool legacy = false,
+        bool includeGeneratedFactories = false)
     {
         Runtime = new RecordingReferenceRuntime();
         Services = new ServiceCollection()
@@ -35,20 +39,47 @@ internal sealed class ReferenceConstructionFixture : IDisposable
             .AddSingleton<IGrainReferenceRuntime>(Runtime)
             .BuildServiceProvider();
         var options = Services.GetRequiredService<IOptions<TypeManifestOptions>>();
+        ManifestOptions = options.Value;
+        // This fixture owns the generated proxies in the same assembly and supplies concrete AOT factory roots.
+        var factories = ManifestOptions.GetOrCreate<ReferenceFactories>();
+        factories.Add(
+            typeof(IGenericConstructionGrain<int>),
+            typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>),
+            OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<int>.Create);
+        factories.Add(
+            typeof(IGenericConstructionGrain<string>),
+            typeof(OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>),
+            OrleansCodeGen.UnitTests.GrainReferences.Proxy_IGenericConstructionGrain<string>.Create);
+
         if (proxyType is not null)
         {
-            var manifestOptions = new TypeManifestOptions();
+            var manifestOptions = includeGeneratedFactories ? ManifestOptions : new TypeManifestOptions();
             manifestOptions.AddInterfaceProxy(proxyType);
+            if (factory is not null)
+            {
+                manifestOptions.GetOrCreate<ReferenceFactories>().Add(typeof(IConstructionGrain), proxyType, factory);
+            }
+
+            options = Options.Create(manifestOptions);
+        }
+        else if (legacy)
+        {
+            var manifestOptions = new TypeManifestOptions();
+            foreach (var type in ManifestOptions.InterfaceProxyTypes)
+            {
+                manifestOptions.InterfaceProxies.Add(type);
+            }
+
             options = Options.Create(manifestOptions);
         }
 
         var typeConverter = Services.GetRequiredService<TypeConverter>();
-        var resolver = new GrainInterfaceTypeResolver([new ConstructionInterfaceTypeProvider()], typeConverter);
+        Resolver = new GrainInterfaceTypeResolver([new ConstructionInterfaceTypeProvider()], typeConverter);
         var manifestProvider = new ConstructionManifestProvider(unordered);
         Provider = new GrainReferenceActivatorProvider(
             Services,
             new GrainPropertiesResolver(manifestProvider),
-            new RpcProvider(options, resolver, typeConverter),
+            new RpcProvider(options, Resolver, typeConverter),
             Services.GetRequiredService<CopyContextPool>(),
             Services.GetRequiredService<CodecProvider>(),
             new GrainVersionManifest(manifestProvider));
@@ -59,9 +90,14 @@ internal sealed class ReferenceConstructionFixture : IDisposable
     public RecordingReferenceRuntime Runtime { get; }
     public GrainReferenceActivatorProvider Provider { get; }
     public GrainReferenceActivator Activator { get; }
+    public TypeManifestOptions ManifestOptions { get; }
+    public GrainInterfaceTypeResolver Resolver { get; }
 
     public GrainReference CreateReference(string key) =>
         Activator.CreateReference(GrainId.Create(GrainType, IdSpan.Create(key)), InterfaceType);
+
+    public GrainReference CreateReference<T>(string key) =>
+        Activator.CreateReference(GrainId.Create(GrainType, IdSpan.Create(key)), Resolver.GetGrainInterfaceType(typeof(IGenericConstructionGrain<T>)));
 
     public void Dispose() => Services.Dispose();
 
@@ -100,6 +136,8 @@ internal sealed class ReferenceConstructionFixture : IDisposable
 
 public interface IConstructionBaseGrain : IGrainWithStringKey;
 public interface IConstructionGrain : IConstructionBaseGrain;
+public interface IGenericConstructionGrain<T> : IConstructionBaseGrain;
+public interface IOtherConstructionGrain : IGrainWithStringKey;
 
 internal sealed class RecordingReferenceRuntime : IGrainReferenceRuntime
 {
@@ -145,6 +183,11 @@ internal sealed class ThrowingConstructorProxy : GrainReference, IConstructionGr
 internal sealed class NonPublicConstructorProxy : GrainReference, IConstructionGrain
 {
     private NonPublicConstructorProxy(GrainReferenceShared shared, IdSpan key) : base(shared, key) { }
+
+    internal static GrainReference Create(GrainReferenceShared shared, IdSpan key) => new NonPublicConstructorProxy(shared, key);
 }
 
 internal sealed class ConstructionException(string message) : Exception(message);
+
+internal sealed class MultipleInterfaceConstructionProxy(GrainReferenceShared shared, IdSpan key)
+    : GrainReference(shared, key), IOtherConstructionGrain, IConstructionGrain;

@@ -3336,6 +3336,16 @@ namespace Orleans.Serialization.Codecs
 
 namespace Orleans.Serialization.Configuration
 {
+    public sealed partial class InterfaceProxyFactoryOptions<TFactory>
+        where TFactory : System.Delegate
+    {
+        public System.Collections.Generic.IReadOnlyDictionary<System.Type, (System.Type ProxyType, TFactory? Factory)> Factories { get { throw null; } }
+
+        public void Add(System.Type interfaceType, System.Type proxyType, TFactory factory) { }
+
+        public void Add(System.Type interfaceType, System.Type proxyType) { }
+    }
+
     public partial interface IProviderMetadataProvider
     {
         void ConfigureProviders(System.Collections.Generic.IDictionary<(string Target, string Kind, string Name), System.Type> providers);
@@ -3403,6 +3413,9 @@ namespace Orleans.Serialization.Configuration
         public void AddInterfaceProxy(System.Type type) { }
 
         public void AddSerializer(System.Type type) { }
+
+        public T GetOrCreate<T>()
+            where T : class, new() { throw null; }
     }
 
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
