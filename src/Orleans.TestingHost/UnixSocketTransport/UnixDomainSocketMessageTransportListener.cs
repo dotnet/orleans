@@ -13,9 +13,19 @@ using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
+/// <summary>
+/// Configures a Unix domain socket message transport listener.
+/// </summary>
 public class UnixDomainSocketMessageTransportListenerOptions
 {
+    /// <summary>
+    /// Gets or sets the socket path. The default is a unique path in the system temporary directory.
+    /// </summary>
     public string Path { get; set; } = CreateDefaultPath();
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the listener is enabled. The default is <see langword="true"/>.
+    /// </summary>
     public bool Enabled { get; set; } = true;
     private static string CreateDefaultPath() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"silo_{Guid.NewGuid():N}");
 }

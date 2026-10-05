@@ -86,13 +86,13 @@ namespace Orleans.TestingHost
 
         public IClusterClient Client { get { throw null; } }
 
-        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
-
         public InProcessTestClusterOptions Options { get { throw null; } }
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
 
         public System.Collections.ObjectModel.ReadOnlyCollection<InProcessSiloHandle> Silos { get { throw null; } }
+
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
 
         public System.Threading.Tasks.Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions, System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -118,7 +118,7 @@ namespace Orleans.TestingHost
 
         public InProcessSiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -379,8 +379,6 @@ namespace Orleans.TestingHost
 
         public IClusterClient Client { get { throw null; } }
 
-        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
-
         public System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> ConfigurationSources { get { throw null; } }
 
         public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsync { set { } }
@@ -393,13 +391,15 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
 
-        public SiloHandle? Primary { get { throw null; } }
+        public SiloHandle Primary { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<SiloHandle> SecondarySilos { get { throw null; } }
 
         public System.IServiceProvider ServiceProvider { get { throw null; } }
 
         public System.Collections.ObjectModel.ReadOnlyCollection<SiloHandle> Silos { get { throw null; } }
+
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
 
         public System.Threading.Tasks.Task DeactivateAsync(Runtime.GrainId grainId) { throw null; }
 
@@ -427,7 +427,7 @@ namespace Orleans.TestingHost
 
         public SiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -518,11 +518,11 @@ namespace Orleans.TestingHost
 
         public TestCluster Build() { throw null; }
 
-        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
-
         public TestClusterBuilder ConfigureBuilder(System.Action configureDelegate) { throw null; }
 
         public TestClusterBuilder ConfigureHostConfiguration(System.Action<Microsoft.Extensions.Configuration.IConfigurationBuilder> configureDelegate) { throw null; }
+
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
 
         public static string CreateClusterId() { throw null; }
     }
@@ -821,6 +821,13 @@ namespace Orleans.TestingHost.Logging
 
 namespace Orleans.TestingHost.UnixSocketTransport
 {
+    public partial class UnixDomainSocketMessageTransportListenerOptions
+    {
+        public bool Enabled { get { throw null; } set { } }
+
+        public string Path { get { throw null; } set { } }
+    }
+
     public static partial class UnixSocketConnectionExtensions
     {
         public static Hosting.IClientBuilder UseUnixSocketConnection(this Hosting.IClientBuilder clientBuilder) { throw null; }

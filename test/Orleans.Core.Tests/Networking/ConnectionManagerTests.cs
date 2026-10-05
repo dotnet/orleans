@@ -100,6 +100,9 @@ public class ConnectionManagerTests
             {
                 response.Dispose();
             }
+
+            await sender.CloseAsync(exception: null).WaitAsync(TestTimeout, CancellationToken.None);
+            rig.Manager.OnConnectionTerminated(rig.Address, sender, exception: null);
         }
     }
 
