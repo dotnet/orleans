@@ -457,9 +457,9 @@ namespace OrleansCodeGen.TestProject
             config.AddInterfaceImplementation(typeof(global::TestProject.ComplexGrain));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexData), typeof(global::TestProject.ComplexData));
             config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain), typeof(global::TestProject.ComplexGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IComplexGrain));
+            var n1 = config.CompoundTypeAliases.GetOrAdd("inv");
+            var n2 = n1.GetOrAdd(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.GetOrAdd(typeof(global::TestProject.IComplexGrain));
             n3.Add("67FE5808", typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808));
         }
     }

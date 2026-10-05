@@ -479,14 +479,16 @@ public class ManifestContractTests
     [Fact]
     public void ExecutableTypeResolutionUsesSourceKnownClosedArrays()
     {
-        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
-        Assert.Equal(typeof(GenericSurrogate<string>), generic.Invoke(null, [typeof(GenericSurrogate<>), new[] { typeof(string) }]));
-        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!;
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(new TypeManifestOptions()));
+        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.Equal(typeof(GenericSurrogate<string>), generic.Invoke(provider, [typeof(GenericSurrogate<>), new[] { typeof(string) }]));
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Instance | BindingFlags.NonPublic)!;
         foreach (var type in new[] { typeof(string[]), typeof(string[,]), typeof(FixedArgument<byte>[]) })
         {
-            Assert.Equal(type, resolve.Invoke(null, [SerializationType.Create(type), Type.EmptyTypes]));
+            Assert.Equal(type, resolve.Invoke(provider, [SerializationType.Create(type), Type.EmptyTypes]));
         }
-        Assert.Equal(typeof(GenericTarget<string, int[]>), resolve.Invoke(null,
+        Assert.Equal(typeof(GenericTarget<string, int[]>), resolve.Invoke(provider,
             [SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Create(typeof(int[]))),
                 new[] { typeof(string) }]));
     }
@@ -497,24 +499,28 @@ public class ManifestContractTests
     [InlineData(1, true)]
     public void ExecutableArrayPatternsRejectWithClosedRegistrationGuidance(int rank, bool openParameter)
     {
-        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Static | BindingFlags.NonPublic)!;
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(new TypeManifestOptions()));
+        var resolve = typeof(CodecProvider).GetMethod("ResolveSerializationType", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var parameter = openParameter ? typeof(GenericSurrogate<>).GetGenericArguments()[0] : typeof(string);
         var description = SerializationType.Array(SerializationType.Parameter(0), rank);
 
-        var exception = Assert.Throws<TargetInvocationException>(() => resolve.Invoke(null, [description, new[] { parameter }]));
+        var exception = Assert.Throws<TargetInvocationException>(() => resolve.Invoke(provider, [description, new[] { parameter }]));
         var failure = Assert.IsType<NotSupportedException>(exception.InnerException);
         Assert.Contains("SerializationType.Create(typeof(ClosedArray))", failure.Message);
         Assert.Contains("explicit closed converter registration", failure.Message);
         exception = Assert.Throws<TargetInvocationException>(() =>
-            resolve.Invoke(null, [SerializationType.Array(SerializationType.Create(typeof(string)), rank), Type.EmptyTypes]));
+            resolve.Invoke(provider, [SerializationType.Array(SerializationType.Create(typeof(string)), rank), Type.EmptyTypes]));
         Assert.Equal(failure.Message, Assert.IsType<NotSupportedException>(exception.InnerException).Message);
     }
 
     [Fact]
     public void MaterializationBoundariesPreserveInvalidShapeErrorsOnJit()
     {
-        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var exception = Assert.Throws<TargetInvocationException>(() => generic.Invoke(null, [typeof(GenericSurrogate<>), Type.EmptyTypes]));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(new TypeManifestOptions()));
+        var generic = typeof(CodecProvider).GetMethod("ConstructGenericImplementation", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var exception = Assert.Throws<TargetInvocationException>(() => generic.Invoke(provider, [typeof(GenericSurrogate<>), Type.EmptyTypes]));
         Assert.IsType<ArgumentException>(exception.InnerException);
         Assert.Throws<ArgumentOutOfRangeException>(() => SerializationType.Array(SerializationType.Create(typeof(string)), 0));
     }
@@ -1136,6 +1142,41 @@ public class ManifestContractTests
         var provider = new CodecProvider(services, Options.Create(options));
 
         Assert.Equal((accepted ? implementation : typeof(ParameterCopier<>)).MakeGenericType(target), provider.GetDeepCopier(target).GetType());
+    }
+
+    [Fact]
+    public void ConstraintRejectionsDoNotFaultPendingClosedFactoryConstruction()
+    {
+        var attempts = 0;
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializationContract(typeof(StructConstrainedCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializerService<ConstraintSelection>(provider =>
+            {
+                attempts++;
+                return new ConstraintSelection(provider.GetDeepCopier<string>(), provider.GetDeepCopier<int>());
+            });
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var root = GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstraintSelection>(null!, provider);
+        Assert.IsType<ParameterCopier<string>>(root.ReferenceCopier);
+        Assert.IsType<StructConstrainedCopier<int>>(root.ValueCopier);
+        Assert.Same(root.ReferenceCopier, provider.GetDeepCopier<string>());
+        Assert.Same(root.ValueCopier, provider.GetDeepCopier<int>());
+        Assert.Same(root, GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstraintSelection>(null!, provider));
+        Assert.Equal(1, attempts);
+        var input = "preserved";
+        Assert.Same(input, root.ReferenceCopier.DeepCopy(input, null!));
+        Assert.Equal(17, root.ValueCopier.DeepCopy(17, null!));
+    }
+
+    private sealed class ConstraintSelection(IDeepCopier<string> referenceCopier, IDeepCopier<int> valueCopier)
+    {
+        public IDeepCopier<string> ReferenceCopier { get; } = referenceCopier;
+        public IDeepCopier<int> ValueCopier { get; } = valueCopier;
     }
 
     [Theory]

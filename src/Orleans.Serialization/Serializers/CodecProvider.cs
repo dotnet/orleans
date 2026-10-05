@@ -1075,6 +1075,8 @@ namespace Orleans.Serialization.Serializers
         }
 
 #if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("Trimming", "IL2070",
+            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). The selected implementation boundary erases that annotation; explicit contracts use their stored surrogate descriptions instead.")]
         [UnconditionalSuppressMessage("Trimming", "IL2075",
             Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). Materialization erases the registration annotation; explicit contracts use their stored surrogate descriptions instead.")]
 #endif
@@ -1177,13 +1179,13 @@ namespace Orleans.Serialization.Serializers
 
                             if (arguments.Length != candidate.Implementation.GetGenericArguments().Length)
                             {
-                                closed = MaterializeGenericImplementation(candidate.Implementation, arguments);
+                                closed = ConstructGenericImplementation(candidate.Implementation, arguments);
                             }
                             else
                             {
                                 try
                                 {
-                                    closed = ConstructGenericImplementation(candidate.Implementation, arguments);
+                                    closed = MaterializeGenericImplementation(candidate.Implementation, arguments);
                                 }
                                 catch (ArgumentException)
                                 {

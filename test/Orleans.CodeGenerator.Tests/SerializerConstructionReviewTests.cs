@@ -418,21 +418,22 @@ public sealed class SerializerConstructionReviewTests
     }
 
     [Theory]
-    [InlineData("activator")]
-    [InlineData("value serializer")]
-    [InlineData("base copier")]
-    public void CaughtDirectMaterializationFailureRollsBackPendingGraph(string service)
+    [InlineData("activator", typeof(ArgumentException))]
+    [InlineData("value serializer", typeof(KeyNotFoundException))]
+    [InlineData("base copier", typeof(KeyNotFoundException))]
+    public void CaughtDirectMaterializationFailureRollsBackPendingGraph(string service, Type exceptionType)
     {
         var services = new ServiceCollection().AddSerializer();
         var leaves = 0;
         var attempts = 0;
         Leaf? failedLeaf = null;
-        ArgumentException? caught = null;
+        Exception? caught = null;
         services.Configure<TypeManifestOptions>(options =>
         {
             options.AddActivator(typeof(ConstrainedActivator<>));
             options.AddSerializer(typeof(ConstrainedValueSerializer<>));
             options.AddCopier(typeof(ConstrainedBaseCopier<>));
+            options.AddActivator(typeof(UnboundActivator<,>), typeof(ReferenceModel<int>));
             options.AddSerializerService<Leaf>(_ => new Leaf(++leaves));
             options.AddSerializerService<Root>(provider =>
             {
@@ -450,7 +451,7 @@ public sealed class SerializerConstructionReviewTests
                             default: throw new InvalidOperationException(service);
                         }
                     }
-                    catch (ArgumentException exception)
+                    catch (Exception exception) when (exception.GetType() == exceptionType)
                     {
                         caught = exception;
                     }
@@ -465,7 +466,8 @@ public sealed class SerializerConstructionReviewTests
         var serializer = codecs.GetValueSerializer<ValueModel<string>>();
         var copier = codecs.GetBaseCopier<ReferenceModel<string>>();
 
-        var failure = Assert.Throws<ArgumentException>(() => OrleansGeneratedCodeHelper.GetService<Root>(null!, codecs));
+        var failure = Record.Exception(() => OrleansGeneratedCodeHelper.GetService<Root>(null!, codecs));
+        Assert.IsType(exceptionType, failure);
         Assert.Same(caught, failure);
         Assert.Equal(1, leaves);
         var root = OrleansGeneratedCodeHelper.GetService<Root>(null!, codecs);
@@ -535,6 +537,11 @@ public sealed class SerializerConstructionReviewTests
     public struct ValueModel<T>;
 
     public sealed class ConstrainedActivator<T> : IActivator<ReferenceModel<T>> where T : class
+    {
+        public ReferenceModel<T> Create() => new();
+    }
+
+    public sealed class UnboundActivator<T, TUnused> : IActivator<ReferenceModel<T>>
     {
         public ReferenceModel<T> Create() => new();
     }
