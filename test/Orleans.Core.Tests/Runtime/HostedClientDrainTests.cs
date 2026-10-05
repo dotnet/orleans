@@ -36,6 +36,135 @@ namespace UnitTests.Runtime;
 [TestCategory("BVT")]
 public class HostedClientDrainTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ReceiveStatusResponse_DisposesMessageAndPreservesPendingCallback(bool knownRequest, bool malformed)
+    {
+        var fixture = new HostedFixture(nameof(ReceiveStatusResponse_DisposesMessageAndPreservesPendingCallback));
+        var callbacks = ReadCallbacks(fixture.Runtime);
+        var completion = new CallbackCompletionSource();
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(2051),
+            SendingGrain = fixture.Hosted.GrainId
+        };
+        var callback = new CallbackData(
+            new SharedCallbackData(
+                message => callbacks.TryRemove((message.SendingGrain, message.Id), out _),
+                NullLogger<CallbackData>.Instance,
+                fixture.Clock,
+                TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
+                cancellationManager: null),
+            completion,
+            request,
+            fixture.ApplicationRequests);
+        try
+        {
+            using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, request.Id, request.SendingGrain, malformed);
+            if (knownRequest)
+            {
+                Assert.True(callbacks.TryAdd((request.SendingGrain, request.Id), callback));
+            }
+
+            var error = Record.Exception(() => fixture.Runtime.ReceiveResponse(response.Message));
+            Assert.Equal(malformed, error is InvalidCastException);
+            if (!malformed)
+            {
+                Assert.Null(error);
+            }
+
+            Assert.Null(response.Message._bodyObject);
+            Assert.Equal(0, response.Request.Body.Length);
+            Assert.False(callback.IsCompleted);
+            Assert.Equal(0, completion.CompletionCount);
+            Assert.Equal(knownRequest, callbacks.ContainsKey((request.SendingGrain, request.Id)));
+            if (knownRequest)
+            {
+                callback.OnTimeout();
+                var timeout = Assert.IsType<TimeoutException>(completion.Exception);
+                Assert.Equal(!malformed, timeout.Message.Contains("processing", StringComparison.Ordinal));
+                Assert.Equal(1, completion.CompletionCount);
+                Assert.Empty(callbacks);
+            }
+        }
+        finally
+        {
+            await fixture.CleanupAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReceiveCacheInvalidationRejection_DisposesMessageAndPreservesPendingCallback(bool knownRequest)
+    {
+        var fixture = new HostedFixture(nameof(ReceiveCacheInvalidationRejection_DisposesMessageAndPreservesPendingCallback));
+        var callbacks = ReadCallbacks(fixture.Runtime);
+        var completion = new CallbackCompletionSource();
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(2052),
+            SendingGrain = fixture.Hosted.GrainId
+        };
+        var callback = new CallbackData(
+            new SharedCallbackData(
+                message => callbacks.TryRemove((message.SendingGrain, message.Id), out _),
+                NullLogger<CallbackData>.Instance,
+                fixture.Clock,
+                TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
+                cancellationManager: null),
+            completion,
+            request,
+            fixture.ApplicationRequests);
+        try
+        {
+            using var response = new BufferedResponse(fixture.Runtime.ServiceProvider, new Message
+            {
+                Direction = Message.Directions.Response,
+                Result = Message.ResponseTypes.Rejection,
+                Id = request.Id,
+                TargetGrain = request.SendingGrain,
+                TargetSilo = fixture.Address,
+                BodyObject = new RejectionResponse { RejectionType = Message.RejectionTypes.CacheInvalidation },
+                CacheInvalidationHeader = [new GrainAddressCacheUpdate(
+                    new GrainAddress { GrainId = GrainId.Create("test", "invalid"), SiloAddress = fixture.Address },
+                    validAddress: null)]
+            });
+            if (knownRequest)
+            {
+                Assert.True(callbacks.TryAdd((request.SendingGrain, request.Id), callback));
+            }
+
+            fixture.Runtime.ReceiveResponse(response.Message);
+
+            Assert.Null(response.Message._bodyObject);
+            Assert.Equal(0, response.Request.Body.Length);
+            Assert.False(callback.IsCompleted);
+            Assert.Equal(0, completion.CompletionCount);
+            Assert.Equal(knownRequest, callbacks.ContainsKey((request.SendingGrain, request.Id)));
+            if (knownRequest)
+            {
+                Assert.Same(callback, callbacks[(request.SendingGrain, request.Id)]);
+                callback.OnTimeout();
+                Assert.Equal(1, completion.CompletionCount);
+                Assert.Empty(callbacks);
+            }
+        }
+        finally
+        {
+            await fixture.CleanupAsync();
+        }
+    }
+
     [Fact]
     public async Task OnStop_DrainsChannelAdmittedUndispatchedMessages()
     {
@@ -392,7 +521,7 @@ public class HostedClientDrainTests
                 Scopes, [new UntypedReferenceProvider(_root, referenceRuntime)]);
             var silo = Substitute.For<ILocalSiloDetails>();
             // Address data only: no socket, port allocation, DNS, or silo startup.
-            silo.SiloAddress.Returns(SiloAddress.New(IPAddress.Loopback, 0, 1));
+            silo.SiloAddress.Returns(Address);
             silo.GatewayAddress.Returns((SiloAddress)null!);
             Runtime = new InsideRuntimeClient(
                 silo, Scopes, messageFactory, loggerFactory, options, trace, referenceActivator,
@@ -402,9 +531,8 @@ public class HostedClientDrainTests
                 deepCopier, Clock, mapping, instruments);
 
             // Constructor-only transport graph. GatewayAddress == null guards the throwing factory.
-            // Catalog/connections/placement/locator are only reached by transport operations:
-            // we never start/stop MessageCenter, send outbound calls, or deliver rejection/status
-            // responses. All observer bodies are valid OneWay invokables, including on failure.
+            // Local callback, status, and cache-invalidation paths use the configured runtime.
+            // Observer bodies use valid OneWay invokables, including on failure.
             var messageCenter = new MessageCenter(
                 siloDetails: silo,
                 messageFactory: messageFactory,
@@ -450,6 +578,7 @@ public class HostedClientDrainTests
 
         internal HostedClient Hosted { get; }
         internal InsideRuntimeClient Runtime { get; }
+        internal SiloAddress Address { get; } = SiloAddress.New(IPAddress.Loopback, 0, 1);
         internal ScopeTrackingProvider Scopes { get; }
         internal ScopeMarker Marker { get; }
         internal FakeTimeProvider Clock { get; } = new();

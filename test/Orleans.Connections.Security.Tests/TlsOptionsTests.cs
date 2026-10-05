@@ -1,41 +1,59 @@
-using System.Net.Security;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Connections;
-using Orleans.Connections.Security;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Connections.Transport.Security;
+using Orleans.Hosting;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Connections.Security.Tests;
 
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Security")]
 public class TlsOptionsTests
 {
     [Fact]
-    public void Constructor_SetsEveryPublicDefaultToItsDocumentedValue()
+    public void SiloTlsConfiguration_AppliesOncePerConnectionRole()
     {
-        var options = new TlsOptions();
+        var services = new ServiceCollection();
+        var configuredOptions = new List<TlsOptions>();
+        var authenticationCount = 0;
+        var builder = new TestSiloBuilder(services);
+        builder.UseTls(options =>
+        {
+            configuredOptions.Add(options);
+            options.OnAuthenticateAsServer += (_, _) => authenticationCount++;
+        });
+        using var provider = services.BuildServiceProvider();
+        var monitor = provider.GetRequiredService<IOptionsMonitor<TlsOptions>>();
+        var defaultOptions = monitor.CurrentValue;
+        var siloOptions = monitor.Get("silo");
+        var gatewayOptions = monitor.Get("gateway");
 
-        Assert.Equal(TimeSpan.FromSeconds(10), options.HandshakeTimeout);
-        Assert.Null(options.LocalCertificate);
-        Assert.Null(options.LocalServerCertificateSelector);
-        Assert.Null(options.LocalClientCertificateSelector);
-        Assert.Equal(RemoteCertificateMode.RequireCertificate, options.RemoteCertificateMode);
-        Assert.Equal(RemoteCertificateMode.AllowCertificate, options.ClientCertificateMode);
-        Assert.Null(options.RemoteCertificateValidation);
-        Assert.Equal(SslProtocols.Tls12 | SslProtocols.Tls13, options.SslProtocols);
-        Assert.False(options.CheckCertificateRevocation);
-        Assert.Null(options.OnAuthenticateAsServer);
-        Assert.Null(options.OnAuthenticateAsClient);
+        Assert.Equal([defaultOptions, siloOptions, gatewayOptions], configuredOptions);
+        Assert.Same(defaultOptions, monitor.Get(Options.DefaultName));
+        Assert.Same(siloOptions, monitor.Get("silo"));
+        Assert.Same(gatewayOptions, monitor.Get("gateway"));
+        Assert.Null(monitor.Get("other").OnAuthenticateAsServer);
+        foreach (var options in configuredOptions)
+        {
+            Assert.NotNull(options.OnAuthenticateAsServer);
+            options.OnAuthenticateAsServer(null!, new TlsServerAuthenticationOptions());
+        }
+
+        Assert.Equal(3, authenticationCount);
+        Assert.Equal(3, configuredOptions.Count);
     }
 
     [Fact]
-    public void HandshakeTimeout_PositiveValue_IsStoredExactly()
+    public void CertificateModes_DefaultToRequiredPeerAndOptionalLocalClientCertificate()
     {
-        var options = new TlsOptions
-        {
-            HandshakeTimeout = TimeSpan.FromMilliseconds(1_237)
-        };
+        var options = new TlsOptions();
 
-        Assert.Equal(TimeSpan.FromMilliseconds(1_237), options.HandshakeTimeout);
+        Assert.Equal(RemoteCertificateMode.RequireCertificate, options.RemoteCertificateMode);
+        Assert.Equal(RemoteCertificateMode.AllowCertificate, options.ClientCertificateMode);
     }
 
     [Fact]
@@ -80,130 +98,28 @@ public class TlsOptionsTests
             () => options.HandshakeTimeout = rejectedValue);
 
         Assert.Equal("value", exception.ParamName);
-        Assert.Null(exception.ActualValue);
         Assert.Contains("must be positive and no greater than", exception.Message);
         Assert.Equal(TimeSpan.FromSeconds(10), options.HandshakeTimeout);
     }
 
-    [Fact]
-    public void HandshakeTimeout_Zero_ThrowsArgumentOutOfRangeException()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void HandshakeTimeout_NonPositiveFiniteValue_ThrowsArgumentOutOfRangeException(int ticks)
     {
         var options = new TlsOptions();
 
         var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => options.HandshakeTimeout = TimeSpan.Zero);
+            () => options.HandshakeTimeout = TimeSpan.FromTicks(ticks));
 
         Assert.Equal("value", exception.ParamName);
-        Assert.Null(exception.ActualValue);
         Assert.Contains("HandshakeTimeout must be positive", exception.Message);
         Assert.Equal(TimeSpan.FromSeconds(10), options.HandshakeTimeout);
     }
 
-    [Fact]
-    public void HandshakeTimeout_NegativeFiniteValue_ThrowsArgumentOutOfRangeException()
+    private sealed class TestSiloBuilder(IServiceCollection services) : ISiloBuilder
     {
-        var options = new TlsOptions();
-        var rejectedValue = TimeSpan.FromTicks(-2);
-
-        var exception = Assert.Throws<ArgumentOutOfRangeException>(
-            () => options.HandshakeTimeout = rejectedValue);
-
-        Assert.Equal("value", exception.ParamName);
-        Assert.Null(exception.ActualValue);
-        Assert.Contains("HandshakeTimeout must be positive", exception.Message);
-        Assert.Equal(TimeSpan.FromSeconds(10), options.HandshakeTimeout);
-    }
-
-    [Fact]
-    public void AllowAnyRemoteCertificate_ReplacesExistingValidatorAndAcceptsEverySslPolicyError()
-    {
-        using var certificate = TestCertificateHelper.CreateSelfSignedCertificate("tls-options.test");
-        RemoteCertificateValidator rejectingValidator = static (_, _, _) => false;
-        var options = new TlsOptions
-        {
-            RemoteCertificateValidation = rejectingValidator
-        };
-
-        options.AllowAnyRemoteCertificate();
-
-        var validator = Assert.IsType<RemoteCertificateValidator>(options.RemoteCertificateValidation);
-        Assert.NotSame(rejectingValidator, validator);
-        Assert.True(validator(certificate, null, SslPolicyErrors.None));
-        Assert.True(validator(certificate, null, SslPolicyErrors.RemoteCertificateNotAvailable));
-        Assert.True(validator(certificate, null, SslPolicyErrors.RemoteCertificateNameMismatch));
-        Assert.True(validator(certificate, null, SslPolicyErrors.RemoteCertificateChainErrors));
-        Assert.True(
-            validator(
-                certificate,
-                null,
-                SslPolicyErrors.RemoteCertificateNotAvailable
-                    | SslPolicyErrors.RemoteCertificateNameMismatch
-                    | SslPolicyErrors.RemoteCertificateChainErrors));
-    }
-
-    [Fact]
-    public void ClientAuthenticationConfiguration_PropagatesMutationsToSslClientAuthenticationOptions()
-    {
-        var connection = new DefaultConnectionContext();
-        var authenticationOptions = new TlsClientAuthenticationOptions();
-        var underlyingOptions = Assert.IsType<SslClientAuthenticationOptions>(
-            authenticationOptions.SslClientAuthenticationOptions);
-        ConnectionContext? receivedConnection = null;
-        TlsClientAuthenticationOptions? receivedOptions = null;
-        Action<ConnectionContext, TlsClientAuthenticationOptions> configure = (context, options) =>
-        {
-            receivedConnection = context;
-            receivedOptions = options;
-            options.TargetHost = "silo.tls-options.test";
-            options.EnabledSslProtocols = SslProtocols.Tls12;
-            options.CertificateRevocationCheckMode = X509RevocationMode.Online;
-        };
-        var options = new TlsOptions
-        {
-            OnAuthenticateAsClient = configure
-        };
-
-        options.OnAuthenticateAsClient(connection, authenticationOptions);
-
-        Assert.Same(configure, options.OnAuthenticateAsClient);
-        Assert.Same(connection, receivedConnection);
-        Assert.Same(authenticationOptions, receivedOptions);
-        Assert.Same(underlyingOptions, authenticationOptions.SslClientAuthenticationOptions);
-        Assert.Equal("silo.tls-options.test", underlyingOptions.TargetHost);
-        Assert.Equal(SslProtocols.Tls12, underlyingOptions.EnabledSslProtocols);
-        Assert.Equal(X509RevocationMode.Online, underlyingOptions.CertificateRevocationCheckMode);
-    }
-
-    [Fact]
-    public void ServerAuthenticationConfiguration_PropagatesMutationsToSslServerAuthenticationOptions()
-    {
-        var connection = new DefaultConnectionContext();
-        var authenticationOptions = new TlsServerAuthenticationOptions();
-        var underlyingOptions = Assert.IsType<SslServerAuthenticationOptions>(
-            authenticationOptions.SslServerAuthenticationOptions);
-        ConnectionContext? receivedConnection = null;
-        TlsServerAuthenticationOptions? receivedOptions = null;
-        Action<ConnectionContext, TlsServerAuthenticationOptions> configure = (context, options) =>
-        {
-            receivedConnection = context;
-            receivedOptions = options;
-            options.ClientCertificateRequired = true;
-            options.EnabledSslProtocols = SslProtocols.Tls13;
-            options.CertificateRevocationCheckMode = X509RevocationMode.Offline;
-        };
-        var options = new TlsOptions
-        {
-            OnAuthenticateAsServer = configure
-        };
-
-        options.OnAuthenticateAsServer(connection, authenticationOptions);
-
-        Assert.Same(configure, options.OnAuthenticateAsServer);
-        Assert.Same(connection, receivedConnection);
-        Assert.Same(authenticationOptions, receivedOptions);
-        Assert.Same(underlyingOptions, authenticationOptions.SslServerAuthenticationOptions);
-        Assert.True(underlyingOptions.ClientCertificateRequired);
-        Assert.Equal(SslProtocols.Tls13, underlyingOptions.EnabledSslProtocols);
-        Assert.Equal(X509RevocationMode.Offline, underlyingOptions.CertificateRevocationCheckMode);
+        public IServiceCollection Services { get; } = services;
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 }

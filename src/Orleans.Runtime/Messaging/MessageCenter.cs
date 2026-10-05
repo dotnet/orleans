@@ -164,6 +164,7 @@ namespace Orleans.Runtime.Messaging
                 else
                 {
                     this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.Dispose();
                 }
 
                 return;
@@ -183,6 +184,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    msg.Dispose();
                     return;
                 }
 
@@ -222,6 +224,10 @@ namespace Orleans.Runtime.Messaging
                         {
                             this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
                             this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                        }
+                        else
+                        {
+                            msg.Dispose();
                         }
 
                         return;
@@ -264,19 +270,30 @@ namespace Orleans.Runtime.Messaging
             Exception? exc,
             string? rejectInfo = null)
         {
-            if (message.Direction == Message.Directions.Request
-                || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
+            try
             {
-                this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
+                if (message.Direction == Message.Directions.Request
+                    || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
+                {
+                    this.messagingTrace.OnDispatcherRejectMessage(message, rejectionType, rejectInfo, exc);
 
-                var str = $"{rejectInfo} {exc}";
-                var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
-                SendMessage(rejection);
+                    SendRejectionResponse(message, rejectionType, $"{rejectInfo} {exc}", exc);
+                }
+                else
+                {
+                    this.messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
+                }
             }
-            else
+            finally
             {
-                this.messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
+                message.Dispose();
             }
+        }
+
+        private void SendRejectionResponse(Message message, Message.RejectionTypes rejectionType, string reason, Exception? exception)
+        {
+            var rejection = messageFactory.CreateRejectionResponse(message, rejectionType, reason, exception);
+            SendMessage(rejection);
         }
 
         internal void ProcessRequestsToInvalidActivation(
@@ -402,11 +419,11 @@ namespace Orleans.Runtime.Messaging
                 // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
                 if (message.Direction == Message.Directions.OneWay)
                 {
-                    this.RejectMessage(
+                    SendRejectionResponse(
                         message,
                         Message.RejectionTypes.CacheInvalidation,
-                        exc,
-                        "OneWay message sent to invalid activation");
+                        $"OneWay message sent to invalid activation {exc}",
+                        exc);
                     sentRejection = true;
                 }
 
@@ -417,6 +434,10 @@ namespace Orleans.Runtime.Messaging
                     {
                         var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after \"{failedOperation}\" to invalid activation. Rejecting now.";
                         RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
+                    }
+                    else
+                    {
+                        message.Dispose();
                     }
                 }
             }
@@ -595,6 +616,8 @@ namespace Orleans.Runtime.Messaging
 
                     SendMessage(response);
                 }
+
+                msg.Dispose();
             }
             else
             {
@@ -608,20 +631,27 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
-            _messagingInstruments.OnRejectedMessage(msg);
+            try
+            {
+                _messagingInstruments.OnRejectedMessage(msg);
 
-            if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
-            {
-                // Do not send reject a rejection locally, it will create a stack overflow
-                _messagingInstruments.OnDroppedSentMessage(msg);
-                LogDebugDroppingRejection(log, msg);
+                if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
+                {
+                    // Do not send reject a rejection locally, it will create a stack overflow
+                    _messagingInstruments.OnDroppedSentMessage(msg);
+                    LogDebugDroppingRejection(log, msg);
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
+                    var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason, exception);
+                    // rejection msgs are always originated in the local silo, they are never remote.
+                    this.ReceiveMessage(error);
+                }
             }
-            else
+            finally
             {
-                if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
-                var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason, exception);
-                // rejection msgs are always originated in the local silo, they are never remote.
-                this.ReceiveMessage(error);
+                msg.Dispose();
             }
         }
 

@@ -26,11 +26,12 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost;
 
 /// <summary>
-/// A host class for local testing with Orleans using in-process silos. 
+/// A host class for local testing with Orleans using in-process silos.
 /// </summary>
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
@@ -62,7 +63,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Options used to configure the test cluster.
     /// </summary>
-    /// <remarks>This is the options you configured your test cluster with, or the default one. 
+    /// <remarks>This is the options you configured your test cluster with, or the default one.
     /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
     /// </remarks>
     public InProcessTestClusterOptions Options { get; }
@@ -200,7 +201,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         if (TryGetGrainContext(grainId, out var grainContext))
         {
-            grainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            grainContext!.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
             await grainContext.Deactivated;
         }
     }
@@ -379,7 +380,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
@@ -405,12 +406,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Wait for active silos to observe cluster manifest updates for all active silos.
+    /// Waits for active silos to observe cluster manifest updates for all active silos.
     /// </summary>
-    /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
     public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value; // Stabilization requires a deployed client.
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
         var activeSilos = GetActiveSilos().ToArray();
         var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
@@ -871,7 +871,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 clientBuilder.Services.AddSingleton<IGatewayListProvider>(_membershipTable);
             }
 
-            clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+            clientBuilder.UseInMemoryTransport(_transportHub);
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
@@ -1000,7 +1000,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                         new ConfigureDistributedGrainDirectory().Configure(siloBuilder);
                     }
 
-                    siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                    siloBuilder.UseInMemoryTransport(_transportHub);
 
                     services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
                     services.AddSingleton<TestHooksSystemTarget>();

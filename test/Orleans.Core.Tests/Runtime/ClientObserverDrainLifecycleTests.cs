@@ -29,6 +29,69 @@ namespace UnitTests.Runtime;
 [TestCategory("BVT")]
 public class ClientObserverDrainLifecycleTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task ReceiveStatusResponse_DisposesMessageAndPreservesPendingCallback(bool knownRequest, bool malformed)
+    {
+        var fixture = new ExternalClientFixture();
+        var callbacks = ReadCallbacks(fixture.Runtime);
+        var completion = new CallbackCompletionSource();
+        using var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(2501),
+            SendingGrain = fixture.ObserverId.GrainId
+        };
+        var callback = new CallbackData(
+            new SharedCallbackData(
+                message => callbacks.TryRemove(message.Id, out _),
+                NullLogger<CallbackData>.Instance,
+                fixture.TimeProvider,
+                TimeSpan.FromMinutes(1),
+                cancelOnTimeout: false,
+                waitForCancellationAcknowledgement: false,
+                cancellationManager: null),
+            completion,
+            request,
+            new ApplicationRequestInstruments(fixture.Instruments));
+        try
+        {
+            using var response = new BufferedResponse(fixture.Services, request.Id, request.SendingGrain, malformed);
+            if (knownRequest)
+            {
+                Assert.True(callbacks.TryAdd(request.Id, callback));
+            }
+
+            var error = Record.Exception(() => fixture.Runtime.ReceiveResponse(response.Message));
+            Assert.Equal(malformed, error is InvalidCastException);
+            if (!malformed)
+            {
+                Assert.Null(error);
+            }
+
+            Assert.Null(response.Message._bodyObject);
+            Assert.Equal(0, response.Request.Body.Length);
+            Assert.False(callback.IsCompleted);
+            Assert.Equal(0, completion.CompletionCount);
+            Assert.Equal(knownRequest, callbacks.ContainsKey(request.Id));
+            if (knownRequest)
+            {
+                callback.OnTimeout();
+                var timeout = Assert.IsType<TimeoutException>(completion.Exception);
+                Assert.Equal(!malformed, timeout.Message.Contains("processing", StringComparison.Ordinal));
+                Assert.Equal(1, completion.CompletionCount);
+                Assert.Empty(callbacks);
+            }
+        }
+        finally
+        {
+            await fixture.CleanupAsync();
+        }
+    }
+
     [Fact]
     public async Task ClusterClientStop_AllowsUpperStageCleanupThenDrainsBeforeConnectionClose()
     {
