@@ -307,12 +307,17 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordStruct));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordClass));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecord));
-            config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoDataRecordStruct>));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordStruct), typeof(global::TestProject.DemoDataRecordStruct));
+            config.AddValueSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordStruct), typeof(global::TestProject.DemoDataRecordStruct));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordClass), typeof(global::TestProject.DemoDataRecordClass));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecordClass), typeof(global::TestProject.DemoDataRecordClass));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecord), typeof(global::TestProject.DemoDataRecord));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoDataRecord), typeof(global::TestProject.DemoDataRecord));
+            config.AddCopier(typeof(global::Orleans.Serialization.Cloning.ShallowCopier<global::TestProject.DemoDataRecordStruct>), typeof(global::TestProject.DemoDataRecordStruct));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass), typeof(global::TestProject.DemoDataRecordClass));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecordClass), typeof(global::TestProject.DemoDataRecordClass));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord), typeof(global::TestProject.DemoDataRecord));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoDataRecord), typeof(global::TestProject.DemoDataRecord));
         }
     }
 }

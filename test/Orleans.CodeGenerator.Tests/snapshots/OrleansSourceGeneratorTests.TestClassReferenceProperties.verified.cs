@@ -155,8 +155,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData), typeof(global::TestProject.DemoData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_DemoData), typeof(global::TestProject.DemoData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData), typeof(global::TestProject.DemoData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_DemoData), typeof(global::TestProject.DemoData));
         }
     }
 }

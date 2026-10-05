@@ -156,8 +156,8 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8), typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8), typeof(OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8));
             config.AddInterfaceProxy(typeof(OrleansCodeGen.TestProject.Proxy_IResponseTimeoutGrain));
             config.AddInterface(typeof(global::TestProject.IResponseTimeoutGrain));
             config.AddInterfaceImplementation(typeof(global::TestProject.ResponseTimeoutGrain));
