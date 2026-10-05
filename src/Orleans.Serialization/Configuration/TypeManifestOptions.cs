@@ -683,7 +683,6 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedTypes.Add(RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false));
-            ContextTypes.Add(type);
         }
 
         /// <summary>

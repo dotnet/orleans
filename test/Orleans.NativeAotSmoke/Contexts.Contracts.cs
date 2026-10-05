@@ -452,6 +452,10 @@ public static partial class ContextContracts
             "Metadata-only argument aliases preserve closed type-name round-trips.");
         Ensure(!services.GetRequiredService<Serializer>().CanSerialize<UnusedAliasMarker>(),
             "Metadata-only alias registration preserves the marker's codec-free role.");
+        var resolver = services.GetRequiredService<Orleans.Serialization.TypeSystem.TypeResolver>();
+        Ensure(resolver.ResolveType(typeof(UnusedAliasMarker).FullName!) == typeof(UnusedAliasMarker)
+            && resolver.ResolveType(typeof(UnusedAliasMarker[]).FullName!) == typeof(UnusedAliasMarker[]),
+            "Metadata-only marker and array names resolve through the common type resolver.");
         Ensure(RoundTrip(services, new InterfaceTaggedPayload { Value = 103 }).Value == 103,
             "Aliased implemented interfaces contribute initialization metadata.");
         Ensure(RoundTrip(services, new AliasedContainer.Payload { Value = 107 }).Value == 107,
@@ -465,6 +469,8 @@ public static partial class ContextContracts
             "Inaccessible incidental interface arguments preserve serializer initialization and payload serialization.");
         Ensure(aliases.Parse("(\"context-private-argument-interface\")") == typeof(IIncidentalMetadataTag<>),
             "Accessible open-interface alias metadata is preserved while its private argument remains incidental.");
+        Ensure(resolver.ResolveType(typeof(IIncidentalMetadataTag<>).FullName!) == typeof(IIncidentalMetadataTag<>),
+            "Open interface metadata names retain their canonical definition independently of codecs.");
         using (var separate = new ServiceCollection().AddSerializerContext(new PrefixContext())
             .AddSerializerContext(new MultipleAliasContext()).BuildServiceProvider())
         {
