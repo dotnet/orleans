@@ -80,6 +80,9 @@ public sealed class SerializationType
     /// <param name="arguments">The generic arguments, in declaration order.</param>
     /// <returns>The type description.</returns>
     /// <remarks>
+    /// Generic definitions supplied without argument descriptions use the implementation's
+    /// generic parameters in declaration order for target matching and executable type resolution.
+    /// Supply argument descriptions to bind a subset of the parameters or reorder them.
     /// Array types supplied to this method must be closed. Use <see cref="Array"/>
     /// to describe a structural target-matching pattern with generic element parameters.
     /// </remarks>

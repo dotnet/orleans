@@ -157,12 +157,12 @@ internal static class Metadata
             .AddSingleton<MetadataMixedActivator<string>>()
             .AddSingleton<MetadataMixedActivator<MetadataMixedTarget<string>>>()
             .BuildServiceProvider();
-        foreach (var plainLast in new[] { false, true })
+        foreach (var (plainLast, useDescription) in new[] { (false, false), (true, false), (false, true), (true, true) })
         {
             var options = new TypeManifestOptions();
             if (!plainLast)
             {
-                options.AddActivator(typeof(MetadataMixedActivator<>), typeof(MetadataMixedTarget<>));
+                AddPlain();
             }
 
             options.AddSerializationContract(typeof(MetadataMixedActivator<>), typeof(IActivator<>),
@@ -170,7 +170,7 @@ internal static class Metadata
                     SerializationType.Create(typeof(MetadataMixedTarget<>), SerializationType.Parameter(0))));
             if (plainLast)
             {
-                options.AddActivator(typeof(MetadataMixedActivator<>), typeof(MetadataMixedTarget<>));
+                AddPlain();
             }
 
             var provider = new CodecProvider(services, Options.Create(options));
@@ -182,6 +182,19 @@ internal static class Metadata
                 || nested.Create() is not MetadataMixedTarget<MetadataMixedTarget<string>>)
             {
                 throw new InvalidOperationException("Implementation closure did not honor the selected plain or described registration.");
+            }
+
+            void AddPlain()
+            {
+                if (useDescription)
+                {
+                    options.AddSerializationContract(typeof(MetadataMixedActivator<>), typeof(IActivator<>),
+                        SerializationType.Create(typeof(MetadataMixedTarget<>)));
+                }
+                else
+                {
+                    options.AddActivator(typeof(MetadataMixedActivator<>), typeof(MetadataMixedTarget<>));
+                }
             }
         }
 

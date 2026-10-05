@@ -252,14 +252,16 @@ public class ManifestContractTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MixedPlainAndDescribedRegistrationsCloseTheSelectedCandidate(bool plainLast)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void MixedPlainAndDescribedRegistrationsCloseTheSelectedCandidate(bool plainLast, bool useDescription)
     {
         var options = new TypeManifestOptions();
         if (!plainLast)
         {
-            options.AddActivator(typeof(MixedRegistrationActivator<>), typeof(FixedArgument<>));
+            AddPlain();
         }
 
         options.AddSerializationContract(typeof(MixedRegistrationActivator<>), typeof(IActivator<>),
@@ -267,7 +269,7 @@ public class ManifestContractTests
                 SerializationType.Create(typeof(GenericSurrogate<>), SerializationType.Parameter(0))));
         if (plainLast)
         {
-            options.AddActivator(typeof(MixedRegistrationActivator<>), typeof(FixedArgument<>));
+            AddPlain();
         }
 
         using var services = new ServiceCollection().BuildServiceProvider();
@@ -279,6 +281,63 @@ public class ManifestContractTests
         var nested = provider.GetActivator<FixedArgument<GenericSurrogate<string>>>();
         Assert.IsType(plainLast ? typeof(MixedRegistrationActivator<GenericSurrogate<string>>) : typeof(MixedRegistrationActivator<string>), nested);
         Assert.IsType<FixedArgument<GenericSurrogate<string>>>(nested.Create());
+
+        void AddPlain()
+        {
+            if (useDescription)
+            {
+                options.AddSerializationContract(typeof(MixedRegistrationActivator<>), typeof(IActivator<>),
+                    SerializationType.Create(typeof(FixedArgument<>)));
+            }
+            else
+            {
+                options.AddActivator(typeof(MixedRegistrationActivator<>), typeof(FixedArgument<>));
+            }
+        }
+    }
+
+    [Fact]
+    public void GenericDefinitionDescriptionsBindPositionalTargetArguments()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(LegacyOrderedCopier<,>), typeof(IDeepCopier<>),
+            SerializationType.Create(typeof(GenericTarget<,>)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<LegacyOrderedCopier<Guid, int>>(provider.GetDeepCopier<GenericTarget<Guid, int>>());
+    }
+
+    [Fact]
+    public void NestedGenericDefinitionDescriptionsRespectExistingParameterBindings()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(PatternCodec<>), typeof(IBaseCodec<>),
+            SerializationType.Create(typeof(PatternOuter<>.Nested<>),
+                SerializationType.Parameter(0), SerializationType.Create(typeof(FixedArgument<>))));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.IsType<PatternCodec<int>>(provider.GetBaseCodec<PatternOuter<int>.Nested<FixedArgument<int>>>());
+        Assert.Throws<KeyNotFoundException>(() => provider.GetBaseCodec<PatternOuter<string>.Nested<FixedArgument<int>>>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericDefinitionDescriptionsRejectArityMismatches(bool nested)
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(nested ? typeof(PairFallbackCopier<,>) : typeof(ParameterCopier<>), typeof(IDeepCopier<>),
+            nested
+                ? SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Create(typeof(FixedArgument<>)), SerializationType.Parameter(1))
+                : SerializationType.Create(typeof(GenericTarget<,>)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var target = nested ? typeof(GenericTarget<FixedArgument<Guid>, int>) : typeof(GenericTarget<Guid, int>);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetDeepCopier(target));
+        Assert.Contains(nested ? "arity 1, but implementation arity is 2" : "arity 2, but implementation arity is 1", exception.Message);
     }
 
     [Fact]

@@ -769,7 +769,47 @@ namespace Orleans.Serialization.Serializers
         {
             if (description.ParameterIndex >= 0)
             {
-                var index = description.ParameterIndex;
+                return BindParameter(description.ParameterIndex, target, arguments);
+            }
+
+            if (description.ArrayRank > 0)
+            {
+                return target.IsArray && target.GetArrayRank() == description.ArrayRank
+                    && (description.ArrayRank != 1 || target.IsSZArray)
+                    && BindTypeArguments(description.Arguments[0], target.GetElementType()!, arguments);
+            }
+
+            if (description.Arguments.Length == 0 && description.Type is not { IsGenericTypeDefinition: true })
+            {
+                return description.Type == target;
+            }
+
+            if (!target.IsConstructedGenericType || target.GetGenericTypeDefinition() != description.Type)
+            {
+                return false;
+            }
+
+            var parameters = target.GetGenericArguments();
+            if (description.Arguments.Length == 0 && parameters.Length != arguments.Length)
+            {
+                throw new InvalidOperationException(
+                    $"Serialization contract generic definition {description.Type} has arity {parameters.Length}, but implementation arity is {arguments.Length}. Supply explicit generic argument descriptions.");
+            }
+
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                if (!(description.Arguments.Length == 0
+                    ? BindParameter(i, parameters[i], arguments)
+                    : BindTypeArguments(description.Arguments[i], parameters[i], arguments)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+
+            static bool BindParameter(int index, Type target, Type?[] arguments)
+            {
                 if (index >= arguments.Length)
                 {
                     throw new InvalidOperationException($"Serialization contract parameter {index} exceeds implementation arity {arguments.Length}.");
@@ -783,34 +823,6 @@ namespace Orleans.Serialization.Serializers
                 arguments[index] = target;
                 return true;
             }
-
-            if (description.ArrayRank > 0)
-            {
-                return target.IsArray && target.GetArrayRank() == description.ArrayRank
-                    && (description.ArrayRank != 1 || target.IsSZArray)
-                    && BindTypeArguments(description.Arguments[0], target.GetElementType()!, arguments);
-            }
-
-            if (description.Arguments.Length == 0)
-            {
-                return description.Type == target;
-            }
-
-            if (!target.IsConstructedGenericType || target.GetGenericTypeDefinition() != description.Type)
-            {
-                return false;
-            }
-
-            var parameters = target.GetGenericArguments();
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                if (!BindTypeArguments(description.Arguments[i], parameters[i], arguments))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private static Type ResolveSerializationType(SerializationType description, Type[] parameters)
