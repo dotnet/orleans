@@ -50,12 +50,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
             selector = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
             {
                 var cert = _certificateSelector(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers);
-                if (cert != null)
-                {
-                    cert = ValidateCertificate(cert, Options.ClientCertificateMode);
-                }
-
-                return cert;
+                return ValidateCertificate(cert, Options.ClientCertificateMode);
             };
         }
 
@@ -72,7 +67,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
         await Stream.AuthenticateAsClientAsync(sslOptions.Value, cancellationToken);
     }
 
-    private static X509Certificate2? ValidateCertificate(X509Certificate2 certificate, RemoteCertificateMode mode)
+    private static X509Certificate2? ValidateCertificate(X509Certificate2? certificate, RemoteCertificateMode mode)
     {
         switch (mode)
         {
@@ -94,7 +89,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
         }
     }
 
-    private static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2 certificate)
+    private static void EnsureCertificateIsAllowedForClientAuth(X509Certificate2? certificate)
     {
         if (certificate is null)
         {

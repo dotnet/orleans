@@ -306,6 +306,27 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task ConnectionCommon_ConcurrentHandlerAcquisitionResolvesOnce()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        var common = CreateConnectionCommon(services, shared);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acquisitions = Enumerable.Range(0, 16).Select(_ => Task.Run(async () =>
+        {
+            await start.Task;
+            return common.MessageHandlerShared;
+        }, TestContext.Current.CancellationToken)).ToArray();
+
+        start.SetResult();
+        var results = await Task.WhenAll(acquisitions).WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.All(results, result => Assert.Same(shared, result));
+        Assert.Same(shared, common.MessageHandlerShared);
+        common.ServiceProvider.Received(1).GetService(typeof(MessageHandlerShared));
+    }
+
+    [Fact]
     public void MessageHandlerShared_DoesNotReuseHandlersAcrossInstances()
     {
         using var firstServiceProvider = CreateServiceProvider();
@@ -716,6 +737,44 @@ public class MessageTransportLifecycleTests
         Assert.Equal(checkRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck, defaultMode);
         var expectedMode = checkRevocation != overrideRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck;
         Assert.Equal(expectedMode, sslOptions.CertificateRevocationCheckMode);
+    }
+
+    [Theory]
+    [InlineData(RemoteCertificateMode.NoCertificate)]
+    [InlineData(RemoteCertificateMode.AllowCertificate)]
+    [InlineData(RemoteCertificateMode.RequireCertificate)]
+    public async Task TlsConnector_ClientCertificateSelectorHonorsCertificateMode(RemoteCertificateMode mode)
+    {
+        var callbackOptions = new TaskCompletionSource<TlsClientAuthenticationOptions>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = Substitute.For<IOptionsMonitor<TlsOptions>>();
+        options.CurrentValue.Returns(new TlsOptions
+        {
+            ClientCertificateMode = mode,
+            LocalClientCertificateSelector = (_, _, _, _, _) => null,
+            OnAuthenticateAsClient = (_, sslOptions) =>
+            {
+                sslOptions.TargetHost = "localhost";
+                callbackOptions.TrySetResult(sslOptions);
+            }
+        });
+        await using var connector = new TlsMessageTransportConnector(new TestConnector(new TrackingTransport()), options, NullLoggerFactory.Instance);
+        await using var transport = await connector.CreateAsync(
+            new IPEndPoint(IPAddress.Loopback, 1),
+            TestContext.Current.CancellationToken);
+        var configuredOptions = await callbackOptions.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var selector = configuredOptions.LocalCertificateSelectionCallback;
+        Assert.NotNull(selector);
+
+        if (mode is RemoteCertificateMode.RequireCertificate)
+        {
+            var error = Assert.Throws<InvalidOperationException>(() =>
+                selector(new object(), "localhost", new X509CertificateCollection(), null, []));
+            Assert.Equal("No certificate provided for client authentication.", error.Message);
+        }
+        else
+        {
+            Assert.Null(selector(new object(), "localhost", new X509CertificateCollection(), null, []));
+        }
     }
 
     [Fact]

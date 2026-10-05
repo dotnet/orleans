@@ -14,7 +14,7 @@ internal sealed class ConnectionCommon(
     Orleans.Placement.Repartitioning.IMessageStatisticsSink messageStatisticsSink)
 {
     private readonly object _lock = new();
-    private MessageHandlerShared? _messageHandlerShared;
+    private volatile MessageHandlerShared? _messageHandlerShared;
 
     public MessageFactory MessageFactory { get; } = messageFactory;
     public IServiceProvider ServiceProvider { get; } = serviceProvider;
