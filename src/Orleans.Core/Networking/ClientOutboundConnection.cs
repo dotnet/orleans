@@ -77,9 +77,10 @@ namespace Orleans.Runtime.Messaging
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
+                NegotiateProtocolVersion(this.connectionOptions.ProtocolVersion, preamble.NetworkProtocolVersion);
                 if (this.Log.IsEnabled(LogLevel.Information))
                 {
-                    var protocolVersion = preamble.NetworkProtocolVersion.ToString();
+                    var protocolVersion = NetworkProtocolVersion.ToString();
                     LogInformationEstablishedConnection(this.Log, preamble.SiloAddress, protocolVersion);
                 }
 
