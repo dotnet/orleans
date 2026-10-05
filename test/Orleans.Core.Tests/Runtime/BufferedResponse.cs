@@ -15,11 +15,23 @@ using Orleans.Serialization.Session;
 
 namespace UnitTests.Runtime;
 
-internal sealed class BufferedStatusResponse : IDisposable
+internal sealed class BufferedResponse : IDisposable
 {
     private readonly MessageHandlerShared _shared;
 
-    public BufferedStatusResponse(IServiceProvider services, CorrelationId id, GrainId targetGrain, bool malformed)
+    public BufferedResponse(IServiceProvider services, CorrelationId id, GrainId targetGrain, bool malformed)
+        : this(services, new Message
+        {
+            Direction = Message.Directions.Response,
+            Result = Message.ResponseTypes.Status,
+            Id = id,
+            TargetGrain = targetGrain,
+            BodyObject = new StatusResponse(isExecuting: true, isWaiting: false, ["processing"])
+        }, malformed)
+    {
+    }
+
+    public BufferedResponse(IServiceProvider services, Message message, bool malformed = false)
     {
         var instruments = new OrleansInstruments(services.GetRequiredService<System.Diagnostics.Metrics.IMeterFactory>());
         var messaging = new MessagingInstruments(instruments);
@@ -33,14 +45,7 @@ internal sealed class BufferedStatusResponse : IDisposable
             factory,
             Substitute.For<IMessageCenter>(),
             messaging);
-        Message = new Message
-        {
-            Direction = Message.Directions.Response,
-            Result = Message.ResponseTypes.Status,
-            Id = id,
-            TargetGrain = targetGrain,
-            BodyObject = new StatusResponse(isExecuting: true, isWaiting: false, ["processing"])
-        };
+        Message = message;
         using var buffer = new ArcBufferWriter();
         int bodyLength;
         if (malformed)
@@ -57,7 +62,7 @@ internal sealed class BufferedStatusResponse : IDisposable
         }
 
         Request = _shared.GetReceiveMessageHandler();
-        Request._originalResponseType = Message.ResponseTypes.Status;
+        Request._originalResponseType = Message.Result;
         Request.Body = buffer.ConsumeSlice(bodyLength);
         typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Request, bodyLength);
         Message.SetMessageReadRequest(Request);

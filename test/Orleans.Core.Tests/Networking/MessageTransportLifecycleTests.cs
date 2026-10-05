@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -672,21 +673,32 @@ public class MessageTransportLifecycleTests
         Assert.True(inner.Disposed);
     }
 
-    [Fact]
-    public async Task TlsConnector_ClientAuthenticationCallbackSeesDefaultApplicationProtocolAndCanSetTargetHost()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task TlsConnector_ClientAuthenticationCallbackSeesDefaultsAndCanOverrideOptions(bool checkRevocation, bool overrideRevocation)
     {
         var inner = new TrackingTransport();
-        var callbackOptions = new TaskCompletionSource<TlsClientAuthenticationOptions>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbackOptions = new TaskCompletionSource<(TlsClientAuthenticationOptions Options, X509RevocationMode DefaultMode)>(TaskCreationOptions.RunContinuationsAsynchronously);
         SslStream? callbackStream = null;
         var options = Substitute.For<IOptionsMonitor<TlsOptions>>();
         options.CurrentValue.Returns(new TlsOptions
         {
             ClientCertificateMode = RemoteCertificateMode.NoCertificate,
+            CheckCertificateRevocation = checkRevocation,
             OnAuthenticateAsClient = (connection, sslOptions) =>
             {
                 callbackStream = connection.Features.Get<SslStream>();
                 sslOptions.TargetHost = "localhost";
-                callbackOptions.TrySetResult(sslOptions);
+                var defaultMode = sslOptions.CertificateRevocationCheckMode;
+                if (overrideRevocation)
+                {
+                    sslOptions.CertificateRevocationCheckMode = checkRevocation ? X509RevocationMode.NoCheck : X509RevocationMode.Online;
+                }
+
+                callbackOptions.TrySetResult((sslOptions, defaultMode));
             }
         });
         await using var connector = new TlsMessageTransportConnector(new TestConnector(inner), options, NullLoggerFactory.Instance);
@@ -694,13 +706,16 @@ public class MessageTransportLifecycleTests
             new IPEndPoint(IPAddress.Loopback, 1),
             TestContext.Current.CancellationToken);
 
-        var configuredOptions = await callbackOptions.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var (configuredOptions, defaultMode) = await callbackOptions.Task.WaitAsync(TestContext.Current.CancellationToken);
         var sslOptions = Assert.IsType<SslClientAuthenticationOptions>(configuredOptions.SslClientAuthenticationOptions);
 
         Assert.NotNull(callbackStream);
         Assert.Same(transport.Features.Get<SslStream>(), callbackStream);
         Assert.Equal("localhost", sslOptions.TargetHost);
         Assert.Equal([new SslApplicationProtocol("Orleans1")], sslOptions.ApplicationProtocols);
+        Assert.Equal(checkRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck, defaultMode);
+        var expectedMode = checkRevocation != overrideRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck;
+        Assert.Equal(expectedMode, sslOptions.CertificateRevocationCheckMode);
     }
 
     [Fact]

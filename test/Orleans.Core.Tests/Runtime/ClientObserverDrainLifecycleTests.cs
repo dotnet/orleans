@@ -59,7 +59,7 @@ public class ClientObserverDrainLifecycleTests
             new ApplicationRequestInstruments(fixture.Instruments));
         try
         {
-            using var response = new BufferedStatusResponse(fixture.Services, request.Id, request.SendingGrain, malformed);
+            using var response = new BufferedResponse(fixture.Services, request.Id, request.SendingGrain, malformed);
             if (knownRequest)
             {
                 Assert.True(callbacks.TryAdd(request.Id, callback));

@@ -64,6 +64,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
             ClientCertificates = _certificate == null || _certificateSelector != null ? null : new X509CertificateCollection { _certificate },
             LocalCertificateSelectionCallback = selector,
             EnabledSslProtocols = Options.SslProtocols,
+            CertificateRevocationCheckMode = Options.CheckCertificateRevocation ? X509RevocationMode.Online : X509RevocationMode.NoCheck,
         };
 
         Options.OnAuthenticateAsClient?.Invoke(transport, sslOptions);
