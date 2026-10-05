@@ -199,6 +199,8 @@ internal static class SerializerFactoryGenerator
             && SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, services.Compilation.Assembly))
         {
             var activatorName = $"global::{constructionModel.GeneratedNamespace}.{ActivatorGenerator.GetSimpleClassName(constructionModel)}";
+            if (type.IsGenericType)
+                activatorName += $"<{string.Join(", ", type.TypeArguments.Select(Name))}>";
             var activatorModel = type.IsGenericType
                 ? SerializableSourceOutputGenerator.CreateSerializableTypeDescription(services, type.OriginalDefinition)!
                 : constructionModel;

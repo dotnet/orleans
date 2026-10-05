@@ -2441,17 +2441,20 @@ public class DemoClass
     }
 
     [Theory]
-    [InlineData("string")]
-    [InlineData("int")]
-    public async Task RpcClosedGenericModelFactoriesUseDefinitionConstructorContracts(string argument)
+    [InlineData("string", false)]
+    [InlineData("int", false)]
+    [InlineData("string", true)]
+    [InlineData("int", true)]
+    public async Task RpcClosedGenericModelFactoriesUseDefinitionConstructorContracts(string argument, bool generatedActivator)
     {
-        var compilation = await CreateCompilation("""
+        var compilation = await CreateCompilation($$"""
             using Orleans;
             namespace GenericConstruction;
             [GenerateSerializer]
             public sealed class Payload<T>
             {
                 [Id(0)] private T _value;
+                {{(generatedActivator ? "[GeneratedActivatorConstructor]" : "")}}
                 public Payload(T value) => _value = value;
                 public T Value => _value;
             }
@@ -2464,6 +2467,8 @@ public class DemoClass
         Assert.Contains($"IActivator<global::GenericConstruction.Payload<{argument}>>", graph.ConfigurationStatements);
         Assert.Contains("provider), provider)", graph.ConfigurationStatements);
         Assert.DoesNotContain("Payload<T>", graph.ConfigurationStatements);
+        if (generatedActivator)
+            Assert.Contains($"new global::OrleansCodeGen.GenericConstruction.Activator_Payload<{argument}>(", graph.ConfigurationStatements);
         var generated = RunSourceGenerator(compilation);
         Assert.Empty(generated.Diagnostics);
         var exercise = $$"""

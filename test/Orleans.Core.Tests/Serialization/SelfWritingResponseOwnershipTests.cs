@@ -66,7 +66,7 @@ public sealed class SelfWritingResponseOwnershipTests
         var filter = filtered ? new CallbackFilter(context => context.Invoke()) : null;
         await using var fixture = new SendFixture(counts, filter, target);
         using var response = await fixture.Invoke(request, observer);
-        Assert.Equal(1, counts.ResponseCopies);
+        Assert.Equal(filtered && behavior != "Throw" ? 2 : 1, counts.ResponseCopies);
         Assert.NotNull(counts.FallbackOriginal);
         Assert.False(fixture.Provider.TryGetRawResponseReader(typeof(List<int>), out _));
         if (behavior == "Same")
@@ -81,7 +81,7 @@ public sealed class SelfWritingResponseOwnershipTests
             Assert.Null(counts.FallbackOriginal.TypedResult);
             Assert.True(counts.OriginalWasPooledAtSend);
             Assert.True(counts.OriginalWasReturnedOnce);
-            Assert.Equal(1, counts.PayloadCopies);
+            Assert.Equal(filtered && behavior != "Throw" ? 2 : 1, counts.PayloadCopies);
             if (behavior == "Throw")
             {
                 Assert.Same(counts.CopyFailure, response.Exception);
@@ -102,7 +102,7 @@ public sealed class SelfWritingResponseOwnershipTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task DirectResponse_ReachesSendWithOneCopyAndOneOwnedHolder(bool observer, bool filtered)
+    public async Task DirectResponse_CopiesAtInvocationAndAfterFiltersWithOwnedHolders(bool observer, bool filtered)
     {
         var counts = new Counts();
         var payload = new Payload { Values = [17, 23, 41] };
@@ -120,11 +120,12 @@ public sealed class SelfWritingResponseOwnershipTests
         using var response = await fixture.Invoke(request, observer);
 
         Assert.Null(response.Exception);
-        Assert.Equal(1, counts.PayloadCopies);
-        Assert.Equal(1, counts.Rents);
-        Assert.Same(request.ReturnedResponse, response);
-        Assert.Equal(0, counts.Returns);
-        Assert.Equal(0, counts.ResponseCopies);
+        Assert.Equal(filtered ? 2 : 1, counts.PayloadCopies);
+        Assert.Equal(filtered ? 2 : 1, counts.Rents);
+        if (filtered) Assert.NotSame(request.ReturnedResponse, response);
+        else Assert.Same(request.ReturnedResponse, response);
+        Assert.Equal(filtered ? 1 : 0, counts.Returns);
+        Assert.Equal(filtered ? 1 : 0, counts.ResponseCopies);
         Assert.NotSame(payload, response.Result);
         var result = Assert.IsType<Payload>(response.Result);
         Assert.Equal(new[] { 17, 23, 41 }, result.Values);
@@ -132,7 +133,7 @@ public sealed class SelfWritingResponseOwnershipTests
         Assert.Equal(new[] { 17, 23, 41 }, result.Values);
         await fixture.AssertFrameRoundTrip(response);
         response.Dispose();
-        Assert.Equal(1, counts.Returns);
+        Assert.Equal(counts.Rents, counts.Returns);
     }
 
     [Theory]
@@ -140,7 +141,7 @@ public sealed class SelfWritingResponseOwnershipTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task LegacyResponse_CopiesOnceAndReturnsBothOwnedWrappers(bool observer, bool filtered)
+    public async Task LegacyResponse_CopiesAtInvocationAndAfterFiltersAndReturnsOwnedWrappers(bool observer, bool filtered)
     {
         var counts = new Counts();
         var payload = new Payload { Values = [17, 23, 41] };
@@ -158,13 +159,59 @@ public sealed class SelfWritingResponseOwnershipTests
 
         Assert.Null(response.Exception);
         Assert.NotSame(request.ReturnedResponse, response);
-        Assert.Equal(1, counts.PayloadCopies);
-        Assert.Equal(1, counts.ResponseCopies);
-        Assert.Equal(2, counts.Rents);
-        Assert.Equal(1, counts.Returns);
+        Assert.Equal(filtered ? 2 : 1, counts.PayloadCopies);
+        Assert.Equal(filtered ? 2 : 1, counts.ResponseCopies);
+        Assert.Equal(filtered ? 3 : 2, counts.Rents);
+        Assert.Equal(filtered ? 2 : 1, counts.Returns);
         Assert.Equal(new[] { 17, 23, 41 }, Assert.IsType<Payload>(response.Result).Values);
         response.Dispose();
-        Assert.Equal(2, counts.Returns);
+        Assert.Equal(counts.Rents, counts.Returns);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task FilterMutatesExistingResponse_IsolatesEnvelopeAndNestedReferences(bool observer, bool direct, bool replaceResult)
+    {
+        var counts = new Counts();
+        var original = new Payload { Values = [17, 23, 41] };
+        var replacement = new Payload { Values = [5, 8, 13] };
+        Payload filterResult = null!;
+        var filter = new CallbackFilter(async context =>
+        {
+            await context.Invoke();
+            var response = context.Response;
+            if (replaceResult) response!.Result = replacement;
+            else Assert.IsType<Payload>(context.Result).Values = replacement.Values;
+            Assert.Same(response, context.Response);
+            filterResult = Assert.IsType<Payload>(context.Result);
+            Assert.Same(replacement.Values, filterResult.Values);
+        });
+        await using var fixture = new SendFixture(counts, filter);
+        LegacyRequest request = direct ? new DirectRequest(original, counts) : new LegacyRequest(original, counts);
+
+        using var response = await fixture.Invoke(request, observer);
+
+        Assert.Null(response.Exception);
+        var result = Assert.IsType<Payload>(response.Result);
+        Assert.NotSame(filterResult, result);
+        Assert.NotSame(replacement.Values, result.Values);
+        Assert.Equal(new[] { 5, 8, 13 }, result.Values);
+        Assert.Equal(2, counts.PayloadCopies);
+        Assert.Equal(direct ? 1 : 2, counts.ResponseCopies);
+        Assert.Equal(direct ? 2 : 3, counts.Rents);
+        Assert.Equal(counts.Rents - 1, counts.Returns);
+        replacement.Values.Clear();
+        Assert.Equal(new[] { 5, 8, 13 }, result.Values);
+        await fixture.AssertFrameRoundTrip(response);
+        response.Dispose();
+        Assert.Equal(counts.Rents, counts.Returns);
     }
 
     [Theory]
@@ -203,7 +250,7 @@ public sealed class SelfWritingResponseOwnershipTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FilterRestoresEarlierRoot_ReusesItsIsolationAndDisposesOtherRoot(bool observer)
+    public async Task FilterRestoresEarlierRoot_IsolatesSelectedResultAndDisposesOtherRoot(bool observer)
     {
         var counts = new Counts();
         var filter = new CallbackFilter(async context =>
@@ -217,12 +264,12 @@ public sealed class SelfWritingResponseOwnershipTests
         await using var fixture = new SendFixture(counts, filter);
         using var response = await fixture.Invoke(new DirectRequest(new Payload { Values = [17] }, counts), observer);
         Assert.Null(response.Exception);
-        Assert.Equal(2, counts.PayloadCopies);
-        Assert.Equal(0, counts.ResponseCopies);
-        Assert.Equal(2, counts.Rents);
-        Assert.Equal(1, counts.Returns);
-        response.Dispose();
+        Assert.Equal(3, counts.PayloadCopies);
+        Assert.Equal(1, counts.ResponseCopies);
+        Assert.Equal(3, counts.Rents);
         Assert.Equal(2, counts.Returns);
+        response.Dispose();
+        Assert.Equal(counts.Rents, counts.Returns);
     }
 
     [Theory]
@@ -276,7 +323,7 @@ public sealed class SelfWritingResponseOwnershipTests
         using var response = await fixture.Invoke(request, observer);
         Assert.Null(response.Exception);
         Assert.Same(request.ReturnedResponse, response);
-        Assert.Equal(1, counts.ResponseCopies);
+        Assert.Equal(filtered ? 2 : 1, counts.ResponseCopies);
         Assert.Equal(0, counts.PayloadCopies);
         Assert.Equal(1, counts.Rents);
         Assert.Equal(0, counts.Returns);
@@ -322,9 +369,9 @@ public sealed class SelfWritingResponseOwnershipTests
         };
         using var response = await fixture.Invoke(new DirectRequest(new Payload { Values = [17] }, counts), observer);
         Assert.Same(failure, response.Exception);
-        Assert.Equal(1, counts.PayloadCopies);
-        Assert.Equal(1, counts.Rents);
-        Assert.Equal(1, counts.Returns);
+        Assert.Equal(2, counts.PayloadCopies);
+        Assert.Equal(2, counts.Rents);
+        Assert.Equal(2, counts.Returns);
     }
 
     [Theory]

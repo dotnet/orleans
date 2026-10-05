@@ -326,7 +326,7 @@ namespace Orleans.Runtime
                                     using var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping,
                                         this.responseCopier, this.responseCodecProvider, this.responseCopyContexts);
                                     await invoker.Invoke();
-                                    (response, isCopied) = invoker.TakeResponse();
+                                    response = invoker.TakeResponse();
                                 }
                                 else
                                 {
@@ -405,7 +405,7 @@ namespace Orleans.Runtime
             Response? ownedResponse = response;
             try
             {
-                if (!isCopied)
+                if (!isCopied && !message.IsExpired)
                 {
                     ownedResponse = null;
                     ownedResponse = ResponseCopyBoundary.CopyAndDispose(response, this._deepCopier);
