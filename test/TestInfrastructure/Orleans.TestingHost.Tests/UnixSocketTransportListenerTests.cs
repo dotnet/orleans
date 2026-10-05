@@ -63,6 +63,40 @@ public class UnixSocketTransportListenerTests
         Assert.False(File.Exists(path));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AcceptAfterShutdownReturnsNull(bool dispose)
+    {
+        if (!Socket.OSSupportsUnixDomainSockets)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("Unix domain sockets are not supported.");
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"orleans-{Guid.NewGuid():N}.sock");
+        var options = new StaticOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>(
+            "test",
+            new UnixDomainSocketMessageTransportListenerOptions { Path = path });
+        await using var listener = new UnixDomainSocketMessageTransportListener("test", options, NullLoggerFactory.Instance);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => listener.AcceptAsync(TestContext.Current.CancellationToken).AsTask());
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        var pendingAccept = listener.AcceptAsync(TestContext.Current.CancellationToken).AsTask();
+
+        if (dispose)
+        {
+            await listener.DisposeAsync();
+        }
+        else
+        {
+            await listener.UnbindAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.Null(await pendingAccept.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Null(await listener.AcceptAsync(TestContext.Current.CancellationToken));
+        Assert.False(File.Exists(path));
+    }
+
     private sealed class StaticOptionsMonitor<TOptions>(string name, TOptions value) : IOptionsMonitor<TOptions>
     {
         public TOptions CurrentValue => value;

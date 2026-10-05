@@ -39,7 +39,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
         if (_certificate is null && _certificateSelector is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
         {
             throw new InvalidOperationException($"Either {nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)} or {nameof(TlsOptions)}.{nameof(TlsOptions.LocalClientCertificateSelector)} must be set to a non-null"
-                + $"value because {nameof(TlsOptions)}.{nameof(TlsOptions.ClientCertificateMode)} is set to {nameof(RemoteCertificateMode)}.{nameof(RemoteCertificateMode.RequireCertificate)}.");
+                + $" value because {nameof(TlsOptions)}.{nameof(TlsOptions.ClientCertificateMode)} is set to {nameof(RemoteCertificateMode)}.{nameof(RemoteCertificateMode.RequireCertificate)}.");
         }
     }
 

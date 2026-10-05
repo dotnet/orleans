@@ -107,7 +107,17 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        var listenSocket = _listenSocket ?? throw new InvalidOperationException("Transport is not bound");
+        var listenSocket = _listenSocket;
+        if (_closingCts.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        if (listenSocket is null)
+        {
+            throw new InvalidOperationException("Transport is not bound");
+        }
+
         using var ct = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closingCts.Token);
         while (!ct.IsCancellationRequested)
         {
