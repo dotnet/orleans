@@ -670,7 +670,7 @@ try {
             'Runtime crash dump upload must run after a failed test coordinator.'
     }
 
-    Invoke-Test 'bounds hosted runner hang dumps' {
+    Invoke-Test 'reduces hosted runner hang dump size' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         Assert-Equal `
             2 `
@@ -687,7 +687,7 @@ try {
         Assert-Equal `
             2 `
             ([regex]::Matches($dotnetTestAction, "'--hangdump-type'\s*'Heap'")).Count `
-            'Both test launch paths must retain managed heap and stack diagnostics without mapped images.'
+            'Both test launch paths must retain managed heap and stack diagnostics while excluding mapped images.'
         Assert-Equal `
             2 `
             ([regex]::Matches($dotnetTestAction, "'--crashdump-type'\s*'Full'")).Count `
