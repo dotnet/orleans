@@ -390,7 +390,9 @@ namespace Orleans
                                 _manager._responseCopier, _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
                                 _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
                             await invoker.Invoke();
-                            (response, isCopied) = invoker.TakeResponse();
+                            response = invoker.TakeResponse();
+                            // Filters can introduce grain-owned references anywhere in the result graph.
+                            isCopied = false;
                         }
                         else
                         {

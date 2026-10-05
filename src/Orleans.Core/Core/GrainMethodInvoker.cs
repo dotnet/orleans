@@ -25,8 +25,7 @@ namespace Orleans.Runtime
         private readonly ICodecProvider codecProvider;
         private readonly CopyContextPool copyContexts;
         private Response? ownedResponse;
-        private bool ownedResponseIsCopied;
-        private List<(Response Response, bool IsCopied)>? otherOwnedResponses;
+        private List<Response>? otherOwnedResponses;
         private int stage;
 
         /// <summary>
@@ -80,13 +79,11 @@ namespace Orleans.Runtime
 
         public Response? Response { get; set; }
 
-        internal (Response Response, bool IsCopied) TakeResponse()
+        internal Response TakeResponse()
         {
             var response = Response!;
-            var isCopied = false;
             if (ReferenceEquals(response, ownedResponse))
             {
-                isCopied = ownedResponseIsCopied;
                 ownedResponse = null;
             }
 
@@ -94,16 +91,15 @@ namespace Orleans.Runtime
             {
                 for (var i = others.Count - 1; i >= 0; i--)
                 {
-                    if (ReferenceEquals(response, others[i].Response))
+                    if (ReferenceEquals(response, others[i]))
                     {
-                        isCopied = others[i].IsCopied;
                         others.RemoveAt(i);
                     }
                 }
             }
 
             Response = null;
-            return (response, isCopied);
+            return response;
         }
 
         public void Dispose()
@@ -115,7 +111,7 @@ namespace Orleans.Runtime
             try
             {
                 if (current is not null && !ReferenceEquals(current, response)
-                    && (otherOwnedResponses is null || !otherOwnedResponses.Exists(entry => ReferenceEquals(current, entry.Response))))
+                    && (otherOwnedResponses is null || !otherOwnedResponses.Exists(entry => ReferenceEquals(current, entry))))
                 {
                     current.Dispose();
                 }
@@ -131,29 +127,28 @@ namespace Orleans.Runtime
                     if (otherOwnedResponses is { } others)
                     {
                         otherOwnedResponses = null;
-                        foreach (var entry in others) entry.Response.Dispose();
+                        foreach (var entry in others) entry.Dispose();
                     }
                 }
             }
         }
 
-        private void SetOwnedResponse(Response response, bool isCopied)
+        private void SetOwnedResponse(Response response)
         {
             if (ownedResponse is { } previous && !ReferenceEquals(previous, response))
             {
-                (otherOwnedResponses ??= []).Add((previous, ownedResponseIsCopied));
+                (otherOwnedResponses ??= []).Add(previous);
             }
 
             if (otherOwnedResponses is { } others)
             {
                 for (var i = others.Count - 1; i >= 0; i--)
                 {
-                    if (ReferenceEquals(response, others[i].Response)) others.RemoveAt(i);
+                    if (ReferenceEquals(response, others[i])) others.RemoveAt(i);
                 }
             }
 
             ownedResponse = Response = response;
-            ownedResponseIsCopied = isCopied;
         }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
@@ -220,14 +215,14 @@ namespace Orleans.Runtime
                     // Propagate exceptions to other filters.
                     if (response.Exception is { } exception)
                     {
-                        SetOwnedResponse(response, isCopied: false);
+                        SetOwnedResponse(response);
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
                     if (request is not IResponseInvokable)
                         response = ResponseCopyBoundary.CopyAndDispose(response, this.responseCopier);
 
-                    SetOwnedResponse(response, isCopied: true);
+                    SetOwnedResponse(response);
 
                     return;
                 }
