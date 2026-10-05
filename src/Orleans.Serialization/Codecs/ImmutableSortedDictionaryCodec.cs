@@ -108,10 +108,12 @@ namespace Orleans.Serialization.Codecs
             // Mitigate that by returning a shallow-copy in such a case.
             context.RecordCopy(input, input);
 
+            var shallowKeys = OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier);
+            var shallowValues = OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier);
             var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
             foreach (var item in input)
-                items.Add(new(OrleansGeneratedCodeHelper.IsShallowCopyable(_keyCopier) ? item.Key : _keyCopier.DeepCopy(item.Key, context)!,
-                    OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier) ? item.Value : _valueCopier.DeepCopy(item.Value, context)!));
+                items.Add(new(shallowKeys ? item.Key : _keyCopier!.DeepCopy(item.Key, context)!,
+                    shallowValues ? item.Value : _valueCopier!.DeepCopy(item.Value, context)!));
 
             var res = ImmutableSortedDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
             context.RecordCopy(input, res);
