@@ -35,10 +35,7 @@ namespace Orleans.Serialization.Configuration
         private readonly HashSet<Type> _interfaces = new();
         private readonly HashSet<Type> _interfaceProxies = new();
         private readonly HashSet<Type> _interfaceImplementations = new();
-        private readonly HashSet<Type> _legacySerializers = new();
-        private readonly HashSet<Type> _legacyCopiers = new();
-        private readonly HashSet<Type> _legacyActivators = new();
-        private readonly HashSet<Type> _legacyConverters = new();
+        private readonly Dictionary<Type, InterfaceDiscoveryKinds> _interfaceDiscoveryRequests = new();
         private readonly Dictionary<(Type Implementation, SerializationContract Contract), int> _contractRegistrationOrders = new();
         // Mutable collection access requests legacy discovery, including types added through retained collection references.
         private bool _serializerCollectionAccessed;
@@ -283,13 +280,17 @@ namespace Orleans.Serialization.Configuration
             => _contractRegistrationOrders[(implementation, contract)];
 
         internal bool DiscoverInterfaces(Type type, Type contractType)
-            => contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
-                ? _serializerCollectionAccessed || _legacySerializers.Contains(type)
+        {
+            var (kind, collectionAccessed) = contractType == typeof(IFieldCodec<>) || contractType == typeof(IBaseCodec<>) || contractType == typeof(IValueSerializer<>)
+                ? (InterfaceDiscoveryKinds.Serializer, _serializerCollectionAccessed)
                 : contractType == typeof(IDeepCopier<>) || contractType == typeof(IBaseCopier<>)
-                    ? _copierCollectionAccessed || _legacyCopiers.Contains(type)
+                    ? (InterfaceDiscoveryKinds.Copier, _copierCollectionAccessed)
                     : contractType == typeof(IActivator<>)
-                        ? _activatorCollectionAccessed || _legacyActivators.Contains(type)
-                        : _converterCollectionAccessed || _legacyConverters.Contains(type);
+                        ? (InterfaceDiscoveryKinds.Activator, _activatorCollectionAccessed)
+                        : (InterfaceDiscoveryKinds.Converter, _converterCollectionAccessed);
+
+            return collectionAccessed || _interfaceDiscoveryRequests.TryGetValue(type, out var requests) && (requests & kind) != 0;
+        }
 
         /// <summary>
         /// Adds a serializer implementation type and preserves the members used to inspect and activate it.
@@ -299,7 +300,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => AddImplementation(_serializers, _legacySerializers, type);
+            Type type) => AddImplementation(_serializers, InterfaceDiscoveryKinds.Serializer, type);
 
         /// <summary>
         /// Adds a field codec implementation type and preserves the members used to inspect and activate it.
@@ -309,7 +310,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => AddImplementation(_fieldCodecs, _legacySerializers, type);
+            Type type) => AddImplementation(_fieldCodecs, InterfaceDiscoveryKinds.Serializer, type);
 
         /// <summary>
         /// Adds a copier implementation type and preserves the members used to inspect and activate it.
@@ -319,7 +320,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => AddImplementation(_copiers, _legacyCopiers, type);
+            Type type) => AddImplementation(_copiers, InterfaceDiscoveryKinds.Copier, type);
 
         /// <summary>
         /// Adds a converter implementation type and preserves the members used to inspect and activate it.
@@ -329,7 +330,7 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => AddImplementation(_converters, _legacyConverters, type);
+            Type type) => AddImplementation(_converters, InterfaceDiscoveryKinds.Converter, type);
 
         /// <summary>
         /// Adds an activator implementation type and preserves the members used to inspect and activate it.
@@ -339,9 +340,9 @@ namespace Orleans.Serialization.Configuration
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(ImplementationTypeMembers)]
 #endif
-            Type type) => AddImplementation(_activators, _legacyActivators, type);
+            Type type) => AddImplementation(_activators, InterfaceDiscoveryKinds.Activator, type);
 
-        private static void AddImplementation(HashSet<Type> types, HashSet<Type> legacyTypes, Type type)
+        private void AddImplementation(HashSet<Type> types, InterfaceDiscoveryKinds kind, Type type)
         {
             if (type is null)
             {
@@ -349,7 +350,8 @@ namespace Orleans.Serialization.Configuration
             }
 
             types.Add(type);
-            legacyTypes.Add(type);
+            _interfaceDiscoveryRequests.TryGetValue(type, out var requests);
+            _interfaceDiscoveryRequests[type] = requests | kind;
         }
 
         /// <summary>
@@ -654,6 +656,15 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedAssemblies.Add(CachedTypeResolver.GetName(assembly));
+        }
+
+        [Flags]
+        private enum InterfaceDiscoveryKinds
+        {
+            Serializer = 1,
+            Copier = 2,
+            Activator = 4,
+            Converter = 8
         }
     }
 }

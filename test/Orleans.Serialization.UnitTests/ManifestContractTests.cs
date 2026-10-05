@@ -124,6 +124,47 @@ public class ManifestContractTests
         Assert.Equal(typeof(SecondTarget), converter.Parse(converter.Format(typeof(SecondTarget))));
     }
 
+    [Theory]
+    [InlineData(nameof(TypeManifestOptions.AddSerializer))]
+    [InlineData(nameof(TypeManifestOptions.AddFieldCodec))]
+    [InlineData(nameof(TypeManifestOptions.AddCopier))]
+    [InlineData(nameof(TypeManifestOptions.AddActivator))]
+    [InlineData(nameof(TypeManifestOptions.AddConverter))]
+    public void InterfaceDiscoveryRequestsAccumulateAndRemainScopedToTheirFamily(string registration)
+    {
+        var options = new TypeManifestOptions();
+        var implementation = typeof(MixedImplementation);
+        switch (registration)
+        {
+            case nameof(TypeManifestOptions.AddSerializer): options.AddSerializer(implementation); break;
+            case nameof(TypeManifestOptions.AddFieldCodec): options.AddFieldCodec(implementation); break;
+            case nameof(TypeManifestOptions.AddCopier): options.AddCopier(implementation); break;
+            case nameof(TypeManifestOptions.AddActivator): options.AddActivator(implementation); break;
+            case nameof(TypeManifestOptions.AddConverter): options.AddConverter(implementation); break;
+        }
+
+        var serializer = registration is nameof(TypeManifestOptions.AddSerializer) or nameof(TypeManifestOptions.AddFieldCodec);
+        Assert.Equal(serializer, options.DiscoverInterfaces(implementation, typeof(IFieldCodec<>)));
+        Assert.Equal(serializer, options.DiscoverInterfaces(implementation, typeof(IBaseCodec<>)));
+        Assert.Equal(serializer, options.DiscoverInterfaces(implementation, typeof(IValueSerializer<>)));
+        Assert.Equal(registration == nameof(TypeManifestOptions.AddCopier), options.DiscoverInterfaces(implementation, typeof(IDeepCopier<>)));
+        Assert.Equal(registration == nameof(TypeManifestOptions.AddCopier), options.DiscoverInterfaces(implementation, typeof(IBaseCopier<>)));
+        Assert.Equal(registration == nameof(TypeManifestOptions.AddActivator), options.DiscoverInterfaces(implementation, typeof(IActivator<>)));
+        Assert.Equal(registration == nameof(TypeManifestOptions.AddConverter), options.DiscoverInterfaces(implementation, typeof(IConverter<,>)));
+        Assert.False(options.DiscoverInterfaces(typeof(SecondTarget), typeof(IFieldCodec<>)));
+
+        options.AddSerializer(implementation);
+        options.AddCopier(implementation);
+        options.AddActivator(implementation);
+        options.AddConverter(implementation);
+        foreach (var role in new[] { typeof(IFieldCodec<>), typeof(IBaseCodec<>), typeof(IValueSerializer<>), typeof(IDeepCopier<>),
+            typeof(IBaseCopier<>), typeof(IActivator<>), typeof(IConverter<,>) })
+        {
+            Assert.True(options.DiscoverInterfaces(implementation, role));
+            Assert.False(options.DiscoverInterfaces(typeof(SecondTarget), role));
+        }
+    }
+
     [Fact]
     public void ExplicitOpenGenericEntriesMapDefinitionsAndAuthorizeTargets()
     {
